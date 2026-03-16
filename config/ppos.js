@@ -39,14 +39,23 @@ const pposConfig = {
  */
 function validateConfig() {
     const issues = [];
-    if (pposConfig.environment === 'production') {
+    const isProd = pposConfig.environment === 'production';
+    const isStaging = pposConfig.environment === 'staging';
+
+    if (isProd || isStaging) {
         if (pposConfig.preflightServiceUrl.includes('localhost')) {
-            issues.push('WARNING: PPOS_PREFLIGHT_SERVICE_URL points to localhost in production.');
+            issues.push(`WARNING: preflightServiceUrl points to localhost in ${pposConfig.environment}.`);
         }
-        if (!pposConfig.apiKey && pposConfig.environment === 'production') {
-            issues.push('NOTE: No PPOS_API_KEY defined for production environment.');
+        
+        if (!pposConfig.apiKey) {
+            issues.push(`CRITICAL: No PPOS_API_KEY defined for ${pposConfig.environment} environment. External communication will be rejected.`);
+        }
+
+        if (pposConfig.timeoutMs < 1000) {
+            issues.push('WARNING: timeoutMs is extremely low (< 1s).');
         }
     }
+
     return issues;
 }
 

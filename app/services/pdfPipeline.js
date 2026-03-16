@@ -58,8 +58,11 @@ module.exports = {
             form.append('file', fs.createReadStream(filePath));
             
             try {
+                const headers = { ...form.getHeaders() };
+                if (pposConfig.apiKey) headers['X-PPOS-API-KEY'] = pposConfig.apiKey;
+
                 const response = await axios.post(`${SERVICE_URL}${pposConfig.routes.analyze}`, form, {
-                    headers: form.getHeaders(),
+                    headers,
                     timeout: pposConfig.timeoutMs
                 });
 
@@ -84,8 +87,11 @@ module.exports = {
         form.append('file', fs.createReadStream(input));
 
         try {
+            const headers = { ...form.getHeaders() };
+            if (pposConfig.apiKey) headers['X-PPOS-API-KEY'] = pposConfig.apiKey;
+
             const response = await axios.post(`${SERVICE_URL}${pposConfig.routes.autofix}?fix=color&profile=${prof}`, form, {
-                headers: form.getHeaders(),
+                headers,
                 responseType: 'arraybuffer',
                 timeout: pposConfig.longTimeoutMs
             });
@@ -107,8 +113,11 @@ module.exports = {
         form.append('file', fs.createReadStream(inputPath));
 
         try {
+            const headers = { ...form.getHeaders() };
+            if (pposConfig.apiKey) headers['X-PPOS-API-KEY'] = pposConfig.apiKey;
+
             const response = await axios.post(`${SERVICE_URL}${pposConfig.routes.autofix}?fix=bleed&bleedMm=${bleedMm}`, form, {
-                headers: form.getHeaders(),
+                headers,
                 responseType: 'arraybuffer',
                 timeout: pposConfig.longTimeoutMs
             });

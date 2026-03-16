@@ -19,6 +19,7 @@ console.log(`[BOOTSTRAP] Build Hash: ${process.env.GIT_COMMIT || 'v2.1.2-priorit
  * @copyright (c) 2025-2026 PrintPrice Pro
  */
 const fs = require('fs');
+const pposConfig = require('../config/ppos');
 
 /** 
  * --- AGGRESSIVE HEALTH CHECK HANDLERS (Hoisted) ---
@@ -30,7 +31,8 @@ async function readyHandler(_req, res) {
 
   const { ok: depsOk, deps } = checkAllDependencies();
   const dbConnected = await dbService.checkConnection();
-  const isHealthy = depsOk && startupErrors.length === 0 && dbConnected;
+  const pposIssues = pposConfig.validateConfig();
+  const isHealthy = depsOk && startupErrors.length === 0 && dbConnected && pposIssues.length === 0;
 
   const response = {
     status: isHealthy ? 'READY' : 'BOOT_ERROR',
@@ -39,12 +41,14 @@ async function readyHandler(_req, res) {
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'production',
     database: dbConnected ? 'CONNECTED' : 'DISCONNECTED',
+    ppos_integration: pposIssues.length === 0 ? 'VALID' : 'MISCONFIGURED',
+    ppos_issues: pposIssues,
     startup_errors: startupErrors,
     dependencies: deps
   };
 
   res.setHeader('X-PPP-Server-Version', response.commit);
-  res.status(response.status === 'READY' ? 200 : 503).json(response);
+  res.status(isHealthy ? 200 : 503).json(response);
 }
 
 function healthDepsHandler(_req, res) {
@@ -393,6 +397,17 @@ if (!global.__SERVER_STARTED) {
       const msg = `[CRITICAL] Missing dependencies: ${missing.join(', ')}.`;
       console.error(msg);
       startupErrors.push(msg);
+    }
+
+    const pposIssues = pposConfig.validateConfig();
+    if (pposIssues.length > 0) {
+      console.warn('[WARNING] PPOS Integration issues detected:');
+      pposIssues.forEach(issue => {
+        console.warn(`  - ${issue}`);
+        if (issue.startsWith('CRITICAL')) {
+          startupErrors.push(issue);
+        }
+      });
     }
 
     if (!ok) {
