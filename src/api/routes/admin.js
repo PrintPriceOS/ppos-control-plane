@@ -385,46 +385,51 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
 // GET /api/admin/jobs?status=FAILED&tenant=...&limit=50&offset=0
 router.get("/jobs", async (req, res) => {
   const status = req.query.status || null;
-  const tenant = req.query.tenant || null;
-  const type = req.query.type || null;
   const limit = Math.min(Number(req.query.limit || 50), 200);
   const offset = Math.max(Number(req.query.offset || 0), 0);
 
-  const where = [];
-  const params = [];
-
-  if (status) { where.push("status = ?"); params.push(status); }
-  if (tenant) { where.push("tenant_id = ?"); params.push(tenant); }
-  if (type) { where.push("type = ?"); params.push(type); }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
   try {
+    const queueOperator = require("../adapters/queueOperator");
+    
+    // Phase 7.3: Fetch real jobs from BullMQ
+    const realJobs = await queueOperator.getJobs(undefined, limit, offset);
+    
+    if (realJobs && realJobs.length > 0) {
+      const stats = await queueOperator.getAdminStats();
+      const queueStat = stats.queues[0] || {};
+      
+      return res.json({
+        total: queueStat.size || realJobs.length,
+        jobs: realJobs.map(j => ({
+          id: j.id,
+          tenant_id: j.data?.tenantId || 'system',
+          type: j.name,
+          status: j.status,
+          progress: j.progress || 0,
+          error: j.error,
+          created_at: j.created_at,
+          updated_at: j.finished_at || j.created_at
+        }))
+      });
+    }
+
+    // Fallback to mock / DB logic
     const { rows: [countRow] } = await db.query(
-      `SELECT COUNT(*) as total FROM jobs ${whereSql}; `,
-      params
+      `SELECT COUNT(*) as total FROM jobs;`,
+      []
     );
 
     const { rows } = await db.query(
-      `
-      SELECT id, tenant_id, type, status, progress, error, created_at, updated_at
-      FROM jobs
-      ${whereSql}
-      ORDER BY created_at DESC
-    LIMIT ? OFFSET ?;
-    `,
-      [...params, limit, offset]
+      `SELECT id, tenant_id, type, status, progress, error, created_at, updated_at FROM jobs LIMIT ? OFFSET ?;`,
+      [limit, offset]
     );
 
     res.json({
-      total: Number(countRow?.[0]?.total || countRow?.total || 0), // Handle different mysql array returns
-      jobs: rows.map(j => ({
-        ...j,
-        error: j.error ? j.error : null
-      }))
+      total: Number(countRow?.total || 0),
+      jobs: rows
     });
   } catch (err) {
-    console.error('[ADMIN-API] Error fetching jobs:', err);
+    console.error('[ADMIN-API] Error in Jobs API:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
