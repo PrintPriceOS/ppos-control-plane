@@ -8,20 +8,32 @@ const fastify = require('fastify')({
     logger: true
 });
 
+const path = require('path');
+
 // Security: Admin Auth Hook
 fastify.addHook('onRequest', async (request, reply) => {
-    // Public routes (Health checks)
-    if (request.url.startsWith('/health')) return;
+    const url = request.url;
+
+    // 1. PUBLIC ROUTES (Always allowed)
+    // Infrastructure health
+    if (url.startsWith('/health')) return;
     
-    // Legacy Admin API bypass (Handled by Express routers logic)
-    if (request.url.startsWith('/api/admin') || request.url.startsWith('/api/v2/analytics') || request.url.startsWith('/api/system')) return;
+    // UI Static Assets & Shell
+    if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;
 
-    const token = request.headers['authorization'];
-    const validToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+    // 2. API BYPASS (Specific endpoints that handle their own auth or are public)
+    if (url.startsWith('/api/admin') || url.startsWith('/api/v2/analytics') || url.startsWith('/api/system')) return;
 
-    if (!token || token !== `Bearer ${validToken}`) {
-        request.log.warn({ url: request.url, ip: request.ip }, 'Unauthorized control plane access');
-        return reply.status(401).send({ error: 'Unauthorized: Valid Bearer token required' });
+    // 3. PROTECTED ROUTES (Require Bearer Token)
+    // Currently protecting Federation and any other generic API
+    if (url.startsWith('/api') || url.startsWith('/federation')) {
+        const token = request.headers['authorization'];
+        const validToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+
+        if (!token || token !== `Bearer ${validToken}`) {
+            request.log.warn({ url: request.url, ip: request.ip }, 'Unauthorized control plane access');
+            return reply.status(401).send({ error: 'Unauthorized: Valid Bearer token required' });
+        }
     }
 });
 
@@ -37,18 +49,33 @@ fastify.get('/health', async () => {
 
 const start = async () => {
     try {
-        // 1. Register Express Bridge
+        // 1. Register Fastify Static (for built frontend)
+        await fastify.register(require('@fastify/static'), {
+            root: path.join(__dirname, 'dist'),
+            prefix: '/', // serve from root
+            wildcard: false // we'll handle fallback manually
+        });
+
+        // 2. Register Express Bridge
         await fastify.register(require('@fastify/express'));
         
-        // 2. Mount Admin, Analytics & System Routes (Express)
+        // 3. Mount Admin, Analytics & System Routes (Express)
         fastify.use('/api/admin', require('./src/api/routes/admin'));
         fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
         fastify.use('/api/system', require('./src/api/routes/system'));
         
         fastify.log.info('Admin, Analytics & System routes mounted');
 
-        // 3. Mount Federation Routes (Fastify)
+        // 4. Mount Federation Routes (Fastify)
         await fastify.register(require('./routes/federation'), { prefix: '/federation' });
+
+        // 5. SPA Fallback: All non-API routes serve index.html
+        fastify.setNotFoundHandler((request, reply) => {
+            if (request.url.startsWith('/api') || request.url.startsWith('/federation')) {
+                return reply.status(404).send({ error: 'Not Found' });
+            }
+            return reply.sendFile('index.html');
+        });
 
         const PORT = process.env.PPOS_CONTROL_PORT || 8080;
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });

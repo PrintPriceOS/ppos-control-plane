@@ -6,10 +6,13 @@
     "private": true,
     "scripts": {
         "start": "node server.js",
-        "dev": "fastify start -l info server.js"
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
     },
     "dependencies": {
         "@fastify/express": "^2.3.0",
+        "@fastify/static": "^6.12.0",
         "@headlessui/react": "^2.2.9",
         "@heroicons/react": "^2.2.0",
         "@ppos/shared-infra": "file:../ppos-shared-infra",
@@ -19,6 +22,14 @@
         "express": "^5.2.1",
         "fastify": "^4.24.0",
         "ioredis": "^5.10.0",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
         "uuid": "^13.0.0"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.2.1",
+        "@vitejs/plugin-react": "^5.0.0",
+        "typescript": "^5.8.2",
+        "vite": "^6.2.0"
     }
 }
