@@ -9,9 +9,14 @@
         "dev": "fastify start -l info server.js"
     },
     "dependencies": {
+        "@fastify/express": "^2.3.0",
+        "@headlessui/react": "^2.2.9",
+        "@heroicons/react": "^2.2.0",
+        "@ppos/shared-infra": "file:../ppos-shared-infra",
         "axios": "^1.6.0",
         "dotenv": "^17.3.1",
+        "express": "^5.2.1",
         "fastify": "^4.24.0",
-        "@ppos/shared-infra": "file:../ppos-shared-infra"
+        "uuid": "^13.0.0"
     }
 }

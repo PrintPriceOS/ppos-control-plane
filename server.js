@@ -10,8 +10,11 @@ const fastify = require('fastify')({
 
 // Security: Admin Auth Hook
 fastify.addHook('onRequest', async (request, reply) => {
-    // Public routes
+    // Public routes (Health checks)
     if (request.url.startsWith('/health')) return;
+    
+    // Legacy Admin API bypass (Handled by Express routers logic)
+    if (request.url.startsWith('/api/admin') || request.url.startsWith('/api/v2/analytics')) return;
 
     const token = request.headers['authorization'];
     const validToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
@@ -28,19 +31,24 @@ fastify.get('/health', async () => {
         status: 'UP', 
         service: 'ppos-control-plane', 
         version: '1.9.0',
-        timestamp: new Date().toISOString(),
-        metrics: {
-            memory: process.memoryUsage(),
-            uptime: process.uptime()
-        }
+        timestamp: new Date().toISOString()
     };
 });
 
-// Federation Health Endpoint
-fastify.register(require('./routes/federation'), { prefix: '/federation' });
-
 const start = async () => {
     try {
+        // 1. Register Express Bridge
+        await fastify.register(require('@fastify/express'));
+        
+        // 2. Mount Admin & Analytics Routes (Express)
+        fastify.use('/api/admin', require('./src/api/routes/admin'));
+        fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+        
+        fastify.log.info('Admin & Analytics routes mounted');
+
+        // 3. Mount Federation Routes (Fastify)
+        await fastify.register(require('./routes/federation'), { prefix: '/federation' });
+
         const PORT = process.env.PPOS_CONTROL_PORT || 8080;
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
