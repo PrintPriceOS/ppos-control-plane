@@ -1,5 +1,5 @@
 import React from "react";
-import * as adminApi from "../../lib/adminApi";
+import * as adminApi from "../lib/adminApi";
 import {
     XMarkIcon,
     BuildingOfficeIcon,

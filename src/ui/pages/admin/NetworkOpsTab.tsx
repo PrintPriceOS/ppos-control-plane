@@ -10,13 +10,13 @@ import {
     AdjustmentsHorizontalIcon,
     MagnifyingGlassIcon
 } from "@heroicons/react/24/outline";
-import { NetworkOverviewCards } from "../../components/network/NetworkOverviewCards";
-import { NetworkCapacityTable } from "../../components/network/NetworkCapacityTable";
-import { NetworkHealthPanel } from "../../components/network/NetworkHealthPanel";
-import { RoutingIntelligencePanel } from "../../components/network/RoutingIntelligencePanel";
-import { RoutingInsightsPanel } from "../../components/network/RoutingInsightsPanel";
-import { SyncHealthPanel } from "../../components/network/SyncHealthPanel";
-import { PrinterNodeDrawer } from "../../components/network/PrinterNodeDrawer";
+import { NetworkOverviewCards } from "../../components/NetworkOverviewCards";
+import { NetworkCapacityTable } from "../../components/NetworkCapacityTable";
+import { NetworkHealthPanel } from "../../components/NetworkHealthPanel";
+import { RoutingIntelligencePanel } from "../../components/RoutingIntelligencePanel";
+import { RoutingInsightsPanel } from "../../components/RoutingInsightsPanel";
+import { SyncHealthPanel } from "../../components/SyncHealthPanel";
+import { PrinterNodeDrawer } from "../../components/PrinterNodeDrawer";
 
 export const NetworkOpsTab: React.FC = () => {
     const [printers, setPrinters] = useState<any[]>([]);
