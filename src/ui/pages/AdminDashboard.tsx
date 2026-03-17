@@ -47,7 +47,7 @@ type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers"
 type Range = "24h" | "7d" | "30d";
 
 const AdminDashboardInner: React.FC = () => {
-    const { currentLocale } = useLocale();
+    const { locale, setLocale, t: ctxT } = useLocale();
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [range, setRange] = useState<Range>("24h");
     const [refresh, setRefresh] = useState<number>(0);
@@ -89,7 +89,7 @@ const AdminDashboardInner: React.FC = () => {
             ["controls", t("admin.tabs.controls" as any), WrenchScrewdriverIcon],
             ["engagement", "Engagement", BoltIcon],
         ] as Array<[Tab, string, any]>),
-        [currentLocale]
+        [locale]
     );
 
     if (!isAuthorized) {
@@ -164,9 +164,22 @@ const AdminDashboardInner: React.FC = () => {
                             value={refresh}
                             onChange={(e) => setRefresh(Number(e.target.value))}
                         >
-                            <option value={0}>{t("admin.refresh.off" as any)}</option>
+                            <option value={0}>{ctxT("admin.refresh.off")}</option>
                             <option value={10000}>10s</option>
                             <option value={30000}>30s</option>
+                        </select>
+                    </div>
+
+                    {/* Language Toggle */}
+                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                        <span className="text-xs font-bold text-slate-400 ml-1">LA</span>
+                        <select
+                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            value={locale}
+                            onChange={(e) => setLocale(e.target.value as any)}
+                        >
+                            <option value="en">EN</option>
+                            <option value="es">ES</option>
                         </select>
                     </div>
 

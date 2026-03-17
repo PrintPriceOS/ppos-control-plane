@@ -42,19 +42,49 @@ router.get('/queues', async (req, res) => {
  */
 router.get('/workers', async (req, res) => {
     try {
-        // BullMQ stores worker info in Redis keys
-        // Scan for keys like bull:preflight_async_queue:workers
         const queueName = process.env.PPOS_QUEUE_NAME || 'preflight_async_queue';
-        const workersKey = `bull:${queueName}:workers`;
         
-        // This is a rough estimation based on Redis keys
-        const workerIds = await connection.smembers(workersKey);
+        // V1.9.3 NEW: Query PPOS Worker Registry
+        const registrySet = 'ppos:workers:active';
+        const registeredIds = await connection.smembers(registrySet);
+        
+        const activeWorkers = [];
+        const expiredIds = [];
+
+        if (registeredIds.length > 0) {
+            // Hydrate metadata
+            for (const id of registeredIds) {
+                const data = await connection.get(`ppos:worker:${id}`);
+                if (data) {
+                    activeWorkers.push(JSON.parse(data));
+                } else {
+                    expiredIds.push(id);
+                }
+            }
+
+            // Cleanup expired IDs from the set (lazy cleanup)
+            if (expiredIds.length > 0) {
+                await connection.srem(registrySet, ...expiredIds);
+            }
+        }
+
+        // FALLBACK: If new registry is empty, try legacy BullMQ set
+        if (activeWorkers.length === 0) {
+            const legacyWorkersKey = `bull:${queueName}:workers`;
+            const legacyIds = await connection.smembers(legacyWorkersKey);
+            
+            return res.json({
+                count: legacyIds.length,
+                workers: legacyIds.map(id => ({ id, status: 'LEGACY', queue: queueName })),
+                discovery: 'FALLBACK_LEGACY'
+            });
+        }
         
         res.json({
-            count: workerIds.length,
-            workerIds: workerIds,
-            queueMapping: queueName,
-            status: 'ACTIVE'
+            count: activeWorkers.length,
+            workers: activeWorkers,
+            discovery: 'CANONICAL_REGISTRY',
+            timestamp: new Date().toISOString()
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

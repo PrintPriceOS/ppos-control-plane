@@ -93,18 +93,36 @@ const queueOperator = {
     getJobs: async (queueName = PPOS_QUEUE_NAME, limit = 50, offset = 0) => {
         try {
             const queue = getQueue(queueName);
-            const jobs = await queue.getJobs(['waiting', 'active', 'completed', 'failed', 'delayed'], offset, offset + limit, false);
+            // Get raw job objects
+            const jobs = await queue.getJobs(['waiting', 'active', 'completed', 'failed', 'delayed'], offset, offset + limit - 1, false);
             
-            return jobs.map(j => ({
-                id: j.id,
-                name: j.name,
-                status: j.getState ? 'N/A' : 'CHECK_STATE', // getState is async
-                progress: j.progress,
-                created_at: new Date(j.timestamp).toISOString(),
-                finished_at: j.finishedOn ? new Date(j.finishedOn).toISOString() : null,
-                error: j.failedReason || null,
-                data: j.data
+            // Hydrate status for current page (async)
+            const hydrated = await Promise.all(jobs.map(async j => {
+                const status = await j.getState();
+                const processedAt = j.processedOn ? new Date(j.processedOn).toISOString() : null;
+                const finishedAt = j.finishedOn ? new Date(j.finishedOn).toISOString() : null;
+                
+                let durationMs = null;
+                if (j.processedOn && j.finishedOn) {
+                    durationMs = j.finishedOn - j.processedOn;
+                }
+
+                return {
+                    id: j.id,
+                    name: j.name,
+                    status: status.toUpperCase(),
+                    progress: j.progress,
+                    created_at: new Date(j.timestamp).toISOString(),
+                    processed_at: processedAt,
+                    finished_at: finishedAt,
+                    duration_ms: durationMs,
+                    error: j.failedReason || null,
+                    data: j.data,
+                    attempts: j.attemptsMade
+                };
             }));
+
+            return hydrated;
         } catch (err) {
             console.error('[QUEUE-OPERATOR] Failed to fetch real jobs:', err.message);
             return [];
