@@ -5,9 +5,19 @@
 const express = require('express');
 const router = express.Router();
 
-const registry = require('../../../../../ppos-preflight-service/src/federation/instanceRegistry');
-const ingestor = require('../../../../../ppos-preflight-service/src/federation/signalIngestor');
-const auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+let registry, ingestor, auditLogger;
+try {
+    registry = require('../../../../../ppos-preflight-service/src/federation/instanceRegistry');
+    ingestor = require('../../../../../ppos-preflight-service/src/federation/signalIngestor');
+    auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Federation Admin routes using sharedMocks:', e.message);
+    const mocks = require('../services/sharedMocks');
+    mocks.markUsed();
+    registry = mocks.instanceRegistry;
+    ingestor = mocks.signalIngestor;
+    auditLogger = mocks.auditLogger;
+}
 
 router.get('/registry', (req, res) => {
     try {

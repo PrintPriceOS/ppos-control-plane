@@ -4,8 +4,22 @@
  */
 
 // In local workspace, relative path to preflight backend
-const { getScore } = require('../../../../ppos-preflight-service/src/services/confidenceAdjuster');
-const { evaluateLifecycle } = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+// In local workspace, relative path to preflight backend; in production, use mocks
+let getScore, evaluateLifecycle, runtimeDependencyState;
+try {
+    const adjuster = require('../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+    const lifecycle = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+    getScore = adjuster.getScore;
+    evaluateLifecycle = lifecycle.evaluateLifecycle;
+    runtimeDependencyState = { source: 'LIVE', degraded: false };
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Failed to load preflight strategy services:', e.message);
+    const mocks = require('./sharedMocks');
+    mocks.markUsed();
+    getScore = mocks.confidenceAdjuster.getScore;
+    evaluateLifecycle = mocks.strategyLifecycleManager.evaluateLifecycle;
+    runtimeDependencyState = { source: 'MOCKED', degraded: true, reason: e.message };
+}
 
 /**
  * Generates optimization candidates based on current intelligence context.

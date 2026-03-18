@@ -7,13 +7,24 @@ const express = require('express');
 const router = express.Router();
 
 // Import backend learning components
-const memory = require('../../../../../ppos-preflight-service/src/services/optimizationMemory');
-const ranker = require('../../../../../ppos-preflight-service/src/services/strategyRanker');
-const adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+let memory, ranker, adjuster, loop;
+try {
+    memory = require('../../../../../ppos-preflight-service/src/services/optimizationMemory');
+    ranker = require('../../../../../ppos-preflight-service/src/services/strategyRanker');
+    adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+    loop = require('../../../../../ppos-preflight-service/src/services/learningLoop');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Learning Admin routes using sharedMocks:', e.message);
+    const mocks = require('../services/sharedMocks');
+    mocks.markUsed();
+    memory = mocks.optimizationMemory;
+    ranker = mocks.strategyRanker;
+    adjuster = mocks.confidenceAdjuster;
+    loop = mocks.learningLoop;
+}
 
 // Mock data injection to seed UI if empty for demonstration
 if (memory.dumpMemory().length === 0) {
-    const loop = require('../../../../../ppos-preflight-service/src/services/learningLoop');
     loop.ingestEvaluatorOutcome({
         candidateId: 'mock_c1', type: 'CONCURRENCY_TUNE', targetType: 'deployment', targetId: 'dep_eu',
         expectedBenefit: { metric: 'latency' }, actualOutcome: null, verdict: 'IMPROVED',

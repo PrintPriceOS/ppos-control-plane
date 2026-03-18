@@ -3,8 +3,17 @@
  * Phase 11 & 13 — Autonomous Optimization Layer + Executions
  */
 
-const eligibility = require('../../../../ppos-preflight-service/src/services/autonomyEligibility');
-const lifecycleManager = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+let eligibility, lifecycleManager;
+try {
+    eligibility = require('../../../../ppos-preflight-service/src/services/autonomyEligibility');
+    lifecycleManager = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Optimization Actions using sharedMocks:', e.message);
+    const mocks = require('./sharedMocks');
+    mocks.markUsed();
+    eligibility = mocks.autonomyEligibility;
+    lifecycleManager = mocks.strategyLifecycleManager;
+}
 
 /**
  * Applies bounding to actions to ensure they are safe.

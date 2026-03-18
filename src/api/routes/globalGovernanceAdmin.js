@@ -5,11 +5,23 @@
 const express = require('express');
 const router = express.Router();
 
-const authority = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyAuthority');
-const registry = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyRegistry');
-const rolloutEngine = require('../../../../../ppos-preflight-service/src/global-governance/policyRolloutEngine');
-const postureAggregator = require('../../../../../ppos-preflight-service/src/global-governance/globalPostureAggregator');
-const auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+let authority, registry, rolloutEngine, postureAggregator, auditLogger;
+try {
+    authority = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyAuthority');
+    registry = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyRegistry');
+    rolloutEngine = require('../../../../../ppos-preflight-service/src/global-governance/policyRolloutEngine');
+    postureAggregator = require('../../../../../ppos-preflight-service/src/global-governance/globalPostureAggregator');
+    auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Global Governance routes using sharedMocks:', e.message);
+    const mocks = require('../services/sharedMocks');
+    mocks.markUsed();
+    registry = mocks.globalPolicyRegistry;
+    rolloutEngine = mocks.policyRolloutEngine;
+    postureAggregator = mocks.globalPostureAggregator;
+    auditLogger = mocks.auditLogger;
+    authority = { getAuthorityStatus: () => 'STABLE_MOCKED' };
+}
 
 router.get('/policies', (req, res) => {
     try {

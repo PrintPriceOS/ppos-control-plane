@@ -6,10 +6,21 @@
 const express = require('express');
 const router = express.Router();
 
-const eligibility = require('../../../../../ppos-preflight-service/src/services/autonomyEligibility');
-const lifecycleManager = require('../../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
-const policy = require('../../../../../ppos-preflight-service/src/services/autonomyPolicy');
-const adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+let eligibility, lifecycleManager, policy, adjuster;
+try {
+    eligibility = require('../../../../../ppos-preflight-service/src/services/autonomyEligibility');
+    lifecycleManager = require('../../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+    policy = require('../../../../../ppos-preflight-service/src/services/autonomyPolicy');
+    adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Autonomy Admin routes using sharedMocks:', e.message);
+    const mocks = require('../services/sharedMocks');
+    mocks.markUsed();
+    eligibility = mocks.autonomyEligibility;
+    lifecycleManager = mocks.strategyLifecycleManager;
+    policy = mocks.autonomyPolicy;
+    adjuster = mocks.confidenceAdjuster;
+}
 
 router.get('/status', (req, res) => {
     try {

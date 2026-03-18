@@ -5,8 +5,17 @@
 const express = require('express');
 const router = express.Router();
 
-const orchestrator = require('../../../../../ppos-preflight-service/src/agents/orchestrator');
-const policy = require('../../../../../ppos-preflight-service/src/agents/agentPolicy');
+let orchestrator, policy;
+try {
+    orchestrator = require('../../../../../ppos-preflight-service/src/agents/orchestrator');
+    policy = require('../../../../../ppos-preflight-service/src/agents/agentPolicy');
+} catch (e) {
+    console.warn('[DEGRADED-MODE] Agent Admin routes using sharedMocks:', e.message);
+    const mocks = require('../services/sharedMocks');
+    mocks.markUsed();
+    orchestrator = { agents: [], decisionLog: [], ...mocks.agentOrchestrator };
+    policy = { getAgentPolicy: () => ({ mode: 'ADVISORY', source: 'MOCKED' }) };
+}
 
 router.get('/status', (req, res) => {
     try {
