@@ -1,0 +1,29 @@
+diff --git a/src/worker.ts b/src/worker.ts
+index 521b80f..285d417 100644
+--- a/src/worker.ts
++++ b/src/worker.ts
+@@ -1,17 +1,18 @@
+ // ppos-preflight-worker/src/worker.ts
+ import 'dotenv/config';
+-import { Worker } from '@temporalio/worker';
++import { Worker, NativeConnection } from '@temporalio/worker';
+ import * as activities from './activities/preflight';
+ 
+ async function run() {
++    const connection = await NativeConnection.connect({
++        address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
++    });
++
+     const worker = await Worker.create({
+-        // In a polyrepo, workflows might be in their own bundle or imported
+-        workflowsPath: require.resolve('./workflows'), 
++        workflowsPath: require.resolve('./workflows'),
+         activities,
+         taskQueue: process.env.TEMPORAL_TASK_QUEUE || 'PREFLIGHT_QUEUE',
+-        connectionOptions: {
+-            address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+-        },
++        connection,
+     });
+ 
+     console.log(`Worker listening on task queue: ${process.env.TEMPORAL_TASK_QUEUE || 'PREFLIGHT_QUEUE'}`);

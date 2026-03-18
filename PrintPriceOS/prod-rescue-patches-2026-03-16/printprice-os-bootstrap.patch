@@ -1,0 +1,687 @@
+diff --git a/api-gateway/src/db.ts b/api-gateway/src/db.ts
+index 663079a..55d1594 100644
+--- a/api-gateway/src/db.ts
++++ b/api-gateway/src/db.ts
+@@ -1,13 +1,22 @@
+ import mysql from 'mysql2/promise';
+ 
+-export const db = mysql.createPool({
+-    host: process.env.MYSQL_HOST || 'localhost',
+-    user: process.env.MYSQL_USER || 'ppos_user',
+-    password: process.env.MYSQL_PASSWORD || 'ppos_pass',
+-    database: process.env.MYSQL_DATABASE || 'printprice_os',
+-    waitForConnections: true,
+-    connectionLimit: 10,
+-    maxIdle: 10,
+-    idleTimeout: 60000,
+-    queueLimit: 0,
++function requiredEnv(name: string): string {
++  const value = process.env[name];
++  if (!value) {
++    throw new Error(`Missing required env var: ${name}`);
++  }
++  return value;
++}
++
++const pool = mysql.createPool({
++  host: requiredEnv('MYSQL_HOST'),
++  port: Number(requiredEnv('MYSQL_PORT')),
++  user: requiredEnv('MYSQL_USER'),
++  password: requiredEnv('MYSQL_PASSWORD'),
++  database: requiredEnv('MYSQL_DATABASE'),
++  waitForConnections: true,
++  connectionLimit: 10,
++  queueLimit: 0,
+ });
++
++export default pool;
+diff --git a/api-gateway/src/index.ts b/api-gateway/src/index.ts
+index b205f2f..6f30866 100644
+--- a/api-gateway/src/index.ts
++++ b/api-gateway/src/index.ts
+@@ -1,3 +1,4 @@
++import "dotenv/config";
+ import { Connection, Client } from '@temporalio/client';
+ import express, { Request, Response, NextFunction } from 'express';
+ import nodeRouter from './nodeRegistry';
+@@ -8,6 +9,14 @@ import { trace, context } from '@opentelemetry/api';
+ 
+ const app = express();
+ app.use(express.json());
++
++app.get('/health', (_req, res) => {
++  res.status(200).json({
++    ok: true,
++    service: 'api-gateway'
++  });
++});
++
+ app.use('/api/v1/nodes', nodeRouter);
+ app.use('/api/v1/telemetry', telemetryRouter);
+ 
+@@ -22,7 +31,13 @@ interface JobRequestDTO {
+         [key: string]: any;
+     };
+ }
+-
++function requiredEnv(name: string): string {
++  const value = process.env[name];
++  if (!value) {
++    throw new Error(`Missing required env var: ${name}`);
++  }
++  return value;
++}
+ // Admission Control Middleware
+ async function admissionControl(req: Request, res: Response, next: NextFunction) {
+     const tier = (req.headers['x-tier'] as string) || 'STANDARD';
+@@ -69,7 +84,7 @@ app.post('/jobs', admissionControl, async (req: Request, res: Response) => {
+             span.setAttribute('ppos.global_job_id', jobId);
+             span.setAttribute('ppos.idempotency_key', payload.idempotencyKey);
+ 
+-            const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS || 'localhost:7233' });
++            const connection = await Connection.connect({ address: requiredEnv('TEMPORAL_ADDRESS') });
+             const client = new Client({ connection });
+ 
+             // Start workflow with idempotencyKey used as workflowId to prevent duplicates
+diff --git a/api-gateway/src/nodeRegistry.ts b/api-gateway/src/nodeRegistry.ts
+index 27f2b51..480faeb 100644
+--- a/api-gateway/src/nodeRegistry.ts
++++ b/api-gateway/src/nodeRegistry.ts
+@@ -1,11 +1,11 @@
+ import { Router, Request, Response } from 'express';
+-import { db } from './db';
++import db from './db';
+ 
+ const router = Router();
+ 
+ // 1. Node Registration
+ router.post('/register', async (req: Request, res: Response) => {
+-    const { node_id, facility_name, country_code, city, timezone, contact_email } = req.body;
++    const { node_id, facility_name, country_code, city, webhook_url } = req.body;
+ 
+     if (!node_id || !facility_name || !country_code) {
+         return res.status(400).json({ error: 'Missing required fields' });
+@@ -13,10 +13,10 @@ router.post('/register', async (req: Request, res: Response) => {
+ 
+     try {
+         await db.execute(
+-            `INSERT INTO printer_nodes (node_id, facility_name, country_code, city, timezone, contact_email, status)
+-       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE')
+-       ON DUPLICATE KEY UPDATE facility_name = ?, country_code = ?, city = ?, timezone = ?, contact_email = ?`,
+-            [node_id, facility_name, country_code, city, timezone, contact_email, facility_name, country_code, city, timezone, contact_email]
++            `INSERT INTO printer_nodes (node_id, facility_name, country_code, city, webhook_url, status)
++       VALUES (?, ?, ?, ?, ?, 'ACTIVE')
++       ON DUPLICATE KEY UPDATE facility_name = ?, country_code = ?, city = ?, webhook_url = ?`,
++            [node_id, facility_name, country_code, city, webhook_url, facility_name, country_code, city, webhook_url]
+         );
+ 
+         res.status(201).json({ status: 'REGISTERED', node_id });
+@@ -39,7 +39,7 @@ router.put('/:node_id/capabilities', async (req: Request, res: Response) => {
+         // We store the hash/blob of capabilities for matchmaking optimization
+         await db.execute(
+             `UPDATE printer_nodes 
+-       SET capabilities_hash = ?, updated_at = NOW() 
++       SET capabilities = ?, updated_at = NOW() 
+        WHERE node_id = ?`,
+             [JSON.stringify(capabilities), node_id]
+         );
+diff --git a/api-gateway/src/telemetryReceiver.ts b/api-gateway/src/telemetryReceiver.ts
+index e56028f..51fe884 100644
+--- a/api-gateway/src/telemetryReceiver.ts
++++ b/api-gateway/src/telemetryReceiver.ts
+@@ -1,8 +1,14 @@
+ import { Router, Request, Response } from 'express';
+-import { db } from './db';
++import db from './db';
+ import { Connection, Client } from '@temporalio/client';
+ import { trace } from '@opentelemetry/api';
+-
++function requiredEnv(name: string): string {
++  const value = process.env[name];
++  if (!value) {
++    throw new Error(`Missing required env var: ${name}`);
++  }
++  return value;
++}
+ const router = Router();
+ 
+ router.post('/:global_job_id', async (req: Request, res: Response) => {
+@@ -31,8 +37,9 @@ router.post('/:global_job_id', async (req: Request, res: Response) => {
+             span.setAttribute('ppos.parent_trace_id', trace_id);
+ 
+             // 2. Map status to Temporal signals
+-            const temporalAddress = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
+-            const connection = await Connection.connect({ address: temporalAddress });
++            const connection = await Connection.connect({
++  address: requiredEnv('TEMPORAL_ADDRESS')
++});
+             const client = new Client({ connection });
+             const handle = client.workflow.getHandle(workflow_id);
+ 
+diff --git a/workers/src/activities.ts b/workers/src/activities.ts
+index 5834fd0..c316e66 100644
+--- a/workers/src/activities.ts
++++ b/workers/src/activities.ts
+@@ -1,4 +1,4 @@
+-import { db } from './db';
++import db from './db';
+ 
+ // Required by temporal to uniquely identify the job states
+ export enum GlobalJobState {
+@@ -10,7 +10,11 @@ export enum GlobalJobState {
+     NODE_ACCEPTED = 'NODE_ACCEPTED',
+     IN_PRODUCTION = 'IN_PRODUCTION',
+     SHIPPED = 'SHIPPED',
++    FAILED_PREFLIGHT = 'FAILED_PREFLIGHT',
++    FAILED_PRICING = 'FAILED_PRICING',
+     FAILED_MATCHMAKING = 'FAILED_MATCHMAKING',
++    MANUAL_REVIEW = 'MANUAL_REVIEW',
++    CANCELLED = 'CANCELLED',
+     REFUNDED = 'REFUNDED'
+ }
+ 
+@@ -30,8 +34,8 @@ export async function updateJobRegistryActivity(
+     try {
+         await connection.beginTransaction();
+ 
+-        const workflowId = context.info.workflowId;
+-        const workflowRunId = context.info.runId;
++        const workflowId = 'unknown-workflow';
++        const workflowRunId = 'unknown-run';
+ 
+         if (expectedPreviousState) {
+             await connection.execute(
+@@ -83,7 +87,7 @@ export async function matchmakerActivity(jobId: string, pricing: any, findings:
+ 
+     const shadowEngine = new ShadowPolicyEngine();
+     const shadowLogger = new ShadowLoggingService();
+-    const traceId = Context.current().info.workflowId;
++    const traceId = 'unknown-trace';
+ 
+     try {
+         // 1. Synchronized Candidate Pool
+diff --git a/workers/src/db.ts b/workers/src/db.ts
+index 663079a..55d1594 100644
+--- a/workers/src/db.ts
++++ b/workers/src/db.ts
+@@ -1,13 +1,22 @@
+ import mysql from 'mysql2/promise';
+ 
+-export const db = mysql.createPool({
+-    host: process.env.MYSQL_HOST || 'localhost',
+-    user: process.env.MYSQL_USER || 'ppos_user',
+-    password: process.env.MYSQL_PASSWORD || 'ppos_pass',
+-    database: process.env.MYSQL_DATABASE || 'printprice_os',
+-    waitForConnections: true,
+-    connectionLimit: 10,
+-    maxIdle: 10,
+-    idleTimeout: 60000,
+-    queueLimit: 0,
++function requiredEnv(name: string): string {
++  const value = process.env[name];
++  if (!value) {
++    throw new Error(`Missing required env var: ${name}`);
++  }
++  return value;
++}
++
++const pool = mysql.createPool({
++  host: requiredEnv('MYSQL_HOST'),
++  port: Number(requiredEnv('MYSQL_PORT')),
++  user: requiredEnv('MYSQL_USER'),
++  password: requiredEnv('MYSQL_PASSWORD'),
++  database: requiredEnv('MYSQL_DATABASE'),
++  waitForConnections: true,
++  connectionLimit: 10,
++  queueLimit: 0,
+ });
++
++export default pool;
+diff --git a/workers/src/matchmaking/ShadowLoggingService.ts b/workers/src/matchmaking/ShadowLoggingService.ts
+index 326eec6..733860a 100644
+--- a/workers/src/matchmaking/ShadowLoggingService.ts
++++ b/workers/src/matchmaking/ShadowLoggingService.ts
+@@ -1,4 +1,4 @@
+-import { db } from '../db';
++import db from '../db';
+ import { ShadowRoutingResult } from './ShadowPolicyEngine';
+ 
+ export interface ShadowLogContext {
+diff --git a/workers/src/matchmaking/errors.ts b/workers/src/matchmaking/errors.ts
+index 58cece3..b5b24e7 100644
+--- a/workers/src/matchmaking/errors.ts
++++ b/workers/src/matchmaking/errors.ts
+@@ -2,7 +2,7 @@ import { ApplicationFailure } from '@temporalio/workflow';
+ 
+ export abstract class MatchmakingError extends ApplicationFailure {
+     constructor(message: string, code: string, nonRetryable: boolean = true) {
+-        super(message, code, undefined, undefined, { nonRetryable });
++        super(message, code, undefined, undefined, undefined as any);
+     }
+ }
+ 
+diff --git a/workers/src/matchmaking/repository.ts b/workers/src/matchmaking/repository.ts
+index d477aae..40c9a05 100644
+--- a/workers/src/matchmaking/repository.ts
++++ b/workers/src/matchmaking/repository.ts
+@@ -1,21 +1,28 @@
+-import { db } from '../db';
++import db from '../db';
+ import { PrinterNodeCapabilities } from './types';
+ 
+ export async function getActivePrinterNodes(): Promise<PrinterNodeCapabilities[]> {
+-    const [rows]: any = await db.query(
+-        `SELECT node_id, country_code, capabilities_hash, reputation_score 
+-     FROM printer_nodes 
+-     WHERE status = 'ACTIVE' 
++  const [rows]: any = await db.query(
++    `SELECT node_id, country_code, capabilities, reputation_score
++     FROM printer_nodes
++     WHERE status = 'ACTIVE'
+      ORDER BY reputation_score DESC`
+-    );
++  );
+ 
+-    // Decoding capability_hash would ideally map to JSON features. Mocking expansion here.
+-    return rows.map((r: any) => ({
+-        nodeId: r.node_id,
+-        countryCode: r.country_code,
+-        supportedFormats: ['A4', 'US_LETTER', 'A5'], // Mock decoded capabilities
+-        supportedBindings: ['perfect', 'saddle_stitch'],
+-        hasColorCapacity: true,
+-        reputationScore: parseFloat(r.reputation_score)
+-    }));
++  return rows.map((r: any) => {
++    const caps =
++      typeof r.capabilities === 'string'
++        ? JSON.parse(r.capabilities)
++        : (r.capabilities || {});
++
++    return {
++      nodeId: r.node_id,
++      countryCode: r.country_code,
++      supportedFormats: caps.supportedFormats || ['A4', 'US_LETTER', 'A5'],
++      supportedBindings: caps.supportedBindings || ['perfect', 'saddle_stitch'],
++      hasColorCapacity:
++        typeof caps.hasColorCapacity === 'boolean' ? caps.hasColorCapacity : true,
++      reputationScore: parseFloat(r.reputation_score)
++    };
++  });
+ }
+diff --git a/workers/src/preflight/errors.ts b/workers/src/preflight/errors.ts
+index 3273d2d..67edd73 100644
+--- a/workers/src/preflight/errors.ts
++++ b/workers/src/preflight/errors.ts
+@@ -3,7 +3,7 @@ import { ApplicationFailure } from '@temporalio/workflow';
+ // Base Preflight Error
+ export abstract class PreflightError extends ApplicationFailure {
+     constructor(message: string, code: string, nonRetryable: boolean = true) {
+-        super(message, code, undefined, undefined, { nonRetryable });
++        super(message, code, undefined, undefined, undefined as any);
+     }
+ }
+ 
+diff --git a/workers/src/pricing/errors.ts b/workers/src/pricing/errors.ts
+index cff11e2..800f9c5 100644
+--- a/workers/src/pricing/errors.ts
++++ b/workers/src/pricing/errors.ts
+@@ -2,7 +2,7 @@ import { ApplicationFailure } from '@temporalio/workflow';
+ 
+ export abstract class PricingError extends ApplicationFailure {
+     constructor(message: string, code: string, nonRetryable: boolean = true) {
+-        super(message, code, undefined, undefined, { nonRetryable });
++        super(message, code, undefined, undefined, undefined as any);
+     }
+ }
+ 
+diff --git a/workers/src/pricing/logic.ts b/workers/src/pricing/logic.ts
+index 77cf03e..da162ae 100644
+--- a/workers/src/pricing/logic.ts
++++ b/workers/src/pricing/logic.ts
+@@ -41,7 +41,8 @@ export async function calculateJobCost(specs: ManufacturingSpecs, pageCount: num
+         total_manufacturing_cost: totalManufacturingCost,
+         currency: 'USD',
+         calculated_margin_percentage: 0, // Calculated later against customer price
+-        is_margin_healthy: true
++        is_margin_healthy: true,
++        total_price: 0
+     };
+ }
+ 
+diff --git a/workers/src/pricing/repository.ts b/workers/src/pricing/repository.ts
+index 414530b..2aea2d5 100644
+--- a/workers/src/pricing/repository.ts
++++ b/workers/src/pricing/repository.ts
+@@ -1,4 +1,4 @@
+-import { db } from '../db';
++import db from '../db';
+ 
+ export async function getPaperCostPerSheet(paperType: string, format: string): Promise<number> {
+     const [rows]: any = await db.query(
+diff --git a/workers/src/smoke_test_ids.ts b/workers/src/smoke_test_ids.ts
+index a6c7716..ea44b78 100644
+--- a/workers/src/smoke_test_ids.ts
++++ b/workers/src/smoke_test_ids.ts
+@@ -1,4 +1,4 @@
+-import { db } from './db';
++import db from './db';
+ import { updateJobRegistryActivity, matchmakerActivity, GlobalJobState } from './activities';
+ 
+ async function runSmokeTest() {
+diff --git a/workers/src/smoke_test_ids_standalone.js b/workers/src/smoke_test_ids_standalone.js
+index 7da67d5..085f251 100644
+--- a/workers/src/smoke_test_ids_standalone.js
++++ b/workers/src/smoke_test_ids_standalone.js
+@@ -1,11 +1,23 @@
+ const mysql = require('mysql2/promise');
+ require('dotenv').config();
+ 
++function requiredEnv(name) {
++  const value = process.env[name];
++  if (!value) {
++    throw new Error(`Missing required env var: ${name}`);
++  }
++  return value;
++}
++
+ const db = mysql.createPool({
+-    host: process.env.MYSQL_HOST || 'localhost',
+-    user: process.env.MYSQL_USER || 'ppos_user',
+-    password: process.env.MYSQL_PASSWORD || 'ppos_pass',
+-    database: process.env.MYSQL_DATABASE || 'printprice_os',
++  host: requiredEnv('MYSQL_HOST'),
++  port: Number(requiredEnv('MYSQL_PORT')),
++  user: requiredEnv('MYSQL_USER'),
++  password: requiredEnv('MYSQL_PASSWORD'),
++  database: requiredEnv('MYSQL_DATABASE'),
++  waitForConnections: true,
++  connectionLimit: 10,
++  queueLimit: 0,
+ });
+ 
+ async function runSmokeTest() {
+diff --git a/workers/src/worker.ts b/workers/src/worker.ts
+index 6377136..f5f0777 100644
+--- a/workers/src/worker.ts
++++ b/workers/src/worker.ts
+@@ -1,21 +1,19 @@
++import "dotenv/config";
+ import { Worker } from '@temporalio/worker';
+ import * as activities from './activities';
+ 
+ async function run() {
+-    const worker = await Worker.create({
+-        workflowsPath: require.resolve('./workflows'),
+-        activities,
+-        taskQueue: 'printprice-jobs',
+-        connectionOptions: {
+-            address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+-        },
+-    });
++  const worker = await Worker.create({
++    workflowsPath: require.resolve('./workflows'),
++    activities,
++    taskQueue: 'printprice-jobs'
++  });
+ 
+-    console.log('Worker listening on task queue: printprice-jobs');
+-    await worker.run();
++  console.log('Worker listening on task queue: printprice-jobs');
++  await worker.run();
+ }
+ 
+ run().catch((err) => {
+-    console.error('Worker failed to start', err);
+-    process.exit(1);
++  console.error('Worker failed to start', err);
++  process.exit(1);
+ });
+diff --git a/workers/src/workflows.ts b/workers/src/workflows.ts
+index 924ef81..5de63af 100644
+--- a/workers/src/workflows.ts
++++ b/workers/src/workflows.ts
+@@ -1,110 +1,142 @@
+-import { proxyActivities, defineSignal, setHandler, condition, sleep } from '@temporalio/workflow';
+-import type * as activities from './activities';
+-import { GlobalJobState } from './activities';
++import { proxyActivities, defineSignal, setHandler, condition } from '@temporalio/workflow';
++import { GlobalJobState } from './types';
++
++interface ActivityFns {
++  preflightActivity(jobId: string, assetUrl: string): Promise<any>;
++  pricingActivity(jobId: string, findings: any, specs: any): Promise<any>;
++  matchmakerActivity(jobId: string, pricing: any, findings: any, attempt: number): Promise<any>;
++  dispatchToNodeActivity(jobId: string, nodeId: string): Promise<void>;
++  refundPaymentActivity(jobId: string): Promise<void>;
++  updateJobRegistryActivity(
++    jobId: string,
++    traceId: string,
++    newState: GlobalJobState,
++    expectedPreviousState: GlobalJobState | null,
++    triggerActivity: string,
++    payload?: any
++  ): Promise<void>;
++}
+ 
+ const {
+-    preflightActivity, pricingActivity, matchmakerActivity, dispatchToNodeActivity,
+-    refundPaymentActivity, updateJobRegistryActivity
+-} = proxyActivities<typeof activities>({
+-    startToCloseTimeout: '1 minute',
+-    retry: {
+-        maximumAttempts: 5,
+-        initialInterval: '2 seconds',
+-        backoffCoefficient: 2,
+-        maximumInterval: '1 minute',
+-        nonRetryableErrorTypes: ['PdfCorruptedError', 'NegativeMarginError']
+-    }
++  preflightActivity,
++  pricingActivity,
++  matchmakerActivity,
++  dispatchToNodeActivity,
++  refundPaymentActivity,
++  updateJobRegistryActivity
++} = proxyActivities<ActivityFns>({
++  startToCloseTimeout: '1 minute',
++  retry: {
++    maximumAttempts: 5,
++    initialInterval: '2 seconds',
++    backoffCoefficient: 2,
++    maximumInterval: '1 minute',
++    nonRetryableErrorTypes: ['PdfCorruptedError', 'NegativeMarginError']
++  }
+ });
+ 
+-// Printer Node Signals
+-export const nodeAcceptedSignal = defineSignal<{ nodeId: string }>('NODE_ACCEPTED');
+-export const nodeRejectedSignal = defineSignal<{ nodeId: string, reason: string }>('NODE_REJECTED');
+-export const nodeInPressSignal = defineSignal<{ nodeId: string }>('NODE_IN_PRESS');
+-export const nodeShippedSignal = defineSignal<{ trackingCode: string }>('NODE_SHIPPED');
+-
+-export async function GlobalJobWorkflow(jobId: string, traceId: string, assetUrl: string, specs: any): Promise<void> {
+-    let isAccepted = false;
+-    let isRejected = false;
+-    let isInPress = false;
+-    let isShipped = false;
+-    let activeNodeId: string | null = null;
+-
+-    setHandler(nodeAcceptedSignal, ({ nodeId }) => { isAccepted = true; activeNodeId = nodeId; });
+-    setHandler(nodeRejectedSignal, () => { isRejected = true; });
+-    setHandler(nodeInPressSignal, () => { isInPress = true; });
+-    setHandler(nodeShippedSignal, () => { isShipped = true; });
+-
+-    async function syncState(newState: GlobalJobState, expectedPrevious?: GlobalJobState, failureContext?: any) {
+-        await updateJobRegistryActivity(jobId, traceId, newState, expectedPrevious || null, 'WorkflowTransition', failureContext);
++export const nodeAcceptedSignal = defineSignal<[any]>('NODE_ACCEPTED');
++export const nodeRejectedSignal = defineSignal<[any]>('NODE_REJECTED');
++export const nodeInPressSignal = defineSignal<[any]>('NODE_IN_PRESS');
++export const nodeShippedSignal = defineSignal<[any]>('NODE_SHIPPED');
++
++export async function GlobalJobWorkflow(
++  jobId: string,
++  traceId: string,
++  assetUrl: string,
++  specs: any
++): Promise<void> {
++  let isAccepted = false;
++  let isRejected = false;
++  let isInPress = false;
++  let isShipped = false;
++  let activeNodeId: string | null = null;
++
++  setHandler(nodeAcceptedSignal, ([payload]) => {
++    isAccepted = true;
++    activeNodeId = payload?.nodeId || null;
++  });
++
++  setHandler(nodeRejectedSignal, () => {
++    isRejected = true;
++  });
++
++  setHandler(nodeInPressSignal, () => {
++    isInPress = true;
++  });
++
++  setHandler(nodeShippedSignal, () => {
++    isShipped = true;
++  });
++
++  async function syncState(
++    newState: GlobalJobState,
++    expectedPrevious?: GlobalJobState,
++    failureContext?: any
++  ) {
++    await updateJobRegistryActivity(
++      jobId,
++      traceId,
++      newState,
++      expectedPrevious || null,
++      'WorkflowTransition',
++      failureContext
++    );
++  }
++
++  try {
++    await syncState(GlobalJobState.PREFLIGHTING, GlobalJobState.INGESTED);
++    const findings = await preflightActivity(jobId, assetUrl);
++
++    await syncState(GlobalJobState.PRICING, GlobalJobState.PREFLIGHTING);
++    const pricing = await pricingActivity(jobId, findings, specs);
++
++    let attempt = 0;
++    while (!isAccepted && attempt < 5) {
++      await syncState(GlobalJobState.MATCHMAKING, GlobalJobState.PRICING);
++      const node = await matchmakerActivity(jobId, pricing, findings, attempt);
++
++      await dispatchToNodeActivity(jobId, node.id);
++      await syncState(GlobalJobState.DISPATCHED, GlobalJobState.MATCHMAKING);
++
++      const responded = await condition(() => isAccepted || isRejected, '4 hours');
++      if (!responded || isRejected) {
++        attempt += 1;
++        isRejected = false;
++        continue;
++      }
++    }
++
++    if (!isAccepted) {
++      await syncState(GlobalJobState.FAILED_MATCHMAKING, GlobalJobState.DISPATCHED, { reason: 'MATCHMAKER_EXHAUSTED' });
++      await refundPaymentActivity(jobId);
++      await syncState(GlobalJobState.REFUNDED, GlobalJobState.FAILED_MATCHMAKING);
++      return;
++    }
++
++    await syncState(GlobalJobState.NODE_ACCEPTED, GlobalJobState.DISPATCHED, { nodeId: activeNodeId });
++
++    await condition(() => isInPress, '48 hours');
++    await syncState(GlobalJobState.IN_PRODUCTION, GlobalJobState.NODE_ACCEPTED);
++
++    await condition(() => isShipped, '14 days');
++    await syncState(GlobalJobState.SHIPPED, GlobalJobState.IN_PRODUCTION);
++  } catch (err: any) {
++    const msg = String(err?.message || '');
++
++    if (msg.includes('PdfCorruptedError')) {
++      await syncState(GlobalJobState.FAILED_PREFLIGHT, undefined, err);
++      await syncState(GlobalJobState.CANCELLED, GlobalJobState.FAILED_PREFLIGHT);
++      return;
+     }
+ 
+-    try {
+-        // 1. PREFLIGHT
+-        await syncState(GlobalJobState.PREFLIGHTING, GlobalJobState.INGESTED);
+-        const findings = await preflightActivity(jobId, assetUrl);
+-
+-        // 2. PRICING
+-        await syncState(GlobalJobState.PRICING, GlobalJobState.PREFLIGHTING);
+-        const pricing = await pricingActivity(jobId, findings, specs);
+-
+-        // 3. MATCHMAKING
+-        let matchAttempts = 0;
+-        while (!isAccepted && matchAttempts < 3) {
+-            await syncState(GlobalJobState.MATCHMAKING, undefined); // Undefined previous to allow loop
+-            const node = await matchmakerActivity(jobId, pricing, findings, matchAttempts);
+-
+-            await syncState(GlobalJobState.DISPATCHED, GlobalJobState.MATCHMAKING);
+-            await dispatchToNodeActivity(jobId, node.id);
+-
+-            // Await Handshake
+-            const responded = await condition(() => isAccepted || isRejected, '4 hours');
+-            if (!responded || isRejected) {
+-                matchAttempts++;
+-                isRejected = false;
+-                continue;
+-            }
+-        }
+-
+-        if (!isAccepted) throw new Error('MATCHMAKER_EXHAUSTED');
+-        await syncState(GlobalJobState.NODE_ACCEPTED, GlobalJobState.DISPATCHED);
+-
+-        // 4. PRODUCTION
+-        const inPress = await condition(() => isInPress, '48 hours');
+-        if (!inPress) {
+-            throw new Error('NODE_PRODUCTION_TIMEOUT');
+-        }
+-        await syncState(GlobalJobState.IN_PRODUCTION, GlobalJobState.NODE_ACCEPTED);
+-
+-        // 5. FULFILLMENT
+-        const shipped = await condition(() => isShipped, '14 days');
+-        if (!shipped) {
+-            throw new Error('NODE_SHIPPING_TIMEOUT');
+-        }
+-        await syncState(GlobalJobState.SHIPPED, GlobalJobState.IN_PRODUCTION);
+-
+-    } catch (err: any) {
+-        const errorType = err.name || err.message;
+-
+-        // Compensation Matrix
+-        if (errorType === 'PdfCorruptedError') {
+-            await syncState(GlobalJobState.FAILED_PREFLIGHT, undefined, err);
+-            // No refund needed, payment intent cancelled transparently
+-            await syncState(GlobalJobState.CANCELLED);
+-        }
+-        else if (errorType === 'NegativeMarginError') {
+-            await syncState(GlobalJobState.FAILED_PRICING, undefined, err);
+-            await syncState(GlobalJobState.MANUAL_REVIEW);
+-        }
+-        else if (errorType === 'MATCHMAKER_EXHAUSTED' || errorType === 'NODE_PRODUCTION_TIMEOUT') {
+-            await syncState(GlobalJobState.FAILED_MATCHMAKING, undefined, err);
+-            await refundPaymentActivity(jobId);
+-            await syncState(GlobalJobState.REFUNDED);
+-        }
+-        else {
+-            // Unhandled fatal error
+-            await syncState(GlobalJobState.MANUAL_REVIEW, undefined, err);
+-        }
+-
+-        throw err; // Fail Temporal Workflow
++    if (msg.includes('NegativeMarginError')) {
++      await syncState(GlobalJobState.FAILED_PRICING, undefined, err);
++      await syncState(GlobalJobState.MANUAL_REVIEW, GlobalJobState.FAILED_PRICING);
++      return;
+     }
++
++    await syncState(GlobalJobState.MANUAL_REVIEW, undefined, err);
++    throw err;
++  }
+ }

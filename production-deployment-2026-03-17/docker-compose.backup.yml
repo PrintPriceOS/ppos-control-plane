@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  # 1. Infrastructure (Shared)
+  ppos-mysql:
+    image: mysql:8.0
+    container_name: ppos-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=printprice_os
+      - MYSQL_USER=ppos_user
+      - MYSQL_PASSWORD=ppos_pass
+    networks:
+      - ppos-staging
+
+  ppos-redis:
+    image: redis:7-alpine
+    container_name: ppos-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ppos-staging
+
+  # 2. Preflight Stack
+  preflight-engine:
+    build:
+      context: .
+      dockerfile: ppos-preflight-engine/Dockerfile
+    container_name: ppos-preflight-engine
+    environment:
+      - GS_COMMAND=gs
+      - PPOS_TEMP_DIR=/tmp/ppos-preflight
+    networks:
+      - ppos-staging
+
+  preflight-service:
+    build:
+      context: .
+      dockerfile: ppos-preflight-service/Dockerfile
+    container_name: ppos-preflight-service
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_HOST=ppos-redis
+      - REDIS_PORT=6379
+      - ADMIN_API_KEY=ppos-staging-token-2026
+      - DATABASE_URL=mysql://ppos_user:ppos_pass@ppos-mysql:3306/printprice_os
+      - PPOS_SERVICE_PORT=8001
+      - PPOS_UPLOADS_DIR=/tmp/ppos-preflight/uploads
+    depends_on:
+      - ppos-redis
+      - ppos-mysql
+    networks:
+      - ppos-staging
+
+  preflight-worker:
+    build:
+      context: .
+      dockerfile: ppos-preflight-worker/Dockerfile
+    container_name: ppos-preflight-worker
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_HOST=ppos-redis
+      - REDIS_PORT=6379
+      - PPOS_QUEUE_NAME=preflight_async_queue
+      - HEALTH_PORT=8002
+      - LOG_LEVEL=info
+    depends_on:
+      - ppos-redis
+    networks:
+      - ppos-staging
+
+networks:
+  ppos-staging:
+    driver: bridge

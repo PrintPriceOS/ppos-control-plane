@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# PrintPrice OS - Production Rescue Consolidation Auditor
+# Safe by default:
+# - read-only on your real repos
+# - patch application is tested only in temp copies
+# - generates reports for Antigravity / human review
+
+ROOT_DIR="${1:-$HOME/PrintPriceOS}"
+PATCH_DIR="${2:-$ROOT_DIR/prod-rescue-patches-2026-03-16}"
+REPORT_DIR="${3:-$ROOT_DIR/reports/prod-consolidation-$(date +%Y%m%d-%H%M%S)}"
+
+REPOS=(
+  "ppos-preflight-service"
+  "ppos-preflight-worker"
+  "ppos-preflight-engine"
+  "ppos-core-platform"
+  "printprice-os-bootstrap"
+)
+
+mkdir -p "$REPORT_DIR"
+mkdir -p "$REPORT_DIR/tmp"
+
+REPORT_MD="$REPORT_DIR/consolidation-report.md"
+SUMMARY_TSV="$REPORT_DIR/repo-summary.tsv"
+
+cat > "$REPORT_MD" <<EOF
+# PrintPrice OS — Production Rescue Consolidation Report
+
+Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+Workspace root: \`$ROOT_DIR\`  
+Patch source: \`$PATCH_DIR\`
+
+## Scope
+This report compares local repos, GitHub remotes, and production rescue patches captured from the server.
+
+EOF
+
+echo -e "repo\tlocal_sha\torigin_main_sha\thead_state\tpatch_file\tpatch_check\tworking_tree" > "$SUMMARY_TSV"
+
+log() {
+  printf '[INFO] %s\n' "$*"
+}
+
+warn() {
+  printf '[WARN] %s\n' "$*" >&2
+}
+
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+require_cmds() {
+  local missing=0
+  for cmd in git awk sed grep mktemp diff find; do
+    if ! has_cmd "$cmd"; then
+      warn "Missing required command: $cmd"
+      missing=1
+    fi
+  done
+  if [[ "$missing" -ne 0 ]]; then
+    exit 1
+  fi
+}
+
+repo_exists() {
+  local repo_path="$1"
+  [[ -d "$repo_path/.git" ]]
+}
+
+get_patch_path() {
+  local repo="$1"
+  local patch="$PATCH_DIR/${repo}.patch"
+  if [[ -f "$patch" ]]; then
+    printf '%s' "$patch"
+  else
+    printf ''
+  fi
+}
+
+safe_git_fetch() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+    git fetch --all --tags --prune >/dev/null 2>&1 || true
+  )
+}
+
+get_current_branch() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+    git branch --show-current 2>/dev/null || true
+  )
+}
+
+get_local_sha() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+    git rev-parse HEAD 2>/dev/null || true
+  )
+}
+
+get_origin_sha() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+    git rev-parse origin/main 2>/dev/null || true
+  )
+}
+
+get_status_short() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+    git status --short 2>/dev/null || true
+  )
+}
+
+get_head_relation() {
+  local repo_path="$1"
+  (
+    cd "$repo_path"
+
+    local ahead behind
+    ahead="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
+    behind="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+
+    if [[ "$ahead" == "0" && "$behind" == "0" ]]; then
+      echo "aligned"
+    elif [[ "$ahead" != "0" && "$behind" == "0" ]]; then
+      echo "ahead:${ahead}"
+    elif [[ "$ahead" == "0" && "$behind" != "0" ]]; then
+      echo "behind:${behind}"
+    else
+      echo "diverged:ahead:${ahead},behind:${behind}"
+    fi
+  )
+}
+
+sanitize_repo_name() {
+  echo "$1" | tr '/' '_' | tr ' ' '_'
+}
+
+write_repo_section() {
+  local repo="$1"
+  local repo_path="$2"
+  local branch="$3"
+  local local_sha="$4"
+  local origin_sha="$5"
+  local relation="$6"
+  local patch_path="$7"
+  local patch_check="$8"
+  local working_tree="$9"
+
+  cat >> "$REPORT_MD" <<EOF
+
+## Repo: \`$repo\`
+
+- Path: \`$repo_path\`
+- Branch: \`$branch\`
+- Local SHA: \`$local_sha\`
+- origin/main SHA: \`$origin_sha\`
+- HEAD relation: \`$relation\`
+- Patch file: \`${patch_path:-MISSING}\`
+- Patch dry-run result: \`$patch_check\`
+
+### Working tree
+\`\`\`text
+$working_tree
+\`\`\`
+
+EOF
+}
+
+write_git_details() {
+  local repo="$1"
+  local repo_path="$2"
+  local outdir="$3"
+
+  (
+    cd "$repo_path"
+
+    {
+      echo "=== git remote -v ==="
+      git remote -v || true
+      echo
+      echo "=== git log --oneline -n 10 ==="
+      git log --oneline -n 10 || true
+      echo
+      echo "=== git log origin/main..HEAD ==="
+      git log --oneline origin/main..HEAD || true
+      echo
+      echo "=== git log HEAD..origin/main ==="
+      git log --oneline HEAD..origin/main || true
+      echo
+      echo "=== git status --short ==="
+      git status --short || true
+      echo
+      echo "=== git diff --stat ==="
+      git diff --stat || true
+    } > "$outdir/git-details.txt"
+  )
+}
+
+check_patch_dry_run() {
+  local repo="$1"
+  local repo_path="$2"
+  local patch_path="$3"
+  local outdir="$4"
+
+  if [[ -z "$patch_path" || ! -f "$patch_path" ]]; then
+    echo "missing_patch"
+    return 0
+  fi
+
+  local tmp_repo
+  tmp_repo="$(mktemp -d "$REPORT_DIR/tmp/$(sanitize_repo_name "$repo").XXXXXX")"
+
+  # Fast local copy; excludes .git to avoid any mutation risk on actual repo metadata
+  mkdir -p "$tmp_repo/repo"
+  rsync -a --exclude='.git' "$repo_path/" "$tmp_repo/repo/" >/dev/null 2>&1 || cp -a "$repo_path/." "$tmp_repo/repo/"
+
+  pushd "$tmp_repo/repo" >/dev/null
+
+  if git init >/dev/null 2>&1 && git add . >/dev/null 2>&1 && git commit -m "temp baseline" >/dev/null 2>&1; then
+    if git apply --check "$patch_path" >"$outdir/patch-apply-check.stdout.txt" 2>"$outdir/patch-apply-check.stderr.txt"; then
+      echo "applies_cleanly"
+    else
+      echo "conflicts_or_mismatch"
+    fi
+  else
+    echo "temp_git_init_failed"
+  fi
+
+  popd >/dev/null
+}
+
+copy_patch_excerpt() {
+  local patch_path="$1"
+  local outdir="$2"
+
+  if [[ -f "$patch_path" ]]; then
+    sed -n '1,240p' "$patch_path" > "$outdir/patch-excerpt.txt" || true
+  fi
+}
+
+copy_untracked_artifacts() {
+  local repo="$1"
+  local outdir="$2"
+
+  mkdir -p "$outdir/untracked-artifacts"
+
+  case "$repo" in
+    "ppos-preflight-worker")
+      [[ -f "$PATCH_DIR/untracked/workflows.ts" ]] && cp -f "$PATCH_DIR/untracked/workflows.ts" "$outdir/untracked-artifacts/" || true
+      [[ -f "$PATCH_DIR/untracked/ppos-preflight-worker.tsconfig.json" ]] && cp -f "$PATCH_DIR/untracked/ppos-preflight-worker.tsconfig.json" "$outdir/untracked-artifacts/" || true
+      ;;
+    "ppos-preflight-engine")
+      [[ -f "$PATCH_DIR/untracked/industrialFindingCodes.js" ]] && cp -f "$PATCH_DIR/untracked/industrialFindingCodes.js" "$outdir/untracked-artifacts/" || true
+      ;;
+  esac
+}
+
+generate_local_diff_files() {
+  local repo_path="$1"
+  local outdir="$2"
+
+  (
+    cd "$repo_path"
+    git diff > "$outdir/local-working-tree.diff" || true
+    git diff --stat > "$outdir/local-working-tree.stat.txt" || true
+  )
+}
+
+classify_initial_findings() {
+  local relation="$1"
+  local working_tree="$2"
+  local patch_check="$3"
+
+  local dirty="clean"
+  if [[ -n "$working_tree" ]]; then
+    dirty="dirty"
+  fi
+
+  if [[ "$patch_check" == "applies_cleanly" && "$relation" == behind:* ]]; then
+    echo "review_high_priority"
+  elif [[ "$patch_check" == "conflicts_or_mismatch" ]]; then
+    echo "manual_reimplementation_likely"
+  elif [[ "$dirty" == "dirty" ]]; then
+    echo "working_tree_review_needed"
+  else
+    echo "low_risk_review"
+  fi
+}
+
+require_cmds
+
+log "Workspace root: $ROOT_DIR"
+log "Patch dir:      $PATCH_DIR"
+log "Report dir:     $REPORT_DIR"
+
+if [[ ! -d "$ROOT_DIR" ]]; then
+  warn "Workspace root not found: $ROOT_DIR"
+  exit 1
+fi
+
+if [[ ! -d "$PATCH_DIR" ]]; then
+  warn "Patch dir not found: $PATCH_DIR"
+  exit 1
+fi
+
+for repo in "${REPOS[@]}"; do
+  repo_path="$ROOT_DIR/$repo"
+  outdir="$REPORT_DIR/$repo"
+  mkdir -p "$outdir"
+
+  if ! repo_exists "$repo_path"; then
+    warn "Repo missing or not a git repo: $repo_path"
+    cat >> "$REPORT_MD" <<EOF
+
+## Repo: \`$repo\`
+
+**Status:** missing or not a git repository at \`$repo_path\`
+
+EOF
+    echo -e "${repo}\tMISSING\tMISSING\tmissing_repo\t$(get_patch_path "$repo")\tn/a\tn/a" >> "$SUMMARY_TSV"
+    continue
+  fi
+
+  log "Analyzing $repo"
+  safe_git_fetch "$repo_path"
+
+  branch="$(get_current_branch "$repo_path")"
+  local_sha="$(get_local_sha "$repo_path")"
+  origin_sha="$(get_origin_sha "$repo_path")"
+  relation="$(get_head_relation "$repo_path")"
+  working_tree="$(get_status_short "$repo_path")"
+  patch_path="$(get_patch_path "$repo")"
+
+  generate_local_diff_files "$repo_path" "$outdir"
+  write_git_details "$repo" "$repo_path" "$outdir"
+  copy_patch_excerpt "$patch_path" "$outdir"
+  copy_untracked_artifacts "$repo" "$outdir"
+
+  patch_check="$(check_patch_dry_run "$repo" "$repo_path" "$patch_path" "$outdir")"
+  initial_classification="$(classify_initial_findings "$relation" "$working_tree" "$patch_check")"
+
+  write_repo_section \
+    "$repo" \
+    "$repo_path" \
+    "$branch" \
+    "$local_sha" \
+    "$origin_sha" \
+    "$relation" \
+    "$patch_path" \
+    "$patch_check" \
+    "${working_tree:-<clean>}"
+
+  cat >> "$REPORT_MD" <<EOF
+### Initial classification
+\`$initial_classification\`
+
+### Notes
+- \`aligned\` means local HEAD equals \`origin/main\`.
+- \`behind:N\` means local HEAD is older than remote by N commits.
+- Patch dry-run is performed only in a temporary copy.
+- A patch that does not apply cleanly may still contain valuable logic and require manual reimplementation.
+
+EOF
+
+  echo -e "${repo}\t${local_sha}\t${origin_sha}\t${relation}\t${patch_path:-missing}\t${patch_check}\t$( [[ -n "$working_tree" ]] && echo dirty || echo clean )" >> "$SUMMARY_TSV"
+done
+
+cat >> "$REPORT_MD" <<EOF
+
+## Suggested next steps
+
+1. Review \`repo-summary.tsv\` for repo-by-repo triage.
+2. Prioritize:
+   - ppos-preflight-service
+   - ppos-preflight-worker
+   - ppos-preflight-engine
+3. For each critical repo:
+   - inspect \`patch-excerpt.txt\`
+   - inspect \`local-working-tree.diff\`
+   - inspect \`git-details.txt\`
+   - decide: keep / discard / reimplement cleanly
+4. Use a release branch for consolidation, not \`main\`.
+5. Do not deploy from production working trees.
+
+EOF
+
+log "Done."
+log "Main report: $REPORT_MD"
+log "Summary TSV: $SUMMARY_TSV"
