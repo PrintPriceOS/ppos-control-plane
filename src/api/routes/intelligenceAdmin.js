@@ -28,7 +28,41 @@ router.get('/overview', async (req, res) => {
     }
 });
 
-// ... (existing anomalies, insights, recommendations routes)
+/**
+ * GET /api/admin/intelligence/anomalies
+ */
+router.get('/anomalies', async (req, res) => {
+    try {
+        const pkg = await intelligenceEngine.getIntelligencePackage();
+        res.json({ ok: true, anomalies: pkg.anomalies || [] });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/intelligence/insights
+ */
+router.get('/insights', async (req, res) => {
+    try {
+        const pkg = await intelligenceEngine.getIntelligencePackage();
+        res.json({ ok: true, insights: pkg.insights || [] });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/intelligence/recommendations
+ */
+router.get('/recommendations', async (req, res) => {
+    try {
+        const pkg = await intelligenceEngine.getIntelligencePackage();
+        res.json({ ok: true, recommendations: pkg.recommendations || [] });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
 
 /**
  * GET /api/admin/intelligence/risk/tenants
