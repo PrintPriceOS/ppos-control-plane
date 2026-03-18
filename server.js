@@ -105,6 +105,13 @@ const start = async () => {
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
     } catch (err) {
         console.error('[FATAL-STARTUP-ERROR]', err);
+        // Write to a file so we can see it in Plesk File Manager
+        try {
+            const fs = require('fs');
+            fs.writeFileSync('crash.log', `${new Date().toISOString()}\n${err.stack}\n`);
+        } catch (fErr) {
+            console.error('Failed to write crash.log:', fErr);
+        }
         process.exit(1);
     }
 };
