@@ -470,24 +470,31 @@ router.get("/errors/top", async (req, res) => {
 router.get("/audit", async (req, res) => {
   const tenant = req.query.tenant_id || null;
   const jobId = req.query.job_id || null;
+  const requestId = req.query.request_id || null;
+  const action = req.query.action || null;
   const limit = Math.min(Number(req.query.limit || 100), 500);
 
   const where = [];
   const params = [];
 
   if (tenant) { where.push("tenant_id = ?"); params.push(tenant); }
-  if (jobId) { where.push("job_id = ?"); params.push(jobId); }
+  if (jobId) { where.push("resource_id = ? AND resource_type = 'JOB'"); params.push(jobId); }
+  if (requestId) { where.push("request_id = ?"); params.push(requestId); }
+  if (action) { where.push("action = ?"); params.push(action); }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")} ` : "";
 
   try {
     const { rows } = await db.query(
       `
-      SELECT id, job_id, tenant_id, action, policy_slug, ip_address, created_at
-      FROM audit_logs
+      SELECT 
+        id, request_id, tenant_id, deployment_id, action, 
+        resource_type, resource_id as job_id, ip_address, 
+        user_role, governance_snapshot, created_at
+      FROM api_audit_log
       ${whereSql}
       ORDER BY created_at DESC
-    LIMIT ?;
+      LIMIT ?;
     `,
       [...params, limit]
     );
@@ -495,6 +502,20 @@ router.get("/audit", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('[ADMIN-API] Error fetching audit logs:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/admin/audit/:requestId - Detailed trace for a specific correlation key
+router.get("/audit/trace/:requestId", async (req, res) => {
+  const { requestId } = req.params;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM api_audit_log WHERE request_id = ? ORDER BY created_at ASC`,
+      [requestId]
+    );
+    res.json(rows);
+  } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });

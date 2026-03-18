@@ -43,5 +43,7 @@ export function useAdminQuery<T>(key: string, fetcher: () => Promise<T>, refetch
         };
     }, [memoKey, tick]);
 
-    return { status, data, error };
+    const refetch = () => setTick(t => t + 1);
+
+    return { status, data, error, refetch };
 }

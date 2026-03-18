@@ -22,17 +22,21 @@ export const clearAdminKey = () => {
     localStorage.removeItem(ADMIN_KEY_STORAGE);
 };
 
-async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
     const key = getAdminKey();
+
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(key ? { "X-Admin-Api-Key": key } : {}),
+        ...(options?.tenantId ? { "X-Tenant-Id": options.tenantId } : {}),
+        ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
+        ...(options?.headers as any || {}),
+    };
 
     const res = await fetch(path, {
         ...options,
-        headers: {
-            "Content-Type": "application/json",
-            ...(key ? { "X-Admin-Api-Key": key } : {}),
-            ...(options?.headers || {}),
-        },
-        credentials: "include", // por si luego metes cookie auth
+        headers,
+        credentials: "include", 
     });
 
     if (!res.ok) {
@@ -122,10 +126,14 @@ export type AuditRow = {
     id: string;
     job_id: string;
     tenant_id: string;
+    deployment_id?: string;
+    request_id?: string;
     action: string;
     policy_slug: string;
     ip_address: string;
     created_at: string;
+    user_role?: string;
+    governance_snapshot?: any;
 };
 
 export type CSWorkflow = {
