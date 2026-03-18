@@ -4,7 +4,6 @@
  */
 
 const db = require('./db');
-const { queueOperator } = require('@ppos/shared-infra'); // Assuming queue stats are here
 
 /**
  * Calculates risk for a specific deployment unit.
