@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const v2Auth = require('../middleware/v2AuthMiddleware');
 const db = require('../services/db');
+const QuotaEngine = require('../services/QuotaEngine');
 
-router.use(v2Auth);
+// All routes in this router require Enterprise Authentication (applied in server.js)
 
 // ---- Helpers ----
 function intervalFor(range) {
@@ -21,7 +21,7 @@ function intervalFor(range) {
  */
 router.get('/summary', async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const interval = intervalFor(req.query.range);
 
         const [jobs, batches] = await Promise.all([
@@ -51,9 +51,17 @@ router.get('/summary', async (req, res) => {
         const b = batches.rows[0] || {};
         const riskBefore = Number(j.avg_risk_before || 0);
         const riskAfter = Number(j.avg_risk_after || 0);
+        const quota = await QuotaEngine.checkJobQuota(tenantId, req.auth.daily_job_limit || 1000);
 
         res.json({
-            tenant_id: tenantId,
+            tenant: {
+                id: tenantId,
+                name: req.auth.tenantName || 'Tenant',
+                plan: req.auth.plan
+            },
+            operational: {
+                current_quota: quota
+            },
             range: req.query.range || '30d',
             total_jobs: Number(j.total_jobs || 0),
             total_batches: Number(b.total_batches || 0),
@@ -76,7 +84,7 @@ router.get('/summary', async (req, res) => {
  */
 router.get('/timeseries', async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const interval = intervalFor(req.query.range);
 
         const { rows } = await db.query(`
@@ -116,7 +124,7 @@ router.get('/timeseries', async (req, res) => {
  */
 router.get('/policies', async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const interval = intervalFor(req.query.range);
 
         const { rows } = await db.query(`
@@ -156,7 +164,7 @@ router.get('/policies', async (req, res) => {
  */
 router.get('/errors', async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const interval = intervalFor(req.query.range);
 
         const { rows } = await db.query(`
@@ -194,7 +202,7 @@ router.get('/errors', async (req, res) => {
  */
 router.get('/batches', async (req, res) => {
     try {
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const interval = intervalFor(req.query.range);
         const limit = Math.min(parseInt(req.query.limit || 20), 100);
 

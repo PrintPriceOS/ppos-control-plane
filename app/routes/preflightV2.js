@@ -27,7 +27,7 @@ router.post('/analyze', upload.single('pdf'), async (req, res) => {
             return res.status(400).json({ error: 'No PDF file uploaded' });
         }
 
-        const tenantId = req.body.tenant_id || 'default';
+        const tenantId = req.auth.tenantId;
  
         const { policyEnforcementService, resourceGovernanceService } = require('@ppos/shared-infra');
         
@@ -116,12 +116,13 @@ router.post('/analyze', upload.single('pdf'), async (req, res) => {
  */
 router.post('/autofix', async (req, res) => {
     try {
-        const { asset_id, tenant_id, policy } = req.body;
+        const { asset_id, policy } = req.body;
+        const tenant_id = req.auth.tenantId;
         if (!asset_id) {
             return res.status(400).json({ error: 'Missing asset_id' });
         }
 
-        const asset = await assetService.getAsset(asset_id);
+        const asset = await assetService.getAsset(asset_id, tenant_id);
         if (!asset) {
             return res.status(404).json({ error: 'Asset not found' });
         }
@@ -206,7 +207,7 @@ router.post('/autofix', async (req, res) => {
  */
 router.get('/jobs/:id', async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+        const result = await db.query('SELECT * FROM jobs WHERE id = ? AND tenant_id = ?', [req.params.id, req.auth.tenantId]);
         const jobRecord = result.rows[0];
 
         if (!jobRecord) {
@@ -265,7 +266,7 @@ router.get('/assets/:id', async (req, res) => {
                 console.warn(`[SECURITY][DOWNLOAD] Unsigned or invalid request for asset ${req.params.id} from ${req.ip}`);
                 return res.status(403).json({ error: 'Access Denied: Signature Required' });
             }
-        const asset = await assetService.getAsset(req.params.id);
+        const asset = await assetService.getAsset(req.params.id, req.auth.tenantId);
         if (!asset) {
             return res.status(404).json({ error: 'Asset not found' });
         }

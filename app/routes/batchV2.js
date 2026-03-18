@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const v2Auth = require('../middleware/v2AuthMiddleware');
 const assetService = require('../services/assetService');
 const queue = require('../services/queue');
 const db = require('../services/db');
@@ -17,7 +16,7 @@ const upload = multer({
     limits: { fileSize: MAX_BATCH_BYTES }
 });
 
-router.use(v2Auth);
+// All routes in this router require Enterprise Authentication (applied in server.js)
 
 // Granular rate limits for Batch v2 (P1)
 const rateLimit = require('express-rate-limit');
@@ -53,7 +52,7 @@ router.post('/', v2UploadLimiter, upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'Only ZIP archives are accepted.' });
         }
 
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const policy = req.body.policy || 'OFFSET_CMYK_STRICT';
         const batchId = 'batch_' + crypto.randomUUID();
 
@@ -107,7 +106,7 @@ router.get('/', v2ReadLimiter, async (req, res) => {
         const status = req.query.status || null;
 
         const where = ['tenant_id = ?'];
-        const params = [req.tenant.id];
+        const params = [req.auth.tenantId];
         if (status) { where.push('status = ?'); params.push(status); }
 
         const { rows } = await db.query(
@@ -135,7 +134,7 @@ router.get('/:id', v2ReadLimiter, async (req, res) => {
             `SELECT *, 
                 (SELECT COUNT(*) FROM jobs WHERE batch_id = ? AND status IN ('QUEUED','RUNNING')) as running_jobs
              FROM batches WHERE id = ? AND tenant_id = ?`,
-            [req.params.id, req.params.id, req.tenant.id]
+            [req.params.id, req.params.id, req.auth.tenantId]
         );
 
         const batch = rows[0];
@@ -177,7 +176,7 @@ router.get('/:id/jobs', v2ReadLimiter, async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit || 50), 200);
         const { rows: [batchCheck] } = await db.query(
             'SELECT id FROM batches WHERE id = ? AND tenant_id = ?',
-            [req.params.id, req.tenant.id]
+            [req.params.id, req.auth.tenantId]
         );
         if (!batchCheck) return res.status(404).json({ error: 'Batch not found.' });
 
@@ -227,7 +226,7 @@ router.get('/:id/download', v2ReadLimiter, async (req, res) => {
         // Verify tenant ownership
         const { rows: [batch] } = await db.query(
             `SELECT * FROM batches WHERE id = ? AND tenant_id = ?`,
-            [req.params.id, req.tenant.id]
+            [req.params.id, req.auth.tenantId]
         );
         if (!batch) return res.status(404).json({ error: 'Batch not found.' });
 

@@ -25,12 +25,13 @@
     "@rollup/rollup-linux-x64-gnu": "*"
   },
   "dependencies": {
-    "@ppos/shared-infra": "file:../ppos-shared-infra",
-    "@ppos/core-platform": "file:../ppos-core-platform",
     "@google/generative-ai": "^0.16.0",
     "@heroicons/react": "^2.2.0",
+    "@ppos/core-platform": "file:../ppos-core-platform",
+    "@ppos/shared-infra": "file:../ppos-shared-infra",
     "adm-zip": "^0.5.16",
     "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
     "compression": "^1.7.5",
     "cors": "^2.8.5",
     "dompurify": "^3.3.0",
@@ -40,6 +41,7 @@
     "fuse.js": "^7.1.0",
     "helmet": "^8.0.0",
     "ioredis": "^5.10.0",
+    "jsonwebtoken": "^9.0.3",
     "marked": "^16.4.1",
     "multer": "^2.0.2",
     "mysql2": "^3.18.2",

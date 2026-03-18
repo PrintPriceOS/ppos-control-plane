@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const v2Auth = require('../middleware/v2AuthMiddleware');
 const assetService = require('../services/assetService');
 const queue = require('../services/queue');
 const db = require('../services/db');
@@ -14,8 +13,7 @@ const upload = multer({
     limits: { fileSize: MAX_UPLOAD_BYTES }
 });
 
-// All routes in this router require v2 API Authentication
-router.use(v2Auth);
+// All routes in this router require Enterprise Authentication (applied in server.js)
 
 // Granular rate limits for Public v2 (P1)
 const rateLimit = require('express-rate-limit');
@@ -44,7 +42,7 @@ router.post('/', v2UploadLimiter, upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No PDF file provided in "file" field.' });
         }
 
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const policy = req.body.policy || 'OFFSET_CMYK_STRICT';
 
         // 1. Create Asset
@@ -100,7 +98,7 @@ router.get('/:id', v2ReadLimiter, async (req, res) => {
             LEFT JOIN metrics m ON j.id = m.job_id
             LEFT JOIN reports r ON j.id = r.job_id
             WHERE j.id = ? AND j.tenant_id = ?
-        `, [req.params.id, req.tenant.id]);
+        `, [req.params.id, req.auth.tenantId]);
 
         const job = rows[0];
         if (!job) return res.status(404).json({ error: 'Job not found for this tenant.' });
@@ -147,7 +145,7 @@ router.get('/', v2ReadLimiter, async (req, res) => {
             WHERE tenant_id = ?
             ORDER BY created_at DESC
             LIMIT ?
-        `, [req.tenant.id, limit]);
+        `, [req.auth.tenantId, limit]);
 
         res.json({
             count: rows.length,
@@ -172,7 +170,7 @@ router.get('/', v2ReadLimiter, async (req, res) => {
 router.post('/:id/routing', v2ReadLimiter, async (req, res) => {
     try {
         const jobId = req.params.id;
-        const tenantId = req.tenant.id;
+        const tenantId = req.auth.tenantId;
         const { paper_id, policy_id } = req.body;
 
         // Verify job ownership

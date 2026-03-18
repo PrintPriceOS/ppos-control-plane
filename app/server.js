@@ -83,6 +83,10 @@ const connectRouter = require('express').Router();
 
 const { startCleanupTask } = require('./services/cleanup');
 const apiKeyMiddleware = require('./middleware/apiKey');
+const enterpriseAuth = require('./middleware/enterpriseAuth');
+const enterpriseStatsRouter = require('./routes/enterpriseStats');
+const requireAuth = require('./middleware/requireAuth');
+const authRoutes = require('./routes/authRoutes');
 const printerAuth = (req, res, next) => next();
 // const requireAdmin = require('../middleware/requireAdmin'); // Removed in 19.C.7
 const rateLimit = require('express-rate-limit');
@@ -265,17 +269,21 @@ const adminLog = (req, res, next) => {
   next();
 };
 
+// 0) Identity Foundation (Internal Auth Generator)
+app.use('/api/auth', authRoutes);
+
 // 1) Core Product Pipeline (V1 & V2)
-app.use('/api/convert', convertLimiter, pdfRouter);
-app.use('/api/v2/preflight', v2UploadLimiter, preflightV2Router);
+app.use('/api/convert', requireAuth, convertLimiter, pdfRouter);
+app.use('/api/v2/preflight', requireAuth, v2UploadLimiter, preflightV2Router);
 
 // 2) Product API Layer (Jobs, Batches, Analytics)
-app.use('/api/v2/jobs', apiKeyMiddleware, apiV2Router);
-app.use('/api/v2/batches', apiKeyMiddleware, batchV2Router);
-app.use('/api/v2/analytics', apiKeyMiddleware, analyticsV2Router);
+app.use('/api/v2/jobs', requireAuth, apiV2Router);
+app.use('/api/v2/batches', requireAuth, batchV2Router);
+app.use('/api/v2/analytics', requireAuth, analyticsV2Router);
+app.use('/api/v2/enterprise', requireAuth, enterpriseStatsRouter);
 
 // 3) Connect / Marketplace (Transitional Surface)
-app.use('/api/connect', connectRouter);
+app.use('/api/connect', requireAuth, connectRouter);
 
 // 4) Product Admin Portal (Guarded by Feature Flags & Secret Key)
 // app.use('/api/admin', requireAdmin, adminLog, adminRoutes); // Removed 19.C.7

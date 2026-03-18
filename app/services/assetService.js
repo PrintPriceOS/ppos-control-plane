@@ -13,24 +13,32 @@ const db = require('./db');
  */
 class AssetService {
     constructor() {
-        this.uploadDir = process.env.PPP_UPLOAD_DIR || path.join(process.platform === 'win32' ? process.env.TEMP : '/tmp', 'ppp-preflight-v2');
-        if (!fs.existsSync(this.uploadDir)) {
-            fs.mkdirSync(this.uploadDir, { recursive: true });
+        this.baseDir = process.env.PPP_STORAGE_DIR || path.join(process.platform === 'win32' ? process.env.TEMP : '/storage', 'ppp-preflight-v2');
+    }
+
+    getTenantDir(tenantId) {
+        const dir = path.join(this.baseDir, 'tenants', tenantId, 'assets');
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
         }
+        return dir;
     }
 
     /**
      * Creates an asset from a file buffer or path.
      */
-    async createAsset({ filename, buffer, filePath, tenantId = 'default' }) {
+    async createAsset({ filename, buffer, filePath, tenantId }) {
+        if (!tenantId) throw new Error('[ASSET-ERR] tenantId is mandatory for strictly isolated storage.');
+
         const fileData = buffer || fs.readFileSync(filePath);
         const sha256 = crypto.createHash('sha256').update(fileData).digest('hex');
         const size = fileData.length;
         const id = crypto.randomUUID();
 
-        // Storage path: uploadDir / {sha256}.pdf to allow deduplication eventually
+        // Isolated Storage path: baseDir / tenants / {tenantId} / assets / {sha256}.pdf
+        const tenantDir = this.getTenantDir(tenantId);
         const storageFilename = `${sha256}.pdf`;
-        const storagePath = path.join(this.uploadDir, storageFilename);
+        const storagePath = path.join(tenantDir, storageFilename);
 
         if (!fs.existsSync(storagePath)) {
             if (buffer) {
@@ -59,18 +67,21 @@ class AssetService {
     }
 
     /**
-     * Retrieves an asset by ID.
+     * Retrieves an asset by ID with tenant validation.
      */
-    async getAsset(id) {
-        const result = await db.query('SELECT * FROM assets WHERE id = ?', [id]);
+    async getAsset(id, tenantId) {
+        const query = tenantId 
+            ? ['SELECT * FROM assets WHERE id = ? AND tenant_id = ?', [id, tenantId]]
+            : ['SELECT * FROM assets WHERE id = ?', [id]];
+        const result = await db.query(query[0], query[1]);
         return result.rows[0];
     }
 
     /**
-     * Returns the full physical path of an asset.
+     * Returns the full physical path of an asset with tenant validation.
      */
-    async getAssetPath(id) {
-        const asset = await this.getAsset(id);
+    async getAssetPath(id, tenantId) {
+        const asset = await this.getAsset(id, tenantId);
         if (!asset) return null;
         return asset.storage_path;
     }
