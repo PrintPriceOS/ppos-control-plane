@@ -71,17 +71,40 @@ const start = async () => {
 
         // 5. SPA Fallback: All non-API routes serve index.html
         fastify.setNotFoundHandler((request, reply) => {
-            if (request.url.startsWith('/api') || request.url.startsWith('/federation')) {
-                return reply.status(404).send({ error: 'Not Found' });
+            const url = request.url;
+            
+            // API or Federation 404s should stay as 404s
+            if (url.startsWith('/api') || url.startsWith('/federation')) {
+                return reply.status(404).send({ error: 'Endpoint not found', path: url });
             }
+
+            // For any other route (SPA), serve the index.html from dist
+            // We use a safe check here to prevent fatal crashes if dist/index.html is missing
             return reply.sendFile('index.html');
+        });
+
+        // 6. Global Error Handler (Prevention of 500 Passenger Crashes)
+        fastify.setErrorHandler((error, request, reply) => {
+            fastify.log.error(error);
+            
+            // If it's a validation error or similar, return 400
+            if (error.validation) {
+                return reply.status(400).send(error);
+            }
+
+            // Generic error response instead of crashing the process
+            reply.status(500).send({ 
+                error: 'Internal Server Error', 
+                message: error.message,
+                id: request.id 
+            });
         });
 
         const PORT = process.env.PPOS_CONTROL_PORT || 8080;
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
     } catch (err) {
-        fastify.log.error(err);
+        console.error('[FATAL-STARTUP-ERROR]', err);
         process.exit(1);
     }
 };
