@@ -40,16 +40,30 @@ fastify.addHook('onRequest', async (request, reply) => {
 // Register Routes
 fastify.get('/health', async () => {
     let mode = 'FULL';
+    let dependencies = {
+        preflight: 'LIVE',
+        learning: 'LIVE',
+        federation: 'LIVE'
+    };
+
     try {
         const mocks = require('./src/api/services/sharedMocks');
-        if (mocks.wasUsed) mode = 'DEGRADED';
+        if (mocks.wasUsed) {
+            mode = 'ISOLATED';
+            dependencies = {
+                preflight: 'UNAVAILABLE',
+                learning: 'MOCKED',
+                federation: 'MOCKED'
+            };
+        }
     } catch (e) {}
 
     return { 
-        status: mode === 'DEGRADED' ? 'DEGRADED' : 'UP',
-        mode: mode, 
+        status: mode === 'ISOLATED' ? 'DEGRADED' : 'UP',
+        mode: mode,
         service: 'ppos-control-plane', 
         version: '1.9.0',
+        dependencies: dependencies,
         timestamp: new Date().toISOString()
     };
 });
