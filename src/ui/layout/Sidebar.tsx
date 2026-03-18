@@ -103,6 +103,19 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/usage" icon={CalculatorIcon || ClockIcon} label="Usage & Quotas" />
         </NavGroup>
 
+        {/* INTELLIGENCE LAYER */}
+        <NavGroup label="Intelligence Layer">
+          <NavItem to="/intelligence" icon={BoltIcon} label="Overview" />
+          <NavItem to="/intelligence/anomalies" icon={ExclamationTriangleIcon} label="Anomalies" />
+          <NavItem to="/intelligence/insights" icon={CpuChipIcon} label="Insights" />
+          <NavItem to="/intelligence/recommendations" icon={WrenchScrewdriverIcon} label="Recommendations" />
+          <NavItem to="/intelligence/risk/tenants" icon={ShieldCheckIcon} label="Tenant Risk" />
+          <NavItem to="/intelligence/risk/deployments" icon={ArrowsRightLeftIcon} label="Deployment Risk" />
+          <NavItem to="/intelligence/trends" icon={ChartBarIcon} label="Trend Prediction" />
+          <NavItem to="/intelligence/guardrails" icon={ShieldCheckIcon} label="Guardrails" />
+          <NavItem to="/intelligence/circuit-breaker" icon={BoltIcon} label="Circuit Breakers" />
+        </NavGroup>
+
         {/* INFRASTRUCTURE & RUNTIME */}
         <NavGroup label="Infrastructure & Runtime">
           <NavItem to="/health" icon={HeartIcon} label="System Health" />
@@ -118,7 +131,6 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/ops/pricing" icon={CurrencyEuroIcon} label="Pricing Intelligence" />
           <NavItem to="/ops/financials" icon={BanknotesIcon} label="Financials" />
           <NavItem to="/ops/success" icon={HeartIcon} label="Customer Operations" />
-          <NavItem to="/ops/intelligence" icon={BoltIcon} label="Intelligence" />
         </NavGroup>
       </nav>
 

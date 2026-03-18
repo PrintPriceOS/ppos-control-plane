@@ -22,6 +22,18 @@ class AuditService {
         }
     }
 
+    async logGuardrail(tenantId, action, rationale, details = {}) {
+        return this.logAction(tenantId, `GUARDRAIL_${action}`, {
+            details: { rationale, ...details }
+        });
+    }
+
+    async logCircuitBreaker(state, reason) {
+        return this.logAction('system', `CIRCUIT_BREAKER_${state}`, {
+            details: { reason }
+        });
+    }
+
     generateSignedUrl(assetId, expiresInSeconds = 3600) {
         const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
         const secret = process.env.APP_SECRET || 'dev-secret-key-123';

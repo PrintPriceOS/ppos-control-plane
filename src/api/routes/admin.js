@@ -18,6 +18,13 @@ const commercialCommitmentAdminRouter = require('./commercialCommitmentAdmin');
 const autonomyAdminRouter = require('./autonomyAdmin');
 const autonomyFinanceRouter = require('./autonomyFinanceAdmin');
 const adminControlRoutes = require('./adminControl');
+const intelligenceAdminRouter = require('./intelligenceAdmin');
+const optimizationAdminRouter = require('./optimizationAdmin');
+const learningAdminRouter = require('./learningAdmin');
+const autonomyAdminRouter = require('./optimizationAutonomyAdmin');
+const agentAdminRouter = require('./agentAdmin');
+const federationAdminRouter = require('./federationAdmin');
+const globalGovernanceAdminRouter = require('./globalGovernanceAdmin');
 
 router.use((req, res, next) => {
   console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
@@ -49,6 +56,13 @@ router.use('/commercial', commercialCommitmentAdminRouter);
 router.use('/autonomy', autonomyAdminRouter);
 router.use('/finance', autonomyFinanceRouter);
 router.use('/control', adminControlRoutes);
+router.use('/intelligence', intelligenceAdminRouter);
+router.use('/optimization', optimizationAdminRouter);
+router.use('/learning', learningAdminRouter);
+router.use('/autonomy', autonomyAdminRouter);
+router.use('/agents', agentAdminRouter);
+router.use('/federation', federationAdminRouter);
+router.use('/global', globalGovernanceAdminRouter);
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d
