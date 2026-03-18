@@ -51,6 +51,8 @@ import { GlobalPosture } from './pages/global/GlobalPosture';
 import { GlobalIncidents } from './pages/global/GlobalIncidents';
 import { GlobalConflicts } from './pages/global/GlobalConflicts';
 
+import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
+
 export const App: React.FC = () => {
     return (
         <Routes>
@@ -117,7 +119,7 @@ export const App: React.FC = () => {
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
-                <Route path="/admin/help" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Help Console Logic Deferred to Phase 17</div>} />
+                <Route path="/admin/help" element={<AdminHelpPage />} />
             </Route>
 
             {/* Fallback */}
