@@ -4,6 +4,7 @@ const requireAdmin = require("../middleware/requireAdmin");
 const db = require("../services/db");
 
 const router = express.Router();
+router.use(express.json()); // Ensure req.body is parsed for POST requests
 router.use(requireAdmin);
 
 // Import sub-routers
