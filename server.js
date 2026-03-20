@@ -22,7 +22,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;
 
     // 2. API BYPASS (Specific endpoints that handle their own auth or are public)
-    if (url.startsWith('/api/admin') || url.startsWith('/api/v2/analytics') || url.startsWith('/api/system')) return;
+    if (url.includes('/api/admin') || url.includes('/api/v2/analytics') || url.includes('/api/system') || url.includes('/api/preflight') || url.includes('/api/auth')) return;
 
     // 3. PROTECTED ROUTES (Require Bearer Token)
     // Currently protecting Federation and any other generic API
@@ -70,14 +70,29 @@ fastify.get('/health', async () => {
 
 const start = async () => {
     try {
-        // 1. Register Fastify Static (for built frontend)
+        // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {
-            root: path.join(__dirname, 'dist'),
+            root: path.join(__dirname, '../../../frontend/dist'),
             prefix: '/', // serve from root
-            wildcard: false // we'll handle fallback manually
+            wildcard: false 
         });
 
-        // 2. Register Express Bridge
+        // 2. Register Http Proxy (Product API Gateway)
+        await fastify.register(require('@fastify/http-proxy'), {
+            upstream: `http://localhost:${process.env.PPOS_SERVICE_PORT || 8001}`,
+            prefix: '/api/preflight',
+            rewritePrefix: '/api/preflight',
+            http2: false
+        });
+
+        await fastify.register(require('@fastify/http-proxy'), {
+            upstream: `http://localhost:${process.env.PPOS_SERVICE_PORT || 8001}`,
+            prefix: '/api/auth',
+            rewritePrefix: '/api/auth',
+            http2: false
+        });
+
+        // 3. Register Express Bridge
         await fastify.register(require('@fastify/express'));
         
         // 3. Mount Admin, Analytics & System Routes (Express)
