@@ -23,6 +23,7 @@
         "fastify": "^4.24.0",
         "fuse.js": "^7.1.0",
         "ioredis": "^5.10.0",
+        "mongodb": "^7.1.1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "react-router-dom": "^7.2.0",
