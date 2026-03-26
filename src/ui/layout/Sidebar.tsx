@@ -23,7 +23,8 @@ import {
   CommandLineIcon,
   CubeIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  PrinterIcon
 } from "@heroicons/react/24/outline";
 import { t } from '../i18n';
 
@@ -101,6 +102,7 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/deployments" icon={ArrowsRightLeftIcon} label="Deployments" />
           <NavItem to="/audit" icon={DocumentCheckIcon} label="Audit Explorer" />
           <NavItem to="/usage" icon={CalculatorIcon || ClockIcon} label="Usage & Quotas" />
+          <NavItem to="/printhouses" icon={PrinterIcon} label="Printhouses" />
         </NavGroup>
 
         {/* INTELLIGENCE LAYER */}

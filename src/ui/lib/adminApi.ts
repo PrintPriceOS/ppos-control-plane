@@ -461,3 +461,29 @@ export async function getEngagementStats() {
     const res = await adminFetch<{ ok: boolean, stats: any[] }>(`/api/admin/engagement-stats`);
     return res.stats || [];
 }
+
+// --- Printhouses ---
+export async function getPrinthouses() {
+    const res = await adminFetch<{ ok: boolean, printhouses: any[] }>(`/api/admin/printhouses`);
+    return res.printhouses;
+}
+
+export async function createPrinthouse(data: object) {
+    return adminFetch<{ ok: boolean, id: string }>(`/api/admin/printhouses`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function updatePrinthouse(mongoId: string, data: object) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/printhouses/${mongoId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function deletePrinthouse(mongoId: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/printhouses/${mongoId}`, {
+        method: 'DELETE'
+    });
+}
