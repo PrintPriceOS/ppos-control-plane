@@ -49,6 +49,7 @@ export interface PrinthouseRates {
 }
 export interface Printhouse {
     _id: string; id: string; name: string;
+    country?: string; city?: string;
     signatures: number[]; delivery_time: string;
     production_lead_days: number; limits: PrinthouseLimits;
     rates?: PrinthouseRates;
@@ -115,7 +116,7 @@ export const EMPTY_RATES: PrinthouseRates = {
 
 type FormState = Omit<Printhouse, '_id'> & { rates: PrinthouseRates };
 const EMPTY_FORM: FormState = {
-    id: '', name: '', signatures: [32], delivery_time: '7 days',
+    id: '', name: '', country: '', city: '', signatures: [32], delivery_time: '7 days',
     production_lead_days: 5, limits: { min_copies: 250, max_pages: 1500 },
     rates: EMPTY_RATES,
 };
@@ -148,6 +149,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
         if (editing) {
             setForm({
                 id: editing.id, name: editing.name,
+                country: editing.country ?? '', city: editing.city ?? '',
                 signatures: editing.signatures, delivery_time: editing.delivery_time,
                 production_lead_days: editing.production_lead_days,
                 limits: { ...editing.limits },
@@ -252,6 +254,18 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     <label className={lbl}>Production Lead Days</label>
                                                     <input type="number" min={1} value={form.production_lead_days}
                                                         onChange={e => setForm(f => ({ ...f, production_lead_days: parseInt(e.target.value, 10) || 0 }))} className={inp} />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className={lbl}>Country</label>
+                                                    <input type="text" value={form.country ?? ''} placeholder="e.g. Belgium"
+                                                        onChange={e => setForm(f => ({ ...f, country: e.target.value }))} className={inp} />
+                                                </div>
+                                                <div>
+                                                    <label className={lbl}>City</label>
+                                                    <input type="text" value={form.city ?? ''} placeholder="e.g. Ghent"
+                                                        onChange={e => setForm(f => ({ ...f, city: e.target.value }))} className={inp} />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -740,32 +754,39 @@ export const PrinthousesPage: React.FC = () => {
 
             <PrinthouseFormModal isOpen={modalOpen} onClose={() => setModalOpen(false)} editing={editing} onSaved={() => q.refetch()} />
 
-            {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 space-y-4">
-                        <div className="flex items-center gap-2">
-                            <div className="p-3 rounded-xl bg-red-50 text-red-500"><TrashIcon className="w-6 h-6" /></div>
-                            <div>
-                                <p className="text-sm font-black text-slate-900">Delete Printhouse</p>
-                                <p className="text-xs text-slate-500 font-medium">This action cannot be undone.</p>
-                            </div>
-                        </div>
-                        <p className="text-sm text-slate-600 font-medium">
-                            Remove <span className="font-black text-slate-900">{deleteTarget.name}</span>?
-                        </p>
-                        <div className="flex gap-2 pt-2">
-                            <button onClick={confirmDelete} disabled={deleting}
-                                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                                {deleting ? 'Deleting…' : 'Delete'}
-                            </button>
-                            <button onClick={() => setDeleteTarget(null)}
-                                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                                Cancel
-                            </button>
-                        </div>
+            <Transition show={!!deleteTarget} as={Fragment}>
+                <Dialog as="div" className="relative z-50" onClose={() => setDeleteTarget(null)}>
+                    <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" />
+                    </TransitionChild>
+                    <div className="fixed inset-0 flex items-center justify-center p-4">
+                        <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
+                            <DialogPanel className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-3 rounded-xl bg-red-50 text-red-500"><TrashIcon className="w-6 h-6" /></div>
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900">Delete Printhouse</p>
+                                        <p className="text-xs text-slate-500 font-medium">This action cannot be undone.</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-600 font-medium">
+                                    Remove <span className="font-black text-slate-900">{deleteTarget?.name}</span>?
+                                </p>
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={confirmDelete} disabled={deleting}
+                                        className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        {deleting ? 'Deleting…' : 'Delete'}
+                                    </button>
+                                    <button onClick={() => setDeleteTarget(null)}
+                                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </DialogPanel>
+                        </TransitionChild>
                     </div>
-                </div>
-            )}
+                </Dialog>
+            </Transition>
         </div>
     );
 };

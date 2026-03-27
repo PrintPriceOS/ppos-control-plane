@@ -64,6 +64,8 @@ function BasicTab({ ph }: { ph: Printhouse }) {
                 <div className="grid grid-cols-2 gap-4">
                     <Cell label="Name">{ph.name}</Cell>
                     <Cell label="ID">{ph.id}</Cell>
+                    <Cell label="Country">{ph.country || '—'}</Cell>
+                    <Cell label="City">{ph.city || '—'}</Cell>
                     <Cell label="Delivery Time">{ph.delivery_time}</Cell>
                     <Cell label="Production Lead Days">{ph.production_lead_days}d</Cell>
                 </div>
