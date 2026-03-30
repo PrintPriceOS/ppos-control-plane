@@ -56,6 +56,16 @@ function RateTable({ headers, rows }: { headers: string[]; rows: { label: string
 
 // ── Tab sections ─────────────────────────────────────────────────────────────
 
+function StatusBadge({ status }: { status?: string }) {
+    const s = status ?? 'Active';
+    const cls = s === 'Active'
+        ? 'bg-emerald-50 text-emerald-700'
+        : s === 'Under Maintenance'
+        ? 'bg-amber-50 text-amber-700'
+        : 'bg-slate-100 text-slate-500';
+    return <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
+}
+
 function BasicTab({ ph }: { ph: Printhouse }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -68,6 +78,10 @@ function BasicTab({ ph }: { ph: Printhouse }) {
                     <Cell label="City">{ph.city || '—'}</Cell>
                     <Cell label="Delivery Time">{ph.delivery_time}</Cell>
                     <Cell label="Production Lead Days">{ph.production_lead_days}d</Cell>
+                    <div>
+                        <p className={lbl}>Status</p>
+                        <StatusBadge status={ph.status} />
+                    </div>
                 </div>
             </div>
             <div className={card}>
@@ -157,7 +171,7 @@ function LaminationUvTab({ r }: { r: PrinthouseRates }) {
             <div className={card}>
                 <h3 className={sectionTitle}>Lamination</h3>
                 <RateTable
-                    headers={finishes}
+                    headers={[...finishes]}
                     rows={[
                         { label: 'Fixed', values: finishes.map(f => r.lam_fixed[f] ?? 0) },
                         { label: 'Variable', values: finishes.map(f => r.lam_var_per_1000[f] ?? 0) },

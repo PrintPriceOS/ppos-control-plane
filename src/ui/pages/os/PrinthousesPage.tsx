@@ -47,9 +47,11 @@ export interface PrinthouseRates {
     percentage_technical_costs: ByCountry;
     transport_costs: ByCountry;
 }
+export type PrinthouseStatus = 'Active' | 'Under Maintenance' | 'Inactive';
 export interface Printhouse {
     _id: string; id: string; name: string;
     country?: string; city?: string;
+    status?: PrinthouseStatus;
     signatures: number[]; delivery_time: string;
     production_lead_days: number; limits: PrinthouseLimits;
     rates?: PrinthouseRates;
@@ -116,7 +118,7 @@ export const EMPTY_RATES: PrinthouseRates = {
 
 type FormState = Omit<Printhouse, '_id'> & { rates: PrinthouseRates };
 const EMPTY_FORM: FormState = {
-    id: '', name: '', country: '', city: '', signatures: [32], delivery_time: '7 days',
+    id: '', name: '', country: '', city: '', status: 'Active', signatures: [32], delivery_time: '7 days',
     production_lead_days: 5, limits: { min_copies: 250, max_pages: 1500 },
     rates: EMPTY_RATES,
 };
@@ -150,6 +152,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
             setForm({
                 id: editing.id, name: editing.name,
                 country: editing.country ?? '', city: editing.city ?? '',
+                status: editing.status ?? 'Active',
                 signatures: editing.signatures, delivery_time: editing.delivery_time,
                 production_lead_days: editing.production_lead_days,
                 limits: { ...editing.limits },
@@ -266,6 +269,22 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     <label className={lbl}>City</label>
                                                     <input type="text" value={form.city ?? ''} placeholder="e.g. Ghent"
                                                         onChange={e => setForm(f => ({ ...f, city: e.target.value }))} className={inp} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className={lbl}>Status</label>
+                                                <div className="flex gap-2">
+                                                    {(['Active', 'Under Maintenance', 'Inactive'] as const).map(s => (
+                                                        <button key={s} type="button"
+                                                            onClick={() => setForm(f => ({ ...f, status: s }))}
+                                                            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${form.status === s
+                                                                ? s === 'Active' ? 'bg-emerald-600 text-white border-emerald-600'
+                                                                    : s === 'Under Maintenance' ? 'bg-amber-500 text-white border-amber-500'
+                                                                    : 'bg-slate-500 text-white border-slate-500'
+                                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+                                                            {s}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -731,6 +750,18 @@ export const PrinthousesPage: React.FC = () => {
                                 </div>
                             </div>
                         ),
+                    },
+                    {
+                        header: 'Status',
+                        accessor: (p) => {
+                            const s = p.status ?? 'Active';
+                            const cls = s === 'Active'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : s === 'Under Maintenance'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-slate-100 text-slate-500';
+                            return <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
+                        },
                     },
                     {
                         header: '',
