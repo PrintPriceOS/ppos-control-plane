@@ -54,6 +54,7 @@ import { GlobalIncidents } from './pages/global/GlobalIncidents';
 import { GlobalConflicts } from './pages/global/GlobalConflicts';
 
 import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
+import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 
 export const App: React.FC = () => {
     return (
@@ -124,6 +125,7 @@ export const App: React.FC = () => {
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />
+                <Route path="/settings" element={<GlobalSettingsPage />} />
             </Route>
 
             {/* Fallback */}
