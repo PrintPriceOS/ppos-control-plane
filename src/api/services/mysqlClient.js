@@ -22,7 +22,7 @@ function getPool() {
 }
 
 async function query(sql, params = []) {
-    const [rows] = await getPool().execute(sql, params);
+    const [rows] = await getPool().query(sql, params);
     return rows;
 }
 
