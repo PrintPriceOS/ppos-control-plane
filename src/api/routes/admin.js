@@ -27,6 +27,7 @@ const agentAdminRouter = require('./agentAdmin');
 const federationAdminRouter = require('./federationAdmin');
 const globalGovernanceAdminRouter = require('./globalGovernanceAdmin');
 const printhousesAdminRouter = require('./printhousesAdmin');
+const ordersAdminRouter = require('./ordersAdmin');
 
 router.use((req, res, next) => {
   console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
@@ -66,6 +67,7 @@ router.use('/agents', agentAdminRouter);
 router.use('/federation', federationAdminRouter);
 router.use('/global', globalGovernanceAdminRouter);
 router.use('/printhouses', printhousesAdminRouter);
+router.use('/orders', ordersAdminRouter);
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d

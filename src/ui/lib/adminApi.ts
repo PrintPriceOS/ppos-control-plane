@@ -487,3 +487,33 @@ export async function deletePrinthouse(mongoId: string) {
         method: 'DELETE'
     });
 }
+
+// --- Orders ---
+export type OrderStatus = 'pending' | 'reviewing' | 'in_production' | 'shipped' | 'delivered' | 'cancelled';
+
+export type Order = {
+    id: number;
+    order_ref: string;
+    user_id: string;
+    status: OrderStatus;
+    specs: any;
+    offer_print_house: string;
+    offer_price: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type OrdersResponse = {
+    ok: boolean;
+    total: number;
+    orders: Order[];
+};
+
+export async function getOrders(params: { status?: OrderStatus; user_id?: string; limit?: number; offset?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.user_id) qs.set('user_id', params.user_id);
+    qs.set('limit', String(params.limit ?? 50));
+    qs.set('offset', String(params.offset ?? 0));
+    return adminFetch<OrdersResponse>(`/api/admin/orders?${qs.toString()}`);
+}

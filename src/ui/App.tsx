@@ -10,6 +10,7 @@ import { DeploymentsPage } from './pages/os/DeploymentsPage';
 import { UsageQuotasPage } from './pages/os/UsageQuotasPage';
 import { PrinthousesPage } from './pages/os/PrinthousesPage';
 import { PrinthouseDetailPage } from './pages/os/PrinthouseDetailPage';
+import { OrdersPage } from './pages/os/OrdersPage';
 import { SystemHealthPage } from './pages/os/SystemHealthPage';
 import { RuntimeContextPage } from './pages/os/RuntimeContextPage';
 import { AdminDashboard } from './pages/AdminDashboard'; // Legacy Dashboard
@@ -72,6 +73,7 @@ export const App: React.FC = () => {
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
 
                 <Route path="/health" element={<SystemHealthPage />} />
                 <Route path="/runtime" element={<RuntimeContextPage />} />
