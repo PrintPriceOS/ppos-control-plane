@@ -60,15 +60,15 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-slate-200 dark:border-white/10 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="glass overflow-hidden rounded-2xl border border-white">
-      <table className="min-w-full divide-y divide-slate-100 italic-text-off">
-        <thead className="bg-slate-50/50 uppercase tracking-widest text-[10px] font-black text-slate-400">
+    <div className="glass overflow-hidden rounded-2xl border border-white dark:border-white/[0.07]">
+      <table className="min-w-full divide-y divide-slate-100 dark:divide-white/[0.05] italic-text-off">
+        <thead className="bg-slate-50/50 dark:bg-white/[0.03] uppercase tracking-widest text-[10px] font-black text-slate-400 dark:text-zinc-500">
           <tr>
             {columns.map((col, i) => {
               const sortable = !!col.sortKey || typeof col.accessor !== 'function';
@@ -78,14 +78,14 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
                 <th 
                   key={i} 
                   onClick={() => sortable && requestSort(col)}
-                  className={`px-6 py-4 text-left ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-slate-100/50 transition-colors group' : ''}`}
+                  className={`px-6 py-4 text-left ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-white/[0.04] transition-colors group' : ''}`}
                 >
                   <div className="flex items-center gap-2">
                     {col.header}
                     {sortable && (
                       <div className={`flex flex-col opacity-0 group-hover:opacity-100 transition-opacity ${activeSort ? 'opacity-100' : ''}`}>
-                         <ChevronUpIcon className={`w-2 h-2 ${activeSort && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`} />
-                         <ChevronDownIcon className={`w-2 h-2 ${activeSort && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`} />
+                         <ChevronUpIcon className={`w-2 h-2 ${activeSort && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}`} />
+                         <ChevronDownIcon className={`w-2 h-2 ${activeSort && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}`} />
                       </div>
                     )}
                   </div>
@@ -94,15 +94,15 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
             })}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white/50">
+        <tbody className="divide-y divide-slate-100 dark:divide-white/[0.05] bg-white/50 dark:bg-transparent">
           {sortedData.map((item, i) => (
-            <tr 
-              key={i} 
+            <tr
+              key={i}
               onClick={() => onRowClick?.(item)}
-              className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50/80' : ''}`}
+              className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50/80 dark:hover:bg-white/[0.04]' : ''}`}
             >
               {columns.map((col, j) => (
-                <td key={j} className={`px-6 py-4 text-sm font-medium text-slate-900 ${col.className || ''}`}>
+                <td key={j} className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-[#ECECF1] ${col.className || ''}`}>
                   {typeof col.accessor === 'function' ? col.accessor(item) : (item[col.accessor] as React.ReactNode)}
                 </td>
               ))}
@@ -110,7 +110,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
           ))}
           {sortedData.length === 0 && (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-20 text-center text-slate-400 font-bold">
+              <td colSpan={columns.length} className="px-6 py-20 text-center text-slate-400 dark:text-zinc-600 font-bold">
                 No data available in this view.
               </td>
             </tr>

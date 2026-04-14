@@ -1,6 +1,26 @@
 @import 'tailwindcss';
 
 /* ===================== */
+/* Tailwind theme override*/
+/* ===================== */
+/*
+  Slate tiene un tono azul inherente. Remapeamos las variantes
+  oscuras (400–950) a grises neutros para que el dark mode
+  quede coherente con la paleta ChatGPT-style sin tocar cada archivo.
+  Las variantes claras (50–300) quedan intactas para el light mode.
+*/
+@theme {
+  --color-slate-300: #d4d4d4;
+  --color-slate-400: #a0a0a0;
+  --color-slate-500: #6e6e6e;
+  --color-slate-600: #505050;
+  --color-slate-700: #3a3a3c;
+  --color-slate-800: #2c2c2e;
+  --color-slate-900: #1c1c1e;
+  --color-slate-950: #141414;
+}
+
+/* ===================== */
 /* Variables CSS          */
 /* ===================== */
 
@@ -115,6 +135,18 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-gray-500);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* Focus visible accesible mejorado */
@@ -232,6 +264,15 @@ div[role="button"]:focus:not(:focus-visible),
 
 .animate-slide-fade {
   animation: slide-fade 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
 }
 
 .loader {
@@ -765,6 +806,16 @@ div[role="button"]:focus:not(:focus-visible),
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass {
+    background: rgba(44, 44, 46, 0.95);
+    border-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.4);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .glass-dark {
@@ -1562,9 +1613,9 @@ div[role="button"]:focus-visible,
 @media (prefers-color-scheme: dark) {
   :root {
     /* Invertir colores para modo oscuro */
-    --color-white: #1f2937;
-    --color-gray-50: #374151;
-    --color-gray-100: #4b5563;
+    --color-white: #2c2c2e;
+    --color-gray-50: #3a3a3c;
+    --color-gray-100: #2c2c2e;
     --color-gray-200: #6b7280;
     --color-gray-300: #9ca3af;
     --color-gray-400: #d1d5db;
@@ -1578,11 +1629,16 @@ div[role="button"]:focus-visible,
     --color-error-bg: #450a0a;
     --color-warning-bg: #451a03;
     --color-info-bg: #0c2a4a;
+
+    /* Glass — dark mode override */
+    --glass-bg: rgba(15, 23, 42, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   }
 
   body {
-    background-color: var(--color-gray-900);
-    color: var(--color-gray-200);
+    background-color: #1c1c1e;
+    color: #e2e8f0;
   }
 
   /* Ajustar scrollbar para modo oscuro */
@@ -1597,6 +1653,36 @@ div[role="button"]:focus-visible,
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-gray-500);
   }
+
+  /* ── Overrides globales de Tailwind para dark mode ──────────────────────────
+     Corrige los ~60 componentes que usan clases hardcoded de light mode sin
+     variantes dark:. Los archivos ya corregidos explícitamente (con dark:text-*
+     o dark:bg-*) continúan funcionando porque sus clases tienen precedencia al
+     aparecer después en el CSS generado por Tailwind.
+  ────────────────────────────────────────────────────────────────────────── */
+
+  /* Texto: evita que textos oscuros desaparezcan sobre fondos oscuros */
+  .text-slate-900 { color: #f1f5f9; }   /* → slate-100 */
+  .text-slate-800 { color: #e2e8f0; }   /* → slate-200 */
+  .text-slate-700 { color: #cbd5e1; }   /* → slate-300 */
+
+  /* Fondos: tarjetas y paneles blancos/gris claro se vuelven oscuros */
+  .bg-white       { background-color: #2c2c2e; }   /* → gris neutro elevado (Apple system gray) */
+  .bg-slate-50    { background-color: #1c1c1e; }   /* → gris profundo (igual que sidebar) */
+  .bg-slate-100   { background-color: #242424; }   /* → gris página (igual que Layout bg) */
+
+  /* Bordes claros invisibles en fondo oscuro */
+  .border-slate-100 { border-color: rgb(51 65 85 / 0.5);  }  /* slate-700/50 */
+  .border-slate-200 { border-color: rgb(71 85 105 / 0.4); }  /* slate-600/40 */
+
+  /* Divisores de tabla y listas */
+  .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(51 65 85 / 0.4);  }
+  .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(71 85 105 / 0.3); }
+
+  /* Hover states */
+  .hover\:bg-slate-50:hover  { background-color: rgb(30 41 59 / 0.6); }
+  .hover\:bg-slate-100:hover { background-color: rgb(30 41 59 / 0.8); }
+  .hover\:text-slate-900:hover { color: #f1f5f9; }
 }
 
 /* =========================================================

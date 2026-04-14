@@ -43,7 +43,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, badge }) => (
       "flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group",
       isActive
         ? "bg-primary/10 text-primary border border-primary/20"
-        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
     ].join(" ")}
   >
     <div className="flex items-center gap-3">
@@ -70,7 +70,7 @@ const NavGroup: React.FC<NavGroupProps> = ({ label, children, defaultOpen = true
     <div className="space-y-1">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-3 py-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+        className="flex items-center justify-between w-full px-3 py-2 text-xs font-black text-slate-400 dark:text-zinc-600 uppercase tracking-widest hover:text-slate-600 dark:hover:text-zinc-400 transition-colors"
       >
         {label}
         {isOpen ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronRightIcon className="w-3 h-3" />}
@@ -82,15 +82,15 @@ const NavGroup: React.FC<NavGroupProps> = ({ label, children, defaultOpen = true
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-72 bg-white/50 backdrop-blur-xl border-r border-slate-200/60 h-screen sticky top-0 flex flex-col overflow-hidden">
+    <aside className="w-72 bg-white/50 dark:bg-[#1C1C1E] border-r border-slate-200/60 dark:border-white/[0.08] h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
-      <div className="px-6 py-8 flex items-center gap-3">
-        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg shadow-slate-900/20">
-          <ShieldCheckIcon className="w-6 h-6 text-white" />
+      <div className="px-6 py-7 flex items-center gap-3.5">
+        <div className="w-10 h-10 bg-slate-900 dark:bg-primary/10 rounded-xl flex items-center justify-center shadow-lg shadow-slate-900/20 dark:shadow-none ring-1 ring-transparent dark:ring-primary/25">
+          <ShieldCheckIcon className="w-6 h-6 text-white dark:text-primary" />
         </div>
         <div>
-          <h1 className="text-lg font-black text-slate-900 leading-none tracking-tight">PrintPrice OS</h1>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Control Plane v2.1</p>
+          <h1 className="text-lg font-black text-slate-900 dark:text-[#ECECF1] leading-none tracking-tight">PrintPrice OS</h1>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-400 mt-1 uppercase tracking-widest">Control Plane v2.1</p>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-4 bg-slate-50/50 border-t border-slate-200/60">
+      <div className="p-4 bg-slate-50/50 dark:bg-black/20 border-t border-slate-200/60 dark:border-white/[0.08]">
         <a 
           href="/admin/help" 
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/10 group"

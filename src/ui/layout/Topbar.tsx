@@ -72,10 +72,10 @@ function formatRelative(iso: string): string {
 }
 
 const SEVERITY_CONFIG: Record<NotifSeverity, { icon: React.ElementType; bg: string; iconColor: string }> = {
-  error:   { icon: ExclamationCircleIcon, bg: 'bg-red-50',    iconColor: 'text-red-500' },
-  warning: { icon: ExclamationTriangleIcon, bg: 'bg-amber-50', iconColor: 'text-amber-500' },
-  info:    { icon: InformationCircleIcon,  bg: 'bg-blue-50',  iconColor: 'text-blue-500' },
-  success: { icon: CheckBadgeIcon,         bg: 'bg-emerald-50', iconColor: 'text-emerald-500' },
+  error:   { icon: ExclamationCircleIcon,   bg: 'bg-red-50 dark:bg-red-900/25',     iconColor: 'text-red-500 dark:text-red-400' },
+  warning: { icon: ExclamationTriangleIcon, bg: 'bg-amber-50 dark:bg-amber-900/25', iconColor: 'text-amber-500 dark:text-amber-400' },
+  info:    { icon: InformationCircleIcon,   bg: 'bg-blue-50 dark:bg-blue-900/25',   iconColor: 'text-blue-500 dark:text-blue-400' },
+  success: { icon: CheckBadgeIcon,          bg: 'bg-emerald-50 dark:bg-emerald-900/25', iconColor: 'text-emerald-500 dark:text-emerald-400' },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -125,16 +125,16 @@ export const Topbar: React.FC = () => {
 
   return (
     <>
-      <header className="h-20 bg-white/70 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-40 px-8 flex items-center justify-between">
+      <header className="h-20 bg-white/70 backdrop-blur-md dark:bg-[#2C2C2E] border-b border-slate-200/60 dark:border-white/[0.08] sticky top-0 z-40 px-8 flex items-center justify-between">
         <div className="flex items-center gap-6">
           {/* Environment Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 animate-pulse-slow">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-700/30 animate-pulse-slow">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span className="text-[10px] font-black uppercase tracking-widest">Production Environment</span>
           </div>
 
           {/* Certification Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-100">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-700/30">
             <ShieldCheckIcon className="w-4 h-4" />
             <span className="text-[10px] font-black uppercase tracking-widest">v2.0.0 Certified</span>
           </div>
@@ -151,11 +151,11 @@ export const Topbar: React.FC = () => {
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setNotifOpen(v => !v)}
-              className="p-2 rounded-xl transition-all relative text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+              className="p-2 rounded-xl transition-all relative text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08]"
             >
               <BellIcon className="w-6 h-6" />
               {hasUnread && (
-                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-0.5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
+                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-0.5 bg-red-500 rounded-full border-2 border-white dark:border-[#2C2C2E] flex items-center justify-center">
                   <span className="text-[9px] font-black text-white leading-none">{unreadCount}</span>
                 </span>
               )}
@@ -163,11 +163,11 @@ export const Topbar: React.FC = () => {
 
             {/* Notifications Dropdown */}
             {notifOpen && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/60 overflow-hidden z-50">
+              <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200 dark:border-white/[0.1] shadow-xl shadow-slate-200/60 dark:shadow-black/60 overflow-hidden z-50">
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-white/[0.06]">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-black text-slate-900">Notifications</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-[#ECECF1]">Notifications</p>
                     {hasUnread && (
                       <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-black">
                         {unreadCount} new
@@ -186,7 +186,7 @@ export const Topbar: React.FC = () => {
                 </div>
 
                 {/* List */}
-                <div className="divide-y divide-slate-50 max-h-[420px] overflow-y-auto">
+                <div className="divide-y divide-slate-50 dark:divide-white/[0.05] max-h-[420px] overflow-y-auto">
                   {notifications.map(n => {
                     const cfg = SEVERITY_CONFIG[n.severity];
                     const Icon = cfg.icon;
@@ -195,7 +195,7 @@ export const Topbar: React.FC = () => {
                         key={n.id}
                         onClick={() => markAsRead(n.id)}
                         className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors ${
-                          n.read ? 'hover:bg-slate-50' : 'bg-slate-50/80 hover:bg-slate-100/80'
+                          n.read ? 'hover:bg-slate-50 dark:hover:bg-white/[0.04]' : 'bg-slate-50/80 dark:bg-white/[0.04] hover:bg-slate-100/80 dark:hover:bg-white/[0.07]'
                         }`}
                       >
                         {/* Severity Icon */}
@@ -206,7 +206,7 @@ export const Topbar: React.FC = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm leading-snug ${n.read ? 'font-medium text-slate-600' : 'font-bold text-slate-900'}`}>
+                            <p className={`text-sm leading-snug ${n.read ? 'font-medium text-slate-600 dark:text-zinc-400' : 'font-bold text-slate-900 dark:text-[#ECECF1]'}`}>
                               {n.title}
                             </p>
                             {!n.read && (
@@ -237,19 +237,19 @@ export const Topbar: React.FC = () => {
           </div>
 
           {/* Role & Profile */}
-          <div className="h-10 w-[1px] bg-slate-200 mx-1" />
+          <div className="h-10 w-[1px] bg-slate-200 dark:bg-white/10 mx-1" />
 
           {/* User Menu */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(v => !v)}
-              className="flex items-center gap-3 pl-2 rounded-xl hover:bg-slate-100 pr-2 py-1.5 transition-all group"
+              className="flex items-center gap-3 pl-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] pr-2 py-1.5 transition-all group"
             >
               <div className="text-right">
-                <p className="text-sm font-black text-slate-900 leading-tight">System Admin</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Superuser (os:admin)</p>
+                <p className="text-sm font-black text-slate-900 dark:text-[#ECECF1] leading-tight">System Admin</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest leading-tight">Superuser (os:admin)</p>
               </div>
-              <div className="w-10 h-10 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 group-hover:border-slate-300 transition-colors">
+              <div className="w-10 h-10 bg-slate-100 dark:bg-[#2C2C2E] rounded-xl border border-slate-200 dark:border-white/[0.1] flex items-center justify-center text-slate-400 dark:text-zinc-400 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">
                 <UserCircleIcon className="w-8 h-8" />
               </div>
               <ChevronDownIcon className={`w-4 h-4 text-slate-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
@@ -257,19 +257,19 @@ export const Topbar: React.FC = () => {
 
             {/* Dropdown */}
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/60 overflow-hidden z-50">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200 dark:border-white/[0.1] shadow-xl shadow-slate-200/60 dark:shadow-black/60 overflow-hidden z-50">
                 <div className="p-1">
                   <button
                     onClick={handleSettings}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors"
                   >
                     <Cog6ToothIcon className="w-4 h-4 text-slate-400" />
                     Settings
                   </button>
-                  <div className="my-1 border-t border-slate-100" />
+                  <div className="my-1 border-t border-slate-100 dark:border-white/[0.06]" />
                   <button
                     onClick={() => { setMenuOpen(false); setLogoutModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
                     <ArrowRightStartOnRectangleIcon className="w-4 h-4" />
                     Logout
@@ -288,20 +288,20 @@ export const Topbar: React.FC = () => {
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={() => setLogoutModal(false)}
           />
-          <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5">
+          <div className="relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/[0.1] p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5">
             <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
               <ExclamationTriangleIcon className="w-7 h-7 text-red-500" />
             </div>
             <div className="text-center">
-              <p className="text-base font-black text-slate-900">Close Session?</p>
-              <p className="text-sm text-slate-500 font-medium mt-1">
+              <p className="text-base font-black text-slate-900 dark:text-[#ECECF1]">Close Session?</p>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium mt-1">
                 Are you sure you want to log out of the Control Plane?
               </p>
             </div>
             <div className="flex gap-3 w-full">
               <button
                 onClick={() => setLogoutModal(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/[0.1] text-sm font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors"
               >
                 Cancel
               </button>
