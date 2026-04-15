@@ -150,8 +150,19 @@ export type CSWorkflow = {
     updated_at: string;
 };
 
+export type GovernanceBlock = {
+    id: string;
+    name: string;
+    status: string;
+    impact: string;
+};
+
 export async function getOverview(range: Range) {
     return adminFetch<OverviewResponse>(`/api/admin/metrics/overview?range=${range}`);
+}
+
+export async function getGovernanceBlocks() {
+    return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }
 export async function getTenants(range: Range) {
     return adminFetch<TenantRow[]>(`/api/admin/metrics/tenants?range=${range}`);

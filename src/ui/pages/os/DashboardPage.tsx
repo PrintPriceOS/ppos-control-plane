@@ -12,7 +12,7 @@ import {
   ServerIcon,
   ArrowRightIcon
 } from "@heroicons/react/24/outline";
-import { getOverview, getQueue } from "../../lib/adminApi";
+import { getOverview, getQueue, getGovernanceBlocks } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 
 const KpiCard = ({ title, value, sub, Icon, color }: { title: string; value: string; sub?: string; Icon: any; color: string }) => (
@@ -33,6 +33,7 @@ const KpiCard = ({ title, value, sub, Icon, color }: { title: string; value: str
 export const DashboardPage: React.FC = () => {
     const o = useAdminQuery("overview:24h", () => getOverview("24h"), 30000);
     const q = useAdminQuery("queue-live", getQueue, 10000);
+    const gov = useAdminQuery("governance-blocks", getGovernanceBlocks, 60000);
 
     return (
         <div className="space-y-8">
@@ -67,10 +68,7 @@ export const DashboardPage: React.FC = () => {
                         </button>
                     </div>
                     <div className="space-y-4 italic-text-off">
-                        {[
-                            { id: 'GB-101', name: 'Regional Data Sovereignty v1.2', status: 'Enforced', impact: 'Global' },
-                            { id: 'GB-102', name: 'Tenant Isolation Protocol v2.0', status: 'Enforced', impact: 'eu-west-1' }
-                        ].map(block => (
+                        {(gov.data?.blocks ?? []).map(block => (
                             <div key={block.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/40">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center font-mono text-[10px] font-black text-slate-700 dark:text-slate-300">
@@ -86,6 +84,9 @@ export const DashboardPage: React.FC = () => {
                                 </span>
                             </div>
                         ))}
+                        {gov.data?.blocks?.length === 0 && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">No active governance blocks</p>
+                        )}
                     </div>
                 </div>
 
