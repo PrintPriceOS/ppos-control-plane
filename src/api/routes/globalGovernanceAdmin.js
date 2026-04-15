@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const db = require('../services/db');
+const mysql = require('../services/mysqlClient');
 
 let authority, registry, rolloutEngine, postureAggregator, auditLogger;
 try {
@@ -59,7 +59,7 @@ router.get('/audit', (req, res) => {
 
 router.get('/blocks', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await mysql.query(`
       SELECT id, name, status, scope_type, scope_id
       FROM governance_policies
       WHERE status = 'active'
