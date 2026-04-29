@@ -27,7 +27,10 @@ async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: 
 
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        ...(key ? { "X-Admin-Api-Key": key } : {}),
+        ...(key ? { 
+            "X-Admin-Api-Key": key,
+            "Authorization": `Bearer ${key}`
+        } : {}),
         ...(options?.tenantId ? { "X-Tenant-Id": options.tenantId } : {}),
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
         ...(options?.headers as any || {}),
