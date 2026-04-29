@@ -26,6 +26,12 @@ import {
   ChevronRightIcon,
   PrinterIcon,
   ClipboardDocumentListIcon,
+  CircleStackIcon,
+  TicketIcon,
+  CpuChipIcon as WorkerIcon,
+  ScaleIcon,
+  DocumentArrowDownIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import { t } from '../i18n';
 
@@ -127,6 +133,16 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/jobs" icon={QueueListIcon} label="Jobs" />
           <NavItem to="/queues-workers" icon={WrenchScrewdriverIcon} label="Queues & Workers" />
           <NavItem to="/tenants" icon={UsersIcon} label="Tenants" />
+        </NavGroup>
+
+        {/* PREFLIGHT OPERATIONS */}
+        <NavGroup label="Preflight Operations">
+          <NavItem to="/preflight/jobs" icon={QueueListIcon} label="Jobs" />
+          <NavItem to="/preflight/large-documents" icon={DocumentDuplicateIcon} label="Large Documents" />
+          <NavItem to="/preflight/artifacts" icon={CircleStackIcon} label="Artifacts" />
+          <NavItem to="/preflight/certificates" icon={TicketIcon} label="Certificates" />
+          <NavItem to="/preflight/quotas" icon={ScaleIcon} label="Quotas" />
+          <NavItem to="/preflight/workers" icon={WorkerIcon} label="Workers" />
         </NavGroup>
 
         {/* EXTENDED OPERATIONS */}

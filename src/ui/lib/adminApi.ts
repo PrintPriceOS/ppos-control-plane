@@ -136,6 +136,49 @@ export type AuditRow = {
     governance_snapshot?: any;
 };
 
+export type PreflightJob = {
+    jobId: string;
+    tenantId: string;
+    userId?: string;
+    filename?: string;
+    fileSize?: number;
+    policy?: string;
+    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+    type: 'ANALYZE' | 'AUTOFIX' | 'CERTIFY';
+    progress: number;
+    issueCount?: number;
+    fixCount?: number;
+    noopFix?: boolean;
+    rewritten?: boolean;
+    certificationMode?: string;
+    destructiveFixRisk?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    createdAt: string;
+    completedAt?: string;
+    artifacts?: any[];
+};
+
+export type PreflightJobsResponse = {
+    total: number;
+    jobs: PreflightJob[];
+};
+
+export type PreflightWorker = {
+    id: string;
+    name: string;
+    status: 'ONLINE' | 'BUSY' | 'OFFLINE' | 'MAINTENANCE';
+    cpuUsage: number;
+    memUsage: number;
+    activeJobs: number;
+    lastSeen: string;
+};
+
+export type PreflightQuota = {
+    tenantId: string;
+    limit: number;
+    usage: number;
+    resetAt: string;
+};
+
 export type CSWorkflow = {
     id: string;
     tenant_id: string;
@@ -527,4 +570,83 @@ export async function getOrders(params: { status?: OrderStatus; user_id?: string
     qs.set('limit', String(params.limit ?? 50));
     qs.set('offset', String(params.offset ?? 0));
     return adminFetch<OrdersResponse>(`/api/admin/orders?${qs.toString()}`);
+}
+
+// --- Preflight Operations API --- //
+
+export async function getPreflightJobs(params: {
+    status?: string;
+    tenant?: string;
+    type?: string;
+    risk?: string;
+    largeOnly?: boolean;
+    limit?: number;
+    offset?: number;
+}): Promise<PreflightJobsResponse> {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status", params.status);
+    if (params.tenant) qs.set("tenant", params.tenant);
+    if (params.type) qs.set("type", params.type);
+    if (params.risk) qs.set("risk", params.risk);
+    if (params.largeOnly) qs.set("largeOnly", "true");
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    
+    try {
+        const res = await adminFetch<any>(`/api/preflight/jobs?${qs.toString()}`);
+        // Normalize: { jobs: [] } or { data: [] } or raw array
+        const jobs = res.jobs || res.data || (Array.isArray(res) ? res : []);
+        const total = res.total ?? jobs.length;
+        return { total, jobs };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightJobs failed:`, e);
+        return { total: 0, jobs: [] };
+    }
+}
+
+export async function getPreflightJob(jobId: string): Promise<PreflightJob | null> {
+    try {
+        const res = await adminFetch<any>(`/api/preflight/jobs/${encodeURIComponent(jobId)}`);
+        // Normalize: { result: job } or raw job
+        return res.result || res.job || (res.jobId ? res : null);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightJob(${jobId}) failed:`, e);
+        return null;
+    }
+}
+
+export async function getPreflightArtifacts(jobId: string): Promise<any[]> {
+    try {
+        const res = await adminFetch<any>(`/api/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
+        // Normalize: { artifacts: [] } or raw array
+        return res.artifacts || res.data || (Array.isArray(res) ? res : []);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightArtifacts(${jobId}) failed:`, e);
+        return [];
+    }
+}
+
+export async function getPreflightWorkers() {
+    try {
+        const res = await adminFetch<any>(`/api/preflight/workers/health`);
+        const workers = res.workers || (Array.isArray(res) ? res : []);
+        return { ok: true, workers };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightWorkers failed:`, e);
+        return { ok: false, workers: [] };
+    }
+}
+
+export async function getPreflightQuotas(): Promise<PreflightQuota[]> {
+    try {
+        const res = await adminFetch<any>(`/api/preflight/quotas`);
+        return res.quotas || (Array.isArray(res) ? res : []);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightQuotas failed:`, e);
+        return [];
+    }
+}
+
+export async function getLargeDocumentJobs(params: { limit?: number; offset?: number }) {
+    return getPreflightJobs({ ...params, largeOnly: true });
 }

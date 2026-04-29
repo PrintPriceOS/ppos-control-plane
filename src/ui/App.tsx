@@ -41,6 +41,14 @@ import { AgentsDashboard } from './pages/intelligence/AgentsDashboard';
 import { AgentDecisions } from './pages/intelligence/AgentDecisions';
 import { AgentConflicts } from './pages/intelligence/AgentConflicts';
 
+import { PreflightJobsPage } from './pages/preflight/PreflightJobsPage';
+import { PreflightJobDetailPage } from './pages/preflight/PreflightJobDetailPage';
+import { PreflightLargeDocumentsPage } from './pages/preflight/PreflightLargeDocumentsPage';
+import { PreflightArtifactsPage } from './pages/preflight/PreflightArtifactsPage';
+import { PreflightCertificatesPage } from './pages/preflight/PreflightCertificatesPage';
+import { PreflightQuotasPage } from './pages/preflight/PreflightQuotasPage';
+import { PreflightWorkersPage } from './pages/preflight/PreflightWorkersPage';
+
 import { FederationOverview } from './pages/federation/FederationOverview';
 import { InstanceRegistry } from './pages/federation/InstanceRegistry';
 import { FederationSignals } from './pages/federation/FederationSignals';
@@ -80,6 +88,15 @@ export const App: React.FC = () => {
                 <Route path="/jobs" element={<JobsPage />} />
                 <Route path="/queues-workers" element={<QueuesWorkersPage />} />
                 <Route path="/tenants" element={<TenantsPage />} />
+
+                {/* PREFLIGHT OPERATIONS */}
+                <Route path="/preflight/jobs" element={<PreflightJobsPage />} />
+                <Route path="/preflight/jobs/:jobId" element={<PreflightJobDetailPage />} />
+                <Route path="/preflight/large-documents" element={<PreflightLargeDocumentsPage />} />
+                <Route path="/preflight/artifacts" element={<PreflightArtifactsPage />} />
+                <Route path="/preflight/certificates" element={<PreflightCertificatesPage />} />
+                <Route path="/preflight/quotas" element={<PreflightQuotasPage />} />
+                <Route path="/preflight/workers" element={<PreflightWorkersPage />} />
 
                 {/* INTELLIGENCE LAYER */}
                 <Route path="/intelligence" element={<IntelligenceOverview />} />
