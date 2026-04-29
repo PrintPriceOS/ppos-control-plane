@@ -27,12 +27,14 @@ graph TD
 
 ## 3. Responsibilities
 - **Federated Health Monitoring**: Real-time aggregation of service status across regions.
+- **Preflight Forensic Visibility**: Deep inspection of PDF analysis/repair jobs and worker execution traces.
 - **Incident Coordination**: Surfacing stuck jobs, regional outages, and policy violations.
 - **Policy Distribution**: Distributing global governance updates to operational regions.
-- **Operator Cockpit**: Visual UI for manual intervention and network health visualization.
+- **Operator Cockpit**: Industrial UI for manual intervention and network health visualization.
 
 ## 4. Key Features
 - **Health Federation API**: Endpoint `/federation/health` for multi-regional health aggregation.
+- **Preflight Operations Hub**: Advanced monitoring of processing jobs, worker health, and tenant quotas.
 - **Incident Dashboard**: Tracking of failed or quarantined PDF assets.
 - **Audit Logging**: Immutable record of all policy changes and operator interventions.
 
