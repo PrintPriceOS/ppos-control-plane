@@ -62,7 +62,7 @@ The dashboard defaults to port `8080` (API) and `3001` (UI dev).
 | `JWT_SECRET` | Secret for operator authentication | `ppos-dev-only` |
 
 ## 8. Version Baseline
-**Current Version**: `v1.9.0` (Federated Health & Decoupling Pass)
+**Current Version**: `v2.0.0` (Intelligence Layer & Preflight Operations Pass)
 
 ---
 © 2026 PrintPrice. Distributed Execution Infrastructure.
