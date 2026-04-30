@@ -13,7 +13,8 @@ import {
   CheckCircleIcon,
   CircleStackIcon,
   XCircleIcon,
-  DocumentIcon
+  DocumentIcon,
+  ArrowPathIcon
 } from "@heroicons/react/24/outline";
 import { getPreflightJob, getPreflightArtifacts, PreflightJob } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
@@ -152,6 +153,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Right Column: Artifacts & Workers */}

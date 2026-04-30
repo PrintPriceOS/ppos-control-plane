@@ -131,6 +131,7 @@ class ProductionBundleService {
   /**
    * Map internal artifact types to bundle filenames
    */
+  _getZipNameForArtifact(type, originalName) {
     // Final sanitization to prevent path traversal
     const safeName = originalName ? path.basename(originalName) : 'unknown-asset.pdf';
     
