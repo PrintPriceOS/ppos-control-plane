@@ -1,0 +1,56 @@
+/**
+ * Production Event Service
+ * 
+ * Unified timeline system for tracking the granular history of production jobs.
+ */
+const persistence = require('./productionPersistenceService');
+
+class ProductionEventService {
+  /**
+   * Record a new production event
+   * @param {Object} event { tenantId, packageId, dispatchId, type, actorType, actorId, message, metadata }
+   */
+  async record(event) {
+    return persistence.createEvent({
+      tenantId: event.tenantId,
+      packageId: event.packageId,
+      dispatchId: event.dispatchId,
+      eventType: event.type,
+      actorType: event.actorType || 'SYSTEM',
+      actorId: event.actorId || 'system',
+      message: event.message,
+      metadata: event.metadata || {}
+    });
+  }
+
+  /**
+   * List events for a package
+   */
+  async getPackageTimeline(packageId, context) {
+    // 1. Fetch Package to check ownership
+    const pkg = await persistence.getPackage(packageId);
+    if (!pkg) throw new Error('NOT_FOUND: Package not found');
+
+    if (pkg.tenant_id !== context.tenantId && context.role !== 'SUPER_ADMIN') {
+        // Also allow the assigned printer to see events
+        if (pkg.assigned_printer_tenant_id !== context.tenantId) {
+            throw new Error('FORBIDDEN: Access restricted');
+        }
+    }
+
+    return persistence.listEvents({ packageId });
+  }
+
+  /**
+   * Global event list (RBAC applied)
+   */
+  async listGlobalEvents(filters, context) {
+    const finalFilters = { ...filters };
+    if (context.role !== 'SUPER_ADMIN') {
+        finalFilters.tenantId = context.tenantId;
+    }
+    return persistence.listEvents(finalFilters);
+  }
+}
+
+module.exports = new ProductionEventService();

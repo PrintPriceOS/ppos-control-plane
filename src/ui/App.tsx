@@ -48,6 +48,7 @@ import { PreflightArtifactsPage } from './pages/preflight/PreflightArtifactsPage
 import { PreflightCertificatesPage } from './pages/preflight/PreflightCertificatesPage';
 import { PreflightQuotasPage } from './pages/preflight/PreflightQuotasPage';
 import { PreflightWorkersPage } from './pages/preflight/PreflightWorkersPage';
+import { ProductionDashboard } from './pages/production/ProductionDashboard';
 
 import { FederationOverview } from './pages/federation/FederationOverview';
 import { InstanceRegistry } from './pages/federation/InstanceRegistry';
@@ -97,6 +98,9 @@ export const App: React.FC = () => {
                 <Route path="/preflight/certificates" element={<PreflightCertificatesPage />} />
                 <Route path="/preflight/quotas" element={<PreflightQuotasPage />} />
                 <Route path="/preflight/workers" element={<PreflightWorkersPage />} />
+
+                {/* PRODUCTION OPERATIONS */}
+                <Route path="/production" element={<ProductionDashboard />} />
 
                 {/* INTELLIGENCE LAYER */}
                 <Route path="/intelligence" element={<IntelligenceOverview />} />

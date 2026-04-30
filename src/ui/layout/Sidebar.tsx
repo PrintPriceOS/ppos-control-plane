@@ -32,6 +32,9 @@ import {
   ScaleIcon,
   DocumentArrowDownIcon,
   DocumentDuplicateIcon,
+  InboxIcon,
+  Square3Stack3DIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { t } from '../i18n';
 
@@ -143,6 +146,11 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/preflight/certificates" icon={TicketIcon} label="Certificates" />
           <NavItem to="/preflight/quotas" icon={ScaleIcon} label="Quotas" />
           <NavItem to="/preflight/workers" icon={WorkerIcon} label="Workers" />
+        </NavGroup>
+
+        {/* PRODUCTION DISPATCH */}
+        <NavGroup label="Production Dispatch">
+          <NavItem to="/production" icon={InboxIcon} label="Incoming Jobs" badge="LIVE" />
         </NavGroup>
 
         {/* EXTENDED OPERATIONS */}
