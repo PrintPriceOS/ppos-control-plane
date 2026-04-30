@@ -19,20 +19,28 @@ class PreflightPersistenceService {
           id VARCHAR(64) PRIMARY KEY,
           tenant_id VARCHAR(64) NOT NULL,
           user_id VARCHAR(64) NULL,
+          submitted_by_role VARCHAR(32) DEFAULT 'USER',
+          assigned_printer_tenant_id VARCHAR(64) NULL,
+          visibility_scope ENUM('PRIVATE', 'SHARED', 'SYSTEM') DEFAULT 'PRIVATE',
           upload_id VARCHAR(64) NOT NULL,
           source_artifact_id VARCHAR(64) NULL,
           output_artifact_id VARCHAR(64) NULL,
           type ENUM('ANALYZE', 'AUTOFIX', 'CERTIFY') NOT NULL,
-          status ENUM('CREATED', 'QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED') DEFAULT 'CREATED',
+          status ENUM('CREATED', 'QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'STALLED', 'RETRYING', 'CANCELLED') DEFAULT 'CREATED',
           progress INT DEFAULT 0,
           step VARCHAR(64) NULL,
           policy VARCHAR(128) NULL,
           error_json JSON NULL,
           metadata_json JSON NULL,
+          retry_count INT DEFAULT 0,
+          max_retries INT DEFAULT 3,
+          last_heartbeat_at TIMESTAMP NULL,
+          last_synced_at TIMESTAMP NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           completed_at TIMESTAMP NULL,
           INDEX idx_tenant (tenant_id),
+          INDEX idx_assigned (assigned_printer_tenant_id),
           INDEX idx_status (status)
         ) ENGINE=InnoDB;
       `);
@@ -49,8 +57,10 @@ class PreflightPersistenceService {
           size_bytes BIGINT NOT NULL,
           checksum VARCHAR(128) NULL,
           mime_type VARCHAR(128) DEFAULT 'application/pdf',
+          status ENUM('ACTIVE', 'ARCHIVED', 'EXPIRED', 'DELETED', 'CORRUPTED') DEFAULT 'ACTIVE',
           metadata_json JSON NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           deleted_at TIMESTAMP NULL,
           INDEX idx_tenant_job (tenant_id, job_id),
           INDEX idx_upload (upload_id)
@@ -78,13 +88,20 @@ class PreflightPersistenceService {
 
   async createJob(jobData) {
     const id = uuidv4();
-    const { tenantId, userId, uploadId, type, policy, metadata } = jobData;
+    const { 
+        tenantId, userId, uploadId, type, policy, metadata,
+        submittedByRole, assignedPrinterTenantId, visibilityScope 
+    } = jobData;
     
     await db.query(`
       INSERT INTO preflight_jobs 
-      (id, tenant_id, user_id, upload_id, type, status, policy, metadata_json)
-      VALUES (?, ?, ?, ?, ?, 'CREATED', ?, ?)
-    `, [id, tenantId, userId || null, uploadId, type, policy || null, JSON.stringify(metadata || {})]);
+      (id, tenant_id, user_id, submitted_by_role, assigned_printer_tenant_id, visibility_scope, upload_id, type, status, policy, metadata_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', ?, ?)
+    `, [
+        id, tenantId, userId || null, submittedByRole || 'USER', 
+        assignedPrinterTenantId || null, visibilityScope || 'PRIVATE', 
+        uploadId, type, policy || null, JSON.stringify(metadata || {})
+    ]);
     
     return this.getJob(id);
   }
@@ -104,7 +121,9 @@ class PreflightPersistenceService {
     const params = [];
 
     if (filters.tenantId) {
-      sql += ' AND j.tenant_id = ?';
+      // Visibility Rule: Owned by tenant OR assigned to tenant as printer
+      sql += ' AND (j.tenant_id = ? OR j.assigned_printer_tenant_id = ?)';
+      params.push(filters.tenantId);
       params.push(filters.tenantId);
     }
     if (filters.status) {
@@ -114,6 +133,14 @@ class PreflightPersistenceService {
     if (filters.type) {
       sql += ' AND j.type = ?';
       params.push(filters.type);
+    }
+    if (filters.submittedByRole) {
+      sql += ' AND j.submitted_by_role = ?';
+      params.push(filters.submittedByRole);
+    }
+    if (filters.visibilityScope) {
+      sql += ' AND j.visibility_scope = ?';
+      params.push(filters.visibilityScope);
     }
     if (filters.largeOnly) {
       sql += ' AND a.size_bytes >= 524288000'; // 500MB
@@ -135,6 +162,9 @@ class PreflightPersistenceService {
     if (updates.upstreamJobId) { fields.push('metadata_json = JSON_SET(COALESCE(metadata_json, "{}"), "$.upstreamJobId", ?)'); params.push(updates.upstreamJobId); }
     if (updates.error) { fields.push('error_json = ?'); params.push(JSON.stringify(updates.error)); }
     if (updates.completedAt) { fields.push('completed_at = ?'); params.push(updates.completedAt); }
+    if (updates.retry_count !== undefined) { fields.push('retry_count = ?'); params.push(updates.retry_count); }
+    if (updates.last_heartbeat_at) { fields.push('last_heartbeat_at = ?'); params.push(updates.last_heartbeat_at); }
+    if (updates.last_synced_at) { fields.push('last_synced_at = ?'); params.push(updates.last_synced_at); }
 
     if (fields.length === 0) return;
 
@@ -185,7 +215,33 @@ class PreflightPersistenceService {
   }
 
   async deleteArtifact(id) {
-    await db.query('UPDATE preflight_artifacts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+    await db.query('UPDATE preflight_artifacts SET deleted_at = CURRENT_TIMESTAMP, status = "DELETED" WHERE id = ?', [id]);
+  }
+
+  async updateArtifact(id, updates) {
+    const fields = [];
+    const params = [];
+    if (updates.status) { fields.push('status = ?'); params.push(updates.status); }
+    if (updates.metadata) { fields.push('metadata_json = ?'); params.push(JSON.stringify(updates.metadata)); }
+    if (fields.length === 0) return;
+    params.push(id);
+    await db.query(`UPDATE preflight_artifacts SET ${fields.join(', ')} WHERE id = ?`, params);
+  }
+
+  /**
+   * Find artifacts that are either soft-deleted OR exceed retention age
+   */
+  async listArtifactsForGC(retentionDays) {
+    const sql = `
+      SELECT * FROM preflight_artifacts 
+      WHERE status != 'DELETED' 
+      AND (
+        deleted_at IS NOT NULL 
+        OR created_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+      )
+      LIMIT 1000
+    `;
+    return db.query(sql, [retentionDays]);
   }
 }
 

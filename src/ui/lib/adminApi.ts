@@ -146,7 +146,7 @@ export type PreflightJob = {
     filename?: string;
     fileSize?: number;
     policy?: string;
-    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+    status: 'CREATED' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'STALLED' | 'RETRYING' | 'CANCELLED';
     type: 'ANALYZE' | 'AUTOFIX' | 'CERTIFY';
     progress: number;
     issueCount?: number;
@@ -718,5 +718,40 @@ export async function deletePreflightArtifact(artifactId: string) {
         method: 'DELETE'
     });
     if (!res.ok) throw new Error(res.error?.message || 'Delete failed');
+    return res;
+}
+
+export async function syncPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/sync`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function retryPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/retry`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function cancelPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/cancel`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function runPreflightGC(dryRun: boolean = false) {
+    const res = await adminFetch<any>(`/api/admin/preflight/artifacts/gc${dryRun ? '?dryRun=true' : ''}`, {
+        method: 'POST'
+    });
+    return res.results;
+}
+
+export async function recoverStalledPreflightJobs() {
+    const res = await adminFetch<any>('/api/admin/preflight/jobs/recover-stalled', {
+        method: 'POST'
+    });
     return res;
 }

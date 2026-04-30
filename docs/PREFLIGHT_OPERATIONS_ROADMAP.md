@@ -28,6 +28,9 @@ The Control Plane acts as the **Administrative & Governance Layer** for the Pref
 | `PPOS_PREFLIGHT_MAX_UPLOAD_MB` | `2048` | Max size for PDF uploads (MB). |
 | `PPOS_PREFLIGHT_SERVICE_URL` | `http://localhost:8001` | Upstream Service endpoint. |
 | `PPOS_CONTROL_TOKEN` | `admin-secret` | Bearer token for admin auth. |
+| `PPOS_PREFLIGHT_STALLED_MINUTES` | `30` | Threshold for detecting stuck jobs. |
+| `PPOS_PREFLIGHT_AUTO_RETRY` | `false` | Enable automatic recovery of stalled jobs. |
+| `PPOS_PREFLIGHT_RETENTION_DAYS` | `90` | Artifact persistence window before GC. |
 
 ## 5. API Surface (`/api/admin/preflight`)
 - `GET /health`: Infrastructure health and worker availability.
@@ -41,6 +44,10 @@ The Control Plane acts as the **Administrative & Governance Layer** for the Pref
 
 ## 6. Storage Model
 Tenant-isolated directory structure under `PPOS_PREFLIGHT_STORAGE_ROOT`:
+- **Storage Keys**: All artifact storage keys are relative to the storage root.
+- **Example**: `tenants/<tenantId>/uploads/<uploadId>/file.pdf`
+- **Backward Compatibility**: Legacy absolute paths are safely resolved if they reside within the storage root.
+
 ```txt
 tenants/
   <tenantId>/
@@ -60,17 +67,41 @@ tenants/
 - **Future**: Dynamic quotas via tenant plans.
 
 ## 8. Job Lifecycle
-1. **CREATED**: Record in `preflight_jobs`, file staged in `uploads/`.
-2. **QUEUED**: Successfully enqueued in upstream BullMQ via Service API.
-3. **PROCESSING**: Worker has picked up the job.
-4. **COMPLETED**: Artifacts stored and DB record updated with success metadata.
-5. **FAILED**: Terminal state with `error_json` diagnostics.
+The Control Plane maintains a persistent state that synchronizes with the upstream Preflight Service.
+
+**Canonical States:**
+- `CREATED`: Local record initialized.
+- `QUEUED`: Enqueued in upstream worker queue (BullMQ).
+- `PROCESSING`: Active processing by Preflight Engine.
+- `COMPLETED`: Success, artifacts generated.
+- `FAILED`: Fatal error in engine or worker.
+- `STALLED`: Worker lost contact or job timed out (default 30 min).
+- `RETRYING`: Automatic recovery attempt in progress.
+- `CANCELLED`: Manually terminated by operator.
+
+**Recovery & Resilience:**
+- **Retry**: Manual retry allowed for `FAILED`, `STALLED`, and `CANCELLED` jobs.
+- **Cancel**: Termination allowed for `CREATED`, `QUEUED`, and `PROCESSING` jobs.
+- **Stalled Recovery**: Maintenance route scans for `PROCESSING` jobs with stale heartbeats and transitions them to `STALLED`.
+- **Auto-Retry**: Configuration `PPOS_PREFLIGHT_AUTO_RETRY` enables automatic requeueing of stalled jobs.
+- **Tracking**: `retry_count` and `last_heartbeat_at` are persisted for forensics.
 
 ## 9. Artifact Lifecycle
-- **Registry**: Metadata stored in `preflight_artifacts`.
-- **Availability**: Streamable via secure signed-like proxy in Control Plane.
-- **Retention**: Configurable (default 30 days).
-- **Deletion**: Soft-delete removes DB visibility; physical cleanup via scheduled task.
+Artifacts follow a structured lifecycle to ensure storage efficiency and governance.
+
+**States:**
+- `ACTIVE`: Available for download/viewing.
+- `ARCHIVED`: Compressed or moved to cold storage (Phase 8).
+- `EXPIRED`: Exceeded retention period (default 90 days).
+- `DELETED`: Physical file removed from disk.
+- `CORRUPTED`: Integrity check failed.
+
+**Retention & GC:**
+- **Policy**: `PPOS_PREFLIGHT_RETENTION_DAYS` (Default: 90).
+- **Soft-Delete**: `DELETE` API marks record as deleted but keeps file for safety window.
+- **Garbage Collector**: `POST /artifacts/gc` performs physical deletion of soft-deleted and expired files.
+- **Security**: GC resolver validates every file against tenant boundaries before physical `unlink`.
+- **Audit**: Every GC run and artifact expiration is logged for compliance.
 
 ## 10. Security Model
 - **Authentication**: Mandatory Bearer token validation matching `PPOS_CONTROL_TOKEN`.

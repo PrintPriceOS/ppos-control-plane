@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePrinterLicense = require('../middleware/requirePrinterLicense');
 
 // Services
 const operations = require('../services/preflightOperationsService');
@@ -27,6 +28,7 @@ const upload = multer({
 
 // Apply admin protection to all routes
 router.use(requireAdmin);
+router.use(requirePrinterLicense);
 
 /**
  * Helper: Resolve Tenant Identity from user context
@@ -93,7 +95,8 @@ router.post('/jobs', async (req, res) => {
       uploadId, 
       type, 
       policy,
-      authHeader: req.headers.authorization 
+      authHeader: req.headers.authorization,
+      submittedByRole: 'PRINTER' 
     });
     
     await auditLogger.log({
@@ -137,10 +140,116 @@ router.get('/jobs/:jobId', async (req, res) => {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
     }
 
-    res.json({ ok: true, job });
+    // Auto-sync if job is in active/non-terminal state
+    const terminalStates = ['COMPLETED', 'FAILED', 'CANCELLED'];
+    let responseJob = job;
+    if (!terminalStates.includes(job.status) && job.metadata_json?.upstreamJobId) {
+        try {
+            responseJob = await operations.syncJobStatus(req.params.jobId, req.headers.authorization);
+        } catch (syncErr) {
+            console.warn(`[API] Auto-sync failed for ${req.params.jobId}:`, syncErr.message);
+            // Fallback to currently known local state
+        }
+    }
+
+    res.json({ ok: true, job: responseJob });
   } catch (error) {
     res.status(500).json({ ok: false, error: { code: 'JOB_FETCH_FAILED', message: error.message } });
   }
+});
+
+/**
+ * POST /api/admin/preflight/jobs/:jobId/sync
+ * Manually trigger a status sync with the upstream service
+ */
+router.post('/jobs/:jobId/sync', async (req, res) => {
+    try {
+        const job = await operations.getJob(req.params.jobId);
+        if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
+
+        // Security: Tenant Isolation
+        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+            return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
+        }
+
+        const syncedJob = await operations.syncJobStatus(req.params.jobId, req.headers.authorization);
+        res.json({ ok: true, job: syncedJob });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: { code: 'SYNC_FAILED', message: error.message } });
+    }
+});
+
+/**
+ * POST /api/admin/preflight/jobs/:jobId/retry
+ */
+router.post('/jobs/:jobId/retry', async (req, res) => {
+    try {
+        const job = await operations.getJob(req.params.jobId);
+        if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
+
+        // Security: Tenant Isolation
+        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+            return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
+        }
+
+        const retriedJob = await operations.retryJob(req.params.jobId, req.headers.authorization);
+        res.json({ ok: true, job: retriedJob });
+    } catch (error) {
+        res.status(400).json({ ok: false, error: { code: 'RETRY_FAILED', message: error.message } });
+    }
+});
+
+/**
+ * POST /api/admin/preflight/jobs/:jobId/cancel
+ */
+router.post('/jobs/:jobId/cancel', async (req, res) => {
+    try {
+        const job = await operations.getJob(req.params.jobId);
+        if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
+
+        // Security: Tenant Isolation
+        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+            return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
+        }
+
+        const cancelledJob = await operations.cancelJob(req.params.jobId, req.headers.authorization);
+        res.json({ ok: true, job: cancelledJob });
+    } catch (error) {
+        res.status(400).json({ ok: false, error: { code: 'CANCEL_FAILED', message: error.message } });
+    }
+});
+
+/**
+ * POST /api/admin/preflight/artifacts/gc
+ * Trigger artifact garbage collection
+ */
+router.post('/artifacts/gc', async (req, res) => {
+    if (req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'GC requires SUPER_ADMIN' } });
+    }
+    try {
+        const dryRun = req.query.dryRun === 'true';
+        const results = await artifacts.runGarbageCollector(dryRun);
+        res.json({ ok: true, results });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: { code: 'GC_FAILED', message: error.message } });
+    }
+});
+
+/**
+ * POST /api/admin/preflight/jobs/recover-stalled
+ * Maintenance route to detect and recover stuck jobs
+ */
+router.post('/jobs/recover-stalled', async (req, res) => {
+    if (req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Maintenance operations require SUPER_ADMIN' } });
+    }
+    try {
+        const result = await operations.recoverStalledJobs();
+        res.json({ ok: true, ...result });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: { code: 'RECOVERY_FAILED', message: error.message } });
+    }
 });
 
 /**
@@ -360,15 +469,17 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       });
     }
 
-    // 4. Sanitize Filename & Resolve Destination
+    // 4. Sanitize Filename & Resolve Destination via Safe Resolver
     const uploadId = uuidv4();
     const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     
     await storage.ensureTenantStorageLayout(tenantId);
-    const uploadDir = path.join(storage.tenantsDir, tenantId, 'uploads', uploadId);
+    
+    // SECURITY: Use canonical resolver to prevent path injection/traversal
+    const uploadDir = storage.resolveTenantPath(tenantId, path.join('uploads', uploadId));
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-    const finalPath = path.join(uploadDir, safeFilename);
+    
+    const finalPath = storage.resolveTenantPath(tenantId, path.join('uploads', uploadId, safeFilename));
     fs.renameSync(req.file.path, finalPath);
 
     await auditLogger.log({

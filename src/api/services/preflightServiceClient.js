@@ -80,6 +80,17 @@ class PreflightServiceClient {
   async getHealth() {
     return this._request('GET', '/api/preflight/workers/health');
   }
+
+  /**
+   * Fetch real-time status of a job from the upstream service
+   */
+  async getJobStatus(upstreamJobId, authHeader = null, tenantId = null) {
+    const headers = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (tenantId) headers['X-Tenant-Id'] = tenantId;
+
+    return this._request('GET', `/api/preflight/jobs/${upstreamJobId}`, null, headers);
+  }
 }
 
 module.exports = new PreflightServiceClient();

@@ -19,24 +19,107 @@ class PreflightStorageService {
 
   /**
    * Safely resolve a tenant path and prevent traversal
+   * 
+   * SECURITY: This is the canonical resolver for ALL tenant storage operations.
+   * It prevents path traversal, absolute path injection, and tenant spoofing.
    */
-  _resolveTenantPath(tenantId, subPath = '') {
+  resolveTenantPath(tenantId, subPath = '') {
     if (!tenantId) throw new Error('Tenant ID is required for storage resolution');
     
-    // Sanitize tenantId (no dots, no slashes)
+    // 1. Sanitize tenantId (no dots, no slashes, strictly alphanumeric/dashes)
     const safeTenantId = tenantId.replace(/[^a-zA-Z0-9_-]/g, '');
-    const tenantBase = path.join(this.tenantsDir, safeTenantId);
+    const tenantBase = path.normalize(path.join(this.tenantsDir, safeTenantId));
     
-    // Sanitize subPath
-    const sanitizedSubPath = subPath.replace(/\.\./g, '');
-    const finalPath = path.resolve(tenantBase, sanitizedSubPath);
+    // 2. Prevent Absolute Path Injection in subPath
+    // If subPath is absolute, we force it to be relative
+    const sanitizedSubPath = path.isAbsolute(subPath) ? path.relative('/', subPath) : subPath;
+    
+    // 3. Prevent Traversal via ../
+    const normalizedSubPath = path.normalize(sanitizedSubPath).replace(/^(\.\.(\/|\\|$))+/, '');
+    
+    // 4. Resolve Final Path
+    const finalPath = path.resolve(tenantBase, normalizedSubPath);
 
-    // Verify it's still inside the tenant directory
+    // 5. Final Boundary Check
+    // Ensures the resolved path MUST be within the tenant's base directory
     if (!finalPath.startsWith(tenantBase)) {
+      console.error(`[SECURITY] Traversal attempt blocked: ${tenantId} -> ${subPath}`);
       throw new Error('Security violation: Path traversal attempted');
     }
 
     return finalPath;
+  }
+
+  /**
+   * Validate that an absolute path belongs to a specific tenant
+   */
+  /**
+   * Validate that an absolute path belongs to a specific tenant
+   */
+  validateTenantPath(tenantId, absolutePath) {
+    const tenantBase = this.resolveTenantPath(tenantId);
+    const resolvedPath = path.resolve(absolutePath);
+    
+    if (!resolvedPath.startsWith(tenantBase)) {
+      console.error(`[SECURITY] Tenant boundary violation: ${tenantId} tried to access ${absolutePath}`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Resolve a storage key (relative or absolute) to a final absolute path
+   * 
+   * SECURITY: 
+   * 1. Rejects traversal (../)
+   * 2. Rejects absolute paths if they are outside the storage root
+   * 3. Ensures the final path stays inside the storage root
+   */
+  resolveStorageKey(storageKey) {
+    if (!storageKey) throw new Error('Storage key is required');
+
+    // Canonicalize storage root
+    const storageRoot = path.resolve(this.root);
+    
+    let finalPath;
+
+    if (path.isAbsolute(storageKey)) {
+        // BACKWARD COMPATIBILITY: Support existing absolute paths
+        finalPath = path.resolve(storageKey);
+        
+        // Security check: Must be inside storage root
+        if (!finalPath.startsWith(storageRoot)) {
+            console.error(`[SECURITY] Absolute storage key outside root blocked: ${storageKey}`);
+            throw new Error('Security violation: Absolute path outside storage root');
+        }
+    } else {
+        // NEW STANDARD: Resolve relative to storage root
+        // Sanitize traversal attempts
+        const sanitizedKey = storageKey.replace(/\.\./g, '');
+        finalPath = path.resolve(storageRoot, sanitizedKey);
+
+        // Security check: Final boundary
+        if (!finalPath.startsWith(storageRoot)) {
+            throw new Error('Security violation: Path traversal attempted in storage key');
+        }
+    }
+
+    return finalPath;
+  }
+
+  /**
+   * Convert an absolute path to a relative storage key
+   */
+  makeRelative(absolutePath) {
+    const storageRoot = path.resolve(this.root);
+    const resolvedPath = path.resolve(absolutePath);
+
+    if (!resolvedPath.startsWith(storageRoot)) {
+        throw new Error('Cannot make path relative: Path is outside storage root');
+    }
+
+    // Return the relative path (forward slashes for consistency)
+    return path.relative(storageRoot, resolvedPath).replace(/\\/g, '/');
   }
 
   /**
@@ -85,7 +168,7 @@ class PreflightStorageService {
    */
   async ensureTenantStorageLayout(tenantId) {
     const folders = ['uploads', 'jobs', 'tmp'];
-    const tenantBase = this._resolveTenantPath(tenantId);
+    const tenantBase = this.resolveTenantPath(tenantId);
 
     for (const folder of folders) {
       const p = path.join(tenantBase, folder);
@@ -100,7 +183,7 @@ class PreflightStorageService {
    * Calculate summary for a specific tenant
    */
   async getTenantStorageSummary(tenantId) {
-    const tenantBase = this._resolveTenantPath(tenantId);
+    const tenantBase = this.resolveTenantPath(tenantId);
     
     const usedBytes = await this._getDirSize(tenantBase);
     const fileCount = await this._getFileCount(tenantBase);
@@ -156,7 +239,7 @@ class PreflightStorageService {
    * Internal helper for job creation
    */
   async ensureJobLayout(tenantId, jobId) {
-    const jobBase = this._resolveTenantPath(tenantId, path.join('jobs', jobId));
+    const jobBase = this.resolveTenantPath(tenantId, path.join('jobs', jobId));
     const subdirs = ['input', 'output', 'reports', 'logs'];
     
     for (const sub of subdirs) {

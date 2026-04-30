@@ -21,15 +21,15 @@ export const PreflightQuotasPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <QuotaCard 
-          label="Global Utilization" 
-          value={formatSize(q.data?.totalBytes || 0)} 
-          limit={formatSize(tenants.length * 2147483648)} 
+        <QuotaCard
+          label="Global Utilization"
+          value={formatSize(q.data?.totalBytes || 0)}
+          limit={formatSize(tenants.length * 2147483648)}
           progress={((q.data?.totalBytes || 0) / (tenants.length * 2147483648 || 1)) * 100}
         />
       </div>
 
-      <DataTable 
+      <DataTable
         isLoading={q.status === 'loading'}
         data={tenants}
         columns={[
@@ -42,8 +42,8 @@ export const PreflightQuotasPage: React.FC = () => {
             accessor: (t) => (
               <div className="flex flex-col gap-1 w-48">
                 <div className="h-2 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
-                  <div className={`h-full ${t.usedBytes / t.quotaBytes > 0.9 ? 'bg-red-500' : 'bg-primary'}`} 
-                       style={{ width: `${(t.usedBytes / t.quotaBytes) * 100}%` }} />
+                  <div className={`h-full ${t.usedBytes / t.quotaBytes > 0.9 ? 'bg-red-500' : 'bg-primary'}`}
+                    style={{ width: `${(t.usedBytes / t.quotaBytes) * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   <span>{formatSize(t.usedBytes)}</span>
@@ -59,9 +59,8 @@ export const PreflightQuotasPage: React.FC = () => {
           {
             header: 'Capacity',
             accessor: (t) => (
-              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
-              }`}>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                }`}>
                 {((t.usedBytes / t.quotaBytes) * 100).toFixed(1)}% Full
               </span>
             )
