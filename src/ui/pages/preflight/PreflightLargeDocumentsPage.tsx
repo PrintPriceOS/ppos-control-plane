@@ -18,14 +18,10 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
   const navigate = useNavigate();
   const q = useAdminQuery("preflight:large-docs", () => getPreflightJobs({ largeOnly: true, limit: 50 }), 15000);
 
-  const largeJobs = React.useMemo(() => {
-    if (!q.data?.jobs) return [];
-    // Strict client-side verification of the 500MB threshold
-    return q.data.jobs.filter(j => (j.fileSize || 0) >= LARGE_DOC_THRESHOLD);
-  }, [q.data]);
+  const largeJobs = q.data?.jobs || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 italic-text-off">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Large Documents (&gt;500MB)</h1>
@@ -34,38 +30,34 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard label="Active Large Jobs" value={String(q.data?.jobs.filter(j => j.status === 'PROCESSING').length || 0)} icon={DocumentDuplicateIcon} color="text-blue-600" />
-        <StatsCard label="Avg. Payload Size" value="842 MB" icon={ExclamationCircleIcon} color="text-amber-600" />
-        <StatsCard label="Worker Pressure" value="High" icon={CpuChipIcon} color="text-red-600" />
+        <StatsCard label="Detected Large Files" value={String(largeJobs.length)} icon={DocumentDuplicateIcon} color="text-blue-600" />
+        <StatsCard label="Avg. Payload Size" value={largeJobs.length > 0 ? formatSize(largeJobs.reduce((acc: number, curr: any) => acc + (curr.file_size || 0), 0) / largeJobs.length) : '0 B'} icon={ExclamationCircleIcon} color="text-amber-600" />
+        <StatsCard label="System Pressure" value={largeJobs.some((j: any) => j.status === 'PROCESSING') ? 'High' : 'Nominal'} icon={CpuChipIcon} color={largeJobs.some((j: any) => j.status === 'PROCESSING') ? 'text-red-600' : 'text-emerald-600'} />
       </div>
 
       <DataTable 
         isLoading={q.status === 'loading'}
         data={largeJobs}
-        onRowClick={(j) => navigate(`/preflight/jobs/${j.jobId}`)}
+        onRowClick={(j) => navigate(`/preflight/jobs/${j.id}`)}
         columns={[
           {
             header: 'Filename',
             accessor: (j) => (
               <div className="flex flex-col">
-                <span className="font-bold">{j.filename || 'Untitled'}</span>
-                <span className="text-[10px] font-mono text-slate-400">#{j.jobId.slice(0, 8)}</span>
+                <span className="font-bold truncate max-w-xs">{j.metadata_json?.originalFilename || 'Untitled'}</span>
+                <span className="text-[10px] font-mono text-slate-400">#{j.id.slice(0, 8)}</span>
               </div>
             )
           },
           {
-            header: 'Size',
-            accessor: (j) => (
-              <span className="px-2 py-1 rounded-lg bg-red-50 text-red-700 font-mono text-xs font-black">
-                {formatSize(j.fileSize)}
-              </span>
-            )
+            header: 'Tenant',
+            accessor: (j) => <span className="font-bold text-primary">{j.tenant_id}</span>
           },
           {
-            header: 'Queue',
-            accessor: () => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.06] text-[9px] font-black uppercase text-slate-500 tracking-wider">
-                HEAVY_DOC_POOL
+            header: 'Impact',
+            accessor: (j) => (
+              <span className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-mono text-xs font-black">
+                {formatSize(j.file_size)}
               </span>
             )
           },
@@ -82,27 +74,23 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
             )
           },
           {
-            header: 'Worker Memory',
+            header: 'Progress',
             accessor: (j) => (
               <div className="flex flex-col gap-1 w-24">
-                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500" style={{ width: '75%' }} />
+                 <div className="h-1.5 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${j.progress || 0}%` }} />
                  </div>
-                 <span className="text-[9px] font-bold text-slate-400 uppercase">3.2GB / 4GB</span>
+                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{j.progress || 0}% Complete</span>
               </div>
             )
           },
           {
-            header: 'Retries',
-            accessor: () => <span className="font-mono text-xs text-slate-500">0</span>
+            header: 'Type',
+            accessor: (j) => <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest">{j.type}</span>
           },
           {
-            header: 'Stage',
-            accessor: (j) => (
-              <span className="text-[10px] font-bold text-slate-600 dark:text-zinc-400">
-                {j.status === 'COMPLETED' ? 'Artifact Promotion' : 'PDF Repair (Stage 2)'}
-              </span>
-            )
+            header: 'Created',
+            accessor: (j) => <span className="text-xs text-slate-400">{new Date(j.created_at).toLocaleDateString()}</span>
           },
           {
             header: '',

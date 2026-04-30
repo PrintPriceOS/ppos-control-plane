@@ -46,11 +46,17 @@ export const PreflightJobDetailPage: React.FC = () => {
     );
   }
 
+  const handleDownload = (id: string) => {
+    const token = localStorage.getItem('admin_token');
+    window.open(`/api/admin/preflight/artifacts/${id}/download?token=${token}`, '_blank');
+  };
+
   // Construct stages for timeline
   const stages: TimelineStage[] = [
-    { id: 'CREATED', label: 'Job Created', timestamp: job.createdAt, status: 'SUCCESS', details: `Job initialized for tenant ${job.tenantId}` },
-    { id: 'PROCESSING', label: 'Processing', timestamp: job.createdAt, status: (job.status === 'PROCESSING' || job.status === 'COMPLETED' ? 'SUCCESS' : job.status === 'FAILED' ? 'FAILED' : 'PENDING'), details: 'Engine worker picked up the task.' },
-    { id: 'COMPLETED', label: 'Finalization', timestamp: job.completedAt || job.createdAt, status: (job.status === 'COMPLETED' ? 'SUCCESS' : job.status === 'FAILED' ? 'FAILED' : 'PENDING'), details: job.status === 'FAILED' ? 'Processing failed.' : 'Artifacts generated and verified.' }
+    { id: 'CREATED', label: 'Job Created', timestamp: job.created_at, status: 'SUCCESS', details: `Job initialized for tenant ${job.tenant_id}` },
+    { id: 'QUEUED', label: 'Queued Upstream', timestamp: job.created_at, status: (['QUEUED', 'PROCESSING', 'COMPLETED'].includes(job.status) ? 'SUCCESS' : job.status === 'FAILED' ? 'FAILED' : 'PENDING'), details: job.upstream_job_id ? `Received ID: ${job.upstream_job_id}` : 'Waiting for engine acknowledgment.' },
+    { id: 'PROCESSING', label: 'Engine Processing', timestamp: job.created_at, status: (['PROCESSING', 'COMPLETED'].includes(job.status) ? 'SUCCESS' : job.status === 'FAILED' && !job.upstream_job_id ? 'FAILED' : 'PENDING'), details: 'Engine worker performing requested operation.' },
+    { id: 'COMPLETED', label: 'Finalization', timestamp: job.completed_at || job.created_at, status: (job.status === 'COMPLETED' ? 'SUCCESS' : job.status === 'FAILED' ? 'FAILED' : 'PENDING'), details: job.status === 'FAILED' ? (job.error_json?.message || 'Processing failed.') : 'Artifacts generated and verified.' }
   ];
 
   return (
@@ -58,7 +64,7 @@ export const PreflightJobDetailPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors">
             <ArrowLeftIcon className="w-5 h-5 text-slate-400" />
           </Link>
           <div>
@@ -68,7 +74,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                 {job.type}
               </span>
             </div>
-            <p className="text-sm text-slate-500 font-medium font-mono">#{job.jobId}</p>
+            <p className="text-sm text-slate-500 font-medium font-mono">#{job.id}</p>
           </div>
         </div>
         
@@ -84,33 +90,40 @@ export const PreflightJobDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {job.status === 'FAILED' && job.error_json && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-start gap-3 text-red-600 dark:text-red-400">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-sm font-black uppercase tracking-widest">Processing Error</h4>
+            <p className="text-xs font-bold">{job.error_json.message || 'Unknown error occurred during upstream trigger or processing.'}</p>
+            {job.error_json.details && (
+              <pre className="mt-2 text-[10px] bg-red-100/50 dark:bg-red-900/40 p-2 rounded-lg overflow-x-auto">
+                {JSON.stringify(job.error_json.details, null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Metadata & Lifecycle */}
         <div className="lg:col-span-2 space-y-8">
           {/* Metadata Grid */}
           <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] grid grid-cols-2 md:grid-cols-4 gap-6">
-            <MetaItem label="Filename" value={job.filename || 'Untitled'} icon={DocumentIcon} />
-            <MetaItem label="File Size" value={formatSize(job.fileSize)} icon={CircleStackIcon} />
+            <MetaItem label="Filename" value={job.metadata_json?.originalFilename || 'Untitled'} icon={DocumentIcon} />
+            <MetaItem label="Tenant ID" value={job.tenant_id} icon={CircleStackIcon} />
             <MetaItem label="Policy" value={job.policy || 'N/A'} icon={ShieldCheckIcon} />
-            <MetaItem label="Risk Profile" value={job.destructiveFixRisk || 'NONE'} icon={ExclamationTriangleIcon} 
-                      color={job.destructiveFixRisk === 'CRITICAL' ? 'text-red-600' : job.destructiveFixRisk === 'HIGH' ? 'text-orange-600' : 'text-slate-600'} />
+            <MetaItem label="Upstream ID" value={job.metadata_json?.upstreamJobId || 'NONE'} icon={CommandLineIcon} />
             <MetaItem label="Issues Found" value={String(job.issueCount ?? 0)} icon={ExclamationTriangleIcon} />
             <MetaItem label="Fixes Applied" value={String(job.fixCount ?? 0)} icon={ShieldCheckIcon} />
-            <MetaItem label="Rewritten" value={job.rewritten ? 'YES' : 'NO'} icon={CubeIcon} />
-            <MetaItem label="Certification" value={job.certificationMode || 'STANDARD'} icon={CheckCircleIcon} />
+            <MetaItem label="Progress" value={`${job.progress}%`} icon={ClockIcon} />
+            <MetaItem label="Created At" value={new Date(job.created_at).toLocaleString()} icon={ClockIcon} />
           </div>
 
           {/* Timeline */}
           <div>
             <SectionHeader label="Lifecycle & Trace" />
             <div className="mt-6">
-              <AuditTimeline requestId={job.jobId} stages={stages} />
-            </div>
-          </div>
-
-          {/* Analysis Summary Placeholder */}
-          <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08]">
-            <SectionHeader label="Analysis Details" />
             <div className="mt-4 space-y-4">
                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
                   <div className="flex items-center gap-3">

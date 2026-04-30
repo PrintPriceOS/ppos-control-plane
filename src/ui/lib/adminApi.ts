@@ -596,7 +596,7 @@ export async function getPreflightJobs(params: {
     qs.set("offset", String(params.offset ?? 0));
     
     try {
-        const res = await adminFetch<any>(`/api/preflight/jobs?${qs.toString()}`);
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs?${qs.toString()}`);
         // Normalize: { jobs: [] } or { data: [] } or raw array
         const jobs = res.jobs || res.data || (Array.isArray(res) ? res : []);
         const total = res.total ?? jobs.length;
@@ -609,7 +609,7 @@ export async function getPreflightJobs(params: {
 
 export async function getPreflightJob(jobId: string): Promise<PreflightJob | null> {
     try {
-        const res = await adminFetch<any>(`/api/preflight/jobs/${encodeURIComponent(jobId)}`);
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}`);
         // Normalize: { result: job } or raw job
         return res.result || res.job || (res.jobId ? res : null);
     } catch (e) {
@@ -620,7 +620,7 @@ export async function getPreflightJob(jobId: string): Promise<PreflightJob | nul
 
 export async function getPreflightArtifacts(jobId: string): Promise<any[]> {
     try {
-        const res = await adminFetch<any>(`/api/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
         // Normalize: { artifacts: [] } or raw array
         return res.artifacts || res.data || (Array.isArray(res) ? res : []);
     } catch (e) {
@@ -631,7 +631,7 @@ export async function getPreflightArtifacts(jobId: string): Promise<any[]> {
 
 export async function getPreflightWorkers() {
     try {
-        const res = await adminFetch<any>(`/api/preflight/workers/health`);
+        const res = await adminFetch<any>(`/api/admin/preflight/health`);
         const workers = res.workers || (Array.isArray(res) ? res : []);
         return { ok: true, workers };
     } catch (e) {
@@ -642,7 +642,7 @@ export async function getPreflightWorkers() {
 
 export async function getPreflightQuotas(): Promise<PreflightQuota[]> {
     try {
-        const res = await adminFetch<any>(`/api/preflight/quotas`);
+        const res = await adminFetch<any>(`/api/admin/preflight/storage`);
         return res.quotas || (Array.isArray(res) ? res : []);
     } catch (e) {
         console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightQuotas failed:`, e);
@@ -652,4 +652,71 @@ export async function getPreflightQuotas(): Promise<PreflightQuota[]> {
 
 export async function getLargeDocumentJobs(params: { limit?: number; offset?: number }) {
     return getPreflightJobs({ ...params, largeOnly: true });
+}
+
+export async function getGlobalArtifacts(params: { tenant?: string; type?: string; limit?: number; offset?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.tenant) qs.set("tenantId", params.tenant);
+    if (params.type) qs.set("type", params.type);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/artifacts?${qs.toString()}`);
+        return res.artifacts || [];
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getGlobalArtifacts failed:`, e);
+        return [];
+    }
+}
+
+export async function uploadPreflightFile(file: File, tenantId: string = 'system') {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Using raw fetch here because adminFetch might not handle FormData correctly without adjustment
+    const token = localStorage.getItem('admin_token');
+    const response = await fetch('/api/admin/preflight/upload', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-Id': tenantId
+        },
+        body: formData
+    });
+    
+    const res = await response.json();
+    if (!res.ok) throw new Error(res.error?.message || 'Upload failed');
+    return res.upload;
+}
+
+export async function createPreflightJob(data: { uploadId: string; type: string; policy?: string; tenantId?: string }) {
+    const res = await adminFetch<any>('/api/admin/preflight/jobs', {
+        method: 'POST',
+        headers: {
+            'X-Tenant-Id': data.tenantId || 'system'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(res.error?.message || 'Job creation failed');
+    return res.job;
+}
+
+export async function getStorageSummary(tenantId?: string) {
+    const url = tenantId ? `/api/admin/preflight/storage/${tenantId}` : '/api/admin/preflight/storage';
+    try {
+        const res = await adminFetch<any>(url);
+        return res;
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getStorageSummary failed:`, e);
+        return null;
+    }
+}
+
+export async function deletePreflightArtifact(artifactId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/artifacts/${artifactId}`, {
+        method: 'DELETE'
+    });
+    if (!res.ok) throw new Error(res.error?.message || 'Delete failed');
+    return res;
 }

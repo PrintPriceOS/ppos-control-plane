@@ -12,12 +12,14 @@ import {
   DocumentIcon,
   ChevronRightIcon
 } from "@heroicons/react/24/outline";
-import { getPreflightJobs, PreflightJob } from "../../lib/adminApi";
+import { getPreflightJobs, getStorageSummary, PreflightJob } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
+import { PreflightUploadModal } from "./PreflightUploadModal";
 
 export const PreflightJobsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [filter, setFilter] = useState({
     tenant: '',
     status: '',
@@ -38,6 +40,8 @@ export const PreflightJobsPage: React.FC = () => {
     }), 
     15000
   );
+
+  const storageQ = useAdminQuery('preflight:storage:global', () => getStorageSummary(), 30000);
 
   const LARGE_DOC_THRESHOLD = 500 * 1024 * 1024;
 
@@ -69,12 +73,43 @@ export const PreflightJobsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Preflight Jobs</h1>
           <p className="text-sm text-slate-500 font-medium">Operational overview of all preflight analysis and repair jobs.</p>
         </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Storage Quota Card */}
+          <div className="hidden lg:flex flex-col items-end glass px-4 py-2 rounded-2xl border border-white/20">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Storage</div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-sm font-black text-slate-700 dark:text-[#ECECF1]">
+                {storageQ.data ? (storageQ.data.totalBytes / (1024*1024*1024)).toFixed(2) : '0.00'} GB
+              </span>
+              <span className="text-[10px] font-bold text-slate-400">used</span>
+            </div>
+            {storageQ.status === 'loading' && <div className="w-20 h-1 bg-slate-100 rounded-full mt-1 animate-pulse" />}
+          </div>
+
+          <button 
+            onClick={() => setIsUploadOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-2xl font-black text-sm hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+          >
+            <CloudArrowUpIcon className="w-5 h-5" />
+            <span>Execute New Job</span>
+          </button>
+        </div>
       </div>
+
+      <PreflightUploadModal 
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onSuccess={() => {
+          q.refetch();
+          storageQ.refetch();
+        }}
+      />
 
       {/* Filters Bar */}
       <div className="glass p-4 rounded-2xl border border-white dark:border-white/[0.08] flex flex-wrap items-center gap-4 italic-text-off">

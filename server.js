@@ -22,7 +22,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;
 
     // 2. API BYPASS (Specific endpoints that handle their own auth or are public)
-    if (url.includes('/api/admin') || url.includes('/api/v2/analytics') || url.includes('/api/system') || url.includes('/api/preflight') || url.includes('/api/auth')) return;
+    if (url.includes('/api/auth') || url.includes('/api/v2/analytics/public')) return;
 
     // 3. PROTECTED ROUTES (Require Bearer Token)
     // Currently protecting Federation and any other generic API

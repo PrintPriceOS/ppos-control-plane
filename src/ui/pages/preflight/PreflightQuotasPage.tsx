@@ -1,69 +1,97 @@
-import React from 'react';
-import { ScaleIcon, BoltIcon, ClockIcon } from "@heroicons/react/24/outline";
-import { getPreflightQuotas } from "../../lib/adminApi";
+import { getStorageSummary } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 
 export const PreflightQuotasPage: React.FC = () => {
-  const q = useAdminQuery("preflight:quotas", getPreflightQuotas, 30000);
+  const q = useAdminQuery("preflight:storage:all", () => getStorageSummary(), 30000);
+
+  const formatSize = (bytes: number) => {
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  };
+
+  const tenants = q.data?.tenants || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Preflight Quotas</h1>
-        <p className="text-sm text-slate-500 font-medium">Tenant-level usage limits and throughput throttling.</p>
+    <div className="space-y-6 italic-text-off">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Storage Quotas</h1>
+          <p className="text-sm text-slate-500 font-medium">Multi-tenant storage usage and 2GB hard-limit enforcement.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <QuotaCard 
+          label="Global Utilization" 
+          value={formatSize(q.data?.totalBytes || 0)} 
+          limit={formatSize(tenants.length * 2147483648)} 
+          progress={((q.data?.totalBytes || 0) / (tenants.length * 2147483648 || 1)) * 100}
+        />
       </div>
 
       <DataTable 
         isLoading={q.status === 'loading'}
-        data={q.data || []}
+        data={tenants}
         columns={[
           {
             header: 'Tenant ID',
-            accessor: (q) => <span className="font-bold text-primary">{q.tenantId}</span>
+            accessor: (t) => <span className="font-bold text-primary">{t.tenantId}</span>
           },
           {
-            header: 'Daily Usage',
-            accessor: (q) => (
-              <div className="flex flex-col gap-1 w-32">
+            header: 'Used Storage',
+            accessor: (t) => (
+              <div className="flex flex-col gap-1 w-48">
                 <div className="h-2 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
-                  <div className={`h-full ${q.usage / q.limit > 0.9 ? 'bg-red-500' : 'bg-primary'}`} 
-                       style={{ width: `${(q.usage / q.limit) * 100}%` }} />
+                  <div className={`h-full ${t.usedBytes / t.quotaBytes > 0.9 ? 'bg-red-500' : 'bg-primary'}`} 
+                       style={{ width: `${(t.usedBytes / t.quotaBytes) * 100}%` }} />
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  <span>{q.usage}</span>
-                  <span>Limit: {q.limit}</span>
+                  <span>{formatSize(t.usedBytes)}</span>
+                  <span>Limit: {formatSize(t.quotaBytes)}</span>
                 </div>
               </div>
             )
           },
           {
-            header: 'Rate Status',
-            accessor: (q) => (
+            header: 'Remaining',
+            accessor: (t) => <span className="text-xs font-mono text-slate-500">{formatSize(t.remainingBytes)}</span>
+          },
+          {
+            header: 'Capacity',
+            accessor: (t) => (
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                q.usage >= q.limit ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
               }`}>
-                {q.usage >= q.limit ? 'Throttled' : 'Nominal'}
+                {((t.usedBytes / t.quotaBytes) * 100).toFixed(1)}% Full
               </span>
             )
           },
           {
-            header: 'Reset Time',
-            accessor: (q) => (
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-                <ClockIcon className="w-3.5 h-3.5" />
-                {new Date(q.resetAt).toLocaleTimeString()}
-              </div>
-            )
+            header: 'Files',
+            accessor: (t) => <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1]">{t.fileCount} items</span>
           }
         ]}
       />
 
-      {!q.data && q.status !== 'loading' && (
-        <div className="p-10 text-center font-bold text-slate-300 italic uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-3xl">
-          Endpoint Unavailable: Quota data could not be fetched.
-        </div>
-      )}
     </div>
   );
 };
+
+const QuotaCard = ({ label, value, limit, progress }: any) => (
+  <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] space-y-4">
+    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</div>
+    <div className="flex items-baseline gap-2">
+      <span className="text-3xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">{value}</span>
+      <span className="text-xs font-bold text-slate-400">/ {limit}</span>
+    </div>
+    <div className="space-y-1.5">
+      <div className="h-2 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+        <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
+      </div>
+      <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
+        <span>Utilization</span>
+        <span>{progress.toFixed(1)}%</span>
+      </div>
+    </div>
+  </div>
+);
