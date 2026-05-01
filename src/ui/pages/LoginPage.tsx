@@ -1,22 +1,37 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheckIcon, KeyIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { setAdminKey } from '../lib/adminApi';
+import { ShieldCheckIcon, KeyIcon, ArrowRightIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { setAdminKey, verifyToken } from '../lib/adminApi';
 
 export const LoginPage: React.FC = () => {
   const [key, setKey] = useState('');
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!key.trim()) {
       setError('Please enter your administration key');
       return;
     }
 
-    setAdminKey(key.trim());
-    navigate('/dashboard');
+    setLoading(true);
+    setError('');
+
+    try {
+      await verifyToken(key.trim());
+      setAdminKey(key.trim());
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error('[LOGIN-ERROR]', err);
+      if (err.message.includes('401')) {
+        setError('Invalid access token. Please check your credentials.');
+      } else {
+        setError(`Connection Error: ${err.message}. If this persists, check if the Authorization header is being blocked by the server.`);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,10 +82,17 @@ export const LoginPage: React.FC = () => {
 
             <button 
               type="submit"
-              className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 group"
+              disabled={loading}
+              className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Authorize Access</span>
-              <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {loading ? (
+                <ArrowPathIcon className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <span>Authorize Access</span>
+                  <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 

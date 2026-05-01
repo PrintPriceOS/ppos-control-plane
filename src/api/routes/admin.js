@@ -5,7 +5,37 @@ const db = require("../services/db");
 
 const router = express.Router();
 router.use(express.json()); // Ensure req.body is parsed for POST requests
+
+// PUBLIC DIAGNOSTICS (No Auth)
+router.get('/test-trace', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'Admin Router Reachable',
+    path: req.path,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl
+  });
+});
+
+router.get('/test-headers', (req, res) => {
+  res.json({
+    ok: true,
+    headers: req.headers,
+    authHeaderFound: !!req.headers['authorization'],
+    authHeaderValue: req.headers['authorization'] ? 'PRESENT (HIDDEN)' : 'MISSING'
+  });
+});
+
 router.use(requireAdmin);
+
+// PROTECTED DIAGNOSTICS (Require Auth)
+router.get('/verify', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'Token Validated',
+    user: req.user
+  });
+});
 
 // Import sub-routers
 const connectAdminRouter = require('./connectAdmin');
@@ -35,17 +65,6 @@ const notificationsRouter = require('./notifications');
 router.use((req, res, next) => {
   console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
   next();
-});
-
-// Test Trace Route
-router.get('/test-trace', (req, res) => {
-  res.json({
-    ok: true,
-    message: 'Admin Router Reachable',
-    path: req.path,
-    originalUrl: req.originalUrl,
-    baseUrl: req.baseUrl
-  });
 });
 
 /**

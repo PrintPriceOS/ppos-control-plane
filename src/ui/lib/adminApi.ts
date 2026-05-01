@@ -52,6 +52,20 @@ async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: 
     return res.json() as Promise<T>;
 }
 
+export async function verifyToken(key: string) {
+    // We manually construct the fetch here to test the key before setting it globally
+    const res = await fetch('/api/admin/verify', {
+        headers: {
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    if (!res.ok) {
+        throw new Error(`Verification failed: ${res.status}`);
+    }
+    return res.json();
+}
+
 export type OverviewResponse = {
     totalJobs: number;
     successRate: number;
