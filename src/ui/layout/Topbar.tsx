@@ -57,7 +57,11 @@ export const Topbar: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>(
+    (window as any).INITIAL_NOTIFICATIONS && Array.isArray((window as any).INITIAL_NOTIFICATIONS)
+      ? (window as any).INITIAL_NOTIFICATIONS
+      : []
+  );
 
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
