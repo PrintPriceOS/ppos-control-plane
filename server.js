@@ -72,7 +72,7 @@ const start = async () => {
     try {
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {
-            root: path.join(__dirname, '../../../frontend/dist'),
+            root: path.join(__dirname, 'dist'),
             prefix: '/', // serve from root
             wildcard: false 
         });

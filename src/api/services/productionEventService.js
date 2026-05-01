@@ -11,7 +11,7 @@ class ProductionEventService {
    * @param {Object} event { tenantId, packageId, dispatchId, type, actorType, actorId, message, metadata }
    */
   async record(event) {
-    return persistence.createEvent({
+    const eventId = await persistence.createEvent({
       tenantId: event.tenantId,
       packageId: event.packageId,
       dispatchId: event.dispatchId,
@@ -21,6 +21,15 @@ class ProductionEventService {
       message: event.message,
       metadata: event.metadata || {}
     });
+
+    // Trigger Notification Engine (Async)
+    // We require here to avoid circular dependencies if any
+    const notificationService = require('./productionNotificationService');
+    notificationService.handleEvent(event).catch(err => {
+      console.error('[EVENT-SERVICE] Notification trigger failed:', err);
+    });
+
+    return eventId;
   }
 
   /**

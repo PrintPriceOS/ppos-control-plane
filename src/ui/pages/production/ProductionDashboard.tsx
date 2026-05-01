@@ -3,10 +3,12 @@ import {
   InboxIcon, 
   Square3Stack3DIcon, 
   ArrowsRightLeftIcon, 
-  SparklesIcon 
+  SparklesIcon,
+  BanknotesIcon 
 } from '@heroicons/react/24/outline';
 import { IncomingJobsPage } from './IncomingJobsPage';
 import { ProductionTimeline } from './ProductionTimeline';
+import { ProductionBillingPage } from './ProductionBillingPage';
 // Placeholder components for other tabs
 const ProductionPackagesTab = () => (
     <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl m-6">
@@ -27,7 +29,8 @@ export const ProductionDashboard: React.FC = () => {
     { id: 'incoming', name: 'Incoming Jobs', icon: InboxIcon },
     { id: 'packages', name: 'Production Packages', icon: Square3Stack3DIcon },
     { id: 'history', name: 'Dispatch History', icon: ArrowsRightLeftIcon },
-    { id: 'matching', name: 'Node Matching', icon: SparklesIcon }
+    { id: 'matching', name: 'Node Matching', icon: SparklesIcon },
+    { id: 'billing', name: 'Financial Settlement', icon: BanknotesIcon }
   ];
 
   return (
@@ -55,6 +58,7 @@ export const ProductionDashboard: React.FC = () => {
         {activeTab === 'packages' && <ProductionPackagesTab />}
         {activeTab === 'history' && <DispatchHistoryTab />}
         {activeTab === 'matching' && <NodeMatchingTab />}
+        {activeTab === 'billing' && <ProductionBillingPage />}
       </div>
     </div>
   );

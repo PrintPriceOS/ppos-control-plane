@@ -139,6 +139,16 @@ class ProductionPackageService {
 
     const updatedPackage = await persistence.updatePackage(packageId, { status: newStatus });
 
+    // 4. Trigger Billing Integration (COMPLETED)
+    if (newStatus === 'COMPLETED') {
+      try {
+        await this.handleBilling(updatedPackage, context);
+      } catch (err) {
+        console.error('[PACKAGE-SERVICE] Billing integration failed:', err);
+        // We don't fail the whole operation, but we should log it
+      }
+    }
+
     await auditLogger.log({
       type: 'PACKAGE_STATUS_UPDATE',
       tenantId: context.tenantId,
@@ -158,6 +168,61 @@ class ProductionPackageService {
     });
 
     return updatedPackage;
+  }
+
+  /**
+   * Internal: Calculate costs and record financial transactions
+   */
+  async handleBilling(pkg, context) {
+    const financialLedger = require('./financialLedgerService');
+    const bookSpec = pkg.book_spec_json || {};
+    
+    // Simple Pricing Logic (Mock for Phase 12.2)
+    const baseFee = 5.00;
+    const pageCount = bookSpec.pageCount || 0;
+    const pricePerPage = 0.05;
+    const totalGross = baseFee + (pageCount * pricePerPage);
+    const printerCost = totalGross * 0.85; // Platform takes 15%
+    const currency = bookSpec.currency || 'EUR';
+
+    // 1. Create a "Virtual" Transaction ID
+    const transactionId = `prod_tx_${pkg.id.substring(0, 12)}`;
+
+    // 2. Record Ledger Entries
+    await financialLedger.createLedgerEntries(transactionId, [
+        { 
+          type: 'DEBIT', 
+          account: 'CUSTOMER', 
+          amount: totalGross, 
+          currency,
+          metadata: { packageId: pkg.id, note: 'Production Completion Payment' }
+        },
+        { 
+          type: 'CREDIT', 
+          account: 'PRINTER', 
+          amount: printerCost, 
+          currency,
+          metadata: { packageId: pkg.id, note: 'Production Payout', printerTenantId: pkg.assigned_printer_tenant_id }
+        },
+        { 
+          type: 'CREDIT', 
+          account: 'PLATFORM_REVENUE', 
+          amount: totalGross - printerCost, 
+          currency,
+          metadata: { packageId: pkg.id, note: 'Platform Fee' }
+        }
+    ]);
+
+    // 3. Record Billing Event
+    await eventService.record({
+      tenantId: pkg.tenant_id,
+      packageId: pkg.id,
+      type: 'BILLING_PROCESSED',
+      actorType: 'SYSTEM',
+      actorId: 'billing-engine',
+      message: `Financial settlement processed: ${totalGross.toFixed(2)} ${currency}`,
+      metadata: { totalGross, printerCost, currency }
+    });
   }
 }
 

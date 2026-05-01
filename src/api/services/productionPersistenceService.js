@@ -117,6 +117,26 @@ class ProductionPersistenceService {
         ) ENGINE=InnoDB;
       `);
       
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS production_notifications (
+          id VARCHAR(64) PRIMARY KEY,
+          tenant_id VARCHAR(64) NOT NULL,
+          user_id VARCHAR(64) NULL,
+          title VARCHAR(255) NOT NULL,
+          message TEXT NULL,
+          severity ENUM('info', 'warning', 'error', 'success') DEFAULT 'info',
+          type VARCHAR(64) NULL,
+          related_entity_type VARCHAR(64) NULL,
+          related_entity_id VARCHAR(64) NULL,
+          is_read BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_tenant (tenant_id),
+          INDEX idx_user (user_id),
+          INDEX idx_read (is_read),
+          INDEX idx_created (created_at)
+        ) ENGINE=InnoDB;
+      `);
+      
       console.log('[PRODUCTION-PERSISTENCE] Tables verified.');
     } catch (err) {
       console.error('[PRODUCTION-PERSISTENCE] Initialization failed:', err.message);
@@ -411,6 +431,67 @@ class ProductionPersistenceService {
     params.push(parseInt(filters.offset || '0'));
 
     return db.query(sql, params);
+  }
+
+  // --- Notifications ---
+
+  async createNotification(data) {
+    const id = uuidv4();
+    const { 
+      tenantId, userId, title, message, severity, 
+      type, relatedEntityType, relatedEntityId 
+    } = data;
+
+    await db.query(`
+      INSERT INTO production_notifications 
+      (id, tenant_id, user_id, title, message, severity, type, related_entity_type, related_entity_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, tenantId, userId || null, title, message || null, severity || 'info', 
+      type || 'GENERAL', relatedEntityType || null, relatedEntityId || null
+    ]);
+
+    return { id, ...data };
+  }
+
+  async listNotifications(filters = {}) {
+    let sql = 'SELECT * FROM production_notifications WHERE 1=1';
+    const params = [];
+
+    if (filters.tenantId) {
+      sql += ' AND tenant_id = ?';
+      params.push(filters.tenantId);
+    }
+    if (filters.userId) {
+      sql += ' AND user_id = ?';
+      params.push(filters.userId);
+    }
+    if (filters.isRead !== undefined) {
+      sql += ' AND is_read = ?';
+      params.push(filters.isRead ? 1 : 0);
+    }
+
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(filters.limit || '50'));
+    params.push(parseInt(filters.offset || '0'));
+
+    return db.query(sql, params);
+  }
+
+  async markNotificationRead(id, tenantId) {
+    await db.query('UPDATE production_notifications SET is_read = 1 WHERE id = ? AND tenant_id = ?', [id, tenantId]);
+    return true;
+  }
+
+  async markAllNotificationsRead(tenantId, userId) {
+    let sql = 'UPDATE production_notifications SET is_read = 1 WHERE tenant_id = ?';
+    const params = [tenantId];
+    if (userId) {
+      sql += ' AND user_id = ?';
+      params.push(userId);
+    }
+    await db.query(sql, params);
+    return true;
   }
 }
 

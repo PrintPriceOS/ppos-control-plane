@@ -20,6 +20,9 @@ export const setAdminKey = (key: string) => {
 
 export const clearAdminKey = () => {
     localStorage.removeItem(ADMIN_KEY_STORAGE);
+    localStorage.removeItem('admin_key');
+    localStorage.removeItem('ppp_admin_api_key');
+    localStorage.removeItem('admin_token');
 };
 
 async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
@@ -754,4 +757,26 @@ export async function recoverStalledPreflightJobs() {
         method: 'POST'
     });
     return res;
+}
+
+// --- Production Notifications ---
+
+export async function getNotifications(limit = 20) {
+  const res = await adminFetch<any>(`/api/admin/production/notifications?limit=${limit}`);
+  return res.notifications || [];
+}
+
+export async function markNotificationRead(id: string) {
+  return adminFetch<any>(`/api/admin/production/notifications/${id}/read`, { method: 'POST' });
+}
+
+export async function markAllNotificationsRead() {
+  return adminFetch<any>(`/api/admin/production/notifications/read-all`, { method: 'POST' });
+}
+
+// --- Production Financials ---
+
+export async function getProductionFinancials(packageId?: string) {
+  const url = packageId ? `/api/admin/production/financials/${packageId}` : '/api/admin/production/financials';
+  return adminFetch<any>(url);
 }

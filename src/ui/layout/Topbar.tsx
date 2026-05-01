@@ -14,6 +14,7 @@ import {
   CheckBadgeIcon,
   CheckIcon,
 } from "@heroicons/react/24/outline";
+import { clearAdminKey, getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/adminApi';
 
 // ─── Notification types ──────────────────────────────────────────────────────
 
@@ -29,37 +30,7 @@ interface Notification {
   severity: NotifSeverity;
 }
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
-
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'n1',
-    userId: 'usr_admin_001',
-    title: 'Anomaly detected in EU-WEST-1',
-    description: 'The intelligence layer flagged an unusual spike in job failure rate (↑ 340%) over the last 15 minutes.',
-    date: '2026-03-30T14:22:00Z',
-    read: false,
-    severity: 'error',
-  },
-  {
-    id: 'n2',
-    userId: 'usr_admin_001',
-    title: 'Deployment rollout paused',
-    description: 'Deployment #d-8812 was automatically paused by the guardrail engine due to a confidence threshold breach.',
-    date: '2026-03-30T11:05:00Z',
-    read: false,
-    severity: 'warning',
-  },
-  {
-    id: 'n3',
-    userId: 'usr_admin_001',
-    title: 'Federation sync completed',
-    description: 'All 4 regional instances have successfully synced global governance policies (v2.0.0).',
-    date: '2026-03-30T09:00:00Z',
-    read: true,
-    severity: 'success',
-  },
-];
+// --- Helpers ---
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,12 +75,45 @@ export const Topbar: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const fetchNotifications = async () => {
+    try {
+      const data = await getNotifications(10);
+      setNotifications(data.map((n: any) => ({
+        id: n.id,
+        userId: n.user_id,
+        title: n.title,
+        description: n.message,
+        date: n.created_at,
+        read: !!n.is_read,
+        severity: n.severity as NotifSeverity
+      })));
+    } catch (err) {
+      console.warn('[TOPBAR] Failed to fetch notifications:', err);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Polling every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await markNotificationRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    } catch (err) {
+      console.error('[TOPBAR] Failed to mark as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('[TOPBAR] Failed to mark all as read:', err);
+    }
   };
 
   const handleSettings = () => {
@@ -119,8 +123,10 @@ export const Topbar: React.FC = () => {
 
   const handleLogoutConfirm = () => {
     setLogoutModal(false);
-    localStorage.removeItem('ppp_admin_api_key');
-    navigate('/');
+    clearAdminKey();
+    navigate('/login');
+    // Force a full page reload to clear any cached state or queries
+    window.location.reload();
   };
 
   return (
@@ -176,7 +182,7 @@ export const Topbar: React.FC = () => {
                   </div>
                   {hasUnread && (
                     <button
-                      onClick={markAllAsRead}
+                      onClick={handleMarkAllAsRead}
                       className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-slate-700 transition-colors"
                     >
                       <CheckIcon className="w-3 h-3" />
@@ -193,7 +199,7 @@ export const Topbar: React.FC = () => {
                     return (
                       <button
                         key={n.id}
-                        onClick={() => markAsRead(n.id)}
+                        onClick={() => handleMarkAsRead(n.id)}
                         className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors ${
                           n.read ? 'hover:bg-slate-50 dark:hover:bg-white/[0.04]' : 'bg-slate-50/80 dark:bg-white/[0.04] hover:bg-slate-100/80 dark:hover:bg-white/[0.07]'
                         }`}

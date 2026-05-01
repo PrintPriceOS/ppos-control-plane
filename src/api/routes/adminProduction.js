@@ -351,4 +351,39 @@ router.get('/packages/:packageId/events', async (req, res) => {
   }
 });
 
+// --- Production Financials ---
+
+/**
+ * GET /api/admin/production/financials
+ * List financial ledger entries related to production
+ */
+router.get('/financials', async (req, res) => {
+  try {
+    const context = resolveContext(req);
+    const db = require('../services/db');
+    
+    // Security: Only allow searching by tenant or if super admin
+    let sql = `
+      SELECT le.*, pkg.id as package_id
+      FROM financial_ledger_entries le
+      JOIN production_packages pkg ON le.transaction_id = CONCAT('prod_tx_', SUBSTRING(pkg.id, 1, 12))
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (context.role !== 'SUPER_ADMIN') {
+      sql += ' AND (pkg.tenant_id = ? OR pkg.assigned_printer_tenant_id = ?)';
+      params.push(context.tenantId, context.tenantId);
+    }
+
+    sql += ' ORDER BY le.created_at DESC LIMIT 100';
+
+    const { rows } = await db.query(sql, params);
+    res.json({ ok: true, financials: rows });
+  } catch (error) {
+    console.error('[ADMIN-PRODUCTION] Financial fetch error:', error);
+    res.status(500).json({ ok: false, error: { code: 'FINANCIAL_LIST_FAILED', message: error.message } });
+  }
+});
+
 module.exports = router;

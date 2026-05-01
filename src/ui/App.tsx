@@ -49,6 +49,7 @@ import { PreflightCertificatesPage } from './pages/preflight/PreflightCertificat
 import { PreflightQuotasPage } from './pages/preflight/PreflightQuotasPage';
 import { PreflightWorkersPage } from './pages/preflight/PreflightWorkersPage';
 import { ProductionDashboard } from './pages/production/ProductionDashboard';
+import { ProductionBillingPage } from './pages/production/ProductionBillingPage';
 
 import { FederationOverview } from './pages/federation/FederationOverview';
 import { InstanceRegistry } from './pages/federation/InstanceRegistry';
@@ -65,6 +66,8 @@ import { GlobalConflicts } from './pages/global/GlobalConflicts';
 
 import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
 import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
+import { LoginPage } from './pages/LoginPage';
+import { AuthGuard } from './components/AuthGuard';
 
 export const App: React.FC = () => {
     return (
@@ -73,7 +76,9 @@ export const App: React.FC = () => {
             <Route path="/legacy" element={<AdminDashboard />} />
 
             {/* New OS Control Plane Layout */}
-            <Route element={<Layout />}>
+            <Route path="/login" element={<LoginPage />} />
+            
+            <Route element={<AuthGuard><Layout /></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/governance" element={<GovernancePage />} />
@@ -101,6 +106,7 @@ export const App: React.FC = () => {
 
                 {/* PRODUCTION OPERATIONS */}
                 <Route path="/production" element={<ProductionDashboard />} />
+                <Route path="/production/billing" element={<ProductionBillingPage />} />
 
                 {/* INTELLIGENCE LAYER */}
                 <Route path="/intelligence" element={<IntelligenceOverview />} />
