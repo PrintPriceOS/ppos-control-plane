@@ -1,111 +1,122 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheckIcon, KeyIcon, ArrowRightIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
-import { setAdminKey, verifyToken } from '../lib/adminApi';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { setAuthToken } from '../lib/authStore';
+import { ShieldCheckIcon, KeyIcon } from '@heroicons/react/24/outline';
 
 export const LoginPage: React.FC = () => {
-  const [key, setKey] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+    const [token, setToken] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    const navigate = useNavigate();
+    const location = useLocation();
+    
+    const from = (location.state as any)?.from?.pathname || '/';
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!key.trim()) {
-      setError('Please enter your administration key');
-      return;
-    }
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
 
-    setLoading(true);
-    setError('');
+        const cleanToken = token.trim();
+        if (!cleanToken) {
+            setError('Please provide a valid Control Plane Bearer Token.');
+            return;
+        }
 
-    try {
-      await verifyToken(key.trim());
-      setAdminKey(key.trim());
-      navigate('/dashboard');
-    } catch (err: any) {
-      console.error('[LOGIN-ERROR]', err);
-      if (err.message.includes('401')) {
-        setError('Invalid access token. Please check your credentials.');
-      } else {
-        setError(`Connection Error: ${err.message}. If this persists, check if the Authorization header is being blocked by the server.`);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+        setIsSubmitting(true);
+        try {
+            // We save the token and attempt to navigate. 
+            // The AuthGuard or the first API call will handle validation fail-loudly.
+            setAuthToken(cleanToken);
+            navigate(from, { replace: true });
+        } catch (err: any) {
+            setError(err.message || 'Failed to authenticate.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#121214] flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        {/* Logo / Brand */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-            <ShieldCheckIcon className="w-10 h-10 text-primary" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">PrintPrice Control Plane</h1>
-          <p className="text-sm text-slate-500 font-medium mt-1 uppercase tracking-widest">Governance & Operations</p>
-        </div>
-
-        {/* Login Card */}
-        <div className="glass p-8 rounded-3xl border border-white dark:border-white/[0.08] shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-[#ECECF1]">Authentication Required</h2>
-            <p className="text-sm text-slate-500 mt-1">Please enter your PPOS Control Token to access the platform.</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                Access Token
-              </label>
-              <div className="relative">
-                <div className="absolute left-4 top-3.5">
-                  <KeyIcon className="w-5 h-5 text-slate-400" />
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0F0F10] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="flex justify-center">
+                    <div className="w-16 h-16 bg-slate-900 dark:bg-primary/10 rounded-2xl flex items-center justify-center shadow-2xl ring-1 ring-white/10">
+                        <ShieldCheckIcon className="w-10 h-10 text-white dark:text-primary" />
+                    </div>
                 </div>
-                <input 
-                  type="password"
-                  value={key}
-                  onChange={(e) => {
-                    setKey(e.target.value);
-                    setError('');
-                  }}
-                  placeholder="Enter your secure token..."
-                  className="w-full bg-slate-50 dark:bg-white/[0.03] border-2 border-slate-100 dark:border-white/[0.05] focus:border-primary/50 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
-                  autoFocus
-                />
-              </div>
+                <h2 className="mt-6 text-center text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                    PrintPrice OS
+                </h2>
+                <p className="mt-2 text-center text-sm font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-[0.2em]">
+                    Control Plane Access
+                </p>
             </div>
 
-            {error && (
-              <p className="text-xs font-bold text-red-500 ml-1">{error}</p>
-            )}
+            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="bg-white dark:bg-[#1C1C1E] py-8 px-4 shadow-xl shadow-slate-200/50 dark:shadow-none sm:rounded-3xl sm:px-10 border border-slate-200/60 dark:border-white/[0.06]">
+                    <form className="space-y-6" onSubmit={handleLogin}>
+                        <div>
+                            <label htmlFor="token" className="block text-xs font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest ml-1 mb-2">
+                                Admin Bearer Token
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <KeyIcon className="h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" aria-hidden="true" />
+                                </div>
+                                <textarea
+                                    id="token"
+                                    name="token"
+                                    rows={3}
+                                    required
+                                    className="block w-full pl-10 pr-3 py-3 border border-slate-200 dark:border-white/[0.08] rounded-2xl bg-slate-50/50 dark:bg-white/[0.03] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none font-mono text-sm"
+                                    placeholder="Paste your Control Plane secret token here..."
+                                    value={token}
+                                    onChange={(e) => setToken(e.target.value)}
+                                />
+                            </div>
+                            <p className="mt-3 text-[11px] text-slate-400 dark:text-zinc-600 leading-relaxed italic">
+                                Paste a valid Control Plane JWT or system-level bearer token provided by your infrastructure administrator.
+                            </p>
+                        </div>
 
-            <button 
-              type="submit"
-              disabled={loading}
-              className="btn-primary-premium w-full flex items-center justify-center !py-4"
-            >
-              {loading ? (
-                <ArrowPathIcon className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <span>Authorize Access</span>
-                  <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-          </form>
+                        {error && (
+                            <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-2xl">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <div className="h-2 w-2 mt-1.5 rounded-full bg-red-400" />
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-sm font-bold text-red-800 dark:text-red-400">
+                                            {error}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/[0.05] text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Restricted to Authorized Operators Only
-          </div>
+                        <div>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-lg text-sm font-black text-white bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest"
+                            >
+                                {isSubmitting ? 'Authenticating...' : 'Enter Control Plane'}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/[0.04]">
+                        <div className="flex items-center justify-between text-[10px] font-black text-slate-400 dark:text-zinc-700 uppercase tracking-widest">
+                            <span>Governance Layer</span>
+                            <span>v2.10.0-PROD</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <p className="mt-6 text-center text-[10px] text-slate-400 dark:text-zinc-600 uppercase tracking-widest">
+                    Authorized Personnel Only &bull; Forensic Audit Enabled
+                </p>
+            </div>
         </div>
-
-        <p className="text-center text-xs text-slate-400 mt-8 font-medium italic-text-off">
-          PrintPrice OS v1.9.0 &copy; {new Date().getFullYear()}
-        </p>
-      </div>
-    </div>
-  );
+    );
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { clearAuthToken } from '../lib/authStore';
 import {
   ChartBarIcon,
   UsersIcon,
@@ -92,6 +93,13 @@ const NavGroup: React.FC<NavGroupProps> = ({ label, children, defaultOpen = true
 };
 
 export const Sidebar: React.FC = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    clearAuthToken();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <aside className="w-72 bg-white/50 dark:bg-[#1C1C1E] border-r border-slate-200/60 dark:border-white/[0.08] h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
@@ -168,7 +176,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-4 bg-slate-50/50 dark:bg-black/20 border-t border-slate-200/60 dark:border-white/[0.08]">
+      <div className="p-4 bg-slate-50/50 dark:bg-black/20 border-t border-slate-200/60 dark:border-white/[0.08] space-y-2">
         <a 
           href="/admin/help" 
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/10 group"
@@ -176,6 +184,14 @@ export const Sidebar: React.FC = () => {
           <BookOpenIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           <span className="text-sm font-bold">OS Help Console</span>
         </a>
+        
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/20 group"
+        >
+          <ArrowPathIcon className="w-5 h-5 transition-transform group-hover:rotate-180" />
+          <span className="text-sm font-bold">Logout Session</span>
+        </button>
       </div>
     </aside>
   );

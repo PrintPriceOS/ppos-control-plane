@@ -1,38 +1,13 @@
-// lib/adminApi.ts
-type Range = "24h" | "7d" | "30d";
-
-const ADMIN_KEY_STORAGE = "ppp_admin_api_key";
-
-export const getAdminKey = () => {
-    // 1. Check local storage (manual login) - support both legacy and new keys
-    const stored = localStorage.getItem(ADMIN_KEY_STORAGE) ||
-        localStorage.getItem('admin_key') ||
-        localStorage.getItem('ppp_admin_api_key');
-    if (stored) return stored;
-
-    // 2. Check build-time env
-    return (import.meta as any)?.env?.VITE_ADMIN_API_KEY || "";
-};
-
-export const setAdminKey = (key: string) => {
-    localStorage.setItem(ADMIN_KEY_STORAGE, key);
-};
-
-export const clearAdminKey = () => {
-    localStorage.removeItem(ADMIN_KEY_STORAGE);
-    localStorage.removeItem('admin_key');
-    localStorage.removeItem('ppp_admin_api_key');
-    localStorage.removeItem('admin_token');
-};
+import { getAuthToken, clearAuthToken, setAuthToken } from './authStore';
 
 async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
-    const key = getAdminKey();
+    const token = getAuthToken();
 
     const headers: Record<string, string> = {
+        "Accept": "application/json",
         "Content-Type": "application/json",
-        ...(key ? { 
-            "X-Admin-Api-Key": key,
-            "Authorization": `Bearer ${key}`
+        ...(token ? { 
+            "Authorization": `Bearer ${token}`
         } : {}),
         ...(options?.tenantId ? { "X-Tenant-Id": options.tenantId } : {}),
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
@@ -45,26 +20,54 @@ async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: 
         credentials: "include", 
     });
 
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Admin API error ${res.status}: ${text || res.statusText}`);
+    if (res.status === 401) {
+        clearAuthToken();
+        // Force redirect to login on 401
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error('Unauthorized: Valid Bearer token required');
     }
+
+    if (!res.ok) {
+        let errorData;
+        try {
+            errorData = await res.json();
+        } catch (e) {
+            errorData = { message: res.statusText };
+        }
+        
+        // Fail-loud: preserve structured backend error if possible
+        const errorMessage = errorData.error?.message || errorData.message || res.statusText;
+        throw new Error(`Admin API error ${res.status}: ${errorMessage}`);
+    }
+    
     return res.json() as Promise<T>;
 }
 
-export async function verifyToken(key: string) {
-    // We manually construct the fetch here to test the key before setting it globally
-    const res = await fetch('/api/admin/verify', {
+export async function verifyToken(token: string) {
+    const res = await fetch('/api/admin/telemetry/snapshot', { // Using a safe read endpoint to verify
         headers: {
-            'Authorization': `Bearer ${key}`,
-            'Content-Type': 'application/json'
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
         }
     });
+    
+    if (res.status === 401) {
+        throw new Error('Invalid token');
+    }
+
     if (!res.ok) {
         throw new Error(`Verification failed: ${res.status}`);
     }
+    
     return res.json();
 }
+
+// Keep legacy exports for compatibility during migration if necessary, but wired to authStore
+export const getAdminKey = getAuthToken;
+export const setAdminKey = setAuthToken;
+export const clearAdminKey = clearAuthToken;
 
 export type OverviewResponse = {
     totalJobs: number;
