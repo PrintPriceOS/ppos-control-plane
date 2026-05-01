@@ -844,12 +844,97 @@ div[role="button"]:focus:not(:focus-visible),
   box-shadow: 0 0 20px rgba(220, 0, 0, 0.2);
 }
 
-.hover-slide {
-  transition: transform var(--transition-normal);
-}
-
 .hover-slide:hover {
   transform: translateY(-2px);
+}
+
+/* ===================== */
+/* Premium Buttons       */
+/* ===================== */
+
+.btn-premium {
+  @apply flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--color-slate-700);
+}
+
+.btn-premium:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-premium:active {
+  transform: translateY(0);
+}
+
+.dark .btn-premium {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ECECF1;
+}
+
+.dark .btn-premium:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary-premium {
+  @apply flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all shadow-lg;
+  background: linear-gradient(135deg, var(--color-primary), #ff2e2e);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.btn-primary-premium:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 10px 20px -5px rgba(220, 0, 0, 0.3);
+  filter: brightness(1.1);
+}
+
+.btn-primary-premium:active {
+  transform: translateY(0);
+}
+
+.btn-ghost {
+  @apply flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all;
+  color: var(--color-slate-500);
+  background: transparent;
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--color-slate-900);
+}
+
+.dark .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.btn-tab {
+  @apply flex items-center gap-2 px-4 py-2 text-sm font-black rounded-xl transition-all duration-300;
+  color: var(--color-slate-500);
+  background: transparent;
+}
+
+.btn-tab-active {
+  @apply shadow-sm;
+  background: white;
+  color: var(--color-slate-900);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .btn-tab-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Texto */

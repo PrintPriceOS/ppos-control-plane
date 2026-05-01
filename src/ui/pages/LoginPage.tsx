@@ -84,7 +84,7 @@ export const LoginPage: React.FC = () => {
             <button 
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-premium w-full flex items-center justify-center !py-4"
             >
               {loading ? (
                 <ArrowPathIcon className="w-5 h-5 animate-spin" />

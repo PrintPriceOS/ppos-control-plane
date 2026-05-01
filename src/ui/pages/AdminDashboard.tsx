@@ -115,7 +115,7 @@ const AdminDashboardInner: React.FC = () => {
                             />
                             <button
                                 onClick={handleConnect}
-                                className="w-full bg-slate-900 text-white rounded-xl py-4 font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                                className="btn-primary-premium w-full !py-4"
                             >
                                 Establish Connection
                             </button>
@@ -209,10 +209,9 @@ const AdminDashboardInner: React.FC = () => {
                             <button
                                 key={id}
                                 className={[
-                                    "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200",
                                     activeTab === id
-                                        ? "bg-white text-slate-900 shadow-sm border border-slate-200/50"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/30",
+                                        ? "btn-tab btn-tab-active"
+                                        : "btn-tab",
                                 ].join(" ")}
                                 onClick={() => setActiveTab(id)}
                             >
