@@ -5,6 +5,7 @@ import { setAdminKey, verifyToken } from '../lib/adminApi';
 
 export const LoginPage: React.FC = () => {
   const [key, setKey] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
