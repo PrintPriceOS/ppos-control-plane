@@ -136,7 +136,10 @@ const start = async () => {
             });
         });
 
-        const PORT = process.env.PPOS_CONTROL_PORT || 8080;
+        // In Plesk/Passenger, the port is often passed via process.env.PORT
+        const PORT = process.env.PORT || process.env.PPOS_CONTROL_PORT || 8080;
+        
+        console.log(`[BOOT] Attempting to listen on port: ${PORT}`);
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
     } catch (err) {
