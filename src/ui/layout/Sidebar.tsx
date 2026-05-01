@@ -35,6 +35,8 @@ import {
   InboxIcon,
   Square3Stack3DIcon,
   SparklesIcon,
+  FingerPrintIcon,
+  SignalIcon,
 } from "@heroicons/react/24/outline";
 import { t } from '../i18n';
 
@@ -114,6 +116,12 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/usage" icon={CalculatorIcon || ClockIcon} label="Usage & Quotas" />
           <NavItem to="/printhouses" icon={PrinterIcon} label="Printhouses" />
           <NavItem to="/orders" icon={ClipboardDocumentListIcon} label="Orders" />
+        </NavGroup>
+
+        {/* FORENSICS & OBSERVABILITY */}
+        <NavGroup label="Forensics & Observability">
+          <NavItem to="/telemetry" icon={SignalIcon} label="Industrial Telemetry" badge="SOC" />
+          <NavItem to="/forensics" icon={FingerPrintIcon} label="Forensic Timeline" />
         </NavGroup>
 
         {/* INTELLIGENCE LAYER */}

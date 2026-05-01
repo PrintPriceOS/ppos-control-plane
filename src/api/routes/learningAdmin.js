@@ -7,36 +7,15 @@ const express = require('express');
 const router = express.Router();
 
 // Import backend learning components
-let memory, ranker, adjuster, loop;
+// Import backend learning components
+let memory = null, ranker = null, adjuster = null, loop = null;
 try {
     memory = require('../upstream/src/services/optimizationMemory');
     ranker = require('../upstream/src/services/strategyRanker');
     adjuster = require('../upstream/src/services/confidenceAdjuster');
     loop = require('../upstream/src/services/learningLoop');
 } catch (e) {
-    console.warn('[DEGRADED-MODE] Learning Admin routes using sharedMocks:', e.message);
-    const mocks = require('../services/sharedMocks');
-    mocks.markUsed();
-    memory = mocks.optimizationMemory;
-    ranker = mocks.strategyRanker;
-    adjuster = mocks.confidenceAdjuster;
-    loop = mocks.learningLoop;
-}
-
-// Mock data injection to seed UI if empty for demonstration
-if (memory.dumpMemory().length === 0) {
-    loop.ingestEvaluatorOutcome({
-        candidateId: 'mock_c1', type: 'CONCURRENCY_TUNE', targetType: 'deployment', targetId: 'dep_eu',
-        expectedBenefit: { metric: 'latency' }, actualOutcome: null, verdict: 'IMPROVED',
-        metricsBefore: { latency: 300 }, metricsAfter: { latency: 150 }, timestamp: new Date().toISOString(),
-        contractContext: { serviceTier: 'enterprise' }
-    });
-    loop.ingestEvaluatorOutcome({
-        candidateId: 'mock_c2', type: 'ROUTING_SHIFT', targetType: 'tenant', targetId: 't_enterprise',
-        expectedBenefit: { metric: 'errorRate' }, actualOutcome: null, verdict: 'UNSAFE',
-        metricsBefore: { errorRate: 2 }, metricsAfter: { errorRate: 6 }, timestamp: new Date().toISOString(),
-        contractContext: { serviceTier: 'enterprise' }
-    });
+    console.error('[CORE-ROUTING] Learning services unavailable:', e.message);
 }
 
 /**
@@ -44,7 +23,7 @@ if (memory.dumpMemory().length === 0) {
  */
 router.get('/outcomes', (req, res) => {
     try {
-        res.json({ ok: true, outcomes: memory.dumpMemory() });
+        res.json({ ok: true, outcomes: memory ? memory.dumpMemory() : [], degraded: !memory });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -55,8 +34,8 @@ router.get('/outcomes', (req, res) => {
  */
 router.get('/strategies', (req, res) => {
     try {
-        const ranked = ranker.rankStrategies({ serviceTier: 'enterprise' });
-        res.json({ ok: true, strategies: ranked.bestStrategies });
+        const ranked = ranker ? ranker.rankStrategies({ serviceTier: 'enterprise' }) : { bestStrategies: [] };
+        res.json({ ok: true, strategies: ranked.bestStrategies, degraded: !ranker });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -67,7 +46,7 @@ router.get('/strategies', (req, res) => {
  */
 router.get('/confidence', (req, res) => {
     try {
-        res.json({ ok: true, confidence: adjuster.getSystemConfidence() });
+        res.json({ ok: true, confidence: adjuster ? adjuster.getSystemConfidence() : 0, degraded: !adjuster });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

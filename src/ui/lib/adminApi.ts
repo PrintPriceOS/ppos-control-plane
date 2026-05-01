@@ -794,3 +794,28 @@ export async function getProductionFinancials(packageId?: string) {
   const url = packageId ? `/api/admin/production/financials/${packageId}` : '/api/admin/production/financials';
   return adminFetch<any>(url);
 }
+// --- Forensics & Telemetry API --- //
+
+export type ForensicTimelineEvent = {
+    event: string;
+    timestamp: string;
+    actor: string;
+    metadata: any;
+};
+
+export type ForensicTimelineResponse = {
+    ok: boolean;
+    jobId: string;
+    traceId?: string;
+    state: string;
+    timeline: ForensicTimelineEvent[];
+};
+
+export async function getForensicTimeline(jobId: string): Promise<ForensicTimelineResponse> {
+    return adminFetch<ForensicTimelineResponse>(`/api/admin/forensics/timeline/${encodeURIComponent(jobId)}`);
+}
+
+export async function getTelemetrySnapshot(): Promise<any> {
+    const res = await adminFetch<any>('/api/admin/telemetry/snapshot');
+    return res.snapshot;
+}

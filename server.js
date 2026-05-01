@@ -46,17 +46,15 @@ fastify.get('/health', async () => {
         federation: 'LIVE'
     };
 
-    try {
-        const mocks = require('./src/api/services/sharedMocks');
-        if (mocks.wasUsed) {
-            mode = 'ISOLATED';
-            dependencies = {
-                preflight: 'UNAVAILABLE',
-                learning: 'MOCKED',
-                federation: 'MOCKED'
-            };
-        }
-    } catch (e) {}
+    const mocksUsed = global.PPOS_MOCKS_ACTIVE || false;
+    if (mocksUsed) {
+        mode = 'ISOLATED';
+        dependencies = {
+            preflight: 'UNAVAILABLE',
+            learning: 'MOCKED',
+            federation: 'MOCKED'
+        };
+    }
 
     return { 
         status: mode === 'ISOLATED' ? 'DEGRADED' : 'UP',
@@ -70,6 +68,9 @@ fastify.get('/health', async () => {
 
 const start = async () => {
     try {
+        // 0. Initialize Database Schemas (Industrial Persistence)
+        require('./src/api/services/controlPlaneSchemaService');
+        
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {
             root: path.join(__dirname, 'dist'),

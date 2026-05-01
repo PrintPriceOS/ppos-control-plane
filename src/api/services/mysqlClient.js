@@ -1,6 +1,8 @@
 // src/api/services/mysqlClient.js
 const mysql = require('mysql2/promise');
 
+const logger = require('./logger').child('mysql-client');
+
 let pool = null;
 
 function getPool() {
@@ -17,7 +19,11 @@ function getPool() {
         queueLimit: 0
     });
 
-    console.log('[MYSQL] Connection pool created');
+    logger.info({
+        event: 'pool_created',
+        message: 'MySQL Connection pool initialized',
+        metadata: { host: process.env.MYSQL_HOST || 'localhost' }
+    });
     return pool;
 }
 

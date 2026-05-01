@@ -40,6 +40,8 @@ import { AutonomyPolicies } from './pages/intelligence/AutonomyPolicies';
 import { AgentsDashboard } from './pages/intelligence/AgentsDashboard';
 import { AgentDecisions } from './pages/intelligence/AgentDecisions';
 import { AgentConflicts } from './pages/intelligence/AgentConflicts';
+import { TelemetryTab } from './pages/admin/TelemetryTab';
+import { ForensicsTab } from './pages/admin/ForensicsTab';
 
 import { PreflightJobsPage } from './pages/preflight/PreflightJobsPage';
 import { PreflightJobDetailPage } from './pages/preflight/PreflightJobDetailPage';
@@ -154,6 +156,8 @@ export const App: React.FC = () => {
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />
+                <Route path="/telemetry" element={<div className="p-8"><TelemetryTab /></div>} />
+                <Route path="/forensics" element={<div className="p-8"><ForensicsTab /></div>} />
                 <Route path="/settings" element={<GlobalSettingsPage />} />
             </Route>
 

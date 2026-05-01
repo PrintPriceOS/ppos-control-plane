@@ -61,6 +61,8 @@ const ordersAdminRouter = require('./ordersAdmin');
 const preflightAdminRouter = require('./adminPreflight');
 const productionAdminRouter = require('./adminProduction');
 const notificationsRouter = require('./notifications');
+const forensicsAdminRouter = require('./forensicsAdmin');
+const telemetryAdminRouter = require('./telemetryAdmin');
 
 router.use((req, res, next) => {
   console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
@@ -93,6 +95,8 @@ router.use('/orders', ordersAdminRouter);
 router.use('/preflight', preflightAdminRouter);
 router.use('/production/notifications', notificationsRouter);
 router.use('/production', productionAdminRouter);
+router.use('/forensics', forensicsAdminRouter);
+router.use('/telemetry', telemetryAdminRouter);
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d

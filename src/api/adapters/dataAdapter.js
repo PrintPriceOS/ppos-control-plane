@@ -1,81 +1,101 @@
 /**
- * Data Adapter for Control Plane
- * Goal: Replace monolith direct DB access with mocked/standardized data points.
+ * Data Adapter for Control Plane (V2 - REAL PERSISTENCE)
+ * Goal: Replace monolith direct DB access with real MySQL queries.
  */
+const mysqlClient = require('../services/mysqlClient');
+const logger = require('../services/logger').child('data-adapter');
 
 const dataAdapter = {
     /**
-     * Replacement for db.query()
+     * Replacement for db.query() - Returns { rows: [] } for compatibility with admin.js
      */
     query: async (sql, params = []) => {
-        console.log(`[DATA-ADAPTER] Executing: ${sql.substring(0, 50)}...`);
-        
-        // Return a default row for aggregate queries to prevent destructuring errors
-        if (sql.toLowerCase().includes('select count') || sql.toLowerCase().includes('sum(')) {
-            let backlog = 0;
-            try {
-                // Phase 7.4: Inject real queue backlog into metrics queries
-                const stats = await require('./queueOperator').getAdminStats();
-                backlog = stats.queues[0]?.size || 0;
-            } catch (e) {}
-
-            return { rows: [{ 
-                total_jobs: 1250, success_rate: 98, avg_latency_ms: 450, 
-                improvement_rate: 85, backlog: backlog, oldest_age_seconds: 0 
-            }] };
+        try {
+            const rows = await mysqlClient.query(sql, params);
+            // MySQL2 returns an array for rows. We wrap it for the Control Plane's expectation.
+            return { rows: Array.isArray(rows) ? rows : [rows] };
+        } catch (err) {
+            logger.error({
+                event: 'query_failed',
+                message: `SQL Query failure: ${sql.substring(0, 100)}...`,
+                metadata: { error: err.message }
+            });
+            throw err; // Propagate to route handler
         }
-        
-        return { rows: [] };
     },
 
-    getOverviewMetrics: async (range) => {
+    /**
+     * Phase 10: Real Overview Metrics
+     */
+    getOverviewMetrics: async (range = '24h') => {
+        const intervalMap = { '24h': '1 DAY', '7d': '7 DAY', '30d': '30 DAY' };
+        const interval = intervalMap[range] || '1 DAY';
+
+        const sql = `
+            SELECT 
+                COUNT(*) as totalJobs,
+                (SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0)) * 100 as successRate,
+                AVG(processing_ms) as avgLatencyMs,
+                SUM(value_generated) as totalValueGenerated,
+                SUM(hours_saved) as totalHoursSaved
+            FROM metrics
+            WHERE created_at >= NOW() - INTERVAL ${interval}
+        `;
+        
+        const { rows } = await dataAdapter.query(sql);
+        const raw = rows[0] || {};
+
+        // Data Classification Layer (Phase 10 Hardening)
+        return {
+            totalJobs: { value: raw.totalJobs || 0, type: 'SOURCE_OF_TRUTH', source: 'MySQL:metrics' },
+            successRate: { value: raw.successRate || 0, type: 'DERIVED', formula: 'success/total' },
+            avgLatencyMs: { value: Math.round(raw.avgLatencyMs || 0), type: 'DERIVED', source: 'MySQL:metrics' },
+            totalValueGenerated: { value: raw.totalValueGenerated || 0, type: 'ESTIMATED', source: 'PricingModel-V1' },
+            totalHoursSaved: { value: raw.totalHoursSaved || 0, type: 'ESTIMATED', source: 'EfficiencyModel-V2' },
+            deltaImprovementRate: { value: 0, type: 'ESTIMATED', status: 'PARTIAL' } // Placeholder for actual delta logic
+        };
+    },
+    
+    getMetrics: async function(range) { return this.getOverviewMetrics(range); },
+
+    /**
+     * Real Tenant Fetching
+     */
+    getTenants: async () => {
+        const { rows } = await dataAdapter.query('SELECT * FROM tenants WHERE status = "ACTIVE"');
+        return rows;
+    },
+
+    /**
+     * Real Queue Stats (Connecting to BullMQ via queueOperator)
+     */
+    getQueueStats: async () => {
         try {
             const queueOperator = require('./queueOperator');
             const stats = await queueOperator.getAdminStats();
-            const queue = stats.queues[0] || {};
-
+            const q = stats.queues[0] || {};
             return {
-                totalJobs: 1250, // Mocked total history
-                successRate: 98.4,
-                avgLatencyMs: 450,
-                maxLatencyMs: 1200,
-                totalValueGenerated: 45000,
-                totalHoursSaved: 180.5,
-                avgRiskBefore: 75,
-                avgRiskAfter: 12,
-                queueBacklog: queue.size || 0, // REAL DATA
-                deltaImprovementRate: 85.0
+                state: 'LIVE',
+                counts: {
+                    waiting: q.counts?.waiting || 0,
+                    active: q.counts?.active || 0,
+                    completed: q.counts?.completed || 0,
+                    failed: q.counts?.failed || 0,
+                    delayed: q.counts?.delayed || 0
+                }
             };
         } catch (err) {
-            console.warn('[DATA-ADAPTER] Failed to fetch real metrics, returning mock:', err.message);
-            return {
-                totalJobs: 1250,
-                successRate: 0,
-                avgLatencyMs: 0,
-                queueBacklog: 0,
-                deltaImprovementRate: 0
+            logger.warn({
+                event: 'queue_telemetry_failure',
+                message: 'Failed to fetch real queue stats, returning degraded state',
+                metadata: { error: err.message }
+            });
+            return { 
+                state: 'DEGRADED', 
+                reason: 'BullMQ Connectivity Failure',
+                counts: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 } 
             };
         }
-    },
-    
-    // Alias for Phase 7.4 compatibility
-    getMetrics: async function(range) { return this.getOverviewMetrics(range); },
-
-    getTenants: async () => {
-        return [
-            { id: 'tenant_mock_1', name: 'Mock Enterprise Print', status: 'ACTIVE', plan: 'ENTERPRISE' },
-            { id: 'tenant_mock_2', name: 'Standard Print Shop', status: 'ACTIVE', plan: 'PRO' }
-        ];
-    },
-
-    getQueueStats: async () => {
-        return {
-            waiting: 2,
-            active: 1,
-            completed: 1500,
-            failed: 4,
-            delayed: 0
-        };
     }
 };
 

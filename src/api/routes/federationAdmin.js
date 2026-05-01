@@ -5,23 +5,18 @@
 const express = require('express');
 const router = express.Router();
 
-let registry, ingestor, auditLogger;
+let registry = null, ingestor = null, auditLogger = null;
 try {
     registry = require('../upstream/src/federation/instanceRegistry');
     ingestor = require('../upstream/src/federation/signalIngestor');
     auditLogger = require('../upstream/src/services/auditLogger');
 } catch (e) {
-    console.warn('[DEGRADED-MODE] Federation Admin routes using sharedMocks:', e.message);
-    const mocks = require('../services/sharedMocks');
-    mocks.markUsed();
-    registry = mocks.instanceRegistry;
-    ingestor = mocks.signalIngestor;
-    auditLogger = mocks.auditLogger;
+    console.error('[CORE-ROUTING] Federation services unavailable:', e.message);
 }
 
 router.get('/registry', (req, res) => {
     try {
-        res.json({ ok: true, instances: registry.getAll() });
+        res.json({ ok: true, instances: registry ? registry.getAll() : [], degraded: !registry });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -29,7 +24,7 @@ router.get('/registry', (req, res) => {
 
 router.get('/signals', (req, res) => {
     try {
-        res.json({ ok: true, signals: ingestor.getLatestSignals() });
+        res.json({ ok: true, signals: ingestor ? ingestor.getLatestSignals() : [], degraded: !ingestor });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -37,7 +32,7 @@ router.get('/signals', (req, res) => {
 
 router.get('/audit', (req, res) => {
     try {
-        res.json({ ok: true, audit: auditLogger.getFederationLogs() });
+        res.json({ ok: true, audit: auditLogger ? auditLogger.getFederationLogs() : [], degraded: !auditLogger });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }

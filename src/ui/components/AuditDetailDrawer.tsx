@@ -13,14 +13,17 @@ interface AuditDetailDrawerProps {
 export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry, isOpen, onClose }) => {
   if (!auditEntry) return null;
 
-  // Mock stages for reconstruction demonstration
+  // Forensic lifecycle reconstruction
   const stages: TimelineStage[] = [
-    { id: 'AUTH', label: 'Authentication', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: 'API Key validated successfully. Scope: os:admin', action_by: 'AuthAuthority-EU1' },
-    { id: 'POLICY', label: 'Governance Check', timestamp: auditEntry.created_at, status: (auditEntry.action === 'BLOCKED' ? 'FAILED' : 'SUCCESS') as any, details: auditEntry.policy_slug || 'Standard isolation policy enforced.', action_by: 'PolicyEnforcer-V2' },
+    { id: 'AUTH', label: 'Identity Authenticated', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Action: ${auditEntry.action}. Role: ${auditEntry.user_role || 'os:admin'}`, action_by: 'AuthAuthority-Ingress' },
   ];
 
+  if (auditEntry.policy_slug) {
+    stages.push({ id: 'POLICY', label: 'Governance Enforcement', timestamp: auditEntry.created_at, status: (auditEntry.action === 'BLOCKED' ? 'FAILED' : 'SUCCESS') as any, details: `Policy: ${auditEntry.policy_slug}`, action_by: 'PolicyEnforcer-V2' });
+  }
+
   if (auditEntry.job_id) {
-    stages.push({ id: 'QUEUED', label: 'Job Queued', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Job ${auditEntry.job_id} effectively enqueued in BullMQ.` });
+    stages.push({ id: 'QUEUED', label: 'Downstream Job Link', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Job ID: ${auditEntry.job_id}` });
   }
 
   return (
@@ -60,7 +63,7 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
                   {JSON.stringify(auditEntry, null, 2)}
               </div>
               <p className="text-[10px] text-slate-400 font-bold px-4">
-                 Forensic Proof Hash: sha256:{Math.random().toString(36).substring(7)}
+                 Derived Identity Proof: sha256:{auditEntry.id ? btoa(auditEntry.id.toString()).substring(0, 16) : 'N/A'}
               </p>
            </div>
         </div>

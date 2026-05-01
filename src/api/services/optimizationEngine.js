@@ -5,20 +5,29 @@
 
 // In local workspace, relative path to preflight backend
 // In local workspace, relative path to preflight backend; in production, use mocks
-let getScore, evaluateLifecycle, runtimeDependencyState;
+const logger = require('./logger').child('optimization-engine');
+
+// In local workspace, relative path to preflight backend
+// In local workspace, relative path to preflight backend; in production, use mocks
+let getScore = (type) => 0.5, evaluateLifecycle = (type) => ({ currentState: 'SHADOW' }), runtimeDependencyState;
 try {
     const adjuster = require('../upstream/src/services/confidenceAdjuster');
     const lifecycle = require('../upstream/src/services/strategyLifecycleManager');
     getScore = adjuster.getScore;
     evaluateLifecycle = lifecycle.evaluateLifecycle;
-    runtimeDependencyState = { source: 'LIVE', degraded: false };
+    runtimeDependencyState = { state: 'LIVE', source: 'UPSTREAM', degraded: false };
 } catch (e) {
-    console.warn('[DEGRADED-MODE] Failed to load preflight strategy services:', e.message);
-    const mocks = require('./sharedMocks');
-    mocks.markUsed();
-    getScore = mocks.confidenceAdjuster.getScore;
-    evaluateLifecycle = mocks.strategyLifecycleManager.evaluateLifecycle;
-    runtimeDependencyState = { source: 'MOCKED', degraded: true, reason: e.message };
+    logger.error({
+        event: 'dependency_unavailable',
+        message: 'Strategy services unavailable - operating in degraded fallback mode',
+        metadata: { reason: e.message }
+    });
+    runtimeDependencyState = { state: 'DEGRADED', source: 'INTERNAL_FALLBACK', degraded: true, reason: e.message };
+}
+
+let idCounter = 0;
+function generateStableId() {
+    return `opt_${Date.now()}_${idCounter++}`;
 }
 
 /**
@@ -32,7 +41,7 @@ function generateCandidates(payload) {
     const latencyAnomalies = anomalies.filter(a => a.type === 'LATENCY_SPIKE');
     for (const anomaly of latencyAnomalies) {
         candidates.push({
-            id: `opt_cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            id: generateStableId(),
             type: 'CONCURRENCY_TUNE',
             targetType: anomaly.targetType || 'deployment',
             targetId: anomaly.targetId,
@@ -57,7 +66,7 @@ function generateCandidates(payload) {
     const highLoadInsights = insights.filter(i => i.type === 'SUSTAINED_HIGH_LOAD' && i.successRate > 99);
     for (const insight of highLoadInsights) {
         candidates.push({
-            id: `opt_cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            id: generateStableId(),
             type: 'COST_OPTIMIZATION',
             targetType: 'routing',
             targetId: insight.targetId,
@@ -85,7 +94,7 @@ function generateCandidates(payload) {
     const tenantRiskTargets = tenantRisks.filter(r => r.riskScore > 75);
     for (const risk of tenantRiskTargets) {
         candidates.push({
-            id: `opt_cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            id: generateStableId(),
             type: 'ROUTING_SHIFT',
             targetType: 'tenant',
             targetId: risk.tenantId,
@@ -112,7 +121,7 @@ function generateCandidates(payload) {
     const queueTrends = trends.filter(t => t.entityType === 'queue' && t.trend === 'UP_FAST');
     for (const q of queueTrends) {
          candidates.push({
-            id: `opt_cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            id: generateStableId(),
             type: 'QUEUE_REBALANCE',
             targetType: 'queue',
             targetId: q.entityId,
@@ -154,7 +163,11 @@ function generateCandidates(payload) {
         // Phase 12 - Adaptive Learning Suppression
         const currentConfidence = getScore(c.type);
         if (currentConfidence < 0.3) {
-            console.log(`[OPTIMIZATION-ENGINE] Suppressing candidate ${c.id} (${c.type}) due to extremely low confidence: ${currentConfidence.toFixed(2)}`);
+            logger.info({
+                event: 'candidate_suppressed',
+                message: 'Extremely low confidence detected. Omitted from results.',
+                metadata: { candidateId: c.id, type: c.type, confidence: currentConfidence }
+            });
             // We omit entirely from the array 
         } else {
             // Phase 13 - Controlled Autonomy Expansion

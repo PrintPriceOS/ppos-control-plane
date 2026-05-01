@@ -1,10 +1,5 @@
-/**
- * src/api/services/auditLoggerService.js
- * 
- * Centralized audit logging for the Control Plane.
- * Logs are written to stdout and optionally to a database for governance compliance.
- */
 const db = require('./db');
+const logger = require('./logger').child('audit-logger');
 
 class AuditLoggerService {
     /**
@@ -16,6 +11,7 @@ class AuditLoggerService {
      * @param {string} event.userId
      * @param {Object} event.metadata
      * @param {string} event.status SUCCESS, FAILURE, WARNING
+     * @param {string} event.traceId
      */
     async log(event) {
         const entry = {
@@ -23,9 +19,16 @@ class AuditLoggerService {
             ...event
         };
 
-        // 1. Console Logging (for container logs / observability)
-        const logMethod = event.status === 'FAILURE' ? 'error' : event.status === 'WARNING' ? 'warn' : 'info';
-        console[logMethod](`[AUDIT] ${entry.type} | Tenant: ${entry.tenantId} | User: ${entry.userId} | Status: ${entry.status}`, entry.metadata);
+        // 1. Structured Industrial Logging
+        const severity = event.status === 'FAILURE' ? 'ERROR' : event.status === 'WARNING' ? 'WARN' : 'INFO';
+        logger._log(severity, {
+            event: `audit_${event.type.toLowerCase()}`,
+            tenantId: event.tenantId,
+            userId: event.userId,
+            traceId: event.traceId || 'audit-internal',
+            metadata: event.metadata,
+            message: `[AUDIT] ${entry.type} | Status: ${entry.status}`
+        });
 
         // 2. Persistent Logging (MySQL)
         try {
@@ -35,7 +38,11 @@ class AuditLoggerService {
                 [event.type, event.tenantId, event.userId, event.status, JSON.stringify(event.metadata || {})]
             );
         } catch (err) {
-            console.error('[AUDIT-PERSISTENCE-FAILED]', err.message);
+            logger.error({
+                event: 'audit_persistence_failed',
+                message: 'Failed to persist audit log to MySQL',
+                metadata: { error: err.message }
+            });
         }
     }
 }

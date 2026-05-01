@@ -6,7 +6,7 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('../services/mysqlClient');
 
-let authority, registry, rolloutEngine, postureAggregator, auditLogger;
+let authority = null, registry = null, rolloutEngine = null, postureAggregator = null, auditLogger = null;
 try {
     authority = require('../upstream/src/global-governance/globalPolicyAuthority');
     registry = require('../upstream/src/global-governance/globalPolicyRegistry');
@@ -14,19 +14,12 @@ try {
     postureAggregator = require('../upstream/src/global-governance/globalPostureAggregator');
     auditLogger = require('../upstream/src/services/auditLogger');
 } catch (e) {
-    console.warn('[DEGRADED-MODE] Global Governance routes using sharedMocks:', e.message);
-    const mocks = require('../services/sharedMocks');
-    mocks.markUsed();
-    registry = mocks.globalPolicyRegistry;
-    rolloutEngine = mocks.policyRolloutEngine;
-    postureAggregator = mocks.globalPostureAggregator;
-    auditLogger = mocks.auditLogger;
-    authority = { getAuthorityStatus: () => 'STABLE_MOCKED' };
+    console.error('[CORE-ROUTING] Global Governance services unavailable:', e.message);
 }
 
 router.get('/policies', (req, res) => {
     try {
-        res.json({ ok: true, policies: registry.getAll() });
+        res.json({ ok: true, policies: registry ? registry.getAll() : [], degraded: !registry });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -34,7 +27,7 @@ router.get('/policies', (req, res) => {
 
 router.get('/rollouts', (req, res) => {
     try {
-        res.json({ ok: true, rollouts: rolloutEngine.getRollouts() });
+        res.json({ ok: true, rollouts: rolloutEngine ? rolloutEngine.getRollouts() : [], degraded: !rolloutEngine });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -42,7 +35,7 @@ router.get('/rollouts', (req, res) => {
 
 router.get('/posture', (req, res) => {
     try {
-        res.json({ ok: true, posture: postureAggregator.buildNetworkSnapshot() });
+        res.json({ ok: true, posture: postureAggregator ? postureAggregator.buildNetworkSnapshot() : null, degraded: !postureAggregator });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -50,8 +43,8 @@ router.get('/posture', (req, res) => {
 
 router.get('/audit', (req, res) => {
     try {
-        const globalEvents = auditLogger.getFederationLogs().filter(a => a.event.startsWith('GLOBAL_'));
-        res.json({ ok: true, audit: globalEvents });
+        const globalEvents = auditLogger ? auditLogger.getFederationLogs().filter(a => a.event.startsWith('GLOBAL_')) : [];
+        res.json({ ok: true, audit: globalEvents, degraded: !auditLogger });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
