@@ -8,10 +8,10 @@ const router = express.Router();
 
 let eligibility, lifecycleManager, policy, adjuster;
 try {
-    eligibility = require('../../../../../ppos-preflight-service/src/services/autonomyEligibility');
-    lifecycleManager = require('../../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
-    policy = require('../../../../../ppos-preflight-service/src/services/autonomyPolicy');
-    adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
+    eligibility = require('../upstream/src/services/autonomyEligibility');
+    lifecycleManager = require('../upstream/src/services/strategyLifecycleManager');
+    policy = require('../upstream/src/services/autonomyPolicy');
+    adjuster = require('../upstream/src/services/confidenceAdjuster');
 } catch (e) {
     console.warn('[DEGRADED-MODE] Autonomy Admin routes using sharedMocks:', e.message);
     const mocks = require('../services/sharedMocks');

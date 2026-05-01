@@ -7,9 +7,9 @@ const router = express.Router();
 
 let registry, ingestor, auditLogger;
 try {
-    registry = require('../../../../../ppos-preflight-service/src/federation/instanceRegistry');
-    ingestor = require('../../../../../ppos-preflight-service/src/federation/signalIngestor');
-    auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+    registry = require('../upstream/src/federation/instanceRegistry');
+    ingestor = require('../upstream/src/federation/signalIngestor');
+    auditLogger = require('../upstream/src/services/auditLogger');
 } catch (e) {
     console.warn('[DEGRADED-MODE] Federation Admin routes using sharedMocks:', e.message);
     const mocks = require('../services/sharedMocks');

@@ -7,8 +7,8 @@
 // In local workspace, relative path to preflight backend; in production, use mocks
 let getScore, evaluateLifecycle, runtimeDependencyState;
 try {
-    const adjuster = require('../../../../ppos-preflight-service/src/services/confidenceAdjuster');
-    const lifecycle = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+    const adjuster = require('../upstream/src/services/confidenceAdjuster');
+    const lifecycle = require('../upstream/src/services/strategyLifecycleManager');
     getScore = adjuster.getScore;
     evaluateLifecycle = lifecycle.evaluateLifecycle;
     runtimeDependencyState = { source: 'LIVE', degraded: false };

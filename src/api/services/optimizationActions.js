@@ -5,8 +5,8 @@
 
 let eligibility, lifecycleManager;
 try {
-    eligibility = require('../../../../ppos-preflight-service/src/services/autonomyEligibility');
-    lifecycleManager = require('../../../../ppos-preflight-service/src/services/strategyLifecycleManager');
+    eligibility = require('../upstream/src/services/autonomyEligibility');
+    lifecycleManager = require('../upstream/src/services/strategyLifecycleManager');
 } catch (e) {
     console.warn('[DEGRADED-MODE] Optimization Actions using sharedMocks:', e.message);
     const mocks = require('./sharedMocks');

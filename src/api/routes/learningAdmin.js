@@ -9,10 +9,10 @@ const router = express.Router();
 // Import backend learning components
 let memory, ranker, adjuster, loop;
 try {
-    memory = require('../../../../../ppos-preflight-service/src/services/optimizationMemory');
-    ranker = require('../../../../../ppos-preflight-service/src/services/strategyRanker');
-    adjuster = require('../../../../../ppos-preflight-service/src/services/confidenceAdjuster');
-    loop = require('../../../../../ppos-preflight-service/src/services/learningLoop');
+    memory = require('../upstream/src/services/optimizationMemory');
+    ranker = require('../upstream/src/services/strategyRanker');
+    adjuster = require('../upstream/src/services/confidenceAdjuster');
+    loop = require('../upstream/src/services/learningLoop');
 } catch (e) {
     console.warn('[DEGRADED-MODE] Learning Admin routes using sharedMocks:', e.message);
     const mocks = require('../services/sharedMocks');

@@ -8,11 +8,11 @@ const mysql = require('../services/mysqlClient');
 
 let authority, registry, rolloutEngine, postureAggregator, auditLogger;
 try {
-    authority = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyAuthority');
-    registry = require('../../../../../ppos-preflight-service/src/global-governance/globalPolicyRegistry');
-    rolloutEngine = require('../../../../../ppos-preflight-service/src/global-governance/policyRolloutEngine');
-    postureAggregator = require('../../../../../ppos-preflight-service/src/global-governance/globalPostureAggregator');
-    auditLogger = require('../../../../../ppos-preflight-service/src/services/auditLogger');
+    authority = require('../upstream/src/global-governance/globalPolicyAuthority');
+    registry = require('../upstream/src/global-governance/globalPolicyRegistry');
+    rolloutEngine = require('../upstream/src/global-governance/policyRolloutEngine');
+    postureAggregator = require('../upstream/src/global-governance/globalPostureAggregator');
+    auditLogger = require('../upstream/src/services/auditLogger');
 } catch (e) {
     console.warn('[DEGRADED-MODE] Global Governance routes using sharedMocks:', e.message);
     const mocks = require('../services/sharedMocks');
