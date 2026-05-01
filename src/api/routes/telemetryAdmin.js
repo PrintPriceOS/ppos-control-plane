@@ -38,4 +38,17 @@ router.get('/snapshot', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/telemetry/industrial
+ * High-fidelity industrial snapshot including fleet health and storage governance.
+ */
+router.get('/industrial', async (req, res) => {
+    try {
+        const snapshot = await telemetry.getIndustrialSnapshot();
+        res.json({ ok: true, ...snapshot });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;

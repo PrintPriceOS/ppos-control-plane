@@ -1,0 +1,108 @@
+// pages/admin/IndustrialOpsPage.tsx
+import React, { useState } from "react";
+import { 
+    CircleStackIcon, 
+    CpuChipIcon, 
+    DocumentDuplicateIcon, 
+    ShieldCheckIcon,
+    BoltIcon,
+    ExclamationTriangleIcon,
+    ClockIcon
+} from "@heroicons/react/24/outline";
+import { ArtifactRegistryTab } from "./ArtifactRegistryTab";
+import { WorkerFleetTab } from "./WorkerFleetTab";
+import { LargeDocumentTab } from "./LargeDocumentTab";
+import { TenantStorageTab } from "./TenantStorageTab";
+import { OrchestrationTab } from "./OrchestrationTab";
+import { IncidentRegistryTab } from "./IncidentRegistryTab";
+import { LifecyclePolicyTab } from "./LifecyclePolicyTab";
+
+export const IndustrialOpsPage: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle'>('artifacts');
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Operations</h1>
+                    <p className="text-sm text-slate-500 font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">System Operational</span>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-2xl w-fit border border-slate-200">
+                <TabButton 
+                    active={activeTab === 'artifacts'} 
+                    onClick={() => setActiveTab('artifacts')}
+                    icon={CircleStackIcon}
+                    label="Artifacts"
+                />
+                <TabButton 
+                    active={activeTab === 'workers'} 
+                    onClick={() => setActiveTab('workers')}
+                    icon={CpuChipIcon}
+                    label="Fleet"
+                />
+                <TabButton 
+                    active={activeTab === 'orchestration'} 
+                    onClick={() => setActiveTab('orchestration')}
+                    icon={BoltIcon}
+                    label="Orchestration"
+                />
+                <TabButton 
+                    active={activeTab === 'incidents'} 
+                    onClick={() => setActiveTab('incidents')}
+                    icon={ExclamationTriangleIcon}
+                    label="Incidents"
+                />
+                <TabButton 
+                    active={activeTab === 'lifecycle'} 
+                    onClick={() => setActiveTab('lifecycle')}
+                    icon={ClockIcon}
+                    label="Lifecycle"
+                />
+                <TabButton 
+                    active={activeTab === 'large-docs'} 
+                    onClick={() => setActiveTab('large-docs')}
+                    icon={DocumentDuplicateIcon}
+                    label="Heavy Loads"
+                />
+                <TabButton 
+                    active={activeTab === 'storage'} 
+                    onClick={() => setActiveTab('storage')}
+                    icon={ShieldCheckIcon}
+                    label="Storage"
+                />
+            </div>
+
+            {/* Tab Content */}
+            <div className="min-h-[500px]">
+                {activeTab === 'artifacts' && <ArtifactRegistryTab />}
+                {activeTab === 'large-docs' && <LargeDocumentTab />}
+                {activeTab === 'workers' && <WorkerFleetTab />}
+                {activeTab === 'storage' && <TenantStorageTab />}
+                {activeTab === 'orchestration' && <OrchestrationTab />}
+                {activeTab === 'incidents' && <IncidentRegistryTab />}
+                {activeTab === 'lifecycle' && <LifecyclePolicyTab />}
+            </div>
+        </div>
+    );
+};
+
+const TabButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+            active 
+            ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black' 
+            : 'text-slate-500 hover:text-slate-700 font-bold hover:bg-white/50'
+        }`}
+    >
+        <Icon className={`w-4 h-4 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+        <span className="text-xs uppercase tracking-tight">{label}</span>
+    </button>
+);

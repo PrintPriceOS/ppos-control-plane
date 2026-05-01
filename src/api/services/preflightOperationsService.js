@@ -7,6 +7,7 @@ const axios = require('axios');
 const persistence = require('./preflightPersistenceService');
 const storage = require('./preflightStorageService');
 const upstream = require('./preflightServiceClient');
+const orchestration = require('./orchestrationService');
 const fs = require('fs');
 const path = require('path');
 
@@ -102,16 +103,49 @@ class PreflightOperationsService {
       mimeType: 'application/pdf'
     });
 
-    // 5. Trigger Upstream Processing (Async attempt)
+    // 5. ORCHESTRATION: Plan Execution (New Industrial Layer)
+    let executionPlan = null;
     try {
-      console.log(`[PREFLIGHT-OPS] Triggering upstream job for ${job.id} (Tenant: ${tenantId})`);
+        executionPlan = await orchestration.planExecution({
+            id: job.id,
+            tenantId,
+            type,
+            fileSize: stats.size,
+            metadata: job.metadata_json
+        });
+        
+        // Persist the plan in job metadata
+        await persistence.updateJob(job.id, {
+            metadata: { 
+                ...job.metadata_json,
+                executionPlan 
+            }
+        });
+    } catch (planErr) {
+        console.error(`[PREFLIGHT-OPS] Execution planning failed for ${job.id}:`, planErr.message);
+        // Fail-Loud: If we can't plan it (e.g., no healthy workers), we don't start it.
+        await persistence.updateJob(job.id, {
+            status: 'FAILED',
+            error: { code: 'ORCHESTRATION_PLANNING_FAILED', message: planErr.message }
+        });
+        job.status = 'FAILED';
+        return job;
+    }
+
+    // 6. Trigger Upstream Processing (Async attempt)
+    try {
+      console.log(`[PREFLIGHT-OPS] Triggering upstream job for ${job.id} (Queue: ${executionPlan.queueName})`);
       const upstreamResult = await upstream.enqueueJob({
         id: job.id,
         tenantId,
         type,
         policy,
         inputPath: filePath,
-        metadata: { originalFilename: filename }
+        queueName: executionPlan.queueName,
+        metadata: { 
+            originalFilename: filename,
+            executionPlan
+        }
       }, jobData.authHeader);
 
       // Update local record to QUEUED

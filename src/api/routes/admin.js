@@ -63,6 +63,9 @@ const productionAdminRouter = require('./adminProduction');
 const notificationsRouter = require('./notifications');
 const forensicsAdminRouter = require('./forensicsAdmin');
 const telemetryAdminRouter = require('./telemetryAdmin');
+const artifactAdminRouter = require('./artifactAdmin');
+const workerAdminRouter = require('./workerAdmin');
+const orchestrationAdminRouter = require('./orchestrationAdmin');
 
 router.use((req, res, next) => {
   console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
@@ -97,6 +100,9 @@ router.use('/production/notifications', notificationsRouter);
 router.use('/production', productionAdminRouter);
 router.use('/forensics', forensicsAdminRouter);
 router.use('/telemetry', telemetryAdminRouter);
+router.use('/artifacts', artifactAdminRouter);
+router.use('/workers', workerAdminRouter);
+router.use('/orchestration', orchestrationAdminRouter);
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d

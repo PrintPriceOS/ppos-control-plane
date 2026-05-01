@@ -68,6 +68,7 @@ class PreflightServiceClient {
       tenantId: jobData.tenantId,
       inputPath: jobData.inputPath, // Full path or storage key
       policy: jobData.policy,
+      queueName: jobData.queueName,
       metadata: {
         ...jobData.metadata,
         controlPlaneJobId: jobData.id

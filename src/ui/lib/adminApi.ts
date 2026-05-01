@@ -459,6 +459,15 @@ export async function getAutonomyMetrics() {
     return adminFetch<any>(`/api/admin/autonomy/metrics`);
 }
 
+export async function getIndustrialIncidents() {
+    // Re-uses audit log with type OPERATIONAL_INCIDENT
+    return adminFetch<any[]>('/api/admin/audit?action=OPERATIONAL_INCIDENT&limit=50');
+}
+
+export async function getIndustrialSnapshot() {
+    return adminFetch<any>('/api/admin/telemetry/industrial');
+}
+
 export async function getAutonomyPipelineDetail(id: string) {
     return adminFetch<any>(`/api/admin/autonomy/${id}`);
 }
@@ -818,4 +827,26 @@ export async function getForensicTimeline(jobId: string): Promise<ForensicTimeli
 export async function getTelemetrySnapshot(): Promise<any> {
     const res = await adminFetch<any>('/api/admin/telemetry/snapshot');
     return res.snapshot;
+}
+
+// --- Industrial Artifacts & Workers API --- //
+
+export async function getArtifacts(params: any = {}) {
+    const qs = new URLSearchParams(params);
+    return adminFetch<{ ok: boolean, artifacts: any[] }>(`/api/admin/artifacts?${qs.toString()}`);
+}
+
+export async function getArtifactLineage(jobId: string) {
+    return adminFetch<{ ok: boolean, lineage: any[] }>(`/api/admin/artifacts/lineage/${jobId}`);
+}
+
+export async function getWorkerFleet() {
+    return adminFetch<{ ok: boolean, fleet: any[] }>('/api/admin/workers/fleet');
+}
+
+export async function setWorkerStatus(id: string, status: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/workers/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status })
+    });
 }

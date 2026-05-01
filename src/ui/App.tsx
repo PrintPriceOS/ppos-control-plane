@@ -42,6 +42,7 @@ import { AgentDecisions } from './pages/intelligence/AgentDecisions';
 import { AgentConflicts } from './pages/intelligence/AgentConflicts';
 import { TelemetryTab } from './pages/admin/TelemetryTab';
 import { ForensicsTab } from './pages/admin/ForensicsTab';
+import { IndustrialOpsPage } from './pages/admin/IndustrialOpsPage';
 
 import { PreflightJobsPage } from './pages/preflight/PreflightJobsPage';
 import { PreflightJobDetailPage } from './pages/preflight/PreflightJobDetailPage';
@@ -158,6 +159,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/help" element={<AdminHelpPage />} />
                 <Route path="/telemetry" element={<div className="p-8"><TelemetryTab /></div>} />
                 <Route path="/forensics" element={<div className="p-8"><ForensicsTab /></div>} />
+                <Route path="/admin/industrial" element={<div className="p-8"><IndustrialOpsPage /></div>} />
                 <Route path="/settings" element={<GlobalSettingsPage />} />
             </Route>
 

@@ -146,14 +146,11 @@ export const Sidebar: React.FC = () => {
           <NavItem to="/tenants" icon={UsersIcon} label="Tenants" />
         </NavGroup>
 
-        {/* PREFLIGHT OPERATIONS */}
-        <NavGroup label="Preflight Operations">
-          <NavItem to="/preflight/jobs" icon={QueueListIcon} label="Jobs" />
-          <NavItem to="/preflight/large-documents" icon={DocumentDuplicateIcon} label="Large Documents" />
-          <NavItem to="/preflight/artifacts" icon={CircleStackIcon} label="Artifacts" />
-          <NavItem to="/preflight/certificates" icon={TicketIcon} label="Certificates" />
-          <NavItem to="/preflight/quotas" icon={ScaleIcon} label="Quotas" />
-          <NavItem to="/preflight/workers" icon={WorkerIcon} label="Workers" />
+        {/* INDUSTRIAL OPERATIONS ORCHESTRATION */}
+        <NavGroup label="Industrial Operations">
+          <NavItem to="/admin/industrial" icon={CubeIcon} label="Operations Control" badge="NOC" />
+          <NavItem to="/preflight/jobs" icon={QueueListIcon} label="Active Pipelines" />
+          <NavItem to="/forensics" icon={FingerPrintIcon} label="Artifact Lineage" />
         </NavGroup>
 
         {/* PRODUCTION DISPATCH */}
