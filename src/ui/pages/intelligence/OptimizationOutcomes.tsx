@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const OptimizationOutcomes: React.FC = () => {
     const [outcomes, setOutcomes] = useState<any[]>([]);
     
     useEffect(() => {
         const fetchOutcomes = async () => {
-            const rs = await fetch('/api/admin/optimization/outcomes', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setOutcomes(d.outcomes);
+            try {
+                const d = await adminFetch<any>('/api/admin/optimization/outcomes');
+                if (d.ok) setOutcomes(d.outcomes);
+            } catch (e) {}
         };
         fetchOutcomes();
     }, []);

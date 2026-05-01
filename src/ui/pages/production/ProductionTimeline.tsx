@@ -8,6 +8,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon
 } from '@heroicons/react/24/outline';
+import { adminFetch } from '../../lib/adminApi';
 
 interface ProductionEvent {
   id: string;
@@ -37,8 +38,7 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
       const url = packageId 
         ? `/api/admin/production/packages/${packageId}/events`
         : '/api/admin/production/events';
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await adminFetch<any>(url);
       if (data.ok) {
         setEvents(data.events);
       }

@@ -60,6 +60,8 @@ router.get('/health', async (req, res) => {
  * List and filter jobs
  */
 router.get('/jobs', async (req, res) => {
+  const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
+  const logger = require('../services/logger').child('admin-preflight');
   try {
     const filters = { ...req.query };
     
@@ -71,7 +73,22 @@ router.get('/jobs', async (req, res) => {
     const result = await operations.listJobs(filters);
     res.json({ ok: true, ...result });
   } catch (error) {
-    res.status(500).json({ ok: false, error: { code: 'JOB_LIST_FAILED', message: error.message } });
+    logger.error({
+        event: 'JOB_LIST_FAILED',
+        error: error.message,
+        tenant: req.user.tenantId,
+        traceId
+    });
+
+    if (error.message.includes('UNAVAILABLE') || error.message.includes('ECONNREFUSED')) {
+        return res.status(503).json({ 
+            ok: false, 
+            status: 'DEGRADED', 
+            error: { code: 'OPERATIONS_SERVICE_UNAVAILABLE', message: 'Preflight operations service is unreachable' } 
+        });
+    }
+
+    res.status(500).json({ ok: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
 

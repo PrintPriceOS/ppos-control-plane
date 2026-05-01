@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const AutonomyPolicies: React.FC = () => {
     const [policy, setPolicy] = useState<any>(null);
 
     useEffect(() => {
         const fetchPolicy = async () => {
-            const rs = await fetch('/api/admin/autonomy/policy', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setPolicy(d.policy);
+            try {
+                const d = await adminFetch<any>('/api/admin/autonomy/policy');
+                if (d.ok) setPolicy(d.policy);
+            } catch (e) {}
         };
         fetchPolicy();
     }, []);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CpuChipIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { IntelligenceDetailDrawer } from '../../components/IntelligenceDetailDrawer';
+import { adminFetch } from '../../lib/adminApi';
 
 export const InsightList: React.FC = () => {
     const [insights, setInsights] = useState<any[]>([]);
@@ -8,10 +9,7 @@ export const InsightList: React.FC = () => {
     const [selectedInsight, setSelectedInsight] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/admin/intelligence/insights', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('ppos_token') || 'admin-secret'}` }
-        })
-        .then(res => res.json())
+        adminFetch<any>('/api/admin/intelligence/insights')
         .then(data => {
             if (data.ok) setInsights(data.insights);
             setLoading(false);

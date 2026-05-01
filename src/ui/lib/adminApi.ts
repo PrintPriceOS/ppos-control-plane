@@ -1,6 +1,6 @@
 import { getAuthToken, clearAuthToken, setAuthToken } from './authStore';
 
-async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
+export async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
     const token = getAuthToken();
 
     const headers: Record<string, string> = {
@@ -46,22 +46,23 @@ async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: 
 }
 
 export async function verifyToken(token: string) {
-    const res = await fetch('/api/admin/telemetry/snapshot', { // Using a safe read endpoint to verify
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-        }
-    });
-    
-    if (res.status === 401) {
-        throw new Error('Invalid token');
+    try {
+        // We use a direct fetch here because this is the BOOTSTRAP verification call
+        // before the global token is set in the store.
+        const res = await fetch('/api/admin/telemetry/snapshot', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (res.status === 401) throw new Error('Invalid token');
+        if (!res.ok) throw new Error(`Verification failed: ${res.status}`);
+        
+        return res.json();
+    } catch (e: any) {
+        throw new Error(e.message);
     }
-
-    if (!res.ok) {
-        throw new Error(`Verification failed: ${res.status}`);
-    }
-    
-    return res.json();
 }
 
 // Keep legacy exports for compatibility during migration if necessary, but wired to authStore
@@ -704,12 +705,13 @@ export async function uploadPreflightFile(file: File, tenantId: string = 'system
     formData.append('file', file);
     
     // Using raw fetch here because adminFetch might not handle FormData correctly without adjustment
-    const token = localStorage.getItem('admin_token');
+    const token = getAuthToken();
     const response = await fetch('/api/admin/preflight/upload', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
-            'X-Tenant-Id': tenantId
+            'X-Tenant-Id': tenantId,
+            'X-Trace-Id': `trace_${Date.now()}`
         },
         body: formData
     });

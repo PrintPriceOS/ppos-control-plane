@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const OptimizationCandidates: React.FC = () => {
     const [candidates, setCandidates] = useState<any[]>([]);
@@ -7,10 +8,7 @@ export const OptimizationCandidates: React.FC = () => {
     useEffect(() => {
         const fetchCandidates = async () => {
             try {
-                const rs = await fetch('/api/admin/optimization/candidates', {
-                    headers: { 'Authorization': 'Bearer admin-secret' }
-                });
-                const d = await rs.json();
+                const d = await adminFetch<any>('/api/admin/optimization/candidates');
                 if (d.ok) setCandidates(d.candidates);
             } catch (err) {
                 console.error(err);
@@ -22,12 +20,12 @@ export const OptimizationCandidates: React.FC = () => {
     }, []);
 
     const handleApply = async (id: string) => {
-        await fetch('/api/admin/optimization/apply', {
+        await adminFetch<any>('/api/admin/optimization/apply', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer admin-secret' },
             body: JSON.stringify({ candidateId: id })
         });
-        alert('Action applied. Check outcomes.');
+        const d = await adminFetch<any>('/api/admin/optimization/candidates');
+        if (d.ok) setCandidates(d.candidates);
     };
 
     if (loading) return <div className="p-6">Loading candidates...</div>;

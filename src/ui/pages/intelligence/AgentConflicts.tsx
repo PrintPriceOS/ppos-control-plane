@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const AgentConflicts: React.FC = () => {
     const [conflicts, setConflicts] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchConflicts = async () => {
-            const rs = await fetch('/api/admin/agents/decisions', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) {
-                // Filter only decisions that were blocked due to conflict resolution
-                const onlyBlocked = d.decisions.filter((x:any) => x.status === 'BLOCKED');
-                setConflicts(onlyBlocked);
-            }
+            try {
+                const d = await adminFetch<any>('/api/admin/agents/decisions');
+                if (d.ok) {
+                    const onlyBlocked = d.decisions.filter((x:any) => x.status === 'BLOCKED');
+                    setConflicts(onlyBlocked);
+                }
+            } catch (e) {}
         };
         fetchConflicts();
     }, []);

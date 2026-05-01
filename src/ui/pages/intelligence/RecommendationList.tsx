@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { WrenchScrewdriverIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { IntelligenceDetailDrawer } from '../../components/IntelligenceDetailDrawer';
+import { adminFetch } from '../../lib/adminApi';
 
 export const RecommendationList: React.FC = () => {
     const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -8,10 +9,7 @@ export const RecommendationList: React.FC = () => {
     const [selectedRec, setSelectedRec] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/admin/intelligence/recommendations', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('ppos_token') || 'admin-secret'}` }
-        })
-        .then(res => res.json())
+        adminFetch<any>('/api/admin/intelligence/recommendations')
         .then(data => {
             if (data.ok) setRecommendations(data.recommendations);
             setLoading(false);

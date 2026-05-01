@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const ConfidenceEvolution: React.FC = () => {
     const [confidenceData, setConfidenceData] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchConf = async () => {
-            const rs = await fetch('/api/admin/learning/confidence', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setConfidenceData(d.confidence);
+            try {
+                const d = await adminFetch<any>('/api/admin/learning/confidence');
+                if (d.ok) setConfidenceData(d.confidence);
+            } catch (e) {}
         };
         fetchConf();
     }, []);

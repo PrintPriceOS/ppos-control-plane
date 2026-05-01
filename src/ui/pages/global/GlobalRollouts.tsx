@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const GlobalRollouts: React.FC = () => {
     const [rollouts, setRollouts] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchRollouts = async () => {
-            const rs = await fetch('/api/admin/global/rollouts', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setRollouts(d.rollouts);
+            try {
+                const d = await adminFetch<any>('/api/admin/global/rollouts');
+                if (d.ok) setRollouts(d.rollouts);
+            } catch (e) {}
         };
         fetchRollouts();
     }, []);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheckIcon, ShieldExclamationIcon, PlayIcon, PauseIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { RiskBadge } from '../../components/RiskBadge';
+import { adminFetch } from '../../lib/adminApi';
 
 const GuardrailsDashboard: React.FC = () => {
     const [data, setData] = useState<any>(null);
@@ -9,12 +10,10 @@ const GuardrailsDashboard: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const [intelRes, safetyRes] = await Promise.all([
-                fetch('/api/admin/intelligence/overview', { headers: { 'Authorization': 'Bearer admin-secret' } }),
-                fetch('/api/admin/intelligence/guardrails/safety', { headers: { 'Authorization': 'Bearer admin-secret' } })
+            const [intel, safe] = await Promise.all([
+                adminFetch<any>('/api/admin/intelligence/overview'),
+                adminFetch<any>('/api/admin/intelligence/guardrails/safety')
             ]);
-            const intel = await intelRes.json();
-            const safe = await safetyRes.json();
             setData(intel.data);
             setSafety(safe.data);
         } catch (err) {
@@ -32,12 +31,8 @@ const GuardrailsDashboard: React.FC = () => {
 
     const toggleSafety = async (flag: string, value: boolean) => {
         try {
-            await fetch('/api/admin/intelligence/guardrails/toggle', {
+            await adminFetch('/api/admin/intelligence/guardrails/toggle', {
                 method: 'POST',
-                headers: { 
-                    'Authorization': 'Bearer admin-secret',
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({ flag, value, reason: 'Manual UI Toggle' })
             });
             fetchData();

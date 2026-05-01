@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const GlobalIncidents: React.FC = () => {
-    const [audit, setAudit] = useState<any[]>([]);
+    const [incidents, setIncidents] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchAudit = async () => {
-            const rs = await fetch('/api/admin/global/audit', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) {
-                const incidents = d.audit.filter((a: any) => a.event.includes('INCIDENT'));
-                setAudit(incidents);
-            }
+        const fetchIncidents = async () => {
+            try {
+                const d = await adminFetch<any>('/api/admin/global/audit');
+                if (d.ok) {
+                    setIncidents(d.audit.filter((a: any) => a.severity === 'CRITICAL'));
+                }
+            } catch (e) {}
         };
-        fetchAudit();
+        fetchIncidents();
     }, []);
 
     return (

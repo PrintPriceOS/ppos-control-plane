@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, MinusIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { adminFetch } from '../../lib/adminApi';
 
 export const TrendDashboard: React.FC = () => {
   const [trends, setTrends] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/intelligence/trends')
-      .then(res => res.json())
+    adminFetch<any>('/api/admin/intelligence/trends')
       .then(data => {
         if (data.ok) setTrends(data.trends || []);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const getTrendIcon = (trend: string) => {

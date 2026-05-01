@@ -5,6 +5,7 @@ import {
     CheckCircleIcon, ExclamationTriangleIcon, CalendarIcon,
     ArrowDownTrayIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline';
+import { adminFetch } from '../lib/adminApi';
 
 // ─── Types ────────────────────────────────────────────────────
 interface Summary {
@@ -30,11 +31,7 @@ const API_KEY = localStorage.getItem('ppp_api_key') || '';
 
 // ─── Fetch helper ─────────────────────────────────────────────
 async function fetchAnalytics<T>(endpoint: string, range: Range): Promise<T> {
-    const res = await fetch(`${BASE}/${endpoint}?range=${range}`, {
-        headers: { Authorization: `Bearer ${API_KEY}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return adminFetch<T>(`${BASE}/${endpoint}?range=${range}`);
 }
 
 // ─── Sub-components ───────────────────────────────────────────
@@ -150,13 +147,12 @@ export function AnalyticsPortal() {
         setLoading(true);
         setError('');
         try {
-            const headers = { Authorization: `Bearer ${key}` };
             const [s, ts, p, e, b] = await Promise.all([
-                fetch(`${BASE}/summary?range=${r}`, { headers }).then(r => r.json()),
-                fetch(`${BASE}/timeseries?range=${r}`, { headers }).then(r => r.json()),
-                fetch(`${BASE}/policies?range=${r}`, { headers }).then(r => r.json()),
-                fetch(`${BASE}/errors?range=${r}`, { headers }).then(r => r.json()),
-                fetch(`${BASE}/batches?range=${r}`, { headers }).then(r => r.json()),
+                adminFetch<any>(`${BASE}/summary?range=${r}`),
+                adminFetch<any>(`${BASE}/timeseries?range=${r}`),
+                adminFetch<any>(`${BASE}/policies?range=${r}`),
+                adminFetch<any>(`${BASE}/errors?range=${r}`),
+                adminFetch<any>(`${BASE}/batches?range=${r}`),
             ]);
             if (s.error) throw new Error(s.error);
             setSummary(s);

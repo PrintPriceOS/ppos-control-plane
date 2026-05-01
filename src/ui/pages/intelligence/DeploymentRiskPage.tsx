@@ -3,18 +3,20 @@ import { RiskBadge } from '../../components/RiskBadge';
 import { ServerStackIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { IntelligenceDetailDrawer } from '../../components/IntelligenceDetailDrawer';
 
+import { adminFetch } from '../../lib/adminApi';
+
 export const DeploymentRiskPage: React.FC = () => {
   const [deployments, setDeployments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/admin/intelligence/risk/deployments')
-      .then(res => res.json())
+    adminFetch<any>('/api/admin/intelligence/risk/deployments')
       .then(data => {
         if (data.ok) setDeployments(data.deploymentRisks || []);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return (

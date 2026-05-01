@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const OutcomeHistory: React.FC = () => {
     const [outcomes, setOutcomes] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchMemory = async () => {
-            const rs = await fetch('/api/admin/learning/outcomes', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setOutcomes(d.outcomes.reverse());
+        const fetchHistory = async () => {
+            try {
+                const d = await adminFetch<any>('/api/admin/learning/outcomes');
+                if (d.ok) setOutcomes([...d.outcomes].reverse());
+            } catch (e) {}
         };
-        fetchMemory();
+        fetchHistory();
     }, []);
 
     return (

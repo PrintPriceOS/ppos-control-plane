@@ -8,15 +8,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 
+import { adminFetch } from '../../lib/adminApi';
+
 export const IntelligenceOverview: React.FC = () => {
     const [summary, setSummary] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/admin/intelligence/overview', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('ppos_token') || 'admin-secret'}` }
-        })
-        .then(res => res.json())
+        adminFetch<any>('/api/admin/intelligence/overview')
         .then(data => {
             if (data.ok) setSummary(data.summary);
             setLoading(false);

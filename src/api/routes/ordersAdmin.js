@@ -9,11 +9,13 @@ const {
     deleteOrder,
     VALID_STATUSES
 } = require('../services/ordersService');
+const logger = require('../services/logger').child('admin-orders');
 
 const router = express.Router();
 
 // GET /api/admin/orders?status=pending&user_id=...&limit=50&offset=0
 router.get('/', async (req, res) => {
+    const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
     const { status, user_id, limit = 50, offset = 0 } = req.query;
 
     if (status && !VALID_STATUSES.includes(status)) {
@@ -29,8 +31,22 @@ router.get('/', async (req, res) => {
         });
         res.json({ ok: true, ...result });
     } catch (err) {
-        console.error('[ORDERS] Error listing orders:', err);
-        res.status(500).json({ ok: false, error: err.message });
+        logger.error({
+            event: 'ORDER_LIST_FAILED',
+            error: err.message,
+            tenant: req.user.tenantId,
+            traceId
+        });
+
+        if (err.message.includes('ECONNREFUSED') || err.message.includes('PROTOCOL_CONNECTION_LOST')) {
+            return res.status(503).json({ 
+                ok: false, 
+                status: 'DEGRADED', 
+                error: { code: 'DATABASE_UNAVAILABLE', message: 'Order database is unreachable' } 
+            });
+        }
+
+        res.status(500).json({ ok: false, error: { code: 'INTERNAL_ERROR', message: err.message } });
     }
 });
 
@@ -41,7 +57,6 @@ router.get('/ref/:order_ref', async (req, res) => {
         if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
         res.json({ ok: true, order });
     } catch (err) {
-        console.error('[ORDERS] Error fetching order by ref:', err);
         res.status(500).json({ ok: false, error: err.message });
     }
 });
@@ -53,7 +68,6 @@ router.get('/:id', async (req, res) => {
         if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
         res.json({ ok: true, order });
     } catch (err) {
-        console.error('[ORDERS] Error fetching order:', err);
         res.status(500).json({ ok: false, error: err.message });
     }
 });
@@ -78,7 +92,6 @@ router.post('/', async (req, res) => {
         const order = await getOrder(insertId);
         res.status(201).json({ ok: true, order });
     } catch (err) {
-        console.error('[ORDERS] Error creating order:', err);
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ ok: false, error: `order_ref '${order_ref}' already exists` });
         }
@@ -97,7 +110,6 @@ router.put('/:id', async (req, res) => {
         const order = await getOrder(req.params.id);
         res.json({ ok: true, order });
     } catch (err) {
-        console.error('[ORDERS] Error updating order:', err);
         if (err.message.startsWith('Invalid status')) {
             return res.status(400).json({ ok: false, error: err.message });
         }
@@ -112,7 +124,6 @@ router.delete('/:id', async (req, res) => {
         if (!deleted) return res.status(404).json({ ok: false, error: 'Order not found' });
         res.json({ ok: true });
     } catch (err) {
-        console.error('[ORDERS] Error deleting order:', err);
         res.status(500).json({ ok: false, error: err.message });
     }
 });

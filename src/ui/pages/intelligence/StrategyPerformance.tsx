@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const StrategyPerformance: React.FC = () => {
-    const [strategies, setStrategies] = useState<any[]>([]);
+    const [performance, setPerformance] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchStrats = async () => {
-            const rs = await fetch('/api/admin/learning/strategies', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setStrategies(d.strategies);
+        const fetchPerformance = async () => {
+            try {
+                const d = await adminFetch<any>('/api/admin/learning/strategies');
+                if (d.ok) setPerformance(d.strategies);
+            } catch (e) {}
         };
-        fetchStrats();
+        fetchPerformance();
     }, []);
 
     return (

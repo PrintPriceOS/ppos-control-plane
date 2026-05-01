@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const AgentDecisions: React.FC = () => {
     const [decisions, setDecisions] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchDecisions = async () => {
-            const rs = await fetch('/api/admin/agents/decisions', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setDecisions(d.decisions);
+            try {
+                const d = await adminFetch<any>('/api/admin/agents/decisions');
+                if (d.ok) setDecisions(d.decisions);
+            } catch (e) {}
         };
         fetchDecisions();
     }, []);

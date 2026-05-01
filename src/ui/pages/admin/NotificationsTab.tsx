@@ -10,6 +10,7 @@ import {
     InformationCircleIcon,
     MagnifyingGlassIcon
 } from "@heroicons/react/24/outline";
+import { adminFetch } from "../../lib/adminApi";
 
 interface Notification {
     id: string;
@@ -44,8 +45,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const fetchNotifications = async () => {
         try {
             const query = filterStatus ? `?status=${filterStatus}` : "";
-            const res = await fetch(`/api/admin/notifications${query}`);
-            const data = await res.json();
+            const data = await adminFetch<any>(`/api/admin/notifications${query}`);
             if (data.ok) setNotifications(data.notifications);
         } catch (err) {
             console.error("Failed to fetch notifications", err);
@@ -56,8 +56,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
 
     const fetchDetail = async (id: string) => {
         try {
-            const res = await fetch(`/api/admin/notifications/${id}`);
-            const data = await res.json();
+            const data = await adminFetch<any>(`/api/admin/notifications/${id}`);
             if (data.ok) setDetail(data);
         } catch (err) {
             console.error("Failed to fetch notification detail", err);
@@ -67,7 +66,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const handleResend = async (id: string) => {
         if (!confirm("Are you sure you want to resend this notification?")) return;
         try {
-            const res = await fetch(`/api/admin/notifications/${id}/resend`, { method: "POST" });
+            const res = await adminFetch<any>(`/api/admin/notifications/${id}/resend`, { method: "POST" });
             if (res.ok) {
                 alert("Resend triggered");
                 fetchNotifications();
@@ -81,7 +80,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const handleCancel = async (id: string) => {
         if (!confirm("Cancel this pending notification?")) return;
         try {
-            const res = await fetch(`/api/admin/notifications/${id}/cancel`, { method: "POST" });
+            const res = await adminFetch<any>(`/api/admin/notifications/${id}/cancel`, { method: "POST" });
             if (res.ok) {
                 fetchNotifications();
                 if (selectedId === id) fetchDetail(id);

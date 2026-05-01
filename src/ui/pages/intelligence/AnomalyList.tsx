@@ -3,16 +3,15 @@ import { DataTable } from '../../components/DataTable';
 import { IntelligenceDetailDrawer } from '../../components/IntelligenceDetailDrawer';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
+import { adminFetch } from '../../lib/adminApi';
+
 export const AnomalyList: React.FC = () => {
     const [anomalies, setAnomalies] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedAnomaly, setSelectedAnomaly] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/admin/intelligence/anomalies', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('ppos_token') || 'admin-secret'}` }
-        })
-        .then(res => res.json())
+        adminFetch<any>('/api/admin/intelligence/anomalies')
         .then(data => {
             if (data.ok) setAnomalies(data.anomalies);
             setLoading(false);

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { RiskBadge } from '../../components/RiskBadge';
 import { ShieldExclamationIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, MinusIcon } from '@heroicons/react/24/outline';
 import { IntelligenceDetailDrawer } from '../../components/IntelligenceDetailDrawer';
+import { adminFetch } from '../../lib/adminApi';
 
 export const TenantRiskPage: React.FC = () => {
   const [tenants, setTenants] = useState<any[]>([]);
@@ -9,8 +10,7 @@ export const TenantRiskPage: React.FC = () => {
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/admin/intelligence/risk/tenants')
-      .then(res => res.json())
+    adminFetch<any>('/api/admin/intelligence/risk/tenants')
       .then(data => {
         if (data.ok) setTenants(data.tenantRisks || []);
         setLoading(false);

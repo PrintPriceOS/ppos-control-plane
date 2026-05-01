@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const InstanceRegistry: React.FC = () => {
     const [instances, setInstances] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchRegistry = async () => {
-            const rs = await fetch('/api/admin/federation/registry', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setInstances(d.instances);
+        const fetchInstances = async () => {
+            try {
+                const d = await adminFetch<any>('/api/admin/federation/registry');
+                if (d.ok) setInstances(d.registry);
+            } catch (e) {}
         };
-        fetchRegistry();
+        fetchInstances();
     }, []);
 
     return (

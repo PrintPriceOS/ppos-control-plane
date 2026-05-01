@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const GlobalPosture: React.FC = () => {
     const [posture, setPosture] = useState<any>(null);
 
     useEffect(() => {
         const fetchPosture = async () => {
-            const rs = await fetch('/api/admin/global/posture', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setPosture(d.posture);
+            try {
+                const d = await adminFetch<any>('/api/admin/global/posture');
+                if (d.ok) setPosture(d.posture);
+            } catch (e) {}
         };
         fetchPosture();
     }, []);

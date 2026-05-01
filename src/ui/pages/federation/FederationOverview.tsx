@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { adminFetch } from '../../lib/adminApi';
 
 export const FederationOverview: React.FC = () => {
     const [instances, setInstances] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchStatus = async () => {
-            const rs = await fetch('/api/admin/federation/registry', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setInstances(d.instances);
+        const fetchInstances = async () => {
+            try {
+                const d = await adminFetch<any>('/api/admin/federation/registry');
+                if (d.ok) setInstances(d.registry);
+            } catch (e) {}
         };
-        fetchStatus();
+        fetchInstances();
     }, []);
 
     const healthyCount = instances.filter(i => i.status === 'HEALTHY').length;

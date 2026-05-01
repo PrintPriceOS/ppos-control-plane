@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { adminFetch } from '../../lib/adminApi';
 
 export const AutonomyDashboard: React.FC = () => {
     const [strategies, setStrategies] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchStatus = async () => {
-            const rs = await fetch('/api/admin/autonomy/status', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setStrategies(d.status);
+            try {
+                const d = await adminFetch<any>('/api/admin/autonomy/status');
+                if (d.ok) setStrategies(d.status);
+            } catch (e) {}
         };
         fetchStatus();
     }, []);

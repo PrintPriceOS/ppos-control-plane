@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const FederationConflicts: React.FC = () => {
     const [conflicts, setConflicts] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchAudit = async () => {
-            const rs = await fetch('/api/admin/federation/audit', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) {
-                // Filter only BLOCKED actions preventing dangerous cross-mesh topology
-                const blocks = d.audit.filter((a: any) => a.event.includes('POLICY_BLOCKED') || a.event.includes('BLOCKED'));
-                setConflicts(blocks);
-            }
+            try {
+                const d = await adminFetch<any>('/api/admin/federation/audit');
+                if (d.ok) {
+                    const blocks = d.audit.filter((a: any) => a.event.includes('BLOCKED_BY_LOCAL_SOVEREIGNTY'));
+                    setConflicts(blocks);
+                }
+            } catch (e) {}
         };
         fetchAudit();
     }, []);

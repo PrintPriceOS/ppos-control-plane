@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const GlobalConflicts: React.FC = () => {
     const [audit, setAudit] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchAudit = async () => {
-            const rs = await fetch('/api/admin/global/audit', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) {
-                const conflicts = d.audit.filter((a: any) => a.event.includes('BLOCKED_BY_LOCAL_SOVEREIGNTY'));
-                setAudit(conflicts);
-            }
+            try {
+                const d = await adminFetch<any>('/api/admin/global/audit');
+                if (d.ok) {
+                    const conflicts = d.audit.filter((a: any) => a.event.includes('BLOCKED_BY_LOCAL_SOVEREIGNTY'));
+                    setAudit(conflicts);
+                }
+            } catch (e) {}
         };
         fetchAudit();
     }, []);

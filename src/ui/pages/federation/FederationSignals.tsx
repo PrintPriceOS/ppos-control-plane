@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const FederationSignals: React.FC = () => {
     const [signals, setSignals] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchSignals = async () => {
-            const rs = await fetch('/api/admin/federation/signals', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setSignals(d.signals);
+            try {
+                const d = await adminFetch<any>('/api/admin/federation/signals');
+                if (d.ok) setSignals(d.signals);
+            } catch (e) {}
         };
         fetchSignals();
     }, []);

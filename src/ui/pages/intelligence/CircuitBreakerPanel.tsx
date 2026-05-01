@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BoltIcon, BoltSlashIcon, ReceiptRefundIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { adminFetch } from '../../lib/adminApi';
 
 const CircuitBreakerPanel: React.FC = () => {
     const [status, setStatus] = useState<any>(null);
@@ -7,8 +8,7 @@ const CircuitBreakerPanel: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const res = await fetch('/api/admin/intelligence/circuit-breaker', { headers: { 'Authorization': 'Bearer admin-secret' } });
-            const json = await res.json();
+            const json = await adminFetch<any>('/api/admin/intelligence/circuit-breaker');
             setStatus(json.data);
         } catch (err) {
             console.error('Error fetching CB status:', err);
@@ -25,9 +25,8 @@ const CircuitBreakerPanel: React.FC = () => {
 
     const manualReset = async () => {
         try {
-            await fetch('/api/admin/intelligence/circuit-breaker/reset', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer admin-secret' }
+            await adminFetch('/api/admin/intelligence/circuit-breaker/reset', {
+                method: 'POST'
             });
             fetchData();
         } catch (err) {

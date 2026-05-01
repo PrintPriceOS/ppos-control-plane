@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const FederationDecisions: React.FC = () => {
     const [audit, setAudit] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchAudit = async () => {
-            const rs = await fetch('/api/admin/federation/audit', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) {
-                // Filter only successful federation routing/agreements
-                const decisions = d.audit.filter((a: any) => !a.event.includes('BLOCKED'));
-                setAudit(decisions);
-            }
+            try {
+                const d = await adminFetch<any>('/api/admin/federation/audit');
+                if (d.ok) {
+                    const decisions = d.audit.filter((a: any) => !a.event.includes('BLOCKED'));
+                    setAudit(decisions);
+                }
+            } catch (e) {}
         };
         fetchAudit();
     }, []);

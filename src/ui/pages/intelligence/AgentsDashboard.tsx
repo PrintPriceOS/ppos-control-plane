@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { adminFetch } from '../../lib/adminApi';
 
 export const AgentsDashboard: React.FC = () => {
     const [agents, setAgents] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchStatus = async () => {
-            const rs = await fetch('/api/admin/agents/status', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setAgents(d.agents);
+            try {
+                const d = await adminFetch<any>('/api/admin/agents/status');
+                if (d.ok) setAgents(d.agents);
+            } catch (e) {}
         };
         fetchStatus();
     }, []);

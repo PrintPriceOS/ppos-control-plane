@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/adminApi';
 
 export const GlobalPolicies: React.FC = () => {
     const [policies, setPolicies] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchPolicies = async () => {
-            const rs = await fetch('/api/admin/global/policies', {
-                headers: { 'Authorization': 'Bearer admin-secret' }
-            });
-            const d = await rs.json();
-            if (d.ok) setPolicies(d.policies);
+            try {
+                const d = await adminFetch<any>('/api/admin/global/policies');
+                if (d.ok) setPolicies(d.policies);
+            } catch (e) {}
         };
         fetchPolicies();
     }, []);

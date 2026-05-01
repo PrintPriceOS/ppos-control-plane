@@ -10,6 +10,7 @@ import {
   ExclamationTriangleIcon,
   CogIcon
 } from '@heroicons/react/24/outline';
+import { adminFetch } from '../../lib/adminApi';
 
 interface Dispatch {
   id: string;
@@ -48,8 +49,7 @@ export const IncomingJobsPage: React.FC = () => {
     setLoading(true);
     try {
       // Fetch dispatches
-      const dRes = await fetch('/api/admin/production/dispatches');
-      const dData = await dRes.json();
+      const dData = await adminFetch<any>('/api/admin/production/dispatches');
       
       if (dData.ok) {
         setDispatches(dData.dispatches);
@@ -59,8 +59,7 @@ export const IncomingJobsPage: React.FC = () => {
         const pkgMap: Record<string, Package> = {};
         
         for (const pid of packageIds as string[]) {
-          const pRes = await fetch(`/api/admin/production/packages/${pid}`);
-          const pData = await pRes.json();
+          const pData = await adminFetch<any>(`/api/admin/production/packages/${pid}`);
           if (pData.ok) {
             pkgMap[pid] = pData.package;
           }
@@ -93,12 +92,10 @@ export const IncomingJobsPage: React.FC = () => {
         body = JSON.stringify({ reason: 'Operational decision' });
       }
 
-      const res = await fetch(endpoint, {
+      const data = await adminFetch<any>(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body
       });
-      const data = await res.json();
       if (data.ok) {
         fetchData(); // Refresh
       } else {
