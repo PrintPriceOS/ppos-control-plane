@@ -150,6 +150,7 @@ router.get("/metrics/overview", async (req, res) => {
       `
       SELECT 
         SUM(CASE WHEN status IN ('QUEUED', 'RUNNING', 'FAILED') THEN 1 ELSE 0 END) as backlog,
+        SUM(CASE WHEN status = 'RUNNING' THEN 1 ELSE 0 END) as active_jobs,
         COALESCE(TIMESTAMPDIFF(SECOND, MIN(CASE WHEN status = 'QUEUED' THEN created_at ELSE NULL END), NOW()), 0) as oldest_age_seconds
       FROM jobs;
       `
@@ -168,6 +169,7 @@ router.get("/metrics/overview", async (req, res) => {
       avgRiskBefore: Number(overview.avg_risk_before || 0),
       avgRiskAfter: Number(overview.avg_risk_after || 0),
       queueBacklog: Number(queueStats?.backlog || 0),
+      activeJobs: Number(queueStats?.active_jobs || 0),
       oldestAgeSeconds: Number(queueStats?.oldest_age_seconds || 0)
     });
   } catch (err) {

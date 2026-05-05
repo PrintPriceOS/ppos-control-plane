@@ -83,6 +83,7 @@ export type OverviewResponse = {
     avgRiskBefore: number;
     avgRiskAfter: number;
     queueBacklog: number;
+    activeJobs: number;
     oldestAgeSeconds: number;
 };
 
