@@ -5,7 +5,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
+const { requireAdmin, resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const nodeService = require('../services/productionNodeService');
 const packageService = require('../services/productionPackageService');
 const bundleService = require('../services/productionBundleService');
@@ -25,7 +25,7 @@ router.use(requireApprovedPrinthouse);
 router.get('/nodes', async (req, res) => {
   try {
     const filters = { ...req.query };
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     
     const nodes = await nodeService.listNodes(filters, context);
     res.json({ ok: true, nodes });
