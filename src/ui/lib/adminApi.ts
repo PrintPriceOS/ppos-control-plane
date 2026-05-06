@@ -481,6 +481,18 @@ export async function getIndustrialSnapshot() {
     return adminFetch<any>('/api/admin/telemetry/industrial');
 }
 
+export async function triggerOrchestrationAnalysis() {
+    return adminFetch<{ ok: boolean }>('/api/admin/orchestration/analyze', {
+        method: 'POST'
+    });
+}
+
+export async function triggerLifecycleProcess() {
+    return adminFetch<{ ok: boolean, results: { transitioned: number, purged: number } }>('/api/admin/preflight/artifacts/lifecycle', {
+        method: 'POST'
+    });
+}
+
 export async function getAutonomyPipelineDetail(id: string) {
     return adminFetch<any>(`/api/admin/autonomy/${id}`);
 }
