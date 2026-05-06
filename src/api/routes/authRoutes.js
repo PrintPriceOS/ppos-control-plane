@@ -5,6 +5,8 @@
  */
 const express = require('express');
 const router = express.Router();
+
+router.use(express.json());
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const userService = require('../services/controlUserService');

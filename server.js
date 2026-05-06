@@ -104,6 +104,10 @@ const start = async () => {
         // 3. Mount Auth, Admin, Analytics & System Routes (Express Bridge)
         await fastify.register(require('@fastify/express'));
         
+        // Body Parsers for Express middleware
+        fastify.use(require('express').json());
+        fastify.use(require('express').urlencoded({ extended: true }));
+        
         fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
         fastify.use('/api/admin', require('./src/api/routes/admin'));
         fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
