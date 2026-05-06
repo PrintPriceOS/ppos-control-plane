@@ -111,7 +111,8 @@ const IconMap: Record<string, any> = {
     BuildingStorefrontIcon: BuildingStorefrontIcon,
     ScaleIcon: ScaleIcon,
     BanknotesIcon: BanknotesIcon,
-    CommandLineIcon: CommandLineIcon
+    CommandLineIcon: CommandLineIcon,
+    DocumentCheckIcon: DocumentCheckIcon
 };
 
 export const Sidebar: React.FC = () => {
