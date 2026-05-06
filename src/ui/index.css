@@ -18,6 +18,13 @@
   --color-slate-800: #2c2c2e;
   --color-slate-900: #1c1c1e;
   --color-slate-950: #141414;
+  
+  /* Brand colors mapped to Tailwind theme */
+  --color-primary: #dc0000;
+  --color-primary-dark: #b90000;
+  --color-error: #dc0000;
+  --color-warning: #d97706;
+  --color-info: #dc0000;
 }
 
 /* ===================== */
@@ -25,13 +32,6 @@
 /* ===================== */
 
 :root {
-  /* Colores principales */
-  --color-primary: #dc0000;
-  --color-primary-dark: #b90000;
-  --color-error: #dc0000;
-  --color-warning: #d97706;
-  --color-info: #dc0000;
-
   /* Colores neutros */
   --color-white: #ffffff;
   --color-gray-50: #f9fafb;
