@@ -49,17 +49,25 @@ export async function verifyToken(token: string) {
     try {
         // We use a direct fetch here because this is the BOOTSTRAP verification call
         // before the global token is set in the store.
-        const res = await fetch('/api/admin/telemetry/snapshot', {
+        const response = await fetch('/api/admin/telemetry/snapshot', {
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
             }
         });
+
+        if (!response.ok) {
+            if (response.status === 502) {
+                throw new Error('Connection Error: 502 Bad Gateway. This usually means the backend service is restarting or Redis is unreachable.');
+            }
+            if (response.status === 401) {
+                throw new Error('Invalid access token. Please check your credentials.');
+            }
+            throw new Error(`Verification failed: ${response.status}`);
+        }
         
-        if (res.status === 401) throw new Error('Invalid token');
-        if (!res.ok) throw new Error(`Verification failed: ${res.status}`);
-        
-        return res.json();
+        return response.json();
     } catch (e: any) {
         throw new Error(e.message);
     }
