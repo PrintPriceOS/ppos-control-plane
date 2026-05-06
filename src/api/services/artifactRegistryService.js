@@ -59,7 +59,7 @@ class ArtifactRegistryService {
         if (rows.length === 0) return null;
 
         const artifact = rows[0];
-        artifact.metadata_json = JSON.parse(artifact.metadata_json || '{}');
+        artifact.metadata_json = artifact.metadata_json || {};
         
         return artifact;
     }
@@ -76,7 +76,7 @@ class ArtifactRegistryService {
 
         return artifacts.map(a => ({
             ...a,
-            metadata_json: JSON.parse(a.metadata_json || '{}')
+            metadata_json: a.metadata_json || {}
         }));
     }
 

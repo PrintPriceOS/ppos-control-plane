@@ -56,8 +56,8 @@ class WorkerRegistryService {
         
         return workers.map(w => ({
             ...w,
-            queue_bindings: JSON.parse(w.queue_bindings || '[]'),
-            capabilities: JSON.parse(w.capabilities || '{}'),
+            queue_bindings: w.queue_bindings || [],
+            capabilities: w.capabilities || {},
             isOnline: (Date.now() - new Date(w.last_heartbeat).getTime()) < 60000 // 1 minute threshold
         }));
     }

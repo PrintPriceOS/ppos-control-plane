@@ -22,7 +22,7 @@ function requireAdmin(req, res, next) {
     // 1. Check Break-glass Token
     if (token === BREAK_GLASS_TOKEN) {
         req.user = {
-            role: 'super_admin',
+            role: 'SUPER_ADMIN',
             id: 'system_bootstrap',
             tenantId: 'ppos-production',
             authMode: 'BREAK_GLASS'
@@ -40,7 +40,7 @@ function requireAdmin(req, res, next) {
         req.user = {
             id: decoded.sub,
             email: decoded.email,
-            role: decoded.role,
+            role: (decoded.role || 'VIEWER').toUpperCase(),
             tenantId: decoded.tenant_id,
             printhouseId: decoded.printhouse_id,
             authMode: 'JWT'

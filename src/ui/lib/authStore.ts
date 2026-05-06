@@ -67,7 +67,8 @@ export function isAuthenticated(): boolean {
  * Accessors for specific user context fields.
  */
 export function getUserRole(): string {
-    return getAuthUser()?.role || 'VIEWER';
+    const user = getAuthUser();
+    return (user?.role || 'VIEWER').toUpperCase();
 }
 
 export function getUserTenantId(): string {
