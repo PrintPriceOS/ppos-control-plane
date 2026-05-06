@@ -43,6 +43,7 @@ router.get('/', async (req, res) => {
  * Mark a notification as read
  */
 router.post('/:id/read', async (req, res) => {
+  try {
     const { resolveActorContext } = require('../middleware/auth');
     const context = resolveActorContext(req);
     await notificationService.markAsRead(req.params.id, context.tenantId);
