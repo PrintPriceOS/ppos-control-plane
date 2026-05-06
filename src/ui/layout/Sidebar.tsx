@@ -106,7 +106,12 @@ const IconMap: Record<string, any> = {
     CurrencyDollarIcon: CurrencyEuroIcon,
     BuildingOfficeIcon: BuildingOfficeIcon,
     ClipboardDocumentListIcon: ClipboardDocumentListIcon,
-    Cog6ToothIcon: BoltIcon
+    Cog6ToothIcon: BoltIcon,
+    SparklesIcon: SparklesIcon,
+    BuildingStorefrontIcon: BuildingStorefrontIcon,
+    ScaleIcon: ScaleIcon,
+    BanknotesIcon: BanknotesIcon,
+    CommandLineIcon: CommandLineIcon
 };
 
 export const Sidebar: React.FC = () => {

@@ -29,6 +29,15 @@ export const navigationConfig: NavItem[] = [
     { id: 'materials', label: 'Materials & Paper', path: '/materials', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'PRINTHOUSE_ADMIN'] },
     { id: 'pricing', label: 'Pricing Profiles', path: '/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'PRINTHOUSE_ADMIN'] },
     
+    // Intelligence Layer (Super Admin & Ops Admin)
+    { id: 'intelligence', label: 'Intelligence Layer', path: '/intelligence', icon: 'SparklesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    
+    // Operations & Marketplace
+    { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'pricing_ops', label: 'Pricing Ops', path: '/ops/pricing', icon: 'ScaleIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'financials', label: 'Financial Ops', path: '/ops/financials', icon: 'BanknotesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+
     // System / Admin
     { id: 'tenants', label: 'Tenant Management', path: '/tenants', icon: 'BuildingOfficeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'audit', label: 'Audit Logs', path: '/audit', icon: 'ClipboardDocumentListIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
