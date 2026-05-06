@@ -1,7 +1,9 @@
-import { getAuthToken, clearAuthToken, setAuthToken } from './authStore';
+import { getAuthToken, clearAuthToken, setAuthToken, getUserTenantId, getUserPrinthouseId } from './authStore';
 
 export async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
     const token = getAuthToken();
+    const storedTenantId = getUserTenantId();
+    const storedPrinthouseId = getUserPrinthouseId();
 
     const headers: Record<string, string> = {
         "Accept": "application/json",
@@ -9,7 +11,8 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
         ...(token ? { 
             "Authorization": `Bearer ${token}`
         } : {}),
-        ...(options?.tenantId ? { "X-Tenant-Id": options.tenantId } : {}),
+        ...(options?.tenantId || storedTenantId ? { "X-Tenant-Id": options?.tenantId || storedTenantId } : {}),
+        ...(storedPrinthouseId ? { "X-Printhouse-Id": storedPrinthouseId } : {}),
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
         ...(options?.headers as any || {}),
     };

@@ -11,11 +11,9 @@ router.get('/', async (req, res) => {
   const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
   try {
     const { limit = 20 } = req.query;
-    const context = {
-        userId: req.user.id,
-        tenantId: req.user.tenantId || 'system',
-        traceId
-    };
+    const { resolveActorContext } = require('../middleware/auth');
+    const context = resolveActorContext(req);
+    context.traceId = traceId;
 
     const notifications = await notificationService.getMyNotifications(context.tenantId, context.userId, parseInt(limit));
     res.json({ ok: true, notifications });
@@ -45,8 +43,9 @@ router.get('/', async (req, res) => {
  * Mark a notification as read
  */
 router.post('/:id/read', async (req, res) => {
-  try {
-    await notificationService.markAsRead(req.params.id, req.user.tenantId);
+    const { resolveActorContext } = require('../middleware/auth');
+    const context = resolveActorContext(req);
+    await notificationService.markAsRead(req.params.id, context.tenantId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -59,7 +58,9 @@ router.post('/:id/read', async (req, res) => {
  */
 router.post('/read-all', async (req, res) => {
   try {
-    await notificationService.markAllAsRead(req.user.tenantId, req.user.id);
+    const { resolveActorContext } = require('../middleware/auth');
+    const context = resolveActorContext(req);
+    await notificationService.markAllAsRead(context.tenantId, context.userId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

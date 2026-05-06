@@ -92,86 +92,62 @@ const NavGroup: React.FC<NavGroupProps> = ({ label, children, defaultOpen = true
   );
 };
 
+import { navigationConfig, Role } from '../config/controlPlaneNavigation';
+import { getUserRole } from '../lib/authStore';
+
+const IconMap: Record<string, any> = {
+    HomeIcon: ChartBarIcon,
+    ShieldCheckIcon: ShieldCheckIcon,
+    CloudIcon: ArrowsRightLeftIcon,
+    InboxIcon: InboxIcon,
+    CpuChipIcon: CpuChipIcon,
+    WrenchScrewdriverIcon: WrenchScrewdriverIcon,
+    RectangleStackIcon: Square3Stack3DIcon,
+    CurrencyDollarIcon: CurrencyEuroIcon,
+    BuildingOfficeIcon: BuildingOfficeIcon,
+    ClipboardDocumentListIcon: ClipboardDocumentListIcon,
+    Cog6ToothIcon: BoltIcon
+};
+
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
+  const userRole = getUserRole() as Role;
 
   const handleLogout = () => {
     clearAuthToken();
     navigate('/login', { replace: true });
   };
 
+  const visibleModules = navigationConfig.filter(item => 
+    item.roles.includes(userRole) || userRole === 'SUPER_ADMIN'
+  );
+
   return (
     <aside className="w-72 bg-white/50 dark:bg-[#1C1C1E] border-r border-slate-200/60 dark:border-white/[0.08] h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
       <div className="px-6 py-7 flex items-center gap-3.5">
-        <div className="w-10 h-10 bg-slate-900 dark:bg-primary/10 rounded-xl flex items-center justify-center shadow-lg shadow-slate-900/20 dark:shadow-none ring-1 ring-transparent dark:ring-primary/25">
-          <ShieldCheckIcon className="w-6 h-6 text-white dark:text-primary" />
+        <div className="w-10 h-10 bg-[#dc0000] rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20 ring-1 ring-transparent">
+          <ShieldCheckIcon className="w-6 h-6 text-white" />
         </div>
         <div>
           <h1 className="text-lg font-black text-slate-900 dark:text-[#ECECF1] leading-none tracking-tight">PrintPrice OS</h1>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-400 mt-1 uppercase tracking-widest">Control Plane v2.1</p>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-400 mt-1 uppercase tracking-widest">
+            {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
+          </p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-8 scrollbar-hide">
-        {/* PLATFORM GOVERNANCE */}
-        <NavGroup label="Platform Governance">
-          <NavItem to="/dashboard" icon={ChartBarIcon} label="Dashboard" />
-          <NavItem to="/governance" icon={ShieldCheckIcon} label="Governance" badge="BETA" />
-          <NavItem to="/deployments" icon={ArrowsRightLeftIcon} label="Deployments" />
-          <NavItem to="/audit" icon={DocumentCheckIcon} label="Audit Explorer" />
-          <NavItem to="/usage" icon={CalculatorIcon || ClockIcon} label="Usage & Quotas" />
-          <NavItem to="/printhouses" icon={PrinterIcon} label="Printhouses" />
-          <NavItem to="/orders" icon={ClipboardDocumentListIcon} label="Orders" />
-        </NavGroup>
-
-        {/* FORENSICS & OBSERVABILITY */}
-        <NavGroup label="Forensics & Observability">
-          <NavItem to="/telemetry" icon={SignalIcon} label="Industrial Telemetry" badge="SOC" />
-          <NavItem to="/forensics" icon={FingerPrintIcon} label="Forensic Timeline" />
-        </NavGroup>
-
-        {/* INTELLIGENCE LAYER */}
-        <NavGroup label="Intelligence Layer">
-          <NavItem to="/intelligence" icon={BoltIcon} label="Overview" />
-          <NavItem to="/intelligence/anomalies" icon={ExclamationTriangleIcon} label="Anomalies" />
-          <NavItem to="/intelligence/insights" icon={CpuChipIcon} label="Insights" />
-          <NavItem to="/intelligence/recommendations" icon={WrenchScrewdriverIcon} label="Recommendations" />
-          <NavItem to="/intelligence/risk/tenants" icon={ShieldCheckIcon} label="Tenant Risk" />
-          <NavItem to="/intelligence/risk/deployments" icon={ArrowsRightLeftIcon} label="Deployment Risk" />
-          <NavItem to="/intelligence/trends" icon={ChartBarIcon} label="Trend Prediction" />
-          <NavItem to="/intelligence/guardrails" icon={ShieldCheckIcon} label="Guardrails" />
-          <NavItem to="/intelligence/circuit-breaker" icon={BoltIcon} label="Circuit Breakers" />
-        </NavGroup>
-
-        {/* INFRASTRUCTURE & RUNTIME */}
-        <NavGroup label="Infrastructure & Runtime">
-          <NavItem to="/health" icon={HeartIcon} label="System Health" />
-          <NavItem to="/runtime" icon={CommandLineIcon || CpuChipIcon} label="Runtime Context" />
-          <NavItem to="/jobs" icon={QueueListIcon} label="Jobs" />
-          <NavItem to="/queues-workers" icon={WrenchScrewdriverIcon} label="Queues & Workers" />
-          <NavItem to="/tenants" icon={UsersIcon} label="Tenants" />
-        </NavGroup>
-
-        {/* INDUSTRIAL OPERATIONS ORCHESTRATION */}
-        <NavGroup label="Industrial Operations">
-          <NavItem to="/admin/industrial" icon={CubeIcon} label="Operations Control" badge="NOC" />
-          <NavItem to="/preflight/jobs" icon={QueueListIcon} label="Active Pipelines" />
-          <NavItem to="/forensics" icon={FingerPrintIcon} label="Artifact Lineage" />
-        </NavGroup>
-
-        {/* PRODUCTION DISPATCH */}
-        <NavGroup label="Production Dispatch">
-          <NavItem to="/production" icon={InboxIcon} label="Incoming Jobs" badge="LIVE" />
-        </NavGroup>
-
-        {/* EXTENDED OPERATIONS */}
-        <NavGroup label="Extended Operations" defaultOpen={false}>
-          <NavItem to="/ops/marketplace" icon={BuildingStorefrontIcon} label="Marketplace" />
-          <NavItem to="/ops/pricing" icon={CurrencyEuroIcon} label="Pricing Intelligence" />
-          <NavItem to="/ops/financials" icon={BanknotesIcon} label="Financials" />
-          <NavItem to="/ops/success" icon={HeartIcon} label="Customer Operations" />
+      <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-hide">
+        <NavGroup label="Main Menu">
+          {visibleModules.map(item => (
+            <NavItem 
+              key={item.id} 
+              to={item.path} 
+              icon={IconMap[item.icon] || CubeIcon} 
+              label={item.label} 
+            />
+          ))}
         </NavGroup>
       </nav>
 

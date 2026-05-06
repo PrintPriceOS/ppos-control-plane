@@ -1,10 +1,8 @@
-/**
- * Artifact Admin Router
- */
 const express = require('express');
 const router = express.Router();
 const artifactRegistry = require('../services/artifactRegistryService');
-const logger = require('../services/logger').child('artifact-admin');
+const { resolveActorContext } = require('../middleware/auth');
+const db = require('../services/mysqlClient');
 
 /**
  * GET /api/admin/artifacts
@@ -12,14 +10,21 @@ const logger = require('../services/logger').child('artifact-admin');
  */
 router.get('/', async (req, res) => {
     const { tenantId, jobId, type } = req.query;
+    const context = resolveActorContext(req);
+    
     try {
         let query = 'SELECT * FROM preflight_artifacts WHERE deleted_at IS NULL';
         const params = [];
 
-        if (tenantId) {
+        // Scoping
+        if (!context.isSuperAdmin) {
+            query += ' AND tenant_id = ?';
+            params.push(context.tenantId);
+        } else if (tenantId) {
             query += ' AND tenant_id = ?';
             params.push(tenantId);
         }
+
         if (jobId) {
             query += ' AND job_id = ?';
             params.push(jobId);
@@ -31,7 +36,7 @@ router.get('/', async (req, res) => {
 
         query += ' ORDER BY created_at DESC LIMIT 100';
         
-        const rows = await require('../services/mysqlClient').query(query, params);
+        const rows = await db.query(query, params);
         res.json({ ok: true, artifacts: rows });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });

@@ -62,3 +62,26 @@ export function clearAuthToken(): void {
 export function isAuthenticated(): boolean {
     return !!getAuthToken();
 }
+
+/**
+ * Accessors for specific user context fields.
+ */
+export function getUserRole(): string {
+    return getAuthUser()?.role || 'VIEWER';
+}
+
+export function getUserTenantId(): string {
+    return getAuthUser()?.tenantId || '';
+}
+
+export function getUserPrinthouseId(): string {
+    return getAuthUser()?.printhouseId || '';
+}
+
+export function isSuperAdmin(): boolean {
+    return getUserRole() === 'SUPER_ADMIN';
+}
+
+export function isPrinthouseUser(): boolean {
+    return ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(getUserRole());
+}

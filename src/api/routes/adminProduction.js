@@ -5,7 +5,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const requireAdmin = require('../middleware/requireAdmin');
+const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const nodeService = require('../services/productionNodeService');
 const packageService = require('../services/productionPackageService');
 const bundleService = require('../services/productionBundleService');
@@ -15,17 +15,8 @@ const eventService = require('../services/productionEventService');
 
 // Apply admin protection to all routes
 router.use(requireAdmin);
-
-/**
- * Helper: Resolve Tenant Identity from user context
- */
-function resolveContext(req) {
-    return {
-        userId: req.user.id,
-        tenantId: req.user.tenantId || 'system',
-        role: req.user.role
-    };
-}
+// Security: For production operations, ensure the printhouse node is APPROVED
+router.use(requireApprovedPrinthouse);
 
 /**
  * GET /api/admin/production/nodes
@@ -49,7 +40,7 @@ router.get('/nodes', async (req, res) => {
  */
 router.get('/nodes/:nodeId', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const node = await nodeService.getNode(req.params.nodeId, context);
     
     if (!node) {
@@ -69,7 +60,7 @@ router.get('/nodes/:nodeId', async (req, res) => {
  */
 router.post('/nodes', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const nodeData = req.body;
 
     if (!nodeData.companyName || !nodeData.machineProfile) {
@@ -93,7 +84,7 @@ router.post('/nodes', async (req, res) => {
  */
 router.patch('/nodes/:nodeId', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const updates = req.body;
 
     const node = await nodeService.updateNode(req.params.nodeId, updates, context);
@@ -112,7 +103,7 @@ router.patch('/nodes/:nodeId', async (req, res) => {
 router.get('/packages', async (req, res) => {
   try {
     const filters = { ...req.query };
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     
     const packages = await packageService.listPackages(filters, context);
     res.json({ ok: true, packages });
@@ -126,7 +117,7 @@ router.get('/packages', async (req, res) => {
  */
 router.get('/packages/:packageId', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const pkg = await packageService.getPackage(req.params.packageId, context);
     
     if (!pkg) {
@@ -146,7 +137,7 @@ router.get('/packages/:packageId', async (req, res) => {
  */
 router.post('/packages', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const packageData = req.body;
 
     if (!packageData.sourceJobId || !packageData.sourceArtifactId) {
@@ -170,7 +161,7 @@ router.post('/packages', async (req, res) => {
  */
 router.patch('/packages/:packageId/status', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const { status } = req.body;
 
     if (!status) {
@@ -190,7 +181,7 @@ router.patch('/packages/:packageId/status', async (req, res) => {
  * Download the production-ready ZIP bundle
  */
 router.get('/packages/:packageId/bundle', async (req, res) => {
-  const context = resolveContext(req);
+  const context = resolveActorContext(req);
   const packageId = req.params.packageId;
 
   try {
@@ -240,7 +231,7 @@ router.post('/packages/:packageId/match', async (req, res) => {
 router.get('/dispatches', async (req, res) => {
   try {
     const filters = { ...req.query };
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     
     const dispatches = await dispatchService.listDispatches(filters, context);
     res.json({ ok: true, dispatches });
@@ -254,7 +245,7 @@ router.get('/dispatches', async (req, res) => {
  */
 router.get('/dispatches/:dispatchId', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const dispatch = await dispatchService.getDispatch(req.params.dispatchId, context);
     
     if (!dispatch) {
@@ -274,7 +265,7 @@ router.get('/dispatches/:dispatchId', async (req, res) => {
  */
 router.post('/packages/:packageId/dispatch', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const { nodeId, message, expiresAt } = req.body;
 
     if (!nodeId) {
@@ -294,7 +285,7 @@ router.post('/packages/:packageId/dispatch', async (req, res) => {
  */
 router.post('/dispatches/:dispatchId/accept', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const dispatch = await dispatchService.acceptDispatch(req.params.dispatchId, context);
     res.json({ ok: true, dispatch });
   } catch (error) {
@@ -308,7 +299,7 @@ router.post('/dispatches/:dispatchId/accept', async (req, res) => {
  */
 router.post('/dispatches/:dispatchId/reject', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const { reason } = req.body;
     const dispatch = await dispatchService.rejectDispatch(req.params.dispatchId, reason, context);
     res.json({ ok: true, dispatch });
@@ -327,7 +318,7 @@ router.post('/dispatches/:dispatchId/reject', async (req, res) => {
 router.get('/events', async (req, res) => {
   try {
     const filters = { ...req.query };
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     
     const events = await eventService.listGlobalEvents(filters, context);
     res.json({ ok: true, events });
@@ -342,7 +333,7 @@ router.get('/events', async (req, res) => {
  */
 router.get('/packages/:packageId/events', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const events = await eventService.getPackageTimeline(req.params.packageId, context);
     res.json({ ok: true, events });
   } catch (error) {
@@ -359,7 +350,7 @@ router.get('/packages/:packageId/events', async (req, res) => {
  */
 router.get('/financials', async (req, res) => {
   try {
-    const context = resolveContext(req);
+    const context = resolveActorContext(req);
     const db = require('../services/db');
     
     // Security: Only allow searching by tenant or if super admin

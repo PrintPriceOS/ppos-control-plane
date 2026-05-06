@@ -80,6 +80,7 @@ export const App: React.FC = () => {
 
             {/* New OS Control Plane Layout */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             
             <Route element={<AuthGuard><Layout /></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

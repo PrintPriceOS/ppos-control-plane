@@ -10,15 +10,15 @@ class ControlUserService {
     /**
      * Create a new control user.
      */
-    async createUser(email, role, tenantId, password) {
+    async createUser(email, role, tenantId, password, printhouseId = null) {
         const passwordHash = await bcrypt.hash(password, 10);
         
         const result = await db.query(
-            'INSERT INTO control_users (email, role, tenant_id, password_hash) VALUES (?, ?, ?, ?)',
-            [email, role, tenantId, passwordHash]
+            'INSERT INTO control_users (email, role, tenant_id, printhouse_id, password_hash) VALUES (?, ?, ?, ?, ?)',
+            [email, role, tenantId, printhouseId, passwordHash]
         );
         
-        return { id: result.insertId, email, role, tenantId };
+        return { id: result.insertId, email, role, tenantId, printhouseId };
     }
 
     /**

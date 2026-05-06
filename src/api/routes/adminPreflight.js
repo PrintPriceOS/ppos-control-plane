@@ -26,20 +26,24 @@ const upload = multer({
   limits: { fileSize: maxMb * 1024 * 1024 }
 });
 
+const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
+
 // Apply admin protection to all routes
 router.use(requireAdmin);
 router.use(requirePrinterLicense);
+router.use(requireApprovedPrinthouse);
 
 /**
  * Helper: Resolve Tenant Identity from user context
  */
 function resolveTargetTenantId(req) {
+    const context = resolveActorContext(req);
     // If SUPER_ADMIN provides X-Tenant-Id, trust it.
-    if (req.user.role === 'SUPER_ADMIN' && req.headers['x-tenant-id']) {
+    if (context.isSuperAdmin && req.headers['x-tenant-id']) {
         return req.headers['x-tenant-id'];
     }
-    // Otherwise, use the user's own tenantId (defaults to 'system' for bootstrap admin)
-    return req.user.tenantId || 'system';
+    // Otherwise, use the user's own tenantId
+    return context.tenantId || 'system';
 }
 
 /**
@@ -64,10 +68,11 @@ router.get('/jobs', async (req, res) => {
   const logger = require('../services/logger').child('admin-preflight');
   try {
     const filters = { ...req.query };
+    const context = resolveActorContext(req);
     
     // Security: Restrict non-SUPER_ADMIN to their own tenant
-    if (req.user.role !== 'SUPER_ADMIN') {
-        filters.tenantId = req.user.tenantId;
+    if (!context.isSuperAdmin) {
+        filters.tenantId = context.tenantId;
     }
 
     const result = await operations.listJobs(filters);

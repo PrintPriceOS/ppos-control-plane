@@ -4,12 +4,13 @@ const { query } = require('./mysqlClient');
 const VALID_STATUSES = ['pending', 'reviewing', 'in_production', 'shipped', 'delivered', 'cancelled'];
 const UPDATABLE_FIELDS = ['status', 'specs', 'offer_print_house', 'offer_price'];
 
-async function listOrders({ status, user_id, limit = 50, offset = 0 }) {
+async function listOrders({ status, user_id, printhouse_id, limit = 50, offset = 0 }) {
     const where = [];
     const params = [];
 
     if (status) { where.push('status = ?'); params.push(status); }
     if (user_id) { where.push('user_id = ?'); params.push(user_id); }
+    if (printhouse_id) { where.push('offer_print_house = ?'); params.push(printhouse_id); }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 

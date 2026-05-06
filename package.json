@@ -8,7 +8,8 @@
         "start": "node server.js",
         "dev": "vite",
         "build": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "seed:demo-printhouse": "node scripts/seed-demo-printhouse.js"
     },
     "dependencies": {
         "@fastify/express": "^4.0.4",

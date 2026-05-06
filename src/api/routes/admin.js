@@ -1,7 +1,7 @@
 // routes/admin.js
 const express = require("express");
-const requireAdmin = require("../middleware/requireAdmin");
-const db = require("../services/db");
+const { requireAdmin, resolveActorContext } = require("../middleware/auth");
+const db = require("../services/mysqlClient");
 
 const router = express.Router();
 router.use(express.json()); // Ensure req.body is parsed for POST requests
@@ -117,6 +117,15 @@ function rangeToInterval(range) {
 // GET /api/admin/metrics/overview?range=24h
 router.get("/metrics/overview", async (req, res) => {
   const interval = rangeToInterval(req.query.range);
+  const context = resolveActorContext(req);
+  
+  let filterSql = '';
+  const params = [];
+  
+  if (context.isPrinthouseUser) {
+    filterSql = 'AND printhouse_id = ?';
+    params.push(context.printhouseId);
+  }
 
   try {
     const { rows: [overview] } = await db.query(
@@ -132,8 +141,9 @@ router.get("/metrics/overview", async (req, res) => {
         AVG(risk_score_before) as avg_risk_before,
         AVG(risk_score_after) as avg_risk_after
       FROM metrics
-      WHERE created_at >= NOW() - ${interval};
-      `
+      WHERE created_at >= NOW() - ${interval} ${filterSql};
+      `,
+      params
     );
 
     const { rows: [improve] } = await db.query(
@@ -443,12 +453,22 @@ router.get("/jobs", async (req, res) => {
   const status = req.query.status || null;
   const limit = Math.min(Number(req.query.limit || 50), 200);
   const offset = Math.max(Number(req.query.offset || 0), 0);
+  const context = resolveActorContext(req);
 
   try {
     const queueOperator = require("../adapters/queueOperator");
     
+    // For Printhouse users, we MUST filter jobs. 
+    // If BullMQ doesn't support easy filtering, we might rely on DB fallback or filter in memory
+    // for this v1 implementation.
+    
     // Phase 7.3: Fetch real jobs from BullMQ
     const realJobs = await queueOperator.getJobs(undefined, limit, offset);
+    
+    let filteredJobs = realJobs;
+    if (context.isPrinthouseUser) {
+        filteredJobs = (realJobs || []).filter(j => j.data?.tenantId === context.tenantId);
+    }
     
     if (realJobs && realJobs.length > 0) {
       const stats = await queueOperator.getAdminStats();
@@ -529,11 +549,20 @@ router.get("/audit", async (req, res) => {
   const requestId = req.query.request_id || null;
   const action = req.query.action || null;
   const limit = Math.min(Number(req.query.limit || 100), 500);
+  const context = resolveActorContext(req);
 
   const where = [];
   const params = [];
 
-  if (tenant) { where.push("tenant_id = ?"); params.push(tenant); }
+  // Scoping: If printhouse user, force their tenant_id
+  if (context.isPrinthouseUser) {
+      where.push("tenant_id = ?");
+      params.push(context.tenantId);
+  } else if (tenant) {
+      where.push("tenant_id = ?");
+      params.push(tenant);
+  }
+
   if (jobId) { where.push("resource_id = ? AND resource_type = 'JOB'"); params.push(jobId); }
   if (requestId) { where.push("request_id = ?"); params.push(requestId); }
   if (action) { where.push("action = ?"); params.push(action); }

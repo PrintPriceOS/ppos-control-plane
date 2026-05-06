@@ -11,12 +11,15 @@ const {
 } = require('../services/ordersService');
 const logger = require('../services/logger').child('admin-orders');
 
+const { resolveActorContext } = require('../middleware/auth');
+
 const router = express.Router();
 
 // GET /api/admin/orders?status=pending&user_id=...&limit=50&offset=0
 router.get('/', async (req, res) => {
     const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
     const { status, user_id, limit = 50, offset = 0 } = req.query;
+    const context = resolveActorContext(req);
 
     if (status && !VALID_STATUSES.includes(status)) {
         return res.status(400).json({ ok: false, error: `Invalid status. Valid values: ${VALID_STATUSES.join(', ')}` });
@@ -26,6 +29,7 @@ router.get('/', async (req, res) => {
         const result = await listOrders({
             status,
             user_id,
+            printhouse_id: context.isPrinthouseUser ? context.printhouseId : (req.query.printhouse_id || null),
             limit: Math.min(Number(limit), 200),
             offset: Math.max(Number(offset), 0)
         });
@@ -63,9 +67,16 @@ router.get('/ref/:order_ref', async (req, res) => {
 
 // GET /api/admin/orders/:id
 router.get('/:id', async (req, res) => {
+    const context = resolveActorContext(req);
     try {
         const order = await getOrder(req.params.id);
         if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
+        
+        // Scope Check
+        if (context.isPrinthouseUser && order.offer_print_house !== context.printhouseId) {
+            return res.status(403).json({ ok: false, error: 'Access denied: This order belongs to another printhouse' });
+        }
+
         res.json({ ok: true, order });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
