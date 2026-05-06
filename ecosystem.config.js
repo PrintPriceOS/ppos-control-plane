@@ -27,6 +27,20 @@ module.exports = {
         HEALTH_PORT: 8002,
         PPOS_UPLOADS_DIR: '/opt/printprice-os/temp-staging'
       }
+    },
+    {
+      name: 'ppos-control-plane',
+      script: 'server.js',
+      cwd: './',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 8081,
+        PPOS_CONTROL_MODE: 'LIVE'
+      }
     }
   ]
 };
