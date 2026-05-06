@@ -128,7 +128,7 @@ router.get("/metrics/overview", async (req, res) => {
   }
 
   try {
-    const { rows: [overview] } = await db.query(
+    const [overview] = await db.query(
       `
       SELECT 
         COUNT(*) as total_jobs,
@@ -146,7 +146,7 @@ router.get("/metrics/overview", async (req, res) => {
       params
     );
 
-    const { rows: [improve] } = await db.query(
+    const [improve] = await db.query(
       `
       SELECT 
         ((SUM(CASE WHEN delta_score > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0)) * 100) as improvement_rate
@@ -156,7 +156,7 @@ router.get("/metrics/overview", async (req, res) => {
       `
     );
 
-    const { rows: [queueStats] } = await db.query(
+    const [queueStats] = await db.query(
       `
       SELECT 
         SUM(CASE WHEN status IN ('QUEUED', 'RUNNING', 'FAILED') THEN 1 ELSE 0 END) as backlog,
@@ -193,7 +193,7 @@ router.get("/metrics/tenants", async (req, res) => {
   const interval = rangeToInterval(req.query.range || "7d");
 
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `
       SELECT 
         tenant_id,
@@ -229,7 +229,7 @@ router.get("/metrics/tenants", async (req, res) => {
 // GET /api/admin/tenants - Detailed tenant list for management (Phase 19)
 router.get("/tenants", async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       SELECT 
         id, name, status, plan, rate_limit_rpm, 
         plan_expires_at, last_active_at, daily_job_limit, 
@@ -239,7 +239,7 @@ router.get("/tenants", async (req, res) => {
     `);
 
     // Fetch API Keys count per tenant
-    const { rows: keyCounts } = await db.query(`
+    const keyCounts = await db.query(`
       SELECT tenant_id, COUNT(*) as key_count
       FROM api_keys
       WHERE revoked = FALSE
@@ -247,7 +247,7 @@ router.get("/tenants", async (req, res) => {
     `);
 
     // Fetch Daily Job Usage (Phase 19.5)
-    const { rows: usageCounts } = await db.query(`
+    const usageCounts = await db.query(`
       SELECT tenant_id, COUNT(*) as daily_count
       FROM jobs
       WHERE created_at >= CURDATE()
@@ -283,7 +283,7 @@ router.post("/tenants/:id", async (req, res) => {
 
   try {
     // 1. Get current state for history (Phase 20)
-    const { rows: [current] } = await db.query('SELECT plan, status FROM tenants WHERE id = ?', [id]);
+    const [current] = await db.query('SELECT plan, status FROM tenants WHERE id = ?', [id]);
     if (!current) return res.status(404).json({ ok: false, error: 'Tenant not found' });
 
     // 2. Perform Update
@@ -332,7 +332,7 @@ router.get("/tenants/:id/usage", async (req, res) => {
   const days = Math.min(Number(req.query.days || 7), 30);
 
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       SELECT date, jobs_count, batches_count, value_generated, hours_saved
       FROM tenant_usage_stats
       WHERE tenant_id = ?
@@ -352,7 +352,7 @@ router.get("/tenants/:id/timeline", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       (SELECT 'ALERT' as type, alert_type as event, details_json as details, created_at as timestamp 
        FROM tenant_alerts_history WHERE tenant_id = ?)
       UNION ALL
@@ -393,7 +393,7 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
     const nextDayDate = new Date(new Date(endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const endTsLimit = `${nextDayDate} 00:00:00`;
 
-    const { rows: stats } = await db.query(`
+    const stats = await db.query(`
       SELECT 
         SUM(jobs_count) as total_jobs,
         SUM(batches_count) as total_batches,
@@ -411,7 +411,7 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
     `, [id, startDate, nextDayDate, id, startDate, nextDayDate, id, startDate, nextDayDate]);
 
     // Enhanced metrics: Policy distribution (as object)
-    const { rows: policies } = await db.query(`
+    const policies = await db.query(`
       SELECT policy_slug, COUNT(*) as count
       FROM audit_logs
       WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
@@ -490,12 +490,12 @@ router.get("/jobs", async (req, res) => {
     }
 
     // Fallback to mock / DB logic
-    const { rows: [countRow] } = await db.query(
+    const [countRow] = await db.query(
       `SELECT COUNT(*) as total FROM jobs;`,
       []
     );
 
-    const { rows } = await db.query(
+    const rows = await db.query(
       `SELECT id, tenant_id, type, status, progress, error, created_at, updated_at FROM jobs LIMIT ? OFFSET ?;`,
       [limit, offset]
     );
@@ -515,7 +515,7 @@ router.get("/errors/top", async (req, res) => {
   const interval = rangeToInterval(req.query.range || "7d");
 
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `
     SELECT
     COALESCE(JSON_UNQUOTE(JSON_EXTRACT(error, '$.code')), 'UNKNOWN') as error_code,
@@ -570,7 +570,7 @@ router.get("/audit", async (req, res) => {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")} ` : "";
 
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `
       SELECT 
         id, request_id, tenant_id, deployment_id, action, 
@@ -595,7 +595,7 @@ router.get("/audit", async (req, res) => {
 router.get("/audit/trace/:requestId", async (req, res) => {
   const { requestId } = req.params;
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `SELECT * FROM api_audit_log WHERE request_id = ? ORDER BY created_at ASC`,
       [requestId]
     );
@@ -629,7 +629,7 @@ router.post("/help/analytics", async (req, res) => {
   }
 
   try {
-    const { rows } = await db.query(
+    const result = await db.query(
       `
       INSERT INTO audit_help_analytics(event_type, article_id, search_query, tenant_id, user_id)
     VALUES(?, ?, ?, ?, ?)
@@ -637,7 +637,7 @@ router.post("/help/analytics", async (req, res) => {
       [event_type, article_id || null, search_query || null, tenant_id || null, user_id || null]
     );
 
-    res.json({ ok: true, id: rows.insertId });
+    res.json({ ok: true, id: result.insertId });
   } catch (err) {
     console.error('[ADMIN-API] Error saving help analytics:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -662,14 +662,14 @@ router.get("/notifications", async (req, res) => {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   try {
-    const { rows: notifications } = await db.query(`
+    const notifications = await db.query(`
       SELECT * FROM notifications 
       ${whereSql} 
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
     `, [...params, Number(limit), Number(offset)]);
 
-    const { rows: [count] } = await db.query(`SELECT COUNT(*) as total FROM notifications ${whereSql}`, params);
+    const [count] = await db.query(`SELECT COUNT(*) as total FROM notifications ${whereSql}`, params);
 
     res.json({
       ok: true,
@@ -685,10 +685,10 @@ router.get("/notifications", async (req, res) => {
 // GET /api/admin/notifications/:id
 router.get("/notifications/:id", async (req, res) => {
   try {
-    const { rows: [notification] } = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
+    const [notification] = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
     if (!notification) return res.status(404).json({ ok: false, error: "Not found" });
 
-    const { rows: events } = await db.query("SELECT * FROM notification_events WHERE notification_id = ? ORDER BY created_at ASC", [req.params.id]);
+    const events = await db.query("SELECT * FROM notification_events WHERE notification_id = ? ORDER BY created_at ASC", [req.params.id]);
 
     res.json({
       ok: true,
@@ -703,7 +703,7 @@ router.get("/notifications/:id", async (req, res) => {
 // POST /api/admin/notifications/:id/resend
 router.post("/notifications/:id/resend", async (req, res) => {
   try {
-    const { rows: [notification] } = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
+    const [notification] = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
     if (!notification) return res.status(404).json({ ok: false, error: "Not found" });
 
     // Mark as pending and reset attempts
@@ -743,7 +743,7 @@ router.post("/notifications/:id/cancel", async (req, res) => {
 // GET /api/admin/tenants/:id/notification-preferences
 router.get("/tenants/:id/notification-preferences", async (req, res) => {
   try {
-    const { rows: [prefs] } = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [req.params.id]);
+    const [prefs] = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [req.params.id]);
     res.json({ ok: true, prefs: prefs || null });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -777,7 +777,7 @@ router.put("/tenants/:id/notification-preferences", async (req, res) => {
 // GET /api/admin/engagement-signals
 router.get('/engagement-signals', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 ee.*,
                 t.name as tenant_name
@@ -795,11 +795,11 @@ router.get('/engagement-signals', async (req, res) => {
 // GET /api/admin/engagement-stats
 router.get('/engagement-stats', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 signal_type, 
                 COUNT(*) as count,
-                MAX(created_at) as last_seen
+                COUNT(DISTINCT tenant_id) as unique_tenants
             FROM engagement_events
             GROUP BY signal_type
         `);
@@ -812,7 +812,7 @@ router.get('/engagement-stats', async (req, res) => {
 // GET /api/admin/cs-workflows
 router.get('/cs-workflows', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 cw.*,
                 t.name as tenant_name

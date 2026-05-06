@@ -70,6 +70,7 @@ import { GlobalConflicts } from './pages/global/GlobalConflicts';
 import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
 import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 import { LoginPage } from './pages/LoginPage';
+import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
 import { AuthGuard } from './components/AuthGuard';
 
 export const App: React.FC = () => {
