@@ -22,39 +22,47 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;
 
     // 2. API BYPASS (Specific endpoints that handle their own auth or are public)
-    if (url.includes('/api/auth') || url.includes('/api/v2/analytics/public')) return;
+    // Auth endpoints manage their own validation
+    if (url.startsWith('/api/auth')) return;
+    
+    if (url.includes('/api/v2/analytics/public')) return;
 
     // 3. PROTECTED ROUTES (Require Bearer Token)
     // Currently protecting Federation and any other generic API
     if (url.startsWith('/api') || url.startsWith('/federation')) {
-        const token = request.headers['authorization'];
-        const validToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+        const authHeader = request.headers['authorization'];
+        const breakGlassToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+        const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-development-only';
+        const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
 
-        if (!token || token !== `Bearer ${validToken}`) {
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
             request.log.warn({ url: request.url, ip: request.ip }, 'Unauthorized control plane access');
             return reply.status(401).send({ error: 'Unauthorized: Valid Bearer token required' });
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        // Break-glass fallback
+        if (token === breakGlassToken) {
+            return;
+        }
+
+        // JWT Validation
+        try {
+            const jwt = require('jsonwebtoken');
+            jwt.verify(token, jwtSecret, { audience: jwtAudience });
+            return;
+        } catch (err) {
+            request.log.warn({ url: request.url, ip: request.ip, error: err.message }, 'Invalid JWT');
+            return reply.status(401).send({ error: `Unauthorized: ${err.message}` });
         }
     }
 });
 
 // Register Routes
 fastify.get('/health', async () => {
-    let mode = 'FULL';
-    let dependencies = {
-        preflight: 'LIVE',
-        learning: 'LIVE',
-        federation: 'LIVE'
+// ... existing code ...
     };
-
-    const mocksUsed = global.PPOS_MOCKS_ACTIVE || false;
-    if (mocksUsed) {
-        mode = 'ISOLATED';
-        dependencies = {
-            preflight: 'UNAVAILABLE',
-            learning: 'MOCKED',
-            federation: 'MOCKED'
-        };
-    }
 
     return { 
         status: mode === 'ISOLATED' ? 'DEGRADED' : 'UP',
@@ -86,17 +94,10 @@ const start = async () => {
             http2: false
         });
 
-        await fastify.register(require('@fastify/http-proxy'), {
-            upstream: `http://localhost:${process.env.PPOS_SERVICE_PORT || 8001}`,
-            prefix: '/api/auth',
-            rewritePrefix: '/api/auth',
-            http2: false
-        });
-
-        // 3. Register Express Bridge
+        // 3. Mount Auth, Admin, Analytics & System Routes (Express Bridge)
         await fastify.register(require('@fastify/express'));
         
-        // 3. Mount Admin, Analytics & System Routes (Express)
+        fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
         fastify.use('/api/admin', require('./src/api/routes/admin'));
         fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
         fastify.use('/api/system', require('./src/api/routes/system'));

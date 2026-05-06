@@ -5,6 +5,7 @@
  */
 
 const TOKEN_KEY = 'ppos_control_token';
+const USER_KEY = 'ppos_control_user';
 
 /**
  * Retrieves the stored Bearer token from localStorage.
@@ -27,11 +28,29 @@ export function setAuthToken(token: string): void {
 }
 
 /**
- * Removes the token from localStorage.
+ * Saves user metadata to localStorage.
+ */
+export function setAuthUser(user: any): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+/**
+ * Retrieves user metadata.
+ */
+export function getAuthUser(): any | null {
+    if (typeof window === 'undefined') return null;
+    const user = localStorage.getItem(USER_KEY);
+    return user ? JSON.parse(user) : null;
+}
+
+/**
+ * Removes the token and user from localStorage.
  */
 export function clearAuthToken(): void {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     // Compatibility with legacy keys if needed
     localStorage.removeItem('ppp_admin_api_key');
     localStorage.removeItem('admin_key');

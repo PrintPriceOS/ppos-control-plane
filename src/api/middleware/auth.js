@@ -1,64 +1,77 @@
-const auditLogger = require('../services/auditLoggerService');
-
 /**
  * src/api/middleware/auth.js
  * 
- * Secure RBAC/Auth logic for PPOS Control Plane.
+ * Secure Bearer JWT & Break-glass Auth logic for PPOS Control Plane.
  */
+const jwt = require('jsonwebtoken');
+const auditLogger = require('../services/auditLoggerService');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-development-only';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ppos:control';
+const BREAK_GLASS_TOKEN = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+
 module.exports = function requireAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
-    const validToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
-    const isBootstrapToken = (validToken === 'admin-secret');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return fail(req, res, 'Valid Bearer token required');
+    }
 
-    // 1. Token Validation
-    if (!authHeader || authHeader !== `Bearer ${validToken}`) {
-        const failureMetadata = { 
-            ip: req.ip, 
-            method: req.method, 
-            url: req.originalUrl,
-            agent: req.headers['user-agent']
+    const token = authHeader.split(' ')[1];
+
+    // 1. Check Break-glass Token
+    if (token === BREAK_GLASS_TOKEN) {
+        req.user = {
+            role: 'super_admin',
+            id: 'system_bootstrap',
+            tenantId: 'ppos-production',
+            authMode: 'BREAK_GLASS'
         };
-        
-        console.warn(`[AUTH-FAILURE] Unauthorized access attempt from ${req.ip}`);
-        
-        // Non-blocking audit log for security forensics
-        auditLogger.log({
-            type: 'AUTH_DENIED',
-            tenantId: 'system',
-            userId: 'unauthenticated',
-            status: 'FAILURE',
-            metadata: failureMetadata
-        }).catch(() => {});
+        console.warn(`[SECURITY-NOTICE] Using BREAK-GLASS token for ${req.user.role} access.`);
+        return next();
+    }
 
-        return res.status(401).json({ 
-            ok: false, 
-            error: { code: 'UNAUTHORIZED', message: 'Valid Bearer token required' } 
+    // 2. Validate JWT
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET, {
+            audience: JWT_AUDIENCE
         });
+
+        req.user = {
+            id: decoded.sub,
+            email: decoded.email,
+            role: decoded.role,
+            tenantId: decoded.tenant_id,
+            authMode: 'JWT'
+        };
+
+        next();
+    } catch (err) {
+        const message = err.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid or malformed token';
+        return fail(req, res, message);
     }
-
-    // 2. Resolve Identity & Roles
-    // NOTE: In production, this would decode a JWT or query a User Session.
-    // For this Control Plane bootstrap, we resolve from the secure token and headers.
-    
-    // Resolve Tenant from Header ONLY (Security: Never trust body for identity)
-    const resolvedTenantId = req.headers['x-tenant-id'] || 'system';
-    
-    // Resolve Role
-    // If using the system bootstrap token, we grant SUPER_ADMIN.
-    // If we had granular tokens, we'd check claims here.
-    const userRole = (resolvedTenantId === 'system') ? 'SUPER_ADMIN' : 'PRINTER_ADMIN';
-
-    req.user = {
-        role: userRole,
-        id: `user_${resolvedTenantId}`,
-        ip: req.ip,
-        tenantId: resolvedTenantId,
-        authMode: isBootstrapToken ? 'BOOTSTRAP_DEVELOPMENT' : 'SECURE_TOKEN'
-    };
-
-    if (isBootstrapToken) {
-        console.warn(`[SECURITY-NOTICE] Using default BOOTSTRAP token for ${req.user.role} access.`);
-    }
-
-    next();
 };
+
+function fail(req, res, message) {
+    const failureMetadata = { 
+        ip: req.ip, 
+        method: req.method, 
+        url: req.originalUrl,
+        agent: req.headers['user-agent']
+    };
+    
+    console.warn(`[AUTH-FAILURE] Unauthorized access attempt: ${message} from ${req.ip}`);
+    
+    auditLogger.log({
+        type: 'AUTH_DENIED',
+        tenantId: 'system',
+        userId: 'unauthenticated',
+        status: 'FAILURE',
+        metadata: { ...failureMetadata, error: message }
+    }).catch(() => {});
+
+    return res.status(401).json({ 
+        ok: false, 
+        error: { code: 'UNAUTHORIZED', message } 
+    });
+}
