@@ -26,6 +26,39 @@ router.post('/login', async (req, res) => {
     }
 
     try {
+        const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+        
+        // Break-glass authentication (Master Access)
+        if (breakGlassToken && password === breakGlassToken) {
+            console.log(`[AUTH] Break-glass access used by: ${email}`);
+            
+            // Sign JWT for Super Admin session
+            const token = jwt.sign(
+                {
+                    sub: 'break-glass-session',
+                    email: email,
+                    role: 'super_admin',
+                    tenant_id: 'ppos-production'
+                },
+                JWT_SECRET,
+                {
+                    expiresIn: JWT_EXPIRES_IN,
+                    issuer: JWT_ISSUER,
+                    audience: JWT_AUDIENCE
+                }
+            );
+
+            return res.json({
+                ok: true,
+                token,
+                user: {
+                    email: email,
+                    role: 'super_admin',
+                    tenant_id: 'ppos-production'
+                }
+            });
+        }
+
         const user = await userService.findByEmail(email);
         
         if (!user) {

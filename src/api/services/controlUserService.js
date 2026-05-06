@@ -13,7 +13,7 @@ class ControlUserService {
     async createUser(email, role, tenantId, password) {
         const passwordHash = await bcrypt.hash(password, 10);
         
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO control_users (email, role, tenant_id, password_hash) VALUES (?, ?, ?, ?)',
             [email, role, tenantId, passwordHash]
         );
@@ -25,11 +25,11 @@ class ControlUserService {
      * Find user by email for authentication.
      */
     async findByEmail(email) {
-        const [users] = await db.query(
+        const users = await db.query(
             'SELECT * FROM control_users WHERE email = ? AND status = "ACTIVE"',
             [email]
         );
-        return users[0];
+        return users && users.length > 0 ? users[0] : null;
     }
 
     /**
