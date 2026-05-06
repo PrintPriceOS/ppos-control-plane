@@ -243,6 +243,10 @@ export async function getOverview(range: Range) {
 export async function getGovernanceBlocks() {
     return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }
+
+export async function getGlobalPolicies() {
+    return adminFetch<{ ok: boolean; policies: any[] }>('/api/admin/global/policies');
+}
 export async function getTenants(range: Range) {
     return adminFetch<TenantRow[]>(`/api/admin/metrics/tenants?range=${range}`);
 }

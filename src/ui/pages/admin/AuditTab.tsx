@@ -86,7 +86,7 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {q.data.map((r: any) => (
+                            {(Array.isArray(q.data) ? q.data : []).map((r: any) => (
                                 <tr key={r.id} className="group hover:bg-slate-50/80 transition-all duration-150">
                                     <td className="py-4 px-6">
                                         <div className="flex items-center gap-2 text-slate-500 text-xs">

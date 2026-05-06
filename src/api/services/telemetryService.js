@@ -73,7 +73,7 @@ class TelemetryService {
             } catch (err) {
                 return { state: 'UNAVAILABLE' };
             }
-        })(), 2000, { state: 'TIMEOUT' });
+        })(), 2000, { state: 'TIMEOUT', counts: { active: 0, waiting: 0, failed: 0, stalled: 0 } });
     }
 
     /**
@@ -124,9 +124,23 @@ class TelemetryService {
                     }
                 };
             } catch (err) {
-                return { state: 'UNAVAILABLE' };
+                return { 
+                    state: 'UNAVAILABLE', 
+                    totalSizeBytes: 0, 
+                    artifactCount: 0, 
+                    integrityIssues: 0, 
+                    capacityBytes: 1024 * 1024 * 1024 * 500,
+                    tierDistribution: { HOT: 0, WARM: 0, COLD: 0 }
+                };
             }
-        })(), 2000, { state: 'TIMEOUT' });
+        })(), 2000, { 
+            state: 'TIMEOUT', 
+            totalSizeBytes: 0, 
+            artifactCount: 0, 
+            integrityIssues: 0, 
+            capacityBytes: 1024 * 1024 * 1024 * 500,
+            tierDistribution: { HOT: 0, WARM: 0, COLD: 0 }
+        });
     }
 
     /**
@@ -151,7 +165,7 @@ class TelemetryService {
                     patterns: rows
                 };
             } catch (err) {
-                return { state: 'DEGRADED' };
+                return { state: 'DEGRADED', patterns: [] };
             }
         })(), 3000, { state: 'TIMEOUT', patterns: [] });
     }

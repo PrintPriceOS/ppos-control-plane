@@ -110,6 +110,7 @@ const start = async () => {
         
         fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
         fastify.use('/api/admin', require('./src/api/routes/admin'));
+        fastify.use('/api/admin/telemetry', require('./src/api/routes/telemetryAdmin'));
         fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
         fastify.use('/api/system', require('./src/api/routes/system'));
         

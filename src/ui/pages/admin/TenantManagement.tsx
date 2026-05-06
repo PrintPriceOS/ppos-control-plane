@@ -328,7 +328,7 @@ export default function TenantManagement() {
             )}
 
             <div className="grid grid-cols-1 gap-6">
-                {tenants.map(tenant => {
+                {(tenants || []).map(tenant => {
                     const usagePercent = Math.min(Math.round((tenant.dailyUsage / (tenant.daily_job_limit || 1000)) * 100), 100);
                     const usageWarning = isNearLimit(tenant.dailyUsage, tenant.daily_job_limit);
                     const expiryWarning = isExpiringSoon(tenant.plan_expires_at);
@@ -435,7 +435,7 @@ export default function TenantManagement() {
                                         <div className="text-xs">
                                             <p className="font-bold text-rose-900 uppercase tracking-tighter">Threshold Alerts Fired Today</p>
                                             <div className="flex gap-2 mt-1">
-                                                {tenant.alerts_state_json.fired.map(lvl => (
+                                                {(tenant.alerts_state_json?.fired || []).map(lvl => (
                                                     <span key={lvl} className="bg-rose-600 text-white px-1.5 py-0.5 rounded text-[10px] font-black">
                                                         {lvl}% REACHED
                                                     </span>

@@ -7,7 +7,8 @@ import {
   ExclamationCircleIcon,
   ArrowPathIcon
 } from "@heroicons/react/24/outline";
-import { uploadPreflightFile, createPreflightJob } from "../../lib/adminApi";
+import { uploadPreflightFile, createPreflightJob, getGlobalPolicies } from "../../lib/adminApi";
+import { useAdminQuery } from "../../hooks/useAdminData";
 
 interface PreflightUploadModalProps {
   isOpen: boolean;
@@ -25,6 +26,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   const [result, setResult] = useState<any>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const policiesQ = useAdminQuery('preflight:policies:global', () => getGlobalPolicies(), 60000);
+  const policies = policiesQ.data?.policies || [];
 
   if (!isOpen) return null;
 
@@ -70,8 +74,8 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="glass w-full max-w-xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/5 overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="glass w-full max-w-2xl rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] border border-white/20 dark:border-white/10 overflow-hidden flex flex-col transform transition-all scale-100">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -162,16 +166,34 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                   </select>
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Policy / Profile</label>
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Policy / Profile</label>
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">
+                      BFF Policy Enforcement Active
+                    </span>
+                  </div>
                   <select 
                     value={policy}
                     onChange={(e) => setPolicy(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-2 focus:ring-primary/20"
                   >
-                    <option value="OFFSET_MODERN_COATED">Offset Modern Coated (ISO Coated v2)</option>
-                    <option value="DIGITAL_STANDARD">Digital Standard (sRGB)</option>
-                    <option value="ISO_NEWSPAPER">ISO Newspaper</option>
+                    {policies.length > 0 ? (
+                      policies.map((p: any) => (
+                        <option key={p.slug || p.id} value={p.slug || p.id}>
+                          {p.name} ({p.slug || p.id})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="OFFSET_MODERN_COATED">Offset Modern Coated (ISO Coated v2)</option>
+                        <option value="DIGITAL_STANDARD">Digital Standard (sRGB)</option>
+                        <option value="ISO_NEWSPAPER">ISO Newspaper</option>
+                      </>
+                    )}
                   </select>
+                  <p className="text-[10px] text-slate-400 ml-1 font-medium italic-text-off">
+                    Select a standardized profile. Governance rules will be applied during analysis.
+                  </p>
                 </div>
               </div>
 

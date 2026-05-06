@@ -22,7 +22,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
   });
 
   const sortedData = useMemo(() => {
-    let sortableItems = [...data];
+    let sortableItems = Array.isArray(data) ? [...data] : [];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         const aValue = a[sortConfig.key!];

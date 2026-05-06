@@ -128,7 +128,7 @@ router.get("/metrics/overview", async (req, res) => {
   }
 
   try {
-    const [overview] = await db.query(
+    const overviewRows = await db.query(
       `
       SELECT 
         COUNT(*) as total_jobs,
@@ -146,7 +146,9 @@ router.get("/metrics/overview", async (req, res) => {
       params
     );
 
-    const [improve] = await db.query(
+    const overview = overviewRows[0] || {};
+
+    const improveRows = await db.query(
       `
       SELECT 
         ((SUM(CASE WHEN delta_score > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0)) * 100) as improvement_rate
@@ -155,8 +157,9 @@ router.get("/metrics/overview", async (req, res) => {
         AND created_at >= NOW() - ${interval};
       `
     );
+    const improve = improveRows[0] || {};
 
-    const [queueStats] = await db.query(
+    const queueStatsRows = await db.query(
       `
       SELECT 
         SUM(CASE WHEN status IN ('QUEUED', 'RUNNING', 'FAILED') THEN 1 ELSE 0 END) as backlog,
@@ -165,6 +168,7 @@ router.get("/metrics/overview", async (req, res) => {
       FROM jobs;
       `
     );
+    const queueStats = queueStatsRows[0] || {};
 
     res.json({
       totalJobs: Number(overview.total_jobs || 0),

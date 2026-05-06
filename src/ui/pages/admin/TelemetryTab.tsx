@@ -49,7 +49,7 @@ export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 500
                         <StatusBadge status={workers.state} />
                     </div>
                     <div className="p-4 flex-1 space-y-3">
-                        {workers.cluster.map((w: any) => (
+                        {(workers?.cluster ?? []).map((w: any) => (
                             <div key={w.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full ${w.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
@@ -83,7 +83,7 @@ export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 500
                         <StatusBadge status={queue.state} />
                     </div>
                     <div className="p-4 flex-1 space-y-4">
-                        {queue.queues.map((q: any) => (
+                        {(queue?.queues ?? []).map((q: any) => (
                             <div key={q.name} className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <div className="text-xs font-bold text-slate-600 uppercase tracking-wider">{q.name}</div>
@@ -137,8 +137,8 @@ export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 500
                     </div>
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {outcomes.patterns.map((p: any) => (
-                        <div key={p.failure_code} className="p-4 rounded-xl border border-slate-100 bg-white shadow-sm flex items-center justify-between">
+                    {(outcomes?.patterns ?? []).map((p: any) => (
+                        <div key={p.failure_code || Math.random()} className="p-4 rounded-xl border border-slate-100 bg-white shadow-sm flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-black text-slate-800 font-mono tracking-tight">{p.failure_code || 'UNCATEGORIZED'}</div>
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Incident Pattern</div>

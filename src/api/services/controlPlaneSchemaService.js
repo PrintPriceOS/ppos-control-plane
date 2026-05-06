@@ -70,6 +70,7 @@ class ControlPlaneSchemaService {
                 CREATE TABLE IF NOT EXISTS jobs (
                     id VARCHAR(64) PRIMARY KEY,
                     tenant_id VARCHAR(64) NOT NULL,
+                    printhouse_id VARCHAR(64) NULL,
                     type VARCHAR(64) NOT NULL,
                     status VARCHAR(32) DEFAULT 'QUEUED',
                     progress INT DEFAULT 0,
@@ -78,6 +79,7 @@ class ControlPlaneSchemaService {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_tenant (tenant_id),
+                    INDEX idx_printhouse (printhouse_id),
                     INDEX idx_status (status),
                     INDEX idx_created (created_at)
                 ) ENGINE=InnoDB;
@@ -88,7 +90,9 @@ class ControlPlaneSchemaService {
                 CREATE TABLE IF NOT EXISTS metrics (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     tenant_id VARCHAR(64) NOT NULL,
+                    printhouse_id VARCHAR(64) NULL,
                     job_id VARCHAR(64) NULL,
+                    policy_slug VARCHAR(64) NULL,
                     success BOOLEAN DEFAULT TRUE,
                     processing_ms INT DEFAULT 0,
                     value_generated DECIMAL(10, 2) DEFAULT 0.00,
@@ -99,6 +103,7 @@ class ControlPlaneSchemaService {
                     metadata_json JSON NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_tenant (tenant_id),
+                    INDEX idx_printhouse (printhouse_id),
                     INDEX idx_created (created_at)
                 ) ENGINE=InnoDB;
             `);
@@ -227,7 +232,7 @@ class ControlPlaneSchemaService {
                 ) ENGINE=InnoDB;
             `);
 
-            // 10. Autonomous Operations (Migration from autonomyAdmin.js)
+            // 10. Autonomous Operations
             await db.query(`
                 CREATE TABLE IF NOT EXISTS autonomous_job_pipelines (
                     id VARCHAR(64) PRIMARY KEY,
@@ -282,7 +287,7 @@ class ControlPlaneSchemaService {
                 ) ENGINE=InnoDB;
             `);
 
-            // 13. Artifact Registry (Forensic Persistence)
+            // 13. Artifact Registry
             await db.query(`
                 CREATE TABLE IF NOT EXISTS preflight_artifacts (
                     id VARCHAR(64) PRIMARY KEY,
@@ -352,7 +357,7 @@ class ControlPlaneSchemaService {
                 CREATE TABLE IF NOT EXISTS lifecycle_policies (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(128) NOT NULL,
-                    tenant_id VARCHAR(64) NULL, -- NULL means Global
+                    tenant_id VARCHAR(64) NULL,
                     artifact_type VARCHAR(64) DEFAULT '*',
                     hot_tier_days INT DEFAULT 7,
                     warm_tier_days INT DEFAULT 30,
@@ -373,14 +378,33 @@ class ControlPlaneSchemaService {
                     password_hash VARCHAR(255) NOT NULL,
                     role ENUM('SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER') DEFAULT 'VIEWER',
                     tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+                    printhouse_id VARCHAR(64) NULL,
                     status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') DEFAULT 'ACTIVE',
                     last_login_at TIMESTAMP NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_email (email),
-                    INDEX idx_tenant (tenant_id)
+                    INDEX idx_tenant (tenant_id),
+                    INDEX idx_printhouse (printhouse_id)
                 ) ENGINE=InnoDB;
             `);
+
+            // --- SCHEMA MIGRATIONS (PHASE 10 HARDENING) ---
+            // Ensure columns exist for existing tables
+            try {
+                await db.query('ALTER TABLE control_users ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
+                await db.query('ALTER TABLE metrics ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
+                await db.query('ALTER TABLE metrics ADD COLUMN IF NOT EXISTS policy_slug VARCHAR(64) NULL AFTER job_id');
+                await db.query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
+                
+                // Add missing indexes if they don't exist
+                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON control_users(printhouse_id)');
+                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON metrics(printhouse_id)');
+                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON jobs(printhouse_id)');
+            } catch (migErr) {
+                // Ignore "column already exists" errors if the DB doesn't support IF NOT EXISTS in ALTER
+                logger.debug({ event: 'migration_notice', message: 'Schema migration check completed' });
+            }
 
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
         } catch (err) {

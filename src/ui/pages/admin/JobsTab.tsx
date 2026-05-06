@@ -137,7 +137,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {q.data.jobs.map((j) => (
+                                {(q.data.jobs || []).map((j: any) => (
                                     <tr
                                         key={j.id}
                                         className="group hover:bg-slate-50/80 cursor-pointer transition-all duration-150"
