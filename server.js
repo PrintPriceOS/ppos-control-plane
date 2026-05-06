@@ -61,15 +61,22 @@ fastify.addHook('onRequest', async (request, reply) => {
 
 // Register Routes
 fastify.get('/health', async () => {
-// ... existing code ...
+    const mode = process.env.PPOS_CONTROL_MODE || 'LIVE';
+    
+    const dependencies = {
+        mysql: process.env.DATABASE_URL ? 'CONFIGURED' : 'UNCONFIGURED',
+        redis: process.env.REDIS_HOST ? 'CONFIGURED' : 'UNCONFIGURED',
+        preflightService: process.env.PPOS_PREFLIGHT_SERVICE_URL
+            ? 'CONFIGURED'
+            : 'UNCONFIGURED'
     };
 
-    return { 
+    return {
         status: mode === 'ISOLATED' ? 'DEGRADED' : 'UP',
-        mode: mode,
-        service: 'ppos-control-plane', 
+        mode,
+        service: 'ppos-control-plane',
         version: '1.9.0',
-        dependencies: dependencies,
+        dependencies,
         timestamp: new Date().toISOString()
     };
 });
