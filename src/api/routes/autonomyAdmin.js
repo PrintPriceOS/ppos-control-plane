@@ -21,6 +21,24 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/pipelines/metrics
+ */
+router.get('/metrics', async (req, res) => {
+    try {
+        const { rows } = await db.query(`
+            SELECT 
+                COUNT(*) as total_jobs,
+                SUM(CASE WHEN pipeline_status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_autonomously,
+                SUM(CASE WHEN pipeline_status = 'FAILED' THEN 1 ELSE 0 END) as failed_pipelines,
+                SUM(CASE WHEN pipeline_status = 'PAUSED' THEN 1 ELSE 0 END) as requiring_intervention
+            FROM autonomous_job_pipelines
+        `);
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
  * GET /api/admin/pipelines/:id
  */
 router.get('/:id', async (req, res) => {
@@ -73,25 +91,6 @@ router.post('/:id/retry-step', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(400).json({ error: err.message });
-    }
-});
-
-/**
- * GET /api/admin/pipelines/metrics
- */
-router.get('/metrics', async (req, res) => {
-    try {
-        const { rows } = await db.query(`
-            SELECT 
-                COUNT(*) as total_jobs,
-                SUM(CASE WHEN pipeline_status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_autonomously,
-                SUM(CASE WHEN pipeline_status = 'FAILED' THEN 1 ELSE 0 END) as failed_pipelines,
-                SUM(CASE WHEN pipeline_status = 'PAUSED' THEN 1 ELSE 0 END) as requiring_intervention
-            FROM autonomous_job_pipelines
-        `);
-        res.json(rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
     }
 });
 
