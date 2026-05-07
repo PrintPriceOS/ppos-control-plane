@@ -10,12 +10,13 @@ class ControlPlaneSchemaService {
     async init() {
         const isProduction = process.env.NODE_ENV === 'production';
         let mutationEnabled = process.env.PPOS_ENABLE_SCHEMA_MUTATION === 'true';
+        const forceOverride = process.env.PPOS_FORCE_SCHEMA_MUTATION === 'true';
 
-        // Hardcoded Protection for Production
-        if (isProduction && mutationEnabled) {
+        // Hardcoded Protection for Production (with override)
+        if (isProduction && mutationEnabled && !forceOverride) {
             logger.warn({
                 event: 'mutation_override',
-                message: 'Schema mutation requested in PRODUCTION. Hard-lock engaged. Mutation DISABLED.',
+                message: 'Schema mutation requested in PRODUCTION. Hard-lock engaged. Use PPOS_FORCE_SCHEMA_MUTATION=true to override.',
                 metadata: { env: process.env.NODE_ENV }
             });
             mutationEnabled = false;
@@ -391,15 +392,25 @@ class ControlPlaneSchemaService {
 
             // --- SCHEMA MIGRATIONS (PHASE 10 HARDENING) ---
             // Ensure columns exist for existing tables
+            await this.ensureColumn('tenants', 'service_tier', "VARCHAR(50) NULL DEFAULT 'standard'");
+            await this.ensureColumn('tenants', 'isolation_mode', "VARCHAR(50) NULL DEFAULT 'shared'");
+
+            await this.ensureColumn('jobs', 'deployment_id', 'VARCHAR(64) NULL AFTER tenant_id');
+            await this.ensureColumn('jobs', 'asset_id', 'VARCHAR(64) NULL AFTER deployment_id');
+            await this.ensureColumn('jobs', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
+            await this.ensureColumn('jobs', 'job_type', 'VARCHAR(50) NULL AFTER type');
+
+            await this.ensureIndex('jobs', 'idx_deployment', 'deployment_id');
+            await this.ensureIndex('jobs', 'idx_asset', 'asset_id');
+            await this.ensureIndex('jobs', 'idx_printhouse', 'printhouse_id');
+            await this.ensureIndex('jobs', 'idx_job_type', 'job_type');
+
             await this.ensureColumn('control_users', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
             await this.ensureColumn('metrics', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
             await this.ensureColumn('metrics', 'policy_slug', 'VARCHAR(64) NULL AFTER job_id');
-            await this.ensureColumn('jobs', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
 
-            // Add missing indexes if they don't exist
             await this.ensureIndex('control_users', 'idx_printhouse', 'printhouse_id');
             await this.ensureIndex('metrics', 'idx_printhouse', 'printhouse_id');
-            await this.ensureIndex('jobs', 'idx_printhouse', 'printhouse_id');
 
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
         } catch (err) {
@@ -412,13 +423,15 @@ class ControlPlaneSchemaService {
      */
     async ensureColumn(table, column, definition) {
         try {
-            const rows = await db.query(`
+            const result = await db.query(`
                 SELECT COLUMN_NAME
                 FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE()
                 AND TABLE_NAME = ?
                 AND COLUMN_NAME = ?
             `, [table, column]);
+
+            const rows = Array.isArray(result[0]) ? result[0] : result;
 
             if (!rows.length) {
                 logger.info({ event: 'schema_migration', message: `Adding column ${column} to ${table}` });
@@ -437,13 +450,15 @@ class ControlPlaneSchemaService {
      */
     async ensureIndex(table, indexName, columns) {
         try {
-            const rows = await db.query(`
+            const result = await db.query(`
                 SELECT INDEX_NAME
                 FROM INFORMATION_SCHEMA.STATISTICS
                 WHERE TABLE_SCHEMA = DATABASE()
                 AND TABLE_NAME = ?
                 AND INDEX_NAME = ?
             `, [table, indexName]);
+
+            const rows = Array.isArray(result[0]) ? result[0] : result;
 
             if (!rows.length) {
                 logger.info({ event: 'schema_migration', message: `Creating index ${indexName} on ${table}(${columns})` });
