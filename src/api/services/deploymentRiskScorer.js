@@ -23,7 +23,7 @@ async function calculateDeploymentRisk(deploymentId) {
         const { rows: [queueStats] } = await db.query(`
             SELECT 
                 COUNT(*) as backlog,
-                EXTRACT(EPOCH FROM (NOW() - MIN(created_at))) / 60 as oldest_job_mins
+                TIMESTAMPDIFF(MINUTE, MIN(created_at), NOW()) as oldest_job_mins
             FROM jobs 
             WHERE status = 'QUEUED'
         `);

@@ -32,9 +32,9 @@ async function calculateTenantRisk(tenantId, options = {}) {
         // 2. Failure Rate Signal (Last 100 jobs)
         const { rows: [failStats] } = await db.query(`
             SELECT 
-                COUNT(*) filter (WHERE status = 'FAILED') as fails,
+                SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as fails,
                 COUNT(*) as total
-            FROM (SELECT status FROM jobs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 100)
+            FROM (SELECT status FROM jobs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 100) AS subquery
         `, [tenantId]);
         
         if (failStats && failStats.total > 0) {
