@@ -303,6 +303,7 @@ class ControlPlaneSchemaService {
                     lineage_parent_id VARCHAR(64) NULL,
                     retention_class ENUM('HOT', 'WARM', 'COLD', 'PURGE') DEFAULT 'HOT',
                     storage_tier VARCHAR(32) DEFAULT 'STANDARD',
+                    storage_key VARCHAR(512) NULL,
                     forensic_trace_id VARCHAR(64) NULL,
                     metadata_json JSON NULL,
                     deleted_at TIMESTAMP NULL,
@@ -408,6 +409,7 @@ class ControlPlaneSchemaService {
             await this.ensureColumn('control_users', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
             await this.ensureColumn('metrics', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
             await this.ensureColumn('metrics', 'policy_slug', 'VARCHAR(64) NULL AFTER job_id');
+            await this.ensureColumn('preflight_artifacts', 'storage_key', 'VARCHAR(512) NULL AFTER storage_tier');
 
             await this.ensureIndex('control_users', 'idx_printhouse', 'printhouse_id');
             await this.ensureIndex('metrics', 'idx_printhouse', 'printhouse_id');

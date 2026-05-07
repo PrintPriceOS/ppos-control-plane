@@ -12,25 +12,34 @@ class ArtifactRegistryService {
      */
     async register(data) {
         const {
-            id,
+            id = `art_${Math.random().toString(36).substring(2, 15)}`,
             jobId,
             tenantId,
+            artifactType,
             type,
             filename,
             mimeType,
             sizeBytes,
+            checksumSha256,
             checksum,
             workerId,
+            createdByWorker,
+            storageKey,
             parentId,
             traceId,
             metadata = {}
         } = data;
 
+        // Map worker-specific fields if they exist
+        const finalType = artifactType || type;
+        const finalChecksum = checksumSha256 || checksum;
+        const finalWorkerId = createdByWorker || workerId;
+
         logger.info({
             event: 'artifact_registration',
             jobId,
             tenantId,
-            type,
+            type: finalType,
             filename,
             sizeBytes,
             traceId
@@ -39,13 +48,13 @@ class ArtifactRegistryService {
         await db.query(`
             INSERT INTO preflight_artifacts (
                 id, job_id, tenant_id, artifact_type, filename, mime_type, 
-                size_bytes, checksum_sha256, created_by_worker, lineage_parent_id,
-                forensic_trace_id, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                size_bytes, checksum_sha256, created_by_worker, storage_key,
+                lineage_parent_id, forensic_trace_id, metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            id, jobId, tenantId, type, filename, mimeType,
-            sizeBytes, checksum, workerId, parentId,
-            traceId, JSON.stringify(metadata)
+            id, jobId, tenantId, finalType, filename, mimeType,
+            sizeBytes, finalChecksum, finalWorkerId, storageKey,
+            parentId, traceId, JSON.stringify(metadata)
         ]);
 
         return { id, registered: true };

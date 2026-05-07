@@ -80,4 +80,17 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/artifacts/register
+ * Register a new artifact (called by workers).
+ */
+router.post('/register', async (req, res) => {
+    try {
+        const result = await artifactRegistry.register(req.body);
+        res.status(201).json({ ok: true, ...result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;
