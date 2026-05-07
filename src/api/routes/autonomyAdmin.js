@@ -28,9 +28,9 @@ router.get('/metrics', async (req, res) => {
         const { rows } = await db.query(`
             SELECT 
                 COUNT(*) as total_jobs,
-                SUM(CASE WHEN pipeline_status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_autonomously,
-                SUM(CASE WHEN pipeline_status = 'FAILED' THEN 1 ELSE 0 END) as failed_pipelines,
-                SUM(CASE WHEN pipeline_status = 'PAUSED' THEN 1 ELSE 0 END) as requiring_intervention
+                COALESCE(SUM(CASE WHEN pipeline_status = 'COMPLETED' THEN 1 ELSE 0 END), 0) as completed_autonomously,
+                COALESCE(SUM(CASE WHEN pipeline_status = 'FAILED' THEN 1 ELSE 0 END), 0) as failed_pipelines,
+                COALESCE(SUM(CASE WHEN pipeline_status = 'PAUSED' THEN 1 ELSE 0 END), 0) as requiring_intervention
             FROM autonomous_job_pipelines
         `);
         res.json(rows[0]);
