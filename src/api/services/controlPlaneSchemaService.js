@@ -391,24 +391,69 @@ class ControlPlaneSchemaService {
 
             // --- SCHEMA MIGRATIONS (PHASE 10 HARDENING) ---
             // Ensure columns exist for existing tables
-            try {
-                await db.query('ALTER TABLE control_users ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
-                await db.query('ALTER TABLE metrics ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
-                await db.query('ALTER TABLE metrics ADD COLUMN IF NOT EXISTS policy_slug VARCHAR(64) NULL AFTER job_id');
-                await db.query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL AFTER tenant_id');
-                
-                // Add missing indexes if they don't exist
-                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON control_users(printhouse_id)');
-                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON metrics(printhouse_id)');
-                await db.query('CREATE INDEX IF NOT EXISTS idx_printhouse ON jobs(printhouse_id)');
-            } catch (migErr) {
-                // Ignore "column already exists" errors if the DB doesn't support IF NOT EXISTS in ALTER
-                logger.debug({ event: 'migration_notice', message: 'Schema migration check completed' });
-            }
+            await this.ensureColumn('control_users', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
+            await this.ensureColumn('metrics', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
+            await this.ensureColumn('metrics', 'policy_slug', 'VARCHAR(64) NULL AFTER job_id');
+            await this.ensureColumn('jobs', 'printhouse_id', 'VARCHAR(64) NULL AFTER tenant_id');
+
+            // Add missing indexes if they don't exist
+            await this.ensureIndex('control_users', 'idx_printhouse', 'printhouse_id');
+            await this.ensureIndex('metrics', 'idx_printhouse', 'printhouse_id');
+            await this.ensureIndex('jobs', 'idx_printhouse', 'printhouse_id');
 
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
         } catch (err) {
             console.error('[CONTROL-PLANE-SCHEMA] Initialization failed:', err.message);
+        }
+    }
+
+    /**
+     * Idempotent Column Addition
+     */
+    async ensureColumn(table, column, definition) {
+        try {
+            const rows = await db.query(`
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ?
+                AND COLUMN_NAME = ?
+            `, [table, column]);
+
+            if (!rows.length) {
+                logger.info({ event: 'schema_migration', message: `Adding column ${column} to ${table}` });
+                await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+                console.log(`[SCHEMA] Added column ${column} to ${table}`);
+            } else {
+                logger.debug({ event: 'schema_skip', message: `Column ${column} already exists in ${table}` });
+            }
+        } catch (err) {
+            logger.error({ event: 'schema_error', message: `Failed to ensure column ${column} in ${table}`, error: err.message });
+        }
+    }
+
+    /**
+     * Idempotent Index Creation
+     */
+    async ensureIndex(table, indexName, columns) {
+        try {
+            const rows = await db.query(`
+                SELECT INDEX_NAME
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ?
+                AND INDEX_NAME = ?
+            `, [table, indexName]);
+
+            if (!rows.length) {
+                logger.info({ event: 'schema_migration', message: `Creating index ${indexName} on ${table}(${columns})` });
+                await db.query(`CREATE INDEX ${indexName} ON ${table}(${columns})`);
+                console.log(`[SCHEMA] Created index ${indexName} on ${table}`);
+            } else {
+                logger.debug({ event: 'schema_skip', message: `Index ${indexName} already exists on ${table}` });
+            }
+        } catch (err) {
+            logger.error({ event: 'schema_error', message: `Failed to ensure index ${indexName} on ${table}`, error: err.message });
         }
     }
 }
