@@ -18,10 +18,35 @@ export const PricingIntelligenceTab: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [formData, setFormData] = useState({
+        printer_id: '',
+        pricing_scope: 'PRINTER',
+        base_cost_per_sheet: 0.05,
+        setup_cost: 150,
+        currency: 'EUR',
+        minimum_job_fee: 50
+    });
+
     useEffect(() => {
         if (view === 'profiles') fetchProfiles();
         if (view === 'routing') fetchRoutingData();
     }, [view]);
+
+    const handleCreateProfile = async () => {
+        if (!formData.printer_id) return;
+        setIsSaving(true);
+        try {
+            await adminApi.createPricingProfile(formData);
+            setIsModalOpen(false);
+            fetchProfiles();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const fetchRoutingData = async () => {
         setLoading(true);
@@ -62,11 +87,78 @@ export const PricingIntelligenceTab: React.FC = () => {
                     <p className="text-sm text-slate-500 font-medium">Model production economics and manage margins.</p>
                 </div>
                 <button
+                    onClick={() => setIsModalOpen(true)}
                     className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
                 >
                     <PlusIcon className="w-4 h-4" /> New Profile
                 </button>
             </div>
+
+            {/* Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+                        <h3 className="text-xl font-black text-slate-900 mb-6">Create Pricing Profile</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Printhouse ID</label>
+                                <input 
+                                    type="text" 
+                                    value={formData.printer_id}
+                                    onChange={e => setFormData({...formData, printer_id: e.target.value})}
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                    placeholder="e.g. adv-2025"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Base Cost / Sheet</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.001"
+                                        value={formData.base_cost_per_sheet}
+                                        onChange={e => setFormData({...formData, base_cost_per_sheet: parseFloat(e.target.value)})}
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Setup Cost</label>
+                                    <input 
+                                        type="number" 
+                                        value={formData.setup_cost}
+                                        onChange={e => setFormData({...formData, setup_cost: parseFloat(e.target.value)})}
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Min. Job Fee</label>
+                                <input 
+                                    type="number" 
+                                    value={formData.minimum_job_fee}
+                                    onChange={e => setFormData({...formData, minimum_job_fee: parseFloat(e.target.value)})}
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-8">
+                            <button 
+                                onClick={handleCreateProfile}
+                                disabled={isSaving || !formData.printer_id}
+                                className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest disabled:opacity-50"
+                            >
+                                {isSaving ? 'Saving...' : 'Save Profile'}
+                            </button>
+                            <button 
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-6 py-3 border border-slate-200 rounded-xl font-black uppercase text-xs tracking-widest text-slate-400 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

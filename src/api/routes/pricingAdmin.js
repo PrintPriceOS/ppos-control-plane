@@ -94,4 +94,69 @@ router.get('/jobs/:jobId/quotes', async (req, res) => {
     }
 });
 
+/**
+ * PUT /api/admin/pricing/profiles/:id
+ * Update a pricing profile.
+ */
+router.put('/profiles/:id', requireApprovedPrinthouse, async (req, res) => {
+    const context = resolveActorContext(req);
+    const { id } = req.params;
+    const updates = req.body;
+
+    try {
+        const [existing] = await mysql.query('SELECT printer_id FROM printer_pricing_profiles WHERE id = ?', [id]);
+        if (!existing) return res.status(404).json({ error: 'Profile not found' });
+
+        if (!context.isSuperAdmin && existing.printer_id !== context.printhouseId) {
+            return res.status(403).json({ error: 'Unauthorized to update this profile' });
+        }
+
+        const fields = [];
+        const params = [];
+        const allowed = [
+            'pricing_scope', 'currency', 'base_cost_per_sheet', 'setup_cost',
+            'color_multiplier', 'tac_penalty_multiplier', 'bleed_handling_cost',
+            'rush_multiplier', 'lead_time_discount_multiplier', 'minimum_job_fee', 'active'
+        ];
+
+        for (const key of allowed) {
+            if (updates[key] !== undefined) {
+                fields.push(`${key} = ?`);
+                params.push(updates[key]);
+            }
+        }
+
+        if (fields.length === 0) return res.json({ ok: true, message: 'No changes' });
+
+        params.push(id);
+        await mysql.query(`UPDATE printer_pricing_profiles SET ${fields.join(', ')} WHERE id = ?`, params);
+        res.json({ ok: true, message: 'Profile updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * DELETE /api/admin/pricing/profiles/:id
+ * Delete a pricing profile.
+ */
+router.delete('/profiles/:id', requireApprovedPrinthouse, async (req, res) => {
+    const context = resolveActorContext(req);
+    const { id } = req.params;
+
+    try {
+        const [existing] = await mysql.query('SELECT printer_id FROM printer_pricing_profiles WHERE id = ?', [id]);
+        if (!existing) return res.status(404).json({ error: 'Profile not found' });
+
+        if (!context.isSuperAdmin && existing.printer_id !== context.printhouseId) {
+            return res.status(403).json({ error: 'Unauthorized to delete this profile' });
+        }
+
+        await mysql.query('DELETE FROM printer_pricing_profiles WHERE id = ?', [id]);
+        res.json({ ok: true, message: 'Profile deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

@@ -158,6 +158,9 @@ export const App: React.FC = () => {
                 {/* EXTENDED OPERATIONS (Restored) */}
                 <Route path="/ops/marketplace" element={<MarketplaceTab />} />
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
+                <Route path="/pricing" element={<PricingIntelligenceTab />} />
+                <Route path="/machines" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Machine Inventory & Fleet Management Deferred to Batch 3</div>} />
+                <Route path="/materials" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Material & Paper Catalog Deferred to Batch 3</div>} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />

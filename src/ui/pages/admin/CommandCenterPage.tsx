@@ -93,10 +93,16 @@ const TelemetryItem = ({ label, value, sub, status }: { label: string, value: st
 
 // --- Main Page ---
 
+import { getModuleReadiness, moduleReadinessRegistry } from '../../config/moduleReadiness';
+
 export const CommandCenterPage: React.FC = () => {
   const role = getUserRole();
   const isSuper = role === 'SUPER_ADMIN';
   const isPrinthouse = isPrinthouseUser();
+
+  const allModulesActive = useMemo(() => {
+    return Object.values(moduleReadinessRegistry).every(m => m.status === 'ACTIVE');
+  }, []);
 
   // Unified Telemetry Binding
   const industrial = useAdminQuery('hawk-eye:industrial', getIndustrialSnapshot, 10000);
@@ -166,6 +172,7 @@ export const CommandCenterPage: React.FC = () => {
           <div className="hidden sm:flex items-center gap-4">
             <StatusBadge label="ENV" value="PRODUCTION" color="emerald" />
             <StatusBadge label="REGION" value="EU-WEST-1" color="slate" />
+            <StatusBadge label="MODULES" value={allModulesActive ? "READY" : "DEGRADED"} color={allModulesActive ? "emerald" : "amber"} />
             <StatusBadge label="HEALTH" value={systemRisk < 20 ? "STABLE" : systemRisk < 50 ? "DEGRADED" : "CRITICAL"} color={systemRisk < 20 ? "emerald" : systemRisk < 50 ? "amber" : "red"} pulse={systemRisk > 50} />
             <StatusBadge label="WORKERS" value={`${industrial.data?.workers?.stats?.activeNodes || 0}/${industrial.data?.workers?.stats?.totalNodes || 0}`} color="primary" />
             <StatusBadge label="JOBS/H" value={throughput > 0 ? throughput.toLocaleString() : "---"} color="slate" />

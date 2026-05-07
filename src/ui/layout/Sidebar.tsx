@@ -112,8 +112,11 @@ const IconMap: Record<string, any> = {
     ScaleIcon: ScaleIcon,
     BanknotesIcon: BanknotesIcon,
     CommandLineIcon: CommandLineIcon,
-    DocumentCheckIcon: DocumentCheckIcon
+    DocumentCheckIcon: DocumentCheckIcon,
+    PrinterIcon: PrinterIcon
 };
+
+import { getModuleReadiness } from '../config/moduleReadiness';
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -146,14 +149,19 @@ export const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-hide">
         <NavGroup label="Main Menu">
-          {visibleModules.map(item => (
-            <NavItem 
-              key={item.id} 
-              to={item.path} 
-              icon={IconMap[item.icon] || CubeIcon} 
-              label={item.label} 
-            />
-          ))}
+          {visibleModules.map(item => {
+            const readiness = getModuleReadiness(item.id);
+            const badge = readiness?.status === 'ACTIVE' ? undefined : readiness?.status;
+            return (
+              <NavItem 
+                key={item.id} 
+                to={item.path} 
+                icon={IconMap[item.icon] || CubeIcon} 
+                label={item.label} 
+                badge={badge}
+              />
+            );
+          })}
         </NavGroup>
       </nav>
 

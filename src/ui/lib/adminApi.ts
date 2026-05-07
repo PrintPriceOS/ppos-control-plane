@@ -557,6 +557,26 @@ export async function getJobQuotes(jobId: string) {
     return adminFetch<any[]>(`/api/admin/pricing/jobs/${jobId}/quotes`);
 }
 
+export async function createPricingProfile(data: object) {
+    return adminFetch<{ ok: boolean, id: string }>(`/api/admin/pricing/profiles`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function updatePricingProfile(id: string, data: object) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/pricing/profiles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function deletePricingProfile(id: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/pricing/profiles/${id}`, {
+        method: 'DELETE'
+    });
+}
+
 // --- Economic Routing ---
 export async function getEconomicRoutingHistory() {
     return adminFetch<any[]>(`/api/admin/routing/economic/history`);

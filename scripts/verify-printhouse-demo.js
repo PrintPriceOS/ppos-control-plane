@@ -48,6 +48,15 @@ async function verify() {
             }
         }
 
+        // 4. Verify Pricing Profiles (New Module)
+        console.log('[STEP 4] Testing access to pricing profiles...');
+        const pricingRes = await axios.get(`${BASE_URL}/api/admin/pricing/profiles`, { headers });
+        if (Array.isArray(pricingRes.data)) {
+            console.log(`[SUCCESS] Retrieved ${pricingRes.data.length} pricing profiles`);
+        } else {
+            console.error('[FAILURE] Unexpected pricing response format');
+        }
+
         console.log('### Verification Completed Successfully.');
         process.exit(0);
     } catch (err) {

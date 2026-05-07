@@ -30,9 +30,10 @@ router.post('/login', async (req, res) => {
 
     try {
         const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+        const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
         
         // Break-glass authentication (Master Access)
-        if (breakGlassToken && password === breakGlassToken) {
+        if (enableBreakGlass && breakGlassToken && password === breakGlassToken) {
             console.log(`[AUTH] Break-glass access used by: ${email}`);
             
             // Sign JWT for Super Admin session

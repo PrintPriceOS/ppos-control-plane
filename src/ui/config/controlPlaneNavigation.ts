@@ -23,19 +23,19 @@ export const navigationConfig: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'HomeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     
     // Printhouse Operational Views
+    { id: 'printhouses', label: 'Printhouses', path: '/printhouses', icon: 'PrinterIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'jobs', label: 'Incoming Jobs', path: '/jobs', icon: 'InboxIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     { id: 'preflight', label: 'Preflight Service', path: '/preflight/jobs', icon: 'DocumentCheckIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     { id: 'production', label: 'Production Cola', path: '/production', icon: 'CpuChipIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     { id: 'machines', label: 'Machines', path: '/machines', icon: 'WrenchScrewdriverIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
     { id: 'materials', label: 'Materials & Paper', path: '/materials', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
-    { id: 'pricing', label: 'Pricing Profiles', path: '/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
+    { id: 'pricing', label: 'Pricing Profiles', path: '/ops/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
     
     // Intelligence Layer (Super Admin & Ops Admin)
     { id: 'intelligence', label: 'Intelligence Layer', path: '/intelligence', icon: 'SparklesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     
     // Operations & Marketplace
     { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
-    { id: 'pricing_ops', label: 'Pricing Ops', path: '/ops/pricing', icon: 'ScaleIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'financials', label: 'Financial Ops', path: '/ops/financials', icon: 'BanknotesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 

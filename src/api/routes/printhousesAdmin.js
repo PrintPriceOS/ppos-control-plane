@@ -17,7 +17,17 @@ router.get('/', async (req, res) => {
         }
 
         const rows = await db.query(sql, params);
-        res.json({ ok: true, printhouses: rows });
+        
+        // Post-process JSON fields for UI compatibility
+        const formatted = rows.map(row => ({
+            ...row,
+            signatures: typeof row.signatures === 'string' ? JSON.parse(row.signatures) : (row.signatures || []),
+            limits: typeof row.limits === 'string' ? JSON.parse(row.limits) : (row.limits || {}),
+            rates: typeof row.rates_json === 'string' ? JSON.parse(row.rates_json) : (row.rates_json || null),
+            _id: row.id // Map id to _id for UI consistency if needed
+        }));
+
+        res.json({ ok: true, printhouses: formatted });
     } catch (err) {
         console.error('[PRINTHOUSES] Error fetching printhouses:', err);
         res.status(500).json({ ok: false, error: err.message });
@@ -67,6 +77,90 @@ router.post('/capabilities', requireApprovedPrinthouse, async (req, res) => {
         res.json({ ok: true, message: 'Capabilities updated' });
     } catch (err) {
         console.error('[PRINTHOUSES] Error updating capabilities:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/printhouses - Create new printhouse (Super Admin only)
+router.post('/', async (req, res) => {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) return res.status(403).json({ ok: false, error: 'Only Super Admins can create printhouses' });
+
+    const { id, name, country, city, status, signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+    
+    if (!id || !name) return res.status(400).json({ ok: false, error: 'ID and Name are required' });
+
+    try {
+        await db.query(`
+            INSERT INTO printer_nodes (
+                id, tenant_id, name, country, city, status, 
+                signatures, delivery_time, production_lead_days, limits, rates_json,
+                email -- Adding dummy email to satisfy NOT NULL constraint if missing
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            id, context.tenantId, name, country, city, status === 'Active' ? 'ACTIVE' : 'PENDING',
+            JSON.stringify(signatures || []),
+            String(delivery_time),
+            parseInt(production_lead_days) || 0,
+            JSON.stringify(limits || {}),
+            JSON.stringify(rates || {}),
+            `ops+${id}@printprice.os`
+        ]);
+
+        res.status(201).json({ ok: true, id });
+    } catch (err) {
+        console.error('[PRINTHOUSES] Error creating printhouse:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// PUT /api/admin/printhouses/:id - Update printhouse
+router.put('/:id', async (req, res) => {
+    const context = resolveActorContext(req);
+    const { id } = req.params;
+
+    // RBAC: Super Admin or the Printhouse Admin themselves
+    if (!context.isSuperAdmin && context.printhouseId !== id) {
+        return res.status(403).json({ ok: false, error: 'Unauthorized to update this printhouse' });
+    }
+
+    const { name, country, city, status, signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+
+    try {
+        const fields = [];
+        const params = [];
+
+        if (name) { fields.push('name = ?'); params.push(name); }
+        if (country) { fields.push('country = ?'); params.push(country); }
+        if (city) { fields.push('city = ?'); params.push(city); }
+        if (status) { fields.push('status = ?'); params.push(status === 'Active' ? 'ACTIVE' : 'SUSPENDED'); }
+        if (signatures) { fields.push('signatures = ?'); params.push(JSON.stringify(signatures)); }
+        if (delivery_time) { fields.push('delivery_time = ?'); params.push(String(delivery_time)); }
+        if (production_lead_days !== undefined) { fields.push('production_lead_days = ?'); params.push(parseInt(production_lead_days) || 0); }
+        if (limits) { fields.push('limits = ?'); params.push(JSON.stringify(limits)); }
+        if (rates) { fields.push('rates_json = ?'); params.push(JSON.stringify(rates)); }
+
+        if (fields.length === 0) return res.json({ ok: true, message: 'No changes' });
+
+        params.push(id);
+        await db.query(`UPDATE printer_nodes SET ${fields.join(', ')} WHERE id = ?`, params);
+
+        res.json({ ok: true, message: 'Printhouse updated' });
+    } catch (err) {
+        console.error('[PRINTHOUSES] Error updating printhouse:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// DELETE /api/admin/printhouses/:id - Delete printhouse (Super Admin only)
+router.delete('/:id', async (req, res) => {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) return res.status(403).json({ ok: false, error: 'Only Super Admins can delete printhouses' });
+
+    try {
+        await db.query('DELETE FROM printer_nodes WHERE id = ?', [req.params.id]);
+        res.json({ ok: true, message: 'Printhouse deleted' });
+    } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });

@@ -8,6 +8,7 @@ const auditLogger = require('../services/auditLoggerService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-development-only';
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ppos:control';
+const ENABLE_BREAK_GLASS = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
 const BREAK_GLASS_TOKEN = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
 
 function requireAdmin(req, res, next) {
@@ -20,14 +21,14 @@ function requireAdmin(req, res, next) {
     const token = authHeader.split(' ')[1];
 
     // 1. Check Break-glass Token
-    if (token === BREAK_GLASS_TOKEN) {
+    if (ENABLE_BREAK_GLASS && token === BREAK_GLASS_TOKEN) {
         req.user = {
             role: 'SUPER_ADMIN',
             id: 'system_bootstrap',
             tenantId: 'ppos-production',
             authMode: 'BREAK_GLASS'
         };
-        console.warn(`[SECURITY-NOTICE] Using BREAK-GLASS token for ${req.user.role} access.`);
+        console.warn(`[SECURITY-NOTICE] Emergency access: Using BREAK-GLASS token for ${req.user.role} context. IP: ${req.ip}`);
         return next();
     }
 
