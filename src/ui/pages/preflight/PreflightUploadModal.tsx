@@ -1,4 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, Fragment } from 'react';
+import { 
+  Dialog, 
+  Transition, 
+  TransitionChild,
+  DialogPanel,
+  DialogTitle
+} from "@headlessui/react";
 import { 
   XMarkIcon, 
   CloudArrowUpIcon, 
@@ -30,8 +37,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   const policiesQ = useAdminQuery('preflight:policies:global', () => getGlobalPolicies(), 60000);
   const policies = policiesQ.data?.policies || [];
 
-  if (!isOpen) return null;
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
@@ -42,6 +47,14 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
       setFile(selected);
       setError(null);
     }
+  };
+
+  const resetAndClose = () => {
+    setFile(null);
+    setStatus('idle');
+    setError(null);
+    setResult(null);
+    onClose();
   };
 
   const handleUpload = async () => {
@@ -74,169 +87,253 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="glass w-full max-w-2xl rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] border border-white/20 dark:border-white/10 overflow-hidden flex flex-col transform transition-all scale-100">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <CloudArrowUpIcon className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-[#ECECF1] tracking-tight italic-text-off">Trigger New Job</h2>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-            <XMarkIcon className="w-6 h-6 text-slate-400" />
-          </button>
-        </div>
+    <Transition show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-[100]" onClose={resetAndClose}>
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" />
+        </TransitionChild>
 
-        {/* Content */}
-        <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-          {status === 'success' ? (
-            <div className="text-center py-8 space-y-4">
-              <CheckCircleIcon className="w-16 h-16 text-emerald-500 mx-auto" />
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-[#ECECF1]">Job Created Successfully</h3>
-                <p className="text-sm text-slate-500 font-medium">Job ID: <span className="font-mono text-primary">#{result?.job?.id?.slice(0, 8)}</span></p>
-              </div>
-              <button 
-                onClick={onClose}
-                className="px-6 py-2 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
-              >
-                Close & View Dashboard
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* File Dropzone */}
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`
-                  border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all
-                  ${file ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-white/10 hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}
-                `}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept="application/pdf"
-                  onChange={handleFileChange}
-                />
-                {file ? (
-                  <div className="space-y-2">
-                    <DocumentIcon className="w-12 h-12 text-primary mx-auto" />
-                    <div className="text-sm font-bold text-slate-700 dark:text-[#ECECF1] truncate max-w-xs mx-auto">
-                      {file.name}
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95 translate-y-4"
+              enterTo="opacity-100 scale-100 translate-y-0"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100 translate-y-0"
+              leaveTo="opacity-0 scale-95 translate-y-4"
+            >
+              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-[2.5rem] bg-white dark:bg-[#1C1C1E] p-1 text-left align-middle shadow-[0_32px_120px_-16px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 transition-all">
+                <div className="bg-white dark:bg-[#1C1C1E] rounded-[2.2rem] overflow-hidden">
+                  {/* Header */}
+                  <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50 dark:border-white/[0.03]">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                        <CloudArrowUpIcon className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <DialogTitle as="h3" className="text-xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight leading-tight">
+                          Trigger New Job
+                        </DialogTitle>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">
+                          Industrial Preflight Engine
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-400">
-                      {(file.size / (1024 * 1024)).toFixed(2)} MB • PDF Document
-                    </div>
+                    <button 
+                      onClick={resetAndClose}
+                      className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <CloudArrowUpIcon className="w-12 h-12 text-slate-300 dark:text-zinc-700 mx-auto" />
-                    <div className="text-sm font-bold text-slate-500">Click or drag PDF here to upload</div>
-                    <div className="text-xs text-slate-400">Maximum size: 2 GB</div>
-                  </div>
-                )}
-              </div>
 
-              {/* Form Grid */}
-              <div className="grid grid-cols-2 gap-4 italic-text-off">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tenant Identity</label>
-                  <input 
-                    type="text" 
-                    value={tenantId}
-                    onChange={(e) => setTenantId(e.target.value)}
-                    placeholder="system, or tenant_id..."
-                    className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Type</label>
-                  <select 
-                    value={jobType}
-                    onChange={(e) => setJobType(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="ANALYZE">ANALYZE</option>
-                    <option value="AUTOFIX">AUTOFIX</option>
-                    <option value="CERTIFY">CERTIFY</option>
-                  </select>
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                  <div className="flex items-center justify-between ml-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Policy / Profile</label>
-                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">
-                      BFF Policy Enforcement Active
-                    </span>
-                  </div>
-                  <select 
-                    value={policy}
-                    onChange={(e) => setPolicy(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-2 focus:ring-primary/20"
-                  >
-                    {policies.length > 0 ? (
-                      policies.map((p: any) => (
-                        <option key={p.slug || p.id} value={p.slug || p.id}>
-                          {p.name} ({p.slug || p.id})
-                        </option>
-                      ))
+                  {/* Body */}
+                  <div className="px-8 py-8 space-y-8">
+                    {status === 'success' ? (
+                      <div className="py-12 flex flex-col items-center text-center animate-in zoom-in duration-500">
+                        <div className="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6 relative">
+                          <CheckCircleIcon className="w-16 h-16 text-emerald-500" />
+                          <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20 animate-ping" />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] mb-2">Job Successfully Initialized</h3>
+                        <p className="text-slate-500 dark:text-zinc-400 max-w-sm mb-8">
+                          Your document has been registered. The intelligence layer is now processing the telemetry.
+                        </p>
+                        <div className="px-6 py-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 w-full max-w-xs mb-8">
+                          <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">Generated Job ID</span>
+                          <span className="font-mono text-primary font-bold text-lg select-all">#{result?.job?.id?.slice(0, 12)}</span>
+                        </div>
+                        <button 
+                          onClick={resetAndClose}
+                          className="w-full max-w-xs py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 transition-all active:scale-95"
+                        >
+                          View Live Pipeline
+                        </button>
+                      </div>
                     ) : (
                       <>
-                        <option value="OFFSET_MODERN_COATED">Offset Modern Coated (ISO Coated v2)</option>
-                        <option value="DIGITAL_STANDARD">Digital Standard (sRGB)</option>
-                        <option value="ISO_NEWSPAPER">ISO Newspaper</option>
+                        {/* File Dropzone */}
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`
+                            group relative border-2 border-dashed rounded-[2rem] p-10 text-center cursor-pointer transition-all duration-300
+                            ${file 
+                              ? 'border-primary bg-primary/[0.02] shadow-[0_0_40px_-10px_rgba(var(--primary-rgb),0.1)]' 
+                              : 'border-slate-200 dark:border-white/10 hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}
+                          `}
+                        >
+                          <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept="application/pdf"
+                            onChange={handleFileChange}
+                          />
+                          
+                          <div className="flex flex-col items-center">
+                            {file ? (
+                              <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
+                                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                  <DocumentIcon className="w-8 h-8 text-primary" />
+                                </div>
+                                <div className="text-base font-black text-slate-800 dark:text-[#ECECF1] truncate max-w-[300px]">
+                                  {file.name}
+                                </div>
+                                <div className="text-xs font-bold text-primary mt-1 px-3 py-1 bg-primary/10 rounded-full">
+                                  {(file.size / (1024 * 1024)).toFixed(2)} MB • READY
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center">
+                                <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-4 text-slate-300 dark:text-zinc-600 group-hover:text-primary transition-colors">
+                                  <CloudArrowUpIcon className="w-10 h-10" />
+                                </div>
+                                <div className="text-base font-black text-slate-900 dark:text-[#ECECF1]">
+                                  Click or drop PDF to begin
+                                </div>
+                                <div className="text-xs font-bold text-slate-400 mt-1">
+                                  Maximum industrial payload: 2 GB
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Configuration Grid */}
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">
+                              Tenant Identity
+                            </label>
+                            <div className="relative group">
+                              <input 
+                                type="text" 
+                                value={tenantId}
+                                onChange={(e) => setTenantId(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none"
+                                placeholder="system"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">
+                              Strategy Type
+                            </label>
+                            <select 
+                              value={jobType}
+                              onChange={(e) => setJobType(e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="ANALYZE">ANALYZE ONLY</option>
+                              <option value="AUTOFIX">AUTO-REPAIR</option>
+                              <option value="CERTIFY">CERTIFICATION</option>
+                            </select>
+                          </div>
+
+                          <div className="col-span-2 space-y-2">
+                            <div className="flex items-center justify-between ml-1">
+                              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
+                                Compliance Policy / Profile
+                              </label>
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20">
+                                <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                                <span className="text-[8px] font-black text-primary uppercase tracking-tight">Active Governance</span>
+                              </div>
+                            </div>
+                            <select 
+                              value={policy}
+                              onChange={(e) => setPolicy(e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
+                            >
+                              {policies.length > 0 ? (
+                                policies.map((p: any) => (
+                                  <option key={p.slug || p.id} value={p.slug || p.id}>
+                                    {p.name}
+                                  </option>
+                                ))
+                              ) : (
+                                <>
+                                  <option value="OFFSET_MODERN_COATED">Offset Modern Coated (ISO Coated v2)</option>
+                                  <option value="DIGITAL_STANDARD">Digital Standard (sRGB)</option>
+                                  <option value="ISO_NEWSPAPER">ISO Newspaper</option>
+                                </>
+                              )}
+                            </select>
+                            <p className="text-[10px] text-slate-400 dark:text-zinc-500 ml-1 font-bold">
+                              Policy rules determine the auto-repair strategy and structural validation thresholds.
+                            </p>
+                          </div>
+                        </div>
+
+                        {error && (
+                          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 text-red-500 animate-in shake duration-300">
+                            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider">Initialization Error</span>
+                              <span className="text-xs font-bold opacity-90">{error}</span>
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
-                  </select>
-                  <p className="text-[10px] text-slate-400 ml-1 font-medium italic-text-off">
-                    Select a standardized profile. Governance rules will be applied during analysis.
-                  </p>
-                </div>
-              </div>
+                  </div>
 
-              {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-center gap-2 text-red-600 dark:text-red-400 italic-text-off">
-                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-xs font-bold">{error}</span>
+                  {/* Footer */}
+                  {status !== 'success' && (
+                    <div className="px-8 py-6 bg-slate-50/50 dark:bg-white/[0.01] border-t border-slate-50 dark:border-white/[0.03] flex items-center justify-between">
+                      <button 
+                        disabled={status !== 'idle' && status !== 'error'}
+                        onClick={resetAndClose}
+                        className="px-6 py-3 text-xs font-black text-slate-400 hover:text-slate-600 dark:hover:text-[#ECECF1] uppercase tracking-[0.2em] transition-all disabled:opacity-50"
+                      >
+                        Abort Operation
+                      </button>
+                      
+                      <div className="flex items-center gap-4">
+                        <button 
+                          disabled={!file || (status !== 'idle' && status !== 'error')}
+                          onClick={handleUpload}
+                          className={`
+                            relative overflow-hidden group flex items-center gap-3 px-10 py-4 bg-primary text-white rounded-2xl font-black text-sm
+                            shadow-[0_12px_24px_-8px_rgba(var(--primary-rgb),0.5)] transition-all
+                            hover:shadow-[0_20px_32px_-10px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-1 active:scale-95
+                            disabled:opacity-30 disabled:grayscale disabled:hover:translate-y-0
+                          `}
+                        >
+                          {(status === 'uploading' || status === 'creating_job') ? (
+                            <>
+                              <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                              <span className="uppercase tracking-widest">Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CloudArrowUpIcon className="w-5 h-5" />
+                              <span className="uppercase tracking-widest">Execute Job</span>
+                            </>
+                          )}
+                          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-[-20deg]" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        {status !== 'success' && (
-          <div className="px-6 py-4 bg-slate-50 dark:bg-white/[0.02] border-t border-slate-100 dark:border-white/5 flex justify-end gap-3 italic-text-off">
-            <button 
-              disabled={status !== 'idle' && status !== 'error'}
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 dark:hover:text-[#ECECF1] transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button 
-              disabled={!file || (status !== 'idle' && status !== 'error')}
-              onClick={handleUpload}
-              className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:grayscale"
-            >
-              {(status === 'uploading' || status === 'creating_job') ? (
-                <>
-                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                  <span>{status === 'uploading' ? 'Uploading...' : 'Finalizing...'}</span>
-                </>
-              ) : (
-                <>
-                  <CloudArrowUpIcon className="w-5 h-5" />
-                  <span>Execute Job</span>
-                </>
-              )}
-            </button>
+              </DialogPanel>
+            </TransitionChild>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      </Dialog>
+    </Transition>
   );
 };
+

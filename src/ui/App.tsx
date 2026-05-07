@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './layout/Layout';
 import { DashboardPage } from './pages/os/DashboardPage';
+import { CommandCenterPage } from './pages/admin/CommandCenterPage';
 import { TenantsPage } from './pages/os/TenantsPage';
 import { JobsPage } from './pages/os/JobsPage';
 import { QueuesWorkersPage } from './pages/os/QueuesWorkersPage';
@@ -85,7 +86,8 @@ export const App: React.FC = () => {
             
             <Route element={<AuthGuard><Layout /></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/dashboard" element={<CommandCenterPage />} />
+                <Route path="/legacy-dashboard" element={<DashboardPage />} />
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
                 <Route path="/audit" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Audit Explorer Logic Deferred to Batch 3</div>} />

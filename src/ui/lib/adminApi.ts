@@ -883,3 +883,23 @@ export async function setWorkerStatus(id: string, status: string) {
         body: JSON.stringify({ status })
     });
 }
+
+// --- Intelligence API --- //
+
+export async function getIntelligenceOverview() {
+    return adminFetch<{ ok: boolean, summary: any, cbStatus: any, guardrailDecisions: any }>(`/api/admin/intelligence/overview`);
+}
+
+export async function getAnomalies() {
+    return adminFetch<{ ok: boolean, anomalies: any[] }>(`/api/admin/intelligence/anomalies`);
+}
+
+// --- Economic Routing API --- //
+
+export async function getEconomicOverview() {
+    return adminFetch<{ metrics: any, avg_final_score: number }>(`/api/admin/routing/economic/overview`);
+}
+
+export async function getEconomicConflicts() {
+    return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
+}
