@@ -37,6 +37,41 @@ router.get('/verify', (req, res) => {
   });
 });
 
+router.use((req, res, next) => {
+  const context = resolveActorContext(req);
+  const path = req.path;
+  const method = req.method;
+
+  // 1. Scoped Worker Access Control
+  if (context.role === 'WORKER_AGENT') {
+    const isAllowedMachineEndpoint = 
+      (method === 'POST' && path === '/workers/heartbeat') || 
+      (method === 'POST' && path === '/artifacts/register');
+
+    if (!isAllowedMachineEndpoint) {
+      return res.status(403).json({ 
+        ok: false, 
+        error: { code: 'FORBIDDEN', message: 'Machine account restricted to heartbeat and artifact registration.' } 
+      });
+    }
+  }
+
+  // 2. Suppress Noise for frequent endpoints in Production
+  const isFrequent = [
+    '/workers/heartbeat',
+    '/telemetry/industrial',
+    '/production/notifications'
+  ].includes(path);
+
+  const showDebug = process.env.PPOS_DEBUG_ADMIN_ROUTER === 'true';
+
+  if (showDebug && !isFrequent) {
+    console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${path}`);
+  }
+
+  next();
+});
+
 // Import sub-routers
 const connectAdminRouter = require('./connectAdmin');
 const routingAdminRouter = require('./routingAdmin');
@@ -66,11 +101,6 @@ const telemetryAdminRouter = require('./telemetryAdmin');
 const artifactAdminRouter = require('./artifactAdmin');
 const workerAdminRouter = require('./workerAdmin');
 const orchestrationAdminRouter = require('./orchestrationAdmin');
-
-router.use((req, res, next) => {
-  console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
-  next();
-});
 
 /**
  * Mount Sub-routers (Top Priority)

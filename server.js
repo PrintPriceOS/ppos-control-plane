@@ -5,8 +5,27 @@
  */
 require('dotenv').config();
 const fastify = require('fastify')({
-    logger: true
+    logger: {
+        level: process.env.PPOS_LOG_LEVEL || 'info',
+        redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
+        // Industrial: Skip noisy logs for machine endpoints in production
+        serializers: {
+            req(request) {
+                const url = request.url;
+                const isNoisy = url.includes('/heartbeat') || url.includes('/telemetry/industrial') || url.includes('/notifications');
+                if (isNoisy && process.env.NODE_ENV === 'production') {
+                    return undefined; // Skip request log
+                }
+                return {
+                    method: request.method,
+                    url: request.url,
+                    remoteAddress: request.ip
+                };
+            }
+        }
+    }
 });
+
 
 const path = require('path');
 
@@ -32,6 +51,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url.startsWith('/api') || url.startsWith('/federation')) {
         const authHeader = request.headers['authorization'];
         const breakGlassToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+        const workerControlToken = process.env.PPOS_WORKER_CONTROL_TOKEN;
         const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-development-only';
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
 
@@ -42,12 +62,21 @@ fastify.addHook('onRequest', async (request, reply) => {
 
         const token = authHeader.split(' ')[1];
 
-        // Break-glass fallback
+        // 1. Scoped Worker Token
+        if (workerControlToken && token === workerControlToken) {
+            return; // Allowed, no notice
+        }
+
+        // 2. Break-glass fallback
         if (token === breakGlassToken) {
+            const isMachineEndpoint = url.includes('/workers/heartbeat') || url.includes('/artifacts/register');
+            if (!isMachineEndpoint) {
+                request.log.warn({ url: request.url, ip: request.ip }, 'BREAK-GLASS security notice');
+            }
             return;
         }
 
-        // JWT Validation
+        // 3. JWT Validation
         try {
             const jwt = require('jsonwebtoken');
             jwt.verify(token, jwtSecret, { audience: jwtAudience });
@@ -58,6 +87,7 @@ fastify.addHook('onRequest', async (request, reply) => {
         }
     }
 });
+
 
 // Register Routes
 fastify.get('/health', async () => {

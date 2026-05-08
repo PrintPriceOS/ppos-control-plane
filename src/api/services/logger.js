@@ -15,6 +15,26 @@ const LOG_LEVELS = {
 
 const CURRENT_LEVEL = process.env.PPOS_LOG_LEVEL || 'INFO';
 
+/**
+ * Redacts sensitive values while keeping enough context for debugging.
+ */
+function redact(value) {
+    if (!value || typeof value !== 'string') return value;
+    if (value.length <= 8) return '[REDACTED]';
+    return `${value.slice(0, 4)}…${value.slice(-4)}`;
+}
+
+const SENSITIVE_FIELDS = [
+    'authorization', 
+    'ppos_control_token', 
+    'ppos_worker_control_token', 
+    'database_url', 
+    'mysql_password',
+    'password',
+    'secret',
+    'token'
+];
+
 class Logger {
     constructor(scope = 'global') {
         this.scope = scope;
@@ -33,6 +53,15 @@ class Logger {
             ? { message: payload } 
             : { ...payload };
 
+        // Industrial Redaction: Deep scan metadata for secrets
+        const cleanMetadata = { ...entry.metadata };
+        for (const key of Object.keys(cleanMetadata)) {
+            const lowerKey = key.toLowerCase();
+            if (SENSITIVE_FIELDS.some(sf => lowerKey.includes(sf))) {
+                cleanMetadata[key] = redact(cleanMetadata[key]);
+            }
+        }
+
         const structuredEntry = {
             timestamp,
             severity: level,
@@ -42,7 +71,7 @@ class Logger {
             traceId: entry.traceId || 'no-trace',
             jobId: entry.jobId || null,
             tenantId: entry.tenantId || null,
-            metadata: entry.metadata || {},
+            metadata: cleanMetadata,
             message: entry.message || null
         };
 
