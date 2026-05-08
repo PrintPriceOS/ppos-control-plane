@@ -12,6 +12,7 @@ const bundleService = require('../services/productionBundleService');
 const matchingService = require('../services/printNodeMatchingService');
 const dispatchService = require('../services/productionDispatchService');
 const eventService = require('../services/productionEventService');
+const machineRegistry = require('../services/machineRegistryService');
 
 // Apply admin protection to all routes
 router.use(requireAdmin);
@@ -92,6 +93,34 @@ router.patch('/nodes/:nodeId', async (req, res) => {
   } catch (error) {
     const status = error.message.includes('NOT_FOUND') ? 404 : (error.message.includes('FORBIDDEN') ? 403 : 500);
     res.status(status).json({ ok: false, error: { code: 'NODE_UPDATE_FAILED', message: error.message } });
+  }
+});
+
+// --- Machine Registry ---
+
+/**
+ * GET /api/admin/production/nodes/:nodeId/machines
+ * List all machines for a specific node
+ */
+router.get('/nodes/:nodeId/machines', async (req, res) => {
+  try {
+    const machines = await machineRegistry.getMachinesForNode(req.params.nodeId);
+    res.json({ ok: true, machines });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: { code: 'MACHINE_LIST_FAILED', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/admin/production/nodes/:nodeId/machines
+ * Register or update a machine in a node
+ */
+router.post('/nodes/:nodeId/machines', async (req, res) => {
+  try {
+    const machine = await machineRegistry.registerMachine(req.params.nodeId, req.body);
+    res.status(201).json({ ok: true, machine });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: { code: 'MACHINE_REGISTRATION_FAILED', message: error.message } });
   }
 });
 

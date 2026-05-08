@@ -240,21 +240,42 @@ export const CommandCenterPage: React.FC = () => {
 
           {/* WORKER CLUSTER */}
           <div className="col-span-12 md:col-span-6 lg:col-span-3 h-[400px]">
-            <TacticalPanel title="Worker Fleet" icon={CpuChipIcon} badge="Industrial" color="primary" status={industrial.status} error={industrial.error}>
+            <TacticalPanel title="Worker Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'Industrial'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
               <div className="space-y-2">
-                {Array.isArray(industrial.data?.workers?.cluster) && industrial.data.workers.cluster.slice(0, 8).map((w: any) => (
-                  <div key={w.id} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/[0.02]">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase">Active Fleet</span>
+                  <span className="text-[9px] font-black text-primary uppercase">{industrial.data?.workers?.stats?.activeNodes || 0} Nodes</span>
+                </div>
+                {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 6).map((w: any) => (
+                  <div key={w.id} className="flex items-center justify-between p-2 rounded bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20">
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${w.isOnline ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <div className={`w-2 h-2 rounded-full ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
                       <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 12) || '---'}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[9px] font-black text-slate-400 uppercase">{Math.round(w.cpu_usage || 0)}% CPU</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">{w.status}</span>
                     </div>
                   </div>
                 ))}
-                {(!industrial.data?.workers?.cluster || industrial.data.workers.cluster.length === 0) && !industrial.status.includes('loading') && (
-                  <div className="text-center py-20 opacity-30 font-black text-[10px]">NO NODES DETECTED</div>
+                
+                {Array.isArray(industrial.data?.workers?.historicalFleet) && industrial.data.workers.historicalFleet.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase">Historical Fleet</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">{industrial.data?.workers?.historicalFleet.length} Offline</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {industrial.data.workers.historicalFleet.slice(0, 4).map((w: any) => (
+                        <div key={w.id} className="p-1 px-2 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[8px] font-mono text-slate-400 truncate text-center">
+                          {w.id?.slice(0, 8)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!industrial.data?.workers?.activeFleet || industrial.data.workers.activeFleet.length === 0) && !industrial.status.includes('loading') && (
+                  <div className="text-center py-20 opacity-30 font-black text-[10px]">NO ACTIVE NODES DETECTED</div>
                 )}
               </div>
             </TacticalPanel>
@@ -305,13 +326,20 @@ export const CommandCenterPage: React.FC = () => {
                      <TelemetryItem label="Low Margin Quotes" value={routing.data?.metrics?.low_margin_count || 0} status={routing.data?.metrics?.low_margin_count > 0 ? 'warning' : 'stable'} />
                    </div>
                    <div className="p-3 bg-white dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-lg space-y-3">
-                     <h4 className="text-[9px] font-black text-slate-400 uppercase">Pricing Distribution</h4>
-                     <div className="flex gap-0.5 h-10 items-end justify-center">
-                        <div className="text-[10px] font-black text-slate-400 uppercase opacity-20">NOT_CONFIGURED</div>
-                     </div>
-                     <div className="flex justify-between text-[8px] font-black text-slate-400 uppercase">
-                       <span>Loss Potential</span>
-                       <span>Target Margin</span>
+                     <h4 className="text-[9px] font-black text-slate-400 uppercase">Pricing & Materials readiness</h4>
+                     <div className="space-y-2">
+                       <div className="flex items-center justify-between">
+                         <span className="text-[9px] font-bold text-slate-500 uppercase">Materials Catalog</span>
+                         <span className={`text-[9px] font-black uppercase ${industrial.data?.readiness?.materials?.state === 'LIVE' ? 'text-emerald-500' : 'text-slate-400'}`}>
+                           {industrial.data?.readiness?.materials?.state || 'NOT_CONFIGURED'}
+                         </span>
+                       </div>
+                       <div className="flex items-center justify-between">
+                         <span className="text-[9px] font-bold text-slate-500 uppercase">Pricing Profiles</span>
+                         <span className={`text-[9px] font-black uppercase ${industrial.data?.readiness?.pricing?.state === 'LIVE' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                           {industrial.data?.readiness?.pricing?.state || 'DEGRADED'}
+                         </span>
+                       </div>
                      </div>
                    </div>
                    <div className="flex items-center justify-between px-1">
@@ -407,7 +435,9 @@ export const CommandCenterPage: React.FC = () => {
                        <span className="text-[10px] font-black text-slate-400 uppercase block">Predictive Outlook</span>
                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
                           <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 leading-relaxed italic-text-off uppercase">
-                             NOT_CONFIGURED
+                             {industrial.data?.readiness?.materials?.state === 'LIVE' 
+                                ? `Active Materials Catalog detected across ${industrial.data?.readiness?.materials?.catalogCount || 0} nodes. Capacity optimization recommended.` 
+                                : 'Catalog extraction pending. System operating in manual pricing mode.'}
                           </p>
                        </div>
                     </div>

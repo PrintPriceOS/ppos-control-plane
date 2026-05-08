@@ -217,20 +217,41 @@ class ProductionPersistenceService {
   }
 
   async createMachineProfile(profileData) {
-    const id = uuidv4();
-    const { nodeId, profileName, profileType, rawData } = profileData;
+    const id = profileData.id || uuidv4();
+    const { 
+      nodeId, profileName, profileType, manufacturer, model, 
+      rawData, normalizedCapabilities, status 
+    } = profileData;
 
     await db.query(`
       INSERT INTO print_node_machine_profiles
-      (id, node_id, profile_name, profile_type, raw_data_json)
-      VALUES (?, ?, ?, ?, ?)
-    `, [id, nodeId, profileName, profileType, JSON.stringify(rawData || {})]);
+      (id, node_id, profile_name, profile_type, manufacturer, model, raw_data_json, normalized_capabilities_json, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        profile_name = VALUES(profile_name),
+        profile_type = VALUES(profile_type),
+        manufacturer = VALUES(manufacturer),
+        model = VALUES(model),
+        raw_data_json = VALUES(raw_data_json),
+        normalized_capabilities_json = VALUES(normalized_capabilities_json),
+        status = VALUES(status)
+    `, [
+      id, nodeId, profileName, profileType || 'OFFSET', 
+      manufacturer || 'UNKNOWN', model || 'UNKNOWN',
+      JSON.stringify(rawData || {}), JSON.stringify(normalizedCapabilities || {}),
+      status || 'ACTIVE'
+    ]);
 
     return id;
   }
 
   async getMachineProfiles(nodeId) {
-    return db.query('SELECT * FROM print_node_machine_profiles WHERE node_id = ?', [nodeId]);
+    const rows = await db.query('SELECT * FROM print_node_machine_profiles WHERE node_id = ?', [nodeId]);
+    return rows.map(row => ({
+      ...row,
+      raw_data_json: typeof row.raw_data_json === 'string' ? JSON.parse(row.raw_data_json) : row.raw_data_json,
+      normalized_capabilities_json: typeof row.normalized_capabilities_json === 'string' ? JSON.parse(row.normalized_capabilities_json) : row.normalized_capabilities_json
+    }));
   }
 
   // --- Production Packages ---

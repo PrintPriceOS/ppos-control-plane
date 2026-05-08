@@ -42,7 +42,7 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         id: 'pricing',
         label: 'Pricing Intelligence',
         route: '/ops/pricing',
-        status: 'DEGRADED',
+        status: 'ACTIVE',
         requiredEndpoints: ['/api/admin/pricing/profiles', '/api/admin/routing/economic/history'],
         requiredTables: ['printer_pricing_profiles', 'economic_routing_history'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'],
@@ -82,12 +82,13 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         id: 'materials',
         label: 'Materials Catalog',
         route: '/materials',
-        status: 'NOT_CONFIGURED',
+        status: 'ACTIVE',
         requiredEndpoints: ['/api/admin/materials'],
         requiredTables: ['materials_inventory'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN'],
         description: 'Paper and consumable registry.'
     },
+
     {
         id: 'governance',
         label: 'Global Governance',

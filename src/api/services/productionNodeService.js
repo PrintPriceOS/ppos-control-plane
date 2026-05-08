@@ -6,6 +6,7 @@
  */
 const persistence = require('./productionPersistenceService');
 const auditLogger = require('./auditLoggerService');
+const machineRegistry = require('./machineRegistryService');
 
 class ProductionNodeService {
   /**
@@ -22,12 +23,19 @@ class ProductionNodeService {
     const { machineProfile } = nodeData;
     
     // Normalize capabilities from machine profile
-    const capabilities = this.normalizeCapabilities(machineProfile);
+    const capabilities = machineRegistry.normalizeCapabilities(machineProfile);
 
     const newNode = await persistence.createNode({
       ...nodeData,
       tenantId: context.tenantId,
       capabilities
+    });
+
+    // Automatically register the primary machine profile
+    await machineRegistry.registerMachine(newNode.id, {
+        profile_name: 'Primary Machine',
+        profile_type: machineProfile.method || 'OFFSET',
+        raw_data_json: machineProfile
     });
 
     await auditLogger.log({
@@ -54,6 +62,9 @@ class ProductionNodeService {
     if (context.role !== 'SUPER_ADMIN' && node.tenant_id !== context.tenantId) {
       throw new Error('FORBIDDEN: Access to this node is restricted');
     }
+
+    // Enrich with machines
+    node.machines = await machineRegistry.getMachinesForNode(nodeId);
 
     return node;
   }
@@ -88,7 +99,14 @@ class ProductionNodeService {
 
     // If machine profile is updated, re-normalize capabilities
     if (updates.machineProfile) {
-      updates.capabilities = this.normalizeCapabilities(updates.machineProfile);
+      updates.capabilities = machineRegistry.normalizeCapabilities(updates.machineProfile);
+      
+      // Update/Sync machines
+      await machineRegistry.registerMachine(nodeId, {
+          profile_name: 'Primary Machine',
+          profile_type: updates.machineProfile.method || 'OFFSET',
+          raw_data_json: updates.machineProfile
+      });
     }
 
     const updatedNode = await persistence.updateNode(nodeId, updates);
@@ -106,30 +124,12 @@ class ProductionNodeService {
 
   /**
    * Normalize machine profile capabilities into structured fields
+   * @deprecated Use machineRegistry.normalizeCapabilities instead
    */
   normalizeCapabilities(profile = {}) {
-    return {
-      printingMethod: profile.method || 'OFFSET',
-      supportedBindings: profile.bindings || ['PERFECT_BOUND', 'SADDLE_STITCH'],
-      trimSizeRanges: profile.trimSizes || {
-        minWidthMm: 100,
-        maxWidthMm: 297,
-        minHeightMm: 148,
-        maxHeightMm: 420
-      },
-      paperGsmRanges: profile.gsm || { min: 60, max: 350 },
-      supportedColorModes: profile.colors || ['CMYK', 'GRAYSCALE', 'SPOT'],
-      iccIntents: profile.icc || ['FOGRA39', 'GRACOL'],
-      hardcoverSupport: !!profile.hardcover,
-      softcoverSupport: profile.softcover !== false,
-      finishingSupport: profile.finishing || ['UV_COATING', 'LAMINATION', 'FOILING'],
-      capacity: {
-        dailyImpressions: profile.capacity || 50000,
-        unitOfMeasure: 'SRA3_EQUIVALENT'
-      },
-      lastNormalizedAt: new Date().toISOString()
-    };
+    return machineRegistry.normalizeCapabilities(profile);
   }
 }
 
 module.exports = new ProductionNodeService();
+

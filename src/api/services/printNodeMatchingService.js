@@ -7,6 +7,7 @@
 const persistence = require('./productionPersistenceService');
 const preflightPersistence = require('./preflightPersistenceService');
 const auditLogger = require('./auditLoggerService');
+const machineRegistry = require('./machineRegistryService');
 
 class PrintNodeMatchingService {
   /**
@@ -29,17 +30,35 @@ class PrintNodeMatchingService {
     const matches = [];
 
     for (const node of nodes) {
+      // PHASE 2: Fetch machine profiles for deep matching precision
+      const machines = await machineRegistry.getMachinesForNode(node.id);
+      
       const matchResult = this.evaluateMatch(pkg, artifact, node);
+      
+      // If node-level is compatible, verify machine-level compatibility
+      if (matchResult.isCompatible && machines.length > 0) {
+        const compatibleMachines = machines.filter(m => this.evaluateMachineMatch(pkg, artifact, m).isCompatible);
+        if (compatibleMachines.length === 0) {
+          matchResult.isCompatible = false;
+          matchResult.reasons.push('Node online but no individual machine supports these technical specs');
+        } else {
+          matchResult.score = Math.min(100, matchResult.score + 10); // Bonus for explicit machine match
+          matchResult.matchedMachines = compatibleMachines.map(m => m.profile_name);
+        }
+      }
+
       if (matchResult.isCompatible) {
         matches.push({
           printNodeId: node.id,
           companyName: node.company_name,
           matchScore: matchResult.score,
           reasons: matchResult.reasons,
-          warnings: matchResult.warnings
+          warnings: matchResult.warnings,
+          matchedMachines: matchResult.matchedMachines || []
         });
       }
     }
+
 
     // 3. Sort by score descending
     matches.sort((a, b) => b.matchScore - a.matchScore);
@@ -66,6 +85,12 @@ class PrintNodeMatchingService {
     const warnings = [];
     let score = 100;
     let isCompatible = true;
+
+    // PHASE 2: Machine-level precision check
+    // If the node has machines registered, at least one must be compatible
+    // Note: This is an async check in a sync method, so we should have fetched machines earlier 
+    // or we'll stick to the node-level capabilities for the core loop and use machine-level for scoring.
+    // However, findMatches is async, so we can fetch machines there.
 
     // 1. Binding Check (HARD)
     if (specs.binding && capabilities.supportedBindings) {
@@ -135,6 +160,47 @@ class PrintNodeMatchingService {
       reasons,
       warnings
     };
+  }
+
+  /**
+   * Evaluate compatibility for a specific machine
+   */
+  evaluateMachineMatch(pkg, artifact, machine) {
+    const specs = pkg.book_spec_json || {};
+    const caps = machine.normalized_capabilities_json || {};
+    
+    const result = { isCompatible: true, reasons: [] };
+
+    // 1. Paper Type
+    if (specs.paperType && caps.paper_types) {
+        if (!caps.paper_types.includes(specs.paperType)) {
+            result.isCompatible = false;
+            result.reasons.push(`Machine does not support paper type: ${specs.paperType}`);
+        }
+    }
+
+    // 2. Format / Sheet Size
+    if (specs.trim && caps.max_sheet) {
+        if (specs.trim.widthMm > caps.max_sheet.width || specs.trim.heightMm > caps.max_sheet.height) {
+            result.isCompatible = false;
+            result.reasons.push(`Trim size exceeds machine max sheet: ${caps.max_sheet.width}x${caps.max_sheet.height}mm`);
+        }
+    }
+
+    // 3. Run Length
+    const runLength = specs.runLength || 0;
+    if (runLength > 0) {
+        if (caps.max_run > 0 && runLength > caps.max_run) {
+            result.isCompatible = false;
+            result.reasons.push(`Run length (${runLength}) exceeds machine max run (${caps.max_run})`);
+        }
+        if (runLength < caps.min_run) {
+            result.isCompatible = false;
+            result.reasons.push(`Run length (${runLength}) below machine minimum (${caps.min_run})`);
+        }
+    }
+
+    return result;
   }
 }
 

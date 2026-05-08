@@ -85,22 +85,32 @@ class TelemetryService {
                 const workerRegistry = require('./workerRegistryService');
                 const cluster = await workerRegistry.getFleetStatus();
                 
-                const healthScore = cluster.reduce((acc, w) => acc + w.health_score, 0) / (cluster.length || 1);
+                const activeNodes = cluster.filter(w => w.status === 'HEALTHY').length;
+                const staleNodes = cluster.filter(w => w.status === 'STALE').length;
+                const offlineNodes = cluster.filter(w => w.status === 'OFFLINE').length;
+                const totalNodes = cluster.length;
+
+                const fleetHealth = totalNodes > 0 ? Math.round((activeNodes / totalNodes) * 100) : 0;
 
                 return {
-                    state: healthScore > 80 ? 'LIVE' : healthScore > 50 ? 'DEGRADED' : 'CRITICAL',
-                    cluster,
+                    state: fleetHealth > 80 ? 'LIVE' : fleetHealth > 50 ? 'DEGRADED' : 'CRITICAL',
+                    activeFleet: cluster.filter(w => w.status === 'HEALTHY' || w.status === 'STALE'),
+                    historicalFleet: cluster.filter(w => w.status === 'OFFLINE'),
                     stats: {
-                        activeNodes: cluster.filter(w => w.isOnline).length,
-                        totalNodes: cluster.length,
-                        fleetHealth: healthScore
+                        activeNodes,
+                        staleNodes,
+                        offlineNodes,
+                        totalNodes,
+                        fleetHealth
                     }
                 };
             } catch (err) {
-                return { state: 'UNAVAILABLE', cluster: [] };
+                logger.error({ event: 'telemetry_failed', scope: 'workers', error: err.message });
+                return { state: 'UNAVAILABLE', activeFleet: [], historicalFleet: [], stats: { totalNodes: 0, fleetHealth: 0 } };
             }
-        })(), 2000, { state: 'TIMEOUT', cluster: [] });
+        })(), 2000, { state: 'TIMEOUT', activeFleet: [], historicalFleet: [], stats: { totalNodes: 0, fleetHealth: 0 } });
     }
+
 
     /**
      * Get Storage usage and artifact integrity
@@ -150,7 +160,7 @@ class TelemetryService {
         const interval = range === '24h' ? '1 DAY' : range === '7d' ? '7 DAY' : '30 DAY';
         return withTimeout((async () => {
             try {
-                const rows = await db.query(`
+                const patterns = await db.query(`
                     SELECT 
                         JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.failure_code')) as failure_code,
                         COUNT(*) as count
@@ -160,26 +170,81 @@ class TelemetryService {
                     GROUP BY failure_code
                     ORDER BY count DESC
                 `);
+
+                // Real State Logic
+                const [recentStats] = await db.query(`
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failures
+                    FROM metrics
+                    WHERE created_at >= NOW() - INTERVAL 1 HOUR
+                `);
+
+                let state = 'IDLE';
+                if (recentStats.total > 0) {
+                    const failureRate = (recentStats.failures / recentStats.total) * 100;
+                    state = failureRate > 15 ? 'DEGRADED' : 'LIVE';
+                }
+
                 return {
-                    state: 'LIVE',
-                    patterns: rows
+                    state,
+                    patterns
                 };
             } catch (err) {
-                return { state: 'DEGRADED', patterns: [] };
+                logger.error({ event: 'telemetry_failed', scope: 'outcomes', error: err.message });
+                return { state: 'FAILED', patterns: [] };
             }
         })(), 3000, { state: 'TIMEOUT', patterns: [] });
+    }
+
+    /**
+     * Get readiness metrics for materials and pricing
+     */
+    async getReadinessMetrics() {
+        try {
+            // Check for real rates in printer nodes
+            const rows = await db.query('SELECT rates_json FROM printer_nodes WHERE rates_json IS NOT NULL LIMIT 10');
+            
+            let hasMaterials = false;
+            let catalogCount = 0;
+            
+            for (const row of rows) {
+                const rates = typeof row.rates_json === 'string' ? JSON.parse(row.rates_json) : row.rates_json;
+                if (rates && (rates.paper_price_cover_by_kilo || rates.paper_price_interior_by_kilo)) {
+                    hasMaterials = true;
+                    catalogCount += 1;
+                }
+            }
+
+            // Check for pricing profiles
+            const [pricingCount] = await db.query('SELECT COUNT(*) as count FROM printer_pricing_profiles');
+
+            return {
+                materials: {
+                    state: hasMaterials ? 'LIVE' : 'NOT_CONFIGURED',
+                    catalogCount
+                },
+                pricing: {
+                    state: pricingCount.count > 0 ? 'LIVE' : 'DEGRADED',
+                    profileCount: pricingCount.count
+                }
+            };
+        } catch (err) {
+            return { materials: { state: 'NOT_CONFIGURED' }, pricing: { state: 'DEGRADED' } };
+        }
     }
 
     /**
      * Get operational health snapshot for NOC
      */
     async getOperationalSnapshot() {
-        const [queue, largeDocs, workers, storage, outcomes] = await Promise.all([
+        const [queue, largeDocs, workers, storage, outcomes, readiness] = await Promise.all([
             this.getQueueMetrics(),
             this.getLargeDocumentTelemetry(),
             this.getWorkerTelemetry(),
             this.getStorageMetrics(),
-            this.getPreflightOutcomes()
+            this.getPreflightOutcomes(),
+            this.getReadinessMetrics()
         ]);
 
         return {
@@ -187,9 +252,11 @@ class TelemetryService {
             largeDocs,
             workers,
             storage,
-            outcomes
+            outcomes,
+            readiness
         };
     }
+
 
     /**
      * Get industrial snapshot including fleet health and storage governance.

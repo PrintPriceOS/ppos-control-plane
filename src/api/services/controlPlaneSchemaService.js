@@ -414,7 +414,15 @@ class ControlPlaneSchemaService {
             await this.ensureIndex('control_users', 'idx_printhouse', 'printhouse_id');
             await this.ensureIndex('metrics', 'idx_printhouse', 'printhouse_id');
 
+            // PHASE 2 - Industrial Autonomy Schema Hardening
+            await this.ensureColumn('print_nodes', 'rates_json', 'JSON NULL AFTER capabilities_json');
+            await this.ensureColumn('print_node_machine_profiles', 'normalized_capabilities_json', 'JSON NULL AFTER raw_data_json');
+            await this.ensureColumn('print_node_machine_profiles', 'status', "ENUM('ACTIVE', 'MAINTENANCE', 'OFFLINE') DEFAULT 'ACTIVE' AFTER profile_type");
+            await this.ensureColumn('print_node_machine_profiles', 'manufacturer', 'VARCHAR(128) NULL AFTER profile_name');
+            await this.ensureColumn('print_node_machine_profiles', 'model', 'VARCHAR(128) NULL AFTER manufacturer');
+
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
+
         } catch (err) {
             console.error('[CONTROL-PLANE-SCHEMA] Initialization failed:', err.message);
         }

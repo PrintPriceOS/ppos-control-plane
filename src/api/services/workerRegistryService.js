@@ -50,17 +50,34 @@ class WorkerRegistryService {
 
     /**
      * Get the entire worker fleet status.
+     * Dynamic state resolution based on heartbeat age.
      */
     async getFleetStatus() {
         const workers = await db.query('SELECT * FROM worker_nodes ORDER BY last_heartbeat DESC');
+        const now = Date.now();
         
-        return workers.map(w => ({
-            ...w,
-            queue_bindings: w.queue_bindings || [],
-            capabilities: w.capabilities || {},
-            isOnline: (Date.now() - new Date(w.last_heartbeat).getTime()) < 60000 // 1 minute threshold
-        }));
+        return workers.map(w => {
+            const heartbeatAgeMs = now - new Date(w.last_heartbeat).getTime();
+            const heartbeatAgeSec = Math.floor(heartbeatAgeMs / 1000);
+
+            let derivedStatus = 'OFFLINE';
+            if (heartbeatAgeSec <= 120) {
+                derivedStatus = 'HEALTHY';
+            } else if (heartbeatAgeSec <= 600) { // 10 minutes
+                derivedStatus = 'STALE';
+            }
+
+            return {
+                ...w,
+                queue_bindings: typeof w.queue_bindings === 'string' ? JSON.parse(w.queue_bindings) : (w.queue_bindings || []),
+                capabilities: typeof w.capabilities === 'string' ? JSON.parse(w.capabilities) : (w.capabilities || {}),
+                status: derivedStatus,
+                isOnline: derivedStatus === 'HEALTHY', // Only HEALTHY counts as strictly online for active tasking
+                heartbeatAgeSec
+            };
+        });
     }
+
 
     /**
      * Calculate worker health score based on telemetry.
