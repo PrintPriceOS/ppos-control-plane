@@ -158,9 +158,15 @@ class TelemetryService {
      */
     async getPreflightOutcomes(range = '24h') {
         const interval = range === '24h' ? '1 DAY' : range === '7d' ? '7 DAY' : '30 DAY';
+        const debugEnabled = process.env.PPOS_DEBUG_OUTCOMES === 'true';
+
         return withTimeout((async () => {
+            let patterns = [];
+            let recentStats = { total: 0, failures: 0 };
+            
             try {
-                const patterns = await db.query(`
+                // 1. Fetch Failure Patterns (Historical)
+                patterns = await db.query(`
                     SELECT 
                         JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.failure_code')) as failure_code,
                         COUNT(*) as count
@@ -171,31 +177,85 @@ class TelemetryService {
                     ORDER BY count DESC
                 `);
 
-                // Real State Logic
-                const [recentStats] = await db.query(`
+                // 2. Fetch Operational Health (Real-time 1h)
+                const [stats] = await db.query(`
                     SELECT 
                         COUNT(*) as total,
-                        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failures
+                        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failures,
+                        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successes
                     FROM metrics
                     WHERE created_at >= NOW() - INTERVAL 1 HOUR
                 `);
+                recentStats = stats || { total: 0, failures: 0, successes: 0 };
 
+                if (debugEnabled) {
+                    logger.info({ 
+                        event: 'outcomes_debug', 
+                        total: recentStats.total, 
+                        failures: recentStats.failures, 
+                        patternCount: patterns.length 
+                    });
+                }
+
+                // --- EVIDENCE-BASED STATE RESOLUTION ---
+                
+                // Default to IDLE (Source is healthy, but no data)
                 let state = 'IDLE';
-                if (recentStats.total > 0) {
-                    const failureRate = (recentStats.failures / recentStats.total) * 100;
-                    state = failureRate > 15 ? 'DEGRADED' : 'LIVE';
+                
+                const recentCompleted = parseInt(recentStats.successes) || 0;
+                const recentFailed = parseInt(recentStats.failures) || 0;
+                const totalRecent = parseInt(recentStats.total) || 0;
+                const failureRatio = totalRecent > 0 ? parseFloat(((recentFailed / totalRecent) * 100).toFixed(2)) : 0;
+                const patternCount = patterns.length;
+
+                if (totalRecent > 0) {
+                    // We have activity - Resolve between LIVE and DEGRADED
+                    state = failureRatio > 15 ? 'DEGRADED' : 'LIVE';
+                } else if (patternCount > 0) {
+                    // No activity in last hour, but we have historical failures
+                    // Stay IDLE or maybe DEGRADED if historical is very high? 
+                    // Requirement: "Healthy idle systems should display IDLE"
+                    state = 'IDLE';
                 }
 
                 return {
                     state,
+                    recentCompleted,
+                    recentFailed,
+                    failureRatio,
+                    patternCount,
                     patterns
                 };
+
             } catch (err) {
-                logger.error({ event: 'telemetry_failed', scope: 'outcomes', error: err.message });
-                return { state: 'FAILED', patterns: [] };
+                logger.error({ 
+                    event: 'telemetry_failed', 
+                    scope: 'outcomes', 
+                    error: err.message,
+                    stack: debugEnabled ? err.stack : undefined
+                });
+                
+                // Return FAILED only if the source query itself exploded
+                return { 
+                    state: 'FAILED', 
+                    recentCompleted: 0,
+                    recentFailed: 0,
+                    failureRatio: 0,
+                    patternCount: 0,
+                    patterns: [],
+                    error: err.message
+                };
             }
-        })(), 3000, { state: 'TIMEOUT', patterns: [] });
+        })(), 3000, { 
+            state: 'TIMEOUT', 
+            recentCompleted: 0,
+            recentFailed: 0,
+            failureRatio: 0,
+            patternCount: 0,
+            patterns: [] 
+        });
     }
+
 
     /**
      * Get readiness metrics for materials and pricing
