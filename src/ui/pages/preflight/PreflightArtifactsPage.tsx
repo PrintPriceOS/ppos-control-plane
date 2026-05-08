@@ -11,6 +11,8 @@ import {
 import { getPreflightArtifacts, getGlobalArtifacts } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
+import { short } from "../../lib/formatters";
+
 
 export const PreflightArtifactsPage: React.FC = () => {
   const [searchJobId, setSearchJobId] = useState('');
@@ -71,7 +73,8 @@ export const PreflightArtifactsPage: React.FC = () => {
                 )}
                 <div className="flex flex-col">
                   <span className="font-bold truncate max-w-xs">{a.filename}</span>
-                  <span className="text-[10px] font-mono text-slate-400">ID: {a.id.slice(0, 8)} • Job: {a.job_id?.slice(0, 8) || 'N/A'}</span>
+                  <span className="text-[10px] font-mono text-slate-400">ID: {short(a.id, 8)} • Job: {short(a.job_id, 8)}</span>
+
                 </div>
               </div>
             )

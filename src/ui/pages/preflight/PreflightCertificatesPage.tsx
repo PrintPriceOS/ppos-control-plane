@@ -4,6 +4,7 @@ import { getPreflightJobs } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { useNavigate } from "react-router-dom";
+import { short } from "../../lib/formatters";
 
 export const PreflightCertificatesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -48,7 +49,8 @@ export const PreflightCertificatesPage: React.FC = () => {
         columns={[
           {
             header: 'Certificate ID',
-            accessor: (j) => <span className="font-mono text-xs font-bold text-slate-400 uppercase">CERT-{j.jobId.slice(0, 8)}</span>
+            accessor: (j) => <span className="font-mono text-xs font-bold text-slate-400 uppercase">CERT-{short(j.jobId, 8)}</span>
+
           },
           {
             header: 'Tenant',

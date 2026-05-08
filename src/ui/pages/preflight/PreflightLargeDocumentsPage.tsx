@@ -11,8 +11,10 @@ import { getPreflightJobs, PreflightJob } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { useNavigate } from "react-router-dom";
+import { short } from "../../lib/formatters";
 
 const LARGE_DOC_THRESHOLD = 500 * 1024 * 1024;
+
 
 export const PreflightLargeDocumentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -45,10 +47,11 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
             accessor: (j) => (
               <div className="flex flex-col">
                 <span className="font-bold truncate max-w-xs">{j.metadata_json?.originalFilename || 'Untitled'}</span>
-                <span className="text-[10px] font-mono text-slate-400">#{j.id.slice(0, 8)}</span>
+                <span className="text-[10px] font-mono text-slate-400">#{short(j.id, 8)}</span>
               </div>
             )
           },
+
           {
             header: 'Tenant',
             accessor: (j) => <span className="font-bold text-primary">{j.tenant_id}</span>

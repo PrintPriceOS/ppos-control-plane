@@ -17,6 +17,7 @@ import { getPreflightJobs, getStorageSummary, PreflightJob } from "../../lib/adm
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { PreflightUploadModal } from "./PreflightUploadModal";
+import { short } from "../../lib/formatters";
 
 export const PreflightJobsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -190,7 +191,8 @@ export const PreflightJobsPage: React.FC = () => {
             header: 'Job ID',
             accessor: (j) => (
               <div className="flex flex-col">
-                <span className="font-mono text-[10px] text-slate-400">#{j.jobId.slice(0, 8)}</span>
+                <span className="font-mono text-[10px] text-slate-400">#{short(j.jobId, 8)}</span>
+
                 <span className="font-bold truncate max-w-[120px]" title={j.filename || 'Untitled'}>
                   {j.filename || 'Untitled'}
                 </span>

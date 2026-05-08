@@ -12,6 +12,8 @@ import {
     ChartBarIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { short } from "../../lib/formatters";
+
 
 export const CommercialCommitmentsTab: React.FC = () => {
     const [commitments, setCommitments] = useState<any[]>([]);
@@ -115,7 +117,8 @@ export const CommercialCommitmentsTab: React.FC = () => {
                                     >
                                         <td className="px-4 py-4">
                                             <div className="font-black text-slate-900 text-xs">{c.transaction_reference}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium">#{c.job_id.slice(0, 8)}</div>
+                                            <div className="text-[10px] text-slate-400 font-medium">#{short(c.job_id, 8)}</div>
+
                                         </td>
                                         <td className="px-4 py-4 text-xs font-bold text-slate-600 truncate max-w-[120px]">{c.printer_name}</td>
                                         <td className="px-4 py-4 text-xs font-black text-slate-900">{c.committed_price} €</td>

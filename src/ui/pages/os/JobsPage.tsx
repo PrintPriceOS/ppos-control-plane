@@ -4,10 +4,13 @@ import { getJobs } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { JobDetailDrawer } from "../../components/JobDetailDrawer";
+import { short } from "../../lib/formatters";
 
 export const JobsPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = React.useState<any | null>(null);
   const q = useAdminQuery("jobs:global", () => getJobs({ limit: 50 }), 10000);
+
+  const jobs = q.data?.jobs || [];
 
   return (
     <div className="space-y-6">
@@ -39,13 +42,14 @@ export const JobsPage: React.FC = () => {
 
       <DataTable 
         isLoading={q.status === 'loading'}
-        data={q.data?.jobs || []}
+        data={jobs}
         onRowClick={(j) => setSelectedJob(j)}
         columns={[
           {
             header: 'Job ID',
-            accessor: (j) => <span className="font-mono text-xs">{j.id.slice(0, 16)}...</span>
+            accessor: (j) => <span className="font-mono text-xs">{short(j.id, 16)}...</span>
           },
+
           {
             header: 'Tenant',
             accessor: (j) => <span className="font-bold text-slate-600">{j.tenant_id}</span>

@@ -6,6 +6,8 @@ import {
     ArrowDownTrayIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { adminFetch } from '../lib/adminApi';
+import { short } from '../lib/formatters';
+
 
 // ─── Types ────────────────────────────────────────────────────
 interface Summary {
@@ -324,9 +326,10 @@ export function AnalyticsPortal() {
                                     {batches.map(b => (
                                         <tr key={b.batch_id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-3">
-                                                <p className="font-mono text-xs text-slate-700">{b.batch_id.slice(0, 18)}…</p>
+                                                <p className="font-mono text-xs text-slate-700">{short(b.batch_id, 18)}…</p>
                                                 <p className="text-xs text-slate-400">{new Date(b.created_at).toLocaleDateString()}</p>
                                             </td>
+
                                             <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
                                             <td className="px-4 py-3 text-right">
                                                 <span className="text-slate-700 font-semibold">{b.completed_jobs}</span>

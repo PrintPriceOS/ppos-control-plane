@@ -1,5 +1,7 @@
 import React from 'react';
 import { Drawer } from './Drawer';
+import { short } from '../lib/formatters';
+
 import { GovernanceSnapshotViewer } from './GovernanceSnapshotViewer';
 import { AuditTimeline } from './AuditTimeline';
 import { 
@@ -34,7 +36,8 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
   }
 
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title={`Job Evidence: ${job.id?.slice(0, 10) || 'N/A'}`}>
+    <Drawer isOpen={isOpen} onClose={onClose} title={`Job Evidence: ${short(job.id, 10)}`}>
+
       <div className="space-y-10 italic-text-off">
         {/* Status Header */}
         <div className="flex items-center gap-6 p-6 rounded-3xl bg-slate-50 border border-slate-100 shadow-sm">

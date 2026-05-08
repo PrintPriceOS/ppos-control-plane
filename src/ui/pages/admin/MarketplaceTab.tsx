@@ -9,6 +9,8 @@ import {
     BoltIcon,
     CurrencyEuroIcon
 } from "@heroicons/react/24/outline";
+import { short } from "../../lib/formatters";
+
 
 export const MarketplaceTab: React.FC = () => {
     const [sessions, setSessions] = useState<any[]>([]);
@@ -158,7 +160,8 @@ export const MarketplaceTab: React.FC = () => {
                                             </div>
 
                                             <div className="flex items-center justify-between pt-2 border-t border-slate-100/50">
-                                                <div className="text-[10px] text-slate-400 font-medium">Node ID: {o.id.slice(0, 8)}</div>
+                                                <div className="text-[10px] text-slate-400 font-medium">Node ID: {short(o.id, 8)}</div>
+
                                                 {!o.offer_selected && selectedSession.session_status === 'OPEN' && (
                                                     <button
                                                         onClick={() => handleSelectOffer(o.id)}

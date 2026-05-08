@@ -300,8 +300,30 @@ export async function getJobs(params: {
     if (params.type) qs.set("type", params.type);
     qs.set("limit", String(params.limit ?? 50));
     qs.set("offset", String(params.offset ?? 0));
-    return adminFetch<JobsResponse>(`/api/admin/jobs?${qs.toString()}`);
+    
+    const res = await adminFetch<JobsResponse>(`/api/admin/jobs?${qs.toString()}`);
+    
+    // Industrial normalization to prevent frontend crashes on missing fields
+    if (res && Array.isArray(res.jobs)) {
+        res.jobs = res.jobs.map((job: any) => ({
+            ...job,
+            id: job.id ?? 'unknown',
+            tenant_id: job.tenant_id ?? 'default',
+            type: job.type ?? job.job_type ?? 'LEGACY',
+            status: job.status ?? 'UNKNOWN',
+            deployment_id: job.deployment_id ?? null,
+            asset_id: job.asset_id ?? null,
+            printhouse_id: job.printhouse_id ?? null,
+            worker_id: job.worker_id ?? null,
+            original_name: job.original_name ?? null,
+            created_at: job.created_at ?? null,
+            updated_at: job.updated_at ?? null,
+        }));
+    }
+    
+    return res;
 }
+
 export async function getTopErrors(range: Range) {
     return adminFetch<TopErrorRow[]>(`/api/admin/errors/top?range=${range}`);
 }
@@ -676,7 +698,18 @@ export async function getPreflightJobs(params: {
     try {
         const res = await adminFetch<any>(`/api/admin/preflight/jobs?${qs.toString()}`);
         // Normalize: { jobs: [] } or { data: [] } or raw array
-        const jobs = res.jobs || res.data || (Array.isArray(res) ? res : []);
+        let rawJobs = res.jobs || res.data || (Array.isArray(res) ? res : []);
+        
+        const jobs = rawJobs.map((j: any) => ({
+            ...j,
+            jobId: j.jobId ?? j.id ?? 'unknown',
+            tenantId: j.tenantId ?? j.tenant_id ?? 'default',
+            status: j.status ?? 'UNKNOWN',
+            type: j.type ?? 'ANALYZE',
+            progress: j.progress ?? 0,
+            createdAt: j.createdAt ?? j.created_at ?? null
+        }));
+
         const total = res.total ?? jobs.length;
         return { total, jobs };
     } catch (e) {

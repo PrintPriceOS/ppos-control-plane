@@ -12,6 +12,8 @@ import {
     ExclamationCircleIcon,
     ListBulletIcon
 } from "@heroicons/react/24/outline";
+import { short } from "../../lib/formatters";
+
 
 export const FinancialOpsTab: React.FC = () => {
     const [transactions, setTransactions] = useState<any[]>([]);
@@ -110,7 +112,8 @@ export const FinancialOpsTab: React.FC = () => {
                                     >
                                         <td className="px-4 py-4">
                                             <div className="text-[11px] font-black text-slate-900">{tx.transaction_reference}</div>
-                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{tx.id.slice(0, 8)}...</div>
+                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{short(tx.id, 8)}...</div>
+
                                         </td>
                                         <td className="px-4 py-4">
                                             <div className="text-[11px] font-bold text-slate-700 truncate max-w-[150px]">{tx.job_name || 'N/A'}</div>

@@ -12,6 +12,8 @@ import { getAudit } from '../../lib/adminApi';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { DataTable } from '../../components/DataTable';
 import { AuditDetailDrawer } from '../../components/AuditDetailDrawer';
+import { short } from '../../lib/formatters';
+
 
 export const AuditExplorerPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -99,9 +101,10 @@ export const AuditExplorerPage: React.FC = () => {
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500">
                                    <FingerPrintIcon className="w-3 h-3" />
-                                   {a.id?.toString().slice(0, 8) || 'Unknown'}
+                                   {short(a.id, 8)}
                                 </div>
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">RequestId: {a.request_id?.slice(0, 12) || 'N/A'}</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">RequestId: {short(a.request_id, 12)}</span>
+
                             </div>
                         )
                     },
