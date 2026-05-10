@@ -18,7 +18,7 @@ import {
     SparklesIcon, 
     ArrowTrendingUpIcon,
     VariableIcon,
-    HistoryIcon
+    ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 export const IndustrialTemporalTab: React.FC = () => {
@@ -135,7 +135,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                 {/* Future-State Optimization Feed */}
                 <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
-                        <HistoryIcon className="w-4 h-4 text-indigo-500" />
+                        <ArrowPathIcon className="w-4 h-4 text-indigo-500" />
                         Future-State Optimization Feed
                     </h3>
                     <div className="space-y-4">

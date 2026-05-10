@@ -17,7 +17,7 @@ import {
     ShieldExclamationIcon, 
     CurrencyDollarIcon,
     ArrowPathIcon,
-    LightningBoltIcon
+    BoltIcon
 } from '@heroicons/react/24/outline';
 
 export const IndustrialEconomicTab: React.FC = () => {
@@ -149,7 +149,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                 {/* Regional Energy Load Panel */}
                 <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
-                        <LightningBoltIcon className="w-4 h-4 text-yellow-500" />
+                        <BoltIcon className="w-4 h-4 text-yellow-500" />
                         Regional Energy Load Panel
                     </h3>
                     <div className="grid grid-cols-1 gap-4">
