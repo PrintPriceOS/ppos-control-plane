@@ -122,11 +122,35 @@ const start = async () => {
             console.log('[INDUSTRIAL-PROVISIONING] Starting autonomous MES bootstrap...');
             provisioningService.runFullProvisioning()
                 .then(summary => {
-                    console.log('[MES-BOOTSTRAP] System state hardened.');
+                    console.log('[MES-BOOTSTRAP] Summary:', JSON.stringify(summary, null, 2));
+                    if (summary.warnings && summary.warnings.length > 0) {
+                        console.warn('[MES-BOOTSTRAP] Warnings:', JSON.stringify(summary.warnings, null, 2));
+                    }
                     console.log(`[MACHINE-DISCOVERY] ${summary.machinesDiscovered} machines active.`);
+                    
+                    if (summary.failedSteps.length > 0) {
+                        console.error(`[MES-BOOTSTRAP] Completed with failures in steps: ${summary.failedSteps.join(', ')}`);
+                    } else if (summary.warnings.length > 0) {
+                        console.log('[MES-BOOTSTRAP] Completed with warnings.');
+                    } else {
+                        console.log('[MES-BOOTSTRAP] Completed cleanly.');
+                    }
+
+                    // Differentiate empty-state
+                    if (summary.machinesDiscovered === 0) {
+                        const sc = summary.sourceCounts || {};
+                        if (sc.printer_nodes === 0) {
+                            console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 printer_nodes exist.');
+                        } else if (sc.print_nodes === 0) {
+                            console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 print_nodes were synced (check ACTIVE status).');
+                        } else {
+                            console.log('[MES-BOOTSTRAP] Insight: 0 machines discovered despite active nodes (check machine profile JSON).');
+                        }
+                    }
                 })
                 .catch(err => {
-                    console.error('[MES-BOOTSTRAP] Background provisioning failed:', err.message);
+                    console.error('[MES-BOOTSTRAP] Fatal provisioning exception:');
+                    console.error(err);
                 });
         } catch (err) {
             console.error('[INDUSTRIAL-PROVISIONING] Load failed:', err.message);
