@@ -59,16 +59,22 @@ async function validate() {
                 const caps2 = typeof m2.normalized_capabilities_json === 'string' ? JSON.parse(m2.normalized_capabilities_json) : m2.normalized_capabilities_json;
                 if (!caps2) continue;
 
-                // Find intersection
-                const commonPapers = (caps1.paper_types || []).filter(p => (caps2.paper_types || []).includes(p));
-                const commonBindings = (caps1.binding || []).filter(b => (caps2.binding || []).includes(b));
-                const commonColours = (caps1.colour_modes || []).filter(c => (caps2.colour_modes || []).includes(c));
+                // Find intersection (case-insensitive)
+                const commonPapers = (caps1.paper_types || []).filter(p => 
+                    (caps2.paper_types || []).map(s => s.toLowerCase()).includes(p.toLowerCase())
+                );
+                const commonBindings = (caps1.binding || []).filter(b => 
+                    (caps2.binding || []).map(s => s.toLowerCase()).includes(b.toLowerCase())
+                );
+                const commonColours = (caps1.colour_modes || []).filter(c => 
+                    (caps2.colour_modes || []).map(s => s.toLowerCase()).includes(c.toLowerCase())
+                );
 
                 if (commonPapers.length > 0 && commonBindings.length > 0 && commonColours.length > 0) {
                     selectedSpec = {
-                        paper: commonPapers[0],
-                        binding: commonBindings[0],
-                        colour: commonColours[0].includes('4') ? 'full' : 'mono',
+                        paper: commonPapers[0].toLowerCase(),
+                        binding: commonBindings[0].toLowerCase(),
+                        colour: commonColours[0].toLowerCase().includes('4') ? 'full' : 'mono',
                         copies: Math.max(caps1.min_run || 1, caps2.min_run || 1),
                         sheet_size: { width: 210, height: 297 }, // A4 default
                         gsm: Math.max(caps1.min_gsm || 80, caps2.min_gsm || 80)
@@ -177,6 +183,22 @@ async function validate() {
         console.log(' -> Running Autonomous Reroute...');
         const rerouteSummary = await autoReroute.evaluateReroutes();
         console.log('    Reroute Summary:', JSON.stringify(rerouteSummary));
+
+        if (rerouteSummary.failures.length > 0) {
+            console.error('\n--- REROUTE FAILURE DIAGNOSTICS ---');
+            rerouteSummary.failures.forEach(f => {
+                console.error(`- Dispatch: ${f.id} | Error: ${f.error}`);
+                if (f.diagnostics) {
+                    console.error(`  Requested Specs: ${JSON.stringify(f.diagnostics.requestedSpecs)}`);
+                    console.error(`  Preferred Node: ${f.diagnostics.preferredNodeId}`);
+                    console.error(`  Excluded Nodes: ${f.diagnostics.excludedNodeIds?.join(', ')}`);
+                    console.error('  Rejected Candidates:');
+                    (f.diagnostics.rejectedCandidates || []).forEach(rc => {
+                        console.error(`    * Machine: ${rc.id} (Node: ${rc.nodeId}) | Reason: ${rc.reason} | Details: ${JSON.stringify(rc.details || {})}`);
+                    });
+                }
+            });
+        }
 
         console.log(' -> Running Learning Loop...');
         const learningSummary = await learningLoop.recomputeIntelligence();

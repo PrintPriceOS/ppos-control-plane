@@ -108,6 +108,15 @@ class DispatchRecommendationService {
         // Pass exclusion list to routing if supported
         const result = await this.getRecommendations({ ...specs, ...options });
         
+        const diagnosticInfo = {
+            jobId,
+            requestedSpecs: specs,
+            preferredNodeId: options.preferredNodeId || null,
+            excludedNodeIds: options.excludeNodeIds || [],
+            allCandidatesCount: result.ok ? result.recommendations.length : 0,
+            rejectedCandidates: result.rejectedCandidates || []
+        };
+
         if (result.ok && result.recommendations.length > 0) {
             // Apply hard filter for excluded nodes if the engine didn't
             let candidates = result.recommendations.filter(r => !options.excludeNodeIds?.includes(r.nodeId));
@@ -124,9 +133,8 @@ class DispatchRecommendationService {
             if (candidates.length === 0) {
                 return {
                     ok: false,
-                    reason: 'ALL_CANDIDATES_EXCLUDED',
-                    allCandidatesCount: result.recommendations.length,
-                    rejectedCandidates: result.rejectedCandidates || []
+                    error: 'ALL_CANDIDATES_EXCLUDED',
+                    ...diagnosticInfo
                 };
             }
 
@@ -139,13 +147,14 @@ class DispatchRecommendationService {
                 estimated_margin: best.estimatedMargin,
                 estimated_days: best.estimatedProductionDays,
                 score: best.finalScore,
-                confidence: best.confidence
+                confidence: best.confidence,
+                diagnosticInfo
             };
         }
         return {
             ok: false,
-            reason: result.message || 'NO_RECOMMENDATIONS_FOUND',
-            rejectedCandidates: result.rejectedCandidates || []
+            error: result.message || 'NO_RECOMMENDATIONS_FOUND',
+            ...diagnosticInfo
         };
     }
 }

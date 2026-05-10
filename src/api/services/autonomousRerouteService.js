@@ -40,12 +40,14 @@ class AutonomousRerouteService {
                     event: 'reroute_failed', 
                     dispatchId: d.id, 
                     originalNode: d.node_id,
-                    error: err.message || 'UNKNOWN_REROUTE_ERROR',
-                    requestedSpecs: err.requestedSpecs || {},
-                    rejectedCandidates: err.rejectedCandidates || [],
-                    capacityState: err.capacityState || 'UNKNOWN'
+                    message: err.message || 'Reroute execution failed',
+                    diagnostics: err.diagnostics || {}
                 });
-                summary.failures.push({ id: d.id, error: err.message });
+                summary.failures.push({ 
+                    id: d.id, 
+                    error: err.message || 'UNKNOWN_ERROR',
+                    diagnostics: err.diagnostics 
+                });
             }
         }
         
@@ -63,9 +65,7 @@ class AutonomousRerouteService {
 
         if (!recommendation || !recommendation.ok) {
             const error = new Error('RECOVERY_FAILED: NO_ALTERNATE_PRODUCTION_CAPACITY');
-            error.rejectedCandidates = recommendation?.rejectedCandidates || [];
-            error.capacityState = recommendation?.reason || 'NO_COMPATIBLE_MACHINES_OR_NODES';
-            error.requestedSpecs = recommendation?.specs || {};
+            error.diagnostics = recommendation || { error: 'UNKNOWN_RECOMMENDATION_FAILURE' };
             throw error;
         }
 
