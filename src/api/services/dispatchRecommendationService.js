@@ -22,6 +22,7 @@ class DispatchRecommendationService {
                     ok: true,
                     recommendations: [],
                     rejectedCandidates,
+                    specs,
                     message: 'NO_COMPATIBLE_MACHINES_FOUND'
                 };
             }

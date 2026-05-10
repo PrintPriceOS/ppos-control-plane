@@ -31,47 +31,84 @@ async function validate() {
         // 1. Create Baseline Data
         console.log('[2/6] Provisioning 3 industrial test dispatches...');
         
-        // Find nodes with compatible machines for a generic book spec
-        const specs = {
-            binding: 'HOT_MELT',
-            paper: 'OFFSET_90G',
-            colour: 'full',
-            copies: 100,
-            sheet_size: 'A4',
-            gsm: 90
-        };
+        // Adaptive discovery of real machine capabilities
+        const allMachines = await db.query(`
+            SELECT node_id, id as machine_id, profile_name, normalized_capabilities_json, raw_data_json 
+            FROM print_node_machine_profiles 
+            WHERE status = 'ACTIVE'
+        `);
 
-        const { matched: machines } = await require('../src/api/services/machineRegistryService').findMatchingMachines({
-            paper_type: specs.paper,
-            sheet_size: specs.sheet_size,
-            colour_mode: '4/4',
-            binding: specs.binding,
-            gsm: specs.gsm,
-            run_length: specs.copies
-        });
-
-        if (machines.length < 2) {
-            console.error('\n❌ NO_VALIDATION_ALTERNATE_NODE_AVAILABLE');
-            console.error('The system does not have at least 2 compatible nodes for the validation specs.');
-            console.log('Specs:', JSON.stringify(specs));
-            console.log('Matched Machines:', machines.length);
+        if (allMachines.length < 2) {
+            console.error('\n❌ NO_VALIDATION_ALTERNATE_NODE_AVAILABLE: Need at least 2 active machines.');
             process.exit(1);
         }
+
+        // Try to find a spec that works for at least 2 different nodes
+        let selectedSpec = null;
+        let selectedMachines = [];
+
+        for (const m1 of allMachines) {
+            const caps1 = typeof m1.normalized_capabilities_json === 'string' ? JSON.parse(m1.normalized_capabilities_json) : m1.normalized_capabilities_json;
+            if (!caps1) continue;
+
+            for (const m2 of allMachines) {
+                if (m1.node_id === m2.node_id) continue; // Must be different nodes for reroute validation
+                
+                const caps2 = typeof m2.normalized_capabilities_json === 'string' ? JSON.parse(m2.normalized_capabilities_json) : m2.normalized_capabilities_json;
+                if (!caps2) continue;
+
+                // Find intersection
+                const commonPapers = (caps1.paper_types || []).filter(p => (caps2.paper_types || []).includes(p));
+                const commonBindings = (caps1.binding || []).filter(b => (caps2.binding || []).includes(b));
+                const commonColours = (caps1.colour_modes || []).filter(c => (caps2.colour_modes || []).includes(c));
+
+                if (commonPapers.length > 0 && commonBindings.length > 0 && commonColours.length > 0) {
+                    selectedSpec = {
+                        paper: commonPapers[0],
+                        binding: commonBindings[0],
+                        colour: commonColours[0].includes('4') ? 'full' : 'mono',
+                        copies: Math.max(caps1.min_run || 1, caps2.min_run || 1),
+                        sheet_size: { width: 210, height: 297 }, // A4 default
+                        gsm: Math.max(caps1.min_gsm || 80, caps2.min_gsm || 80)
+                    };
+                    selectedMachines = [m1, m2];
+                    break;
+                }
+            }
+            if (selectedSpec) break;
+        }
+
+        if (!selectedSpec) {
+            console.error('\n❌ NO_VALIDATION_ALTERNATE_NODE_AVAILABLE: Could not find compatible overlap between nodes.');
+            console.log('--- MACHINE CAPABILITIES DIAGNOSTICS ---');
+            allMachines.forEach(m => {
+                const c = typeof m.normalized_capabilities_json === 'string' ? JSON.parse(m.normalized_capabilities_json) : m.normalized_capabilities_json;
+                console.log(`- Machine: ${m.profile_name} (Node: ${m.node_id})`);
+                console.log(`  Papers: ${c?.paper_types?.join(', ')}`);
+                console.log(`  Bindings: ${c?.binding?.join(', ')}`);
+                console.log(`  Colours: ${c?.colour_modes?.join(', ')}`);
+            });
+            process.exit(1);
+        }
+
+        console.log(`    Selected Validation Spec: ${JSON.stringify(selectedSpec)}`);
+        console.log(`    Original Node: ${selectedMachines[0].node_id} (Machine: ${selectedMachines[0].machine_id})`);
+        console.log(`    Alternate Node: ${selectedMachines[1].node_id} (Machine: ${selectedMachines[1].machine_id})`);
 
         const testJobs = [];
         for (let i = 1; i <= 3; i++) {
             const jobId = `TEST-JOB-${i}-${Date.now()}`;
-            const jobMetadata = { ...specs, is_rush: i === 1 };
+            // Ensure first job is assigned to original node, others to alternate to simulate capacity load
+            const machine = i === 1 ? selectedMachines[0] : selectedMachines[1];
             
+            const jobMetadata = { ...selectedSpec, is_rush: i === 1 };
             await db.query("INSERT INTO jobs (id, original_name, metadata_json) VALUES (?, ?, ?)", [
                 jobId, `Validation Job ${i}`, JSON.stringify(jobMetadata)
             ]);
             
-            // Assign to first machine for d1, second for others to ensure capacity
-            const machine = machines[i % machines.length];
             const assignment = {
                 nodeId: machine.node_id,
-                machineId: machine.id,
+                machineId: machine.machine_id,
                 estimatedCost: 100 * i,
                 estimatedMargin: 20,
                 estimatedProductionDays: 2,
