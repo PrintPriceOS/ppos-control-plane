@@ -6,7 +6,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const simulation = require('../services/realitySimulationService');
+const simulation = require('../services/RealitySimulationService');
 const timeline = require('../services/timelineOptimizationService');
 const modeling = require('../services/parallelCivilizationModelingService');
 const forecasting = require('../services/quantumIndustrialForecastingService');
