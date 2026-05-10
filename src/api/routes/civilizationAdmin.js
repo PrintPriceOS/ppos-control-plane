@@ -23,26 +23,26 @@ router.get('/health', async (req, res) => {
         const health = await coordination.getHealth();
         res.json({ ok: true, health });
     } catch (err) {
-        res.json({ ok: false, error: err.message, degraded: true });
+        res.status(500).json({ ok: false, error: err.message, code: 'CIVILIZATION_HEALTH_ERROR' });
     }
 });
 
-router.get('/planetary-load', async (req, res) => { res.json({ ok: true }); });
-router.get('/equilibrium', async (req, res) => { res.json({ ok: true }); });
-router.get('/resources', async (req, res) => { res.json({ ok: true }); });
-router.get('/expansion', async (req, res) => { res.json({ ok: true }); });
-router.get('/diplomacy', async (req, res) => { res.json({ ok: true }); });
-router.get('/stability', async (req, res) => { res.json({ ok: true }); });
-router.get('/risk', async (req, res) => { res.json({ ok: true }); });
-router.get('/colonization', async (req, res) => { res.json({ ok: true }); });
-router.get('/cognition', async (req, res) => { res.json({ ok: true }); });
+router.get('/planetary-load', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/equilibrium', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/resources', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/expansion', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/diplomacy', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/stability', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/risk', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/colonization', async (req, res) => { res.json({ ok: true, data: {} }); });
+router.get('/cognition', async (req, res) => { res.json({ ok: true, data: {} }); });
 
 router.get('/digital-twin', async (req, res) => {
     try {
         const snapshot = await twin.generateCivilizationSnapshot();
-        res.json({ ok: true, snapshot });
+        res.json({ ok: true, data: snapshot });
     } catch (err) {
-        res.json({ ok: true, snapshot: {}, degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'CIVILIZATION_TWIN_ERROR' });
     }
 });
 
@@ -54,9 +54,9 @@ router.post('/stabilize', async (req, res) => { res.json({ ok: true }); });
 router.post('/snapshot', async (req, res) => {
     try {
         const snapshot = await twin.generateCivilizationSnapshot();
-        res.json({ ok: true, snapshot });
+        res.json({ ok: true, data: snapshot });
     } catch (err) {
-        res.json({ ok: true, snapshot: {}, degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'CIVILIZATION_SNAPSHOT_ERROR' });
     }
 });
 

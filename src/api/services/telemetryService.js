@@ -472,13 +472,13 @@ class TelemetryService {
             `);
 
             return {
-                state: stats.stalled_dispatches > 5 ? 'DEGRADED' : 'LIVE',
-                activeDispatches: parseInt(stats.active_dispatches) || 0,
-                stalledDispatches: parseInt(stats.stalled_dispatches) || 0,
-                autonomousRecoveries: parseInt(stats.autonomous_recoveries) || 0,
-                capacityConflicts: parseInt(stats.capacity_conflicts) || 0,
-                avgNodeReliability: parseFloat(reliability[0]?.avg_score || 0).toFixed(2),
-                avgProductionDuration: `${parseFloat(reliability[0]?.avg_turnaround || 0).toFixed(1)}h`,
+                state: (stats?.stalled_dispatches > 5) ? 'DEGRADED' : 'LIVE',
+                activeDispatches: parseInt(stats?.active_dispatches) || 0,
+                stalledDispatches: parseInt(stats?.stalled_dispatches) || 0,
+                autonomousRecoveries: parseInt(stats?.autonomous_recoveries) || 0,
+                capacityConflicts: parseInt(stats?.capacity_conflicts) || 0,
+                avgNodeReliability: parseFloat(reliability?.avg_score || 0).toFixed(2),
+                avgProductionDuration: `${parseFloat(reliability?.avg_turnaround || 0).toFixed(1)}h`,
                 timestamp: new Date().toISOString()
             };
         } catch (err) {

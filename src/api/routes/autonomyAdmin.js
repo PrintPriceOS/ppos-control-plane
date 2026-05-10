@@ -14,67 +14,48 @@ const learningLoop = require('../services/manufacturingLearningService');
 router.get('/status', async (req, res) => {
     try {
         const status = autonomousOrchestrator.getStatus();
-        res.json({ ok: true, status });
+        res.json({ ok: true, data: status });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_STATUS_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/autonomous/dispatch/evaluate
- * Manually trigger dispatch evaluation.
- */
 router.post('/dispatch/evaluate', async (req, res) => {
     try {
         const result = await autoDispatch.evaluateQueuedJobs();
-        res.json({ ok: true, result });
+        res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_EVALUATE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/autonomous/sla/scan
- * Manually trigger SLA monitoring scan.
- */
 router.post('/sla/scan', async (req, res) => {
     try {
         const result = await slaMonitor.scanActiveDispatches();
-        res.json({ ok: true, result });
+        res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_SLA_SCAN_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/autonomous/reroute/run
- * Manually trigger autonomous rerouting.
- */
 router.post('/reroute/run', async (req, res) => {
     try {
         const result = await autoReroute.evaluateReroutes();
-        res.json({ ok: true, result });
+        res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_REROUTE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/autonomous/learning/recompute
- * Manually trigger learning feedback loop.
- */
 router.post('/learning/recompute', async (req, res) => {
     try {
         const result = await learningLoop.recomputeIntelligence();
-        res.json({ ok: true, result });
+        res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_LEARNING_ERROR' });
     }
 });
 
-/**
- * Legacy Pipeline Routes
- */
 router.get('/pipelines', async (req, res) => {
     try {
         const { rows } = await db.query(`
@@ -83,15 +64,12 @@ router.get('/pipelines', async (req, res) => {
             LEFT JOIN jobs j ON ajp.job_id = j.id
             ORDER BY ajp.created_at DESC
         `);
-        res.json(rows);
+        res.json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_PIPELINES_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/pipelines/metrics
- */
 router.get('/metrics', async (req, res) => {
     try {
         const { rows } = await db.query(`
@@ -102,78 +80,66 @@ router.get('/metrics', async (req, res) => {
                 COALESCE(SUM(CASE WHEN pipeline_status = 'PAUSED' THEN 1 ELSE 0 END), 0) as requiring_intervention
             FROM autonomous_job_pipelines
         `);
-        res.json(rows[0]);
+        res.json({ ok: true, data: rows[0] });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_METRICS_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/autonomous/health
- */
 router.get('/health', async (req, res) => {
     try {
         const telemetryService = require('../services/telemetryService');
         const health = await telemetryService.getIndustrialHealthSnapshot();
         res.json({ ok: true, health });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_HEALTH_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/pipelines/:id
- */
 router.get('/:id', async (req, res) => {
     try {
         const { rows: [pipeline] } = await db.query('SELECT * FROM autonomous_job_pipelines WHERE id = ?', [req.params.id]);
-        if (!pipeline) return res.status(404).json({ error: 'Pipeline not found' });
+        if (!pipeline) return res.status(404).json({ ok: false, error: 'Pipeline not found', code: 'AUTONOMY_PIPELINE_NOT_FOUND' });
 
         const { rows: events } = await db.query('SELECT * FROM pipeline_events WHERE pipeline_id = ? ORDER BY created_at ASC', [req.params.id]);
 
         res.json({
-            ...pipeline,
-            events
+            ok: true,
+            data: {
+                ...pipeline,
+                events
+            }
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'AUTONOMY_PIPELINE_QUERY_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/pipelines/:id/pause
- */
 router.post('/:id/pause', async (req, res) => {
     try {
         const { reason } = req.body;
         await autonomousOrchestrator.pausePipeline(req.params.id, reason || 'Manual intervention');
-        res.json({ success: true });
+        res.json({ ok: true, message: 'Pipeline paused' });
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ ok: false, error: err.message, code: 'AUTONOMY_PAUSE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/pipelines/:id/resume
- */
 router.post('/:id/resume', async (req, res) => {
     try {
         await autonomousOrchestrator.resumePipeline(req.params.id);
-        res.json({ success: true });
+        res.json({ ok: true, message: 'Pipeline resumed' });
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ ok: false, error: err.message, code: 'AUTONOMY_RESUME_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/pipelines/:id/retry-step
- */
 router.post('/:id/retry-step', async (req, res) => {
     try {
         await autonomousOrchestrator.retryPipelineStep(req.params.id);
-        res.json({ success: true });
+        res.json({ ok: true, message: 'Step retry triggered' });
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ ok: false, error: err.message, code: 'AUTONOMY_RETRY_ERROR' });
     }
 });
 

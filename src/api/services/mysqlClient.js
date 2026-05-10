@@ -8,7 +8,7 @@ let pool = null;
 function getPool() {
     if (pool) return pool;
 
-    let config = {
+    const config = {
         host: process.env.MYSQL_HOST,
         port: parseInt(process.env.MYSQL_PORT || '3306'),
         user: process.env.MYSQL_USER,
@@ -16,7 +16,8 @@ function getPool() {
         database: process.env.MYSQL_DATABASE,
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
+        queueLimit: 0,
+        connectTimeout: 5000 // Industrial: Fail fast if host unreachable
     };
 
     let usedUrl = false;
@@ -82,8 +83,27 @@ function getPool() {
 }
 
 async function query(sql, params = []) {
-    const [rows] = await getPool().query(sql, params);
-    return rows;
+    const isConfigured = process.env.MYSQL_HOST || process.env.DATABASE_URL;
+    
+    if (!isConfigured) {
+        const error = new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
+        error.code = 'DB_UNCONFIGURED';
+        throw error;
+    }
+
+    try {
+        const [rows] = await getPool().query(sql, params);
+        return rows;
+    } catch (err) {
+        // Hardening: Wrap connection refused to be more readable
+        if (err.code === 'ECONNREFUSED') {
+            const wrappedErr = new Error(`Database connection refused at ${process.env.MYSQL_HOST || 'localhost'}`);
+            wrappedErr.code = 'DB_CONNECTION_REFUSED';
+            wrappedErr.originalError = err;
+            throw wrappedErr;
+        }
+        throw err;
+    }
 }
 
 module.exports = { getPool, query };

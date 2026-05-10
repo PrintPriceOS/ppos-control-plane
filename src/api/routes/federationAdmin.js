@@ -21,104 +21,80 @@ router.get('/health', async (req, res) => {
         const health = await globalIntel.computeGlobalHealth();
         res.json({ ok: true, health });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_HEALTH_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/federation/factories
- */
 router.get('/factories', async (req, res) => {
     try {
         const factories = await registry.getActiveFactories();
-        res.json({ ok: true, factories });
+        res.json({ ok: true, data: factories });
     } catch (err) {
-        res.json({ ok: true, factories: [], degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_FACTORIES_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/federation/consensus
- */
 router.get('/consensus', async (req, res) => {
     try {
         const events = await db.query('SELECT * FROM swarm_consensus_events ORDER BY created_at DESC LIMIT 50');
-        res.json({ ok: true, events });
+        res.json({ ok: true, data: events });
     } catch (err) {
-        res.json({ ok: true, events: [], degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_CONSENSUS_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/federation/digital-twin
- */
 router.get('/digital-twin', async (req, res) => {
     try {
         const snapshots = await twin.getSnapshots();
-        res.json({ ok: true, snapshots });
+        res.json({ ok: true, data: snapshots });
     } catch (err) {
-        res.json({ ok: true, snapshots: [], degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_TWIN_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/federation/delegations
- */
 router.get('/delegations', async (req, res) => {
     try {
         const delegations = await db.query('SELECT * FROM distributed_dispatch_delegations ORDER BY created_at DESC LIMIT 50');
-        res.json({ ok: true, delegations });
+        res.json({ ok: true, data: delegations });
     } catch (err) {
-        res.json({ ok: true, delegations: [], degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_DELEGATIONS_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/federation/recovery
- */
 router.get('/recovery', async (req, res) => {
     try {
         const events = await db.query('SELECT * FROM federation_recovery_events ORDER BY created_at DESC LIMIT 50');
-        res.json({ ok: true, events });
+        res.json({ ok: true, data: events });
     } catch (err) {
-        res.json({ ok: true, events: [], degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_RECOVERY_QUERY_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/federation/rebalance
- */
 router.post('/rebalance', async (req, res) => {
     try {
         const executed = await orchestration.rebalanceFederationLoad();
         res.json({ ok: true, rebalanceExecuted: executed });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_REBALANCE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/federation/recover
- */
 router.post('/recover', async (req, res) => {
     try {
         const { factoryId } = req.body;
         await recovery.recoverFactory(factoryId);
         res.json({ ok: true, message: `Recovery initiated for factory ${factoryId}` });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_RECOVERY_TRIGGER_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/federation/snapshot
- */
 router.post('/snapshot', async (req, res) => {
     try {
         const snapshot = await twin.generateFederationSnapshot('MANUAL');
-        res.json({ ok: true, snapshot });
+        res.json({ ok: true, data: snapshot });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_SNAPSHOT_ERROR' });
     }
 });
 

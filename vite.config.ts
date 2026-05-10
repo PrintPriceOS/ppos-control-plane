@@ -13,6 +13,36 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor: React + core libraries
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          // Vendor: Routing
+          if (id.includes('node_modules/react-router')) {
+            return 'vendor-router';
+          }
+          // Vendor: Icons
+          if (id.includes('node_modules/@heroicons') || id.includes('node_modules/lucide')) {
+            return 'vendor-icons';
+          }
+          // Vendor: Data/state
+          if (id.includes('node_modules/axios') || id.includes('node_modules/swr') || id.includes('node_modules/zustand')) {
+            return 'vendor-data';
+          }
+          // Admin pages — separate from shared hooks to avoid circular refs
+          if (id.includes('/pages/admin/ProductionDispatch') || id.includes('/pages/admin/ProductionNode')) {
+            return 'admin-intelligence';
+          }
+          if (id.includes('/pages/admin/')) {
+            return 'admin-core';
+          }
+        },
+      },
+    },
   },
   server: {
     port: 3000,

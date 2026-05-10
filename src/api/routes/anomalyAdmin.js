@@ -27,55 +27,43 @@ router.get('/health', async (req, res) => {
             }
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ANOMALY_HEALTH_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/anomaly/nodes
- */
 router.get('/nodes', async (req, res) => {
     try {
         const rows = await db.query("SELECT node_id, current_drift_score FROM print_node_machine_profiles WHERE current_drift_score > 0");
-        res.json(rows);
+        res.json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ANOMALY_NODES_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/anomaly/digital-twin
- */
 router.get('/digital-twin', async (req, res) => {
     try {
         const rows = await db.query("SELECT * FROM industrial_digital_twin_snapshots ORDER BY created_at DESC LIMIT 50");
-        res.json(rows);
+        res.json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ANOMALY_TWIN_QUERY_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/anomaly/recompute
- */
 router.post('/recompute', async (req, res) => {
     try {
         await twin.generateSnapshot('MANUAL');
         res.json({ ok: true, message: 'Digital Twin snapshot generated.' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ANOMALY_RECOMPUTE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/anomaly/preemptive-recovery
- */
 router.post('/preemptive-recovery', async (req, res) => {
     try {
         const count = await recovery.runPreemptiveRecovery();
         res.json({ ok: true, preemptiveRecoveries: count });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ANOMALY_RECOVERY_ERROR' });
     }
 });
 

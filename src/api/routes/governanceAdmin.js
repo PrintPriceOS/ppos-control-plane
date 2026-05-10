@@ -22,48 +22,48 @@ router.get('/health', async (req, res) => {
         const health = await policy.getHealth();
         res.json({ ok: true, health });
     } catch (err) {
-        res.json({ ok: false, error: err.message, degraded: true });
+        res.status(500).json({ ok: false, error: err.message, code: 'GOVERNANCE_HEALTH_ERROR' });
     }
 });
 
 router.get('/policies', async (req, res) => {
-    res.json({ ok: true, policies: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/constitution', async (req, res) => {
-    res.json({ ok: true, constitution: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/cognition', async (req, res) => {
-    res.json({ ok: true, cognition: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/memory', async (req, res) => {
-    res.json({ ok: true, memory: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/simulations', async (req, res) => {
-    res.json({ ok: true, simulations: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/ethics', async (req, res) => {
-    res.json({ ok: true, ethics: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/learning', async (req, res) => {
-    res.json({ ok: true, learning: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/optimization', async (req, res) => {
-    res.json({ ok: true, optimization: [] });
+    res.json({ ok: true, data: [] });
 });
 
 router.get('/digital-twin', async (req, res) => {
     try {
         const snapshot = await twin.generateGovernanceSnapshot();
-        res.json({ ok: true, snapshot });
+        res.json({ ok: true, data: snapshot });
     } catch (err) {
-        res.json({ ok: true, snapshot: {}, degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'GOVERNANCE_TWIN_ERROR' });
     }
 });
 
@@ -86,9 +86,9 @@ router.post('/recover', async (req, res) => {
 router.post('/snapshot', async (req, res) => {
     try {
         const snapshot = await twin.generateGovernanceSnapshot();
-        res.json({ ok: true, snapshot });
+        res.json({ ok: true, data: snapshot });
     } catch (err) {
-        res.json({ ok: true, snapshot: {}, degraded: true, error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'GOVERNANCE_SNAPSHOT_ERROR' });
     }
 });
 

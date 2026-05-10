@@ -33,16 +33,13 @@ router.get('/health', async (req, res) => {
     } catch (err) {
         console.error('[ECONOMIC-ADMIN] Health check failed:', err);
         res.status(500).json({ 
+            ok: false,
             error: err.message || 'Internal Server Error',
-            code: err.code,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            code: 'ECONOMIC_HEALTH_ERROR'
         });
     }
 });
 
-/**
- * GET /api/admin/economic/network
- */
 router.get('/network', async (req, res) => {
     try {
         const nodes = await db.query("SELECT * FROM printer_capacity_state");
@@ -58,13 +55,10 @@ router.get('/network', async (req, res) => {
             }))
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_NETWORK_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/economic/profitability
- */
 router.get('/profitability', async (req, res) => {
     try {
         const dispatches = await db.query("SELECT * FROM manufacturing_dispatches WHERE status NOT IN ('CANCELED', 'FAILED') LIMIT 100");
@@ -76,13 +70,10 @@ router.get('/profitability', async (req, res) => {
             averageScore: dispatches.reduce((acc, d) => acc + profitability.calculateProfitabilityScore(d), 0) / (dispatches.length || 1)
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_PROFITABILITY_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/economic/efficiency
- */
 router.get('/efficiency', async (req, res) => {
     try {
         const [stats] = await db.query("SELECT AVG(reliability_score) as avgRel, AVG(utilization_percent) as avgUtil FROM printer_reliability_metrics JOIN printer_capacity_state ON printer_reliability_metrics.printer_id = printer_capacity_state.printer_id");
@@ -99,13 +90,10 @@ router.get('/efficiency', async (req, res) => {
             }
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_EFFICIENCY_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/economic/energy
- */
 router.get('/energy', async (req, res) => {
     try {
         const nodes = await db.query("SELECT * FROM printer_capacity_state");
@@ -120,13 +108,10 @@ router.get('/energy', async (req, res) => {
             pressureNodes: metrics.filter(m => m.pressure).length
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_ENERGY_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/economic/swarm
- */
 router.get('/swarm', async (req, res) => {
     try {
         const nodes = await db.query("SELECT * FROM printer_capacity_state");
@@ -138,43 +123,34 @@ router.get('/swarm', async (req, res) => {
             status: score > 70 ? 'OPTIMIZED' : 'DEGRADED'
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_SWARM_QUERY_ERROR' });
     }
 });
 
-/**
- * GET /api/admin/economic/digital-twin
- */
 router.get('/digital-twin', async (req, res) => {
     try {
         const rows = await db.query("SELECT * FROM economic_digital_twin_snapshots ORDER BY created_at DESC LIMIT 50");
-        res.json(rows);
+        res.json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_TWIN_QUERY_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/economic/rebalance
- */
 router.post('/rebalance', async (req, res) => {
     try {
         const executed = await orch.executeGlobalRebalance();
         res.json({ ok: true, rebalanceExecuted: executed });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_REBALANCE_ERROR' });
     }
 });
 
-/**
- * POST /api/admin/economic/recompute
- */
 router.post('/recompute', async (req, res) => {
     try {
         await twin.generateEconomicSnapshot('MANUAL');
         res.json({ ok: true, message: 'Economic Digital Twin snapshot generated.' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ ok: false, error: err.message, code: 'ECONOMIC_RECOMPUTE_ERROR' });
     }
 });
 
