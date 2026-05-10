@@ -10,7 +10,7 @@ export const Layout: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
         <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-8 animate-slide-fade">
+          <div className="max-w-none space-y-8 animate-slide-fade">
             <Outlet />
           </div>
         </main>

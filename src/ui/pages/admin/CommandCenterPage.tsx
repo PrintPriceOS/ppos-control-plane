@@ -115,7 +115,7 @@ export const CommandCenterPage: React.FC = () => {
 
   // Derivation Helpers
   const complianceScore = useMemo(() => {
-    if (!blocks.data?.blocks || blocks.data.blocks.length === 0) return 'No data';
+    if (!blocks.data?.blocks || blocks.data.blocks.length === 0) return 'No governance telemetry';
     const active = blocks.data.blocks.filter((b: any) => b.status === 'ACTIVE').length;
     return `${Math.round((active / blocks.data.blocks.length) * 100)}%`;
   }, [blocks.data]);
@@ -164,221 +164,149 @@ export const CommandCenterPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Dashboard Title Block */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Dashboard</h1>
-          <p className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase">
-            Live operational state across preflight, production, fleet, governance, and artifacts.
+          <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Control Plane</h1>
+          <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase">
+            Operational Intelligence & Industrial Telemetry
           </p>
         </div>
-        <div className="flex items-center gap-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl">
+        <div className="flex items-center gap-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-md">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-            <span className="text-[10px] font-black uppercase text-slate-400">Queue: {industrial.data?.queue?.state || '---'}</span>
+            <div className={`w-1.5 h-1.5 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500'}`} />
+            <span className="text-[9px] font-black uppercase text-slate-400">Queue: {industrial.data?.queue?.state || 'OFFLINE'}</span>
           </div>
-          <div className="w-[1px] h-3 bg-slate-200 dark:bg-white/10" />
+          <div className="w-[1px] h-2 bg-slate-200 dark:bg-white/10" />
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-black uppercase text-slate-400">Health: Stable</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+            <span className="text-[9px] font-black uppercase text-slate-400">Health: Stable</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-4">
         
         {/* 2. MAIN OPERATIONAL GRID */}
-        <div className="col-span-12 xl:col-span-8 grid grid-cols-12 auto-rows-min gap-6 h-fit">
+        <div className="col-span-12 xl:col-span-9 grid grid-cols-12 auto-rows-min gap-4 h-fit">
           
-          {/* PREFLIGHT OPERATIONS */}
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 h-[400px]">
-            <TacticalPanel title="Preflight Operations" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status} error={industrial.error}>
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[260px]">
+            <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status} error={industrial.error}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
                   <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
                   <TelemetryItem label="Queue Depth" value={waitingJobs} status={waitingJobs > 100 ? 'warning' : 'stable'} />
                 </div>
                 <div className="h-[1px] bg-slate-100 dark:bg-white/5" />
-                <div className="space-y-4">
-                  <StatBar label="Industrial Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
-                  <StatBar label="Worker Availability" value={industrial.data?.workers?.stats?.fleetHealth || 0} color="primary" />
-                  <StatBar label="Engine Pressure" value={activeJobs > 50 ? 80 : 20} color="amber" />
-                </div>
-                <div className="mt-4 p-3 bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-lg">
-                  <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Queue Distribution</span>
-                  <div className="flex gap-1 h-2 rounded-full overflow-hidden">
-                    <div className="flex-1 bg-emerald-500" style={{ flex: activeJobs || 1 }} />
-                    <div className="bg-primary" style={{ flex: waitingJobs || 0 }} />
-                    <div className="bg-amber-500" style={{ flex: industrial.data?.queue?.queues?.[0]?.counts?.stalled || 0 }} />
-                  </div>
+                <div className="space-y-3">
+                  <StatBar label="Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
+                  <StatBar label="Nodes" value={industrial.data?.workers?.stats?.fleetHealth || 0} color="primary" />
+                  <StatBar label="Pressure" value={activeJobs > 50 ? 80 : 20} color="amber" />
                 </div>
               </div>
             </TacticalPanel>
           </div>
 
-          {/* WORKER CLUSTER */}
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 h-[400px]">
-            <TacticalPanel title="Worker Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'Industrial'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
+          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[260px]">
+            <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
               <div className="space-y-2">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase">Active Fleet</span>
-                  <span className="text-[9px] font-black text-primary uppercase">{industrial.data?.workers?.stats?.activeNodes || 0} Nodes</span>
-                </div>
-                {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 6).map((w: any) => (
-                  <div key={w.id} className="flex items-center justify-between p-2 rounded bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                      <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 12) || '---'}</span>
+                {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 4).map((w: any) => (
+                  <div key={w.id} className="flex items-center justify-between p-1.5 rounded bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <span className="text-[9px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 8) || '---'}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[9px] font-black text-slate-400 uppercase">{w.status}</span>
-                    </div>
+                    <span className="text-[8px] font-black text-slate-400 uppercase">{w.status}</span>
                   </div>
                 ))}
                 
-                {Array.isArray(industrial.data?.workers?.historicalFleet) && industrial.data.workers.historicalFleet.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[9px] font-black text-slate-400 uppercase">Historical Fleet</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase">{industrial.data?.workers?.historicalFleet.length} Offline</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {industrial.data.workers.historicalFleet.slice(0, 4).map((w: any) => (
-                        <div key={w.id} className="p-1 px-2 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[8px] font-mono text-slate-400 truncate text-center">
-                          {w.id?.slice(0, 8)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {(!industrial.data?.workers?.activeFleet || industrial.data.workers.activeFleet.length === 0) && industrial.status !== 'loading' && (
-                  <div className="text-center py-20 opacity-30 font-black text-[10px]">NO ACTIVE NODES DETECTED</div>
+                  <div className="text-center py-10 opacity-30 font-black text-[9px]">NO ACTIVE NODES</div>
                 )}
               </div>
             </TacticalPanel>
           </div>
 
-          {/* GLOBAL PRINTHOUSE NETWORK */}
-          <div className="col-span-12 lg:col-span-6 h-[400px]">
-            <TacticalPanel title="Global Manufacturing Grid" icon={GlobeAltIcon} badge="World-Scale" color="slate" status={capacity.status}>
-               <div className="flex flex-col h-full gap-4">
-                 <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-xl overflow-hidden group">
-                    <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                       <GlobeAltIcon className="w-64 h-64" />
-                    </div>
-                    <div className="absolute inset-0 p-4 overflow-y-auto custom-scrollbar">
+          <div className="col-span-12 lg:col-span-6 min-h-[260px]">
+            <TacticalPanel title="Manufacturing Grid" icon={GlobeAltIcon} badge="Global" color="slate" status={capacity.status}>
+               <div className="flex flex-col h-full gap-3">
+                 <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-md overflow-hidden min-h-[140px]">
+                    <div className="absolute inset-0 p-3 overflow-y-auto custom-scrollbar">
                        <div className="grid grid-cols-2 gap-2">
-                         {Array.isArray(capacity.data) && capacity.data.map((node: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-2 bg-white/40 dark:bg-white/5 border border-white/20 rounded-lg backdrop-blur-sm">
+                         {Array.isArray(capacity.data) && capacity.data.slice(0, 10).map((node: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between p-1.5 bg-white/40 dark:bg-white/5 border border-white/10 rounded backdrop-blur-sm">
                                <div className="flex items-center gap-2">
-                                  <div className={`w-2 h-2 rounded-full ${node.capacity_utilization_pct < 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                  <span className="text-[9px] font-black uppercase text-slate-600 dark:text-slate-300">{node.region || 'UNKNOWN'} ({node.country || '??'})</span>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${node.capacity_utilization_pct < 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                  <span className="text-[8px] font-black uppercase text-slate-500 dark:text-slate-400">{node.region || 'UNK'}</span>
                                </div>
-                               <span className="text-[9px] font-bold text-slate-400 tabular-nums">{node.printers || 0} PRINTERS</span>
+                               <span className="text-[8px] font-bold text-slate-400 tabular-nums">{node.printers || 0} P</span>
                             </div>
                          ))}
-                         {(!Array.isArray(capacity.data) || capacity.data.length === 0) && (
-                            <div className="col-span-2 text-center py-10 text-[9px] font-black text-slate-400 uppercase">NO ACTIVE REGIONS DETECTED</div>
-                         )}
                        </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-white/80 dark:bg-black/40 backdrop-blur-md border-t border-slate-200 dark:border-white/10 px-4 flex items-center justify-between">
-                       <MiniMetric label="TOTAL PRINTERS" value={network.data?.total_printers || 0} />
-                       <MiniMetric label="ACTIVE NODES" value={network.data?.active_printers || 0} />
-                       <MiniMetric label="UTILIZATION" value={`${network.data?.capacity_utilization_pct || 0}%`} />
-                       <MiniMetric label="SYNC HEALTH" value={syncHealth} />
+                    <div className="absolute bottom-0 left-0 right-0 h-10 bg-white/90 dark:bg-black/60 backdrop-blur-md border-t border-slate-200 dark:border-white/10 px-3 flex items-center justify-between">
+                       <MiniMetric label="TOTAL" value={network.data?.total_printers || 0} />
+                       <MiniMetric label="LOAD" value={`${network.data?.capacity_utilization_pct || 0}%`} />
+                       <MiniMetric label="SYNC" value={syncHealth} />
                     </div>
                  </div>
                </div>
             </TacticalPanel>
           </div>
 
-          {/* ECONOMIC ROUTING ENGINE */}
           {(isSuper || isPrinthouse) && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 h-[350px]">
-              <TacticalPanel title="Economic Intelligence" icon={CurrencyEuroIcon} badge="Market-Aware" color="amber" status={routing.status}>
-                 <div className="space-y-4">
+            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+              <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
+                 <div className="space-y-3">
                    <div className="grid grid-cols-2 gap-4">
                      <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${routing.data.metrics.avg_margin_pct.toFixed(1)}%` : '---'} status="stable" />
-                     <TelemetryItem label="Low Margin Quotes" value={routing.data?.metrics?.low_margin_count || 0} status={routing.data?.metrics?.low_margin_count > 0 ? 'warning' : 'stable'} />
-                   </div>
-                   <div className="p-3 bg-white dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-lg space-y-3">
-                     <h4 className="text-[9px] font-black text-slate-400 uppercase">Pricing & Materials readiness</h4>
-                     <div className="space-y-2">
-                       <div className="flex items-center justify-between">
-                         <span className="text-[9px] font-bold text-slate-500 uppercase">Materials Catalog</span>
-                         <span className={`text-[9px] font-black uppercase ${industrial.data?.readiness?.materials?.state === 'LIVE' ? 'text-emerald-500' : 'text-slate-400'}`}>
-                           {industrial.data?.readiness?.materials?.state || 'NOT_CONFIGURED'}
-                         </span>
-                       </div>
-                       <div className="flex items-center justify-between">
-                         <span className="text-[9px] font-bold text-slate-500 uppercase">Pricing Profiles</span>
-                         <span className={`text-[9px] font-black uppercase ${industrial.data?.readiness?.pricing?.state === 'LIVE' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                           {industrial.data?.readiness?.pricing?.state || 'DEGRADED'}
-                         </span>
-                       </div>
-                     </div>
+                     <TelemetryItem label="Low Margin" value={routing.data?.metrics?.low_margin_count || 0} status={routing.data?.metrics?.low_margin_count > 0 ? 'warning' : 'stable'} />
                    </div>
                    <div className="flex items-center justify-between px-1">
-                     <span className="text-[9px] font-bold text-slate-500 uppercase">Network Quality Score</span>
-                     <span className="text-sm font-black text-emerald-500">{(routing.data?.avg_final_score || 0).toFixed(1)} / 10</span>
+                     <span className="text-[9px] font-bold text-slate-500 uppercase">Quality Score</span>
+                     <span className="text-sm font-black text-emerald-500">{(routing.data?.avg_final_score || 0).toFixed(1)}</span>
                    </div>
                  </div>
               </TacticalPanel>
             </div>
           )}
 
-          {/* GOVERNANCE & SECURITY */}
           {isSuper && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 h-[350px]">
-              <TacticalPanel title="Governance Posture" icon={ShieldCheckIcon} badge="SOC Industrial" color="red" status={blocks.status}>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex flex-col">
-                      <span className="text-xl font-black text-slate-900 dark:text-white">{complianceScore}</span>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Compliance Score</span>
-                    </div>
+            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+              <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="SOC Industrial" color="red" status={blocks.status}>
+                <div className="space-y-3">
+                  <div className="flex flex-col mb-2">
+                    <span className="text-lg font-black text-slate-900 dark:text-white uppercase leading-none">{complianceScore}</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Compliance</span>
                   </div>
-                  <div className="space-y-2">
-                    {Array.isArray(blocks.data?.blocks) && blocks.data.blocks.slice(0, 4).map((b: any) => (
+                  <div className="space-y-1">
+                    {Array.isArray(blocks.data?.blocks) && blocks.data.blocks.slice(0, 3).map((b: any) => (
                       <GovernanceRow key={b.id} label={b.name} status={b.status} color={b.status === 'ACTIVE' ? 'emerald' : 'red'} />
                     ))}
-                    {(!blocks.data?.blocks || blocks.data.blocks.length === 0) && <div className="text-center py-10 opacity-30 text-[9px] font-black">NO POLICY BLOCKS</div>}
+                    {(!blocks.data?.blocks || blocks.data.blocks.length === 0) && <div className="text-center py-4 opacity-30 text-[9px] font-black">NO POLICY FLOW</div>}
                   </div>
                 </div>
               </TacticalPanel>
             </div>
           )}
 
-          {/* ARTIFACT LIFECYCLE */}
-          <div className="col-span-12 md:col-span-6 lg:col-span-4 h-[350px]">
-            <TacticalPanel title="Artifact Lifecycle" icon={ArchiveBoxIcon} badge="Storage Pressure" color="slate" status={industrial.status}>
-               <div className="space-y-6">
+          <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+            <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Pressure" color="slate" status={industrial.status}>
+               <div className="space-y-4">
                  <div className="flex items-center justify-between">
-                   <div className="flex flex-col">
-                     <span className="text-xl font-black text-slate-900 dark:text-white">
-                        {( (industrial.data?.storage?.totalSizeBytes || 0) / (1024 * 1024 * 1024)).toFixed(2)} GB
-                     </span>
-                     <span className="text-[8px] font-black text-slate-400 uppercase">Current Footprint</span>
-                   </div>
-                   <div className="text-right">
-                     <span className="text-sm font-black text-slate-900 dark:text-white">{(industrial.data?.storage?.artifactCount || 0).toLocaleString()}</span>
-                     <span className="text-[8px] font-black text-slate-400 uppercase block">Active Artifacts</span>
-                   </div>
+                   <span className="text-lg font-black text-slate-900 dark:text-white">
+                      {( (industrial.data?.storage?.totalSizeBytes || 0) / (1024 * 1024 * 1024)).toFixed(1)} GB
+                   </span>
+                   <span className="text-sm font-black text-slate-400 tabular-nums">{(industrial.data?.storage?.artifactCount || 0).toLocaleString()}</span>
                  </div>
-                 <div className="space-y-1.5">
-                    <div className="flex justify-between text-[8px] font-black text-slate-400 uppercase">
-                      <span>Quota Utilization</span>
-                      <span>{Math.round(((industrial.data?.storage?.totalSizeBytes || 0) / (industrial.data?.storage?.capacityBytes || 1)) * 100)}%</span>
-                    </div>
-                    <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                 <div className="space-y-1">
+                    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)] transition-all duration-1000" 
+                        className="h-full bg-primary" 
                         style={{ width: `${Math.min(100, ((industrial.data?.storage?.totalSizeBytes || 0) / (industrial.data?.storage?.capacityBytes || 1)) * 100)}%` }} 
                       />
                     </div>
                  </div>
-                 <div className="grid grid-cols-3 gap-2">
+                 <div className="grid grid-cols-3 gap-1.5">
                     <LifecycleTier label="HOT" value={industrial.data?.storage?.tierDistribution?.HOT || 0} color="primary" />
                     <LifecycleTier label="WARM" value={industrial.data?.storage?.tierDistribution?.WARM || 0} color="amber" />
                     <LifecycleTier label="COLD" value={industrial.data?.storage?.tierDistribution?.COLD || 0} color="slate" />
@@ -387,57 +315,47 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          {/* INTELLIGENCE & ANOMALIES */}
-          <div className="col-span-12 lg:col-span-8 h-[300px]">
-             <TacticalPanel title="Intelligence Layer & Anomaly Detection" icon={BoltIcon} badge="AI Operational" color="primary" status={anomalies.status}>
-               <div className="flex flex-col md:flex-row gap-8 h-full">
-                 <div className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
-                    {Array.isArray(anomalies.data?.anomalies) && anomalies.data.anomalies.map((a: any) => (
+          <div className="col-span-12 lg:col-span-8 min-h-[220px]">
+             <TacticalPanel title="Intelligence & Anomalies" icon={BoltIcon} badge="AI Active" color="primary" status={anomalies.status}>
+               <div className="flex flex-col md:flex-row gap-6 h-full">
+                 <div className="flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar min-h-[100px]">
+                    {Array.isArray(anomalies.data?.anomalies) && anomalies.data.anomalies.slice(0, 5).map((a: any) => (
                       <AnomalyRow key={a.id} title={a.title || a.event} tenant={a.tenant_id} confidence={Math.round((a.confidence || 0) * 100)} severity={a.severity} />
                     ))}
                     {(!anomalies.data?.anomalies || anomalies.data.anomalies.length === 0) && (
-                      <div className="flex flex-col items-center justify-center h-full opacity-30 text-center py-10">
-                         <ShieldCheckIcon className="w-8 h-8 mb-2" />
-                         <span className="text-[10px] font-black uppercase">No Detected Outliers</span>
+                      <div className="flex flex-col items-center justify-center py-6 opacity-20 text-center">
+                         <ShieldCheckIcon className="w-6 h-6 mb-1" />
+                         <span className="text-[8px] font-black uppercase">Grid Secure</span>
                       </div>
                     )}
                  </div>
-                 <div className="md:w-1/3 border-l border-slate-100 dark:border-white/5 md:pl-8 py-2 space-y-6">
+                 <div className="md:w-1/3 border-l border-slate-100 dark:border-white/5 md:pl-6 space-y-4">
                     <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase block mb-2">Autonomy Confidence</span>
-                      <div className="text-3xl font-black text-primary">{autonomyConfidence}</div>
-                      <div className="text-[9px] font-bold text-emerald-500 uppercase mt-1 italic-text-off">Self-Healing Enabled</div>
+                      <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Confidence</span>
+                      <div className="text-2xl font-black text-primary">{autonomyConfidence}</div>
                     </div>
-                    <div className="space-y-3">
-                       <span className="text-[10px] font-black text-slate-400 uppercase block">Predictive Outlook</span>
-                       <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
-                          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 leading-relaxed italic-text-off uppercase">
-                             {industrial.data?.readiness?.materials?.state === 'LIVE' 
-                                ? `Active Materials Catalog detected across ${industrial.data?.readiness?.materials?.catalogCount || 0} nodes. Capacity optimization recommended.` 
-                                : 'Catalog extraction pending. System operating in manual pricing mode.'}
-                          </p>
-                       </div>
+                    <div className="p-2 bg-primary/5 border border-primary/10 rounded-md">
+                       <p className="text-[9px] font-bold text-slate-500 dark:text-zinc-500 leading-tight uppercase">
+                          {industrial.data?.readiness?.materials?.state === 'LIVE' 
+                             ? 'Self-healing active. Optimization recommended.' 
+                             : 'Manual intervention mode enabled.'}
+                       </p>
                     </div>
                  </div>
                </div>
              </TacticalPanel>
           </div>
 
-          {/* COMMAND ACTIONS */}
           {(isSuper || isPrinthouse) && (
-            <div className="col-span-12 lg:col-span-4 h-[300px]">
-              <TacticalPanel title="Command Console" icon={CommandLineIcon} badge="Direct Override" color="slate">
+            <div className="col-span-12 lg:col-span-4 min-h-[220px]">
+              <TacticalPanel title="Console" icon={CommandLineIcon} badge="Override" color="slate">
                  <div className="grid grid-cols-2 gap-2 h-full">
-                    <CommandButton label="Pause Queue" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
-                    <CommandButton label="Resume Queue" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
-                    <CommandButton label="Drain Fleet" icon={AdjustmentsHorizontalIcon} color="slate" badge="Coming soon" disabled />
-                    <CommandButton label="Quarantine" icon={LockClosedIcon} color="slate" badge="Coming soon" disabled />
-                    <CommandButton label="Purge Cache" icon={ArchiveBoxIcon} color="slate" badge="Coming soon" disabled />
-                    <CommandButton label="Shift Traffic" icon={LinkIcon} color="slate" badge="Coming soon" disabled />
-                    <div className="col-span-2 mt-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-mono text-[10px] flex items-center justify-between">
-                       <span className="opacity-50"># system_status_active</span>
-                       <span className="text-emerald-500 font-bold uppercase">Stable</span>
-                    </div>
+                    <CommandButton label="Pause" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
+                    <CommandButton label="Resume" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
+                    <CommandButton label="Drain" icon={AdjustmentsHorizontalIcon} color="slate" badge="Soon" disabled />
+                    <CommandButton label="Lock" icon={LockClosedIcon} color="slate" badge="Soon" disabled />
+                    <CommandButton label="Purge" icon={ArchiveBoxIcon} color="slate" badge="Soon" disabled />
+                    <CommandButton label="Shift" icon={LinkIcon} color="slate" badge="Soon" disabled />
                  </div>
               </TacticalPanel>
             </div>
@@ -445,58 +363,56 @@ export const CommandCenterPage: React.FC = () => {
 
         </div>
 
-        {/* 3. GLOBAL INCIDENT CENTER (INTEGRATED) */}
-        <div className="col-span-12 xl:col-span-4 bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col z-40 rounded-sm h-fit sticky top-6">
-           <div className="p-4 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                 <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
-                 <h2 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Incident Bridge</h2>
+        {/* 3. GLOBAL INCIDENT CENTER (STICKY) */}
+        <div className="col-span-12 xl:col-span-3 flex flex-col gap-4 sticky top-6 self-start max-h-[calc(100vh-140px)]">
+           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-fit">
+              <div className="p-3 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
+                 <div className="flex items-center gap-2">
+                    <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
+                    <h2 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Incident Bridge</h2>
+                 </div>
+                 <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[8px] font-black animate-pulse">
+                   {Array.isArray(incidents.data) ? incidents.data.length : 0}
+                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-black animate-pulse">
-                {Array.isArray(incidents.data) ? incidents.data.length : 0} ACTIVE
-              </span>
-           </div>
-           
-           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-              {Array.isArray(incidents.data) && incidents.data.map((inc: any) => (
-                <div key={inc.id} className="p-4 rounded-2xl bg-red-500/5 border border-red-500/10 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <span className="px-2 py-0.5 rounded bg-red-500 text-white text-[8px] font-black uppercase">CRITICAL</span>
-                    <span className="text-[9px] font-bold text-slate-400 font-mono">#{inc.id?.slice(0,6) || '---'}</span>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900 dark:text-white leading-tight uppercase">{inc.action?.replace(/_/g, ' ') || 'UNKNOWN INCIDENT'}</h4>
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 mt-1 uppercase">{inc.created_at ? new Date(inc.created_at).toLocaleTimeString() : '---'}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                     <button className="py-2 bg-red-500 text-white text-[9px] font-black uppercase rounded-lg hover:bg-red-600 transition-colors">Triage</button>
-                     <button className="py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white text-[9px] font-black uppercase rounded-lg">Mute</button>
-                  </div>
-                </div>
-              ))}
-              {(!Array.isArray(incidents.data) || incidents.data.length === 0) && (
-                <div className="h-full flex flex-col items-center justify-center opacity-20 text-center py-20">
-                   <ShieldCheckIcon className="w-12 h-12 mb-4" />
-                   <p className="text-[10px] font-black uppercase tracking-widest">No Active Incidents Detected</p>
-                </div>
-              )}
+              
+              <div className="max-h-[300px] overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                 {Array.isArray(incidents.data) && incidents.data.map((inc: any) => (
+                   <div key={inc.id} className="p-3 rounded-md bg-red-500/5 border border-red-500/10 space-y-2">
+                     <div className="flex items-start justify-between">
+                       <span className="text-[8px] font-black text-red-500 uppercase">CRITICAL</span>
+                       <span className="text-[8px] font-bold text-slate-400 font-mono">#{inc.id?.slice(0,4)}</span>
+                     </div>
+                     <h4 className="text-[10px] font-black text-slate-900 dark:text-white leading-tight uppercase truncate">{inc.action?.replace(/_/g, ' ') || 'INCIDENT'}</h4>
+                     <div className="grid grid-cols-2 gap-1.5">
+                        <button className="py-1 bg-red-500 text-white text-[8px] font-black uppercase rounded hover:bg-red-600">Triage</button>
+                        <button className="py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white text-[8px] font-black uppercase rounded">Mute</button>
+                     </div>
+                   </div>
+                 ))}
+                 {(!Array.isArray(incidents.data) || incidents.data.length === 0) && (
+                   <div className="py-8 text-center opacity-20">
+                      <ShieldCheckIcon className="w-6 h-6 mx-auto mb-1" />
+                      <p className="text-[8px] font-black uppercase">Clear</p>
+                   </div>
+                 )}
+              </div>
            </div>
 
            {/* Telemetry Stream */}
-           <div className="h-64 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 flex flex-col">
-              <div className="px-4 py-2 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Telemetry Stream</span>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-[300px]">
+              <div className="px-3 py-2 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Live Stream</span>
+                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="flex-1 overflow-y-auto p-3 font-mono text-[8px] space-y-1.5 custom-scrollbar text-slate-500 dark:text-zinc-500">
-                 {Array.isArray(audit.data) && audit.data.slice(0, 20).map((log: any) => (
-                   <div key={log.id} className="whitespace-nowrap flex gap-2">
-                      <span className="opacity-50">[{log.created_at ? new Date(log.created_at).toLocaleTimeString() : '---'}]</span>
-                      <span className="text-slate-700 dark:text-zinc-300">USER_{log.tenant_id?.slice(0,4) || 'SYS'}</span>
+              <div className="flex-1 overflow-y-auto p-3 font-mono text-[7px] space-y-1.5 custom-scrollbar text-slate-500 dark:text-zinc-500 leading-tight">
+                 {Array.isArray(audit.data) && audit.data.slice(0, 15).map((log: any) => (
+                   <div key={log.id} className="whitespace-nowrap flex gap-1.5">
+                      <span className="opacity-40">[{log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}]</span>
                       <span className={log.action?.includes('ERROR') || log.action?.includes('FAILED') ? 'text-red-500' : 'text-emerald-500'}>{log.action}</span>
                    </div>
                  ))}
-                 {(!Array.isArray(audit.data) || audit.data.length === 0) && <div className="text-center py-10 opacity-20 uppercase font-black text-[7px]">Stream Idle</div>}
+                 {(!Array.isArray(audit.data) || audit.data.length === 0) && <div className="text-center py-10 opacity-20 uppercase font-black text-[7px]">Idle</div>}
               </div>
            </div>
         </div>
@@ -573,13 +489,13 @@ const AnomalyRow = ({ title, tenant, confidence, severity, job }: { title: strin
   </div>
 );
 
- const CommandButton = ({ label, icon: Icon, color, onClick, badge, disabled }: { label: string, icon: any, color: string, onClick?: () => void, badge?: string, disabled?: boolean }) => (
+  const CommandButton = ({ label, icon: Icon, color, onClick, badge, disabled }: { label: string, icon: any, color: string, onClick?: () => void, badge?: string, disabled?: boolean }) => (
   <button 
     onClick={onClick}
     disabled={disabled}
     aria-disabled={disabled}
-    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left relative ${
-      disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'
+    className={`flex items-center gap-2.5 p-2.5 rounded-md border transition-all text-left relative ${
+      disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-95'
     } ${
       color === 'red' && !disabled ? 'bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10' :
       color === 'emerald' && !disabled ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10' :
@@ -589,10 +505,10 @@ const AnomalyRow = ({ title, tenant, confidence, severity, job }: { title: strin
       'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-white/10'
     }`}
   >
-    <Icon className="w-5 h-5 flex-shrink-0" />
-    <div className="flex flex-col">
-      <span className="text-[10px] font-black uppercase tracking-widest leading-tight">{label}</span>
-      {badge && <span className="text-[7px] font-black uppercase text-slate-400 mt-1">{badge}</span>}
+    <Icon className="w-4 h-4 flex-shrink-0" />
+    <div className="flex flex-col min-w-0">
+      <span className="text-[9px] font-black uppercase tracking-widest leading-tight truncate">{label}</span>
+      {badge && <span className="text-[7px] font-black uppercase text-slate-400 mt-0.5">{badge}</span>}
     </div>
   </button>
 );
