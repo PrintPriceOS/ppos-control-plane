@@ -101,6 +101,10 @@ const telemetryAdminRouter = require('./telemetryAdmin');
 const artifactAdminRouter = require('./artifactAdmin');
 const workerAdminRouter = require('./workerAdmin');
 const orchestrationAdminRouter = require('./orchestrationAdmin');
+const industrialProvisioningAdminRouter = require('./industrialProvisioningAdmin');
+const industrialRoutingAdminRouter = require('./industrialRoutingAdmin');
+const productionDispatchAdminRouter = require('./productionDispatchAdmin');
+
 
 /**
  * Mount Sub-routers (Top Priority)
@@ -133,6 +137,11 @@ router.use('/telemetry', telemetryAdminRouter);
 router.use('/artifacts', artifactAdminRouter);
 router.use('/workers', workerAdminRouter);
 router.use('/orchestration', orchestrationAdminRouter);
+router.use('/provisioning', industrialProvisioningAdminRouter);
+router.use('/routing/decision', industrialRoutingAdminRouter); // Autonomous Routing
+router.use('/dispatch', productionDispatchAdminRouter); // Execution Layer
+
+
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d

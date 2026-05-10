@@ -262,6 +262,8 @@ class TelemetryService {
      */
     async getReadinessMetrics() {
         try {
+            const provisioningService = require('./industrialProvisioningService');
+            
             // Check for real rates in printer nodes
             const rows = await db.query('SELECT rates_json FROM printer_nodes WHERE rates_json IS NOT NULL LIMIT 10');
             
@@ -279,6 +281,9 @@ class TelemetryService {
             // Check for pricing profiles
             const [pricingCount] = await db.query('SELECT COUNT(*) as count FROM printer_pricing_profiles');
 
+            // Provisioning Metrics
+            const provStatus = await provisioningService.getProvisioningStatus();
+
             return {
                 materials: {
                     state: hasMaterials ? 'LIVE' : 'NOT_CONFIGURED',
@@ -287,10 +292,46 @@ class TelemetryService {
                 pricing: {
                     state: pricingCount.count > 0 ? 'LIVE' : 'DEGRADED',
                     profileCount: pricingCount.count
+                },
+                provisioning: {
+                    state: (provStatus.printerNodes > 0 && provStatus.printNodes > 0) ? 'LIVE' : 'DEGRADED',
+                    printerNodes: provStatus.printerNodes,
+                    printNodes: provStatus.printNodes,
+                    machineProfiles: provStatus.machineProfiles,
+                    pricingProfiles: provStatus.pricingProfiles,
+                    jobsHasMetadataJson: provStatus.jobsHasMetadataJson,
+                    metricsHasMetadataJson: provStatus.metricsHasMetadataJson
                 }
             };
         } catch (err) {
-            return { materials: { state: 'NOT_CONFIGURED' }, pricing: { state: 'DEGRADED' } };
+            logger.error({ event: 'readiness_failed', error: err.message });
+            return { materials: { state: 'NOT_CONFIGURED' }, pricing: { state: 'DEGRADED' }, provisioning: { state: 'DEGRADED' } };
+        }
+    }
+
+
+    /**
+     * Get routing readiness based on profiles and configuration.
+     */
+    async getRoutingTelemetry() {
+        try {
+            const provisioningService = require('./industrialProvisioningService');
+            const provStatus = await provisioningService.getProvisioningStatus();
+            
+            let state = 'LIVE';
+            if (provStatus.pricingProfiles === 0) state = 'NOT_CONFIGURED';
+            else if (provStatus.capacityProfiles === 0 || provStatus.reliabilityProfiles === 0) state = 'DEGRADED';
+
+            return {
+                state,
+                compatibleNodes: provStatus.printNodes,
+                machineProfiles: provStatus.machineProfiles,
+                pricingProfiles: provStatus.pricingProfiles,
+                reliabilityProfiles: provStatus.reliabilityProfiles,
+                capacityProfiles: provStatus.capacityProfiles
+            };
+        } catch (err) {
+            return { state: 'FAILED', error: err.message };
         }
     }
 
@@ -298,13 +339,14 @@ class TelemetryService {
      * Get operational health snapshot for NOC
      */
     async getOperationalSnapshot() {
-        const [queue, largeDocs, workers, storage, outcomes, readiness] = await Promise.all([
+        const [queue, largeDocs, workers, storage, outcomes, readiness, routing] = await Promise.all([
             this.getQueueMetrics(),
             this.getLargeDocumentTelemetry(),
             this.getWorkerTelemetry(),
             this.getStorageMetrics(),
             this.getPreflightOutcomes(),
-            this.getReadinessMetrics()
+            this.getReadinessMetrics(),
+            this.getRoutingTelemetry()
         ]);
 
         return {
@@ -313,9 +355,11 @@ class TelemetryService {
             workers,
             storage,
             outcomes,
-            readiness
+            readiness,
+            routing
         };
     }
+
 
 
     /**

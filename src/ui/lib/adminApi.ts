@@ -608,6 +608,48 @@ export async function getEconomicRoutingConflicts() {
     return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
 }
 
+export async function getRoutingRecommendations(specs: any) {
+    return adminFetch<any>(`/api/admin/routing/decision/recommend`, {
+        method: 'POST',
+        body: JSON.stringify({ specs })
+    });
+}
+
+export async function getRoutingHealth() {
+    return adminFetch<any>(`/api/admin/routing/decision/health`);
+}
+
+// --- Production Dispatch ---
+export async function getDispatches() {
+    return adminFetch<{ ok: boolean, dispatches: any[] }>(`/api/admin/dispatch`);
+}
+
+export async function getDispatchDetail(id: string) {
+    return adminFetch<{ ok: boolean, dispatch: any }>(`/api/admin/dispatch/${id}`);
+}
+
+export async function assignDispatch(jobId: string, recommendation: any) {
+    return adminFetch<{ ok: boolean, dispatchId: string }>(`/api/admin/dispatch/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ jobId, recommendation })
+    });
+}
+
+export async function updateDispatchStatus(id: string, status: string, message?: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/dispatch/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status, message })
+    });
+}
+
+export async function rerouteDispatch(id: string, reason: string) {
+    return adminFetch<{ ok: boolean, message: string }>(`/api/admin/dispatch/${id}/reroute`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+
 // --- Engagement ---
 export async function getEngagementSignals() {
     const res = await adminFetch<{ ok: boolean, signals: any[] }>(`/api/admin/engagement-signals`);
