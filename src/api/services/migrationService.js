@@ -49,7 +49,7 @@ class MigrationService {
             .filter(f => f.endsWith('.sql'))
             .sort();
 
-        const [applied] = await db.query('SELECT version, checksum FROM schema_versions');
+        const applied = await db.query('SELECT version, checksum FROM schema_versions');
         const appliedMap = new Map(applied.map(m => [m.version, m.checksum]));
 
         let appliedCount = 0;

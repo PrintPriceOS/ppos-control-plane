@@ -52,21 +52,21 @@ class IndustrialProvisioningService {
             summary.warnings.push(`Initial metadata sync warning: ${err.message}`);
         }
 
-        // Step 1: Modern SQL Migrations
+        // Step 1: Idempotent Column Hardening (Phase 18-22)
+        try {
+            summary.columnsEnsured = await this.ensureCoreColumns();
+        } catch (err) {
+            summary.failedSteps.push('ensureCoreColumns');
+            this._logStepError('ensureCoreColumns', err);
+        }
+
+        // Step 2: Modern SQL Migrations
         try {
             const migrationResult = await migrationService.runMigrations();
             summary.migrationsApplied = migrationResult.appliedCount;
         } catch (err) {
             summary.failedSteps.push('migrations');
             this._logStepError('migrations', err);
-        }
-
-        // Step 2: Idempotent Column Hardening (Phase 18-22)
-        try {
-            summary.columnsEnsured = await this.ensureCoreColumns();
-        } catch (err) {
-            summary.failedSteps.push('ensureCoreColumns');
-            this._logStepError('ensureCoreColumns', err);
         }
 
         // Step 3: Operational Node Sync
@@ -114,6 +114,8 @@ class IndustrialProvisioningService {
 
         // Ensure Phase 18 Governance columns exist
         const governanceMigrations = [
+            { table: 'print_nodes', column: 'rates_json', type: 'JSON NULL' },
+            { table: 'printer_pricing_profiles', column: 'rates_json', type: 'JSON NULL' },
             { table: 'manufacturing_dispatches', column: 'governance_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
             { table: 'manufacturing_dispatches', column: 'constitutional_compliance', type: 'DECIMAL(5,2) DEFAULT 100.00' },
             { table: 'manufacturing_dispatches', column: 'cognition_priority', type: 'INT DEFAULT 0' },

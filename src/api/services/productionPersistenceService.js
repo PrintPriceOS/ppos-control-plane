@@ -28,6 +28,7 @@ class ProductionPersistenceService {
           supported_policies_json JSON NULL,
           max_file_size_mb INT DEFAULT 500,
           api_enabled BOOLEAN DEFAULT FALSE,
+          rates_json JSON NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_tenant (tenant_id),
