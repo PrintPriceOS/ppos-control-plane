@@ -29,48 +29,88 @@ class IndustrialProvisioningService {
 
     /**
      * Entry point for full system provisioning.
-     * Delegates schema management to migrationService.
+     * Consolidates modern migrations and legacy column hardening.
      */
     async runFullProvisioning() {
         const summary = {
             startTime: new Date().toISOString(),
+            columnsEnsured: 0,
             migrationsApplied: 0,
+            printNodesSynced: 0,
             machinesDiscovered: 0,
-            sourceCounts: {},
+            pricingProfilesSeeded: 0,
+            federationFactoriesSeeded: 0,
+            warnings: [],
             failedSteps: [],
-            warnings: []
+            sourceCounts: {},
+            timestamp: new Date().toISOString()
         };
 
         try {
-            // 1. Run migrations first (Schema Hardening)
+            summary.sourceCounts = await this.getSourceCounts();
+        } catch (err) {
+            summary.warnings.push(`Initial metadata sync warning: ${err.message}`);
+        }
+
+        // Step 1: Modern SQL Migrations
+        try {
             const migrationResult = await migrationService.runMigrations();
             summary.migrationsApplied = migrationResult.appliedCount;
         } catch (err) {
             summary.failedSteps.push('migrations');
             this._logStepError('migrations', err);
-            // Critical failure: if schema can't be hardened, we might want to stop,
-            // but for now we continue to attempt operational bootstrap.
         }
 
-        // 2. Operational Bootstrap (Real Industrial Logic)
+        // Step 2: Idempotent Column Hardening (Phase 18-22)
         try {
-            await this.syncActivePrintNodes();
-            const machineSummary = await machineRegistry.refreshFleet();
-            summary.machinesDiscovered = machineSummary.total;
+            summary.columnsEnsured = await this.ensureCoreColumns();
         } catch (err) {
-            summary.failedSteps.push('operational_bootstrap');
-            this._logStepError('operational_bootstrap', err);
+            summary.failedSteps.push('ensureCoreColumns');
+            this._logStepError('ensureCoreColumns', err);
         }
 
+        // Step 3: Operational Node Sync
+        try {
+            summary.printNodesSynced = await this.syncPrinterNodesToPrintNodes();
+        } catch (err) {
+            summary.failedSteps.push('syncPrinterNodesToPrintNodes');
+            this._logStepError('syncPrinterNodesToPrintNodes', err);
+        }
+
+        // Step 4: Machine Discovery
+        try {
+            summary.machinesDiscovered = await this.discoverMachineProfiles();
+        } catch (err) {
+            summary.failedSteps.push('discoverMachineProfiles');
+            this._logStepError('discoverMachineProfiles', err);
+        }
+
+        // Step 5: Pricing & Federation Seeding
+        try {
+            summary.pricingProfilesSeeded = await this.seedPricingProfiles();
+            summary.federationFactoriesSeeded = await this.seedFederationFactories();
+        } catch (err) {
+            summary.failedSteps.push('seeding');
+            this._logStepError('seeding', err);
+        }
+
+        // Refresh source counts after provisioning
         try {
             summary.sourceCounts = await this.getSourceCounts();
         } catch (err) {
-            summary.warnings.push(`Metadata sync warning: ${err.message}`);
+            summary.warnings.push(`Final metadata sync warning: ${err.message}`);
         }
 
         summary.endTime = new Date().toISOString();
         return summary;
     }
+
+    /**
+     * Idempotent column hardening for Phase 18-22 industrial features.
+     */
+    async ensureCoreColumns() {
+        let ensured = 0;
+        const coreTables = []; // Placeholder for any specific table creation logic if needed
 
         // Ensure Phase 18 Governance columns exist
         const governanceMigrations = [
@@ -404,77 +444,6 @@ class IndustrialProvisioningService {
         return counts;
     }
 
-    /**
-     * Runs full provisioning independently.
-     */
-    async runFullProvisioning() {
-        const summary = {
-            columnsEnsured: 0,
-            printNodesSynced: 0,
-            machinesDiscovered: 0,
-            pricingProfilesSeeded: 0,
-            federationFactoriesSeeded: 0,
-            warnings: [],
-            failedSteps: [],
-            sourceCounts: {},
-            timestamp: new Date().toISOString()
-        };
-
-        try {
-            summary.sourceCounts = await this.getSourceCounts();
-        } catch (err) {
-            summary.warnings.push(`Failed to fetch initial source counts: ${err.message}`);
-        }
-
-        // Step 1: Schema Hardening
-        try {
-            summary.columnsEnsured = await this.ensureCoreColumns();
-        } catch (err) {
-            summary.failedSteps.push('ensureCoreColumns');
-            summary.warnings.push(`Schema hardening failed: ${err.message}`);
-        }
-
-        // Step 2: Node Sync
-        try {
-            summary.printNodesSynced = await this.syncPrinterNodesToPrintNodes();
-        } catch (err) {
-            summary.failedSteps.push('syncPrinterNodesToPrintNodes');
-            summary.warnings.push(`Node synchronization failed: ${err.message}`);
-        }
-
-        // Step 3: Machine Discovery
-        try {
-            summary.machinesDiscovered = await this.discoverMachineProfiles();
-        } catch (err) {
-            summary.failedSteps.push('discoverMachineProfiles');
-            summary.warnings.push(`Machine discovery failed: ${err.message}`);
-        }
-
-        // Step 4: Pricing Seed
-        try {
-            summary.pricingProfilesSeeded = await this.seedPricingProfiles();
-        } catch (err) {
-            summary.failedSteps.push('seedPricingProfiles');
-            summary.warnings.push(`Pricing profile seeding failed: ${err.message}`);
-        }
-
-        // Step 5: Federation Seed
-        try {
-            summary.federationFactoriesSeeded = await this.seedFederationFactories();
-        } catch (err) {
-            summary.failedSteps.push('seedFederationFactories');
-            summary.warnings.push(`Federation seeding failed: ${err.message}`);
-        }
-
-        // Refresh source counts after provisioning
-        try {
-            summary.sourceCounts = await this.getSourceCounts();
-        } catch (err) {
-            summary.warnings.push(`Failed to fetch final source counts: ${err.message}`);
-        }
-
-        return summary;
-    }
 
     async getProvisioningStatus() {
         const counts = await this.getSourceCounts();
