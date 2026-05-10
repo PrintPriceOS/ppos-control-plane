@@ -250,7 +250,7 @@ const start = async () => {
 
             // For any other route (SPA), serve the index.html from dist
             // We use a safe check here to prevent fatal crashes if dist/index.html is missing
-            return reply.sendFile('index.html');
+            return reply.sendFile('index.html', path.join(__dirname, 'dist'));
         });
 
         // 6. Global Error Handler (Prevention of 500 Passenger Crashes)
