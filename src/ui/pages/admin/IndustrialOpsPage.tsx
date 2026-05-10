@@ -16,9 +16,10 @@ import { TenantStorageTab } from "./TenantStorageTab";
 import { OrchestrationTab } from "./OrchestrationTab";
 import { IncidentRegistryTab } from "./IncidentRegistryTab";
 import { LifecyclePolicyTab } from "./LifecyclePolicyTab";
+import { ProductionNodeRegistryTab } from "./ProductionNodeRegistryTab";
 
 export const IndustrialOpsPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle'>('artifacts');
+    const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle'>('artifacts');
 
     return (
         <div className="space-y-6">
@@ -46,6 +47,12 @@ export const IndustrialOpsPage: React.FC = () => {
                     onClick={() => setActiveTab('workers')}
                     icon={CpuChipIcon}
                     label="Fleet"
+                />
+                <TabButton 
+                    active={activeTab === 'nodes'} 
+                    onClick={() => setActiveTab('nodes')}
+                    icon={ShieldCheckIcon}
+                    label="Nodes"
                 />
                 <TabButton 
                     active={activeTab === 'orchestration'} 
@@ -84,6 +91,7 @@ export const IndustrialOpsPage: React.FC = () => {
                 {activeTab === 'artifacts' && <ArtifactRegistryTab />}
                 {activeTab === 'large-docs' && <LargeDocumentTab />}
                 {activeTab === 'workers' && <WorkerFleetTab />}
+                {activeTab === 'nodes' && <ProductionNodeRegistryTab />}
                 {activeTab === 'storage' && <TenantStorageTab />}
                 {activeTab === 'orchestration' && <OrchestrationTab />}
                 {activeTab === 'incidents' && <IncidentRegistryTab />}

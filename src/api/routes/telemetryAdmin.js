@@ -51,4 +51,17 @@ router.get('/industrial', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/telemetry/nodes/:nodeId/mes
+ * Returns MES operational history for a specific printer node.
+ */
+router.get('/nodes/:nodeId/mes', async (req, res) => {
+    try {
+        const stats = await telemetry.getNodeMESStats(req.params.nodeId);
+        res.json({ ok: true, stats });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;

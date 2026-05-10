@@ -115,6 +115,22 @@ const start = async () => {
     try {
         // 0. Initialize Database Schemas (Industrial Persistence)
         require('./src/api/services/controlPlaneSchemaService');
+
+        // 0.1 Industrial Provisioning (MES Bootstrap)
+        try {
+            const provisioningService = require('./src/api/services/industrialProvisioningService');
+            console.log('[INDUSTRIAL-PROVISIONING] Starting autonomous MES bootstrap...');
+            provisioningService.runFullProvisioning()
+                .then(summary => {
+                    console.log('[MES-BOOTSTRAP] System state hardened.');
+                    console.log(`[MACHINE-DISCOVERY] ${summary.machinesDiscovered} machines active.`);
+                })
+                .catch(err => {
+                    console.error('[MES-BOOTSTRAP] Background provisioning failed:', err.message);
+                });
+        } catch (err) {
+            console.error('[INDUSTRIAL-PROVISIONING] Load failed:', err.message);
+        }
         
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {

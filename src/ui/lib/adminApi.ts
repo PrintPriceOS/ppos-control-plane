@@ -510,6 +510,10 @@ export async function getIndustrialSnapshot() {
     return adminFetch<any>('/api/admin/telemetry/industrial');
 }
 
+export async function getNodeMESStats(nodeId: string) {
+    return adminFetch<{ ok: boolean, stats: any }>(`/api/admin/telemetry/nodes/${nodeId}/mes`);
+}
+
 export async function triggerOrchestrationAnalysis() {
     return adminFetch<{ ok: boolean }>('/api/admin/orchestration/analyze', {
         method: 'POST'

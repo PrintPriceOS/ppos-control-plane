@@ -399,6 +399,49 @@ class TelemetryService {
 
         return { analyzed: true, timestamp: new Date().toISOString() };
     }
+
+    /**
+     * Get MES operational history for a specific printer node.
+     */
+    async getNodeMESStats(nodeId) {
+        try {
+            const [counts] = await db.query(`
+                SELECT 
+                    COUNT(*) as total_dispatches,
+                    SUM(CASE WHEN status NOT IN ('DELIVERED', 'FAILED', 'CANCELED', 'REROUTED') THEN 1 ELSE 0 END) as active_dispatches,
+                    SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_dispatches,
+                    SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as rerouted_dispatches
+                FROM manufacturing_dispatches
+                WHERE node_id = ?
+            `, [nodeId]);
+
+            const [utilization] = await db.query(`
+                SELECT utilization_percent, active_jobs, queued_jobs
+                FROM printer_capacity_state
+                WHERE printer_id = ?
+            `, [nodeId]);
+
+            const [reservations] = await db.query(`
+                SELECT COUNT(*) as count
+                FROM manufacturing_capacity_reservations
+                WHERE node_id = ? AND reservation_status = 'ACTIVE'
+            `, [nodeId]);
+
+            return {
+                totalDispatches: parseInt(counts?.total_dispatches) || 0,
+                activeDispatches: parseInt(counts?.active_dispatches) || 0,
+                failedDispatches: parseInt(counts?.failed_dispatches) || 0,
+                reroutedDispatches: parseInt(counts?.rerouted_dispatches) || 0,
+                utilization: utilization?.utilization_percent || 0,
+                activeJobs: utilization?.active_jobs || 0,
+                queuedJobs: utilization?.queued_jobs || 0,
+                activeReservations: reservations?.count || 0
+            };
+        } catch (err) {
+            logger.error({ event: 'node_mes_stats_failed', nodeId, error: err.message });
+            throw err;
+        }
+    }
 }
 
 module.exports = new TelemetryService();

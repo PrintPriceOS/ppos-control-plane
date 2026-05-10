@@ -8,7 +8,13 @@ import {
     CheckCircleIcon,
     BoltIcon,
     ArchiveBoxIcon,
-    MapPinIcon
+    MapPinIcon,
+    FingerPrintIcon,
+    Square3Stack3DIcon,
+    DocumentTextIcon,
+    TagIcon,
+    CurrencyEuroIcon,
+    CalendarIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
 
@@ -16,10 +22,12 @@ export const ProductionDispatchTab: React.FC = () => {
     const [dispatches, setDispatches] = useState<any[]>([]);
     const [selectedDispatch, setSelectedDispatch] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+    const [updating, setUpdating] = useState(false);
+    const [showJson, setShowJson] = useState(false);
 
     useEffect(() => {
         fetchDispatches();
-        const interval = setInterval(fetchDispatches, 10000);
+        const interval = setInterval(fetchDispatches, 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -34,178 +42,262 @@ export const ProductionDispatchTab: React.FC = () => {
     };
 
     const fetchDetail = async (id: string) => {
+        setUpdating(true);
         try {
             const data = await adminApi.getDispatchDetail(id);
             setSelectedDispatch(data.dispatch || null);
         } catch (err) {
             console.error('Failed to fetch dispatch detail:', err);
+        } finally {
+            setUpdating(false);
         }
     };
 
     const handleStatusUpdate = async (id: string, status: string) => {
+        if (!confirm(`Confirm operational state transition to: ${status}?`)) return;
+        setUpdating(true);
         try {
-            await adminApi.updateDispatchStatus(id, status, 'Manual status override');
-            fetchDetail(id);
-            fetchDispatches();
+            await adminApi.updateDispatchStatus(id, status, `Manual transition to ${status}`);
+            await fetchDetail(id);
+            await fetchDispatches();
         } catch (err) {
-            alert(`Failed to update status: ${err}`);
+            alert(`State transition failed: ${err}`);
+        } finally {
+            setUpdating(false);
         }
     };
 
     const handleReroute = async (id: string) => {
-        const reason = prompt('Reason for reroute?');
+        const reason = prompt('Specify industrial reason for rerouting:');
         if (!reason) return;
+        setUpdating(true);
         try {
-            await adminApi.rerouteDispatch(id, reason);
-            fetchDetail(id);
-            fetchDispatches();
+            const res = await adminApi.rerouteDispatch(id, reason);
+            alert(`Reroute initiated: ${res.message}`);
+            await fetchDetail(id);
+            await fetchDispatches();
         } catch (err) {
-            alert(`Reroute failed: ${err}`);
+            alert(`Reroute command failed: ${err}`);
+        } finally {
+            setUpdating(false);
         }
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'DELIVERED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-            case 'FAILED': return 'bg-red-50 text-red-600 border-red-100';
+            case 'DELIVERED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+            case 'FAILED': return 'bg-red-500/10 text-red-400 border-red-500/20';
             case 'CANCELED':
-            case 'REROUTED': return 'bg-slate-50 text-slate-600 border-slate-100';
+            case 'REROUTED': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
             case 'PRINTING':
-            case 'BINDING': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
-            default: return 'bg-blue-50 text-blue-600 border-blue-100';
+            case 'BINDING':
+            case 'PREPARING': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+            case 'ACCEPTED':
+            case 'ASSIGNED': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+            default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
         }
     };
+
+    const isTransitionValid = (current: string, next: string) => {
+        const terminal = ['DELIVERED', 'FAILED', 'CANCELED', 'REROUTED'];
+        if (terminal.includes(current)) return false;
+        // Simplified sequence for now, but in industrial we allow most forward steps
+        return true;
+    };
+
+    const possibleStatuses = [
+        'ASSIGNED', 'ACCEPTED', 'PREPARING', 'PRINTING', 'BINDING', 
+        'PACKAGING', 'SHIPPED', 'DELIVERED', 'FAILED', 'CANCELED'
+    ];
 
     return (
         <div className="space-y-6 animate-slide-fade">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        <TruckIcon className="w-6 h-6 text-indigo-600" />
-                        Production Dispatch Control
+                    <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                        <Square3Stack3DIcon className="w-6 h-6 text-indigo-500" />
+                        MES Production Control
                     </h2>
-                    <p className="text-sm text-slate-500 font-medium tracking-tight">Active manufacturing lifecycle & logistics tracking.</p>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Autonomous Manufacturing Execution System</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Execution Layer: LIVE</span>
+                    </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Dispatch List */}
+                {/* Dispatch Ledger */}
                 <div className="lg:col-span-4 space-y-4">
-                    <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm">
-                        <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Dispatches</span>
-                            <button onClick={fetchDispatches} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
-                                <ArrowPathIcon className="w-3 h-3 text-slate-500" />
+                    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+                        <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Industrial Ledger</span>
+                            <button onClick={fetchDispatches} className="p-1 hover:bg-slate-800 rounded-lg transition-colors">
+                                <ArrowPathIcon className={`w-3 h-3 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                             </button>
                         </div>
-                        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                        <div className="divide-y divide-slate-800 max-h-[700px] overflow-y-auto custom-scrollbar">
                             {dispatches.map((d) => (
                                 <button
                                     key={d.id}
                                     onClick={() => fetchDetail(d.id)}
-                                    className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex items-center justify-between ${selectedDispatch?.id === d.id ? 'bg-indigo-50/50 border-r-2 border-indigo-500' : ''}`}
+                                    className={`w-full text-left p-4 hover:bg-slate-800/50 transition-all flex items-center justify-between border-l-4 ${selectedDispatch?.id === d.id ? 'bg-indigo-500/5 border-indigo-500' : 'border-transparent'}`}
                                 >
                                     <div>
-                                        <div className="font-bold text-slate-900 text-xs mb-1">DISP-{d.id.slice(5, 13)}</div>
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                            <MapPinIcon className="w-3 h-3" /> Node {d.node_id.slice(0, 8)}
+                                        <div className="font-mono text-[10px] text-white mb-1 uppercase tracking-tighter">#{d.id.slice(-8)}</div>
+                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold tracking-tight">
+                                            <MapPinIcon className="w-3 h-3" /> {d.node_id.slice(0, 8)}
                                         </div>
                                     </div>
-                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${getStatusColor(d.status)}`}>
+                                    <div className={`text-[8px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${getStatusColor(d.status)}`}>
                                         {d.status}
-                                    </span>
+                                    </div>
                                 </button>
                             ))}
-                            {dispatches.length === 0 && (
-                                <div className="p-10 text-center text-slate-300">
+                            {dispatches.length === 0 && !loading && (
+                                <div className="p-12 text-center text-slate-700">
                                     <ArchiveBoxIcon className="w-8 h-8 mx-auto opacity-20 mb-2" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">No active dispatches</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest">No manufacturing records</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Dispatch Inspector */}
+                {/* Dispatch Forensic Inspector */}
                 <div className="lg:col-span-8">
                     {selectedDispatch ? (
-                        <div className="space-y-6">
-                            <div className="glass rounded-3xl border border-white p-8 shadow-xl relative overflow-hidden">
+                        <div className="space-y-6 animate-slide-fade">
+                            <div className="bg-slate-900 rounded-3xl border border-slate-800 p-8 shadow-2xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-8">
-                                    <div className={`px-4 py-1.5 rounded-full border text-xs font-black uppercase tracking-widest ${getStatusColor(selectedDispatch.status)}`}>
+                                    <div className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${getStatusColor(selectedDispatch.status)}`}>
                                         {selectedDispatch.status}
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-2xl font-black">
-                                        <TruckIcon className="w-8 h-8" />
+                                <div className="flex items-center gap-6 mb-10">
+                                    <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-500 border border-slate-700 shadow-inner">
+                                        <TruckIcon className="w-10 h-10" />
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">Dispatch {selectedDispatch.id}</h3>
-                                        <p className="text-sm text-slate-500 font-medium tracking-tight">Created {new Date(selectedDispatch.created_at).toLocaleString()}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-2xl font-black text-white tracking-tighter uppercase">DISPATCH {selectedDispatch.id.slice(-8)}</h3>
+                                            <FingerPrintIcon className="w-4 h-4 text-slate-600" />
+                                        </div>
+                                        <p className="text-xs text-slate-500 font-mono tracking-tight uppercase">Trace ID: {selectedDispatch.id}</p>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8 pt-8 border-t border-slate-100">
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Printhouse</div>
-                                        <div className="text-sm font-bold text-slate-800">{selectedDispatch.node_id}</div>
+                                {/* Operational Metrics Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <MapPinIcon className="w-3 h-3" /> Node
+                                        </div>
+                                        <div className="text-xs font-bold text-white font-mono">{selectedDispatch.node_id.slice(0, 12)}...</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Machine</div>
-                                        <div className="text-sm font-bold text-slate-800">{selectedDispatch.machine_id}</div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <BoltIcon className="w-3 h-3" /> Machine
+                                        </div>
+                                        <div className="text-xs font-bold text-white font-mono">{selectedDispatch.machine_id?.slice(0, 12) || 'AUTO'}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Est. Cost</div>
-                                        <div className="text-sm font-bold text-emerald-600">€{selectedDispatch.estimated_cost}</div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <CurrencyEuroIcon className="w-3 h-3" /> Est. Cost
+                                        </div>
+                                        <div className="text-xs font-bold text-emerald-400">€{selectedDispatch.estimated_cost}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target SLA</div>
-                                        <div className="text-sm font-bold text-amber-600">{selectedDispatch.sla_deadline ? new Date(selectedDispatch.sla_deadline).toLocaleDateString() : 'N/A'}</div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <TagIcon className="w-3 h-3" /> Est. Margin
+                                        </div>
+                                        <div className="text-xs font-bold text-indigo-400">{selectedDispatch.estimated_margin}%</div>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2 mb-8">
-                                    <select 
-                                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none"
-                                        onChange={(e) => handleStatusUpdate(selectedDispatch.id, e.target.value)}
-                                        value={selectedDispatch.status}
-                                    >
-                                        <option value="ASSIGNED">ASSIGNED</option>
-                                        <option value="ACCEPTED">ACCEPTED</option>
-                                        <option value="PRINTING">PRINTING</option>
-                                        <option value="BINDING">BINDING</option>
-                                        <option value="SHIPPED">SHIPPED</option>
-                                        <option value="DELIVERED">DELIVERED</option>
-                                        <option value="FAILED">FAILED</option>
-                                    </select>
-                                    <button 
-                                        onClick={() => handleReroute(selectedDispatch.id)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 text-xs font-black uppercase tracking-widest hover:bg-amber-100 transition-colors"
-                                    >
-                                        <ArrowPathIcon className="w-4 h-4" /> Reroute Dispatch
-                                    </button>
+                                {/* Reservation Window */}
+                                <div className="mb-10 p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4" /> Capacity Reservation Window
+                                    </h4>
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-center flex-1">
+                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Starts</div>
+                                            <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_from ? new Date(selectedDispatch.reserved_from).toLocaleString() : 'PENDING'}</div>
+                                        </div>
+                                        <div className="px-4 text-indigo-500 opacity-30 italic">→</div>
+                                        <div className="text-center flex-1">
+                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Expires</div>
+                                            <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_until ? new Date(selectedDispatch.reserved_until).toLocaleString() : 'PENDING'}</div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Timeline */}
-                                <div className="space-y-6 pt-8 border-t border-slate-100">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Activity Timeline</h4>
-                                    <div className="space-y-6 relative before:absolute before:inset-0 before:left-5 before:w-0.5 before:bg-slate-100">
+                                {/* Lifecycle Controls */}
+                                <div className="space-y-4 mb-10 pt-10 border-t border-slate-800">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Lifecycle State Transition</h4>
+                                        <span className="text-[8px] font-mono text-slate-700 uppercase">Authenticated Override Only</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {possibleStatuses.map(status => (
+                                            <button
+                                                key={status}
+                                                disabled={!isTransitionValid(selectedDispatch.status, status) || updating}
+                                                onClick={() => handleStatusUpdate(selectedDispatch.id, status)}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                                    selectedDispatch.status === status 
+                                                    ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
+                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {status}
+                                            </button>
+                                        ))}
+                                        <button 
+                                            onClick={() => handleReroute(selectedDispatch.id)}
+                                            className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all"
+                                        >
+                                            Reroute Node
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Evidence & Metadata */}
+                                <div className="space-y-4 pt-10 border-t border-slate-800">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Forensic Evidence</h4>
+                                        <button 
+                                            onClick={() => setShowJson(!showJson)}
+                                            className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline"
+                                        >
+                                            {showJson ? 'Hide Payload' : 'Show Recommendation JSON'}
+                                        </button>
+                                    </div>
+                                    {showJson && (
+                                        <div className="p-4 bg-black/50 rounded-2xl border border-slate-800 font-mono text-[10px] text-indigo-300/80 overflow-x-auto whitespace-pre">
+                                            {JSON.stringify(selectedDispatch.metadata_json, null, 2)}
+                                        </div>
+                                    )}
+
+                                    {/* Timeline */}
+                                    <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-px before:bg-slate-800/50 pt-4">
                                         {selectedDispatch.events?.map((e: any, i: number) => (
-                                            <div key={i} className="relative pl-12">
-                                                <div className="absolute left-0 top-0 w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-                                                    {e.event_type === 'STATUS_CHANGED' ? <ClockIcon className="w-5 h-5 text-indigo-500" /> : <BoltIcon className="w-5 h-5 text-amber-500" />}
+                                            <div key={i} className="relative pl-10">
+                                                <div className="absolute left-0 top-0 w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
+                                                    {e.event_type === 'STATUS_CHANGED' ? <ClockIcon className="w-4 h-4 text-indigo-500" /> : <BoltIcon className="w-4 h-4 text-amber-500" />}
                                                 </div>
-                                                <div className="p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
+                                                <div className="p-4 rounded-2xl bg-slate-800/20 border border-slate-800/50">
                                                     <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{e.event_type}</span>
-                                                        <span className="text-[9px] text-slate-400 font-medium">{new Date(e.created_at).toLocaleString()}</span>
+                                                        <span className="text-[9px] font-black text-white uppercase tracking-widest">{e.event_type}</span>
+                                                        <span className="text-[8px] text-slate-500 font-bold font-mono">{new Date(e.created_at).toLocaleString()}</span>
                                                     </div>
-                                                    <div className="text-xs font-bold text-slate-600">
-                                                        {e.from_status ? `${e.from_status} → ${e.to_status}` : e.to_status}
+                                                    <div className="text-[10px] font-bold text-slate-400">
+                                                        {e.old_status ? `${e.old_status} \u2192 ${e.new_status}` : e.new_status}
                                                     </div>
-                                                    {e.message && <p className="text-[10px] text-slate-400 mt-1 italic">{e.message}</p>}
+                                                    {e.message && <p className="text-[9px] text-slate-600 mt-1 italic font-medium tracking-tight">"{e.message}"</p>}
                                                 </div>
                                             </div>
                                         ))}
@@ -214,9 +306,14 @@ export const ProductionDispatchTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[500px] glass rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                            <ArchiveBoxIcon className="w-12 h-12 opacity-20" />
-                            <p className="font-black uppercase text-xs tracking-widest opacity-40">Select a dispatch to inspect details</p>
+                        <div className="h-full min-h-[600px] bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-6">
+                            <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 shadow-xl">
+                                <DocumentTextIcon className="w-10 h-10 opacity-20" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-black uppercase text-xs tracking-widest opacity-40">Select a dispatch for forensic inspection</p>
+                                <p className="text-[10px] font-medium text-slate-700 mt-2 italic tracking-widest">Awaiting industrial command signal...</p>
+                            </div>
                         </div>
                     )}
                 </div>
