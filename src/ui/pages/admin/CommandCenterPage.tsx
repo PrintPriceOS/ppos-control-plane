@@ -24,7 +24,7 @@ import {
   getAudit,
   pauseQueue,
   resumeQueue,
-  getEconomicOverview,
+  getRoutingEconomicOverview,
   getCapacity,
   scoreDispatch,
   createDispatch,
@@ -366,7 +366,7 @@ export const CommandCenterPage: React.FC = () => {
   const industrial = useAdminQuery('hawk-eye:industrial', getIndustrialSnapshot, 10000);
   const network = useAdminQuery('hawk-eye:network', getNetworkOverview, 60000);
   const capacity = useAdminQuery('hawk-eye:capacity', getCapacity, 60000);
-  const routing = useAdminQuery('hawk-eye:routing', getEconomicOverview, 60000);
+  const routing = useAdminQuery('hawk-eye:routing', getRoutingEconomicOverview, 60000);
   const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
   const incidents = useAdminQuery('hawk-eye:incidents', getIndustrialIncidents, 10000);
   const audit = useAdminQuery('hawk-eye:audit', () => getAudit({ limit: 20 }), 5000);

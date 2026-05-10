@@ -7,7 +7,7 @@
 import React from 'react';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { 
-    getEconomicOverview, 
+    getDispatchEconomicOverview, 
     getEconomicRisk, 
     getProfitabilityHistory 
 } from '../../lib/adminApi';
@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export const IndustrialEconomicTab: React.FC = () => {
-    const overview = useAdminQuery('econ:overview', getEconomicOverview, 10000);
+    const overview = useAdminQuery('econ:overview', getDispatchEconomicOverview, 10000);
     const risk = useAdminQuery('econ:risk', getEconomicRisk, 10000);
     const history = useAdminQuery('econ:profitability', getProfitabilityHistory, 15000);
 

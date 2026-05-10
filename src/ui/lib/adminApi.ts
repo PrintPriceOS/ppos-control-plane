@@ -740,7 +740,7 @@ export async function getManufacturingPredictions() {
 }
 
 // --- Phase 30 — Autonomous Industrial Economic Engine ---
-export async function getEconomicOverview() {
+export async function getDispatchEconomicOverview() {
     return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/economics/overview');
 }
 
@@ -1207,7 +1207,7 @@ export async function getAnomalies() {
 
 // --- Economic Routing API --- //
 
-export async function getEconomicOverview() {
+export async function getRoutingEconomicOverview() {
     return adminFetch<{ metrics: any, avg_final_score: number }>(`/api/admin/routing/economic/overview`);
 }
 
