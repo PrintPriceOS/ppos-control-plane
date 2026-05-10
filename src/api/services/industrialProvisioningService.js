@@ -685,6 +685,56 @@ class IndustrialProvisioningService {
                     universal_health DECIMAL(5,2),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'omniversal_consciousness_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS omniversal_consciousness_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    omniversal_coherence DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'post_reality_singularity_events',
+                sql: `CREATE TABLE IF NOT EXISTS post_reality_singularity_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    singularity_vector DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'infinite_dimensional_routes',
+                sql: `CREATE TABLE IF NOT EXISTS infinite_dimensional_routes (
+                    id VARCHAR(64) PRIMARY KEY,
+                    dimension_label VARCHAR(128),
+                    stability_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'universal_entropy_registry',
+                sql: `CREATE TABLE IF NOT EXISTS universal_entropy_registry (
+                    id VARCHAR(64) PRIMARY KEY,
+                    entropy_level DECIMAL(5,2),
+                    negentropy_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'causal_manufacturing_chains',
+                sql: `CREATE TABLE IF NOT EXISTS causal_manufacturing_chains (
+                    id VARCHAR(64) PRIMARY KEY,
+                    causal_stability DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'omniversal_singularity_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS omniversal_singularity_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    singularity_health DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
             }
         ];
 
@@ -840,6 +890,30 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureRealityColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Ensure Phase 22 Omniversal/Singularity columns exist
+        const singularityMigrations = [
+            { table: 'manufacturing_dispatches', column: 'singularity_weight',       type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'manufacturing_dispatches', column: 'omniversal_priority',       type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'causal_chain_id',           type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'entropy_score',             type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'dimensional_cluster_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_node_machine_profiles', column: 'omniversal_coherence',   type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'transcendent_awareness', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'singularity_stability',  type: 'DECIMAL(5,2) DEFAULT 100.00' }
+        ];
+
+        for (const gm of singularityMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureSingularityColumns:${gm.table}.${gm.column}`, err);
             }
         }
 

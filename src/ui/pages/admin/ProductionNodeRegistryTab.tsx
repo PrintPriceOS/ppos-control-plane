@@ -275,6 +275,24 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  icon={ArrowPathIcon}
                                  color="text-indigo-500"
                             />
+                            <StatCard 
+                                 label="Omniv. Coherence" 
+                                 value={`${selectedNode.omniversal_coherence || 100}%`} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-fuchsia-500"
+                            />
+                            <StatCard 
+                                 label="Transcend. Aware." 
+                                 value={`${selectedNode.transcendent_awareness || 100}%`} 
+                                 icon={BoltIcon}
+                                 color="text-pink-400"
+                            />
+                            <StatCard 
+                                 label="Singularity Stab." 
+                                 value={`${selectedNode.singularity_stability || 100}%`} 
+                                 icon={CheckCircleIcon}
+                                 color="text-emerald-400"
+                            />
                         </div>
 
                         {/* Performance Details */}
