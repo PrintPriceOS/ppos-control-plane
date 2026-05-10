@@ -89,15 +89,15 @@ export const ProductionDispatchTab: React.FC = () => {
             case 'FAILED': return 'bg-red-500/10 text-red-400 border-red-500/20';
             case 'CANCELED': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
             case 'REROUTED':
-            case 'AUTO_REROUTED': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+            case 'AUTO_REROUTED': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
             case 'PRINTING':
             case 'BINDING':
             case 'PREPARING': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
             case 'ACCEPTED':
             case 'ASSIGNED':
             case 'AUTO_ASSIGNED': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-            case 'SLA_AT_RISK': return 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse';
-            case 'CAPACITY_BLOCKED': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+            case 'SLA_AT_RISK': return 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse';
+            case 'CAPACITY_BLOCKED': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
             default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
         }
     };
@@ -196,9 +196,21 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </div>
                                         <p className="text-xs text-slate-500 font-mono tracking-tight uppercase">Trace ID: {selectedDispatch.id}</p>
                                         {selectedDispatch.status === 'SLA_AT_RISK' && (
+                                            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
+                                                <ExclamationTriangleIcon className="w-4 h-4 text-amber-500" />
+                                                <div>
+                                                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-tight block">SLA BREACH RISK DETECTED</span>
+                                                    <span className="text-[9px] text-amber-500/70 font-bold uppercase">{selectedDispatch.metadata_json?.sla_alert?.message || 'Industrial delay detected'}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedDispatch.status === 'CAPACITY_BLOCKED' && (
                                             <div className="mt-2 p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
                                                 <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" />
-                                                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-tight">Industrial SLA Alert: Production Delay Detected</span>
+                                                <div>
+                                                    <span className="text-[10px] font-black text-rose-400 uppercase tracking-tight block">CAPACITY CONFLICT DETECTED</span>
+                                                    <span className="text-[9px] text-rose-500/70 font-bold uppercase">Scheduling overlap detected on machine {selectedDispatch.metadata_json?.capacity_conflict?.machine_id}</span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -230,24 +242,54 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </div>
                                         <div className="text-xs font-bold text-indigo-400">{selectedDispatch.estimated_margin}%</div>
                                     </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <BoltIcon className="w-3 h-3" /> Reliability
+                                        </div>
+                                        <div className="text-xs font-bold text-cyan-400">{selectedDispatch.reliability_score || 0}%</div>
+                                    </div>
                                 </div>
 
-                                {/* Reservation Window */}
-                                <div className="mb-10 p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
-                                        <CalendarIcon className="w-4 h-4" /> Capacity Reservation Window
-                                    </h4>
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-center flex-1">
-                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Starts</div>
-                                            <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_from ? new Date(selectedDispatch.reserved_from).toLocaleString() : 'PENDING'}</div>
-                                        </div>
-                                        <div className="px-4 text-indigo-500 opacity-30 italic">→</div>
-                                        <div className="text-center flex-1">
-                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Expires</div>
-                                            <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_until ? new Date(selectedDispatch.reserved_until).toLocaleString() : 'PENDING'}</div>
+                                {/* Reservation & Recovery Context */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+                                    <div className="p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
+                                            <CalendarIcon className="w-4 h-4" /> Capacity Reservation Window
+                                        </h4>
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-center flex-1">
+                                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Starts</div>
+                                                <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_from ? new Date(selectedDispatch.reserved_from).toLocaleString() : 'PENDING'}</div>
+                                            </div>
+                                            <div className="px-2 text-indigo-500 opacity-30 italic">→</div>
+                                            <div className="text-center flex-1">
+                                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Expires</div>
+                                                <div className="text-xs font-bold text-white font-mono">{selectedDispatch.reserved_until ? new Date(selectedDispatch.reserved_until).toLocaleString() : 'PENDING'}</div>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {selectedDispatch.metadata_json?.autonomous_recovery && (
+                                        <div className="p-6 bg-cyan-500/5 rounded-2xl border border-cyan-500/10">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-4 flex items-center gap-2">
+                                                <BoltIcon className="w-4 h-4" /> Autonomous Recovery Node
+                                            </h4>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reason</span>
+                                                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-tighter">{selectedDispatch.metadata_json.autonomous_recovery.reason}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Confidence</span>
+                                                    <span className="text-[10px] font-bold text-white px-2 py-0.5 bg-cyan-500/20 rounded uppercase tracking-widest">{selectedDispatch.metadata_json.autonomous_recovery.confidence}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Old Node</span>
+                                                    <span className="text-[10px] font-mono text-slate-400">{selectedDispatch.metadata_json.autonomous_recovery.old_node.slice(0, 12)}...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Lifecycle Controls */}

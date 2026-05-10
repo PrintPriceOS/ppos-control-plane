@@ -66,26 +66,46 @@ class AutonomousRerouteService {
             previous_dispatch_id: oldDispatch.id,
             reroute_count: (oldMetadata.reroute_count || 0) + 1,
             autonomous: true,
-            reason: 'AUTONOMOUS_RECOVERY_REASSIGNMENT'
+            reason: `AUTONOMOUS_RECOVERY: ${oldMetadata.sla_alert?.code || 'UNSPECIFIED_FAILURE'}`
         };
 
         const result = await productionOrchestration.assignDispatch(oldDispatch.job_id, newAssignment);
 
-        // 3. Update old dispatch status and release reservations
+        // 3. Update metadata with recovery info
+        const recoveryMetadata = {
+            reason: newAssignment.reason,
+            old_node: oldDispatch.node_id,
+            new_node: recommendation.best_node.id,
+            confidence: recommendation.confidence,
+            recovered_at: new Date().toISOString(),
+            source_alert: oldMetadata.sla_alert
+        };
+
+        await db.query(`
+            UPDATE manufacturing_dispatches 
+            SET metadata_json = JSON_SET(COALESCE(metadata_json, '{}'), '$.autonomous_recovery', ?)
+            WHERE id = ?
+        `, [JSON.stringify(recoveryMetadata), result.dispatchId]);
+
+        // 4. Update old dispatch status and release reservations
         await productionOrchestration.updateStatus(
             oldDispatch.id, 
             'AUTO_REROUTED', 
-            `Recovered via autonomous reroute to ${result.dispatchId}`
+            `Recovered via autonomous reroute to ${result.dispatchId}. Reason: ${recoveryMetadata.reason}`
         );
 
-        // 4. Log cross-link event
+        // 5. Log cross-link event
         await productionOrchestration.logEvent(
             result.dispatchId, 
             'AUTO_REROUTE_EXECUTED', 
             null, 
             'ASSIGNED', 
             `Autonomous recovery from previous dispatch ${oldDispatch.id}`,
-            { source_dispatch_id: oldDispatch.id }
+            { 
+                source_dispatch_id: oldDispatch.id,
+                recovery_confidence: recommendation.confidence,
+                score: recommendation.score
+            }
         );
 
         return { ok: true, newDispatchId: result.dispatchId };

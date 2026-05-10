@@ -89,6 +89,38 @@ class DispatchRecommendationService {
             throw err;
         }
     }
+    /**
+     * Helper to get a single best recommendation for a job ID.
+     */
+    async getRecommendation(jobId, options = {}) {
+        const db = require('./mysqlClient');
+        const [job] = await db.query('SELECT metadata_json FROM jobs WHERE id = ?', [jobId]);
+        if (!job) return null;
+
+        const specs = typeof job.metadata_json === 'string' ? JSON.parse(job.metadata_json) : (job.metadata_json || {});
+        
+        // Pass exclusion list to routing if supported
+        const result = await this.getRecommendations({ ...specs, ...options });
+        
+        if (result.ok && result.recommendations.length > 0) {
+            // Apply hard filter for excluded nodes if the engine didn't
+            const candidates = result.recommendations.filter(r => !options.excludeNodeIds?.includes(r.nodeId));
+            
+            if (candidates.length === 0) return null;
+
+            const best = candidates[0];
+            return {
+                best_node: { id: best.nodeId },
+                best_machine: { id: best.machineId },
+                estimated_cost: best.estimatedCost,
+                estimated_margin: best.estimatedMargin,
+                estimated_days: best.estimatedProductionDays,
+                score: best.finalScore,
+                confidence: best.confidence
+            };
+        }
+        return null;
+    }
 }
 
 module.exports = new DispatchRecommendationService();

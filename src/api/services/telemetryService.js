@@ -450,6 +450,42 @@ class TelemetryService {
             throw err;
         }
     }
+    /**
+     * Get industrial health snapshot including autonomous MES metrics.
+     */
+    async getIndustrialHealthSnapshot() {
+        try {
+            const [stats] = await db.query(`
+                SELECT 
+                    COUNT(*) as total_dispatches,
+                    SUM(CASE WHEN status NOT IN ('DELIVERED', 'FAILED', 'CANCELED', 'REROUTED', 'AUTO_REROUTED') THEN 1 ELSE 0 END) as active_dispatches,
+                    SUM(CASE WHEN status = 'SLA_AT_RISK' THEN 1 ELSE 0 END) as stalled_dispatches,
+                    SUM(CASE WHEN status = 'AUTO_REROUTED' THEN 1 ELSE 0 END) as autonomous_recoveries,
+                    SUM(CASE WHEN status = 'CAPACITY_BLOCKED' THEN 1 ELSE 0 END) as capacity_conflicts,
+                    SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as manual_reroutes
+                FROM manufacturing_dispatches
+            `);
+
+            const [reliability] = await db.query(`
+                SELECT AVG(reliability_score) as avg_score, AVG(avg_turnaround_hours) as avg_turnaround
+                FROM printer_reliability_metrics
+            `);
+
+            return {
+                state: stats.stalled_dispatches > 5 ? 'DEGRADED' : 'LIVE',
+                activeDispatches: parseInt(stats.active_dispatches) || 0,
+                stalledDispatches: parseInt(stats.stalled_dispatches) || 0,
+                autonomousRecoveries: parseInt(stats.autonomous_recoveries) || 0,
+                capacityConflicts: parseInt(stats.capacity_conflicts) || 0,
+                avgNodeReliability: parseFloat(reliability[0]?.avg_score || 0).toFixed(2),
+                avgProductionDuration: `${parseFloat(reliability[0]?.avg_turnaround || 0).toFixed(1)}h`,
+                timestamp: new Date().toISOString()
+            };
+        } catch (err) {
+            logger.error({ event: 'industrial_health_failed', error: err.message });
+            return { state: 'UNAVAILABLE' };
+        }
+    }
 }
 
 module.exports = new TelemetryService();

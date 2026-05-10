@@ -148,7 +148,13 @@ class ProductionOrchestrationService {
     }
 
     async getDispatchDetail(dispatchId) {
-        const [dispatch] = await db.query('SELECT * FROM manufacturing_dispatches WHERE id = ?', [dispatchId]);
+        const [dispatch] = await db.query(`
+            SELECT d.*, r.reliability_score, r.avg_turnaround_hours
+            FROM manufacturing_dispatches d
+            LEFT JOIN printer_reliability_metrics r ON d.node_id = r.printer_id
+            WHERE d.id = ?
+        `, [dispatchId]);
+        
         if (!dispatch) return null;
 
         const events = await db.query('SELECT * FROM manufacturing_dispatch_events WHERE dispatch_id = ? ORDER BY created_at DESC', [dispatchId]);

@@ -49,25 +49,40 @@ class SLAMonitoringService {
             };
         }
 
-        // 2. Acceptance Latency Check
-        if (d.status === 'ASSIGNED' || d.status === 'AUTO_ASSIGNED') {
-            const createdAt = new Date(d.created_at);
-            const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-            if (hoursSinceCreation > 12) {
-                return {
-                    code: 'ACCEPTANCE_DELAY',
-                    message: `Node has not accepted dispatch within 12-hour industrial window.`
-                };
-            }
+        const createdAt = new Date(d.created_at);
+        const updatedAt = new Date(d.updated_at);
+        const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+        const hoursSinceUpdate = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
+
+        // 2. Node Non-Response Check
+        if ((d.status === 'ASSIGNED' || d.status === 'AUTO_ASSIGNED') && hoursSinceCreation > 12) {
+            return {
+                code: 'NODE_NON_RESPONSE',
+                message: `Node has not accepted dispatch within 12-hour industrial window.`
+            };
         }
 
-        // 3. State Stagnation Check
-        const updatedAt = new Date(d.updated_at);
-        const hoursInactive = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursInactive > 48) {
+        // 3. Prepress Delay Check
+        if (d.status === 'PREPARING' && hoursSinceUpdate > 24) {
+            return {
+                code: 'PREPRESS_DELAY',
+                message: `Dispatch stuck in PREPARING for > 24 hours. Preflight or material prep delay suspected.`
+            };
+        }
+
+        // 4. Production Stalled Check
+        if (d.status === 'PRINTING' && hoursSinceUpdate > 72) {
             return {
                 code: 'PRODUCTION_STALLED',
-                message: `No state transition detected for > 48 hours. Node heartbeat or telemetry missing.`
+                message: `Production stuck in PRINTING for > 72 hours. Potential machine failure or resource shortage.`
+            };
+        }
+
+        // 5. General Stagnation Check (Fallback)
+        if (hoursSinceUpdate > 96) {
+            return {
+                code: 'GENERAL_STAGNATION',
+                message: `No state transition detected for > 96 hours. Critical production oversight.`
             };
         }
 
