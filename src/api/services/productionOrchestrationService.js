@@ -20,12 +20,18 @@ class ProductionOrchestrationService {
         try {
             await db.query('START TRANSACTION');
 
+            // Calculate reservation window once
+            const now = new Date();
+            const estimatedHours = recommendation.estimatedProductionDays * 24;
+            const reservedUntil = new Date(now.getTime() + estimatedHours * 60 * 60 * 1000);
+
             // 1. Create Manufacturing Dispatch record
             await db.query(`
                 INSERT INTO manufacturing_dispatches (
                     id, job_id, node_id, machine_id, status,
-                    estimated_cost, estimated_margin, metadata_json
-                ) VALUES (?, ?, ?, ?, 'ASSIGNED', ?, ?, ?)
+                    estimated_cost, estimated_margin, 
+                    reserved_from, reserved_until, metadata_json
+                ) VALUES (?, ?, ?, ?, 'ASSIGNED', ?, ?, ?, ?, ?)
             `, [
                 dispatchId, 
                 jobId, 
@@ -33,23 +39,25 @@ class ProductionOrchestrationService {
                 recommendation.machineId,
                 recommendation.estimatedCost,
                 recommendation.estimatedMargin || 0,
+                now,
+                reservedUntil,
                 JSON.stringify(recommendation)
             ]);
 
             // 2. Reserve Capacity
-            const estimatedHours = recommendation.estimatedProductionDays * 24;
             await db.query(`
                 INSERT INTO manufacturing_capacity_reservations (
                     id, dispatch_id, job_id, node_id, machine_id, reserved_units,
                     reserved_from, reserved_until, reservation_status
-                ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? HOUR), 'ACTIVE')
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'ACTIVE')
             `, [
                 reservationId,
                 dispatchId,
                 jobId,
                 recommendation.nodeId,
                 recommendation.machineId,
-                estimatedHours
+                now,
+                reservedUntil
             ]);
 
             // 3. Log Event
