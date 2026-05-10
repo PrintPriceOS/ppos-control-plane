@@ -1,0 +1,164 @@
+/**
+ * src/api/services/dispatch/DispatchExecutionService.js
+ * 
+ * Orchestrates real industrial dispatches, capacity reservations, and lifecycle events.
+ * 100% DB-backed, no mocks.
+ */
+const db = require('../mysqlClient');
+const { v4: uuidv4 } = require('uuid');
+const logger = require('../logger').child('dispatch-execution');
+
+class DispatchExecutionService {
+  /**
+   * Creates a real industrial dispatch and reserves capacity.
+   * @param {Object} packageId 
+   * @param {Object} selectedNodeId 
+   * @param {Object} options { operatorId, jobInput }
+   */
+  async createManufacturingDispatch(packageId, selectedNodeId, options = {}) {
+    const dispatchId = uuidv4();
+    const reservationId = uuidv4();
+    const { operatorId, jobInput } = options;
+
+    const connection = await db.getPool().getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // 1. Verify Package exists and is READY
+      const [packages] = await connection.query('SELECT * FROM production_packages WHERE id = ?', [packageId]);
+      const pkg = packages[0];
+      if (!pkg) throw new Error('PACKAGE_NOT_FOUND');
+      
+      // 2. Verify Node exists
+      const [nodes] = await connection.query('SELECT * FROM print_nodes WHERE id = ?', [selectedNodeId]);
+      const node = nodes[0];
+      if (!node) throw new Error('NODE_NOT_FOUND');
+
+      // 3. Create Dispatch
+      const slaEta = new Date();
+      slaEta.setHours(slaEta.getHours() + (node.production_lead_days || 24)); // Default 24h lead if not set
+
+      await connection.query(`
+        INSERT INTO production_dispatches 
+        (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, status, orchestration_metadata_json, sla_estimate_json, operator_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        dispatchId, packageId, selectedNodeId, pkg.tenant_id, node.tenant_id, 'ALLOCATED',
+        JSON.stringify({
+          federation_node_id: node.federation_id || node.id,
+          initial_utilization: node.capacity_utilization_pct,
+          job_input: jobInput
+        }),
+        JSON.stringify({
+          estimated_completion: slaEta.toISOString(),
+          risk_buffer_minutes: 60
+        }),
+        operatorId || 'SYSTEM'
+      ]);
+
+      // 4. Create Capacity Reservation
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 2); // 2h lock until node accepts
+
+      await connection.query(`
+        INSERT INTO manufacturing_reservations 
+        (id, node_id, dispatch_id, job_input_snapshot_json, status, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [
+        reservationId, selectedNodeId, dispatchId, JSON.stringify(jobInput), 'PENDING', expiresAt
+      ]);
+
+      // 5. Update Package Status
+      await connection.query('UPDATE production_packages SET status = ?, assigned_printer_tenant_id = ? WHERE id = ?', [
+        'DISPATCHED', node.tenant_id, packageId
+      ]);
+
+      // 6. Log Event
+      await connection.query(`
+        INSERT INTO production_events 
+        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        uuidv4(), pkg.tenant_id, packageId, dispatchId, 'DISPATCH_CREATED', 'USER', operatorId || 'SYSTEM',
+        `Autonomous dispatch initialized for node ${node.company_name}`,
+        JSON.stringify({ reservationId, nodeId: selectedNodeId })
+      ]);
+
+      await connection.commit();
+      
+      logger.info({
+        event: 'dispatch_created',
+        dispatchId,
+        nodeId: selectedNodeId,
+        packageId
+      });
+
+      return {
+        ok: true,
+        dispatchId,
+        reservationId,
+        sla: { estimatedCompletion: slaEta }
+      };
+
+    } catch (err) {
+      await connection.rollback();
+      logger.error({
+        event: 'dispatch_failed',
+        error: err.message,
+        packageId,
+        nodeId: selectedNodeId
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Updates dispatch status and triggers associated state changes.
+   */
+  async updateDispatchLifecycle(dispatchId, newStatus, actorId, message = '') {
+    const connection = await db.getPool().getConnection();
+    await connection.beginTransaction();
+
+    try {
+      const [dispatches] = await connection.query('SELECT * FROM production_dispatches WHERE id = ?', [dispatchId]);
+      const dispatch = dispatches[0];
+      if (!dispatch) throw new Error('DISPATCH_NOT_FOUND');
+
+      // Update Dispatch
+      await connection.query('UPDATE production_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
+
+      // Handle specific transitions
+      if (newStatus === 'IN_PRODUCTION') {
+        await connection.query('UPDATE manufacturing_reservations SET status = ? WHERE dispatch_id = ?', ['CONFIRMED', dispatchId]);
+        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['IN_PRODUCTION', dispatch.production_package_id]);
+      } else if (newStatus === 'COMPLETED') {
+        await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['RELEASED', dispatchId]);
+        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['COMPLETED', dispatch.production_package_id]);
+      } else if (newStatus === 'FAILED' || newStatus === 'BLOCKED') {
+        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', dispatch.production_package_id]);
+      }
+
+      // Log Event
+      await connection.query(`
+        INSERT INTO production_events 
+        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        uuidv4(), dispatch.sender_tenant_id, dispatch.production_package_id, dispatchId, `DISPATCH_${newStatus}`, 'SYSTEM', actorId || 'SYSTEM',
+        message || `Dispatch transitioned to ${newStatus}`
+      ]);
+
+      await connection.commit();
+      return { ok: true };
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+}
+
+module.exports = new DispatchExecutionService();

@@ -186,6 +186,430 @@ class ProductionPersistenceService {
           INDEX idx_created (created_at)
         ) ENGINE=InnoDB;
       `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS predictive_bottleneck_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          congestion_score FLOAT DEFAULT 0,
+          predicted_delay_minutes INT DEFAULT 0,
+          risk_level VARCHAR(32) DEFAULT 'LOW',
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_risk (risk_level),
+          CONSTRAINT fk_bottleneck_node FOREIGN KEY (node_id) REFERENCES print_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS failure_prediction_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          dispatch_id VARCHAR(64) NOT NULL,
+          failure_probability FLOAT DEFAULT 0,
+          reason_code VARCHAR(64) NULL,
+          mitigation_recommendation TEXT NULL,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_dispatch (dispatch_id),
+          CONSTRAINT fk_failure_dispatch FOREIGN KEY (dispatch_id) REFERENCES production_dispatches(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS industrial_memory_graph (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          entity_type VARCHAR(64) NOT NULL,
+          entity_id VARCHAR(64) NOT NULL,
+          relationship_type VARCHAR(64) NOT NULL,
+          weight FLOAT DEFAULT 1.0,
+          metadata_json JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_entity (entity_type, entity_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS industrial_learning_cycles (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          cycle_type VARCHAR(64) NOT NULL,
+          input_size INT DEFAULT 0,
+          improvement_delta FLOAT DEFAULT 0,
+          metadata_json JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS dispatch_outcome_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          dispatch_id VARCHAR(64) NOT NULL,
+          node_id VARCHAR(64) NOT NULL,
+          outcome_status VARCHAR(32) NOT NULL,
+          sla_met BOOLEAN DEFAULT TRUE,
+          latency_ms INT DEFAULT 0,
+          quality_score INT DEFAULT 100,
+          recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_dispatch (dispatch_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS printer_reliability_metrics (
+          printer_id VARCHAR(64) PRIMARY KEY,
+          sla_success_rate FLOAT DEFAULT 1.0,
+          reroute_frequency FLOAT DEFAULT 0,
+          delivery_accuracy FLOAT DEFAULT 1.0,
+          capacity_stability FLOAT DEFAULT 1.0,
+          heartbeat_stability FLOAT DEFAULT 1.0,
+          failure_probability FLOAT DEFAULT 0,
+          trust_score INT DEFAULT 100,
+          last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT fk_rel_printer FOREIGN KEY (printer_id) REFERENCES print_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS predictive_congestion_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          forecast_window_minutes INT DEFAULT 60,
+          predicted_utilization_pct INT DEFAULT 0,
+          confidence_score FLOAT DEFAULT 0,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_forecast (forecast_at)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS federated_intelligence_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          health_score INT DEFAULT 100,
+          bottleneck_count INT DEFAULT 0,
+          resilience_score INT DEFAULT 100,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region (region)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS regional_capacity_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          forecast_date DATE NOT NULL,
+          predicted_load_pct INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region_date (region, forecast_date)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS optimization_learning_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          optimization_type VARCHAR(64) NOT NULL,
+          pre_score FLOAT DEFAULT 0,
+          post_score FLOAT DEFAULT 0,
+          efficiency_gain_pct FLOAT DEFAULT 0,
+          metadata_json JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS industrial_prediction_cycles (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          model_version VARCHAR(32) DEFAULT 'v1',
+          accuracy_score FLOAT DEFAULT 0,
+          predictions_made INT DEFAULT 0,
+          false_positives INT DEFAULT 0,
+          false_negatives INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS economic_optimization_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          optimization_type VARCHAR(64) NOT NULL,
+          projected_margin_delta FLOAT DEFAULT 0,
+          efficiency_score INT DEFAULT 100,
+          metadata_json JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS industrial_profitability_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          dispatch_id VARCHAR(64) NOT NULL,
+          gross_revenue FLOAT DEFAULT 0,
+          operational_cost FLOAT DEFAULT 0,
+          logistics_cost FLOAT DEFAULT 0,
+          energy_cost FLOAT DEFAULT 0,
+          net_margin FLOAT DEFAULT 0,
+          recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_dispatch (dispatch_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS economic_risk_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          risk_type VARCHAR(64) NOT NULL,
+          probability FLOAT DEFAULT 0,
+          impact_score INT DEFAULT 0,
+          forecast_window_hours INT DEFAULT 24,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region (region)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS economic_pressure_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          energy_load_pct INT DEFAULT 0,
+          logistics_latency_ms INT DEFAULT 0,
+          margin_compression_pct FLOAT DEFAULT 0,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS federation_economic_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          federation_id VARCHAR(64) NOT NULL,
+          total_revenue FLOAT DEFAULT 0,
+          avg_margin_pct FLOAT DEFAULT 0,
+          operational_efficiency_score INT DEFAULT 100,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_federation (federation_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS regional_profitability_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          forecast_date DATE NOT NULL,
+          predicted_margin_pct FLOAT DEFAULT 0,
+          risk_level VARCHAR(32) DEFAULT 'LOW',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region_date (region, forecast_date)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS governance_resilience_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          federation_id VARCHAR(64) NOT NULL,
+          resilience_score INT DEFAULT 100,
+          survivability_index INT DEFAULT 100,
+          governance_status VARCHAR(32) DEFAULT 'OPTIMAL',
+          metadata_json JSON NULL,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_federation (federation_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS continuity_policy_evaluations (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          policy_id VARCHAR(64) NOT NULL,
+          target_entity VARCHAR(64) NOT NULL,
+          evaluation_result VARCHAR(32) NOT NULL,
+          violation_details TEXT NULL,
+          evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_policy (policy_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS cascading_failure_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          source_region VARCHAR(64) NOT NULL,
+          target_region VARCHAR(64) NOT NULL,
+          failure_probability FLOAT DEFAULT 0,
+          propagation_vector VARCHAR(64) NULL,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_source (source_region)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS systemic_risk_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          risk_type VARCHAR(64) NOT NULL,
+          systemic_impact_pct INT DEFAULT 0,
+          probability FLOAT DEFAULT 0,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_risk (risk_type)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS federation_resilience_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          redundancy_ratio FLOAT DEFAULT 1.0,
+          diversity_score INT DEFAULT 100,
+          criticality_index FLOAT DEFAULT 0,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region (region)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS regional_survivability_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          forecast_window_hours INT DEFAULT 48,
+          survivability_score INT DEFAULT 100,
+          risk_mitigation_plan TEXT NULL,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_region (region)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS temporal_intelligence_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          forecast_type VARCHAR(64) NOT NULL,
+          stability_score INT DEFAULT 100,
+          divergence_index FLOAT DEFAULT 0,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_type (forecast_type)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS future_state_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          horizon_hours INT NOT NULL,
+          predicted_congestion_pct FLOAT DEFAULT 0,
+          survivability_index INT DEFAULT 100,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS parallel_timeline_models (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          timeline_id VARCHAR(64) NOT NULL,
+          description TEXT NULL,
+          stability_ranking INT DEFAULT 100,
+          simulated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_timeline (timeline_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS timeline_branch_evaluations (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          branch_name VARCHAR(64) NOT NULL,
+          survivability_score INT DEFAULT 100,
+          economic_viability FLOAT DEFAULT 0,
+          evaluation_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS temporal_risk_forecasts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          risk_type VARCHAR(64) NOT NULL,
+          probability FLOAT DEFAULT 0,
+          time_to_impact_hours INT DEFAULT 0,
+          forecast_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS future_governance_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          policy_id VARCHAR(64) NOT NULL,
+          survivability_score INT DEFAULT 100,
+          evolution_path VARCHAR(128) NULL,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS long_horizon_resilience_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          region VARCHAR(64) NOT NULL,
+          decade_survivability_pct FLOAT DEFAULT 100,
+          resilience_erosion_rate FLOAT DEFAULT 0,
+          snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS reality_simulation_runs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          simulation_id VARCHAR(64) NOT NULL,
+          simulation_type VARCHAR(64) NOT NULL,
+          config JSON NULL,
+          status VARCHAR(32) DEFAULT 'PENDING',
+          started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP NULL,
+          INDEX idx_sim_id (simulation_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS synthetic_operations_snapshots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          simulation_id VARCHAR(64) NOT NULL,
+          snapshot_data JSON NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_sim_id (simulation_id),
+          INDEX idx_created (created_at)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS simulation_outcome_evaluations (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          simulation_id VARCHAR(64) NOT NULL,
+          survivability_delta FLOAT DEFAULT 0,
+          economic_impact_pct FLOAT DEFAULT 0,
+          governance_delta FLOAT DEFAULT 0,
+          evaluation_data JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_sim_id (simulation_id)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS autonomous_simulation_recommendations (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          simulation_id VARCHAR(64) NOT NULL,
+          action VARCHAR(32) NOT NULL, -- EXECUTE, HOLD, REROUTE, REJECT, ESCALATE
+          reason TEXT NULL,
+          confidence_score FLOAT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_sim_id (simulation_id),
+          INDEX idx_action (action)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS future_outcome_projections (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          simulation_id VARCHAR(64) NOT NULL,
+          horizon_hours INT NOT NULL,
+          projected_state JSON NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_sim_id (simulation_id)
+        ) ENGINE=InnoDB;
+      `);
       
       console.log('[PRODUCTION-PERSISTENCE] Tables verified.');
     } catch (err) {

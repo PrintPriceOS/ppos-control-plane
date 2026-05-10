@@ -7,7 +7,11 @@ import {
     ShieldCheckIcon,
     BoltIcon,
     ExclamationTriangleIcon,
-    ClockIcon
+    ClockIcon,
+    AcademicCapIcon,
+    BanknotesIcon,
+    ShieldCheckIcon,
+    CpuChipIcon
 } from "@heroicons/react/24/outline";
 import { ArtifactRegistryTab } from "./ArtifactRegistryTab";
 import { WorkerFleetTab } from "./WorkerFleetTab";
@@ -17,9 +21,15 @@ import { OrchestrationTab } from "./OrchestrationTab";
 import { IncidentRegistryTab } from "./IncidentRegistryTab";
 import { LifecyclePolicyTab } from "./LifecyclePolicyTab";
 import { ProductionNodeRegistryTab } from "./ProductionNodeRegistryTab";
+import { IndustrialLiveTab } from "./IndustrialLiveTab";
+import { IndustrialIntelligenceTab } from "./IndustrialIntelligenceTab";
+import { IndustrialEconomicTab } from "./IndustrialEconomicTab";
+import { IndustrialGovernanceTab } from "./IndustrialGovernanceTab";
+import { IndustrialTemporalTab } from "./IndustrialTemporalTab";
+import { IndustrialSimulationTab } from "./IndustrialSimulationTab";
 
 export const IndustrialOpsPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle'>('artifacts');
+    const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'live' | 'intelligence' | 'economics' | 'governance' | 'temporal' | 'simulation' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle'>('live');
 
     return (
         <div className="space-y-6">
@@ -53,6 +63,42 @@ export const IndustrialOpsPage: React.FC = () => {
                     onClick={() => setActiveTab('nodes')}
                     icon={ShieldCheckIcon}
                     label="Nodes"
+                />
+                <TabButton 
+                    active={activeTab === 'live'} 
+                    onClick={() => setActiveTab('live')}
+                    icon={BoltIcon}
+                    label="Live Orchestration"
+                />
+                <TabButton 
+                    active={activeTab === 'intelligence'} 
+                    onClick={() => setActiveTab('intelligence')}
+                    icon={AcademicCapIcon}
+                    label="Intelligence"
+                />
+                <TabButton 
+                    active={activeTab === 'economics'} 
+                    onClick={() => setActiveTab('economics')}
+                    icon={BanknotesIcon}
+                    label="Economics"
+                />
+                <TabButton 
+                    active={activeTab === 'governance'} 
+                    onClick={() => setActiveTab('governance')}
+                    icon={ShieldCheckIcon}
+                    label="Governance"
+                />
+                <TabButton 
+                    active={activeTab === 'temporal'} 
+                    onClick={() => setActiveTab('temporal')}
+                    icon={ClockIcon}
+                    label="Temporal"
+                />
+                <TabButton 
+                    active={activeTab === 'simulation'} 
+                    onClick={() => setActiveTab('simulation')}
+                    icon={CpuChipIcon}
+                    label="Simulation"
                 />
                 <TabButton 
                     active={activeTab === 'orchestration'} 
@@ -92,6 +138,12 @@ export const IndustrialOpsPage: React.FC = () => {
                 {activeTab === 'large-docs' && <LargeDocumentTab />}
                 {activeTab === 'workers' && <WorkerFleetTab />}
                 {activeTab === 'nodes' && <ProductionNodeRegistryTab />}
+                {activeTab === 'live' && <IndustrialLiveTab />}
+                {activeTab === 'intelligence' && <IndustrialIntelligenceTab />}
+                {activeTab === 'economics' && <IndustrialEconomicTab />}
+                {activeTab === 'governance' && <IndustrialGovernanceTab />}
+                {activeTab === 'temporal' && <IndustrialTemporalTab />}
+                {activeTab === 'simulation' && <IndustrialSimulationTab />}
                 {activeTab === 'storage' && <TenantStorageTab />}
                 {activeTab === 'orchestration' && <OrchestrationTab />}
                 {activeTab === 'incidents' && <IncidentRegistryTab />}

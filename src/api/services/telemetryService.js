@@ -264,8 +264,8 @@ class TelemetryService {
         try {
             const provisioningService = require('./industrialProvisioningService');
             
-            // Check for real rates in printer nodes
-            const rows = await db.query('SELECT rates_json FROM printer_nodes WHERE rates_json IS NOT NULL LIMIT 10');
+            // Check for real rates in print nodes
+            const rows = await db.query('SELECT rates_json FROM print_nodes WHERE rates_json IS NOT NULL LIMIT 10');
             
             let hasMaterials = false;
             let catalogCount = 0;
@@ -408,25 +408,25 @@ class TelemetryService {
             const [counts] = await db.query(`
                 SELECT 
                     COUNT(*) as total_dispatches,
-                    SUM(CASE WHEN status NOT IN ('DELIVERED', 'FAILED', 'CANCELED', 'REROUTED') THEN 1 ELSE 0 END) as active_dispatches,
+                    SUM(CASE WHEN status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'REROUTED', 'ROLLED_BACK') THEN 1 ELSE 0 END) as active_dispatches,
                     SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_dispatches,
                     SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as rerouted_dispatches
-                FROM manufacturing_dispatches
-                WHERE node_id = ?
+                FROM production_dispatches
+                WHERE print_node_id = ?
             `, [nodeId]);
-
-            const [utilization] = await db.query(`
-                SELECT utilization_percent, active_jobs, queued_jobs
-                FROM printer_capacity_state
-                WHERE printer_id = ?
+ 
+            const [nodeData] = await db.query(`
+                SELECT capacity_utilization_pct as utilization_percent, status
+                FROM print_nodes
+                WHERE id = ?
             `, [nodeId]);
-
+ 
             const [reservations] = await db.query(`
                 SELECT COUNT(*) as count
-                FROM manufacturing_capacity_reservations
-                WHERE node_id = ? AND reservation_status = 'ACTIVE'
+                FROM manufacturing_reservations
+                WHERE node_id = ? AND status = 'PENDING'
             `, [nodeId]);
-
+ 
             const [reliability] = await db.query(`
                 SELECT reliability_score, avg_turnaround_hours
                 FROM printer_reliability_metrics
@@ -458,12 +458,12 @@ class TelemetryService {
             const [stats] = await db.query(`
                 SELECT 
                     COUNT(*) as total_dispatches,
-                    SUM(CASE WHEN status NOT IN ('DELIVERED', 'FAILED', 'CANCELED', 'REROUTED', 'AUTO_REROUTED') THEN 1 ELSE 0 END) as active_dispatches,
+                    SUM(CASE WHEN status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'REROUTED', 'ROLLED_BACK') THEN 1 ELSE 0 END) as active_dispatches,
                     SUM(CASE WHEN status = 'SLA_AT_RISK' THEN 1 ELSE 0 END) as stalled_dispatches,
-                    SUM(CASE WHEN status = 'AUTO_REROUTED' THEN 1 ELSE 0 END) as autonomous_recoveries,
-                    SUM(CASE WHEN status = 'CAPACITY_BLOCKED' THEN 1 ELSE 0 END) as capacity_conflicts,
+                    SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as autonomous_recoveries,
+                    SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as capacity_conflicts,
                     SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as manual_reroutes
-                FROM manufacturing_dispatches
+                FROM production_dispatches
             `);
 
             const [reliability] = await db.query(`

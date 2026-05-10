@@ -685,6 +685,142 @@ export async function sendNodeHeartbeat(payload: any) {
     });
 }
 
+// --- Phase 28 — Live Autonomous Dispatch Orchestration ---
+export async function getIndustrialLiveState() {
+    return adminFetch<{ ok: boolean, stats: any }>('/api/admin/dispatch/live-state');
+}
+
+export async function getActiveDispatches() {
+    return adminFetch<{ ok: boolean, dispatches: any[] }>('/api/admin/dispatch/active');
+}
+
+export async function getSLARisks() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/sla-risks');
+}
+
+export async function getRerouteEvents() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/dispatch/reroutes');
+}
+
+export async function getNodeCapacityHeatmap() {
+    return adminFetch<{ ok: boolean, nodes: any[] }>('/api/admin/dispatch/capacity');
+}
+
+export async function getIndustrialNodeDetail(id: string) {
+    return adminFetch<{ ok: boolean, node: any, heartbeats: any[], dispatches: any[] }>(`/api/admin/dispatch/node/${id}`);
+}
+
+export async function triggerSLAScan() {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/scan', { method: 'POST' });
+}
+
+export async function triggerRebalance() {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/rebalance', { method: 'POST' });
+}
+
+// --- Phase 29 — Predictive Industrial Intelligence ---
+export async function getReliabilityRanking() {
+    return adminFetch<{ ok: boolean, ranking: any[] }>('/api/admin/dispatch/intelligence/reliability');
+}
+
+export async function getCongestionForecast() {
+    return adminFetch<{ ok: boolean, forecasts: any[] }>('/api/admin/dispatch/intelligence/congestion');
+}
+
+export async function getFederationIntelligence() {
+    return adminFetch<{ ok: boolean, snapshots: any[], loadDrift: any[] }>('/api/admin/dispatch/intelligence/federation');
+}
+
+export async function getOptimizationHistory() {
+    return adminFetch<{ ok: boolean, history: any[], cycles: any[] }>('/api/admin/dispatch/intelligence/optimization');
+}
+
+export async function getManufacturingPredictions() {
+    return adminFetch<{ ok: boolean, predictions: any[] }>('/api/admin/dispatch/intelligence/predictions');
+}
+
+// --- Phase 30 — Autonomous Industrial Economic Engine ---
+export async function getEconomicOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/economics/overview');
+}
+
+export async function getEconomicRisk() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/economics/risk');
+}
+
+export async function getProfitabilityHistory() {
+    return adminFetch<{ ok: boolean, history: any[] }>('/api/admin/dispatch/economics/profitability');
+}
+
+export async function simulateEconomicRouting(jobData: any, candidateIds: string[]) {
+    return adminFetch<{ ok: boolean, simulation: any }>('/api/admin/dispatch/economics/simulator', {
+        method: 'POST',
+        body: JSON.stringify({ jobData, candidateIds })
+    });
+}
+
+export async function getNodeEconomicDetail(nodeId: string) {
+    return adminFetch<{ ok: boolean, profitability: any, pressure: any[] }>(`/api/admin/dispatch/economics/node/${nodeId}`);
+}
+
+// --- Phase 31 — Global Industrial Governance & Resilience ---
+export async function getGovernanceOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/governance/overview');
+}
+
+export async function getRegionalResilience() {
+    return adminFetch<{ ok: boolean, resilience: any[] }>('/api/admin/dispatch/governance/resilience');
+}
+
+export async function getSystemicRisk() {
+    return adminFetch<{ ok: boolean, risks: any[], cascading: any[] }>('/api/admin/dispatch/governance/systemic-risk');
+}
+
+export async function runResilienceSimulation() {
+    return adminFetch<{ ok: boolean, simulation: any }>('/api/admin/dispatch/governance/simulation');
+}
+
+// --- Phase 32 — Temporal Industrial Intelligence ---
+export async function getTemporalOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/temporal/overview');
+}
+
+export async function getFutureForecasts() {
+    return adminFetch<{ ok: boolean, forecasts: any[] }>('/api/admin/dispatch/temporal/futures');
+}
+
+export async function getParallelTimelines() {
+    return adminFetch<{ ok: boolean, timelines: any[] }>('/api/admin/dispatch/temporal/timelines');
+}
+
+export async function getTemporalRisk() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/temporal/risk');
+}
+
+// --- Phase 33 — Reality Simulation & Synthetic Operations Twin ---
+export async function getSimulationOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/simulation/overview');
+}
+
+export async function runManualSimulation(type: string, config: any = {}) {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/simulation/run', {
+        method: 'POST',
+        body: JSON.stringify({ type, config })
+    });
+}
+
+export async function getSimulationRuns() {
+    return adminFetch<{ ok: boolean, runs: any[] }>('/api/admin/dispatch/simulation/runs');
+}
+
+export async function getSimulationRecommendations() {
+    return adminFetch<{ ok: boolean, recommendations: any[] }>('/api/admin/dispatch/simulation/recommendations');
+}
+
+export async function getFutureProjections() {
+    return adminFetch<{ ok: boolean, projections: any[] }>('/api/admin/dispatch/simulation/future-projections');
+}
+
 // --- Phase 16 — Industrial Federation & Swarm ---
 export async function getFederationHealth() {
     return adminFetch<{ ok: boolean, health: any }>('/api/admin/federation/health');
