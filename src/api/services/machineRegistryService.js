@@ -107,34 +107,79 @@ class MachineRegistryService {
 
     /**
      * Find machines across the network matching technical requirements.
+     * Returns { matched: [], rejected: [] } for explainability.
      */
     async findMatchingMachines(requirements) {
         const { paper_type, sheet_size, colour_mode, binding, gsm, run_length } = requirements;
         
-        // Fetch active machines
         const allMachines = await db.query('SELECT * FROM print_node_machine_profiles WHERE status = "ACTIVE"');
         
-        return allMachines.filter(m => {
+        const matched = [];
+        const rejected = [];
+
+        for (const m of allMachines) {
             const caps = typeof m.normalized_capabilities_json === 'string' 
                 ? JSON.parse(m.normalized_capabilities_json) 
                 : m.normalized_capabilities_json;
             
-            if (!caps) return false;
-
-            // Technical compatibility checks
-            if (paper_type && Array.isArray(caps.paper_types) && !caps.paper_types.includes(paper_type)) return false;
-            if (colour_mode && Array.isArray(caps.colour_modes) && !caps.colour_modes.includes(colour_mode)) return false;
-            if (binding && Array.isArray(caps.binding) && !caps.binding.includes(binding)) return false;
-            
-            if (gsm && (gsm < (caps.min_gsm || 0) || gsm > (caps.max_gsm || 999))) return false;
-            if (run_length && (run_length < (caps.min_run || 0) || (caps.max_run > 0 && run_length > caps.max_run))) return false;
-
-            if (sheet_size && caps.max_sheet && caps.max_sheet.width > 0) {
-                if (sheet_size.width > caps.max_sheet.width || sheet_size.height > caps.max_sheet.height) return false;
+            if (!caps) {
+                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'MISSING_CAPABILITIES' });
+                continue;
             }
 
-            return true;
-        });
+            // Normalization for comparison
+            const targetPaper = paper_type?.toLowerCase();
+            const targetBinding = binding?.toLowerCase();
+            const targetColour = colour_mode?.toLowerCase();
+
+            const supportedPapers = (caps.paper_types || []).map(s => s.toLowerCase());
+            const supportedBindings = (caps.binding || []).map(s => s.toLowerCase());
+            const supportedColours = (caps.colour_modes || []).map(s => s.toLowerCase());
+
+            // Technical compatibility checks
+            if (targetPaper && !supportedPapers.includes(targetPaper)) {
+                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'PAPER_NOT_SUPPORTED', details: { target: targetPaper, supported: supportedPapers } });
+                continue;
+            }
+
+            if (targetBinding && !supportedBindings.includes(targetBinding)) {
+                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'BINDING_NOT_SUPPORTED', details: { target: targetBinding, supported: supportedBindings } });
+                continue;
+            }
+
+            if (targetColour && !supportedColours.includes(targetColour)) {
+                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'COLOUR_NOT_SUPPORTED', details: { target: targetColour, supported: supportedColours } });
+                continue;
+            }
+            
+            if (gsm && (gsm < (caps.min_gsm || 60) || gsm > (caps.max_gsm || 350))) {
+                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'GSM_OUT_OF_RANGE', details: { gsm, min: caps.min_gsm, max: caps.max_gsm } });
+                continue;
+            }
+
+            if (run_length) {
+                const minRun = caps.min_run || 0;
+                const maxRun = caps.max_run || 0;
+                if (run_length < minRun || (maxRun > 0 && run_length > maxRun)) {
+                    rejected.push({ id: m.id, nodeId: m.node_id, reason: 'RUN_SIZE_OUT_OF_RANGE', details: { run_length, min: minRun, max: maxRun } });
+                    continue;
+                }
+            }
+
+            if (sheet_size && caps.max_sheet && caps.max_sheet.width > 0) {
+                if (sheet_size.width > caps.max_sheet.width || sheet_size.height > caps.max_sheet.height) {
+                    rejected.push({ id: m.id, nodeId: m.node_id, reason: 'SHEET_SIZE_TOO_LARGE', details: { target: sheet_size, max: caps.max_sheet } });
+                    continue;
+                }
+            }
+
+            matched.push({
+                ...m,
+                normalized_capabilities_json: caps
+            });
+        }
+
+        return { matched, rejected };
     }
 }
 

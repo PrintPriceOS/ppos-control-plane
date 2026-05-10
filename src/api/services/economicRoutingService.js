@@ -2,6 +2,7 @@
  * src/api/services/economicRoutingService.js
  * 
  * Handles technical compatibility and economic cost calculations for routing.
+ * Returns both valid candidates and rejected ones for transparency.
  */
 const machineRegistry = require('./machineRegistryService');
 const pricingIntelligence = require('./pricingIntelligenceService');
@@ -24,7 +25,7 @@ class EconomicRoutingService {
 
         try {
             // 1. Find technically compatible machines
-            const machines = await machineRegistry.findMatchingMachines({
+            const { matched: machines, rejected } = await machineRegistry.findMatchingMachines({
                 paper_type: paper,
                 sheet_size,
                 colour_mode: colour === 'full' ? '4/4' : '1/1',
@@ -33,37 +34,33 @@ class EconomicRoutingService {
                 run_length: copies
             });
 
-            if (machines.length === 0) {
-                return [];
-            }
-
             const candidates = [];
+            const rejectedWithPricing = [...rejected];
 
             for (const machine of machines) {
                 // 2. Resolve pricing profile
                 const pricingProfile = await pricingIntelligence.resolvePricingProfile(machine.node_id, machine.id);
                 
                 if (!pricingProfile) {
-                    logger.warn({ event: 'no_pricing_profile', nodeId: machine.node_id, machineId: machine.id });
+                    rejectedWithPricing.push({
+                        id: machine.id,
+                        nodeId: machine.node_id,
+                        reason: 'NO_PRICING_PROFILE'
+                    });
                     continue;
                 }
 
                 // 3. Calculate estimated cost
                 const estimatedCost = pricingIntelligence.calculateProductionCost({
-                    estimated_sheet_count: copies, // Simplified mapping
-                    color_factor: colour === 'full' ? 1.0 : 0.0,
+                    estimated_sheet_count: copies,
+                    color_factor: (colour === 'full' || colour === '4/4') ? 1.0 : 0.0,
                     is_rush
                 }, pricingProfile);
 
-                // 4. Calculate Economic Score (Higher is better, normalized 0-100)
-                // Logic: lower cost relative to a baseline or fixed scale
-                // For now, let's use a dynamic normalization if multiple candidates exist, 
-                // but here we provide the raw components.
-                
                 candidates.push({
                     nodeId: machine.node_id,
                     machineId: machine.id,
-                    technicalScore: 100, // They matched the registry filter
+                    technicalScore: 100,
                     estimatedCost,
                     pricingProfileId: pricingProfile.id,
                     specsMatched: {
@@ -74,7 +71,10 @@ class EconomicRoutingService {
                 });
             }
 
-            return candidates;
+            return {
+                candidates,
+                rejectedCandidates: rejectedWithPricing
+            };
         } catch (err) {
             logger.error({ event: 'evaluation_failed', error: err.message });
             throw err;

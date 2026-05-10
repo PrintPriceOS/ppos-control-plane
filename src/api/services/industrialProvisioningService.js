@@ -60,41 +60,45 @@ class IndustrialProvisioningService {
             ) ENGINE=InnoDB;
         `);
 
-        // Phase 5: Production Orchestration
+        // Phase 5: Production Orchestration (MES)
         await db.query(`
-            CREATE TABLE IF NOT EXISTS production_dispatches (
+            CREATE TABLE IF NOT EXISTS manufacturing_dispatches (
                 id VARCHAR(64) PRIMARY KEY,
                 job_id VARCHAR(64) NOT NULL,
-                printer_id VARCHAR(64) NOT NULL,
-                machine_id VARCHAR(64) NOT NULL,
+                node_id VARCHAR(64) NOT NULL,
+                machine_id VARCHAR(64) NULL,
                 status ENUM(
-                    'QUEUED', 'RECOMMENDED', 'ASSIGNED', 'ACCEPTED', 
-                    'PREPARING', 'PRINTING', 'BINDING', 'PACKAGING', 
-                    'SHIPPED', 'DELIVERED', 'FAILED', 'REROUTED', 'CANCELED'
+                    'QUEUED','RECOMMENDED','ASSIGNED','ACCEPTED','PREPARING',
+                    'PRINTING','BINDING','PACKAGING','SHIPPED','DELIVERED',
+                    'FAILED','REROUTED','CANCELED'
                 ) DEFAULT 'QUEUED',
-                estimated_cost DECIMAL(10,2) DEFAULT 0.00,
-                estimated_margin DECIMAL(10,2) DEFAULT 0.00,
-                sla_deadline TIMESTAMP NULL,
-                routing_metadata_json JSON NULL,
+                estimated_cost DECIMAL(12,2) NULL,
+                estimated_margin DECIMAL(8,2) NULL,
+                sla_hours INT NULL,
+                reserved_from TIMESTAMP NULL,
+                reserved_until TIMESTAMP NULL,
+                metadata_json JSON NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_job (job_id),
                 INDEX idx_status (status),
-                INDEX idx_printer (printer_id)
+                INDEX idx_node (node_id)
             ) ENGINE=InnoDB;
         `);
 
         await db.query(`
-            CREATE TABLE IF NOT EXISTS capacity_reservations (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS manufacturing_capacity_reservations (
+                id VARCHAR(64) PRIMARY KEY,
                 dispatch_id VARCHAR(64) NOT NULL,
-                printer_id VARCHAR(64) NOT NULL,
-                machine_id VARCHAR(64) NOT NULL,
-                estimated_hours DECIMAL(10,2) DEFAULT 0.00,
+                job_id VARCHAR(64) NOT NULL,
+                node_id VARCHAR(64) NOT NULL,
+                machine_id VARCHAR(64) NULL,
+                reserved_units INT DEFAULT 1,
                 reserved_from TIMESTAMP NULL,
                 reserved_until TIMESTAMP NULL,
-                reservation_status ENUM('PENDING', 'ACTIVE', 'RELEASED', 'EXPIRED') DEFAULT 'PENDING',
+                reservation_status ENUM('ACTIVE','EXPIRED','CONFIRMED','CANCELLED','RELEASED') DEFAULT 'ACTIVE',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_dispatch (dispatch_id),
                 INDEX idx_machine (machine_id),
                 INDEX idx_range (reserved_from, reserved_until)
@@ -102,12 +106,12 @@ class IndustrialProvisioningService {
         `);
 
         await db.query(`
-            CREATE TABLE IF NOT EXISTS production_dispatch_events (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS manufacturing_dispatch_events (
+                id VARCHAR(64) PRIMARY KEY,
                 dispatch_id VARCHAR(64) NOT NULL,
                 event_type VARCHAR(64) NOT NULL,
-                from_status VARCHAR(32) NULL,
-                to_status VARCHAR(32) NULL,
+                old_status VARCHAR(64) NULL,
+                new_status VARCHAR(64) NULL,
                 message TEXT NULL,
                 metadata_json JSON NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -250,6 +254,7 @@ class IndustrialProvisioningService {
         const [pricingProfiles] = await db.query("SELECT COUNT(*) as count FROM printer_pricing_profiles");
         const [capacityRows] = await db.query("SELECT COUNT(*) as count FROM printer_capacity_state");
         const [reliabilityRows] = await db.query("SELECT COUNT(*) as count FROM printer_reliability_metrics");
+        const [mfgDispatches] = await db.query("SELECT COUNT(*) as count FROM manufacturing_dispatches");
 
         return {
             printerNodes: printerNodes.count,
@@ -258,6 +263,7 @@ class IndustrialProvisioningService {
             pricingProfiles: pricingProfiles.count,
             capacityProfiles: capacityRows.count,
             reliabilityProfiles: reliabilityRows.count,
+            manufacturingDispatches: mfgDispatches.count,
             jobsHasMetadataJson: await this.checkColumnExists('jobs', 'metadata_json'),
             metricsHasMetadataJson: await this.checkColumnExists('metrics', 'metadata_json'),
             missingColumns: []

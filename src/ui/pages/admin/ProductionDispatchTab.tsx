@@ -108,7 +108,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                     <div>
                                         <div className="font-bold text-slate-900 text-xs mb-1">DISP-{d.id.slice(5, 13)}</div>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                            <MapPinIcon className="w-3 h-3" /> Node {d.printer_id.slice(0, 8)}
+                                            <MapPinIcon className="w-3 h-3" /> Node {d.node_id.slice(0, 8)}
                                         </div>
                                     </div>
                                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${getStatusColor(d.status)}`}>
@@ -150,7 +150,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8 pt-8 border-t border-slate-100">
                                     <div>
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Printhouse</div>
-                                        <div className="text-sm font-bold text-slate-800">{selectedDispatch.printer_id}</div>
+                                        <div className="text-sm font-bold text-slate-800">{selectedDispatch.node_id}</div>
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Machine</div>

@@ -15,12 +15,13 @@ class DispatchRecommendationService {
     async getRecommendations(specs) {
         try {
             // 1. Get base candidates (Technical + Economic)
-            const candidates = await economicRouting.evaluateCandidates(specs);
+            const { candidates, rejectedCandidates } = await economicRouting.evaluateCandidates(specs);
             
             if (candidates.length === 0) {
                 return {
                     ok: true,
                     recommendations: [],
+                    rejectedCandidates,
                     message: 'NO_COMPATIBLE_MACHINES_FOUND'
                 };
             }
@@ -34,7 +35,7 @@ class DispatchRecommendationService {
                 const reliability = await reliabilityScoring.getScore(c.nodeId);
                 const congestion = await capacityScoring.getScore(c.nodeId);
                 
-                // 4. Calculate SLA Score (SImple heuristic for now)
+                // 4. Calculate SLA Score (Simple heuristic for now)
                 let slaScore = 80;
                 if (specs.is_rush && congestion.score < 50) slaScore = 40; // High congestion hurts rush
                 if (specs.is_rush && congestion.score > 80) slaScore = 100;
@@ -70,7 +71,7 @@ class DispatchRecommendationService {
                     finalScore: Math.round(finalScore),
                     confidence: reliability.confidence,
                     estimatedCost: c.estimatedCost,
-                    estimatedMargin: 20, // Mock for now, would derive from price - cost
+                    estimatedMargin: 20, // Mock for now
                     estimatedProductionDays: specs.is_rush ? 2 : 5,
                     reasons
                 };
@@ -79,7 +80,8 @@ class DispatchRecommendationService {
             // 7. Sort by final score descending
             return {
                 ok: true,
-                recommendations: processed.sort((a, b) => b.finalScore - a.finalScore)
+                recommendations: processed.sort((a, b) => b.finalScore - a.finalScore),
+                rejectedCandidates
             };
 
         } catch (err) {
