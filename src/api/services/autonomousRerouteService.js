@@ -40,7 +40,8 @@ class AutonomousRerouteService {
                     event: 'reroute_failed', 
                     dispatchId: d.id, 
                     originalNode: d.node_id,
-                    error: err.message,
+                    error: err.message || 'UNKNOWN_REROUTE_ERROR',
+                    requestedSpecs: err.requestedSpecs || {},
                     rejectedCandidates: err.rejectedCandidates || [],
                     capacityState: err.capacityState || 'UNKNOWN'
                 });
@@ -56,13 +57,15 @@ class AutonomousRerouteService {
 
         // 1. Get a fresh recommendation (excluding the current failed node)
         const recommendation = await recommendationService.getRecommendation(oldDispatch.job_id, {
-            excludeNodeIds: [oldDispatch.node_id]
+            excludeNodeIds: [oldDispatch.node_id],
+            preferredNodeId: oldMetadata.validation_recovery_node || null
         });
 
         if (!recommendation || !recommendation.ok) {
             const error = new Error('RECOVERY_FAILED: NO_ALTERNATE_PRODUCTION_CAPACITY');
             error.rejectedCandidates = recommendation?.rejectedCandidates || [];
             error.capacityState = recommendation?.reason || 'NO_COMPATIBLE_MACHINES_OR_NODES';
+            error.requestedSpecs = recommendation?.specs || {};
             throw error;
         }
 

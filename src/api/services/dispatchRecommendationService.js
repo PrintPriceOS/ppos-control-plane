@@ -98,15 +98,29 @@ class DispatchRecommendationService {
         const [job] = await db.query('SELECT metadata_json FROM jobs WHERE id = ?', [jobId]);
         if (!job) return null;
 
-        const specs = typeof job.metadata_json === 'string' ? JSON.parse(job.metadata_json) : (job.metadata_json || {});
+        let specs = typeof job.metadata_json === 'string' ? JSON.parse(job.metadata_json) : (job.metadata_json || {});
+        
+        // Deep extraction for industrial resilience
+        if (specs.specs) specs = { ...specs, ...specs.specs };
+        if (specs.original_specs) specs = { ...specs, ...specs.original_specs };
+        if (specs.autonomous_eval?.specs) specs = { ...specs, ...specs.autonomous_eval.specs };
         
         // Pass exclusion list to routing if supported
         const result = await this.getRecommendations({ ...specs, ...options });
         
         if (result.ok && result.recommendations.length > 0) {
             // Apply hard filter for excluded nodes if the engine didn't
-            const candidates = result.recommendations.filter(r => !options.excludeNodeIds?.includes(r.nodeId));
+            let candidates = result.recommendations.filter(r => !options.excludeNodeIds?.includes(r.nodeId));
             
+            // Apply preference for validation or operational overrides
+            if (options.preferredNodeId) {
+                const preferred = candidates.find(c => c.nodeId === options.preferredNodeId);
+                if (preferred) {
+                    // Move preferred to the top
+                    candidates = [preferred, ...candidates.filter(c => c.nodeId !== options.preferredNodeId)];
+                }
+            }
+
             if (candidates.length === 0) {
                 return {
                     ok: false,

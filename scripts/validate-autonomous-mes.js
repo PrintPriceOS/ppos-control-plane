@@ -151,9 +151,10 @@ async function validate() {
             UPDATE manufacturing_dispatches 
             SET status = 'PRINTING', 
                 updated_at = ?, 
-                reserved_until = ? 
+                reserved_until = ?,
+                metadata_json = JSON_SET(COALESCE(metadata_json, '{}'), '$.validation_recovery_node', ?)
             WHERE id = ?
-        `, [pastDate, pastDate, d1]);
+        `, [pastDate, pastDate, recoveryMachine.node_id, d1]);
         
         await db.query(`
             UPDATE manufacturing_capacity_reservations 
