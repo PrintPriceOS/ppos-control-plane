@@ -484,6 +484,7 @@ class ControlPlaneSchemaService {
 }
 
 const service = new ControlPlaneSchemaService();
-service.init().catch(err => console.error('[CONTROL-PLANE-SCHEMA] Critical init error:', err));
+// Legacy init disabled. Moved to MigrationService.
+// service.init().catch(err => console.error('[CONTROL-PLANE-SCHEMA] Critical init error:', err));
 
 module.exports = service;

@@ -33,56 +33,49 @@ const path = require('path');
 fastify.addHook('onRequest', async (request, reply) => {
     const url = request.url;
 
-    // 1. PUBLIC ROUTES (Always allowed)
-    // Infrastructure health
+    // 1. PUBLIC ROUTES
     if (url.startsWith('/health')) return;
-    
-    // UI Static Assets & Shell
     if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;
 
-    // 2. API BYPASS (Specific endpoints that handle their own auth or are public)
-    // Auth endpoints manage their own validation
+    // 2. API BYPASS
     if (url.startsWith('/api/auth')) return;
-    
     if (url.includes('/api/v2/analytics/public')) return;
 
-    // 3. PROTECTED ROUTES (Require Bearer Token)
-    // Currently protecting Federation and any other generic API
+    // 3. PROTECTED ROUTES
     if (url.startsWith('/api') || url.startsWith('/federation')) {
         const authHeader = request.headers['authorization'];
-        const breakGlassToken = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
-        const workerControlToken = process.env.PPOS_WORKER_CONTROL_TOKEN;
-        const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-development-only';
+        const jwtSecret = process.env.JWT_SECRET;
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
+        const jwtIssuer = process.env.JWT_ISSUER || 'https://auth.printprice.pro';
+
+        if (!jwtSecret) {
+            request.log.error('[SECURITY-FATAL] JWT_SECRET not configured');
+            return reply.status(500).send({ error: 'Internal Server Configuration Error' });
+        }
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            request.log.warn({ url: request.url, ip: request.ip }, 'Unauthorized control plane access');
-            return reply.status(401).send({ error: 'Unauthorized: Valid Bearer token required' });
+            return reply.status(401).send({ error: 'Unauthorized: Bearer token required' });
         }
 
         const token = authHeader.split(' ')[1];
 
-        // 1. Scoped Worker Token
-        if (workerControlToken && token === workerControlToken) {
-            return; // Allowed, no notice
-        }
-
-        // 2. Break-glass fallback
-        if (token === breakGlassToken) {
-            const isMachineEndpoint = url.includes('/workers/heartbeat') || url.includes('/artifacts/register');
-            if (!isMachineEndpoint) {
-                request.log.warn({ url: request.url, ip: request.ip }, 'BREAK-GLASS security notice');
-            }
-            return;
-        }
-
-        // 3. JWT Validation
         try {
             const jwt = require('jsonwebtoken');
-            jwt.verify(token, jwtSecret, { audience: jwtAudience });
+            const decoded = jwt.verify(token, jwtSecret, { 
+                audience: jwtAudience,
+                issuer: jwtIssuer
+            });
+            
+            // Populate request context for Fastify routes
+            request.user = {
+                id: decoded.sub,
+                role: (decoded.role || 'VIEWER').toUpperCase(),
+                tenantId: decoded.tenant_id
+            };
+            
             return;
         } catch (err) {
-            request.log.warn({ url: request.url, ip: request.ip, error: err.message }, 'Invalid JWT');
+            request.log.warn({ url: request.url, ip: request.ip, error: err.message }, 'JWT Validation Failed');
             return reply.status(401).send({ error: `Unauthorized: ${err.message}` });
         }
     }
@@ -117,6 +110,16 @@ fastify.get('/health', async () => {
 
 const start = async () => {
     try {
+        // -1. Industrial Startup Validation (Fail-Fast)
+        if (!process.env.JWT_SECRET) {
+            console.error('[FATAL-STARTUP] JWT_SECRET is not defined. Aborting for security.');
+            process.exit(1);
+        }
+        if (!process.env.MYSQL_HOST && !process.env.DATABASE_URL) {
+            console.error('[FATAL-STARTUP] Database configuration missing. Aborting.');
+            process.exit(1);
+        }
+
         // 0. Initialize Database Schemas (Industrial Persistence)
         require('./src/api/services/controlPlaneSchemaService');
 
@@ -195,9 +198,23 @@ const start = async () => {
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
-            fastify.use('/api/system', require('./src/api/routes/system'));
-            
             fastify.log.info('Core API routes mounted successfully');
+
+            // Industrial Observability Hook
+            fastify.addHook('onResponse', (request, reply, done) => {
+                try {
+                    const observability = require('./src/api/services/observabilityService');
+                    observability.trackRequest(
+                        request.method,
+                        request.url,
+                        reply.statusCode,
+                        reply.getResponseTime()
+                    );
+                } catch (err) {
+                    // Fail silently for observability
+                }
+                done();
+            });
         } catch (err) {
             fastify.log.error({ msg: 'FAILED TO MOUNT CORE ROUTES', error: err.message });
             // In production, we might want to crash here if core routes are missing,
@@ -222,6 +239,14 @@ const start = async () => {
         fastify.setErrorHandler((error, request, reply) => {
             fastify.log.error(error);
             
+            // Track in Observability
+            try {
+                const observability = require('./src/api/services/observabilityService');
+                observability.metrics.errorCount++;
+            } catch (obsErr) {
+                // Ignore errors in observability during error handling
+            }
+
             // If it's a validation error or similar, return 400
             if (error.validation) {
                 return reply.status(400).send(error);

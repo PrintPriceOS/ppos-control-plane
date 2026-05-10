@@ -8,82 +8,11 @@ const { v4: uuidv4 } = require('uuid');
 
 class PreflightPersistenceService {
   /**
-   * Initialize tables if they don't exist
+   * Initialize tables - Now managed by MigrationService.
    */
   async init() {
-    try {
-      console.log('[PREFLIGHT-PERSISTENCE] Initializing tables...');
-      
-      await db.query(`
-        CREATE TABLE IF NOT EXISTS preflight_jobs (
-          id VARCHAR(64) PRIMARY KEY,
-          tenant_id VARCHAR(64) NOT NULL,
-          user_id VARCHAR(64) NULL,
-          submitted_by_role VARCHAR(32) DEFAULT 'USER',
-          assigned_printer_tenant_id VARCHAR(64) NULL,
-          visibility_scope ENUM('PRIVATE', 'SHARED', 'SYSTEM') DEFAULT 'PRIVATE',
-          upload_id VARCHAR(64) NOT NULL,
-          source_artifact_id VARCHAR(64) NULL,
-          output_artifact_id VARCHAR(64) NULL,
-          type ENUM('ANALYZE', 'AUTOFIX', 'CERTIFY') NOT NULL,
-          status ENUM('CREATED', 'QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'STALLED', 'RETRYING', 'CANCELLED') DEFAULT 'CREATED',
-          progress INT DEFAULT 0,
-          step VARCHAR(64) NULL,
-          policy VARCHAR(128) NULL,
-          error_json JSON NULL,
-          metadata_json JSON NULL,
-          retry_count INT DEFAULT 0,
-          max_retries INT DEFAULT 3,
-          last_heartbeat_at TIMESTAMP NULL,
-          last_synced_at TIMESTAMP NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          completed_at TIMESTAMP NULL,
-          INDEX idx_tenant (tenant_id),
-          INDEX idx_assigned (assigned_printer_tenant_id),
-          INDEX idx_status (status)
-        ) ENGINE=InnoDB;
-      `);
-
-      await db.query(`
-        CREATE TABLE IF NOT EXISTS preflight_artifacts (
-          id VARCHAR(64) PRIMARY KEY,
-          tenant_id VARCHAR(64) NOT NULL,
-          job_id VARCHAR(64) NULL,
-          upload_id VARCHAR(64) NULL,
-          type VARCHAR(32) NOT NULL,
-          filename VARCHAR(255) NOT NULL,
-          storage_key VARCHAR(512) NOT NULL,
-          size_bytes BIGINT NOT NULL,
-          checksum VARCHAR(128) NULL,
-          mime_type VARCHAR(128) DEFAULT 'application/pdf',
-          status ENUM('ACTIVE', 'ARCHIVED', 'EXPIRED', 'DELETED', 'CORRUPTED') DEFAULT 'ACTIVE',
-          metadata_json JSON NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          deleted_at TIMESTAMP NULL,
-          INDEX idx_tenant_job (tenant_id, job_id),
-          INDEX idx_upload (upload_id)
-        ) ENGINE=InnoDB;
-      `);
-
-      await db.query(`
-        CREATE TABLE IF NOT EXISTS audit_logs (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          event_type VARCHAR(64) NOT NULL,
-          tenant_id VARCHAR(64) NOT NULL,
-          user_id VARCHAR(64) NOT NULL,
-          status VARCHAR(32) NOT NULL,
-          metadata_json JSON NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_tenant_event (tenant_id, event_type)
-        ) ENGINE=InnoDB;
-      `);
-      
-      console.log('[PREFLIGHT-PERSISTENCE] Tables verified.');
-    } catch (err) {
-      console.error('[PREFLIGHT-PERSISTENCE] Initialization failed:', err.message);
-    }
+    // Schema logic moved to migrations/003_preflight_orchestration.sql
+    console.log('[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.');
   }
 
   async createJob(jobData) {

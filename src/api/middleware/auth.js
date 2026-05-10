@@ -6,75 +6,65 @@
 const jwt = require('jsonwebtoken');
 const auditLogger = require('../services/auditLoggerService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-development-only';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ppos:control';
-const ENABLE_BREAK_GLASS = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
-const BREAK_GLASS_TOKEN = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
-const WORKER_CONTROL_TOKEN = process.env.PPOS_WORKER_CONTROL_TOKEN;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'https://auth.printprice.pro';
 
+if (!JWT_SECRET) {
+    console.error('[FATAL-CONFIG-ERROR] JWT_SECRET is not set. Control Plane cannot start securely.');
+    process.exit(1);
+}
+
+/**
+ * Primary Authentication Middleware.
+ * Enforces JWT validation and populates req.user.
+ */
 function requireAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return fail(req, res, 'Valid Bearer token required');
+        return fail(req, res, 'Bearer token required');
     }
 
     const token = authHeader.split(' ')[1];
 
-    // 1. Check Scoped Worker Token (Higher priority for machine endpoints)
-    if (WORKER_CONTROL_TOKEN && token === WORKER_CONTROL_TOKEN) {
-        req.user = {
-            role: 'WORKER_AGENT',
-            id: 'worker_agent_bootstrap',
-            tenantId: 'ppos-production-worker',
-            authMode: 'WORKER_TOKEN',
-            isMachine: true
-        };
-        // No SECURITY-NOTICE for standard worker heartbeat
-        return next();
-    }
-
-    // 2. Check Break-glass Token
-    if (ENABLE_BREAK_GLASS && token === BREAK_GLASS_TOKEN) {
-        req.user = {
-            role: 'SUPER_ADMIN',
-            id: 'system_bootstrap',
-            tenantId: 'ppos-production',
-            authMode: 'BREAK_GLASS'
-        };
-        
-        // Suppress notice for frequent machine endpoints even if using break-glass
-        const isMachineEndpoint = [
-            '/api/admin/workers/heartbeat',
-            '/api/admin/artifacts/register'
-        ].some(p => req.originalUrl.includes(p));
-
-        if (!isMachineEndpoint) {
-            console.warn(`[SECURITY-NOTICE] Emergency access: Using BREAK-GLASS token for ${req.user.role} context. IP: ${req.ip}`);
-        }
-        
-        return next();
-    }
-
-
-    // 2. Validate JWT
+    // 1. Validate JWT
     try {
         const decoded = jwt.verify(token, JWT_SECRET, {
-            audience: JWT_AUDIENCE
+            audience: JWT_AUDIENCE,
+            issuer: JWT_ISSUER
         });
 
+        // 2. Map Industrial Identity
         req.user = {
             id: decoded.sub,
             email: decoded.email,
             role: (decoded.role || 'VIEWER').toUpperCase(),
             tenantId: decoded.tenant_id,
             printhouseId: decoded.printhouse_id,
-            authMode: 'JWT'
+            scopes: decoded.scopes || [],
+            authMode: 'JWT',
+            issuedAt: decoded.iat,
+            expiresAt: decoded.exp
         };
+
+        // 3. Log Successful Auth (Sampling or Critical only)
+        if (process.env.PPOS_LOG_AUTH_SUCCESS === 'true') {
+            auditLogger.log({
+                type: 'AUTH_SUCCESS',
+                tenantId: req.user.tenantId || 'system',
+                userId: req.user.id,
+                status: 'SUCCESS',
+                metadata: { method: req.method, url: req.originalUrl }
+            }).catch(() => {});
+        }
 
         next();
     } catch (err) {
-        const message = err.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid or malformed token';
+        let message = 'Invalid or malformed token';
+        if (err.name === 'TokenExpiredError') message = 'Token expired';
+        if (err.name === 'JsonWebTokenError') message = `JWT Error: ${err.message}`;
+        
         return fail(req, res, message);
     }
 }
@@ -122,18 +112,35 @@ function resolveActorContext(req) {
 
 
 /**
- * Middleware factory to enforce specific roles.
+ * RBAC Enforcement Middleware.
+ * Enforces role hierarchy and permission matrix.
+ * 
+ * Hierarchy: SUPER_ADMIN > TENANT_ADMIN > OPERATOR > VIEWER
  */
-function requireRole(...allowedRoles) {
-    const normalizedRoles = allowedRoles.map(r => r.toUpperCase());
+const ROLE_HIERARCHY = {
+    'SUPER_ADMIN': 100,
+    'TENANT_ADMIN': 50,
+    'OPERATOR': 20,
+    'VIEWER': 10
+};
+
+function requireRole(minRole) {
+    const minLevel = ROLE_HIERARCHY[minRole.toUpperCase()] || 0;
+    
     return (req, res, next) => {
-        const { role } = resolveActorContext(req);
-        if (normalizedRoles.includes(role) || role === 'SUPER_ADMIN') {
+        const context = resolveActorContext(req);
+        const userLevel = ROLE_HIERARCHY[context.role] || 0;
+
+        if (userLevel >= minLevel) {
             return next();
         }
+
         return res.status(403).json({ 
             ok: false, 
-            error: { code: 'FORBIDDEN', message: 'Insufficient permissions for this action' } 
+            error: { 
+                code: 'FORBIDDEN', 
+                message: `Insufficient permissions. Required: ${minRole}, Current: ${context.role}` 
+            } 
         });
     };
 }
