@@ -77,6 +77,7 @@ const connectAdminRouter = require('./connectAdmin');
 const routingAdminRouter = require('./routingAdmin');
 const marketplaceAdminRouter = require('./marketplaceAdmin');
 const governanceAdminRouter = require('./governanceAdmin');
+const civilizationAdminRouter = require('./civilizationAdmin');
 const economicRoutingAdminRouter = require('./economicRoutingAdmin');
 const pricingAdminRouter = require('./pricingAdmin');
 const offersAdminRouter = require('./offersAdmin');
@@ -116,6 +117,7 @@ router.use('/routing', routingAdminRouter);
 router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
+router.use('/civilization', civilizationAdminRouter);
 router.use('/pricing', pricingAdminRouter);
 router.use('/offers', offersAdminRouter);
 router.use('/commercial', commercialCommitmentAdminRouter);

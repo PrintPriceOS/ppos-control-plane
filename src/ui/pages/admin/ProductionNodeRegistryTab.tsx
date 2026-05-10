@@ -215,6 +215,24 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  icon={CheckCircleIcon}
                                  color="text-emerald-400"
                             />
+                            <StatCard 
+                                 label="Cont. Cluster" 
+                                 value={`${selectedNode.continental_cluster_id || 'EU-WEST'}`} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-sky-500"
+                            />
+                            <StatCard 
+                                 label="Planetary Rel." 
+                                 value={`${selectedNode.planetary_reliability_index || 100}%`} 
+                                 icon={BoltIcon}
+                                 color="text-indigo-400"
+                            />
+                            <StatCard 
+                                 label="Civ. Contrib." 
+                                 value={`${selectedNode.civilization_contribution_score || 0}%`} 
+                                 icon={ChartBarIcon}
+                                 color="text-fuchsia-400"
+                            />
                         </div>
 
                         {/* Performance Details */}

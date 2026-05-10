@@ -477,6 +477,86 @@ class IndustrialProvisioningService {
                     awareness_score DECIMAL(5,2),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'planetary_federations',
+                sql: `CREATE TABLE IF NOT EXISTS planetary_federations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    federation_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'continental_industrial_clusters',
+                sql: `CREATE TABLE IF NOT EXISTS continental_industrial_clusters (
+                    id VARCHAR(64) PRIMARY KEY,
+                    cluster_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'civilization_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS civilization_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    health_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'planetary_resource_forecasts',
+                sql: `CREATE TABLE IF NOT EXISTS planetary_resource_forecasts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    resource_type VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'inter_federation_diplomacy',
+                sql: `CREATE TABLE IF NOT EXISTS inter_federation_diplomacy (
+                    id VARCHAR(64) PRIMARY KEY,
+                    negotiation_status VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_expansion_zones',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_expansion_zones (
+                    id VARCHAR(64) PRIMARY KEY,
+                    zone_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'civilization_stability_events',
+                sql: `CREATE TABLE IF NOT EXISTS civilization_stability_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    event_type VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'planetary_risk_forecasts',
+                sql: `CREATE TABLE IF NOT EXISTS planetary_risk_forecasts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    risk_level VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_colonization_targets',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_colonization_targets (
+                    id VARCHAR(64) PRIMARY KEY,
+                    target_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'planetary_cognition_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS planetary_cognition_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    awareness_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
             }
         ];
 
@@ -562,6 +642,29 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureGovernanceColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Ensure Phase 19 Civilization columns exist
+        const civilizationMigrations = [
+            { table: 'manufacturing_dispatches', column: 'planetary_priority_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'civilization_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'intercontinental_route_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'planetary_equilibrium_weight', type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'print_node_machine_profiles', column: 'continental_cluster_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_node_machine_profiles', column: 'planetary_reliability_index', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'civilization_contribution_score', type: 'DECIMAL(5,2) DEFAULT 0.00' }
+        ];
+
+        for (const gm of civilizationMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureCivilizationColumns:${gm.table}.${gm.column}`, err);
             }
         }
 
