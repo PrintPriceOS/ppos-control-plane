@@ -182,20 +182,6 @@ CREATE TABLE IF NOT EXISTS civilization_state_snapshots (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 7. Add missing columns to manufacturing_dispatches
--- Note: Using a procedure to safely add columns if they don't exist
-DELIMITER //
-CREATE PROCEDURE AddMissingIndustrialColumns()
-BEGIN
-    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_name = 'manufacturing_dispatches' AND column_name = 'federation_node_id' AND table_schema = DATABASE()) THEN
-        ALTER TABLE manufacturing_dispatches ADD COLUMN federation_node_id VARCHAR(64) NULL;
-    END IF;
-    
-    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_name = 'manufacturing_dispatches' AND column_name = 'governance_policy_score' AND table_schema = DATABASE()) THEN
-        ALTER TABLE manufacturing_dispatches ADD COLUMN governance_policy_score FLOAT DEFAULT 0.0;
-    END IF;
-END //
-DELIMITER ;
-
-CALL AddMissingIndustrialColumns();
-DROP PROCEDURE AddMissingIndustrialColumns;
+-- 7. Missing columns migrated to IndustrialProvisioningService.ensureCoreColumns()
+-- federation_node_id
+-- governance_policy_score

@@ -116,6 +116,8 @@ class IndustrialProvisioningService {
         const governanceMigrations = [
             { table: 'print_nodes', column: 'rates_json', type: 'JSON NULL' },
             { table: 'printer_pricing_profiles', column: 'rates_json', type: 'JSON NULL' },
+            { table: 'manufacturing_dispatches', column: 'federation_node_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'governance_policy_score', type: 'FLOAT DEFAULT 0.0' },
             { table: 'manufacturing_dispatches', column: 'governance_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
             { table: 'manufacturing_dispatches', column: 'constitutional_compliance', type: 'DECIMAL(5,2) DEFAULT 100.00' },
             { table: 'manufacturing_dispatches', column: 'cognition_priority', type: 'INT DEFAULT 0' },
