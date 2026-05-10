@@ -251,6 +251,30 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  icon={CheckCircleIcon}
                                  color="text-sky-400"
                             />
+                            <StatCard 
+                                 label="Sim. Coherence" 
+                                 value={`${selectedNode.simulation_coherence || 100}%`} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-pink-500"
+                            />
+                            <StatCard 
+                                 label="Univ. Sync" 
+                                 value={`${selectedNode.universal_synchronization || 100}%`} 
+                                 icon={BoltIcon}
+                                 color="text-emerald-400"
+                            />
+                            <StatCard 
+                                 label="Reality Stability" 
+                                 value={`${selectedNode.reality_stability_index || 100}%`} 
+                                 icon={ChartBarIcon}
+                                 color="text-blue-400"
+                            />
+                            <StatCard 
+                                 label="Recursive Cont." 
+                                 value={`${selectedNode.recursive_continuity || 100}%`} 
+                                 icon={ArrowPathIcon}
+                                 color="text-indigo-500"
+                            />
                         </div>
 
                         {/* Performance Details */}

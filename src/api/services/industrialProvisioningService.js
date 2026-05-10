@@ -637,6 +637,54 @@ class IndustrialProvisioningService {
                     civilization_health DECIMAL(5,2),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'reality_simulation_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS reality_simulation_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    simulation_integrity DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'timeline_optimization_graph',
+                sql: `CREATE TABLE IF NOT EXISTS timeline_optimization_graph (
+                    id VARCHAR(64) PRIMARY KEY,
+                    timeline_status VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'parallel_civilization_models',
+                sql: `CREATE TABLE IF NOT EXISTS parallel_civilization_models (
+                    id VARCHAR(64) PRIMARY KEY,
+                    model_coherence DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'universal_governance_constraints',
+                sql: `CREATE TABLE IF NOT EXISTS universal_governance_constraints (
+                    id VARCHAR(64) PRIMARY KEY,
+                    constraint_type VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'synthetic_reality_events',
+                sql: `CREATE TABLE IF NOT EXISTS synthetic_reality_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    event_type VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'omniscient_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS omniscient_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    universal_health DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
             }
         ];
 
@@ -768,6 +816,30 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureInterplanetaryColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Ensure Phase 21 Reality columns exist
+        const realityMigrations = [
+            { table: 'manufacturing_dispatches', column: 'timeline_weight', type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'manufacturing_dispatches', column: 'existence_priority', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'reality_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'universal_dependency', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'simulation_coherence', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'universal_synchronization', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'reality_stability_index', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'recursive_continuity', type: 'DECIMAL(5,2) DEFAULT 100.00' }
+        ];
+
+        for (const gm of realityMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureRealityColumns:${gm.table}.${gm.column}`, err);
             }
         }
 
