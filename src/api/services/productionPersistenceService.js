@@ -19,7 +19,7 @@ class ProductionPersistenceService {
           id VARCHAR(64) PRIMARY KEY,
           tenant_id VARCHAR(64) NOT NULL,
           company_name VARCHAR(255) NOT NULL,
-          status ENUM('ONLINE', 'OFFLINE', 'BUSY', 'MAINTENANCE') DEFAULT 'OFFLINE',
+          status ENUM('ONLINE', 'OFFLINE', 'BUSY', 'MAINTENANCE', 'DEGRADED', 'SATURATED', 'RECOVERING', 'DESYNCHRONIZED') DEFAULT 'OFFLINE',
           license_status ENUM('ACTIVE', 'EXPIRED', 'PENDING', 'SUSPENDED') DEFAULT 'PENDING',
           country VARCHAR(64) NULL,
           city VARCHAR(64) NULL,
@@ -29,11 +29,37 @@ class ProductionPersistenceService {
           max_file_size_mb INT DEFAULT 500,
           api_enabled BOOLEAN DEFAULT FALSE,
           rates_json JSON NULL,
+          last_heartbeat_at TIMESTAMP NULL,
+          capacity_utilization_pct INT DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_tenant (tenant_id),
           INDEX idx_status (status),
-          INDEX idx_license (license_status)
+          INDEX idx_license (license_status),
+          INDEX idx_heartbeat (last_heartbeat_at)
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS node_heartbeats (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          printhouse_id VARCHAR(64) NULL,
+          status VARCHAR(32) NOT NULL,
+          queue_depth INT DEFAULT 0,
+          active_jobs INT DEFAULT 0,
+          utilization_pct INT DEFAULT 0,
+          machine_state VARCHAR(64) NULL,
+          worker_state VARCHAR(64) NULL,
+          dispatches_active INT DEFAULT 0,
+          dispatches_delayed INT DEFAULT 0,
+          storage_pressure INT DEFAULT 0,
+          sync_version VARCHAR(32) NULL,
+          heartbeat_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_printhouse (printhouse_id),
+          INDEX idx_timestamp (heartbeat_at),
+          CONSTRAINT fk_heartbeat_node FOREIGN KEY (node_id) REFERENCES print_nodes(id) ON DELETE CASCADE
         ) ENGINE=InnoDB;
       `);
 
@@ -82,8 +108,13 @@ class ProductionPersistenceService {
           print_node_id VARCHAR(64) NOT NULL,
           sender_tenant_id VARCHAR(64) NOT NULL,
           receiver_tenant_id VARCHAR(64) NOT NULL,
-          status ENUM('PENDING', 'SENT', 'VIEWED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED') DEFAULT 'PENDING',
+          status VARCHAR(32) DEFAULT 'PENDING',
           message TEXT NULL,
+          score_snapshot_json JSON NULL,
+          routing_state_json JSON NULL,
+          sla_estimate_json JSON NULL,
+          orchestration_metadata_json JSON NULL,
+          operator_id VARCHAR(64) NULL,
           expires_at TIMESTAMP NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -96,6 +127,24 @@ class ProductionPersistenceService {
           INDEX idx_status (status),
           CONSTRAINT fk_dispatch_package FOREIGN KEY (production_package_id) REFERENCES production_packages(id) ON DELETE CASCADE,
           CONSTRAINT fk_dispatch_node FOREIGN KEY (print_node_id) REFERENCES print_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS manufacturing_reservations (
+          id VARCHAR(64) PRIMARY KEY,
+          node_id VARCHAR(64) NOT NULL,
+          dispatch_id VARCHAR(64) NULL,
+          job_input_snapshot_json JSON NULL,
+          status ENUM('PENDING', 'CONFIRMED', 'EXPIRED', 'RELEASED', 'ROLLED_BACK') DEFAULT 'PENDING',
+          expires_at TIMESTAMP NOT NULL,
+          released_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_node (node_id),
+          INDEX idx_dispatch (dispatch_id),
+          INDEX idx_status (status),
+          INDEX idx_expires (expires_at),
+          CONSTRAINT fk_res_node FOREIGN KEY (node_id) REFERENCES print_nodes(id) ON DELETE CASCADE
         ) ENGINE=InnoDB;
       `);
 

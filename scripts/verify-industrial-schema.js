@@ -73,6 +73,12 @@ const REQUIRED_COLUMNS = [
     { table: 'print_node_machine_profiles', column: 'civilization_survival_score' },
     { table: 'print_node_machine_profiles', column: 'singularity_stability' },
     { table: 'print_node_machine_profiles', column: 'omniversal_coherence' },
+    // Phase 23
+    { table: 'printer_nodes', column: 'region' },
+    { table: 'printer_nodes', column: 'latitude' },
+    { table: 'printer_nodes', column: 'longitude' },
+    { table: 'printer_nodes', column: 'timezone' },
+    { table: 'printer_nodes', column: 'address_line' },
 ];
 
 const TABLE_ALIASES = {

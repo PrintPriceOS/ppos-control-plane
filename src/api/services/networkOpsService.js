@@ -250,14 +250,17 @@ class NetworkOpsService {
             const { rows } = await db.query(`
                 SELECT 
                     p.country,
-                    p.city as region,
+                    p.city,
+                    p.region,
+                    p.latitude,
+                    p.longitude,
                     COUNT(p.id) as printers,
                     SUM(pc.capacity_total) as capacity_total_today,
                     SUM(pc.capacity_available) as capacity_available_today
                 FROM printer_nodes p
                 LEFT JOIN printer_capacity pc ON p.id = pc.printer_id AND pc.date = ?
                 WHERE p.status = 'ACTIVE'
-                GROUP BY p.country, p.city
+                GROUP BY p.country, p.city, p.region, p.latitude, p.longitude
             `, [today]);
 
             return rows.map(r => ({

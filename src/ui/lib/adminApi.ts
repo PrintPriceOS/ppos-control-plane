@@ -653,6 +653,38 @@ export async function rerouteDispatch(id: string, reason: string) {
     });
 }
 
+export async function scoreDispatch(jobInput: any, options?: any) {
+    return adminFetch<any>(`/api/admin/dispatch/score`, {
+        method: 'POST',
+        body: JSON.stringify({ jobInput, options })
+    });
+}
+
+export async function createDispatch(jobInput: any, selectedCandidate: any, options?: any) {
+    return adminFetch<any>(`/api/admin/dispatch/create`, {
+        method: 'POST',
+        body: JSON.stringify({ jobInput, selectedCandidate, options })
+    });
+}
+
+export async function rollbackDispatch(dispatchId: string, reason: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/dispatch/${dispatchId}/rollback`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function getIndustrialTelemetryOverview() {
+    return adminFetch<{ ok: boolean, telemetry: any }>('/api/admin/dispatch/telemetry/overview');
+}
+
+export async function sendNodeHeartbeat(payload: any) {
+    return adminFetch<{ ok: boolean, state: string }>('/api/admin/dispatch/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
 // --- Phase 16 — Industrial Federation & Swarm ---
 export async function getFederationHealth() {
     return adminFetch<{ ok: boolean, health: any }>('/api/admin/federation/health');

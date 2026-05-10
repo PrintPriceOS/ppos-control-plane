@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
     ArrowLeftIcon, PencilSquareIcon, PrinterIcon,
-    ClockIcon, DocumentTextIcon, HashtagIcon,
+    ClockIcon, DocumentTextIcon, HashtagIcon, GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { useAdminQuery } from '../../hooks/useAdminData';
-import { getPrinthouses } from '../../lib/adminApi';
+import { getPrinthouses, getDispatches, getIndustrialTelemetryOverview } from '../../lib/adminApi';
 import {
     Printhouse, PrinthouseRates, PrinthouseFormModal,
     SIG_KEYS, COLOUR_KEYS, SECTIONS, COUNTRIES, BINDING_CONFIGS, BindingKey,
@@ -64,6 +64,107 @@ function StatusBadge({ status }: { status?: string }) {
         ? 'bg-amber-50 text-amber-700'
         : 'bg-slate-100 text-slate-500';
     return <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
+}
+
+function OperationalTab({ ph }: { ph: Printhouse }) {
+    const isEligible = ph.latitude && ph.longitude && ph.region && ph.status === 'Active';
+    const missingFields = [];
+    if (!ph.latitude || !ph.longitude) missingFields.push('Coordinates');
+    if (!ph.region) missingFields.push('Operational Region');
+    if (ph.status !== 'Active') missingFields.push('Active Status');
+
+    const dispatches = useAdminQuery('dispatches', getDispatches, 10000);
+    const telemetry = useAdminQuery('telemetry-overview', getIndustrialTelemetryOverview, 5000);
+
+    const activeDispatches = (dispatches.data?.dispatches || []).filter((d: any) => d.printhouse_id === ph.id && d.status === 'ACTIVE').length;
+    
+    // Find node-specific telemetry if available (this is a simplification, ideally node_id is used)
+    const nodeHealth = ph.status === 'Active' ? 'ONLINE' : 'OFFLINE';
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={card}>
+                <h3 className={sectionTitle}>Geospatial Metadata</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <Cell label="Region / Economic Zone">{ph.region || '—'}</Cell>
+                    <Cell label="Timezone">{ph.timezone || '—'}</Cell>
+                    <Cell label="Latitude">{ph.latitude || '0'}</Cell>
+                    <Cell label="Longitude">{ph.longitude || '0'}</Cell>
+                </div>
+                <div className="pt-2 border-t border-slate-50 mt-2">
+                    <Cell label="Last Heartbeat">{ph.last_heartbeat_at ? new Date(ph.last_heartbeat_at).toLocaleString() : 'Never Recorded'}</Cell>
+                </div>
+            </div>
+            <div className={card}>
+                <h3 className={sectionTitle}>Dispatch Eligibility</h3>
+                <div className="space-y-4">
+                    <div className={`p-4 rounded-xl border ${isEligible ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${isEligible ? 'text-emerald-600' : 'text-red-600'}`}>
+                          Routing Readiness: {isEligible ? 'VERIFIED' : 'RESTRICTED'}
+                        </p>
+                        <div className={`w-2 h-2 rounded-full ${isEligible ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                      </div>
+                      <p className={`text-xs leading-relaxed font-medium ${isEligible ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {isEligible 
+                          ? "Deterministic routing identity resolved. Node is eligible for Global Manufacturing Grid orchestration and autonomous dispatch scoring."
+                          : `Nodal identity cannot be fully resolved. Missing: ${missingFields.join(', ')}. Autonomous routing is disabled for this candidate.`}
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <EligibilityCheck label="Geospatial ID" passed={!!(ph.latitude && ph.longitude)} />
+                        <EligibilityCheck label="Regional Mapping" passed={!!ph.region} />
+                        <EligibilityCheck label="Capacity Sync" passed={!!ph.last_heartbeat_at} />
+                        <EligibilityCheck label="Economic Ready" passed={!!ph.rates} />
+                    </div>
+                </div>
+            </div>
+
+            <div className={`${card} md:col-span-2`}>
+                <h3 className={sectionTitle}>Operational Dispatch Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-4">
+                        <Cell label="Active Dispatches">{activeDispatches}</Cell>
+                        <Cell label="Queue Depth">{ph.queue_depth || 0} / 500</Cell>
+                        <Cell label="Reservation Pressure">{ph.capacity_utilization_pct || 0}%</Cell>
+                    </div>
+                    <div className="md:col-span-2">
+                        {activeDispatches > 0 ? (
+                           <div className="space-y-2">
+                              {(dispatches.data?.dispatches || []).filter((d: any) => d.printhouse_id === ph.id && d.status === 'ACTIVE').map((d: any) => (
+                                <div key={d.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
+                                   <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase">Dispatch ID</p>
+                                      <p className="text-xs font-mono font-bold text-slate-700">#{d.id.slice(0, 8)}</p>
+                                   </div>
+                                   <div className="text-right">
+                                      <p className="text-[10px] font-black text-slate-400 uppercase">State</p>
+                                      <p className="text-xs font-bold text-emerald-500">ACTIVE</p>
+                                   </div>
+                                </div>
+                              ))}
+                           </div>
+                        ) : (
+                          <div className="p-10 border-2 border-dashed border-slate-100 rounded-xl flex flex-col items-center justify-center text-center opacity-30">
+                              <GlobeAltIcon className="w-8 h-8 mb-2 text-slate-300" />
+                              <p className="text-[10px] font-black uppercase text-slate-400">No active orchestration events for this node.</p>
+                          </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function EligibilityCheck({ label, passed }: { label: string, passed: boolean }) {
+    return (
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-slate-50 border border-slate-100">
+            <div className={`w-1.5 h-1.5 rounded-full ${passed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <span className={`text-[9px] font-black uppercase ${passed ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
+        </div>
+    );
 }
 
 function BasicTab({ ph }: { ph: Printhouse }) {
@@ -307,7 +408,7 @@ function TransportTab({ r }: { r: PrinthouseRates }) {
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['Basic', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
+const DETAIL_TABS = ['Basic', 'Operational Geography', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
 type DetailTab = typeof DETAIL_TABS[number];
 
 export const PrinthouseDetailPage: React.FC = () => {
@@ -401,6 +502,7 @@ export const PrinthouseDetailPage: React.FC = () => {
             {/* Tab content */}
             <div>
                 {tab === 'Basic' && <BasicTab ph={ph} />}
+                {tab === 'Operational Geography' && <OperationalTab ph={ph} />}
                 {tab === 'Interior' && (r ? <InteriorTab r={r} /> : <NoRates />)}
                 {tab === 'Cover & Endpapers' && (r ? <CoverEndpapersTab r={r} /> : <NoRates />)}
                 {tab === 'Lamination & UV' && (r ? <LaminationUvTab r={r} /> : <NoRates />)}

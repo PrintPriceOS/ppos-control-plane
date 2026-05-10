@@ -55,6 +55,12 @@ export interface Printhouse {
     signatures: number[]; delivery_time: string;
     production_lead_days: number; limits: PrinthouseLimits;
     rates?: PrinthouseRates;
+    // Phase 24 Geolocation
+    region?: string;
+    latitude?: number;
+    longitude?: number;
+    timezone?: string;
+    address_line?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -121,13 +127,14 @@ const EMPTY_FORM: FormState = {
     id: '', name: '', country: '', city: '', status: 'Active', signatures: [32], delivery_time: '7 days',
     production_lead_days: 5, limits: { min_copies: 250, max_pages: 1500 },
     rates: EMPTY_RATES,
+    region: '', latitude: 0, longitude: 0, timezone: 'UTC', address_line: ''
 };
 
 // ── Styling helpers ────────────────────────────────────────────────────────────
 const inp = "px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400/30 focus:border-slate-400 bg-white w-full";
 const lbl = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1";
 
-const FORM_TABS = ['Basic', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
+const FORM_TABS = ['Basic', 'Operational', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
 type FormTab = typeof FORM_TABS[number];
 
 // ── Form Modal ─────────────────────────────────────────────────────────────────
@@ -157,6 +164,11 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                 production_lead_days: editing.production_lead_days,
                 limits: { ...editing.limits },
                 rates: editing.rates ? { ...EMPTY_RATES, ...editing.rates } : { ...EMPTY_RATES },
+                region: editing.region ?? '',
+                latitude: editing.latitude ?? 0,
+                longitude: editing.longitude ?? 0,
+                timezone: editing.timezone ?? 'UTC',
+                address_line: editing.address_line ?? '',
             });
         } else {
             setForm(EMPTY_FORM);
@@ -298,6 +310,47 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     <input type="number" min={1} value={form.limits.max_pages}
                                                         onChange={e => setForm(f => ({ ...f, limits: { ...f.limits, max_pages: parseInt(e.target.value, 10) || 0 } }))} className={inp} />
                                                 </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ── OPERATIONAL ── */}
+                                    {tab === 'Operational' && (
+                                        <div className="space-y-5 max-w-2xl">
+                                            <div>
+                                                <label className={lbl}>Street Address</label>
+                                                <input type="text" value={form.address_line} placeholder="e.g. 123 Industrial Way"
+                                                    onChange={e => setForm(f => ({ ...f, address_line: e.target.value }))} className={inp} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className={lbl}>Region / Economic Zone</label>
+                                                    <input type="text" value={form.region} placeholder="e.g. EU-WEST"
+                                                        onChange={e => setForm(f => ({ ...f, region: e.target.value }))} className={inp} />
+                                                </div>
+                                                <div>
+                                                    <label className={lbl}>Timezone</label>
+                                                    <input type="text" value={form.timezone} placeholder="e.g. Europe/Paris"
+                                                        onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))} className={inp} />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className={lbl}>Latitude</label>
+                                                    <input type="number" step="0.000001" value={form.latitude}
+                                                        onChange={e => setForm(f => ({ ...f, latitude: parseFloat(e.target.value) || 0 }))} className={inp} />
+                                                </div>
+                                                <div>
+                                                    <label className={lbl}>Longitude</label>
+                                                    <input type="number" step="0.000001" value={form.longitude}
+                                                        onChange={e => setForm(f => ({ ...f, longitude: parseFloat(e.target.value) || 0 }))} className={inp} />
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Routing Intelligence Note</p>
+                                              <p className="text-xs text-slate-500 leading-relaxed">
+                                                Providing precise geographic coordinates enables the Global Manufacturing Grid to perform deterministic routing calculations and proximity-based dispatch balancing.
+                                              </p>
                                             </div>
                                         </div>
                                     )}

@@ -86,7 +86,11 @@ router.post('/', async (req, res) => {
     const context = resolveActorContext(req);
     if (!context.isSuperAdmin) return res.status(403).json({ ok: false, error: 'Only Super Admins can create printhouses' });
 
-    const { id, name, country, city, status, signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+    const { 
+        id, name, country, city, status, signatures, delivery_time, 
+        production_lead_days, limits, rates,
+        region, latitude, longitude, timezone, address_line
+    } = req.body;
     
     if (!id || !name) return res.status(400).json({ ok: false, error: 'ID and Name are required' });
 
@@ -95,8 +99,9 @@ router.post('/', async (req, res) => {
             INSERT INTO printer_nodes (
                 id, tenant_id, name, country, city, status, 
                 signatures, delivery_time, production_lead_days, limits, rates_json,
-                email -- Adding dummy email to satisfy NOT NULL constraint if missing
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                email,
+                region, latitude, longitude, timezone, address_line
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             id, context.tenantId, name, country, city, status === 'Active' ? 'ACTIVE' : 'PENDING',
             JSON.stringify(signatures || []),
@@ -104,7 +109,8 @@ router.post('/', async (req, res) => {
             parseInt(production_lead_days) || 0,
             JSON.stringify(limits || {}),
             JSON.stringify(rates || {}),
-            `ops+${id}@printprice.os`
+            `ops+${id}@printprice.os`,
+            region, latitude, longitude, timezone, address_line
         ]);
 
         res.status(201).json({ ok: true, id });
@@ -124,7 +130,11 @@ router.put('/:id', async (req, res) => {
         return res.status(403).json({ ok: false, error: 'Unauthorized to update this printhouse' });
     }
 
-    const { name, country, city, status, signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+    const { 
+        name, country, city, status, signatures, delivery_time, 
+        production_lead_days, limits, rates,
+        region, latitude, longitude, timezone, address_line
+    } = req.body;
 
     try {
         const fields = [];
@@ -139,6 +149,11 @@ router.put('/:id', async (req, res) => {
         if (production_lead_days !== undefined) { fields.push('production_lead_days = ?'); params.push(parseInt(production_lead_days) || 0); }
         if (limits) { fields.push('limits = ?'); params.push(JSON.stringify(limits)); }
         if (rates) { fields.push('rates_json = ?'); params.push(JSON.stringify(rates)); }
+        if (region) { fields.push('region = ?'); params.push(region); }
+        if (latitude !== undefined) { fields.push('latitude = ?'); params.push(latitude); }
+        if (longitude !== undefined) { fields.push('longitude = ?'); params.push(longitude); }
+        if (timezone) { fields.push('timezone = ?'); params.push(timezone); }
+        if (address_line) { fields.push('address_line = ?'); params.push(address_line); }
 
         if (fields.length === 0) return res.json({ ok: true, message: 'No changes' });
 

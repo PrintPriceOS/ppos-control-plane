@@ -233,6 +233,27 @@ class IndustrialProvisioningService {
             }
         }
 
+        // Phase 23: Manufacturing Grid Geolocation Hardening
+        const geolocationMigrations = [
+            { table: 'printer_nodes', column: 'region',       type: 'VARCHAR(128) NULL' },
+            { table: 'printer_nodes', column: 'latitude',     type: 'DECIMAL(10, 8) NULL' },
+            { table: 'printer_nodes', column: 'longitude',    type: 'DECIMAL(11, 8) NULL' },
+            { table: 'printer_nodes', column: 'timezone',     type: 'VARCHAR(64) NULL' },
+            { table: 'printer_nodes', column: 'address_line', type: 'TEXT NULL' }
+        ];
+
+        for (const gm of geolocationMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureGeolocationColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
         for (const table of coreTables) {
             try {
                 await db.query(table.sql);
