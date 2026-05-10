@@ -10,6 +10,25 @@ const { v4: uuidv4 } = require('uuid');
 
 class MachineRegistryService {
     /**
+     * Canonical colour normalization for industrial MES.
+     */
+    normalizeColour(val) {
+        if (!val) return 'unknown';
+        const s = String(val).toLowerCase().trim();
+        
+        // Mono equivalents
+        if (['one', '1/1', 'mono', 'monochrome', 'black', 'black_white', 'bw', 'b/w'].includes(s)) return 'one';
+        
+        // Two-colour equivalents
+        if (['two', '2', '2/2', 'two_colour', 'two_color'].includes(s)) return 'two';
+        
+        // Full-colour equivalents
+        if (['full', 'color', 'colour', 'cmyk', '4/4', '4c', 'full_colour', 'full_color'].includes(s)) return 'full';
+        
+        return s;
+    }
+
+    /**
      * Normalizes a machine profile into a standard capability JSON.
      */
     normalizeCapabilities(rawData) {
@@ -18,7 +37,7 @@ class MachineRegistryService {
             paper_types: rawData.paper_types || ['mc', 'offset', 'munken'],
             max_sheet: rawData.max_sheet || { width: 0, height: 0 },
             min_sheet: rawData.min_sheet || { width: 0, height: 0 },
-            colour_modes: rawData.colour_modes || ['1/1', '4/4'],
+            colour_modes: (rawData.colour_modes || ['1/1', '4/4']).map(c => this.normalizeColour(c)),
             binding: rawData.binding || ['pb', 'hc'],
             min_run: rawData.min_run || 0,
             max_run: rawData.max_run || 0,
@@ -130,11 +149,13 @@ class MachineRegistryService {
             // Normalization for comparison
             const targetPaper = paper_type?.toLowerCase();
             const targetBinding = binding?.toLowerCase();
-            const targetColour = colour_mode?.toLowerCase();
+            const targetColourRaw = colour_mode;
+            const targetColour = this.normalizeColour(colour_mode);
 
             const supportedPapers = (caps.paper_types || []).map(s => s.toLowerCase());
             const supportedBindings = (caps.binding || []).map(s => s.toLowerCase());
-            const supportedColours = (caps.colour_modes || []).map(s => s.toLowerCase());
+            const supportedColoursRaw = caps.colour_modes || [];
+            const supportedColours = (caps.colour_modes || []).map(s => this.normalizeColour(s));
 
             // Technical compatibility checks
             if (targetPaper && !supportedPapers.includes(targetPaper)) {
@@ -148,7 +169,17 @@ class MachineRegistryService {
             }
 
             if (targetColour && !supportedColours.includes(targetColour)) {
-                rejected.push({ id: m.id, nodeId: m.node_id, reason: 'COLOUR_NOT_SUPPORTED', details: { target: targetColour, supported: supportedColours } });
+                rejected.push({ 
+                    id: m.id, 
+                    nodeId: m.node_id, 
+                    reason: 'COLOUR_NOT_SUPPORTED', 
+                    details: { 
+                        target: targetColour, 
+                        targetRaw: targetColourRaw,
+                        supported: supportedColours,
+                        supportedRaw: supportedColoursRaw
+                    } 
+                });
                 continue;
             }
             

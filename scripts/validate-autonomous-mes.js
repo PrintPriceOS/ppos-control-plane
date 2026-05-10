@@ -71,10 +71,11 @@ async function validate() {
                 );
 
                 if (commonPapers.length > 0 && commonBindings.length > 0 && commonColours.length > 0) {
+                    const machineRegistry = require('../src/api/services/machineRegistryService');
                     selectedSpec = {
                         paper: commonPapers[0].toLowerCase(),
                         binding: commonBindings[0].toLowerCase(),
-                        colour: commonColours[0].toLowerCase().includes('4') ? 'full' : 'mono',
+                        colour: machineRegistry.normalizeColour(commonColours[0]),
                         copies: Math.max(caps1.min_run || 1, caps2.min_run || 1),
                         sheet_size: { width: 210, height: 297 }, // A4 default
                         gsm: Math.max(caps1.min_gsm || 80, caps2.min_gsm || 80)

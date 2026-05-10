@@ -28,7 +28,7 @@ class EconomicRoutingService {
             const { matched: machines, rejected } = await machineRegistry.findMatchingMachines({
                 paper_type: paper,
                 sheet_size,
-                colour_mode: colour === 'full' ? '4/4' : '1/1',
+                colour_mode: colour,
                 binding,
                 gsm,
                 run_length: copies
