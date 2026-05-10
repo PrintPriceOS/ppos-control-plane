@@ -2,11 +2,80 @@ const express = require('express');
 const router = express.Router();
 const db = require('../services/db');
 const autonomousOrchestrator = require('../services/autonomousOrchestrator');
+const autoDispatch = require('../services/autonomousDispatchService');
+const slaMonitor = require('../services/slaMonitoringService');
+const autoReroute = require('../services/autonomousRerouteService');
+const learningLoop = require('../services/manufacturingLearningService');
 
 /**
- * GET /api/admin/pipelines
+ * GET /api/admin/autonomous/status
+ * Exposes autonomous loop health and active evaluations.
  */
-router.get('/', async (req, res) => {
+router.get('/status', async (req, res) => {
+    try {
+        const status = autonomousOrchestrator.getStatus();
+        res.json({ ok: true, status });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/autonomous/dispatch/evaluate
+ * Manually trigger dispatch evaluation.
+ */
+router.post('/dispatch/evaluate', async (req, res) => {
+    try {
+        const result = await autoDispatch.evaluateQueuedJobs();
+        res.json({ ok: true, result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/autonomous/sla/scan
+ * Manually trigger SLA monitoring scan.
+ */
+router.post('/sla/scan', async (req, res) => {
+    try {
+        const result = await slaMonitor.scanActiveDispatches();
+        res.json({ ok: true, result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/autonomous/reroute/run
+ * Manually trigger autonomous rerouting.
+ */
+router.post('/reroute/run', async (req, res) => {
+    try {
+        const result = await autoReroute.evaluateReroutes();
+        res.json({ ok: true, result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/autonomous/learning/recompute
+ * Manually trigger learning feedback loop.
+ */
+router.post('/learning/recompute', async (req, res) => {
+    try {
+        const result = await learningLoop.recomputeIntelligence();
+        res.json({ ok: true, result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * Legacy Pipeline Routes
+ */
+router.get('/pipelines', async (req, res) => {
     try {
         const { rows } = await db.query(`
             SELECT ajp.*, j.original_name as job_name
@@ -38,6 +107,7 @@ router.get('/metrics', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 /**
  * GET /api/admin/pipelines/:id
  */

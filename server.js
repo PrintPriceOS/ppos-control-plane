@@ -155,6 +155,15 @@ const start = async () => {
         } catch (err) {
             console.error('[INDUSTRIAL-PROVISIONING] Load failed:', err.message);
         }
+
+        // 0.2 Autonomous MES Decision Loop
+        try {
+            const orchestrator = require('./src/api/services/autonomousOrchestrator');
+            orchestrator.start();
+            console.log('[AUTONOMOUS-MES] Orchestration loop initiated.');
+        } catch (err) {
+            console.error('[AUTONOMOUS-MES] Loop startup failed:', err.message);
+        }
         
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {
@@ -181,6 +190,7 @@ const start = async () => {
         fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
         fastify.use('/api/admin', require('./src/api/routes/admin'));
         fastify.use('/api/admin/telemetry', require('./src/api/routes/telemetryAdmin'));
+        fastify.use('/api/admin/autonomous', require('./src/api/routes/autonomyAdmin'));
         fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
         fastify.use('/api/system', require('./src/api/routes/system'));
         

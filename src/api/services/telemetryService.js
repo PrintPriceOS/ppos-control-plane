@@ -427,6 +427,12 @@ class TelemetryService {
                 WHERE node_id = ? AND reservation_status = 'ACTIVE'
             `, [nodeId]);
 
+            const [reliability] = await db.query(`
+                SELECT reliability_score, avg_turnaround_hours
+                FROM printer_reliability_metrics
+                WHERE printer_id = ?
+            `, [nodeId]);
+
             return {
                 totalDispatches: parseInt(counts?.total_dispatches) || 0,
                 activeDispatches: parseInt(counts?.active_dispatches) || 0,
@@ -435,7 +441,9 @@ class TelemetryService {
                 utilization: utilization?.utilization_percent || 0,
                 activeJobs: utilization?.active_jobs || 0,
                 queuedJobs: utilization?.queued_jobs || 0,
-                activeReservations: reservations?.count || 0
+                activeReservations: reservations?.count || 0,
+                reliabilityScore: reliability?.reliability_score || 0,
+                avgTurnaround: reliability?.avg_turnaround_hours || 0
             };
         } catch (err) {
             logger.error({ event: 'node_mes_stats_failed', nodeId, error: err.message });

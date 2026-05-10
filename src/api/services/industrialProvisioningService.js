@@ -40,6 +40,22 @@ class IndustrialProvisioningService {
             { table: 'print_node_machine_profiles', column: 'normalized_capabilities_json', type: 'JSON NULL' }
         ];
 
+        // Ensure status enum is updated for Phase 12
+        try {
+            await db.query(`
+                ALTER TABLE manufacturing_dispatches 
+                MODIFY COLUMN status ENUM(
+                    'QUEUED','RECOMMENDED','ASSIGNED','ACCEPTED','PREPARING',
+                    'PRINTING','BINDING','PACKAGING','SHIPPED','DELIVERED',
+                    'FAILED','REROUTED','CANCELED',
+                    'AUTO_ASSIGNED', 'AUTO_REROUTED', 'SLA_AT_RISK', 'CAPACITY_BLOCKED'
+                ) DEFAULT 'QUEUED'
+            `);
+        } catch (err) {
+            // Might fail if table doesn't exist yet, which is fine since CREATE TABLE will use the new definition
+            logger.debug({ event: 'migration_enum_skip', message: err.message });
+        }
+
         let ensured = 0;
         for (const m of migrations) {
             try {
@@ -94,7 +110,8 @@ class IndustrialProvisioningService {
                     status ENUM(
                         'QUEUED','RECOMMENDED','ASSIGNED','ACCEPTED','PREPARING',
                         'PRINTING','BINDING','PACKAGING','SHIPPED','DELIVERED',
-                        'FAILED','REROUTED','CANCELED'
+                        'FAILED','REROUTED','CANCELED',
+                        'AUTO_ASSIGNED', 'AUTO_REROUTED', 'SLA_AT_RISK', 'CAPACITY_BLOCKED'
                     ) DEFAULT 'QUEUED',
                     estimated_cost DECIMAL(12,2) NULL,
                     estimated_margin DECIMAL(8,2) NULL,

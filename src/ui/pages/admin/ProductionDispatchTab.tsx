@@ -87,13 +87,17 @@ export const ProductionDispatchTab: React.FC = () => {
         switch (status) {
             case 'DELIVERED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
             case 'FAILED': return 'bg-red-500/10 text-red-400 border-red-500/20';
-            case 'CANCELED':
-            case 'REROUTED': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+            case 'CANCELED': return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+            case 'REROUTED':
+            case 'AUTO_REROUTED': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
             case 'PRINTING':
             case 'BINDING':
             case 'PREPARING': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
             case 'ACCEPTED':
-            case 'ASSIGNED': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+            case 'ASSIGNED':
+            case 'AUTO_ASSIGNED': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+            case 'SLA_AT_RISK': return 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse';
+            case 'CAPACITY_BLOCKED': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
             default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
         }
     };
@@ -106,8 +110,8 @@ export const ProductionDispatchTab: React.FC = () => {
     };
 
     const possibleStatuses = [
-        'ASSIGNED', 'ACCEPTED', 'PREPARING', 'PRINTING', 'BINDING', 
-        'PACKAGING', 'SHIPPED', 'DELIVERED', 'FAILED', 'CANCELED'
+        'ASSIGNED', 'AUTO_ASSIGNED', 'ACCEPTED', 'PREPARING', 'PRINTING', 'BINDING', 
+        'PACKAGING', 'SHIPPED', 'DELIVERED', 'FAILED', 'REROUTED', 'AUTO_REROUTED', 'SLA_AT_RISK', 'CANCELED'
     ];
 
     return (
@@ -184,8 +188,19 @@ export const ProductionDispatchTab: React.FC = () => {
                                         <div className="flex items-center gap-2 mb-1">
                                             <h3 className="text-2xl font-black text-white tracking-tighter uppercase">DISPATCH {selectedDispatch.id.slice(-8)}</h3>
                                             <FingerPrintIcon className="w-4 h-4 text-slate-600" />
+                                            {selectedDispatch.metadata_json?.autonomous && (
+                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[8px] font-black text-blue-400 uppercase tracking-widest">
+                                                    <BoltIcon className="w-2 h-2" /> Autonomous Decision
+                                                </div>
+                                            )}
                                         </div>
                                         <p className="text-xs text-slate-500 font-mono tracking-tight uppercase">Trace ID: {selectedDispatch.id}</p>
+                                        {selectedDispatch.status === 'SLA_AT_RISK' && (
+                                            <div className="mt-2 p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+                                                <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" />
+                                                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-tight">Industrial SLA Alert: Production Delay Detected</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

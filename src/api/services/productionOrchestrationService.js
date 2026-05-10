@@ -89,7 +89,7 @@ class ProductionOrchestrationService {
             await db.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
 
             // If terminal status, release capacity
-            if (['DELIVERED', 'FAILED', 'CANCELED', 'REROUTED'].includes(newStatus)) {
+            if (['DELIVERED', 'FAILED', 'CANCELED', 'REROUTED', 'AUTO_REROUTED'].includes(newStatus)) {
                 await db.query('UPDATE manufacturing_capacity_reservations SET reservation_status = "RELEASED" WHERE dispatch_id = ?', [dispatchId]);
             }
 
