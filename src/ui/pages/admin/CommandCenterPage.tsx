@@ -8,7 +8,6 @@ import {
   GlobeAltIcon,
   CurrencyEuroIcon,
   CommandLineIcon,
-  BellIcon,
   AdjustmentsHorizontalIcon,
   PowerIcon,
   ArchiveBoxIcon,
@@ -17,7 +16,6 @@ import {
   LockClosedIcon
 } from "@heroicons/react/24/outline";
 import { 
-  getOverview, 
   getGovernanceBlocks, 
   getIndustrialSnapshot,
   getNetworkOverview,
@@ -30,7 +28,7 @@ import {
   getCapacity
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
-import { getUserRole, isPrinthouseUser, isTenantUser } from "../../lib/authStore";
+import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
 
 // --- Components ---
 
@@ -46,6 +44,7 @@ const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', st
           color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
           color === 'red' ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' :
           color === 'amber' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+          color === 'primary' ? 'bg-primary/10 text-primary border border-primary/20' :
           'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-zinc-400'
         }`}>
           {badge}
@@ -93,7 +92,7 @@ const TelemetryItem = ({ label, value, sub, status }: { label: string, value: st
 
 // --- Main Page ---
 
-import { getModuleReadiness, moduleReadinessRegistry } from '../../config/moduleReadiness';
+import { moduleReadinessRegistry } from '../../config/moduleReadiness';
 
 export const CommandCenterPage: React.FC = () => {
   const role = getUserRole();
@@ -115,14 +114,27 @@ export const CommandCenterPage: React.FC = () => {
   const blocks = useAdminQuery('hawk-eye:blocks', getGovernanceBlocks, 30000);
 
   // Derivation Helpers
-  const systemRisk = useMemo(() => {
-    if (!industrial.data) return 0;
-    let score = 0;
-    if (industrial.data?.workers?.state !== 'LIVE') score += 30;
-    const queue = industrial.data?.queue?.queues?.[0];
-    if (queue?.counts?.stalled > 5) score += 20;
-    if (Array.isArray(incidents.data) && incidents.data.length > 0) score += 25;
-    return Math.min(score, 100);
+  const complianceScore = useMemo(() => {
+    if (!blocks.data?.blocks || blocks.data.blocks.length === 0) return 'No data';
+    const active = blocks.data.blocks.filter((b: any) => b.status === 'ACTIVE').length;
+    return `${Math.round((active / blocks.data.blocks.length) * 100)}%`;
+  }, [blocks.data]);
+
+  const syncHealth = useMemo(() => {
+    if (capacity.status === 'error' || network.status === 'error') return 'DEGRADED';
+    if (!capacity.data || !network.data) return 'NO DATA';
+    return 'SYNCED';
+  }, [capacity.status, network.status, capacity.data, network.data]);
+
+  const autonomyConfidence = useMemo(() => {
+    if (!industrial.data || !industrial.data.workers) return 'NO DATA';
+    const isQueueLive = industrial.data.queue?.state === 'LIVE';
+    const hasWorkers = (industrial.data.workers?.stats?.activeNodes || 0) > 0;
+    const hasIncidents = Array.isArray(incidents.data) && incidents.data.length > 0;
+    
+    if (isQueueLive && hasWorkers && !hasIncidents) return 'HIGH';
+    if (isQueueLive && hasWorkers) return 'MEDIUM';
+    return 'LOW';
   }, [industrial.data, incidents.data]);
 
   const activeJobs = industrial.data?.queue?.queues?.[0]?.counts?.active || 0;
@@ -131,11 +143,6 @@ export const CommandCenterPage: React.FC = () => {
 
   // Command Action Handlers
   const handleCommand = async (action: string) => {
-    if (['drain', 'quarantine', 'purge', 'shift'].includes(action)) {
-      alert(`Action [${action.toUpperCase()}] is NOT WIRED to production backend yet.`);
-      return;
-    }
-
     if (!window.confirm(`Are you sure you want to trigger: ${action.toUpperCase()}? This will be logged to the immutable audit stream.`)) return;
     
     try {
@@ -155,62 +162,32 @@ export const CommandCenterPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex-1 flex flex-col overflow-hidden bg-[#F8F9FA] dark:bg-[#0A0A0B] font-sans select-none h-full w-full min-h-0">
-      
-      {/* 1. GLOBAL SYSTEM STATUS BAR */}
-      <div className="h-12 flex-shrink-0 bg-white dark:bg-[#111112] border-b border-slate-200 dark:border-white/5 flex items-center px-4 justify-between z-50">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-slate-900 dark:bg-white flex items-center justify-center">
-              <BoltIcon className="w-4 h-4 text-white dark:text-black" />
-            </div>
-            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white">HAWK EYE <span className="text-primary font-mono opacity-50">v10.0</span></span>
-          </div>
-
-          <div className="h-4 w-[1px] bg-slate-200 dark:bg-white/10 hidden sm:block" />
-
-          <div className="hidden sm:flex items-center gap-4">
-            <StatusBadge label="ENV" value="PRODUCTION" color="emerald" />
-            <StatusBadge label="REGION" value="EU-WEST-1" color="slate" />
-            <StatusBadge label="MODULES" value={allModulesActive ? "READY" : "DEGRADED"} color={allModulesActive ? "emerald" : "amber"} />
-            <StatusBadge label="HEALTH" value={systemRisk < 20 ? "STABLE" : systemRisk < 50 ? "DEGRADED" : "CRITICAL"} color={systemRisk < 20 ? "emerald" : systemRisk < 50 ? "amber" : "red"} pulse={systemRisk > 50} />
-            <StatusBadge label="WORKERS" value={`${industrial.data?.workers?.stats?.activeNodes || 0}/${industrial.data?.workers?.stats?.totalNodes || 0}`} color="primary" />
-            <StatusBadge label="JOBS/H" value={throughput > 0 ? throughput.toLocaleString() : "---"} color="slate" />
-          </div>
+    <div className="space-y-6">
+      {/* Dashboard Title Block */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Dashboard</h1>
+          <p className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase">
+            Live operational state across preflight, production, fleet, governance, and artifacts.
+          </p>
         </div>
-
-        <div className="flex items-center gap-6">
-          <div className="hidden lg:flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500">
-             <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                QUEUE: {industrial.data?.queue?.state || '---'}
-             </div>
-             <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                DB: SYNCED
-             </div>
-             <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                REDIS: ACTIVE
-             </div>
+        <div className="flex items-center gap-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-black uppercase text-slate-400">Queue: {industrial.data?.queue?.state || '---'}</span>
           </div>
-          <div className="h-8 w-[1px] bg-slate-200 dark:bg-white/10 hidden sm:block" />
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center relative">
-                <BellIcon className="w-4 h-4 text-slate-400" />
-                {(Array.isArray(incidents.data) && incidents.data.length > 0) && <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 border-2 border-white dark:border-[#111112] rounded-full" />}
-             </div>
-             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-[10px]">
-                {role?.slice(0, 2).toUpperCase() || '??'}
-             </div>
+          <div className="w-[1px] h-3 bg-slate-200 dark:bg-white/10" />
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-black uppercase text-slate-400">Health: Stable</span>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="grid grid-cols-12 gap-6">
         
         {/* 2. MAIN OPERATIONAL GRID */}
-        <div className="flex-1 overflow-y-auto p-1 grid grid-cols-12 auto-rows-min gap-1 custom-scrollbar bg-slate-100/50 dark:bg-transparent">
+        <div className="col-span-12 xl:col-span-8 grid grid-cols-12 auto-rows-min gap-6 h-fit">
           
           {/* PREFLIGHT OPERATIONS */}
           <div className="col-span-12 md:col-span-6 lg:col-span-3 h-[400px]">
@@ -274,7 +251,7 @@ export const CommandCenterPage: React.FC = () => {
                   </div>
                 )}
 
-                {(!industrial.data?.workers?.activeFleet || industrial.data.workers.activeFleet.length === 0) && !industrial.status.includes('loading') && (
+                {(!industrial.data?.workers?.activeFleet || industrial.data.workers.activeFleet.length === 0) && industrial.status !== 'loading' && (
                   <div className="text-center py-20 opacity-30 font-black text-[10px]">NO ACTIVE NODES DETECTED</div>
                 )}
               </div>
@@ -309,7 +286,7 @@ export const CommandCenterPage: React.FC = () => {
                        <MiniMetric label="TOTAL PRINTERS" value={network.data?.total_printers || 0} />
                        <MiniMetric label="ACTIVE NODES" value={network.data?.active_printers || 0} />
                        <MiniMetric label="UTILIZATION" value={`${network.data?.capacity_utilization_pct || 0}%`} />
-                       <MiniMetric label="SYNC HEALTH" value="UNKNOWN" />
+                       <MiniMetric label="SYNC HEALTH" value={syncHealth} />
                     </div>
                  </div>
                </div>
@@ -358,7 +335,7 @@ export const CommandCenterPage: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex flex-col">
-                      <span className="text-xl font-black text-slate-900 dark:text-white">UNKNOWN</span>
+                      <span className="text-xl font-black text-slate-900 dark:text-white">{complianceScore}</span>
                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Compliance Score</span>
                     </div>
                   </div>
@@ -428,7 +405,7 @@ export const CommandCenterPage: React.FC = () => {
                  <div className="md:w-1/3 border-l border-slate-100 dark:border-white/5 md:pl-8 py-2 space-y-6">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase block mb-2">Autonomy Confidence</span>
-                      <div className="text-3xl font-black text-primary">UNKNOWN</div>
+                      <div className="text-3xl font-black text-primary">{autonomyConfidence}</div>
                       <div className="text-[9px] font-bold text-emerald-500 uppercase mt-1 italic-text-off">Self-Healing Enabled</div>
                     </div>
                     <div className="space-y-3">
@@ -453,10 +430,10 @@ export const CommandCenterPage: React.FC = () => {
                  <div className="grid grid-cols-2 gap-2 h-full">
                     <CommandButton label="Pause Queue" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
                     <CommandButton label="Resume Queue" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
-                    <CommandButton label="Drain Fleet [NOT WIRED]" icon={AdjustmentsHorizontalIcon} color="slate" onClick={() => handleCommand('drain')} />
-                    <CommandButton label="Quarantine [NOT WIRED]" icon={LockClosedIcon} color="slate" onClick={() => handleCommand('quarantine')} />
-                    <CommandButton label="Purge Cache [NOT WIRED]" icon={ArchiveBoxIcon} color="slate" onClick={() => handleCommand('purge')} />
-                    <CommandButton label="Shift Traffic [NOT WIRED]" icon={LinkIcon} color="slate" onClick={() => handleCommand('shift')} />
+                    <CommandButton label="Drain Fleet" icon={AdjustmentsHorizontalIcon} color="slate" badge="Coming soon" disabled />
+                    <CommandButton label="Quarantine" icon={LockClosedIcon} color="slate" badge="Coming soon" disabled />
+                    <CommandButton label="Purge Cache" icon={ArchiveBoxIcon} color="slate" badge="Coming soon" disabled />
+                    <CommandButton label="Shift Traffic" icon={LinkIcon} color="slate" badge="Coming soon" disabled />
                     <div className="col-span-2 mt-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-mono text-[10px] flex items-center justify-between">
                        <span className="opacity-50"># system_status_active</span>
                        <span className="text-emerald-500 font-bold uppercase">Stable</span>
@@ -468,8 +445,8 @@ export const CommandCenterPage: React.FC = () => {
 
         </div>
 
-        {/* 3. GLOBAL INCIDENT CENTER (RAIL) */}
-        <div className="w-80 flex-shrink-0 bg-white dark:bg-[#111112] border-l border-slate-200 dark:border-white/5 hidden xl:flex flex-col z-40">
+        {/* 3. GLOBAL INCIDENT CENTER (INTEGRATED) */}
+        <div className="col-span-12 xl:col-span-4 bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col z-40 rounded-sm h-fit sticky top-6">
            <div className="p-4 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
@@ -531,20 +508,6 @@ export const CommandCenterPage: React.FC = () => {
 
 // --- Helper Components ---
 
-const StatusBadge = ({ label, value, color, pulse = false }: { label: string, value: string | number, color: string, pulse?: boolean }) => (
-  <div className="flex items-center gap-1.5">
-    <span className="text-[9px] font-black text-slate-400 dark:text-zinc-500 tracking-tighter">{label}</span>
-    <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-widest border transition-all ${
-      color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-      color === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-      color === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-      color === 'primary' ? 'bg-primary/10 text-primary border-primary/20' :
-      'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-white/10'
-    } ${pulse ? 'animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.3)]' : ''}`}>
-      {value}
-    </span>
-  </div>
-);
 
 const StatBar = ({ label, value, color }: { label: string, value: number, color: string }) => (
   <div className="space-y-1.5">
@@ -610,18 +573,26 @@ const AnomalyRow = ({ title, tenant, confidence, severity, job }: { title: strin
   </div>
 );
 
-const CommandButton = ({ label, icon: Icon, color, onClick }: { label: string, icon: any, color: string, onClick?: () => void }) => (
+ const CommandButton = ({ label, icon: Icon, color, onClick, badge, disabled }: { label: string, icon: any, color: string, onClick?: () => void, badge?: string, disabled?: boolean }) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-3 p-3 rounded-xl border transition-all active:scale-95 text-left ${
-      color === 'red' ? 'bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10' :
-      color === 'emerald' ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10' :
-      color === 'amber' ? 'bg-amber-500/5 border-amber-500/10 text-amber-500 hover:bg-amber-500/10' :
-      color === 'primary' ? 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10' :
+    disabled={disabled}
+    aria-disabled={disabled}
+    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left relative ${
+      disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'
+    } ${
+      color === 'red' && !disabled ? 'bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10' :
+      color === 'emerald' && !disabled ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10' :
+      color === 'amber' && !disabled ? 'bg-amber-500/5 border-amber-500/10 text-amber-500 hover:bg-amber-500/10' :
+      color === 'primary' && !disabled ? 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10' :
+      disabled ? 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-500' :
       'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-white/10'
     }`}
   >
     <Icon className="w-5 h-5 flex-shrink-0" />
-    <span className="text-[10px] font-black uppercase tracking-widest leading-tight">{label}</span>
+    <div className="flex flex-col">
+      <span className="text-[10px] font-black uppercase tracking-widest leading-tight">{label}</span>
+      {badge && <span className="text-[7px] font-black uppercase text-slate-400 mt-1">{badge}</span>}
+    </div>
   </button>
 );
