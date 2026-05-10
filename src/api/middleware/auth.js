@@ -22,6 +22,11 @@ if (!JWT_SECRET) {
 function requireAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
     
+    // Support bypass if already authenticated by Fastify hook
+    if (req.user && (req.user.authMode === 'JWT' || req.user.authMode === 'BREAK_GLASS')) {
+        return next();
+    }
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return fail(req, res, 'Bearer token required');
     }

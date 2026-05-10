@@ -2,9 +2,9 @@ name: PPOS Control Plane CI
 
 on:
   push:
-    branches: [ main, v1.9.0, release/* ]
+    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer ]
   pull_request:
-    branches: [ main, v1.9.0 ]
+    branches: [ main, v1.9.0, phase-10-intelligence-layer ]
 
 jobs:
   build:
@@ -17,6 +17,12 @@ jobs:
         node-version: '18.x'
         cache: 'npm'
     - name: Install dependencies
-      run: npm install
-    - name: Smoke check
-      run: node smoke-check.js
+      run: npm ci
+    - name: Syntax Validation
+      run: |
+        node -c server.js
+        find src/api scripts -name "*.js" -type f -print0 | xargs -0 -n1 node -c
+    - name: Production Build
+      run: npm run build
+    - name: Schema Integrity Check
+      run: node scripts/verify-industrial-schema.js

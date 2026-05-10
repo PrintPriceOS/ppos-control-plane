@@ -81,11 +81,14 @@ fastify.addHook('onRequest', async (request, reply) => {
                 issuer: jwtIssuer
             });
             
-            // Populate request context for Fastify routes
+            // Populate request context for both Fastify and Express (via fastify-express)
             request.user = {
                 id: decoded.sub,
+                email: decoded.email,
                 role: (decoded.role || 'VIEWER').toUpperCase(),
-                tenantId: decoded.tenant_id
+                tenantId: decoded.tenant_id,
+                printhouseId: decoded.printhouse_id,
+                authMode: 'JWT'
             };
             
             return;

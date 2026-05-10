@@ -12,7 +12,11 @@ const bcrypt = require('bcrypt');
 const userService = require('../services/controlUserService');
 const printhouseService = require('../services/printhouseService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-development-only';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('[FATAL-SECURITY] JWT_SECRET is not configured. Authentication cannot proceed.');
+    process.exit(1);
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const JWT_ISSUER = process.env.JWT_ISSUER || 'https://auth.printprice.pro';
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ppos:control';
@@ -30,7 +34,8 @@ router.post('/login', async (req, res) => {
 
     try {
         const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
-        const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+        const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+        const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true' && isDev;
         
         // Break-glass authentication (Master Access)
         if (enableBreakGlass && breakGlassToken && password === breakGlassToken) {
