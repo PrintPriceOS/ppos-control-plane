@@ -147,6 +147,24 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                 icon={ClockIcon}
                                 color="text-amber-600"
                             />
+                            <StatCard 
+                                 label="Projected Saturation" 
+                                 value={statsLoading ? '...' : `${nodeStats?.projectedSaturation || 0}%`} 
+                                 icon={BoltIcon}
+                                 color="text-cyan-600"
+                            />
+                            <StatCard 
+                                 label="Industrial Drift" 
+                                 value={statsLoading ? '...' : `${nodeStats?.driftScore || 0}`} 
+                                 icon={ExclamationTriangleIcon}
+                                 color={(nodeStats?.driftScore || 0) > 20 ? 'text-rose-600' : 'text-slate-400'}
+                            />
+                            <StatCard 
+                                 label="Process Efficiency" 
+                                 value={statsLoading ? '...' : `${nodeStats?.efficiencyScore || 0}%`} 
+                                 icon={BoltIcon}
+                                 color="text-emerald-500"
+                            />
                         </div>
 
                         {/* Performance Details */}

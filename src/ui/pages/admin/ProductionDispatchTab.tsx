@@ -14,7 +14,8 @@ import {
     DocumentTextIcon,
     TagIcon,
     CurrencyEuroIcon,
-    CalendarIcon
+    CalendarIcon,
+    ShieldCheckIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
 
@@ -244,11 +245,91 @@ export const ProductionDispatchTab: React.FC = () => {
                                     </div>
                                     <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <ExclamationTriangleIcon className="w-3 h-3" /> Anomaly Score
+                                        </div>
+                                        <div className={`text-xs font-bold ${
+                                            (selectedDispatch.anomaly_score || 0) > 70 ? 'text-rose-500 animate-pulse' :
+                                            (selectedDispatch.anomaly_score || 0) > 40 ? 'text-amber-500' :
+                                            'text-emerald-400'
+                                        }`}>
+                                            {selectedDispatch.anomaly_score || '0.00'}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <BoltIcon className="w-3 h-3" /> Stability
+                                        </div>
+                                        <div className="text-xs font-bold text-cyan-400">
+                                            {Math.max(0, 100 - (selectedDispatch.anomaly_score || 0)).toFixed(1)}%
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Reliability
                                         </div>
                                         <div className="text-xs font-bold text-cyan-400">{selectedDispatch.reliability_score || 0}%</div>
                                     </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <CurrencyEuroIcon className="w-3 h-3" /> Econ Score
+                                        </div>
+                                        <div className="text-xs font-bold text-emerald-500">
+                                            {selectedDispatch.economic_score || '0'}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <BoltIcon className="w-3 h-3" /> Energy
+                                        </div>
+                                        <div className="text-xs font-bold text-amber-500">
+                                            {selectedDispatch.energy_efficiency_score || '0'}%
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <ShieldCheckIcon className="w-3 h-3" /> Risk Score
+                                        </div>
+                                        <div className={`text-xs font-bold ${
+                                            (selectedDispatch.metadata_json?.predictive_risk?.score || 0) > 70 ? 'text-rose-500' :
+                                            (selectedDispatch.metadata_json?.predictive_risk?.score || 0) > 40 ? 'text-amber-500' :
+                                            'text-emerald-500'
+                                        }`}>
+                                            {selectedDispatch.metadata_json?.predictive_risk?.score || '0'} / 100
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* Predictive Risk Intelligence */}
+                                {selectedDispatch.metadata_json?.predictive_risk && (
+                                    <div className="mb-10 p-6 bg-rose-500/5 rounded-2xl border border-rose-500/10">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-4 flex items-center gap-2">
+                                            <ShieldCheckIcon className="w-4 h-4" /> Predictive Industrial Risk Analysis
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Level</div>
+                                                <div className={`text-xl font-black tracking-tight ${
+                                                    selectedDispatch.metadata_json.predictive_risk.level === 'CRITICAL' ? 'text-rose-500 animate-pulse' :
+                                                    selectedDispatch.metadata_json.predictive_risk.level === 'HIGH' ? 'text-rose-400' :
+                                                    selectedDispatch.metadata_json.predictive_risk.level === 'MODERATE' ? 'text-amber-400' :
+                                                    'text-emerald-400'
+                                                }`}>
+                                                    {selectedDispatch.metadata_json.predictive_risk.level}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Contributing Factors</div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedDispatch.metadata_json.predictive_risk.factors?.map((f: string) => (
+                                                        <span key={f} className="px-2 py-0.5 bg-slate-800 rounded text-[8px] font-black text-slate-400 uppercase border border-slate-700">
+                                                            {f}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Reservation & Recovery Context */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">

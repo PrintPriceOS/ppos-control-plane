@@ -158,8 +158,138 @@ class IndustrialProvisioningService {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_dispatch (dispatch_id)
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'predictive_machine_metrics',
+                sql: `CREATE TABLE IF NOT EXISTS predictive_machine_metrics (
+                    machine_id VARCHAR(64) PRIMARY KEY,
+                    node_id VARCHAR(64) NOT NULL,
+                    predicted_failure_probability DECIMAL(5,4) DEFAULT 0.0000,
+                    remaining_useful_life_hours INT NULL,
+                    projected_maintenance_date TIMESTAMP NULL,
+                    wear_index DECIMAL(5,2) DEFAULT 0.00,
+                    last_prediction_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_node (node_id)
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'predictive_material_inventory',
+                sql: `CREATE TABLE IF NOT EXISTS predictive_material_inventory (
+                    id VARCHAR(64) PRIMARY KEY,
+                    node_id VARCHAR(64) NOT NULL,
+                    material_type VARCHAR(64) NOT NULL,
+                    material_name VARCHAR(128) NOT NULL,
+                    current_stock_units DECIMAL(12,2) DEFAULT 0.00,
+                    reserved_stock_units DECIMAL(12,2) DEFAULT 0.00,
+                    stock_unit_name VARCHAR(32) DEFAULT 'units',
+                    replenishment_lead_days INT DEFAULT 5,
+                    reorder_point DECIMAL(12,2) DEFAULT 100.00,
+                    forecasted_depletion_date TIMESTAMP NULL,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_node_material (node_id, material_type)
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'predictive_dispatch_risk',
+                sql: `CREATE TABLE IF NOT EXISTS predictive_dispatch_risk (
+                    dispatch_id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
+                    risk_score DECIMAL(5,2) DEFAULT 0.00,
+                    risk_level ENUM('LOW', 'MODERATE', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+                    breach_probability DECIMAL(5,4) DEFAULT 0.0000,
+                    contributing_factors_json JSON NULL,
+                    projected_delay_hours DECIMAL(8,2) DEFAULT 0.00,
+                    last_scored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_job (job_id),
+                    INDEX idx_risk (risk_score)
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'predictive_capacity_forecasts',
+                sql: `CREATE TABLE IF NOT EXISTS predictive_capacity_forecasts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    node_id VARCHAR(64) NOT NULL,
+                    machine_id VARCHAR(64) NULL,
+                    forecast_date DATE NOT NULL,
+                    projected_saturation_percent DECIMAL(5,2) DEFAULT 0.00,
+                    projected_queue_depth INT DEFAULT 0,
+                    bottleneck_risk_level ENUM('STABLE', 'STRESSED', 'SATURATED') DEFAULT 'STABLE',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_node_date (node_id, forecast_date)
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    snapshot_type ENUM('PERIODIC', 'ON_ANOMALY', 'MANUAL') DEFAULT 'PERIODIC',
+                    active_dispatches_count INT DEFAULT 0,
+                    avg_saturation_percent DECIMAL(5,2) DEFAULT 0.00,
+                    bottleneck_count INT DEFAULT 0,
+                    material_risk_count INT DEFAULT 0,
+                    avg_anomaly_score DECIMAL(5,2) DEFAULT 0.00,
+                    global_stability_index DECIMAL(5,2) DEFAULT 100.00,
+                    telemetry_snapshot_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_created (created_at)
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'economic_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS economic_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    snapshot_type ENUM('PERIODIC', 'ON_OPTIMIZATION', 'MANUAL') DEFAULT 'PERIODIC',
+                    global_utilization_percent DECIMAL(5,2) DEFAULT 0.00,
+                    global_profitability_index DECIMAL(5,2) DEFAULT 0.00,
+                    global_energy_efficiency_score DECIMAL(5,2) DEFAULT 0.00,
+                    network_imbalance_index DECIMAL(5,2) DEFAULT 0.00,
+                    total_estimated_margin DECIMAL(12,2) DEFAULT 0.00,
+                    economic_waste_prediction DECIMAL(12,2) DEFAULT 0.00,
+                    telemetry_snapshot_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_created (created_at)
+                ) ENGINE=InnoDB;`
             }
         ];
+
+        // Ensure economic optimization columns exist
+        const economicMigrations = [
+            { table: 'manufacturing_dispatches', column: 'economic_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'profitability_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'energy_efficiency_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'industrial_efficiency_score', type: 'DECIMAL(5,2) DEFAULT 0.00' }
+        ];
+
+        for (const em of economicMigrations) {
+            try {
+                const exists = await this.checkColumnExists(em.table, em.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${em.table} ADD COLUMN ${em.column} ${em.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureEconomicColumns:${em.table}.${em.column}`, err);
+            }
+        }
+
+        // Ensure anomaly score columns exist
+        const anomalyMigrations = [
+            { table: 'manufacturing_dispatches', column: 'anomaly_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'historical_throughput_baseline', type: 'DECIMAL(12,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'current_drift_score', type: 'DECIMAL(5,2) DEFAULT 0.00' }
+        ];
+
+        for (const am of anomalyMigrations) {
+            try {
+                const exists = await this.checkColumnExists(am.table, am.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${am.table} ADD COLUMN ${am.column} ${am.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureAnomalyColumns:${am.table}.${am.column}`, err);
+            }
+        }
 
         for (const table of coreTables) {
             try {
