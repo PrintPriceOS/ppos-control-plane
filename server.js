@@ -187,26 +187,29 @@ const start = async () => {
         // 3. Mount Auth, Admin, Analytics & System Routes (Express Bridge)
         await fastify.register(require('@fastify/express'));
         
-        // Body Parsers for Express middleware
-        fastify.use(require('express').json());
-        fastify.use(require('express').urlencoded({ extended: true }));
-        
-        fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
-        fastify.use('/api/admin', require('./src/api/routes/admin'));
-        fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
-        fastify.use('/api/system', require('./src/api/routes/system'));
-        
-        fastify.log.info('Admin, Analytics & System routes mounted');
+        // 3. Mount Centralized Express Middleware & Routes
+        try {
+            fastify.use(require('express').json());
+            fastify.use(require('express').urlencoded({ extended: true }));
+            
+            fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
+            fastify.use('/api/admin', require('./src/api/routes/admin'));
+            fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+            fastify.use('/api/system', require('./src/api/routes/system'));
+            
+            fastify.log.info('Core API routes mounted successfully');
+        } catch (err) {
+            fastify.log.error({ msg: 'FAILED TO MOUNT CORE ROUTES', error: err.message });
+            // In production, we might want to crash here if core routes are missing,
+            // but for stability during transitions, we log and continue if possible.
+        }
 
-        // 4. Mount Federation Aggregator (Fastify Native)
-        await fastify.register(require('./src/api/routes/federationFastify'), { prefix: '/federation' });
-
-        // 5. SPA Fallback: All non-API routes serve index.html
+        // 4. SPA Fallback: All non-API routes serve index.html
         fastify.setNotFoundHandler((request, reply) => {
             const url = request.url;
             
-            // API or Federation 404s should stay as 404s
-            if (url.startsWith('/api') || url.startsWith('/federation')) {
+            // API 404s should stay as 404s
+            if (url.startsWith('/api')) {
                 return reply.status(404).send({ error: 'Endpoint not found', path: url });
             }
 
