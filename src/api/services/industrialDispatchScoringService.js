@@ -148,27 +148,33 @@ class IndustrialDispatchScoringService {
       return { eligible: false, reasons: ['NODE_OFFLINE_OR_STALE_TELEMETRY'] };
     }
 
-    // 3. Phase 32 Temporal Scores
-    const timelineStability = 95; // Baseline
+    // 3. Phase 1 Industrial Performance Scores (Live Topology)
+    const timelineStability = node.uptime_score || 95; 
     const futureSurvivability = await this._scoreFutureSurvivability(node);
     const temporalRiskScore = 100 - (node.failure_probability * 150 || 0);
     const geographicScore = this._scoreGeography(node, job);
-    const profitabilityScore = marginValidation.projection?.profitability_score || 70;
+    
+    // Industrial Performance Scaling (Phase 1)
+    const economicFactor = node.economic_efficiency || 1.0;
+    const profitabilityScore = (marginValidation.projection?.profitability_score || 70) * economicFactor;
 
-    // 3.5 Live Capacity Scoring (Phase 34)
+    // 3.5 Live Capacity & Throughput Scoring (Phase 34 + Phase 1)
     let liveCapacityScore = 100;
     if (node.capacity_utilization_pct > 95) liveCapacityScore = 10;
     else if (node.capacity_utilization_pct > 80) liveCapacityScore = 40;
     else if (node.capacity_utilization_pct > 60) liveCapacityScore = 70;
 
-    // Weighted Total Calculation
+    const throughputBonus = Math.min(20, (node.throughput || 0) / 1000); // Small bonus for higher throughput capacity
+
+    // Weighted Total Calculation (Phase 1 Industrial Mix)
     const score_total = Math.round(
       (futureSurvivability * weights.temporal +
        timelineStability * weights.governance +
        temporalRiskScore * weights.reliability +
        profitabilityScore * weights.profitability +
        geographicScore * weights.geographic +
-       liveCapacityScore * 10) / 110 // Adjusted for new weight
+       liveCapacityScore * 10 +
+       throughputBonus * 5) / 115 // Adjusted denominator for new weight mix
     );
 
     return {
@@ -176,6 +182,11 @@ class IndustrialDispatchScoringService {
       node_id: node.id,
       display_name: node.company_name || node.name,
       score_total,
+      industrial_metrics: {
+        uptime_score: timelineStability,
+        economic_efficiency: economicFactor,
+        throughput: node.throughput || 0
+      },
       temporal_breakdown: {
         timeline_stability_score: timelineStability,
         future_survivability_score: futureSurvivability,

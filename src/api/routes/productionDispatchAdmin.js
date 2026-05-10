@@ -44,6 +44,9 @@ const realitySimulation = require('../services/RealitySimulationService');
 const simulationProjector = require('../services/FutureOutcomeProjectionService');
 const simulationLoop = require('../services/AutonomousSimulationLoop');
 
+// Phase 35: Industrial Telemetry (Phase 1 Live Integration)
+const telemetryService = require('../services/IndustrialTelemetryService');
+
 // Auto-start loops
 if (process.env.NODE_ENV !== 'test') {
     optimizationLoop.start();
@@ -93,6 +96,90 @@ router.get('/:id', requireAdmin, async (req, res) => {
         const detail = await orchestrationService.getDispatchDetail(req.params.id);
         if (!detail) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
         res.json({ ok: true, dispatch: detail });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/:id/timeline
+ * Returns chronological event timeline for a manufacturing dispatch.
+ */
+router.get('/:id/timeline', requireAdmin, async (req, res) => {
+    try {
+        const timeline = await orchestrationService.getDispatchTimeline(req.params.id);
+        res.json({ ok: true, timeline });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/telemetry/overview
+ * Grid-wide manufacturing performance overview.
+ */
+router.get('/telemetry/overview', requireAdmin, async (req, res) => {
+    try {
+        const overview = await telemetryService.getTelemetryOverview();
+        res.json({ ok: true, ...overview });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/telemetry/nodes
+ * Detailed node performance metrics.
+ */
+router.get('/telemetry/nodes', requireAdmin, async (req, res) => {
+    try {
+        const nodes = await telemetryService.getNodesPerformance();
+        res.json({ ok: true, nodes });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/telemetry/history
+ * Historical telemetry snapshots.
+ */
+router.get('/telemetry/history', requireAdmin, async (req, res) => {
+    const { nodeId, limit } = req.query;
+    try {
+        const history = await telemetryService.getTelemetryHistory(nodeId, limit ? parseInt(limit) : 100);
+        res.json({ ok: true, history });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/telemetry/topology
+ * Global grid topology and regional health.
+ */
+router.get('/telemetry/topology', requireAdmin, async (req, res) => {
+    try {
+        const federationTopology = require('../services/FederationTopologyService');
+        const topology = await federationTopology.getGlobalGridState();
+        res.json({ ok: true, topology });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/dispatch/heartbeat
+ * Real industrial heartbeat ingestion.
+ */
+router.post('/heartbeat', requireAdmin, async (req, res) => {
+    try {
+        const { nodeId, payload } = req.body;
+        if (!nodeId || !payload) {
+            return res.status(400).json({ ok: false, error: 'MISSING_DATA' });
+        }
+        const result = await telemetryService.ingestHeartbeat(nodeId, payload);
+        res.json({ ok: true, ...result });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

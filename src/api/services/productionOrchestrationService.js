@@ -7,6 +7,19 @@
 const db = require('./mysqlClient');
 const logger = require('./logger').child('production-orchestration');
 const crypto = require('crypto');
+const reservationService = require('./CapacityReservationService');
+
+const DISPATCH_LIFECYCLE = {
+    PENDING: 'PENDING',
+    QUEUED: 'QUEUED',
+    ASSIGNED: 'ASSIGNED',
+    IN_PRODUCTION: 'IN_PRODUCTION',
+    POST_PROCESSING: 'POST_PROCESSING',
+    CERTIFICATION: 'CERTIFICATION',
+    READY_TO_SHIP: 'READY_TO_SHIP',
+    COMPLETED: 'COMPLETED',
+    FAILED: 'FAILED'
+};
 
 class ProductionOrchestrationService {
     /**
@@ -14,57 +27,73 @@ class ProductionOrchestrationService {
      */
     async assignDispatch(jobId, recommendation) {
         const dispatchId = `mfg_disp_${crypto.randomBytes(8).toString('hex')}`;
-        const reservationId = `mfg_res_${crypto.randomBytes(8).toString('hex')}`;
-        const eventId = `mfg_evt_${crypto.randomBytes(8).toString('hex')}`;
         
         try {
+            // 0. Verification of Live Node Health (Industrial Requirement)
+            const [node] = await db.query('SELECT status, last_heartbeat_at, capacity_utilization_pct FROM print_nodes WHERE id = ?', [recommendation.nodeId]);
+            if (!node) throw new Error('NODE_NOT_FOUND');
+
+            const now = new Date();
+            const heartbeatAgeMinutes = node.last_heartbeat_at ? (now - new Date(node.last_heartbeat_at)) / (1000 * 60) : 9999;
+
+            if (node.status === 'OFFLINE' || heartbeatAgeMinutes > 15) {
+                throw new Error('NODE_STALE_OR_OFFLINE');
+            }
+            if (node.capacity_utilization_pct > 98) {
+                throw new Error('NODE_SATURATED');
+            }
+
             await db.query('START TRANSACTION');
 
-            // Calculate reservation window once
-            const now = new Date();
-            const estimatedHours = recommendation.estimatedProductionDays * 24;
+            // 1. Calculate reservation window
+            const estimatedHours = (recommendation.estimatedProductionDays || 1) * 24;
             const reservedUntil = new Date(now.getTime() + estimatedHours * 60 * 60 * 1000);
 
-            // 1. Create Manufacturing Dispatch record
+            // 2. Create Manufacturing Dispatch record with Industrial Evidence
             await db.query(`
                 INSERT INTO manufacturing_dispatches (
                     id, job_id, node_id, machine_id, status,
                     estimated_cost, estimated_margin, 
-                    reserved_from, reserved_until, metadata_json
-                ) VALUES (?, ?, ?, ?, 'ASSIGNED', ?, ?, ?, ?, ?)
+                    reserved_from, reserved_until, 
+                    economic_score, profitability_score, energy_efficiency_score,
+                    federation_node_id, governance_policy_score,
+                    evidence_snapshot_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 dispatchId, 
                 jobId, 
                 recommendation.nodeId, 
                 recommendation.machineId,
-                recommendation.estimatedCost,
+                DISPATCH_LIFECYCLE.PENDING,
+                recommendation.estimatedCost || 0,
                 recommendation.estimatedMargin || 0,
                 now,
                 reservedUntil,
-                JSON.stringify({
-                    ...recommendation,
-                    previous_dispatch_id: recommendation.previous_dispatch_id || null
-                })
-            ]);
-
-            // 2. Reserve Capacity
-            await db.query(`
-                INSERT INTO manufacturing_capacity_reservations (
-                    id, dispatch_id, job_id, node_id, machine_id, reserved_units,
-                    reserved_from, reserved_until, reservation_status
-                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'ACTIVE')
-            `, [
-                reservationId,
-                dispatchId,
-                jobId,
+                recommendation.industrial_metrics?.economic_efficiency || 1.0,
+                recommendation.score_total || 0,
+                recommendation.energy_score || 80,
                 recommendation.nodeId,
-                recommendation.machineId,
-                now,
-                reservedUntil
+                recommendation.governance_score || 95,
+                JSON.stringify({
+                    scoring: recommendation,
+                    telemetry_at_dispatch: node,
+                    timestamp: now.toISOString()
+                }),
+                JSON.stringify(recommendation)
             ]);
 
-            // 3. Log Event
-            await this.logEvent(dispatchId, 'DISPATCH_CREATED', null, 'ASSIGNED', 'Initial production assignment');
+            // 3. Reserve Capacity through Service
+            await reservationService.reserveCapacity(
+                recommendation.nodeId, 
+                recommendation.machineId, 
+                dispatchId, 
+                jobId, 
+                1, 
+                estimatedHours
+            );
+
+            // 4. Log Industrial Lifecycle Event
+            await this.logEvent(dispatchId, 'DISPATCH_CREATED', null, DISPATCH_LIFECYCLE.PENDING, 'Initial production assignment with industrial evidence.');
 
             await db.query('COMMIT');
             
@@ -91,9 +120,14 @@ class ProductionOrchestrationService {
 
             await db.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
 
+            // If entering production, confirm reservation
+            if (newStatus === DISPATCH_LIFECYCLE.IN_PRODUCTION) {
+                await reservationService.confirmReservation(dispatchId);
+            }
+
             // If terminal status, release capacity
-            if (['DELIVERED', 'FAILED', 'CANCELED', 'REROUTED', 'AUTO_REROUTED'].includes(newStatus)) {
-                await db.query('UPDATE manufacturing_capacity_reservations SET reservation_status = "RELEASED" WHERE dispatch_id = ?', [dispatchId]);
+            if ([DISPATCH_LIFECYCLE.COMPLETED, DISPATCH_LIFECYCLE.FAILED, 'CANCELED', 'REROUTED', 'AUTO_REROUTED'].includes(newStatus)) {
+                await reservationService.releaseCapacity(dispatchId);
             }
 
             await this.logEvent(dispatchId, 'STATUS_CHANGED', oldStatus, newStatus, message);
@@ -164,6 +198,10 @@ class ProductionOrchestrationService {
         const reservations = await db.query('SELECT * FROM manufacturing_capacity_reservations WHERE dispatch_id = ?', [dispatchId]);
 
         return { ...dispatch, events, reservations };
+    }
+
+    async getDispatchTimeline(dispatchId) {
+        return db.query('SELECT * FROM manufacturing_dispatch_events WHERE dispatch_id = ? ORDER BY created_at ASC', [dispatchId]);
     }
 }
 

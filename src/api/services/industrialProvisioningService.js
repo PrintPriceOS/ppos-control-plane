@@ -281,6 +281,80 @@ class IndustrialProvisioningService {
             }
         }
 
+        // Phase 1: Live Industrial Integration Columns (Real Topology & Performance)
+        const industrialIntegrationMigrations = [
+            { table: 'printer_nodes', column: 'supported_products', type: 'JSON NULL' },
+            { table: 'printer_nodes', column: 'binding_capabilities', type: 'JSON NULL' },
+            { table: 'printer_nodes', column: 'color_profiles', type: 'JSON NULL' },
+            { table: 'printer_nodes', column: 'throughput', type: 'DECIMAL(12,2) DEFAULT 0.00' },
+            { table: 'printer_nodes', column: 'uptime_score', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'printer_nodes', column: 'economic_efficiency', type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'print_nodes', column: 'supported_products', type: 'JSON NULL' },
+            { table: 'print_nodes', column: 'binding_capabilities', type: 'JSON NULL' },
+            { table: 'print_nodes', column: 'color_profiles', type: 'JSON NULL' },
+            { table: 'print_nodes', column: 'throughput', type: 'DECIMAL(12,2) DEFAULT 0.00' },
+            { table: 'print_nodes', column: 'uptime_score', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_nodes', column: 'economic_efficiency', type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'print_node_machine_profiles', column: 'throughput', type: 'DECIMAL(12,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'uptime_score', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'economic_efficiency', type: 'DECIMAL(5,2) DEFAULT 1.00' }
+        ];
+
+        for (const gm of industrialIntegrationMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureIndustrialIntegrationColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Phase 1: Live Dispatch Hardening (Economic, Forensic & Integration)
+        const dispatchHardeningMigrations = [
+            { table: 'manufacturing_dispatches', column: 'economic_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'profitability_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'energy_efficiency_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'evidence_snapshot_json', type: 'JSON NULL' },
+            { table: 'manufacturing_dispatches', column: 'certification_state', type: 'VARCHAR(64) DEFAULT "PENDING"' },
+            { table: 'manufacturing_dispatches', column: 'forensic_risk', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'autofix_state', type: 'VARCHAR(64) DEFAULT "NONE"' },
+            { table: 'manufacturing_dispatches', column: 'artifact_count', type: 'INT DEFAULT 0' },
+            { table: 'manufacturing_dispatches', column: 'certified_pdf_url', type: 'TEXT NULL' },
+            { table: 'manufacturing_dispatches', column: 'normalized_pdf_url', type: 'TEXT NULL' }
+        ];
+
+        for (const gm of dispatchHardeningMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureDispatchHardeningColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Phase 1: Capacity Reservation Hardening
+        const capacityMigrations = [
+            { table: 'manufacturing_capacity_reservations', column: 'utilization_snapshot', type: 'INT DEFAULT 0' }
+        ];
+
+        for (const gm of capacityMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureCapacityHardeningColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
         for (const table of coreTables) {
             try {
                 await db.query(table.sql);
@@ -404,17 +478,27 @@ class IndustrialProvisioningService {
                     INSERT INTO print_nodes (
                         id, tenant_id, company_name, status, license_status, country, city,
                         capabilities_json, machine_profile_json, supported_policies_json,
-                        max_file_size_mb, api_enabled, rates_json
-                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, 500, 0, ?)
+                        max_file_size_mb, api_enabled, rates_json,
+                        supported_products, binding_capabilities, color_profiles,
+                        throughput, uptime_score, economic_efficiency
+                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, 500, 0, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         company_name = VALUES(company_name),
                         country = VALUES(country),
                         city = VALUES(city),
-                        rates_json = VALUES(rates_json)
+                        rates_json = VALUES(rates_json),
+                        supported_products = VALUES(supported_products),
+                        binding_capabilities = VALUES(binding_capabilities),
+                        color_profiles = VALUES(color_profiles),
+                        throughput = VALUES(throughput),
+                        uptime_score = VALUES(uptime_score),
+                        economic_efficiency = VALUES(economic_efficiency)
                 `, [
                     pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null,
                     pn.capabilities_json || '{}', pn.machine_profile_json || '{}', 
-                    pn.supported_policies_json || '[]', pn.rates_json || null
+                    pn.supported_policies_json || '[]', pn.rates_json || null,
+                    pn.supported_products || null, pn.binding_capabilities || null, pn.color_profiles || null,
+                    pn.throughput || 0.00, pn.uptime_score || 100.00, pn.economic_efficiency || 1.00
                 ]);
                 synced++;
             } catch (err) {
