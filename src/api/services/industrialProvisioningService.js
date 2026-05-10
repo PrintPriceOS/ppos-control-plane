@@ -254,6 +254,32 @@ class IndustrialProvisioningService {
             }
         }
 
+        // Phase 34: Live Federation Agent Hardening
+        const agentMigrations = [
+            { table: 'printer_nodes', column: 'printer_api_key_hash', type: 'VARCHAR(255) NULL' },
+            { table: 'printer_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
+            { table: 'printer_nodes', column: 'worker_state', type: 'VARCHAR(64) NULL' },
+            { table: 'printer_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' },
+            { table: 'printer_nodes', column: 'queue_depth', type: 'INT DEFAULT 0' },
+            { table: 'printer_nodes', column: 'active_jobs', type: 'INT DEFAULT 0' },
+            { table: 'printer_nodes', column: 'capacity_utilization_pct', type: 'INT DEFAULT 0' },
+            { table: 'print_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
+            { table: 'print_nodes', column: 'worker_state', type: 'VARCHAR(64) NULL' },
+            { table: 'print_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' }
+        ];
+
+        for (const gm of agentMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureAgentColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
         for (const table of coreTables) {
             try {
                 await db.query(table.sql);
@@ -261,6 +287,68 @@ class IndustrialProvisioningService {
                 this._logStepError(`ensureCoreColumns:table:${table.name}`, err);
                 throw err;
             }
+        }
+
+        // Phase 34: Live Capacity Snapshots
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS live_capacity_snapshots (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    node_id VARCHAR(64) NOT NULL,
+                    status VARCHAR(32),
+                    utilization_pct INT,
+                    freshness_state VARCHAR(32),
+                    routing_eligible BOOLEAN,
+                    saturation_risk VARCHAR(32),
+                    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_node (node_id),
+                    INDEX idx_captured (captured_at)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            this._logStepError('createLiveCapacitySnapshots', err);
+        }
+
+        // Phase 34: Immutable Evidence Ledger
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS production_evidence_ledger (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    dispatch_id VARCHAR(64) NOT NULL,
+                    node_id VARCHAR(64),
+                    tenant_id VARCHAR(64),
+                    evidence_type VARCHAR(64) NOT NULL,
+                    payload_json JSON NOT NULL,
+                    hash VARCHAR(64) NOT NULL,
+                    previous_hash VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_dispatch (dispatch_id),
+                    INDEX idx_evidence_type (evidence_type)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            this._logStepError('createProductionEvidenceLedger', err);
+        }
+
+        // Phase 34: Live SLA Evidence Snapshots
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS sla_evidence_snapshots (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    dispatch_id VARCHAR(64) NOT NULL,
+                    promised_delivery_at DATETIME,
+                    estimated_completion_at DATETIME,
+                    sla_drift_minutes INT DEFAULT 0,
+                    risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+                    evidence_count INT DEFAULT 0,
+                    last_node_seen_at TIMESTAMP NULL,
+                    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_dispatch (dispatch_id),
+                    INDEX idx_risk (risk_level)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            this._logStepError('createSlaEvidenceSnapshots', err);
         }
 
         return ensured;

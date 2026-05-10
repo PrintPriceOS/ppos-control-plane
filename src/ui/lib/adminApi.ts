@@ -1214,3 +1214,16 @@ export async function getRoutingEconomicOverview() {
 export async function getEconomicConflicts() {
     return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
 }
+
+// --- Phase 34 — Live Federation Activation ---
+export async function getLiveCapacity() {
+    return adminFetch<{ ok: boolean, overview: any[] }>('/api/admin/nodes/capacity/live');
+}
+
+export async function getLiveSLARisks() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/sla/risks');
+}
+
+export async function getDispatchSLAEvidence(dispatchId: string) {
+    return adminFetch<{ ok: boolean, snapshot: any, evidence: any[] }>(`/api/admin/dispatch/${dispatchId}/sla-evidence`);
+}

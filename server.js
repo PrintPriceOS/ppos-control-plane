@@ -216,6 +216,7 @@ const start = async () => {
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+            fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             fastify.log.info('Core API routes mounted successfully');
 
             // Industrial Observability Hook

@@ -79,6 +79,14 @@ const REQUIRED_COLUMNS = [
     { table: 'printer_nodes', column: 'longitude' },
     { table: 'printer_nodes', column: 'timezone' },
     { table: 'printer_nodes', column: 'address_line' },
+    // Phase 34
+    { table: 'printer_nodes', column: 'printer_api_key_hash' },
+    { table: 'printer_nodes', column: 'machine_state' },
+    { table: 'printer_nodes', column: 'worker_state' },
+    { table: 'printer_nodes', column: 'sync_version' },
+    { table: 'print_nodes', column: 'machine_state' },
+    { table: 'print_nodes', column: 'worker_state' },
+    { table: 'print_nodes', column: 'sync_version' },
 ];
 
 const TABLE_ALIASES = {

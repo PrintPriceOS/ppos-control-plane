@@ -110,6 +110,25 @@ class AutonomousRerouteService {
       ]);
 
       await connection.commit();
+
+      // Phase 34: Immutable Evidence Ledger - Record Autonomous Reroute
+      try {
+        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+          dispatch_id: newDispatchId,
+          node_id: bestAlternative.id,
+          tenant_id: dispatch.sender_tenant_id,
+          evidence_type: 'AUTONOMOUS_REROUTE',
+          payload: {
+            source_dispatch_id: dispatch.id,
+            target_node_id: bestAlternative.id,
+            reason: `Autonomous reroute from node ${dispatch.print_node_id}`
+          }
+        });
+      } catch (e) {
+        logger.warn({ event: 'reroute_evidence_failed', dispatchId: newDispatchId, error: e.message });
+      }
+
       logger.info({ event: 'autonomous_reroute_success', from: dispatch.id, to: newDispatchId });
       return true;
     } catch (err) {

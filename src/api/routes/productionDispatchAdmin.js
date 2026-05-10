@@ -642,4 +642,75 @@ router.get('/dispatch/simulation/future-projections', requireAdmin, async (req, 
     }
 });
 
+/**
+ * GET /api/admin/dispatch/:id/evidence
+ * Returns all evidence ledger entries for a specific dispatch.
+ */
+router.get('/:id/evidence', requireAdmin, async (req, res) => {
+    try {
+        const evidenceLedger = require('../services/ProductionEvidenceLedgerService');
+        const evidence = await evidenceLedger.getEvidence(req.params.id);
+        res.json({ ok: true, evidence });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/:id/evidence/verify
+ * Verifies the integrity of the evidence chain for a specific dispatch.
+ */
+router.get('/:id/evidence/verify', requireAdmin, async (req, res) => {
+    try {
+        const evidenceLedger = require('../services/ProductionEvidenceLedgerService');
+        const verification = await evidenceLedger.verifyChain(req.params.id);
+        res.json(verification);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/sla/live
+ * Triggers a refresh and returns live SLA state.
+ */
+router.get('/sla/live', requireAdmin, async (req, res) => {
+    try {
+        const slaService = require('../services/LiveSLAEvidenceService');
+        await slaService.refreshSLASnapshots();
+        const risks = await slaService.getLiveSLARisks();
+        res.json({ ok: true, risks });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/sla/risks
+ * Returns current evidence-backed SLA risks.
+ */
+router.get('/sla/risks', requireAdmin, async (req, res) => {
+    try {
+        const slaService = require('../services/LiveSLAEvidenceService');
+        const risks = await slaService.getLiveSLARisks();
+        res.json({ ok: true, risks });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/:id/sla-evidence
+ * Returns detailed SLA evidence for a specific dispatch.
+ */
+router.get('/:id/sla-evidence', requireAdmin, async (req, res) => {
+    try {
+        const slaService = require('../services/LiveSLAEvidenceService');
+        const detail = await slaService.getDispatchSLAEvidence(req.params.id);
+        res.json({ ok: true, ...detail });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;

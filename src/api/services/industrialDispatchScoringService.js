@@ -61,6 +61,24 @@ class IndustrialDispatchScoringService {
         c.rank = idx + 1;
       });
 
+      // Phase 34: Immutable Evidence Ledger - Record Scoring Decision
+      try {
+        const evidenceLedger = require('./ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+          dispatch_id: jobInput.id || 'SCORING_SIMULATION',
+          tenant_id: jobInput.tenant_id,
+          evidence_type: 'DISPATCH_SCORING',
+          payload: {
+            job_input: jobInput,
+            weights,
+            top_candidates: result.candidates.slice(0, 3).map(c => ({ id: c.node_id, score: c.score_total })),
+            rejected_count: result.rejected.length
+          }
+        });
+      } catch (e) {
+        logger.warn({ event: 'scoring_evidence_failed', error: e.message });
+      }
+
       return result;
     } catch (err) {
       logger.error({ event: 'scoring_failed', error: err.message });
@@ -121,6 +139,15 @@ class IndustrialDispatchScoringService {
       return { eligible: false, reasons };
     }
 
+    // 2.5 Live Capacity Eligibility (Phase 34)
+    const now = new Date();
+    const lastHeartbeat = node.last_heartbeat_at ? new Date(node.last_heartbeat_at) : null;
+    const heartbeatAgeMinutes = lastHeartbeat ? (now - lastHeartbeat) / (1000 * 60) : 9999;
+    
+    if (node.status === 'OFFLINE' || heartbeatAgeMinutes > 15) {
+      return { eligible: false, reasons: ['NODE_OFFLINE_OR_STALE_TELEMETRY'] };
+    }
+
     // 3. Phase 32 Temporal Scores
     const timelineStability = 95; // Baseline
     const futureSurvivability = await this._scoreFutureSurvivability(node);
@@ -128,13 +155,20 @@ class IndustrialDispatchScoringService {
     const geographicScore = this._scoreGeography(node, job);
     const profitabilityScore = marginValidation.projection?.profitability_score || 70;
 
+    // 3.5 Live Capacity Scoring (Phase 34)
+    let liveCapacityScore = 100;
+    if (node.capacity_utilization_pct > 95) liveCapacityScore = 10;
+    else if (node.capacity_utilization_pct > 80) liveCapacityScore = 40;
+    else if (node.capacity_utilization_pct > 60) liveCapacityScore = 70;
+
     // Weighted Total Calculation
     const score_total = Math.round(
       (futureSurvivability * weights.temporal +
        timelineStability * weights.governance +
        temporalRiskScore * weights.reliability +
        profitabilityScore * weights.profitability +
-       geographicScore * weights.geographic) / 100
+       geographicScore * weights.geographic +
+       liveCapacityScore * 10) / 110 // Adjusted for new weight
     );
 
     return {
@@ -146,6 +180,7 @@ class IndustrialDispatchScoringService {
         timeline_stability_score: timelineStability,
         future_survivability_score: futureSurvivability,
         temporal_risk_score: temporalRiskScore,
+        live_capacity_score: liveCapacityScore,
         future_congestion_probability: (node.capacity_utilization_pct || 0) / 100,
         timeline_resilience_weight: weights.temporal / 100
       },

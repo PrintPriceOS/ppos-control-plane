@@ -9,9 +9,9 @@ import { useAdminQuery } from '../../hooks/useAdminData';
 import { 
     getIndustrialLiveState, 
     getActiveDispatches, 
-    getSLARisks, 
+    getLiveSLARisks, 
     getRerouteEvents, 
-    getNodeCapacityHeatmap,
+    getLiveCapacity,
     triggerSLAScan,
     triggerRebalance
 } from '../../lib/adminApi';
@@ -20,15 +20,16 @@ import {
     ArrowPathIcon, 
     ExclamationCircleIcon, 
     QueueListIcon,
-    BoltIcon
+    BoltIcon,
+    ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
 export const IndustrialLiveTab: React.FC = () => {
     const liveState = useAdminQuery('industrial-live-state', getIndustrialLiveState, 5000);
     const activeDispatches = useAdminQuery('active-dispatches', getActiveDispatches, 5000);
-    const slaRisks = useAdminQuery('sla-risks', getSLARisks, 10000);
+    const slaRisks = useAdminQuery('sla-risks-live', getLiveSLARisks, 10000);
     const reroutes = useAdminQuery('reroute-events', getRerouteEvents, 10000);
-    const heatmap = useAdminQuery('capacity-heatmap', getNodeCapacityHeatmap, 5000);
+    const capacity = useAdminQuery('capacity-live', getLiveCapacity, 5000);
 
     const handleScan = async () => {
         await triggerSLAScan();
@@ -78,28 +79,28 @@ export const IndustrialLiveTab: React.FC = () => {
                 <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ServerIcon className="w-4 h-4" />
-                        Global Capacity Heatmap
+                        Global Capacity Heatmap (Live Telemetry)
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {(heatmap.data?.nodes || []).map((node: any) => (
-                            <div key={node.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-200 transition-all">
+                        {(capacity.data?.overview || []).map((node: any) => (
+                            <div key={node.node_id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-200 transition-all">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className={`w-2 h-2 rounded-full ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase">{node.city}</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">{node.city || 'GLOBAL'}</span>
                                 </div>
                                 <p className="text-sm font-black text-slate-800 mb-1 truncate">{node.company_name}</p>
                                 <div className="mt-4">
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Load</span>
-                                        <span className="text-[10px] font-black text-slate-900">{node.capacity_utilization_pct}%</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{node.freshness_state} LOAD</span>
+                                        <span className="text-[10px] font-black text-slate-900">{node.utilization_pct}%</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
                                         <div 
                                             className={`h-full rounded-full transition-all duration-1000 ${
-                                                node.capacity_utilization_pct > 90 ? 'bg-red-500' : 
-                                                node.capacity_utilization_pct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                                                node.utilization_pct > 90 ? 'bg-red-500' : 
+                                                node.utilization_pct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
                                             }`} 
-                                            style={{ width: `${node.capacity_utilization_pct}%` }} 
+                                            style={{ width: `${node.utilization_pct}%` }} 
                                         />
                                     </div>
                                 </div>
@@ -108,30 +109,44 @@ export const IndustrialLiveTab: React.FC = () => {
                     </div>
                 </div>
 
-                {/* SLA Risk Monitor */}
-                <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl">
+                {/* Live SLA Risks */}
+                <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                        <ExclamationCircleIcon className="w-4 h-4 text-red-400" />
-                        Predictive SLA Risks
+                        <ExclamationCircleIcon className="w-4 h-4" />
+                        Evidence-Backed SLA Risks
                     </h3>
                     <div className="space-y-4">
-                        {(slaRisks.data?.risks || []).slice(0, 5).map((risk: any) => (
-                            <div key={risk.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all">
+                        {(slaRisks.data?.risks || []).map((risk: any) => (
+                            <div key={risk.dispatch_id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 relative overflow-hidden group">
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                    risk.risk_level === 'CRITICAL' ? 'bg-red-500' : 
+                                    risk.risk_level === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500'
+                                }`} />
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                                        risk.failure_probability > 0.8 ? 'bg-red-500' : 'bg-amber-500'
-                                    }`}>
-                                        {Math.round(risk.failure_probability * 100)}% RISK
-                                    </span>
-                                    <span className="text-[10px] font-black text-slate-500 uppercase">#{risk.dispatch_id.slice(0,8)}</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">#{risk.dispatch_id.slice(-8)}</span>
+                                    <div className="flex items-center gap-1">
+                                        <ShieldCheckIcon className="w-3 h-3 text-emerald-500" />
+                                        <span className="text-[10px] font-bold text-emerald-600 uppercase">{risk.evidence_count} Proofs</span>
+                                    </div>
                                 </div>
-                                <p className="text-xs font-bold text-slate-300 mb-2">{risk.node_name}</p>
-                                <p className="text-[10px] text-slate-500 leading-relaxed italic">{risk.mitigation_recommendation}</p>
+                                <p className="text-xs font-black text-slate-800 mb-1">{risk.node_name}</p>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">DRIFT: +{risk.sla_drift_minutes}m</span>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                        risk.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700' : 
+                                        risk.risk_level === 'HIGH' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                        {risk.risk_level}
+                                    </span>
+                                </div>
                             </div>
                         ))}
-                        {(!slaRisks.data?.risks || slaRisks.data?.risks.length === 0) && (
-                            <div className="py-10 text-center opacity-30">
-                                <p className="text-[10px] font-black uppercase tracking-widest">No Critical Risks Detected</p>
+                        {(!slaRisks.data?.risks || slaRisks.data.risks.length === 0) && (
+                            <div className="text-center py-10">
+                                <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <ShieldCheckIcon className="w-5 h-5 text-slate-300" />
+                                </div>
+                                <p className="text-xs font-bold text-slate-400">All dispatches within SLA.</p>
                             </div>
                         )}
                     </div>

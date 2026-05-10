@@ -58,6 +58,25 @@ class IndustrialHeartbeatService {
           capacity_utilization_pct = ?
       WHERE id = ?
     `, [derivedState, utilization_pct || 0, node_id]);
+    
+    // Phase 34: Immutable Evidence Ledger - Record Heartbeat
+    try {
+        const evidenceLedger = require('./ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+            dispatch_id: `TELEMETRY-${node_id}`,
+            node_id: node_id,
+            evidence_type: 'NODE_HEARTBEAT',
+            payload: {
+                status: derivedState,
+                utilization: utilization_pct,
+                queue_depth: queue_depth,
+                active_jobs: active_jobs,
+                timestamp: timestamp
+            }
+        });
+    } catch (e) {
+        // Log but don't fail heartbeat
+    }
 
     // 4. Check for SLA Drift on active dispatches
     if (dispatches_active > 0) {

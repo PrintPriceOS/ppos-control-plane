@@ -86,6 +86,25 @@ class DispatchExecutionService {
 
       await connection.commit();
       
+      // Phase 34: Immutable Evidence Ledger - Record Dispatch Creation
+      try {
+        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+          dispatch_id: dispatchId,
+          node_id: selectedNodeId,
+          tenant_id: pkg.tenant_id,
+          evidence_type: 'DISPATCH_EXECUTION',
+          payload: {
+            package_id: packageId,
+            node_id: selectedNodeId,
+            sla_eta: slaEta.toISOString(),
+            job_input: jobInput
+          }
+        });
+      } catch (e) {
+        logger.warn({ event: 'dispatch_evidence_failed', dispatchId, error: e.message });
+      }
+
       logger.info({
         event: 'dispatch_created',
         dispatchId,
@@ -151,6 +170,76 @@ class DispatchExecutionService {
       ]);
 
       await connection.commit();
+
+      // Phase 34: Immutable Evidence Ledger - Record Lifecycle Transition
+      try {
+        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+          dispatch_id: dispatchId,
+          evidence_type: 'LIFECYCLE_TRANSITION',
+          payload: {
+            new_status: newStatus,
+            actor_id: actorId,
+            message
+          }
+        });
+      } catch (e) {
+        logger.warn({ event: 'lifecycle_evidence_failed', dispatchId, error: e.message });
+      }
+
+      return { ok: true };
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Rolls back a dispatch and releases resources.
+   */
+  async rollbackDispatch(dispatchId, operatorId, reason) {
+    const connection = await db.getPool().getConnection();
+    await connection.beginTransaction();
+
+    try {
+      const [dispatches] = await connection.query('SELECT * FROM production_dispatches WHERE id = ?', [dispatchId]);
+      const dispatch = dispatches[0];
+      if (!dispatch) throw new Error('DISPATCH_NOT_FOUND');
+
+      // Update Dispatch
+      await connection.query('UPDATE production_dispatches SET status = ? WHERE id = ?', ['ROLLED_BACK', dispatchId]);
+      await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['ROLLED_BACK', dispatchId]);
+      await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', dispatch.production_package_id]);
+
+      // Log Event
+      await connection.query(`
+        INSERT INTO production_events 
+        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        uuidv4(), dispatch.sender_tenant_id, dispatch.production_package_id, dispatchId, 'DISPATCH_ROLLED_BACK', 'USER', operatorId || 'SYSTEM',
+        reason || 'Dispatch rolled back by operator'
+      ]);
+
+      await connection.commit();
+
+      // Phase 34: Immutable Evidence Ledger - Record Rollback
+      try {
+        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        await evidenceLedger.appendEvidence({
+          dispatch_id: dispatchId,
+          evidence_type: 'DISPATCH_ROLLBACK',
+          payload: {
+            reason,
+            operator_id: operatorId
+          }
+        });
+      } catch (e) {
+        logger.warn({ event: 'rollback_evidence_failed', dispatchId, error: e.message });
+      }
+
       return { ok: true };
     } catch (err) {
       await connection.rollback();
