@@ -233,6 +233,24 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  icon={ChartBarIcon}
                                  color="text-fuchsia-400"
                             />
+                            <StatCard 
+                                 label="Orbital Cluster" 
+                                 value={`${selectedNode.orbital_cluster_id || 'LSA-01'}`} 
+                                 icon={BoltIcon}
+                                 color="text-violet-500"
+                            />
+                            <StatCard 
+                                 label="Synth. Aware." 
+                                 value={`${selectedNode.synthetic_awareness_score || 100}%`} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-emerald-400"
+                            />
+                            <StatCard 
+                                 label="Survival Score" 
+                                 value={`${selectedNode.civilization_survival_score || 100}%`} 
+                                 icon={CheckCircleIcon}
+                                 color="text-sky-400"
+                            />
                         </div>
 
                         {/* Performance Details */}

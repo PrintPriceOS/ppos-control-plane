@@ -183,6 +183,55 @@ export const ProductionDispatchTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* Interplanetary Intelligence Ribbon */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="p-4 bg-slate-900 rounded-2xl border border-violet-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(139,92,246,0.1)]">
+                    <div>
+                        <div className="text-[8px] font-black text-violet-500 uppercase tracking-widest mb-1">Galactic Stability</div>
+                        <div className="text-xl font-black text-white tracking-tighter">100%</div>
+                    </div>
+                    <div className="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-500">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Civ. Continuity</div>
+                        <div className="text-xl font-black text-emerald-400 tracking-tighter">INTACT</div>
+                    </div>
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                        <CheckCircleIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Interplan. Eq.</div>
+                        <div className="text-xl font-black text-blue-400 tracking-tighter">BALANCED</div>
+                    </div>
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                        <BoltIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Expansion Read.</div>
+                        <div className="text-xl font-black text-slate-400 tracking-tighter">NOMINAL</div>
+                    </div>
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existential Risk</div>
+                        <div className="text-xl font-black text-rose-400 tracking-tighter">ZERO</div>
+                    </div>
+                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                </div>
+            </div>
+
             {/* Civilization Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="p-4 bg-slate-900 rounded-2xl border border-sky-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(14,165,233,0.1)]">
@@ -596,6 +645,35 @@ export const ProductionDispatchTab: React.FC = () => {
                                         <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Priority</div>
                                             <div className="text-lg font-black text-white">{selectedDispatch.exchange_priority_score || 'LOW'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dispatch Interplanetary Intelligence */}
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
+                                        <ShieldCheckIcon className="w-4 h-4 text-violet-500" /> Interplanetary Manufacturing Intelligence
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Interplan. Priority</div>
+                                            <div className="text-lg font-black text-white">{selectedDispatch.interplanetary_priority_score || '0.00'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existential Risk</div>
+                                            <div className="text-lg font-black text-rose-400">{selectedDispatch.existential_risk_score || '0.00'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Orbital Route</div>
+                                            <div className="text-lg font-black text-indigo-400">{selectedDispatch.orbital_route_id ? 'ACTIVE' : 'N/A'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Continuity Weight</div>
+                                            <div className="text-lg font-black text-emerald-400">{selectedDispatch.continuity_weight || '1.00'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Deep Space Rel.</div>
+                                            <div className="text-lg font-black text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>

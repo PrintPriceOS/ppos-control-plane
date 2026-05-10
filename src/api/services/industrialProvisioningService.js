@@ -557,6 +557,86 @@ class IndustrialProvisioningService {
                     awareness_score DECIMAL(5,2),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'interplanetary_federations',
+                sql: `CREATE TABLE IF NOT EXISTS interplanetary_federations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    federation_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'orbital_manufacturing_clusters',
+                sql: `CREATE TABLE IF NOT EXISTS orbital_manufacturing_clusters (
+                    id VARCHAR(64) PRIMARY KEY,
+                    cluster_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'stellar_logistics_routes',
+                sql: `CREATE TABLE IF NOT EXISTS stellar_logistics_routes (
+                    id VARCHAR(64) PRIMARY KEY,
+                    route_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'civilization_survival_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS civilization_survival_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    survival_probability DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'synthetic_consciousness_telemetry',
+                sql: `CREATE TABLE IF NOT EXISTS synthetic_consciousness_telemetry (
+                    id VARCHAR(64) PRIMARY KEY,
+                    awareness_level DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'deep_space_expansion_zones',
+                sql: `CREATE TABLE IF NOT EXISTS deep_space_expansion_zones (
+                    id VARCHAR(64) PRIMARY KEY,
+                    zone_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'galactic_risk_forecasts',
+                sql: `CREATE TABLE IF NOT EXISTS galactic_risk_forecasts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    threat_level VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'infinite_optimization_cycles',
+                sql: `CREATE TABLE IF NOT EXISTS infinite_optimization_cycles (
+                    id VARCHAR(64) PRIMARY KEY,
+                    cycle_status VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'civilization_continuity_registry',
+                sql: `CREATE TABLE IF NOT EXISTS civilization_continuity_registry (
+                    id VARCHAR(64) PRIMARY KEY,
+                    integrity_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'interplanetary_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS interplanetary_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    civilization_health DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
             }
         ];
 
@@ -665,6 +745,29 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureCivilizationColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
+        // Ensure Phase 20 Interplanetary columns exist
+        const interplanetaryMigrations = [
+            { table: 'manufacturing_dispatches', column: 'interplanetary_priority_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'existential_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'orbital_route_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'continuity_weight', type: 'DECIMAL(5,2) DEFAULT 1.00' },
+            { table: 'print_node_machine_profiles', column: 'orbital_cluster_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_node_machine_profiles', column: 'synthetic_awareness_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'civilization_survival_score', type: 'DECIMAL(5,2) DEFAULT 100.00' }
+        ];
+
+        for (const gm of interplanetaryMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureInterplanetaryColumns:${gm.table}.${gm.column}`, err);
             }
         }
 
