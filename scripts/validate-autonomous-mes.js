@@ -45,7 +45,9 @@ async function validate() {
 
         // Try to find a spec that works for at least 2 different nodes
         let selectedSpec = null;
-        let selectedMachines = [];
+        let originalMachine = null;
+        let recoveryMachine = null;
+        let noiseMachines = [];
 
         for (const m1 of allMachines) {
             const caps1 = typeof m1.normalized_capabilities_json === 'string' ? JSON.parse(m1.normalized_capabilities_json) : m1.normalized_capabilities_json;
@@ -71,7 +73,10 @@ async function validate() {
                         sheet_size: { width: 210, height: 297 }, // A4 default
                         gsm: Math.max(caps1.min_gsm || 80, caps2.min_gsm || 80)
                     };
-                    selectedMachines = [m1, m2];
+                    originalMachine = m1;
+                    recoveryMachine = m2;
+                    // Any machine that is NOT on original or recovery node can be a noise machine
+                    noiseMachines = allMachines.filter(m => m.node_id !== m1.node_id && m.node_id !== m2.node_id);
                     break;
                 }
             }
@@ -80,26 +85,42 @@ async function validate() {
 
         if (!selectedSpec) {
             console.error('\n❌ NO_VALIDATION_ALTERNATE_NODE_AVAILABLE: Could not find compatible overlap between nodes.');
-            console.log('--- MACHINE CAPABILITIES DIAGNOSTICS ---');
             allMachines.forEach(m => {
                 const c = typeof m.normalized_capabilities_json === 'string' ? JSON.parse(m.normalized_capabilities_json) : m.normalized_capabilities_json;
-                console.log(`- Machine: ${m.profile_name} (Node: ${m.node_id})`);
-                console.log(`  Papers: ${c?.paper_types?.join(', ')}`);
-                console.log(`  Bindings: ${c?.binding?.join(', ')}`);
-                console.log(`  Colours: ${c?.colour_modes?.join(', ')}`);
+                console.log(`- Machine: ${m.profile_name} (Node: ${m.node_id}) | Papers: ${c?.paper_types?.join(',')} | Bindings: ${c?.binding?.join(',')} | Colours: ${c?.colour_modes?.join(',')}`);
             });
             process.exit(1);
         }
 
         console.log(`    Selected Validation Spec: ${JSON.stringify(selectedSpec)}`);
-        console.log(`    Original Node: ${selectedMachines[0].node_id} (Machine: ${selectedMachines[0].machine_id})`);
-        console.log(`    Alternate Node: ${selectedMachines[1].node_id} (Machine: ${selectedMachines[1].machine_id})`);
+        console.log(`    Original Node: ${originalMachine.node_id} (Machine: ${originalMachine.machine_id})`);
+        console.log(`    Recovery Node (Reserved): ${recoveryMachine.node_id} (Machine: ${recoveryMachine.machine_id})`);
+        console.log(`    Noise Nodes Available: ${noiseMachines.map(n => n.node_id).join(', ') || 'NONE'}`);
+
+        // Double check recovery node is clean
+        const [existingReservations] = await db.query(
+            "SELECT COUNT(*) as count FROM manufacturing_capacity_reservations WHERE node_id = ? AND reservation_status = 'ACTIVE'",
+            [recoveryMachine.node_id]
+        );
+        if (existingReservations.count > 0) {
+            console.error(`\n❌ NO_CLEAN_ALTERNATE_CAPACITY_FOR_VALIDATION: Recovery node ${recoveryMachine.node_id} already has ${existingReservations.count} active jobs.`);
+            process.exit(1);
+        }
 
         const testJobs = [];
         for (let i = 1; i <= 3; i++) {
             const jobId = `TEST-JOB-${i}-${Date.now()}`;
-            // Ensure first job is assigned to original node, others to alternate to simulate capacity load
-            const machine = i === 1 ? selectedMachines[0] : selectedMachines[1];
+            
+            let machine;
+            if (i === 1) {
+                machine = originalMachine;
+            } else if (noiseMachines.length > 0) {
+                machine = noiseMachines[(i-2) % noiseMachines.length];
+            } else {
+                // If no noise machines available, just don't create Dispatch 2 and 3 on the recovery node
+                // We'll just create them on the original node instead (different machine if possible, or just same)
+                machine = originalMachine;
+            }
             
             const jobMetadata = { ...selectedSpec, is_rush: i === 1 };
             await db.query("INSERT INTO jobs (id, original_name, metadata_json) VALUES (?, ?, ?)", [
