@@ -28,6 +28,22 @@ function requireAdmin(req, res, next) {
 
     const token = authHeader.split(' ')[1];
 
+    // 0. Support Break-Glass token directly (Master Access)
+    const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+    const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+
+    if (enableBreakGlass && breakGlassToken && token === breakGlassToken && !requireJwtOnly) {
+        req.user = {
+            id: 'break-glass-session',
+            email: 'admin@printprice.pro',
+            role: 'SUPER_ADMIN',
+            tenantId: 'ppos-production',
+            authMode: 'BREAK_GLASS'
+        };
+        return next();
+    }
+
     // 1. Validate JWT
     try {
         const decoded = jwt.verify(token, JWT_SECRET, {

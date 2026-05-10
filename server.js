@@ -59,6 +59,21 @@ fastify.addHook('onRequest', async (request, reply) => {
 
         const token = authHeader.split(' ')[1];
 
+        // 0. Support Break-Glass token directly (Master Access)
+        const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+        const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+        const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+
+        if (enableBreakGlass && breakGlassToken && token === breakGlassToken && !requireJwtOnly) {
+            request.user = {
+                id: 'break-glass-session',
+                role: 'SUPER_ADMIN',
+                tenantId: 'ppos-production',
+                authMode: 'BREAK_GLASS'
+            };
+            return;
+        }
+
         try {
             const jwt = require('jsonwebtoken');
             const decoded = jwt.verify(token, jwtSecret, { 

@@ -24,9 +24,32 @@ const TOKEN  = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
 
 const api = axios.create({
     baseURL: TARGET,
-    headers: { 'Authorization': `Bearer ${TOKEN}` },
     timeout: 10000,
     validateStatus: () => true,
+});
+
+function getAuthToken() {
+    const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+    const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    const jwtToken = process.env.PPOS_ADMIN_JWT || process.env.JWT_VALIDATION_TOKEN;
+    const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+
+    if (requireJwtOnly) return jwtToken;
+    if (enableBreakGlass) return breakGlassToken || jwtToken;
+    return jwtToken;
+}
+
+function getAuthHeaders() {
+    const token = getAuthToken();
+    return {
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+}
+
+// Inject headers into every request
+api.interceptors.request.use(config => {
+    config.headers = { ...config.headers, ...getAuthHeaders() };
+    return config;
 });
 
 // --- Parse CLI args ---
@@ -147,8 +170,13 @@ async function runCheck(chk) {
     try {
         const method = (chk.method || 'GET').toLowerCase();
         const res = await api[method](chk.path, chk.body || undefined);
-        const ok = res.data && res.data.ok === true;
-        return { label: chk.label, ok, latencyMs: Date.now() - t0, status: res.status };
+        
+        if (res.status === 401) {
+            return { label: chk.label, ok: false, latencyMs: Date.now() - t0, status: res.status, error: 'AUTH_FAILURE', body: res.data };
+        }
+
+        const ok = res.data && (res.data.ok === true || res.data.status === 'UP');
+        return { label: chk.label, ok, latencyMs: Date.now() - t0, status: res.status, body: res.data };
     } catch (err) {
         return { label: chk.label, ok: false, latencyMs: Date.now() - t0, error: err.message };
     }
@@ -163,6 +191,29 @@ async function main() {
     console.log(`  Target : ${TARGET}`);
     console.log(`  Mode   : ${targetPhase ? `Phase ${targetPhase} only` : quickMode ? 'quick' : 'full'}`);
     console.log(`  Time   : ${new Date().toISOString()}\n`);
+
+    // --- AUTH DIAGNOSTICS ---
+    const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+    const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    const hasJwtSecret = !!process.env.JWT_SECRET;
+    
+    let authMode = 'UNKNOWN';
+    if (requireJwtOnly) authMode = 'JWT_ONLY_STRICT';
+    else if (enableBreakGlass) authMode = 'JWT_PRIMARY_BREAK_GLASS_ENABLED';
+    else if (hasJwtSecret) authMode = 'JWT_ONLY';
+
+    const token = getAuthToken();
+    const tokenSource = requireJwtOnly ? (process.env.PPOS_ADMIN_JWT ? 'PPOS_ADMIN_JWT' : 'JWT_VALIDATION_TOKEN')
+                      : (enableBreakGlass ? 'PPOS_CONTROL_TOKEN' : 'PPOS_ADMIN_JWT');
+    
+    console.log(`  Auth Mode         : ${authMode}`);
+    console.log(`  Auth Token Source : ${tokenSource}`);
+    console.log(`  Auth Token Present: ${token ? 'YES' : 'NO'}`);
+    if (token) {
+        const preview = token.length > 12 ? `${token.substring(0, 10)}...${token.substring(token.length - 4)}` : '***';
+        console.log(`  Auth Token Preview: ${preview}`);
+    }
+    console.log('');
 
     const phasesToRun = PHASES.filter(p => !targetPhase || p.phase === targetPhase);
     const phaseResults = [];
@@ -188,7 +239,10 @@ async function main() {
         console.log(`  ${statusIcon}  Phase ${String(phase.phase).padEnd(4)} [${statusText}]  ${phase.label.padEnd(44)} (${phaseMs}ms)`);
         if (!phasePassed && !quickMode) {
             failedChecks.forEach(fc => {
-                console.log(`         ↳ FAIL: ${fc.label}${fc.error ? ' — ' + fc.error : ''}`);
+                const errorInfo = fc.error ? ` — ${fc.error}` : '';
+                const statusInfo = fc.status ? ` [Status: ${fc.status}]` : '';
+                const bodyInfo = fc.body && fc.status !== 200 ? ` | Body: ${JSON.stringify(fc.body)}` : '';
+                console.log(`         ↳ FAIL: ${fc.label}${errorInfo}${statusInfo}${bodyInfo}`);
             });
         }
     }

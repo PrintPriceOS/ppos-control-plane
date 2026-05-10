@@ -17,7 +17,6 @@ const TOKEN  = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
 
 const api = axios.create({
     baseURL: TARGET,
-    headers: { 'Authorization': `Bearer ${TOKEN}` },
     timeout: 8000,
     validateStatus: () => true,
 });
@@ -26,6 +25,30 @@ const checks = [];
 let passed = 0;
 let failed = 0;
 const startTime = Date.now();
+
+function getAuthToken() {
+    const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+    const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    const jwtToken = process.env.PPOS_ADMIN_JWT || process.env.JWT_VALIDATION_TOKEN;
+    const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
+
+    if (requireJwtOnly) return jwtToken;
+    if (enableBreakGlass) return breakGlassToken || jwtToken;
+    return jwtToken;
+}
+
+function getAuthHeaders() {
+    const token = getAuthToken();
+    return {
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+}
+
+// Inject headers into every request
+api.interceptors.request.use(config => {
+    config.headers = { ...config.headers, ...getAuthHeaders() };
+    return config;
+});
 
 async function check(label, fn) {
     const t0 = Date.now();
@@ -42,7 +65,8 @@ async function check(label, fn) {
             checks.push({ label, ok: true, warning: true, reason: result.reason });
         } else {
             const targetInfo = result.target ? ` [Target: ${result.target}]` : '';
-            console.error(`  ✗  ${label.padEnd(42)} → ${result.reason || 'FAILED'}${targetInfo}`);
+            const bodyInfo = result.body ? ` | Body: ${JSON.stringify(result.body)}` : '';
+            console.error(`  ✗  ${label.padEnd(42)} → ${result.reason || 'FAILED'}${targetInfo}${bodyInfo}`);
             failed++;
             checks.push({ label, ok: false, reason: result.reason, target: result.target });
         }
@@ -60,17 +84,28 @@ async function main() {
     console.log(`  Target : ${TARGET}`);
     console.log(`  Time   : ${new Date().toISOString()}\n`);
 
-    // --- AUTH MODE ---
-    const hasJwtSecret = !!process.env.JWT_SECRET;
-    const breakGlassEnabled = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    // --- AUTH DIAGNOSTICS ---
     const requireJwtOnly = process.env.REQUIRE_JWT_ONLY === 'true';
+    const enableBreakGlass = process.env.ENABLE_BREAK_GLASS_TOKEN === 'true';
+    const hasJwtSecret = !!process.env.JWT_SECRET;
     
     let authMode = 'UNKNOWN';
-    if (hasJwtSecret && !breakGlassEnabled) authMode = 'JWT_ONLY';
-    else if (hasJwtSecret && breakGlassEnabled) authMode = 'JWT_PRIMARY_BREAK_GLASS_ENABLED';
-    else if (!hasJwtSecret && breakGlassEnabled) authMode = 'BREAK_GLASS_ONLY';
+    if (requireJwtOnly) authMode = 'JWT_ONLY_STRICT';
+    else if (enableBreakGlass) authMode = 'JWT_PRIMARY_BREAK_GLASS_ENABLED';
+    else if (hasJwtSecret) authMode = 'JWT_ONLY';
+
+    const token = getAuthToken();
+    const tokenSource = requireJwtOnly ? (process.env.PPOS_ADMIN_JWT ? 'PPOS_ADMIN_JWT' : 'JWT_VALIDATION_TOKEN')
+                      : (enableBreakGlass ? 'PPOS_CONTROL_TOKEN' : 'PPOS_ADMIN_JWT');
     
-    console.log(`  Auth Mode : ${authMode}\n`);
+    console.log(`  Auth Mode         : ${authMode}`);
+    console.log(`  Auth Token Source : ${tokenSource}`);
+    console.log(`  Auth Token Present: ${token ? 'YES' : 'NO'}`);
+    if (token) {
+        const preview = token.length > 12 ? `${token.substring(0, 10)}...${token.substring(token.length - 4)}` : '***';
+        console.log(`  Auth Token Preview: ${preview}`);
+    }
+    console.log('');
 
     // --- DATABASE ---
     console.log('  [ Database ]\n');
@@ -140,14 +175,15 @@ async function main() {
         const path = '/health';
         const res = await api.get(path);
         const ok = res.status === 200 || (res.data && res.data.status === 'UP');
-        return { ok, target: TARGET + path };
+        return { ok, target: TARGET + path, reason: `Status ${res.status}`, body: res.data };
     });
 
     await check('Admin routes responsive', async () => {
         const path = '/api/admin/telemetry/snapshot';
         const res = await api.get(path);
+        if (res.status === 401) return { ok: false, reason: 'AUTH_FAILURE', target: TARGET + path, body: res.data };
         const ok = res.status === 200 || (res.data && res.data.ok === true);
-        return { ok, target: TARGET + path, reason: `Status ${res.status}` };
+        return { ok, target: TARGET + path, reason: `Status ${res.status}`, body: res.data };
     });
 
     // --- PHASE READINESS ---
@@ -169,12 +205,13 @@ async function main() {
     for (const pc of phaseChecks) {
         await check(pc.label, async () => {
             const res = await api.get(pc.path);
+            if (res.status === 401) return { ok: false, reason: 'AUTH_FAILURE', target: TARGET + pc.path, body: res.data };
             const ok = res.status === 200 && res.data && (res.data.ok === true || res.data.status === 'UP');
             if (ok) return { ok: true };
             if (res.data && res.data.status === 'DEGRADED') {
                 return { ok: false, warning: true, reason: 'DEGRADED', target: TARGET + pc.path };
             }
-            return { ok: false, reason: `Status ${res.status}`, target: TARGET + pc.path };
+            return { ok: false, reason: `Status ${res.status}`, target: TARGET + pc.path, body: res.data };
         });
     }
 
