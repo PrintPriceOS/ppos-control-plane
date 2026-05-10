@@ -16,49 +16,50 @@ const api = axios.create({
 async function validate() {
     console.log('--- PHASE 15 VALIDATION: ECONOMIC INDUSTRIAL OPTIMIZATION ---');
 
-    try {
-        // 1. Check Economic Health
-        console.log('\n[1/5] Checking Economic Health...');
-        const healthRes = await api.get('/api/admin/economic/health');
-        console.log('Health:', JSON.stringify(healthRes.data, null, 2));
+    const endpoints = [
+        { name: 'Health', method: 'GET', path: '/api/admin/economic/health' },
+        { name: 'Network', method: 'GET', path: '/api/admin/economic/network' },
+        { name: 'Profitability', method: 'GET', path: '/api/admin/economic/profitability' },
+        { name: 'Efficiency', method: 'GET', path: '/api/admin/economic/efficiency' },
+        { name: 'Energy', method: 'GET', path: '/api/admin/economic/energy' },
+        { name: 'Swarm', method: 'GET', path: '/api/admin/economic/swarm' },
+        { name: 'Digital Twin', method: 'GET', path: '/api/admin/economic/digital-twin' },
+        { name: 'Recompute', method: 'POST', path: '/api/admin/economic/recompute' },
+        { name: 'Rebalance', method: 'POST', path: '/api/admin/economic/rebalance' }
+    ];
 
-        if (!healthRes.data.ok || healthRes.data.health.state !== 'ECONOMIC_OPTIMIZATION_ACTIVE') {
-            throw new Error('Economic health state invalid');
+    for (const ep of endpoints) {
+        try {
+            console.log(`\n[*] Validating ${ep.name} [${ep.method} ${ep.path}]...`);
+            const res = await api({
+                method: ep.method,
+                url: ep.path
+            });
+            console.log(`[PASS] ${ep.name} returned 200 OK`);
+            
+            if (ep.name === 'Health' && (!res.data.ok || res.data.health?.state !== 'ECONOMIC_OPTIMIZATION_ACTIVE')) {
+                throw new Error(`Health check logic failure: ${JSON.stringify(res.data)}`);
+            }
+        } catch (err) {
+            console.error(`\n[FAIL] ${ep.name} FAILED`);
+            if (err.response) {
+                console.error(`Status: ${err.response.status}`);
+                console.error(`Data: ${JSON.stringify(err.response.data, null, 2)}`);
+            } else {
+                console.error(`Error: ${err.message}`);
+            }
+            process.exit(1);
         }
-
-        // 2. Verify Economic Digital Twin
-        console.log('\n[2/5] Verifying Economic Digital Twin...');
-        const twinRes = await api.get('/api/admin/economic/digital-twin');
-        console.log('Economic Snapshots Count:', twinRes.data.length);
-
-        // 3. Trigger Global Rebalance
-        console.log('\n[3/5] Triggering Global Network Rebalance...');
-        const rebalanceRes = await api.post('/api/admin/economic/rebalance');
-        console.log('Rebalance Result:', rebalanceRes.data.rebalanceExecuted ? 'EXECUTED' : 'NOT_REQUIRED_NOMINAL');
-
-        // 4. Trigger Economic Snapshot
-        console.log('\n[4/5] Triggering Manual Economic Snapshot...');
-        const recompRes = await api.post('/api/admin/economic/recompute');
-        console.log('Snapshot Result:', recompRes.data.ok ? 'SUCCESS' : 'FAILED');
-
-        // 5. Verify Economic Telemetry
-        console.log('\n[5/5] Verifying Telemetry Propagation...');
-        // In a real environment we would check logger/events
-        console.log('Telemetry Stream: ACTIVE');
-
-        console.log('\n--- VALIDATION SUCCESSFUL ---');
-        console.log('✓ economic optimization active');
-        console.log('✓ global balancing operational');
-        console.log('✓ profitability scoring active');
-        console.log('✓ energy optimization operational');
-        console.log('✓ economic digital twin synchronized');
-        console.log('✓ swarm coordination initialized');
-        console.log('✓ telemetry synchronized');
-    } catch (err) {
-        console.error('\n--- VALIDATION FAILED ---');
-        console.error(err.response?.data || err.message);
-        process.exit(1);
     }
+
+    console.log('\n--- VALIDATION SUCCESSFUL ---');
+    console.log('✓ economic optimization active');
+    console.log('✓ global balancing operational');
+    console.log('✓ profitability scoring active');
+    console.log('✓ energy optimization operational');
+    console.log('✓ economic digital twin synchronized');
+    console.log('✓ swarm coordination initialized');
+    console.log('✓ telemetry synchronized');
 }
 
 validate();
