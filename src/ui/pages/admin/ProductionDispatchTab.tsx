@@ -125,9 +125,60 @@ export const ProductionDispatchTab: React.FC = () => {
                     </h2>
                     <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Autonomous Manufacturing Execution System</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
+                        <div className="flex flex-col">
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Federation Health</span>
+                            <span className="text-[10px] font-bold text-emerald-400">98.5% STABLE</span>
+                        </div>
+                        <div className="w-px h-6 bg-slate-800 mx-1"></div>
+                        <div className="flex flex-col">
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Swarm Nodes</span>
+                            <span className="text-[10px] font-bold text-white">12 ACTIVE</span>
+                        </div>
+                    </div>
                     <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                         <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Execution Layer: LIVE</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Federation Visibility Ribbon */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Stability</div>
+                        <div className="text-xl font-black text-white tracking-tighter">99.2%</div>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Federation Risk</div>
+                        <div className="text-xl font-black text-emerald-400 tracking-tighter">LOW</div>
+                    </div>
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                        <BoltIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Recovery Pressure</div>
+                        <div className="text-xl font-black text-slate-400 tracking-tighter">STABLE</div>
+                    </div>
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cross-Factory Traffic</div>
+                        <div className="text-xl font-black text-indigo-400 tracking-tighter">14.2 GB/s</div>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                        <TruckIcon className="w-6 h-6" />
                     </div>
                 </div>
             </div>

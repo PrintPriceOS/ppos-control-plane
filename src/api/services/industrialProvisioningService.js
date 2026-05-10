@@ -37,7 +37,15 @@ class IndustrialProvisioningService {
             { table: 'print_node_machine_profiles', column: 'manufacturer', type: 'VARCHAR(128) NULL' },
             { table: 'print_node_machine_profiles', column: 'model', type: 'VARCHAR(128) NULL' },
             { table: 'print_node_machine_profiles', column: 'status', type: "ENUM('ACTIVE', 'MAINTENANCE', 'OFFLINE') DEFAULT 'ACTIVE'" },
-            { table: 'print_node_machine_profiles', column: 'normalized_capabilities_json', type: 'JSON NULL' }
+            { table: 'print_node_machine_profiles', column: 'normalized_capabilities_json', type: 'JSON NULL' },
+            { table: 'jobs', column: 'federation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'jobs', column: 'regional_priority', type: 'INT DEFAULT 0' },
+            { table: 'jobs', column: 'swarm_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'federation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'delegated_from_factory', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'delegated_to_factory', type: 'VARCHAR(64) NULL' },
+            { table: 'print_node_machine_profiles', column: 'federation_state', type: "ENUM('LOCAL', 'FEDERATED', 'ISOLATED') DEFAULT 'LOCAL'" },
+            { table: 'print_node_machine_profiles', column: 'swarm_score', type: 'DECIMAL(5,2) DEFAULT 0.00' }
         ];
 
         // Ensure status enum is updated for Phase 12
@@ -235,6 +243,74 @@ class IndustrialProvisioningService {
                 ) ENGINE=InnoDB;`
             },
             {
+                name: 'federation_factories',
+                sql: `CREATE TABLE IF NOT EXISTS federation_factories (
+                    id VARCHAR(64) PRIMARY KEY,
+                    factory_name VARCHAR(128) NOT NULL,
+                    region VARCHAR(64) NOT NULL,
+                    timezone VARCHAR(64) DEFAULT 'UTC',
+                    specialization VARCHAR(128) NULL,
+                    capacity_index DECIMAL(5,2) DEFAULT 0.00,
+                    reliability_index DECIMAL(5,2) DEFAULT 0.00,
+                    latency_score INT DEFAULT 0,
+                    economic_score DECIMAL(5,2) DEFAULT 0.00,
+                    energy_score DECIMAL(5,2) DEFAULT 0.00,
+                    federation_state ENUM('ACTIVE', 'DEGRADED', 'OFFLINE', 'RECOVERING') DEFAULT 'ACTIVE',
+                    last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'federated_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS federated_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    snapshot_type ENUM('PERIODIC', 'ON_ANOMALY', 'MANUAL') DEFAULT 'PERIODIC',
+                    global_utilization DECIMAL(5,2) DEFAULT 0.00,
+                    federation_stability DECIMAL(5,2) DEFAULT 0.00,
+                    inter_factory_imbalance DECIMAL(5,2) DEFAULT 0.00,
+                    economic_efficiency DECIMAL(5,2) DEFAULT 0.00,
+                    swarm_resilience_index DECIMAL(5,2) DEFAULT 100.00,
+                    telemetry_snapshot_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'federation_recovery_events',
+                sql: `CREATE TABLE IF NOT EXISTS federation_recovery_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    factory_id VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    severity ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'MEDIUM',
+                    action_taken TEXT NULL,
+                    recovery_status ENUM('PENDING', 'ACTIVE', 'RESOLVED') DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'swarm_consensus_events',
+                sql: `CREATE TABLE IF NOT EXISTS swarm_consensus_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    decision_type VARCHAR(64) NOT NULL,
+                    consensus_score DECIMAL(5,2) DEFAULT 0.00,
+                    confidence_score DECIMAL(5,2) DEFAULT 0.00,
+                    decision_json JSON NULL,
+                    rejected_factories_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'distributed_dispatch_delegations',
+                sql: `CREATE TABLE IF NOT EXISTS distributed_dispatch_delegations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    dispatch_id VARCHAR(64) NOT NULL,
+                    from_factory_id VARCHAR(64) NOT NULL,
+                    to_factory_id VARCHAR(64) NOT NULL,
+                    delegation_reason TEXT NULL,
+                    delegation_status ENUM('PENDING', 'ACCEPTED', 'COMPLETED', 'FAILED') DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
                 name: 'economic_digital_twin_snapshots',
                 sql: `CREATE TABLE IF NOT EXISTS economic_digital_twin_snapshots (
                     id VARCHAR(64) PRIMARY KEY,
@@ -249,7 +325,7 @@ class IndustrialProvisioningService {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_created (created_at)
                 ) ENGINE=InnoDB;`
-            }
+            },
         ];
 
         // Ensure economic optimization columns exist

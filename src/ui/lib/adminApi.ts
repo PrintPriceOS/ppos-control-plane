@@ -653,6 +653,50 @@ export async function rerouteDispatch(id: string, reason: string) {
     });
 }
 
+// --- Phase 16 — Industrial Federation & Swarm ---
+export async function getFederationHealth() {
+    return adminFetch<{ ok: boolean, health: any }>('/api/admin/federation/health');
+}
+
+export async function getFederationFactories() {
+    return adminFetch<{ ok: boolean, factories: any[] }>('/api/admin/federation/factories');
+}
+
+export async function getFederationConsensus() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/federation/consensus');
+}
+
+export async function getFederationDigitalTwin() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/federation/digital-twin');
+}
+
+export async function getFederationDelegations() {
+    return adminFetch<{ ok: boolean, delegations: any[] }>('/api/admin/federation/delegations');
+}
+
+export async function getFederationRecovery() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/federation/recovery');
+}
+
+export async function rebalanceFederation() {
+    return adminFetch<{ ok: boolean, rebalanceExecuted: boolean }>('/api/admin/federation/rebalance', {
+        method: 'POST'
+    });
+}
+
+export async function recoverFederationFactory(factoryId: string) {
+    return adminFetch<{ ok: boolean, message: string }>(`/api/admin/federation/recover`, {
+        method: 'POST',
+        body: JSON.stringify({ factoryId })
+    });
+}
+
+export async function snapshotFederation() {
+    return adminFetch<{ ok: boolean, snapshot: any }>('/api/admin/federation/snapshot', {
+        method: 'POST'
+    });
+}
+
 
 // --- Engagement ---
 export async function getEngagementSignals() {

@@ -165,6 +165,18 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  icon={BoltIcon}
                                  color="text-emerald-500"
                             />
+                            <StatCard 
+                                 label="Federation ID" 
+                                 value={selectedNode.federation_id || 'LOCAL'} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-indigo-600"
+                            />
+                            <StatCard 
+                                 label="Swarm Stability" 
+                                 value={`${selectedNode.swarm_score || 100}%`} 
+                                 icon={ArrowPathIcon}
+                                 color="text-cyan-600"
+                            />
                         </div>
 
                         {/* Performance Details */}
