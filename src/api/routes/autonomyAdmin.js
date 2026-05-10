@@ -109,6 +109,19 @@ router.get('/metrics', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/autonomous/health
+ */
+router.get('/health', async (req, res) => {
+    try {
+        const telemetryService = require('../services/telemetryService');
+        const health = await telemetryService.getIndustrialHealthSnapshot();
+        res.json({ ok: true, health });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
  * GET /api/admin/pipelines/:id
  */
 router.get('/:id', async (req, res) => {
@@ -161,19 +174,6 @@ router.post('/:id/retry-step', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(400).json({ error: err.message });
-    }
-});
-
-/**
- * GET /api/admin/autonomous/health
- */
-router.get('/health', async (req, res) => {
-    try {
-        const telemetryService = require('../services/telemetryService');
-        const health = await telemetryService.getIndustrialHealthSnapshot();
-        res.json({ ok: true, health });
-    } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
     }
 });
 

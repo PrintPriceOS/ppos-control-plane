@@ -41,7 +41,10 @@ class ProductionOrchestrationService {
                 recommendation.estimatedMargin || 0,
                 now,
                 reservedUntil,
-                JSON.stringify(recommendation)
+                JSON.stringify({
+                    ...recommendation,
+                    previous_dispatch_id: recommendation.previous_dispatch_id || null
+                })
             ]);
 
             // 2. Reserve Capacity

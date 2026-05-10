@@ -106,10 +106,18 @@ class DispatchRecommendationService {
             // Apply hard filter for excluded nodes if the engine didn't
             const candidates = result.recommendations.filter(r => !options.excludeNodeIds?.includes(r.nodeId));
             
-            if (candidates.length === 0) return null;
+            if (candidates.length === 0) {
+                return {
+                    ok: false,
+                    reason: 'ALL_CANDIDATES_EXCLUDED',
+                    allCandidatesCount: result.recommendations.length,
+                    rejectedCandidates: result.rejectedCandidates || []
+                };
+            }
 
             const best = candidates[0];
             return {
+                ok: true,
                 best_node: { id: best.nodeId },
                 best_machine: { id: best.machineId },
                 estimated_cost: best.estimatedCost,
@@ -119,7 +127,11 @@ class DispatchRecommendationService {
                 confidence: best.confidence
             };
         }
-        return null;
+        return {
+            ok: false,
+            reason: result.message || 'NO_RECOMMENDATIONS_FOUND',
+            rejectedCandidates: result.rejectedCandidates || []
+        };
     }
 }
 

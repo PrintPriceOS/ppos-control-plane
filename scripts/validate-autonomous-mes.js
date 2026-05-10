@@ -31,23 +31,47 @@ async function validate() {
         // 1. Create Baseline Data
         console.log('[2/6] Provisioning 3 industrial test dispatches...');
         
-        // We need real nodes/machines to assign to. 
-        const nodes = await db.query("SELECT id FROM printer_nodes LIMIT 2");
-        if (nodes.length < 2) throw new Error("Insufficient printer_nodes for validation (need 2)");
-        
-        const machines = await db.query("SELECT id FROM print_node_machine_profiles WHERE node_id IN (?)", [nodes.map(n => n.id)]);
-        if (machines.length < 2) throw new Error("Insufficient machine profiles for validation (need 2)");
+        // Find nodes with compatible machines for a generic book spec
+        const specs = {
+            binding: 'HOT_MELT',
+            paper: 'OFFSET_90G',
+            colour: 'full',
+            copies: 100,
+            sheet_size: 'A4',
+            gsm: 90
+        };
+
+        const { matched: machines } = await require('../src/api/services/machineRegistryService').findMatchingMachines({
+            paper_type: specs.paper,
+            sheet_size: specs.sheet_size,
+            colour_mode: '4/4',
+            binding: specs.binding,
+            gsm: specs.gsm,
+            run_length: specs.copies
+        });
+
+        if (machines.length < 2) {
+            console.error('\n❌ NO_VALIDATION_ALTERNATE_NODE_AVAILABLE');
+            console.error('The system does not have at least 2 compatible nodes for the validation specs.');
+            console.log('Specs:', JSON.stringify(specs));
+            console.log('Matched Machines:', machines.length);
+            process.exit(1);
+        }
 
         const testJobs = [];
         for (let i = 1; i <= 3; i++) {
             const jobId = `TEST-JOB-${i}-${Date.now()}`;
+            const jobMetadata = { ...specs, is_rush: i === 1 };
+            
             await db.query("INSERT INTO jobs (id, original_name, metadata_json) VALUES (?, ?, ?)", [
-                jobId, `Validation Job ${i}`, JSON.stringify({ is_rush: i === 1, type: 'BOOK_HARDCOVER' })
+                jobId, `Validation Job ${i}`, JSON.stringify(jobMetadata)
             ]);
             
+            // Assign to first machine for d1, second for others to ensure capacity
+            const machine = machines[i % machines.length];
             const assignment = {
-                nodeId: nodes[i % nodes.length].id,
-                machineId: machines[i % machines.length].id,
+                nodeId: machine.node_id,
+                machineId: machine.id,
                 estimatedCost: 100 * i,
                 estimatedMargin: 20,
                 estimatedProductionDays: 2,
@@ -120,6 +144,17 @@ async function validate() {
             throw new Error(`VALIDATION_FAILED: Replacement dispatch missing autonomous_recovery metadata`);
         }
         console.log(`    Recovery Reason: ${metadata.autonomous_recovery.reason}`);
+
+        if (metadata.previous_dispatch_id !== d1) {
+            throw new Error(`VALIDATION_FAILED: Replacement dispatch missing cross-link to previous_dispatch_id. Found: ${metadata.previous_dispatch_id}`);
+        }
+        console.log(`    Cross-link verified: ${metadata.previous_dispatch_id}`);
+
+        const [oldReservation] = await db.query("SELECT reservation_status FROM manufacturing_capacity_reservations WHERE dispatch_id = ?", [d1]);
+        if (oldReservation.reservation_status !== 'RELEASED') {
+            throw new Error(`VALIDATION_FAILED: Old reservation for ${d1} should be RELEASED, found ${oldReservation.reservation_status}`);
+        }
+        console.log(`    Old reservation released.`);
 
         // 5. Telemetry Validation
         console.log('[6/6] Validating telemetry propagation...');

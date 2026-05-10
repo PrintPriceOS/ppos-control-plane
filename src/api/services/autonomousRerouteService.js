@@ -36,7 +36,14 @@ class AutonomousRerouteService {
                     summary.rerouted++;
                 }
             } catch (err) {
-                logger.error({ event: 'reroute_failed', dispatchId: d.id, error: err.message });
+                logger.error({ 
+                    event: 'reroute_failed', 
+                    dispatchId: d.id, 
+                    originalNode: d.node_id,
+                    error: err.message,
+                    rejectedCandidates: err.rejectedCandidates || [],
+                    capacityState: err.capacityState || 'UNKNOWN'
+                });
                 summary.failures.push({ id: d.id, error: err.message });
             }
         }
@@ -52,8 +59,11 @@ class AutonomousRerouteService {
             excludeNodeIds: [oldDispatch.node_id]
         });
 
-        if (!recommendation || !recommendation.best_node) {
-            throw new Error('RECOVERY_FAILED: NO_ALTERNATE_PRODUCTION_CAPACITY');
+        if (!recommendation || !recommendation.ok) {
+            const error = new Error('RECOVERY_FAILED: NO_ALTERNATE_PRODUCTION_CAPACITY');
+            error.rejectedCandidates = recommendation?.rejectedCandidates || [];
+            error.capacityState = recommendation?.reason || 'NO_COMPATIBLE_MACHINES_OR_NODES';
+            throw error;
         }
 
         // 2. Execute new assignment
