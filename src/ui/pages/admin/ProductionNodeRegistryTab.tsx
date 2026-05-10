@@ -8,7 +8,8 @@ import {
     ShieldCheckIcon,
     ClockIcon,
     BoltIcon,
-    CurrencyEuroIcon
+    CurrencyEuroIcon,
+    CheckCircleIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
 
@@ -195,6 +196,24 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  value={`#${selectedNode.economic_efficiency_rank || 1}`} 
                                  icon={ChartBarIcon}
                                  color="text-indigo-500"
+                            />
+                            <StatCard 
+                                 label="Gov Stability" 
+                                 value={`${selectedNode.governance_stability_score || 100}%`} 
+                                 icon={ShieldCheckIcon}
+                                 color="text-fuchsia-500"
+                            />
+                            <StatCard 
+                                 label="Learning Score" 
+                                 value={`${selectedNode.federation_learning_score || 0}%`} 
+                                 icon={ArrowPathIcon}
+                                 color="text-blue-400"
+                            />
+                            <StatCard 
+                                 label="Ethics Comp." 
+                                 value={`${selectedNode.ethics_compliance_score || 100}%`} 
+                                 icon={CheckCircleIcon}
+                                 color="text-emerald-400"
                             />
                         </div>
 

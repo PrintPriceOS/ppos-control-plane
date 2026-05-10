@@ -396,6 +396,87 @@ class IndustrialProvisioningService {
                     status ENUM('SUBMITTED', 'ACCEPTED', 'REJECTED') DEFAULT 'SUBMITTED',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_governance_policies',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_governance_policies (
+                    id VARCHAR(64) PRIMARY KEY,
+                    policy_name VARCHAR(128),
+                    status ENUM('ACTIVE', 'DEPRECATED') DEFAULT 'ACTIVE',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_policy_generations',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_policy_generations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    generation_index INT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_constitution_constraints',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_constitution_constraints (
+                    id VARCHAR(64) PRIMARY KEY,
+                    constraint_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_memory_graph',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_memory_graph (
+                    id VARCHAR(64) PRIMARY KEY,
+                    event_type VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'governance_digital_twin_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS governance_digital_twin_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    health_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_federated_learning',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_federated_learning (
+                    id VARCHAR(64) PRIMARY KEY,
+                    model_version VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'governance_simulation_results',
+                sql: `CREATE TABLE IF NOT EXISTS governance_simulation_results (
+                    id VARCHAR(64) PRIMARY KEY,
+                    simulation_name VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_ethics_events',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_ethics_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    event_type VARCHAR(128),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'recursive_optimization_cycles',
+                sql: `CREATE TABLE IF NOT EXISTS recursive_optimization_cycles (
+                    id VARCHAR(64) PRIMARY KEY,
+                    cycle_index INT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'industrial_cognition_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS industrial_cognition_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    awareness_score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
             }
         ];
 
@@ -458,6 +539,29 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureMarketplaceColumns:${mm.table}.${mm.column}`, err);
+            }
+        }
+
+        // Ensure Phase 18 Governance columns exist
+        const governanceMigrations = [
+            { table: 'manufacturing_dispatches', column: 'governance_risk_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'constitutional_compliance', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'manufacturing_dispatches', column: 'cognition_priority', type: 'INT DEFAULT 0' },
+            { table: 'manufacturing_dispatches', column: 'recursive_generation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_node_machine_profiles', column: 'governance_stability_score', type: 'DECIMAL(5,2) DEFAULT 100.00' },
+            { table: 'print_node_machine_profiles', column: 'federation_learning_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'ethics_compliance_score', type: 'DECIMAL(5,2) DEFAULT 100.00' }
+        ];
+
+        for (const gm of governanceMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureGovernanceColumns:${gm.table}.${gm.column}`, err);
             }
         }
 

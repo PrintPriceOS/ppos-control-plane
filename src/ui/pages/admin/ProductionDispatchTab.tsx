@@ -183,6 +183,55 @@ export const ProductionDispatchTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* Governance Intelligence Ribbon */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="p-4 bg-slate-900 rounded-2xl border border-fuchsia-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(217,70,239,0.1)]">
+                    <div>
+                        <div className="text-[8px] font-black text-fuchsia-500 uppercase tracking-widest mb-1">Governance Health</div>
+                        <div className="text-xl font-black text-white tracking-tighter">100%</div>
+                    </div>
+                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-xl flex items-center justify-center text-fuchsia-500">
+                        <ShieldCheckIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fed Cognition</div>
+                        <div className="text-xl font-black text-blue-400 tracking-tighter">AWARE</div>
+                    </div>
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                        <BoltIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Constitution</div>
+                        <div className="text-xl font-black text-emerald-400 tracking-tighter">INTACT</div>
+                    </div>
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                        <CheckCircleIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Ethics Pressure</div>
+                        <div className="text-xl font-black text-slate-400 tracking-tighter">LOW</div>
+                    </div>
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Optimization</div>
+                        <div className="text-xl font-black text-indigo-400 tracking-tighter">GEN-12</div>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+            </div>
+
             {/* Marketplace Economic Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="p-4 bg-slate-900 rounded-2xl border border-amber-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.1)]">
@@ -498,6 +547,35 @@ export const ProductionDispatchTab: React.FC = () => {
                                         <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Priority</div>
                                             <div className="text-lg font-black text-white">{selectedDispatch.exchange_priority_score || 'LOW'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dispatch Governance Intelligence */}
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
+                                        <ShieldCheckIcon className="w-4 h-4 text-fuchsia-500" /> Industrial AI Governance
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Governance Risk</div>
+                                            <div className="text-lg font-black text-white">{selectedDispatch.governance_risk_score || '0.00'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Constitution</div>
+                                            <div className="text-lg font-black text-emerald-400">{selectedDispatch.constitutional_compliance || '100'}%</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cognition Priority</div>
+                                            <div className="text-lg font-black text-indigo-400">{selectedDispatch.cognition_priority || '0'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Generation ID</div>
+                                            <div className="text-lg font-black text-cyan-400">{selectedDispatch.recursive_generation_id ? selectedDispatch.recursive_generation_id.slice(0,6) : 'N/A'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Ethics Class</div>
+                                            <div className="text-lg font-black text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>
