@@ -51,7 +51,7 @@ const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', st
         </span>
       )}
     </div>
-    <div className="flex-1 overflow-auto p-4 custom-scrollbar relative">
+    <div className="flex-1 overflow-auto p-3 custom-scrollbar relative">
       {status === 'loading' && (
         <div className="absolute inset-0 bg-white/50 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center z-10">
           <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -115,8 +115,9 @@ export const CommandCenterPage: React.FC = () => {
 
   // Derivation Helpers
   const complianceScore = useMemo(() => {
+    const healthyStatuses = ['ACTIVE', 'ENFORCED', 'OPERATIONAL', 'LIVE'];
     if (!blocks.data?.blocks || blocks.data.blocks.length === 0) return 'No governance telemetry';
-    const active = blocks.data.blocks.filter((b: any) => b.status === 'ACTIVE').length;
+    const active = blocks.data.blocks.filter((b: any) => healthyStatuses.includes(b.status)).length;
     return `${Math.round((active / blocks.data.blocks.length) * 100)}%`;
   }, [blocks.data]);
 
@@ -162,9 +163,9 @@ export const CommandCenterPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Dashboard Title Block */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-3">
         <div>
           <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Control Plane</h1>
           <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase">
@@ -184,10 +185,10 @@ export const CommandCenterPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-3">
         
         {/* 2. MAIN OPERATIONAL GRID */}
-        <div className="col-span-12 xl:col-span-9 grid grid-cols-12 auto-rows-min gap-4 h-fit">
+        <div className="col-span-12 xl:col-span-9 grid grid-cols-12 auto-rows-min gap-3 h-fit">
           
           <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[260px]">
             <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status} error={industrial.error}>
@@ -315,7 +316,7 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          <div className="col-span-12 lg:col-span-8 min-h-[220px]">
+          <div className="col-span-12 lg:col-span-8 min-h-[180px]">
              <TacticalPanel title="Intelligence & Anomalies" icon={BoltIcon} badge="AI Active" color="primary" status={anomalies.status}>
                <div className="flex flex-col md:flex-row gap-6 h-full">
                  <div className="flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar min-h-[100px]">
@@ -347,7 +348,7 @@ export const CommandCenterPage: React.FC = () => {
           </div>
 
           {(isSuper || isPrinthouse) && (
-            <div className="col-span-12 lg:col-span-4 min-h-[220px]">
+            <div className="col-span-12 lg:col-span-4 min-h-[180px]">
               <TacticalPanel title="Console" icon={CommandLineIcon} badge="Override" color="slate">
                  <div className="grid grid-cols-2 gap-2 h-full">
                     <CommandButton label="Pause" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
@@ -365,7 +366,7 @@ export const CommandCenterPage: React.FC = () => {
 
         {/* 3. GLOBAL INCIDENT CENTER (STICKY) */}
         <div className="col-span-12 xl:col-span-3 flex flex-col gap-4 sticky top-6 self-start max-h-[calc(100vh-140px)]">
-           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-fit">
+           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-fit max-h-[180px]">
               <div className="p-3 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
                  <div className="flex items-center gap-2">
                     <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
@@ -376,7 +377,7 @@ export const CommandCenterPage: React.FC = () => {
                  </span>
               </div>
               
-              <div className="max-h-[300px] overflow-y-auto p-3 space-y-2 custom-scrollbar">
+              <div className="overflow-y-auto p-3 space-y-2 custom-scrollbar">
                  {Array.isArray(incidents.data) && incidents.data.map((inc: any) => (
                    <div key={inc.id} className="p-3 rounded-md bg-red-500/5 border border-red-500/10 space-y-2">
                      <div className="flex items-start justify-between">
@@ -391,7 +392,7 @@ export const CommandCenterPage: React.FC = () => {
                    </div>
                  ))}
                  {(!Array.isArray(incidents.data) || incidents.data.length === 0) && (
-                   <div className="py-8 text-center opacity-20">
+                   <div className="py-5 text-center opacity-20">
                       <ShieldCheckIcon className="w-6 h-6 mx-auto mb-1" />
                       <p className="text-[8px] font-black uppercase">Clear</p>
                    </div>
