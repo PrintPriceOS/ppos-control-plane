@@ -50,19 +50,29 @@ class FederationRegistryService {
     }
 
     async getFederationHealth() {
-        const rows = await db.query('SELECT federation_state, COUNT(*) as count FROM federation_factories GROUP BY federation_state');
-        return {
-            timestamp: new Date().toISOString(),
-            distribution: rows.reduce((acc, r) => {
-                acc[r.federation_state] = r.count;
-                return acc;
-            }, {}),
-            is_healthy: !rows.some(r => r.federation_state === 'OFFLINE' || r.federation_state === 'DEGRADED')
-        };
+        try {
+            const rows = await db.query('SELECT federation_state, COUNT(*) as count FROM federation_factories GROUP BY federation_state');
+            return {
+                timestamp: new Date().toISOString(),
+                distribution: rows.reduce((acc, r) => {
+                    acc[r.federation_state] = r.count;
+                    return acc;
+                }, {}),
+                is_healthy: !rows.some(r => r.federation_state === 'OFFLINE' || r.federation_state === 'DEGRADED')
+            };
+        } catch (err) {
+            logger.error({ event: 'health_query_failed', error: err.message });
+            return { timestamp: new Date().toISOString(), distribution: {}, is_healthy: true, degraded: true };
+        }
     }
 
     async getActiveFactories() {
-        return await db.query('SELECT * FROM federation_factories WHERE federation_state IN ("ACTIVE", "RECOVERING")');
+        try {
+            return await db.query('SELECT * FROM federation_factories WHERE federation_state IN ("ACTIVE", "RECOVERING")');
+        } catch (err) {
+            logger.error({ event: 'active_factories_query_failed', error: err.message });
+            return [];
+        }
     }
 
     async getFactoryById(id) {

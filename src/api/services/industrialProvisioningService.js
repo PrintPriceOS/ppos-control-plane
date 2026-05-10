@@ -495,6 +495,67 @@ class IndustrialProvisioningService {
     }
 
     /**
+     * Seeds deterministic federation factories for Phase 16 validation.
+     */
+    async seedFederationFactories() {
+        logger.info({ event: 'provisioning_step_start', step: 'seedFederationFactories' });
+        const federationRegistry = require('./federationRegistryService');
+        
+        const demoFactories = [
+            {
+                id: 'factory_eu_west_01',
+                factory_name: 'EU West Production Hub',
+                region: 'eu-west',
+                timezone: 'Europe/Dublin',
+                specialization: 'OFFSET_HIGH_VOLUME',
+                capacity_index: 85,
+                reliability_index: 98,
+                latency_score: 12,
+                economic_score: 92,
+                energy_score: 88,
+                federation_state: 'ACTIVE'
+            },
+            {
+                id: 'factory_baltic_01',
+                factory_name: 'Baltic Logistics Center',
+                region: 'eu-north',
+                timezone: 'Europe/Tallinn',
+                specialization: 'DIGITAL_FAST_TRACK',
+                capacity_index: 40,
+                reliability_index: 95,
+                latency_score: 45,
+                economic_score: 95,
+                energy_score: 90,
+                federation_state: 'ACTIVE'
+            },
+            {
+                id: 'factory_us_east_01',
+                factory_name: 'US East Edge Factory',
+                region: 'us-east',
+                timezone: 'America/New_York',
+                specialization: 'LARGE_FORMAT_INDUSTRIAL',
+                capacity_index: 60,
+                reliability_index: 92,
+                latency_score: 85,
+                economic_score: 88,
+                energy_score: 75,
+                federation_state: 'ACTIVE'
+            }
+        ];
+
+        let seeded = 0;
+        for (const f of demoFactories) {
+            try {
+                await federationRegistry.registerFactory(f);
+                seeded++;
+            } catch (err) {
+                this._logStepError(`seedFederationFactories:factory:${f.id}`, err);
+            }
+        }
+        return seeded;
+    }
+
+    /**
      * Collection of row counts for diagnostic visibility.
      */
     async getSourceCounts() {
@@ -505,7 +566,8 @@ class IndustrialProvisioningService {
             'printer_pricing_profiles',
             'manufacturing_dispatches',
             'manufacturing_capacity_reservations',
-            'manufacturing_dispatch_events'
+            'manufacturing_dispatch_events',
+            'federation_factories'
         ];
 
         const counts = {};
@@ -529,6 +591,7 @@ class IndustrialProvisioningService {
             printNodesSynced: 0,
             machinesDiscovered: 0,
             pricingProfilesSeeded: 0,
+            federationFactoriesSeeded: 0,
             warnings: [],
             failedSteps: [],
             sourceCounts: {},
@@ -571,6 +634,14 @@ class IndustrialProvisioningService {
         } catch (err) {
             summary.failedSteps.push('seedPricingProfiles');
             summary.warnings.push(`Pricing profile seeding failed: ${err.message}`);
+        }
+
+        // Step 5: Federation Seed
+        try {
+            summary.federationFactoriesSeeded = await this.seedFederationFactories();
+        } catch (err) {
+            summary.failedSteps.push('seedFederationFactories');
+            summary.warnings.push(`Federation seeding failed: ${err.message}`);
         }
 
         // Refresh source counts after provisioning

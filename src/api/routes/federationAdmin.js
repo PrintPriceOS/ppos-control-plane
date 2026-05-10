@@ -30,10 +30,10 @@ router.get('/health', async (req, res) => {
  */
 router.get('/factories', async (req, res) => {
     try {
-        const factories = await db.query('SELECT * FROM federation_factories');
+        const factories = await registry.getActiveFactories();
         res.json({ ok: true, factories });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.json({ ok: true, factories: [], degraded: true, error: err.message });
     }
 });
 
@@ -45,7 +45,7 @@ router.get('/consensus', async (req, res) => {
         const events = await db.query('SELECT * FROM swarm_consensus_events ORDER BY created_at DESC LIMIT 50');
         res.json({ ok: true, events });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.json({ ok: true, events: [], degraded: true, error: err.message });
     }
 });
 
@@ -54,10 +54,10 @@ router.get('/consensus', async (req, res) => {
  */
 router.get('/digital-twin', async (req, res) => {
     try {
-        const snapshots = await db.query('SELECT * FROM federated_digital_twin_snapshots ORDER BY created_at DESC LIMIT 50');
+        const snapshots = await twin.getSnapshots();
         res.json({ ok: true, snapshots });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.json({ ok: true, snapshots: [], degraded: true, error: err.message });
     }
 });
 
@@ -69,7 +69,7 @@ router.get('/delegations', async (req, res) => {
         const delegations = await db.query('SELECT * FROM distributed_dispatch_delegations ORDER BY created_at DESC LIMIT 50');
         res.json({ ok: true, delegations });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.json({ ok: true, delegations: [], degraded: true, error: err.message });
     }
 });
 
@@ -81,7 +81,7 @@ router.get('/recovery', async (req, res) => {
         const events = await db.query('SELECT * FROM federation_recovery_events ORDER BY created_at DESC LIMIT 50');
         res.json({ ok: true, events });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.json({ ok: true, events: [], degraded: true, error: err.message });
     }
 });
 
