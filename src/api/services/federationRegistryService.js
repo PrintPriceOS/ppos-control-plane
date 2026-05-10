@@ -12,11 +12,12 @@ class FederationRegistryService {
         const id = factoryDef.id || uuidv4();
         const sql = `
             INSERT INTO federation_factories (
-                id, factory_name, region, timezone, specialization, 
+                id, company_name, factory_name, region, timezone, specialization, 
                 capacity_index, reliability_index, latency_score, 
                 economic_score, energy_score, federation_state
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+                company_name = VALUES(company_name),
                 factory_name = VALUES(factory_name),
                 region = VALUES(region),
                 timezone = VALUES(timezone),
@@ -31,7 +32,7 @@ class FederationRegistryService {
         `;
 
         await db.query(sql, [
-            id, factoryDef.factory_name, factoryDef.region, factoryDef.timezone || 'UTC',
+            id, factoryDef.company_name, factoryDef.factory_name, factoryDef.region, factoryDef.timezone || 'UTC',
             factoryDef.specialization, factoryDef.capacity_index || 0, 
             factoryDef.reliability_index || 0, factoryDef.latency_score || 0,
             factoryDef.economic_score || 0, factoryDef.energy_score || 0,

@@ -59,6 +59,7 @@ async function seedFactories() {
             const demoFactories = [
                 {
                     id: 'factory_eu_west_01',
+                    company_name: 'EU West Production Hub',
                     factory_name: 'EU West Production Hub',
                     region: 'eu-west',
                     timezone: 'Europe/Dublin',
@@ -72,6 +73,7 @@ async function seedFactories() {
                 },
                 {
                     id: 'factory_baltic_01',
+                    company_name: 'Baltic Logistics Center',
                     factory_name: 'Baltic Logistics Center',
                     region: 'eu-north',
                     timezone: 'Europe/Tallinn',
@@ -85,6 +87,7 @@ async function seedFactories() {
                 },
                 {
                     id: 'factory_us_east_01',
+                    company_name: 'US East Edge Factory',
                     factory_name: 'US East Edge Factory',
                     region: 'us-east',
                     timezone: 'America/New_York',

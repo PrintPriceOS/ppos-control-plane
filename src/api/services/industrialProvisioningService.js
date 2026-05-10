@@ -263,6 +263,7 @@ class IndustrialProvisioningService {
             { table: 'printer_nodes', column: 'queue_depth', type: 'INT DEFAULT 0' },
             { table: 'printer_nodes', column: 'active_jobs', type: 'INT DEFAULT 0' },
             { table: 'printer_nodes', column: 'capacity_utilization_pct', type: 'INT DEFAULT 0' },
+            { table: 'printer_nodes', column: 'company_name', type: 'VARCHAR(255) NULL' },
             { table: 'print_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
             { table: 'print_nodes', column: 'worker_state', type: 'VARCHAR(64) NULL' },
             { table: 'print_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' }
@@ -351,6 +352,30 @@ class IndustrialProvisioningService {
             this._logStepError('createSlaEvidenceSnapshots', err);
         }
 
+        // Phase 16: Federation Factories (Industrial Hubs) - REQUIRED for Registry Seeding
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS federation_factories (
+                    id VARCHAR(64) PRIMARY KEY,
+                    company_name VARCHAR(255) NOT NULL,
+                    factory_name VARCHAR(255) NOT NULL,
+                    region VARCHAR(64),
+                    timezone VARCHAR(64) DEFAULT 'UTC',
+                    specialization VARCHAR(128),
+                    capacity_index DECIMAL(5,2) DEFAULT 0.00,
+                    reliability_index DECIMAL(5,2) DEFAULT 0.00,
+                    latency_score DECIMAL(5,2) DEFAULT 0.00,
+                    economic_score DECIMAL(5,2) DEFAULT 0.00,
+                    energy_score DECIMAL(5,2) DEFAULT 0.00,
+                    federation_state VARCHAR(32) DEFAULT 'ACTIVE',
+                    last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            this._logStepError('createFederationFactories', err);
+        }
+
         return ensured;
     }
 
@@ -387,7 +412,7 @@ class IndustrialProvisioningService {
                         city = VALUES(city),
                         rates_json = VALUES(rates_json)
                 `, [
-                    pn.id, pn.tenant_id, pn.company_name, pn.country || null, pn.city || null,
+                    pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null,
                     pn.capabilities_json || '{}', pn.machine_profile_json || '{}', 
                     pn.supported_policies_json || '[]', pn.rates_json || null
                 ]);
@@ -479,6 +504,7 @@ class IndustrialProvisioningService {
         const demoFactories = [
             {
                 id: 'factory_eu_west_01',
+                company_name: 'EU West Production Hub',
                 factory_name: 'EU West Production Hub',
                 region: 'eu-west',
                 timezone: 'Europe/Dublin',
@@ -492,6 +518,7 @@ class IndustrialProvisioningService {
             },
             {
                 id: 'factory_baltic_01',
+                company_name: 'Baltic Logistics Center',
                 factory_name: 'Baltic Logistics Center',
                 region: 'eu-north',
                 timezone: 'Europe/Tallinn',
@@ -505,6 +532,7 @@ class IndustrialProvisioningService {
             },
             {
                 id: 'factory_us_east_01',
+                company_name: 'US East Edge Factory',
                 factory_name: 'US East Edge Factory',
                 region: 'us-east',
                 timezone: 'America/New_York',
