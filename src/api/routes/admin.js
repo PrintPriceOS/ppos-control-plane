@@ -117,7 +117,7 @@ router.use('/marketplace', marketplaceAdminRouter);
 router.use('/pricing', pricingAdminRouter);
 router.use('/offers', offersAdminRouter);
 router.use('/commercial', commercialCommitmentAdminRouter);
-router.use('/autonomy', autonomyAdminRouter);
+router.use('/autonomous', autonomyAdminRouter);
 router.use('/finance', autonomyFinanceRouter);
 router.use('/control', adminControlRoutes);
 router.use('/intelligence', intelligenceAdminRouter);
