@@ -326,6 +326,77 @@ class IndustrialProvisioningService {
                     INDEX idx_created (created_at)
                 ) ENGINE=InnoDB;`
             },
+            {
+                name: 'marketplace_capacity_offers',
+                sql: `CREATE TABLE IF NOT EXISTS marketplace_capacity_offers (
+                    id VARCHAR(64) PRIMARY KEY,
+                    factory_id VARCHAR(64) NOT NULL,
+                    capacity_type VARCHAR(64) NOT NULL,
+                    available_slots INT DEFAULT 0,
+                    min_margin_score DECIMAL(5,2) DEFAULT 0.00,
+                    status ENUM('ACTIVE', 'CLOSED', 'EXPIRED') DEFAULT 'ACTIVE',
+                    expires_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'marketplace_dispatch_auctions',
+                sql: `CREATE TABLE IF NOT EXISTS marketplace_dispatch_auctions (
+                    id VARCHAR(64) PRIMARY KEY,
+                    dispatch_id VARCHAR(64) NOT NULL,
+                    starting_bid DECIMAL(12,2) DEFAULT 0.00,
+                    max_acceptable_bid DECIMAL(12,2) DEFAULT 0.00,
+                    winning_factory_id VARCHAR(64) NULL,
+                    status ENUM('OPEN', 'CLOSED', 'CANCELLED') DEFAULT 'OPEN',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'federation_trade_ledger',
+                sql: `CREATE TABLE IF NOT EXISTS federation_trade_ledger (
+                    id VARCHAR(64) PRIMARY KEY,
+                    source_factory_id VARCHAR(64) NOT NULL,
+                    target_factory_id VARCHAR(64) NOT NULL,
+                    dispatch_id VARCHAR(64) NOT NULL,
+                    margin_transferred DECIMAL(12,2) DEFAULT 0.00,
+                    status ENUM('PENDING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'capacity_exchange_reservations',
+                sql: `CREATE TABLE IF NOT EXISTS capacity_exchange_reservations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    source_factory_id VARCHAR(64) NOT NULL,
+                    target_factory_id VARCHAR(64) NOT NULL,
+                    reserved_slots INT DEFAULT 0,
+                    status ENUM('PENDING', 'ACCEPTED', 'REJECTED') DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'marketplace_economic_snapshots',
+                sql: `CREATE TABLE IF NOT EXISTS marketplace_economic_snapshots (
+                    id VARCHAR(64) PRIMARY KEY,
+                    liquidity_index DECIMAL(5,2) DEFAULT 0.00,
+                    trade_velocity INT DEFAULT 0,
+                    economic_pressure DECIMAL(5,2) DEFAULT 0.00,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            },
+            {
+                name: 'autonomous_factory_bids',
+                sql: `CREATE TABLE IF NOT EXISTS autonomous_factory_bids (
+                    id VARCHAR(64) PRIMARY KEY,
+                    factory_id VARCHAR(64) NOT NULL,
+                    auction_id VARCHAR(64) NOT NULL,
+                    bid_amount DECIMAL(12,2) DEFAULT 0.00,
+                    margin_score DECIMAL(5,2) DEFAULT 0.00,
+                    confidence_score DECIMAL(5,2) DEFAULT 0.00,
+                    status ENUM('SUBMITTED', 'ACCEPTED', 'REJECTED') DEFAULT 'SUBMITTED',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;`
+            }
         ];
 
         // Ensure economic optimization columns exist
@@ -364,6 +435,29 @@ class IndustrialProvisioningService {
                 }
             } catch (err) {
                 this._logStepError(`ensureAnomalyColumns:${am.table}.${am.column}`, err);
+            }
+        }
+
+        // Ensure Phase 17 Marketplace columns exist
+        const marketplaceMigrations = [
+            { table: 'manufacturing_dispatches', column: 'marketplace_bid_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'delegated_factory_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatches', column: 'federated_margin_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'manufacturing_dispatches', column: 'exchange_priority_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'marketplace_reputation', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'liquidity_score', type: 'DECIMAL(5,2) DEFAULT 0.00' },
+            { table: 'print_node_machine_profiles', column: 'economic_efficiency_rank', type: 'INT DEFAULT 50' }
+        ];
+
+        for (const mm of marketplaceMigrations) {
+            try {
+                const exists = await this.checkColumnExists(mm.table, mm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${mm.table} ADD COLUMN ${mm.column} ${mm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureMarketplaceColumns:${mm.table}.${mm.column}`, err);
             }
         }
 

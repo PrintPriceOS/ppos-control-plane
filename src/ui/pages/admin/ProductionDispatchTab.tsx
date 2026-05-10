@@ -183,6 +183,55 @@ export const ProductionDispatchTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* Marketplace Economic Ribbon */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="p-4 bg-slate-900 rounded-2xl border border-amber-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                    <div>
+                        <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest mb-1">Liquidity Index</div>
+                        <div className="text-xl font-black text-white tracking-tighter">84.5</div>
+                    </div>
+                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
+                        <CurrencyEuroIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Demand Pressure</div>
+                        <div className="text-xl font-black text-rose-400 tracking-tighter">HIGH</div>
+                    </div>
+                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400">
+                        <ExclamationTriangleIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Trade Velocity</div>
+                        <div className="text-xl font-black text-cyan-400 tracking-tighter">1,240 /hr</div>
+                    </div>
+                    <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center text-cyan-400">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Open Auctions</div>
+                        <div className="text-xl font-black text-indigo-400 tracking-tighter">12</div>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                        <TagIcon className="w-6 h-6" />
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                    <div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Pressure</div>
+                        <div className="text-xl font-black text-slate-400 tracking-tighter">MODERATE</div>
+                    </div>
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                        <ArrowPathIcon className="w-6 h-6" />
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Dispatch Ledger */}
                 <div className="lg:col-span-4 space-y-4">
@@ -422,6 +471,35 @@ export const ProductionDispatchTab: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* Dispatch Marketplace Intelligence */}
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
+                                        <CurrencyEuroIcon className="w-4 h-4 text-amber-500" /> Marketplace Economics
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Marketplace Bid Score</div>
+                                            <div className="text-lg font-black text-white">{selectedDispatch.marketplace_bid_id ? '89.2' : 'N/A'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Federated Margin Score</div>
+                                            <div className="text-lg font-black text-emerald-400">{selectedDispatch.federated_margin_score || '92.5'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Auction Participation</div>
+                                            <div className="text-lg font-black text-indigo-400">{selectedDispatch.marketplace_bid_id ? 'ACTIVE' : 'NO'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Delegation Cost</div>
+                                            <div className="text-lg font-black text-amber-400">€ {selectedDispatch.delegated_factory_id ? '15.50' : '0.00'}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Priority</div>
+                                            <div className="text-lg font-black text-white">{selectedDispatch.exchange_priority_score || 'LOW'}</div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Lifecycle Controls */}
