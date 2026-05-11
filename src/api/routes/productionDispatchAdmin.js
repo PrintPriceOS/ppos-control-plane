@@ -800,4 +800,43 @@ router.get('/:id/sla-evidence', requireAdmin, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/events/recent
+ * Returns recent industrial events from the orchestration timeline.
+ */
+router.get('/events/recent', requireAdmin, async (req, res) => {
+    try {
+        const events = await db.query('SELECT * FROM manufacturing_dispatch_events ORDER BY created_at DESC LIMIT 100');
+        res.json({ ok: true, events });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/events/dispatch/:id
+ * Returns industrial events for a specific dispatch.
+ */
+router.get('/events/dispatch/:id', requireAdmin, async (req, res) => {
+    try {
+        const events = await db.query('SELECT * FROM manufacturing_dispatch_events WHERE dispatch_id = ? ORDER BY created_at ASC', [req.params.id]);
+        res.json({ ok: true, events });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/events/traces/:traceId
+ * Reconstructs an orchestration trace.
+ */
+router.get('/events/traces/:traceId', requireAdmin, async (req, res) => {
+    try {
+        const events = await db.query('SELECT * FROM manufacturing_dispatch_events WHERE trace_id = ? OR correlation_id = ? ORDER BY created_at ASC', [req.params.traceId, req.params.traceId]);
+        res.json({ ok: true, traceId: req.params.traceId, events });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;

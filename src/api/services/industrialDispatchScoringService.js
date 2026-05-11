@@ -9,6 +9,7 @@ const logger = require('./logger').child('dispatch-scoring');
 const marginService = require('./economics/MarginOptimizationService');
 const governanceService = require('./governance/IndustrialGovernanceService');
 const temporalService = require('./temporal/TemporalIntelligenceService');
+const eventOrchestrator = require('./IndustrialEventOrchestrationService');
 
 class IndustrialDispatchScoringService {
   /**
@@ -64,7 +65,7 @@ class IndustrialDispatchScoringService {
       // Phase 34: Immutable Evidence Ledger - Record Scoring Decision
       try {
         const evidenceLedger = require('./ProductionEvidenceLedgerService');
-        await evidenceLedger.appendEvidence({
+        const evidencePayload = {
           dispatch_id: jobInput.id || 'SCORING_SIMULATION',
           tenant_id: jobInput.tenant_id,
           evidence_type: 'DISPATCH_SCORING',
@@ -74,7 +75,18 @@ class IndustrialDispatchScoringService {
             top_candidates: result.candidates.slice(0, 3).map(c => ({ id: c.node_id, score: c.score_total })),
             rejected_count: result.rejected.length
           }
-        });
+        };
+        await evidenceLedger.appendEvidence(evidencePayload);
+
+        // Phase C: Emit Failover Routing Evidence if we have candidates
+        if (result.candidates.length > 0) {
+            await eventOrchestrator._publish('federation.failover.evidence', {
+                jobId: jobInput.id,
+                best_candidate: result.candidates[0].node_id,
+                alternative_count: result.candidates.length - 1,
+                scoring_mode: result.mode
+            });
+        }
       } catch (e) {
         logger.warn({ event: 'scoring_evidence_failed', error: e.message });
       }

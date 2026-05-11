@@ -355,6 +355,27 @@ class IndustrialProvisioningService {
             }
         }
 
+        // Phase C: Industrial Event Orchestration Hardening
+        const eventOrchestrationMigrations = [
+            { table: 'manufacturing_dispatch_events', column: 'trace_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatch_events', column: 'correlation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'manufacturing_dispatch_events', column: 'source_service', type: 'VARCHAR(128) NULL' },
+            { table: 'manufacturing_dispatch_events', column: 'routing_reason', type: 'VARCHAR(255) NULL' },
+            { table: 'manufacturing_dispatch_events', column: 'orchestration_metadata', type: 'JSON NULL' }
+        ];
+
+        for (const gm of eventOrchestrationMigrations) {
+            try {
+                const exists = await this.checkColumnExists(gm.table, gm.column);
+                if (!exists) {
+                    await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);
+                    ensured++;
+                }
+            } catch (err) {
+                this._logStepError(`ensureEventOrchestrationColumns:${gm.table}.${gm.column}`, err);
+            }
+        }
+
         for (const table of coreTables) {
             try {
                 await db.query(table.sql);

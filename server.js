@@ -190,6 +190,15 @@ const start = async () => {
             console.error('[AUTONOMOUS-MES] Loop startup failed:', err.message);
         }
         
+        // 0.3 Industrial Event Orchestration (Phase 10 Integration)
+        try {
+            const industrialOrchestrator = require('./src/api/services/IndustrialEventOrchestrationService');
+            industrialOrchestrator.initializeConsumers();
+            console.log('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers initialized.');
+        } catch (err) {
+            console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Startup failed:', err.message);
+        }
+        
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
         await fastify.register(require('@fastify/static'), {
             root: path.join(__dirname, 'dist'),

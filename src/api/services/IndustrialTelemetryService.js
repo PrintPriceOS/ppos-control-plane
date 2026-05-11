@@ -11,8 +11,9 @@ class IndustrialTelemetryService {
      * Ingests a real heartbeat from a Print Node.
      * Maps hardware-level telemetry into the Control Plane persistence layer.
      */
-    async ingestHeartbeat(nodeId, payload) {
+    async ingestHeartbeat(nodeId, payload, options = {}) {
         const timestamp = new Date();
+        const trace_id = options.trace_id || options.traceId;
         
         try {
             // 1. Record raw heartbeat for historical analysis
@@ -73,11 +74,56 @@ class IndustrialTelemetryService {
                 nodeId
             ]);
 
-            logger.info({ event: 'industrial_heartbeat_processed', nodeId, status: payload.status });
+            logger.info({ 
+                type: 'TELEMETRY-INGESTION', 
+                event: 'heartbeat_processed', 
+                nodeId, 
+                status: payload.status,
+                trace_id
+            }, `[TELEMETRY-INGESTION] Heartbeat from ${nodeId} processed.`);
+
             return { success: true, timestamp: timestamp.toISOString() };
         } catch (err) {
-            logger.error({ event: 'industrial_heartbeat_failed', nodeId, error: err.message });
+            logger.error({ 
+                type: 'TELEMETRY-INGESTION-FAILED', 
+                nodeId, 
+                error: err.message,
+                trace_id
+            }, `[TELEMETRY-INGESTION-FAILED] ${nodeId}: ${err.message}`);
             throw err;
+        }
+    }
+
+    /**
+     * Handles heartbeat event from the industrial event bus.
+     */
+    async handleHeartbeat(payload, options = {}) {
+        if (!payload || !payload.nodeId) {
+            logger.warn({ type: 'TELEMETRY-INVALID-PAYLOAD', payload }, '[TELEMETRY-INVALID-PAYLOAD] Received heartbeat without nodeId');
+            return;
+        }
+        return this.ingestHeartbeat(payload.nodeId, payload, options);
+    }
+
+    /**
+     * Periodic check to mark stale nodes as DEGRADED.
+     */
+    async checkStaleNodes() {
+        const threshold = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes
+        
+        try {
+            // Mark as DEGRADED if last heartbeat is older than 15 minutes
+            const result = await db.query(`
+                UPDATE print_nodes 
+                SET status = 'DEGRADED' 
+                WHERE last_heartbeat_at < ? AND status != 'OFFLINE' AND status != 'DEGRADED'
+            `, [threshold]);
+            
+            if (result.affectedRows > 0) {
+                logger.info({ type: 'TELEMETRY-STALE-NODES', count: result.affectedRows }, `[TELEMETRY-STALE-NODES] Marked ${result.affectedRows} nodes as DEGRADED due to inactivity.`);
+            }
+        } catch (error) {
+            logger.error({ type: 'TELEMETRY-STALE-CHECK-FAILED', error: error.message }, `[TELEMETRY-STALE-CHECK-FAILED] ${error.message}`);
         }
     }
 

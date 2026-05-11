@@ -6,6 +6,7 @@
  */
 const db = require('./mysqlClient');
 const logger = require('./logger').child('federation-topology');
+const eventOrchestrator = require('./IndustrialEventOrchestrationService');
 
 class FederationTopologyService {
     /**
@@ -52,6 +53,17 @@ class FederationTopologyService {
                 }, {}),
                 grid_stability_index: this._calculateStabilityIndex(hubs, nodeDistribution)
             };
+
+            // Phase C: Industrial Event Emission
+            for (const [region, health] of Object.entries(result.regional_health)) {
+                if (health.load_status === 'CRITICAL') {
+                    await this.emitSaturationWarning(region, health);
+                } else if (health.load_status === 'DEGRADED') {
+                    await this.emitRegionalDegradation(region, health);
+                }
+            }
+
+            return result;
         } catch (err) {
             logger.error({ event: 'grid_state_fetch_failed', error: err.message });
             throw err;
@@ -84,6 +96,32 @@ class FederationTopologyService {
             ORDER BY reliability_index DESC, capacity_index DESC
             LIMIT 3
         `, [primaryRegion]);
+    }
+
+    /**
+     * Emits a regional degradation event.
+     */
+    async emitRegionalDegradation(region, health) {
+        logger.warn({ type: 'FEDERATION-REGIONAL-DEGRADED', region, health }, `[FEDERATION-REGIONAL-DEGRADED] Region ${region} is showing performance degradation.`);
+        
+        await eventOrchestrator._publish('federation.region.degraded', {
+            region,
+            health,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Emits a saturation warning for a region.
+     */
+    async emitSaturationWarning(region, health) {
+        logger.error({ type: 'FEDERATION-REGIONAL-SATURATED', region, health }, `[FEDERATION-REGIONAL-SATURATED] Region ${region} has reached saturation threshold!`);
+        
+        await eventOrchestrator._publish('federation.region.saturated', {
+            region,
+            health,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 

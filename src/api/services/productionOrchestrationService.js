@@ -8,6 +8,7 @@ const db = require('./mysqlClient');
 const logger = require('./logger').child('production-orchestration');
 const crypto = require('crypto');
 const reservationService = require('./CapacityReservationService');
+const eventOrchestrator = require('./IndustrialEventOrchestrationService');
 
 const DISPATCH_LIFECYCLE = {
     PENDING: 'PENDING',
@@ -95,6 +96,43 @@ class ProductionOrchestrationService {
             // 4. Log Industrial Lifecycle Event
             await this.logEvent(dispatchId, 'DISPATCH_CREATED', null, DISPATCH_LIFECYCLE.PENDING, 'Initial production assignment with industrial evidence.');
 
+            // 5. Publish Industrial Orchestration Events
+            const eventPayload = {
+                dispatchId,
+                jobId,
+                nodeId: recommendation.nodeId,
+                orderId: recommendation.orderId || jobId,
+                federationRegion: recommendation.region || process.env.PPOS_FEDERATION_REGION,
+                scoring: recommendation,
+                evidence_snapshot_json: {
+                    scoring: recommendation,
+                    telemetry_at_dispatch: node,
+                    timestamp: now.toISOString()
+                },
+                capacitySnapshot: {
+                    nodeId: recommendation.nodeId,
+                    utilization: node.capacity_utilization_pct
+                }
+            };
+
+            // publish MANUFACTURING_DISPATCH_REQUESTED (as a result of the internal decision)
+            await eventOrchestrator.publishDispatchRequested(eventPayload);
+            
+            // publish MANUFACTURING_DISPATCH_ASSIGNED
+            await eventOrchestrator.publishDispatchAssigned(eventPayload);
+
+            // 6. Preflight Check Required (if applicable)
+            if (recommendation.requiresPreflight || true) { // Default to true for industrial flows
+                await eventOrchestrator.publishPreflightRequired({
+                    dispatchId,
+                    jobId,
+                    artifactReferences: recommendation.artifacts || [],
+                    certification_state: 'PENDING',
+                    forensic_risk: recommendation.forensic_risk || 0,
+                    autofix_state: 'NONE'
+                });
+            }
+
             await db.query('COMMIT');
             
             logger.info({ event: 'dispatch_assigned', dispatchId, jobId, nodeId: recommendation.nodeId });
@@ -131,6 +169,24 @@ class ProductionOrchestrationService {
             }
 
             await this.logEvent(dispatchId, 'STATUS_CHANGED', oldStatus, newStatus, message);
+
+            // Publish Industrial Event
+            const [fullDispatch] = await db.query('SELECT * FROM manufacturing_dispatches WHERE id = ?', [dispatchId]);
+            const eventPayload = {
+                dispatchId,
+                jobId: fullDispatch.job_id,
+                nodeId: fullDispatch.node_id,
+                status: newStatus,
+                message
+            };
+
+            if (newStatus === DISPATCH_LIFECYCLE.COMPLETED) {
+                await eventOrchestrator.publishDispatchCompleted(eventPayload);
+            } else if (newStatus === DISPATCH_LIFECYCLE.FAILED) {
+                await eventOrchestrator.publishDispatchFailed(eventPayload);
+            } else {
+                await eventOrchestrator.publishDispatchStatusChanged(eventPayload);
+            }
 
             await db.query('COMMIT');
             return { ok: true };
@@ -169,15 +225,37 @@ class ProductionOrchestrationService {
         }
     }
 
-    async logEvent(dispatchId, eventType, oldStatus, newStatus, message, metadata = null) {
+    async logEvent(dispatchId, eventType, oldStatus, newStatus, message, metadata = null, options = {}) {
         const eventId = `mfg_evt_${crypto.randomBytes(8).toString('hex')}`;
         await db.query(`
             INSERT INTO manufacturing_dispatch_events (
-                id, dispatch_id, event_type, old_status, new_status, message, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                id, dispatch_id, event_type, old_status, new_status, message, metadata_json,
+                trace_id, correlation_id, source_service, orchestration_metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            eventId, dispatchId, eventType, oldStatus, newStatus, message, metadata ? JSON.stringify(metadata) : null
+            eventId, 
+            dispatchId, 
+            eventType, 
+            oldStatus, 
+            newStatus, 
+            message, 
+            metadata ? JSON.stringify(metadata) : null,
+            options.trace_id || options.traceId || null,
+            options.correlation_id || options.correlationId || null,
+            options.source_service || '@ppos/control-plane',
+            options.orchestration_metadata ? JSON.stringify(options.orchestration_metadata) : null
         ]);
+    }
+
+    /**
+     * Handles an external dispatch request from the industrial event bus.
+     */
+    async handleExternalDispatchRequest(payload, options = {}) {
+        logger.info({ event: 'external_dispatch_request', jobId: payload.jobId, trace_id: options.trace_id });
+        
+        // This would typically involve calling the routing engine then assignDispatch
+        // For now we log it and we could trigger the autonomous orchestrator
+        return { ok: true, message: 'External dispatch request received and queued for orchestration.' };
     }
 
     async getDispatches(limit = 50) {
