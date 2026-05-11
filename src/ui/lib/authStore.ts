@@ -65,10 +65,24 @@ export function isAuthenticated(): boolean {
 
 /**
  * Accessors for specific user context fields.
+ * Includes safe fallback for SUPER_ADMIN resolution.
  */
 export function getUserRole(): string {
     const user = getAuthUser();
-    return (user?.role || 'VIEWER').toUpperCase();
+    if (!user) return 'VIEWER';
+
+    const rawRole = (user.role || 'VIEWER').toUpperCase();
+    const email = (user.email || '').toLowerCase();
+
+    // SAFE FALLBACK: 
+    // 1. Explicit SUPER_ADMIN role
+    // 2. Canonical admin email
+    // 3. isSuperAdmin flag (set by break-glass or master token)
+    if (rawRole === 'SUPER_ADMIN' || email === 'admin@printprice.pro' || user.isSuperAdmin === true) {
+        return 'SUPER_ADMIN';
+    }
+
+    return rawRole;
 }
 
 export function getUserTenantId(): string {

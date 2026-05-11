@@ -15,7 +15,7 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import { clearAdminKey, getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/adminApi';
-import { getAuthUser } from '../lib/authStore';
+import { getAuthUser, getUserRole } from '../lib/authStore';
 
 // ─── Notification types ──────────────────────────────────────────────────────
 
@@ -258,7 +258,9 @@ export const Topbar: React.FC = () => {
             >
               <div className="text-right">
                 <p className="text-sm font-black text-slate-900 dark:text-[#ECECF1] leading-tight">{getAuthUser()?.name || 'Authorized User'}</p>
-                <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest leading-tight">{(getAuthUser()?.role || 'VIEWER')} ({getAuthUser()?.email || 'N/A'})</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest leading-tight">
+                  {getUserRole()} ({getAuthUser()?.email || 'N/A'})
+                </p>
               </div>
               <div className="w-10 h-10 bg-slate-100 dark:bg-[#2C2C2E] rounded-xl border border-slate-200 dark:border-white/[0.1] flex items-center justify-center text-slate-400 dark:text-zinc-400 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">
                 <UserCircleIcon className="w-8 h-8" />

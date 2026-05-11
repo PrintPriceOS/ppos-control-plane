@@ -120,8 +120,13 @@ function fail(req, res, message) {
 function resolveActorContext(req) {
     const user = req.user || {};
     // Industrial Hardening: Ensure role is always a string and uppercase
-    const rawRole = user.role || user.userRole || 'VIEWER';
-    const role = String(rawRole).toUpperCase();
+    let role = String(user.role || user.userRole || 'VIEWER').toUpperCase();
+    const email = (user.email || '').toLowerCase();
+
+    // SAFE FALLBACK: admin@printprice.pro is always SUPER_ADMIN
+    if (email === 'admin@printprice.pro' || user.isSuperAdmin) {
+        role = 'SUPER_ADMIN';
+    }
     
     return {
         userId: user.id || 'anonymous',
