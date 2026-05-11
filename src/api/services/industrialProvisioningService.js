@@ -261,7 +261,9 @@ class IndustrialProvisioningService {
             { table: 'printer_nodes', column: 'latitude',     type: 'DECIMAL(10, 8) NULL' },
             { table: 'printer_nodes', column: 'longitude',    type: 'DECIMAL(11, 8) NULL' },
             { table: 'printer_nodes', column: 'timezone',     type: 'VARCHAR(64) NULL' },
-            { table: 'printer_nodes', column: 'address_line', type: 'TEXT NULL' }
+            { table: 'printer_nodes', column: 'address_line', type: 'TEXT NULL' },
+            { table: 'printer_nodes', column: 'federation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'printer_nodes', column: 'cluster_id',    type: 'VARCHAR(64) NULL' }
         ];
 
         for (const gm of geolocationMigrations) {
@@ -288,7 +290,10 @@ class IndustrialProvisioningService {
             { table: 'printer_nodes', column: 'company_name', type: 'VARCHAR(255) NULL' },
             { table: 'print_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
             { table: 'print_nodes', column: 'worker_state', type: 'VARCHAR(64) NULL' },
-            { table: 'print_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' }
+            { table: 'print_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' },
+            { table: 'print_nodes', column: 'region', type: 'VARCHAR(128) NULL' },
+            { table: 'print_nodes', column: 'federation_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_nodes', column: 'cluster_id', type: 'VARCHAR(64) NULL' }
         ];
 
         for (const gm of agentMigrations) {
@@ -531,25 +536,29 @@ class IndustrialProvisioningService {
             try {
                 await db.query(`
                     INSERT INTO print_nodes (
-                        id, tenant_id, company_name, status, license_status, country, city,
+                        id, tenant_id, company_name, status, license_status, country, city, region,
                         capabilities_json, machine_profile_json, supported_policies_json,
                         max_file_size_mb, api_enabled, rates_json,
                         supported_products, binding_capabilities, color_profiles,
-                        throughput, uptime_score, economic_efficiency
-                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, 500, 0, ?, ?, ?, ?, ?, ?, ?)
+                        throughput, uptime_score, economic_efficiency,
+                        federation_id, cluster_id
+                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, ?, 500, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         company_name = VALUES(company_name),
                         country = VALUES(country),
                         city = VALUES(city),
+                        region = VALUES(region),
                         rates_json = VALUES(rates_json),
                         supported_products = VALUES(supported_products),
                         binding_capabilities = VALUES(binding_capabilities),
                         color_profiles = VALUES(color_profiles),
                         throughput = VALUES(throughput),
                         uptime_score = VALUES(uptime_score),
-                        economic_efficiency = VALUES(economic_efficiency)
+                        economic_efficiency = VALUES(economic_efficiency),
+                        federation_id = VALUES(federation_id),
+                        cluster_id = VALUES(cluster_id)
                 `, [
-                    pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null,
+                    pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null, pn.region || null,
                     this.normalizeJsonForMysql(pn.capabilities_json, {}),
                     this.normalizeJsonForMysql(pn.machine_profile_json, {}),
                     this.normalizeJsonForMysql(pn.supported_policies_json, []),
@@ -557,7 +566,8 @@ class IndustrialProvisioningService {
                     this.normalizeJsonForMysql(pn.supported_products, []),
                     this.normalizeJsonForMysql(pn.binding_capabilities, []),
                     this.normalizeJsonForMysql(pn.color_profiles, []),
-                    pn.throughput || 0.00, pn.uptime_score || 100.00, pn.economic_efficiency || 1.00
+                    pn.throughput || 0.00, pn.uptime_score || 100.00, pn.economic_efficiency || 1.00,
+                    pn.federation_id || null, pn.cluster_id || null
                 ]);
                 synced++;
             } catch (err) {

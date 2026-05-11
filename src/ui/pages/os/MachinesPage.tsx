@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
     CpuChipIcon, 
     SignalIcon, 
     GlobeAltIcon,
     BoltIcon,
-    ScaleIcon
+    ScaleIcon,
+    MagnifyingGlassIcon,
+    FunnelIcon,
+    ArrowPathIcon,
+    ClockIcon,
+    MapPinIcon
 } from "@heroicons/react/24/outline";
 import { DataTable } from '../../components/DataTable';
 import { useAdminQuery } from '../../hooks/useAdminData';
@@ -14,45 +19,125 @@ interface Machine {
     id: string;
     companyName: string;
     status: string;
-    locationLabel: string;
+    healthState: string;
     machineState: string;
     workerState: string;
-    capacityUtilizationPct: number;
-    throughput: number;
-    uptimeScore: number;
-    economicEfficiency: number;
-    lastHeartbeatAt: string;
+    locationLabel: string;
+    city: string;
+    country: string;
+    region: string;
+    capacityUtilizationPct: number | null;
+    throughput: number | null;
+    uptimeScore: number | null;
+    economicEfficiency: number | null;
+    lastHeartbeatAt: string | null;
+    federationId?: string;
+    clusterId?: string;
 }
 
 export const MachinesPage: React.FC = () => {
-    const q = useAdminQuery<{ ok: boolean; total: number; machines: Machine[]; status: string }>('machines', getMachines);
-
-    const machines = q.data?.machines ?? [];
+    const [search, setSearch] = useState('');
+    const [filterStatus, setFilterStatus] = useState<string>('ALL');
     
-    // Derived stats
-    const activeMachines = machines.filter(m => m.status === 'ACTIVE').length;
-    const avgUptime = machines.length 
-        ? (machines.reduce((s, m) => s + (Number(m.uptimeScore) || 0), 0) / machines.length).toFixed(1) 
-        : '0';
-    const avgEfficiency = machines.length 
-        ? (machines.reduce((s, m) => s + (Number(m.economicEfficiency) || 0), 0) / machines.length).toFixed(1) 
-        : '0';
+    const q = useAdminQuery<{ ok: boolean; total: number; machines: Machine[]; status: string; timestamp: string }>('machines', getMachines);
+
+    const rawMachines = q.data?.machines ?? [];
+    
+    // Filtering logic
+    const filteredMachines = useMemo(() => {
+        return rawMachines.filter(m => {
+            const matchesSearch = !search || 
+                m.companyName.toLowerCase().includes(search.toLowerCase()) || 
+                m.id.toLowerCase().includes(search.toLowerCase()) ||
+                m.locationLabel.toLowerCase().includes(search.toLowerCase());
+            
+            const matchesStatus = filterStatus === 'ALL' || m.healthState === filterStatus;
+            
+            return matchesSearch && matchesStatus;
+        });
+    }, [rawMachines, search, filterStatus]);
+
+    // Derived stats (from ALL machines, not just filtered)
+    const activeNodes = rawMachines.filter(m => 
+        ['ONLINE', 'PROCESSING', 'READY', 'HEALTHY', 'SYNCED'].includes(m.healthState)
+    ).length;
+
+    const avgUptime = useMemo(() => {
+        const withData = rawMachines.filter(m => m.uptimeScore !== null);
+        if (!withData.length) return null;
+        return (withData.reduce((s, m) => s + (m.uptimeScore || 0), 0) / withData.length).toFixed(1);
+    }, [rawMachines]);
+
+    const avgEfficiency = useMemo(() => {
+        const withData = rawMachines.filter(m => m.economicEfficiency !== null);
+        if (!withData.length) return null;
+        return (withData.reduce((s, m) => s + (m.economicEfficiency || 0), 0) / withData.length).toFixed(2);
+    }, [rawMachines]);
+
+    const getHealthColor = (state: string) => {
+        switch (state) {
+            case 'ONLINE':
+            case 'HEALTHY':
+            case 'PROCESSING':
+                return 'bg-emerald-500';
+            case 'DEGRADED':
+            case 'CAPACITY_BLOCKED':
+                return 'bg-amber-500';
+            case 'OFFLINE':
+                return 'bg-red-500';
+            default:
+                return 'bg-slate-300';
+        }
+    };
+
+    const getHealthPillClass = (state: string) => {
+        switch (state) {
+            case 'ONLINE':
+            case 'HEALTHY':
+            case 'PROCESSING':
+                return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+            case 'DEGRADED':
+            case 'CAPACITY_BLOCKED':
+                return 'bg-amber-50 text-amber-600 border-amber-100';
+            case 'OFFLINE':
+                return 'bg-red-50 text-red-600 border-red-100';
+            default:
+                return 'bg-slate-50 text-slate-500 border-slate-100';
+        }
+    };
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Machines</h1>
-                    <p className="text-sm text-slate-500 font-medium tracking-tight">Live fleet monitoring, telemetry, and performance metrics for configured print nodes.</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm text-slate-500 font-medium tracking-tight">Real-time industrial telemetry for the global manufacturing grid.</p>
+                        {q.data?.timestamp && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <ClockIcon className="w-3 h-3" />
+                                <span>Refreshed: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                   <button 
+                     onClick={() => q.refetch()}
+                     className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-500"
+                     title="Force Telemetry Refresh"
+                   >
+                     <ArrowPathIcon className={`w-5 h-5 ${q.isFetching ? 'animate-spin' : ''}`} />
+                   </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Fleet', value: machines.length, icon: CpuChipIcon, color: 'primary' },
-                    { label: 'Active Nodes', value: activeMachines, icon: SignalIcon, color: 'emerald' },
-                    { label: 'Avg. Uptime Score', value: `${avgUptime}%`, icon: BoltIcon, color: 'blue' },
-                    { label: 'Economic Efficiency', value: `${avgEfficiency}%`, icon: ScaleIcon, color: 'indigo' },
+                    { label: 'Total Fleet', value: rawMachines.length, icon: CpuChipIcon, color: 'primary' },
+                    { label: 'Active Nodes', value: activeNodes, icon: SignalIcon, color: 'emerald' },
+                    { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, color: 'blue' },
+                    { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, color: 'indigo' },
                 ].map((stat, i) => (
                     <div key={i} className="glass p-5 rounded-2xl border border-white flex items-center gap-4 shadow-sm">
                         <div className={`p-3 rounded-xl ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
@@ -63,111 +148,197 @@ export const MachinesPage: React.FC = () => {
                         </div>
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                            <p className="text-xl font-black text-slate-900">{stat.value}</p>
+                            <p className="text-xl font-black text-slate-900 tracking-tighter">{stat.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                        type="text"
+                        placeholder="Search by company, ID, or location..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"
+                    />
+                </div>
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/[0.03] p-1 rounded-xl border border-slate-200 dark:border-white/10">
+                    <div className="px-3 py-1.5 flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
+                        <FunnelIcon className="w-3.5 h-3.5" />
+                        Status
+                    </div>
+                    {['ALL', 'ONLINE', 'DEGRADED', 'OFFLINE'].map(status => (
+                        <button
+                            key={status}
+                            onClick={() => setFilterStatus(status)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            {status}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {q.status === 'error' && (
-                <div className="glass px-5 py-4 rounded-2xl border border-red-200 bg-red-50 text-sm font-medium text-red-600">
-                    Failed to load machine data: {q.error}
+                <div className="glass px-5 py-4 rounded-2xl border border-red-200 bg-red-50 text-sm font-medium text-red-600 flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                        <SignalIcon className="w-5 h-5" />
+                    </div>
+                    <span>Failed to synchronize grid telemetry: {q.error}</span>
                 </div>
             )}
 
             <DataTable<Machine>
                 isLoading={q.status === 'loading'}
-                data={machines}
+                data={filteredMachines}
                 columns={[
                     {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0 border border-slate-100">
+                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10">
                                     <CpuChipIcon className="w-5 h-5 text-slate-400" />
                                 </div>
                                 <div>
-                                    <p className="font-bold text-slate-900">{m.companyName || 'Unnamed Node'}</p>
-                                    <p className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</p>
+                                    <p className="font-bold text-slate-900 dark:text-[#ECECF1] leading-tight">{m.companyName || 'Industrial Node'}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</span>
+                                        {m.clusterId && (
+                                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
+                                                {m.clusterId}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ),
+                        sortKey: 'companyName'
                     },
                     {
-                        header: 'Location',
+                        header: 'Geolocation',
                         accessor: (m) => (
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                                <GlobeAltIcon className="w-4 h-4 text-slate-300" />
-                                <span className="text-xs font-medium">{m.locationLabel}</span>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                    <GlobeAltIcon className="w-3.5 h-3.5 text-slate-300" />
+                                    <span className="text-xs font-bold">{m.locationLabel}</span>
+                                </div>
+                                {m.region && (
+                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                        <MapPinIcon className="w-3 h-3" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">{m.region}</span>
+                                    </div>
+                                )}
                             </div>
                         ),
+                        sortKey: 'locationLabel'
                     },
                     {
-                        header: 'States',
+                        header: 'Grid Health',
                         accessor: (m) => (
-                            <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${m.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{m.status}</span>
+                            <div className="flex flex-col gap-1.5">
+                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider w-fit ${getHealthPillClass(m.healthState)}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${getHealthColor(m.healthState)}`} />
+                                    {m.healthState}
                                 </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${m.machineState === 'READY' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-                                        {m.machineState}
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${m.workerState === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                                        {m.workerState}
-                                    </span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase">Proc:</span>
+                                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400">{m.machineState}</span>
+                                    <span className="text-slate-300 mx-0.5">|</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase">Worker:</span>
+                                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400">{m.workerState}</span>
                                 </div>
                             </div>
                         ),
+                        sortKey: 'healthState'
                     },
                     {
-                        header: 'Telemetry',
+                        header: 'Grid Telemetry',
                         accessor: (m) => (
-                            <div className="space-y-2 w-32">
+                            <div className="space-y-2 w-36">
                                 <div>
                                     <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                                        <span>Capacity</span>
-                                        <span>{m.capacityUtilizationPct}%</span>
+                                        <span>Util / Cap</span>
+                                        <span className={m.capacityUtilizationPct === null ? 'italic' : ''}>
+                                            {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
+                                        </span>
                                     </div>
-                                    <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full ${m.capacityUtilizationPct > 80 ? 'bg-amber-500' : 'bg-slate-800'}`}
-                                            style={{ width: `${m.capacityUtilizationPct}%` }}
-                                        />
+                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                        {m.capacityUtilizationPct !== null && (
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-1000 ${
+                                                    m.capacityUtilizationPct > 90 ? 'bg-red-500' : 
+                                                    m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-primary'
+                                                }`}
+                                                style={{ width: `${m.capacityUtilizationPct}%` }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         ),
+                        sortKey: 'capacityUtilizationPct'
                     },
                     {
-                        header: 'Health',
+                        header: 'Performance',
                         accessor: (m) => (
                             <div className="flex items-center gap-4">
                                 <div className="text-center">
                                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Uptime</p>
-                                    <p className={`text-xs font-bold ${m.uptimeScore > 95 ? 'text-emerald-600' : 'text-slate-900'}`}>{m.uptimeScore}%</p>
+                                    <p className={`text-xs font-bold ${m.uptimeScore !== null && m.uptimeScore > 95 ? 'text-emerald-600' : 'text-slate-900 dark:text-[#ECECF1]'}`}>
+                                        {m.uptimeScore !== null ? `${m.uptimeScore}%` : 'N/A'}
+                                    </p>
                                 </div>
                                 <div className="text-center">
                                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Efficiency</p>
-                                    <p className="text-xs font-bold text-slate-900">{m.economicEfficiency}%</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-[#ECECF1]">
+                                        {m.economicEfficiency !== null ? `${m.economicEfficiency}%` : 'N/A'}
+                                    </p>
                                 </div>
                             </div>
                         ),
+                        sortKey: 'uptimeScore'
                     },
                     {
-                        header: 'Last Heartbeat',
+                        header: 'Heartbeat',
                         accessor: (m) => (
-                            <div className="flex items-center gap-1.5">
-                                <SignalIcon className={`w-4 h-4 ${m.lastHeartbeatAt && (new Date().getTime() - new Date(m.lastHeartbeatAt).getTime() < 900000) ? 'text-emerald-500' : 'text-slate-300'}`} />
-                                <span className="text-[10px] font-mono text-slate-500">
-                                    {m.lastHeartbeatAt ? new Date(m.lastHeartbeatAt).toLocaleTimeString() : 'NEVER'}
-                                </span>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                    <SignalIcon className={`w-4 h-4 ${m.lastHeartbeatAt && (new Date().getTime() - new Date(m.lastHeartbeatAt).getTime() < 900000) ? 'text-emerald-500' : 'text-slate-300'}`} />
+                                    <span className="text-[10px] font-black text-slate-500 font-mono">
+                                        {m.lastHeartbeatAt ? new Date(m.lastHeartbeatAt).toLocaleTimeString() : 'NEVER'}
+                                    </span>
+                                </div>
+                                {m.lastHeartbeatAt && (
+                                    <p className="text-[9px] font-medium text-slate-400">
+                                        {Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000)}m ago
+                                    </p>
+                                )}
                             </div>
                         ),
+                        sortKey: 'lastHeartbeatAt'
                     }
                 ]}
             />
+            
+            <div className="flex items-center justify-between py-4 border-t border-slate-100 dark:border-white/[0.05]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Showing {filteredMachines.length} of {rawMachines.length} Grid Nodes
+                </p>
+                <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> ONLINE
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" /> DEGRADED
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-500" /> OFFLINE
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
