@@ -125,7 +125,7 @@ export const FinancialOpsTab: React.FC = () => {
                                             {parseFloat(tx.platform_fee).toFixed(2)} {tx.currency}
                                         </td>
                                         <td className="px-4 py-4">
-                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${tx.transaction_status === 'SETTLED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-none border uppercase tracking-widest ${tx.transaction_status === 'SETTLED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                 tx.transaction_status === 'FAILED' ? 'bg-red-50 text-red-600 border-red-100' :
                                                     tx.transaction_status === 'CREATED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                                                 }`}>

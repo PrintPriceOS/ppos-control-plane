@@ -74,7 +74,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
         {/* Header Control */}
         <div className="flex items-center justify-between p-4 border-b border-white/10 bg-zinc-950">
            <div className="flex items-center gap-3">
-             <div className="w-2 h-2 rounded-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)]" />
+             <div className="w-2 h-2 rounded-none bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)]" />
              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Machine Intelligence Layer</span>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-white/5 transition-colors group">
@@ -112,7 +112,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
                     <h1 className="text-3xl font-black uppercase leading-none mb-2 tracking-tighter">{data.header.name}</h1>
                     <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                        <span>{data.header.manufacturer} / {data.header.model}</span>
-                       <span className="w-1 h-1 bg-zinc-800 rounded-full" />
+                       <span className="w-1 h-1 bg-zinc-800 rounded-none" />
                        <span>{data.header.region}</span>
                     </div>
                   </div>
@@ -264,7 +264,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
                     <div key={incident.id} className="p-4 border border-white/5 bg-zinc-900 flex items-start justify-between group">
                        <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                             <span className={`w-1.5 h-1.5 rounded-full ${incident.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-amber-500'}`} />
+                             <span className={`w-1.5 h-1.5 rounded-none ${incident.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-amber-500'}`} />
                              <span className="text-[10px] font-black uppercase text-white tracking-widest">{incident.type}</span>
                           </div>
                           <p className="text-xs text-zinc-400 font-medium">{incident.message}</p>

@@ -123,7 +123,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
                                         <td className="px-4 py-4 text-xs font-bold text-slate-600 truncate max-w-[120px]">{c.printer_name}</td>
                                         <td className="px-4 py-4 text-xs font-black text-slate-900">{c.committed_price} €</td>
                                         <td className="px-4 py-4">
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-wider ${c.commercial_commitment_status === 'LOCKED' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-none border uppercase tracking-wider ${c.commercial_commitment_status === 'LOCKED' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
                                                 c.commercial_commitment_status === 'VOIDED' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-600 border-slate-100'
                                                 }`}>
                                                 {c.commercial_commitment_status}

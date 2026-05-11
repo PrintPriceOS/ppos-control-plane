@@ -15,7 +15,7 @@ import {
 
 const val = "text-sm font-mono text-slate-900 font-semibold";
 const lbl = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5";
-const card = "bg-white/70 border border-slate-100 rounded-2xl p-5 space-y-4";
+const card = "bg-white/70 border border-slate-100 rounded-none p-5 space-y-4";
 const sectionTitle = "text-sm font-black text-slate-700 mb-3";
 
 function Cell({ label, children }: { label: string; children: React.ReactNode }) {
@@ -63,7 +63,7 @@ function StatusBadge({ status }: { status?: string }) {
         : s === 'Under Maintenance'
         ? 'bg-amber-50 text-amber-700'
         : 'bg-slate-100 text-slate-500';
-    return <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
+    return <span className={`inline-block px-2.5 py-0.5 rounded-none text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
 }
 
 function OperationalTab({ ph }: { ph: Printhouse }) {
@@ -98,12 +98,12 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
             <div className={card}>
                 <h3 className={sectionTitle}>Dispatch Eligibility</h3>
                 <div className="space-y-4">
-                    <div className={`p-4 rounded-xl border ${isEligible ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                    <div className={`p-4 rounded-none border ${isEligible ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                       <div className="flex items-center justify-between mb-2">
                         <p className={`text-[10px] font-black uppercase tracking-widest ${isEligible ? 'text-emerald-600' : 'text-red-600'}`}>
                           Routing Readiness: {isEligible ? 'VERIFIED' : 'RESTRICTED'}
                         </p>
-                        <div className={`w-2 h-2 rounded-full ${isEligible ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        <div className={`w-2 h-2 rounded-none ${isEligible ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                       </div>
                       <p className={`text-xs leading-relaxed font-medium ${isEligible ? 'text-emerald-700' : 'text-red-700'}`}>
                         {isEligible 
@@ -133,7 +133,7 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
                         {activeDispatches > 0 ? (
                            <div className="space-y-2">
                               {(dispatches.data?.dispatches || []).filter((d: any) => d.printhouse_id === ph.id && d.status === 'ACTIVE').map((d: any) => (
-                                <div key={d.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
+                                <div key={d.id} className="p-3 bg-slate-50 border border-slate-100 rounded-none flex items-center justify-between">
                                    <div>
                                       <p className="text-[10px] font-black text-slate-400 uppercase">Dispatch ID</p>
                                       <p className="text-xs font-mono font-bold text-slate-700">#{d.id.slice(0, 8)}</p>
@@ -146,7 +146,7 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
                               ))}
                            </div>
                         ) : (
-                          <div className="p-10 border-2 border-dashed border-slate-100 rounded-xl flex flex-col items-center justify-center text-center opacity-30">
+                          <div className="p-10 border-2 border-dashed border-slate-100 rounded-none flex flex-col items-center justify-center text-center opacity-30">
                               <GlobeAltIcon className="w-8 h-8 mb-2 text-slate-300" />
                               <p className="text-[10px] font-black uppercase text-slate-400">No active orchestration events for this node.</p>
                           </div>
@@ -160,8 +160,8 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
 
 function EligibilityCheck({ label, passed }: { label: string, passed: boolean }) {
     return (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-slate-50 border border-slate-100">
-            <div className={`w-1.5 h-1.5 rounded-full ${passed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-none bg-slate-50 border border-slate-100">
+            <div className={`w-1.5 h-1.5 rounded-none ${passed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
             <span className={`text-[9px] font-black uppercase ${passed ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
         </div>
     );
@@ -195,7 +195,7 @@ function BasicTab({ ph }: { ph: Printhouse }) {
                     <p className={lbl}>Signatures</p>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                         {(ph.signatures ?? []).map(s => (
-                            <span key={s} className="px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">{s}p</span>
+                            <span key={s} className="px-2.5 py-0.5 rounded-none bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">{s}p</span>
                         ))}
                     </div>
                 </div>
@@ -453,10 +453,10 @@ export const PrinthouseDetailPage: React.FC = () => {
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                     <button onClick={() => navigate('/printhouses')}
-                        className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors flex-shrink-0">
+                        className="p-2 rounded-none border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors flex-shrink-0">
                         <ArrowLeftIcon className="w-4 h-4" />
                     </button>
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-none bg-slate-100 flex items-center justify-center flex-shrink-0">
                         <PrinterIcon className="w-5 h-5 text-slate-400" />
                     </div>
                     <div className="min-w-0">
@@ -465,7 +465,7 @@ export const PrinthouseDetailPage: React.FC = () => {
                     </div>
                 </div>
                 <button onClick={() => setEditOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors flex-shrink-0">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors flex-shrink-0">
                     <PencilSquareIcon className="w-4 h-4" />
                     Edit
                 </button>
@@ -479,7 +479,7 @@ export const PrinthouseDetailPage: React.FC = () => {
                     { label: 'Min Copies', value: (ph.limits?.min_copies ?? 0).toLocaleString(), icon: DocumentTextIcon },
                     { label: 'Max Pages', value: (ph.limits?.max_pages ?? 0).toLocaleString(), icon: HashtagIcon },
                 ].map((s, i) => (
-                    <div key={i} className="bg-white/70 border border-slate-100 rounded-2xl p-4 flex items-center gap-3">
+                    <div key={i} className="bg-white/70 border border-slate-100 rounded-none p-4 flex items-center gap-3">
                         <s.icon className="w-5 h-5 text-slate-300 flex-shrink-0" />
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
@@ -526,7 +526,7 @@ export const PrinthouseDetailPage: React.FC = () => {
 
 function NoRates() {
     return (
-        <div className="flex items-center justify-center h-40 text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-2xl">
+        <div className="flex items-center justify-center h-40 text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-none">
             No rate data configured yet. Use Edit to add rates.
         </div>
     );

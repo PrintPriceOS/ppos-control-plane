@@ -19,7 +19,7 @@ export const AgentDecisions: React.FC = () => {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 border-b pb-4">Agent Executive Decisions</h1>
             <p className="text-sm text-slate-500">Audit log of system actions permitted by the Central Orchestrator following multi-agent peer review.</p>
 
-            <div className="bg-white border rounded-xl overflow-hidden shadow-sm mt-4">
+            <div className="bg-white border rounded-none overflow-hidden shadow-sm mt-4">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b">
                         <tr>
@@ -38,7 +38,7 @@ export const AgentDecisions: React.FC = () => {
                                 <td className="p-4">{d.action || 'KNOWN_ACTION'}</td>
                                 <td className="p-4">{d.agentType || 'UNKNOWN_AGENT'}</td>
                                 <td className="p-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${d.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.status}</span>
+                                    <span className={`px-2 py-1 rounded-none text-xs font-bold ${d.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.status}</span>
                                 </td>
                             </tr>
                         ))}

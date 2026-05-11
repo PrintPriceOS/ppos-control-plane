@@ -52,7 +52,9 @@ const SEVERITY_CONFIG: Record<NotifSeverity, { icon: React.ElementType; bg: stri
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const Topbar: React.FC = () => {
+import { Bars3Icon, ShieldCheckIcon, MapPinIcon, UserCircleIcon, BellIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ChevronDownIcon, ExclamationTriangleIcon, ExclamationCircleIcon, InformationCircleIcon, CheckBadgeIcon } from "@heroicons/react/24/outline";
+
+export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) => {
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -136,22 +138,32 @@ export const Topbar: React.FC = () => {
 
   return (
     <>
-      <header className="h-16 bg-white dark:bg-[#0e0e0f] border-b border-slate-200 dark:border-white/10 sticky top-0 z-40 px-8 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+      <header className="h-16 bg-white dark:bg-[#0e0e0f] border-b border-slate-200 dark:border-white/10 sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between">
+        <div className="flex items-center gap-3 lg:gap-6">
+          {/* Mobile Menu Button */}
+          {onMenuClick && (
+            <button 
+              onClick={onMenuClick} 
+              className="lg:hidden p-2 text-slate-500 hover:text-black dark:hover:text-white transition-colors"
+            >
+              <Bars3Icon className="w-6 h-6" />
+            </button>
+          )}
+
           {/* Environment Badge */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
             <div className="w-1 h-1 bg-emerald-500" />
             <span className="text-[9px] font-black uppercase tracking-widest">Production Environment</span>
           </div>
 
           {/* Certification Badge */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20">
             <ShieldCheckIcon className="w-3.5 h-3.5" />
             <span className="text-[9px] font-black uppercase tracking-widest">v2.0.0 Certified</span>
           </div>
 
           {/* Region Context */}
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="hidden lg:flex items-center gap-2 text-slate-400">
             <MapPinIcon className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-wider">EU-WEST-1 (Primary)</span>
           </div>

@@ -20,21 +20,21 @@ export const JobsPage: React.FC = () => {
           <p className="text-sm text-slate-500 font-medium">Real-time status of all preflight and autofix requests across the regional BullMQ stack.</p>
         </div>
       </div>
-      <div className="glass p-4 rounded-2xl border border-white flex items-center gap-4 italic-text-off">
+      <div className="glass p-4 rounded-none border border-white flex items-center gap-4 italic-text-off">
           <div className="flex-1 relative">
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
               <input 
                   type="text" 
                   placeholder="Filter by Job ID, Tenant ID, or Type..." 
-                  className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  className="w-full bg-slate-50 border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
               />
           </div>
           <div className="flex items-center gap-2">
-            <button className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
+            <button className="px-4 py-2 bg-slate-50 rounded-none border border-slate-100 flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
                 <FunnelIcon className="w-4 h-4" />
                 <span>Status: All</span>
             </button>
-            <button className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest leading-none shadow-lg shadow-slate-900/10 active:scale-95 transition-all">
+            <button className="px-4 py-2 rounded-none bg-slate-900 text-white text-xs font-black uppercase tracking-widest leading-none shadow-lg shadow-slate-900/10 active:scale-95 transition-all">
                 Force Redispatch
             </button>
           </div>
@@ -57,7 +57,7 @@ export const JobsPage: React.FC = () => {
           {
             header: 'Type',
             accessor: (j) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+              <span className="px-2 py-0.5 rounded-none bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                 {j.type}
               </span>
             )
@@ -95,7 +95,7 @@ export const JobsPage: React.FC = () => {
           {
             header: '',
             accessor: () => (
-              <button className="p-2 rounded-lg text-slate-300 hover:text-primary transition-colors">
+              <button className="p-2 rounded-none text-slate-300 hover:text-primary transition-colors">
                 <ArrowTopRightOnSquareIcon className="w-4 h-4" />
               </button>
             ),

@@ -101,7 +101,7 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
                                             <span className="font-bold text-slate-700">{r.action.replace('_', ' ')}</span>
                                             <a
                                                 href={`/admin/help?q=${r.action.toLowerCase()}`}
-                                                className="opacity-0 group-hover/action:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-blue-600 px-2 py-1 rounded shadow-none border border-blue-100 hover:bg-blue-50"
+                                                className="opacity-0 group-hover/action:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-blue-600 px-2 py-1 rounded-none shadow-none border border-blue-100 hover:bg-blue-50"
                                             >
                                                 ℹ What is this?
                                             </a>
@@ -109,7 +109,7 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
                                     </td>
                                     <td className="py-4 px-6">
                                         {r.policy_slug ? (
-                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold font-mono">
+                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-none text-[10px] font-bold font-mono">
                                                 {r.policy_slug}
                                             </span>
                                         ) : <span className="text-slate-300">-</span>}
@@ -120,7 +120,7 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
                                     </td>
                                     <td className="py-4 px-6 text-right">
                                         {r.job_id ? (
-                                            <span className="font-mono text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded">
+                                            <span className="font-mono text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded-none">
                                                 {r.job_id.split('-')[0]}
                                             </span>
                                         ) : <span className="text-slate-300">-</span>}

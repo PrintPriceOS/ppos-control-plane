@@ -500,7 +500,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             <MapPinIcon className="w-3 h-3" /> {d.node_id.slice(0, 8)}
                                         </div>
                                     </div>
-                                    <div className={`text-[8px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${getStatusColor(d.status)}`}>
+                                    <div className={`text-[8px] font-black px-2 py-0.5 rounded-none border uppercase tracking-widest ${getStatusColor(d.status)}`}>
                                         {d.status}
                                     </div>
                                 </button>
@@ -535,7 +535,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             <h3 className="text-2xl font-black text-white tracking-tighter uppercase">DISPATCH {selectedDispatch.id.slice(-8)}</h3>
                                             <FingerPrintIcon className="w-4 h-4 text-slate-600" />
                                             {selectedDispatch.metadata_json?.autonomous && (
-                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[8px] font-black text-blue-400 uppercase tracking-widest">
+                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-none text-[8px] font-black text-blue-400 uppercase tracking-widest">
                                                     <BoltIcon className="w-2 h-2" /> Autonomous Decision
                                                 </div>
                                             )}
@@ -666,7 +666,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                                 <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Contributing Factors</div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedDispatch.metadata_json.predictive_risk.factors?.map((f: string) => (
-                                                        <span key={f} className="px-2 py-0.5 bg-slate-800 rounded text-[8px] font-black text-slate-400 uppercase border border-slate-700">
+                                                        <span key={f} className="px-2 py-0.5 bg-slate-800 rounded-none text-[8px] font-black text-slate-400 uppercase border border-slate-700">
                                                             {f}
                                                         </span>
                                                     ))}
@@ -707,7 +707,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Confidence</span>
-                                                    <span className="text-[10px] font-bold text-white px-2 py-0.5 bg-cyan-500/20 rounded uppercase tracking-widest">{selectedDispatch.metadata_json.autonomous_recovery.confidence}</span>
+                                                    <span className="text-[10px] font-bold text-white px-2 py-0.5 bg-cyan-500/20 rounded-none uppercase tracking-widest">{selectedDispatch.metadata_json.autonomous_recovery.confidence}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Old Node</span>

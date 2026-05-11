@@ -30,13 +30,13 @@ export const DeploymentRiskPage: React.FC = () => {
         {loading ? (
           <div className="col-span-full py-12 text-center text-gray-400 font-medium">Scanning deployment nodes...</div>
         ) : deployments.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+          <div className="col-span-full py-12 text-center text-gray-400 bg-gray-50 rounded-none border-2 border-dashed border-gray-200">
             No infrastructure risks detected. System health is optimal.
           </div>
         ) : deployments.map(dep => (
           <div 
             key={dep.deploymentId} 
-            className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-indigo-500"
+            className="bg-white p-6 rounded-none border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-indigo-500"
             onClick={() => setSelectedEntity(dep)}
           >
             <div className="flex justify-between items-start mb-4">

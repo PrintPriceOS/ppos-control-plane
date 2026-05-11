@@ -27,9 +27,9 @@ export const ConfidenceEvolution: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                 {confidenceData.length === 0 ? (
-                    <div className="col-span-2 p-8 text-center text-slate-400 border-2 border-dashed rounded-xl">No confidence data initialized.</div>
+                    <div className="col-span-2 p-8 text-center text-slate-400 border-2 border-dashed rounded-none">No confidence data initialized.</div>
                 ) : confidenceData.map((c, idx) => (
-                    <div key={idx} className="bg-white border rounded-xl p-5 shadow-sm">
+                    <div key={idx} className="bg-white border rounded-none p-5 shadow-sm">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-800">{c.strategyType}</h3>
                             <span className="text-xs">{renderTrendIcon(c.trend)}</span>
@@ -42,8 +42,8 @@ export const ConfidenceEvolution: React.FC = () => {
                             </span>
                         </div>
                         
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-1 overflow-hidden">
-                            <div className={`h-2.5 rounded-full ${c.confidenceScore < 0.3 ? 'bg-red-500' : 'bg-blue-600'}`} style={{ width: `${Math.max(c.confidenceScore * 100, 2)}%` }}></div>
+                        <div className="w-full bg-slate-100 rounded-none h-2.5 mb-1 overflow-hidden">
+                            <div className={`h-2.5 rounded-none ${c.confidenceScore < 0.3 ? 'bg-red-500' : 'bg-blue-600'}`} style={{ width: `${Math.max(c.confidenceScore * 100, 2)}%` }}></div>
                         </div>
                         <div className="flex justify-between text-xs text-slate-400 mt-1">
                             <span>0% (Suppressed)</span>

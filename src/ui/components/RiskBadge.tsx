@@ -17,7 +17,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ level, score, showScore = 
   };
 
   return (
-    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[level]}`}>
+    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-none text-xs font-semibold border ${styles[level]}`}>
       <span className="mr-1">{level}</span>
       {showScore && score !== undefined && (
         <span className="opacity-70">({score})</span>

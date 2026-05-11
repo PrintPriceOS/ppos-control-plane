@@ -65,7 +65,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-slate-200 sticky top-0 bg-white/90 backdrop-blur-md z-10">
                     <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 ${getStatusColor(data?.profile?.status)}`}>
+                        <div className={`w-12 h-12 rounded-none flex items-center justify-center border-2 ${getStatusColor(data?.profile?.status)}`}>
                             <BuildingOfficeIcon className="w-6 h-6" />
                         </div>
                         <div>
@@ -73,14 +73,14 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Printer ID: {printerId}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-none transition-colors">
                         <XMarkIcon className="w-6 h-6 text-slate-400" />
                     </button>
                 </div>
 
                 {loading ? (
                     <div className="p-20 flex flex-col items-center gap-4 text-slate-400">
-                        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-none animate-spin" />
                         <span className="text-xs font-black uppercase tracking-widest">Loading node data...</span>
                     </div>
                 ) : data && (
@@ -91,38 +91,38 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 {data.profile.status !== 'ACTIVE' ? (
                                     <button
                                         onClick={() => onAction(printerId, 'approve')}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-2xl text-sm font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
+                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-none text-sm font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
                                     >
                                         <CheckCircleIcon className="w-5 h-5" /> Approve & Enable Routing
                                     </button>
                                 ) : (
                                     <button
                                         onClick={() => onAction(printerId, 'suspend')}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-rose-100 text-rose-600 rounded-2xl text-sm font-black hover:bg-rose-50 transition-all"
+                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-rose-100 text-rose-600 rounded-none text-sm font-black hover:bg-rose-50 transition-all"
                                     >
                                         <XCircleIcon className="w-5 h-5" /> Suspend Operations
                                     </button>
                                 )}
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center">
+                                <div className="p-3 bg-white rounded-none border border-slate-200 text-center">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Status</div>
                                     <div className="text-xs font-bold text-slate-900">{data.profile.status}</div>
                                 </div>
-                                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center">
+                                <div className="p-3 bg-white rounded-none border border-slate-200 text-center">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Connect</div>
                                     <div className="text-xs font-bold text-slate-900">{data.profile.connect_status}</div>
                                 </div>
-                                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center">
+                                <div className="p-3 bg-white rounded-none border border-slate-200 text-center">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Quality</div>
                                     <div className="text-xs font-bold text-slate-900">{(data.profile.quality_score * 100).toFixed(0)}%</div>
                                 </div>
-                                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center col-span-3">
+                                <div className="p-3 bg-white rounded-none border border-slate-200 text-center col-span-3">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Last API Sync</div>
                                     <div className="text-xs font-bold text-slate-900 flex items-center justify-center gap-2">
                                         <SignalIcon className={`w-3 h-3 ${data.profile.sync_status === 'HEALTHY' ? 'text-emerald-500' : 'text-rose-400'}`} />
                                         {data.profile.last_sync_at ? new Date(data.profile.last_sync_at).toLocaleString() : 'NEVER'}
-                                        <span className={`ml-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${data.profile.sync_status === 'HEALTHY' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                        <span className={`ml-2 px-2 py-0.5 rounded-none text-[8px] font-black uppercase ${data.profile.sync_status === 'HEALTHY' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                             {data.profile.sync_status}
                                         </span>
                                     </div>
@@ -138,7 +138,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                             </h3>
                             <div className="grid gap-2">
                                 {data.machines.map((m: any, idx: number) => (
-                                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
+                                    <div key={idx} className="bg-white p-4 rounded-none border border-slate-200 flex items-center justify-between">
                                         <div>
                                             <div className="text-sm font-black text-slate-900">{m.nickname || m.name}</div>
                                             <div className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2">
@@ -151,14 +151,14 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                                 <div className="text-[8px] italic text-slate-400 mt-1 uppercase">Updated: {new Date(m.last_status_update).toLocaleTimeString()}</div>
                                             )}
                                         </div>
-                                        <div className="text-xs font-heavy text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 text-right">
+                                        <div className="text-xs font-heavy text-slate-500 bg-slate-50 px-2 py-1 rounded-none border border-slate-100 text-right">
                                             <div className="text-[8px] font-black text-slate-300 uppercase">Index</div>
                                             {m.capacity_index}
                                         </div>
                                     </div>
                                 ))}
                                 {data.machines.length === 0 && (
-                                    <div className="p-6 text-center bg-slate-100/50 rounded-xl border border-slate-200 text-slate-400 text-[10px] uppercase font-black tracking-widest">
+                                    <div className="p-6 text-center bg-slate-100/50 rounded-none border border-slate-200 text-slate-400 text-[10px] uppercase font-black tracking-widest">
                                         No hardware registered
                                     </div>
                                 )}
@@ -171,7 +171,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 <CalendarIcon className="w-4 h-4 text-slate-400" />
                                 Capacity Log (Last 7 Days)
                             </h3>
-                            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+                            <div className="bg-white rounded-none border border-slate-200 divide-y divide-slate-100">
                                 {data.capacity.map((c: any, idx: number) => (
                                     <div key={idx} className="px-4 py-3 flex items-center justify-between">
                                         <div className="text-xs font-bold text-slate-700">{new Date(c.date).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</div>
@@ -199,7 +199,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 <BoltIcon className="w-4 h-4 text-amber-500" />
                                 Active Capacity Reservations
                             </h3>
-                            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                            <div className="bg-white rounded-none border border-slate-200 divide-y divide-slate-100 overflow-hidden">
                                 {data.reservations && data.reservations.map((r: any, idx: number) => (
                                     <div key={idx} className="px-4 py-3 flex items-center justify-between bg-amber-50/30">
                                         <div>
@@ -223,7 +223,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 <RocketLaunchIcon className="w-4 h-4 text-rose-500" />
                                 Recent Dispatches
                             </h3>
-                            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                            <div className="bg-white rounded-none border border-slate-200 divide-y divide-slate-100 overflow-hidden">
                                 {data.assignments && data.assignments.map((a: any, idx: number) => (
                                     <div key={idx} className="px-4 py-3 flex items-center justify-between">
                                         <div>
@@ -254,7 +254,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                     <ShieldCheckIcon className="w-4 h-4 text-slate-400" />
                                     Eligibility Check
                                 </h3>
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                                <div className="bg-white p-4 rounded-none border border-slate-200 space-y-2">
                                     {data.eligibility.reasons.map((r: any, idx: number) => (
                                         <div key={idx} className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase">{r.label}</span>
@@ -273,13 +273,13 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 </h3>
                                 <div className="space-y-2">
                                     {data.health_warnings.map((w: any, idx: number) => (
-                                        <div key={idx} className={`p-3 rounded-xl border flex gap-2 ${w.severity === 'CRITICAL' ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+                                        <div key={idx} className={`p-3 rounded-none border flex gap-2 ${w.severity === 'CRITICAL' ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
                                             <ExclamationTriangleIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                                             <div className="text-[10px] font-bold leading-tight">{w.message}</div>
                                         </div>
                                     ))}
                                     {data.health_warnings.length === 0 && (
-                                        <div className="p-6 text-center bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
+                                        <div className="p-6 text-center bg-emerald-50 rounded-none border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
                                             Healthy
                                         </div>
                                     )}
@@ -293,7 +293,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 <ChartBarSquareIcon className="w-4 h-4 text-indigo-500" />
                                 Historical Performance
                             </h3>
-                            <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-xl shadow-indigo-100">
+                            <div className="bg-indigo-900 rounded-none p-6 text-white shadow-xl shadow-indigo-100">
                                 <div className="grid grid-cols-2 gap-8 mb-6">
                                     <div>
                                         <div className="text-[8px] font-black text-indigo-300 uppercase tracking-widest mb-1">Jobs Processed</div>
@@ -311,7 +311,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                         <span className="font-bold uppercase text-indigo-300 tracking-wider">On-Time Delivery</span>
                                         <span className="font-black">{(data.performance?.on_time_delivery_rate * 100 || 100).toFixed(0)}%</span>
                                     </div>
-                                    <div className="w-full bg-indigo-800 h-1.5 rounded-full overflow-hidden">
+                                    <div className="w-full bg-indigo-800 h-1.5 rounded-none overflow-hidden">
                                         <div
                                             className="bg-emerald-400 h-full transition-all duration-1000"
                                             style={{ width: `${(data.performance?.on_time_delivery_rate * 100 || 100)}%` }}
@@ -335,12 +335,12 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                             </h3>
                             <div className="flex flex-wrap gap-2">
                                 {data.service_regions.map((r: any, idx: number) => (
-                                    <span key={idx} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600">
+                                    <span key={idx} className="px-3 py-1 bg-white border border-slate-200 rounded-none text-xs font-bold text-slate-600">
                                         {r.region} ({r.country})
                                     </span>
                                 ))}
                                 {data.service_regions.length === 0 && (
-                                    <div className="w-full p-4 text-center bg-slate-100 rounded-xl text-slate-400 text-[10px] font-black uppercase">No regions defined</div>
+                                    <div className="w-full p-4 text-center bg-slate-100 rounded-none text-slate-400 text-[10px] font-black uppercase">No regions defined</div>
                                 )}
                             </div>
                         </div>

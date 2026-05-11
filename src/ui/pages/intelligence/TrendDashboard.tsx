@@ -36,7 +36,7 @@ export const TrendDashboard: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900 font-display">Predictive Trend Dashboard</h1>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-none border border-gray-200 shadow-sm overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-4 bg-gray-50 border-b border-gray-200 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
           <div className="px-6 py-3">Entity</div>
           <div className="px-6 py-3">Metric</div>
@@ -61,8 +61,8 @@ export const TrendDashboard: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-mono text-gray-600 mb-1">{Math.round(t.confidence * 100)}%</div>
-                  <div className="w-full bg-gray-200 rounded-full h-1 ml-auto max-w-[60px]">
-                    <div className="bg-indigo-500 h-1 rounded-full" style={{ width: `${t.confidence * 100}%` }}></div>
+                  <div className="w-full bg-gray-200 rounded-none h-1 ml-auto max-w-[60px]">
+                    <div className="bg-indigo-500 h-1 rounded-none" style={{ width: `${t.confidence * 100}%` }}></div>
                   </div>
                 </div>
               </div>
@@ -71,8 +71,8 @@ export const TrendDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-8 bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex items-start gap-4">
-        <div className="bg-indigo-100 p-2 rounded">
+      <div className="mt-8 bg-indigo-50 border border-indigo-100 p-4 rounded-none flex items-start gap-4">
+        <div className="bg-indigo-100 p-2 rounded-none">
           <ChartBarIcon className="w-5 h-5 text-indigo-600" />
         </div>
         <div>

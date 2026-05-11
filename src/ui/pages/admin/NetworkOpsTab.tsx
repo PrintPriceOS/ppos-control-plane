@@ -206,7 +206,7 @@ export const NetworkOpsTab: React.FC = () => {
                                                     {p.connect_status}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-600">
+                                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded-none text-[10px] font-black text-slate-600">
                                                         <CpuChipIcon className="w-3 h-3" />
                                                         {p.machines_count}
                                                     </div>

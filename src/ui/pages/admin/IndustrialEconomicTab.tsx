@@ -28,7 +28,7 @@ export const IndustrialEconomicTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Economic Header */}
-            <div className="p-10 bg-emerald-950 rounded-[3rem] text-white shadow-none relative overflow-hidden border border-emerald-900">
+            <div className="p-10 bg-emerald-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-emerald-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-emerald-500/20 rounded-none border border-emerald-500/30">
@@ -55,14 +55,14 @@ export const IndustrialEconomicTab: React.FC = () => {
             {/* Economic Risk Radar & Margin Timeline */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Economic Risk Radar */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ShieldExclamationIcon className="w-4 h-4 text-red-500" />
                         Predictive Economic Risk Radar
                     </h3>
                     <div className="space-y-6">
                         {(risk.data?.risks || []).map((r: any, idx: number) => (
-                            <div key={idx} className="p-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] relative overflow-hidden group hover:border-red-200 transition-all">
+                            <div key={idx} className="p-5 bg-slate-50 border border-slate-100 rounded-none-[1.5rem] relative overflow-hidden group hover:border-red-200 transition-all">
                                 <div className="relative z-10 flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{r.region}</p>
@@ -82,7 +82,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                 </div>
 
                 {/* Dispatch Margin Timeline */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-none">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none">
                     <div className="flex items-center justify-between mb-8">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <PresentationChartLineIcon className="w-4 h-4 text-emerald-400" />
@@ -120,7 +120,7 @@ export const IndustrialEconomicTab: React.FC = () => {
             {/* Federation Profitability Map & Energy Load */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Cost Escalation Forecast */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none relative overflow-hidden">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ArrowPathIcon className="w-4 h-4" />
                         Cost Escalation Forecast
@@ -147,7 +147,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                 </div>
 
                 {/* Regional Energy Load Panel */}
-                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <BoltIcon className="w-4 h-4 text-yellow-500" />
                         Regional Energy Load Panel
@@ -174,7 +174,7 @@ export const IndustrialEconomicTab: React.FC = () => {
             </div>
 
             {/* Economic Optimization Feed */}
-            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-none overflow-hidden">
+            <div className="bg-white rounded-none-[2.5rem] border border-slate-200 shadow-none overflow-hidden">
                 <div className="p-8 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         <ArrowPathIcon className="w-4 h-4" />

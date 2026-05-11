@@ -45,7 +45,7 @@ export const PreflightArtifactsPage: React.FC = () => {
         <p className="text-sm text-slate-500 font-medium">Registry of generated PDFs and JSON reports.</p>
       </div>
 
-      <div className="glass p-4 rounded-2xl border border-white dark:border-white/[0.08] italic-text-off max-w-xl">
+      <div className="glass p-4 rounded-none border border-white dark:border-white/[0.08] italic-text-off max-w-xl">
           <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
               <input 
@@ -53,7 +53,7 @@ export const PreflightArtifactsPage: React.FC = () => {
                   placeholder="Enter Job ID to view artifacts..." 
                   value={searchJobId}
                   onChange={(e) => setSearchJobId(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
               />
           </div>
       </div>
@@ -86,7 +86,7 @@ export const PreflightArtifactsPage: React.FC = () => {
           {
             header: 'Type',
             accessor: (a) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
+              <span className="px-2 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
                 {a.type}
               </span>
             )
@@ -105,14 +105,14 @@ export const PreflightArtifactsPage: React.FC = () => {
               <div className="flex justify-end gap-2">
                 <button 
                   onClick={() => handleDownload(a.id)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-primary/20 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary font-black text-[10px] uppercase tracking-widest rounded-none hover:bg-primary/20 transition-colors"
                 >
                   <DocumentArrowDownIcon className="w-3.5 h-3.5" />
                   Download
                 </button>
                 <button 
                   onClick={() => handleDelete(a.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-none transition-all"
                   title="Delete Artifact"
                 >
                   <TrashIcon className="w-4 h-4" />

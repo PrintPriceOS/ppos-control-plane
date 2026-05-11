@@ -36,7 +36,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Governance Header */}
-            <div className="p-10 bg-indigo-950 rounded-[3rem] text-white shadow-none relative overflow-hidden border border-indigo-900">
+            <div className="p-10 bg-indigo-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-indigo-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-indigo-500/20 rounded-none border border-indigo-500/30">
@@ -66,14 +66,14 @@ export const IndustrialGovernanceTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Systemic Risk Radar */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ExclamationTriangleIcon className="w-4 h-4 text-orange-500" />
                         Cascading Failure Radar
                     </h3>
                     <div className="space-y-6">
                         {(systemic.data?.risks || []).map((r: any, idx: number) => (
-                            <div key={idx} className="p-5 bg-orange-50 border border-orange-100 rounded-[1.5rem] relative overflow-hidden">
+                            <div key={idx} className="p-5 bg-orange-50 border border-orange-100 rounded-none-[1.5rem] relative overflow-hidden">
                                 <p className="text-[10px] font-black text-orange-600 uppercase mb-1">{r.risk_type}</p>
                                 <div className="flex items-end justify-between">
                                     <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Systemic Impact</p>
@@ -93,7 +93,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                 </div>
 
                 {/* Planetary Resilience Map */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
                     <div className="relative z-10">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                             <GlobeAltIcon className="w-4 h-4 text-indigo-400" />
@@ -118,7 +118,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
             {/* Continuity & Enforcement */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Governance Enforcement Feed */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ScaleIcon className="w-4 h-4" />
                         Governance Enforcement Feed
@@ -141,7 +141,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                 </div>
 
                 {/* Continuity Stability Timeline */}
-                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ServerStackIcon className="w-4 h-4 text-indigo-500" />
                         Federation Survivability Index

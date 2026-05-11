@@ -18,7 +18,7 @@ export const RecommendationList: React.FC = () => {
     }, []);
 
     if (loading) return <div className="space-y-4 animate-pulse">
-        {[1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-100 rounded-[2rem]" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-100 rounded-none-[2rem]" />)}
     </div>;
 
     return (
@@ -38,9 +38,9 @@ export const RecommendationList: React.FC = () => {
                     <div 
                         key={rec.id}
                         onClick={() => setSelectedRec(rec)}
-                        className="group flex flex-col md:flex-row items-start md:items-center gap-6 p-8 bg-white border border-slate-200 rounded-[2.5rem] hover:shadow-xl hover:shadow-slate-100 transition-all duration-300 cursor-pointer"
+                        className="group flex flex-col md:flex-row items-start md:items-center gap-6 p-8 bg-white border border-slate-200 rounded-none-[2.5rem] hover:shadow-xl hover:shadow-slate-100 transition-all duration-300 cursor-pointer"
                     >
-                        <div className={`p-4 rounded-2xl ${
+                        <div className={`p-4 rounded-none ${
                             rec.severity === 'HIGH' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'
                         }`}>
                             <WrenchScrewdriverIcon className="w-8 h-8" />
@@ -51,7 +51,7 @@ export const RecommendationList: React.FC = () => {
                                 <h4 className="text-xl font-black text-slate-900 group-hover:text-primary transition-colors">
                                     {rec.summary}
                                 </h4>
-                                <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                                <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-none uppercase">
                                     {rec.actionMode}
                                 </span>
                             </div>
@@ -66,7 +66,7 @@ export const RecommendationList: React.FC = () => {
                 ))}
 
                 {recommendations.length === 0 && (
-                    <div className="py-20 text-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                    <div className="py-20 text-center bg-slate-50 rounded-none-[2.5rem] border-2 border-dashed border-slate-200">
                         <p className="text-slate-400 font-bold uppercase tracking-widest italic-text-off">No active recommendations for current platform state</p>
                     </div>
                 )}

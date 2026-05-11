@@ -228,7 +228,7 @@ export default function TenantManagement() {
     };
 
     const Sparkline = ({ data }: { data: number[] }) => {
-        if (!data || data.length < 2) return <div className="h-8 w-24 bg-slate-50 rounded flex items-center justify-center text-[10px] text-slate-300">No trend data</div>;
+        if (!data || data.length < 2) return <div className="h-8 w-24 bg-slate-50 rounded-none flex items-center justify-center text-[10px] text-slate-300">No trend data</div>;
 
         const max = Math.max(...data, 1);
         const height = 32;
@@ -436,7 +436,7 @@ export default function TenantManagement() {
                                             <p className="font-bold text-rose-900 uppercase tracking-tighter">Threshold Alerts Fired Today</p>
                                             <div className="flex gap-2 mt-1">
                                                 {(tenant.alerts_state_json?.fired || []).map(lvl => (
-                                                    <span key={lvl} className="bg-rose-600 text-white px-1.5 py-0.5 rounded text-[10px] font-black">
+                                                    <span key={lvl} className="bg-rose-600 text-white px-1.5 py-0.5 rounded-none text-[10px] font-black">
                                                         {lvl}% REACHED
                                                     </span>
                                                 ))}
@@ -623,7 +623,7 @@ export default function TenantManagement() {
                                                         email: e.target.checked
                                                     }
                                                 })}
-                                                className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
+                                                className="w-5 h-5 rounded-none border-slate-300 text-primary focus:ring-primary"
                                             />
                                         </div>
                                         <input
@@ -666,7 +666,7 @@ export default function TenantManagement() {
                                                                 }
                                                             });
                                                         }}
-                                                        className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                                        className="w-4 h-4 rounded-none border-slate-300 text-purple-600 focus:ring-purple-500"
                                                     />
                                                     <span className="text-xs font-mono text-slate-600">{evt}</span>
                                                 </label>

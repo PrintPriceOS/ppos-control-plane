@@ -131,7 +131,7 @@ const EMPTY_FORM: FormState = {
 };
 
 // ── Styling helpers ────────────────────────────────────────────────────────────
-const inp = "px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400/30 focus:border-slate-400 bg-white w-full";
+const inp = "px-3 py-1.5 rounded-none border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400/30 focus:border-slate-400 bg-white w-full";
 const lbl = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1";
 
 const FORM_TABS = ['Basic', 'Operational', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
@@ -210,13 +210,13 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-start justify-center p-4 pt-6">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="w-full max-w-6xl bg-white rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: '92vh' }}>
+                            <DialogPanel className="w-full max-w-6xl bg-white rounded-none shadow-2xl flex flex-col" style={{ maxHeight: '92vh' }}>
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 flex-shrink-0">
                                     <h2 className="text-xl font-black text-slate-900 tracking-tight">
                                         {editing ? `Edit: ${editing.name}` : 'Add Printhouse'}
                                     </h2>
-                                    <button onClick={onClose} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
+                                    <button onClick={onClose} className="p-2 rounded-none bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
                                         <XMarkIcon className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -253,7 +253,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                             return (
                                                                 <button key={sig} type="button"
                                                                     onClick={() => setForm(f => ({ ...f, signatures: [sig] }))}
-                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${active ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+                                                                    className={`px-3 py-1.5 rounded-none text-xs font-black uppercase tracking-widest border transition-colors ${active ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
                                                                     {sig}p
                                                                 </button>
                                                             );
@@ -289,7 +289,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     {(['Active', 'Under Maintenance', 'Inactive'] as const).map(s => (
                                                         <button key={s} type="button"
                                                             onClick={() => setForm(f => ({ ...f, status: s }))}
-                                                            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-colors ${form.status === s
+                                                            className={`px-3 py-1.5 rounded-none text-xs font-black uppercase tracking-widest border transition-colors ${form.status === s
                                                                 ? s === 'Active' ? 'bg-emerald-600 text-white border-emerald-600'
                                                                     : s === 'Under Maintenance' ? 'bg-amber-500 text-white border-amber-500'
                                                                     : 'bg-slate-500 text-white border-slate-500'
@@ -346,7 +346,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                         onChange={e => setForm(f => ({ ...f, longitude: parseFloat(e.target.value) || 0 }))} className={inp} />
                                                 </div>
                                             </div>
-                                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                            <div className="p-4 bg-slate-50 rounded-none border border-slate-100">
                                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Routing Intelligence Note</p>
                                               <p className="text-xs text-slate-500 leading-relaxed">
                                                 Providing precise geographic coordinates enables the Global Manufacturing Grid to perform deterministic routing calculations and proximity-based dispatch balancing.
@@ -506,7 +506,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                             <div className="flex gap-1.5 flex-wrap">
                                                 {BINDING_CONFIGS.map(b => (
                                                     <button key={b.key} onClick={() => setBindingTab(b.key)}
-                                                        className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-colors ${bindingTab === b.key ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                                        className={`px-3 py-1.5 rounded-none text-[11px] font-black uppercase tracking-widest transition-colors ${bindingTab === b.key ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                                                         {b.label}
                                                     </button>
                                                 ))}
@@ -631,7 +631,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input type="checkbox" checked={form.rates.technical_costs_for_transport}
                                                     onChange={e => setRates(r => ({ ...r, technical_costs_for_transport: e.target.checked }))}
-                                                    className="w-4 h-4 rounded border-slate-300 text-slate-800 focus:ring-slate-500" />
+                                                    className="w-4 h-4 rounded-none border-slate-300 text-slate-800 focus:ring-slate-500" />
                                                 <span className="text-sm font-bold text-slate-700">Technical costs for transport</span>
                                             </label>
                                             <div className="max-w-xs">
@@ -663,11 +663,11 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                 {/* Footer */}
                                 <div className="flex items-center gap-3 px-8 py-5 border-t border-slate-100 flex-shrink-0">
                                     <button onClick={handleSave} disabled={saving || !form.id.trim() || !form.name.trim()}
-                                        className="px-6 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        className="px-6 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                         {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Printhouse'}
                                     </button>
                                     <button onClick={onClose}
-                                        className="px-6 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        className="px-6 py-2.5 rounded-none border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                                         Cancel
                                     </button>
                                 </div>
@@ -716,7 +716,7 @@ export const PrinthousesPage: React.FC = () => {
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
                 </div>
                 <button onClick={openAdd}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors">
                     <PlusIcon className="w-4 h-4" />
                     Add Printhouse
                 </button>
@@ -728,8 +728,8 @@ export const PrinthousesPage: React.FC = () => {
                     { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon, color: 'blue' },
                     { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon, color: 'indigo' },
                 ].map((stat, i) => (
-                    <div key={i} className="glass p-5 rounded-2xl border border-white flex items-center gap-2">
-                        <div className={`p-3 rounded-xl bg-${stat.color}/10 text-${stat.color}`}>
+                    <div key={i} className="glass p-5 rounded-none border border-white flex items-center gap-2">
+                        <div className={`p-3 rounded-none bg-${stat.color}/10 text-${stat.color}`}>
                             <stat.icon className="w-6 h-6" />
                         </div>
                         <div>
@@ -741,7 +741,7 @@ export const PrinthousesPage: React.FC = () => {
             </div>
 
             {q.status === 'error' && (
-                <div className="glass px-5 py-4 rounded-2xl border border-red-200 bg-red-50 text-sm font-medium text-red-600">
+                <div className="glass px-5 py-4 rounded-none border border-red-200 bg-red-50 text-sm font-medium text-red-600">
                     Failed to load printhouses: {q.error}
                 </div>
             )}
@@ -754,7 +754,7 @@ export const PrinthousesPage: React.FC = () => {
                         header: 'Printhouse',
                         accessor: (p) => (
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <div className="w-7 h-7 rounded-none bg-slate-100 flex items-center justify-center flex-shrink-0">
                                     <PrinterIcon className="w-4 h-4 text-slate-400" />
                                 </div>
                                 <div>
@@ -769,7 +769,7 @@ export const PrinthousesPage: React.FC = () => {
                         accessor: (p) => (
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 {(p.signatures ?? []).map(s => (
-                                    <span key={s} className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">{s}p</span>
+                                    <span key={s} className="px-2 py-0.5 rounded-none bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">{s}p</span>
                                 ))}
                             </div>
                         ),
@@ -786,7 +786,7 @@ export const PrinthousesPage: React.FC = () => {
                     {
                         header: 'Lead Days',
                         accessor: (p) => (
-                            <span className="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-bold text-[10px] uppercase tracking-widest">{p.production_lead_days}d</span>
+                            <span className="px-2 py-0.5 rounded-none bg-blue-50 text-blue-700 font-bold text-[10px] uppercase tracking-widest">{p.production_lead_days}d</span>
                         ),
                     },
                     {
@@ -813,7 +813,7 @@ export const PrinthousesPage: React.FC = () => {
                                 : s === 'Under Maintenance'
                                 ? 'bg-amber-50 text-amber-700'
                                 : 'bg-slate-100 text-slate-500';
-                            return <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
+                            return <span className={`px-2 py-0.5 rounded-none text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
                         },
                     },
                     {
@@ -821,11 +821,11 @@ export const PrinthousesPage: React.FC = () => {
                         accessor: (p) => (
                             <div className="flex items-center gap-1 justify-end">
                                 <button onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                                    className="p-2 rounded-lg text-slate-300 hover:text-slate-600 transition-colors" title="Edit">
+                                    className="p-2 rounded-none text-slate-300 hover:text-slate-600 transition-colors" title="Edit">
                                     <PencilSquareIcon className="w-4 h-4" />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
-                                    className="p-2 rounded-lg text-slate-300 hover:text-red-500 transition-colors" title="Delete">
+                                    className="p-2 rounded-none text-slate-300 hover:text-red-500 transition-colors" title="Delete">
                                     <TrashIcon className="w-4 h-4" />
                                 </button>
                             </div>
@@ -845,9 +845,9 @@ export const PrinthousesPage: React.FC = () => {
                     </TransitionChild>
                     <div className="fixed inset-0 flex items-center justify-center p-4">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full space-y-4">
+                            <DialogPanel className="bg-white rounded-none shadow-2xl p-8 max-w-sm w-full space-y-4">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-3 rounded-xl bg-red-50 text-red-500"><TrashIcon className="w-6 h-6" /></div>
+                                    <div className="p-3 rounded-none bg-red-50 text-red-500"><TrashIcon className="w-6 h-6" /></div>
                                     <div>
                                         <p className="text-sm font-black text-slate-900">Delete Printhouse</p>
                                         <p className="text-xs text-slate-500 font-medium">This action cannot be undone.</p>
@@ -858,11 +858,11 @@ export const PrinthousesPage: React.FC = () => {
                                 </p>
                                 <div className="flex gap-2 pt-2">
                                     <button onClick={confirmDelete} disabled={deleting}
-                                        className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        className="flex-1 py-2.5 rounded-none bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                         {deleting ? 'Deleting…' : 'Delete'}
                                     </button>
                                     <button onClick={() => setDeleteTarget(null)}
-                                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        className="flex-1 py-2.5 rounded-none border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                                         Cancel
                                     </button>
                                 </div>

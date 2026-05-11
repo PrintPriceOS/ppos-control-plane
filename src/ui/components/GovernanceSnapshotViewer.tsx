@@ -32,10 +32,10 @@ export const GovernanceSnapshotViewer: React.FC<GovernanceSnapshotViewerProps> =
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-3">
-        <div className="h-4 bg-slate-100 rounded w-1/2" />
+        <div className="h-4 bg-slate-100 rounded-none w-1/2" />
         <div className="grid grid-cols-2 gap-2">
-           <div className="h-10 bg-slate-50 rounded" />
-           <div className="h-10 bg-slate-50 rounded" />
+           <div className="h-10 bg-slate-50 rounded-none" />
+           <div className="h-10 bg-slate-50 rounded-none" />
         </div>
       </div>
     );
@@ -43,7 +43,7 @@ export const GovernanceSnapshotViewer: React.FC<GovernanceSnapshotViewerProps> =
 
   if (!snapshot) {
     return (
-      <div className="p-8 rounded-3xl bg-slate-50 border border-dashed border-slate-200 text-center">
+      <div className="p-8 rounded-none bg-slate-50 border border-dashed border-slate-200 text-center">
         <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic-text-off">Governance Snapshot Not Available</p>
         <p className="text-[10px] text-slate-400 mt-2 italic-text-off">No policy posture was recorded for this specific trace identifier.</p>
       </div>
@@ -67,7 +67,7 @@ export const GovernanceSnapshotViewer: React.FC<GovernanceSnapshotViewerProps> =
       </div>
 
       {snapshot.blockReason && (
-        <div className="p-3 rounded-xl bg-red-50 border border-red-100 flex gap-3">
+        <div className="p-3 rounded-none bg-red-50 border border-red-100 flex gap-3">
           <ExclamationTriangleIcon className="w-5 h-5 text-red-500 shrink-0" />
           <div>
              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Block Logic Triggered</p>
@@ -96,7 +96,7 @@ export const GovernanceSnapshotViewer: React.FC<GovernanceSnapshotViewerProps> =
 };
 
 const StatItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
-  <div className="p-3 rounded-xl bg-white border border-slate-100 flex flex-col gap-1 shadow-sm">
+  <div className="p-3 rounded-none bg-white border border-slate-100 flex flex-col gap-1 shadow-sm">
     <div className="flex items-center gap-1.5 text-slate-400">
        <Icon className={`w-3 h-3 ${color === 'emerald' ? 'text-emerald-500' : color === 'amber' ? 'text-amber-500' : ''}`} />
        <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>

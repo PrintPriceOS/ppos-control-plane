@@ -96,12 +96,12 @@ export const UsageQuotasPage: React.FC = () => {
                         <input 
                             type="text" 
                             placeholder="Filter tenants..." 
-                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all w-64 shadow-sm"
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-none text-xs font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all w-64 shadow-sm"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-                    <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                    <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-none hover:bg-slate-50 transition-colors shadow-sm">
                         <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
@@ -109,8 +109,8 @@ export const UsageQuotasPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat, i) => (
-                    <div key={i} className="glass p-5 rounded-2xl border border-white flex items-center gap-4">
-                        <div className={`p-3 rounded-xl bg-${stat.color || 'primary'}/10 text-${stat.color || 'primary'}`}>
+                    <div key={i} className="glass p-5 rounded-none border border-white flex items-center gap-4">
+                        <div className={`p-3 rounded-none bg-${stat.color || 'primary'}/10 text-${stat.color || 'primary'}`}>
                             <stat.icon className="w-6 h-6" />
                         </div>
                         <div>
@@ -121,16 +121,16 @@ export const UsageQuotasPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm">
+            <div className="glass rounded-none border border-white overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white/50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
+                        <div className="p-2 bg-primary/10 rounded-none">
                             <UsersIcon className="w-5 h-5 text-primary" />
                         </div>
                         <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Tenant Quota Explorer</h2>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse"></div>
                         Live Metering Active
                     </div>
                 </div>
@@ -157,7 +157,7 @@ export const UsageQuotasPage: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-md text-[10px] font-black tracking-widest uppercase ${
+                                        <span className={`px-2 py-1 rounded-none text-[10px] font-black tracking-widest uppercase ${
                                             tenant.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 
                                             tenant.status === 'SUSPENDED' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                                         }`}>
@@ -183,8 +183,8 @@ export const UsageQuotasPage: React.FC = () => {
                                                 <span className="text-[9px] font-black text-slate-400 uppercase">Allocated</span>
                                                 <span className="text-[9px] font-black text-slate-900">80%</span>
                                             </div>
-                                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-primary rounded-full" style={{ width: '80%' }}></div>
+                                            <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden">
+                                                <div className="h-full bg-primary rounded-none" style={{ width: '80%' }}></div>
                                             </div>
                                         </div>
                                     </td>
@@ -205,9 +205,9 @@ export const UsageQuotasPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="glass p-6 rounded-2xl border border-white">
+                <div className="glass p-6 rounded-none border border-white">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                        <div className="p-2 bg-blue-500/10 rounded-none text-blue-500">
                             <ComputerDesktopIcon className="w-5 h-5" />
                         </div>
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Systemic Capacity</h3>
@@ -218,8 +218,8 @@ export const UsageQuotasPage: React.FC = () => {
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">CPU Reservation</span>
                                 <span className="text-xs font-black text-slate-900">42%</span>
                             </div>
-                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: '42%' }}></div>
+                            <div className="h-2 w-full bg-slate-100 rounded-none overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-none transition-all duration-1000" style={{ width: '42%' }}></div>
                             </div>
                         </div>
                         <div>
@@ -227,14 +227,14 @@ export const UsageQuotasPage: React.FC = () => {
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Memory Pressure</span>
                                 <span className="text-xs font-black text-slate-900">28%</span>
                             </div>
-                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000" style={{ width: '28%' }}></div>
+                            <div className="h-2 w-full bg-slate-100 rounded-none overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-none transition-all duration-1000" style={{ width: '28%' }}></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="glass p-6 rounded-2xl border border-white bg-slate-900 text-white overflow-hidden relative">
+                <div className="glass p-6 rounded-none border border-white bg-slate-900 text-white overflow-hidden relative">
                     <div className="absolute top-0 right-0 p-8 opacity-10">
                         <ShieldCheckIcon className="w-32 h-32" />
                     </div>
@@ -244,10 +244,10 @@ export const UsageQuotasPage: React.FC = () => {
                         Tenant traffic is being normalized against available worker fleet capacity.
                     </p>
                     <div className="flex gap-4">
-                        <div className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest border border-white/10">
+                        <div className="px-3 py-1 bg-white/10 rounded-none text-[10px] font-black uppercase tracking-widest border border-white/10">
                             Auto-Scaling: ON
                         </div>
-                        <div className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest border border-white/10">
+                        <div className="px-3 py-1 bg-white/10 rounded-none text-[10px] font-black uppercase tracking-widest border border-white/10">
                             Throttle: 0.0%
                         </div>
                     </div>

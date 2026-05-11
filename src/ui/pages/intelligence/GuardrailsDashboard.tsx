@@ -54,12 +54,12 @@ const GuardrailsDashboard: React.FC = () => {
                     <p className="text-slate-500 mt-1 italic-text-off">Policy-bound interventions and safety controllers.</p>
                 </div>
                 
-                <div className="flex space-x-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex space-x-4 bg-white p-4 rounded-none shadow-sm border border-slate-100">
                     <div className="flex items-center space-x-3 pr-4 border-r border-slate-100">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Global Engine</span>
                         <button 
                             onClick={() => toggleSafety('guardrails_enabled', !safety?.guardrails_enabled)}
-                            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                            className={`px-3 py-1.5 rounded-none font-bold text-xs transition-all ${
                                 safety?.guardrails_enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                             }`}
                         >
@@ -70,7 +70,7 @@ const GuardrailsDashboard: React.FC = () => {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Auto Mode</span>
                         <button 
                             onClick={() => toggleSafety('auto_actions_enabled', !safety?.auto_actions_enabled)}
-                            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                            className={`px-3 py-1.5 rounded-none font-bold text-xs transition-all ${
                                 safety?.auto_actions_enabled ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200' : 'bg-slate-50 text-slate-400'
                             }`}
                         >
@@ -81,7 +81,7 @@ const GuardrailsDashboard: React.FC = () => {
             </div>
 
             {/* Active Guardrails Table */}
-            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-none shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
                     <h2 className="font-bold text-slate-700 flex items-center">
                         <ShieldCheckIcon className="w-5 h-5 mr-2 text-indigo-500" />
@@ -131,7 +131,7 @@ const GuardrailsDashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
+                                        <span className={`px-2 py-1 rounded-none text-[10px] font-bold uppercase ${
                                             safety?.auto_actions_enabled && (d.severity !== 'HIGH' && d.severity !== 'CRITICAL') 
                                                 ? 'bg-emerald-100 text-emerald-700' 
                                                 : 'bg-amber-100 text-amber-700'

@@ -19,9 +19,9 @@ export const SystemHealthPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {services.map(s => (
-                    <div key={s.id} className="glass p-6 rounded-2xl border border-white flex flex-col gap-4 group hover:border-primary/20 transition-all">
+                    <div key={s.id} className="glass p-6 rounded-none border border-white flex flex-col gap-4 group hover:border-primary/20 transition-all">
                         <div className="flex items-center justify-between">
-                            <div className="p-3 rounded-xl bg-slate-100 text-slate-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                            <div className="p-3 rounded-none bg-slate-100 text-slate-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                                 <ServerIcon className="w-6 h-6" />
                             </div>
                             <span className="text-[10px] font-black text-slate-400">PORT {s.id}</span>
@@ -29,7 +29,7 @@ export const SystemHealthPage: React.FC = () => {
                         <div>
                             <p className="text-lg font-black text-slate-900">{s.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <div className="w-2 h-2 rounded-none bg-emerald-500" />
                                 <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">{s.status}</span>
                             </div>
                         </div>
@@ -37,7 +37,7 @@ export const SystemHealthPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="glass p-8 rounded-2xl border border-white">
+            <div className="glass p-8 rounded-none border border-white">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Dependencies & Backends</h3>
                 <div className="space-y-4 italic-text-off">
                     {[
@@ -45,7 +45,7 @@ export const SystemHealthPage: React.FC = () => {
                         { name: 'OS Registry Store (MySQL)', icon: CircleStackIcon, status: 'Connected', latency: '4ms' },
                         { name: 'Federation Gateway', icon: GlobeAltIcon, status: 'Connected', latency: '12ms' }
                     ].map((dep, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 rounded-xl hover:bg-slate-50 transition-colors">
+                        <div key={i} className="flex items-center justify-between p-4 rounded-none hover:bg-slate-50 transition-colors">
                             <div className="flex items-center gap-4">
                                 <dep.icon className="w-5 h-5 text-slate-400" />
                                 <div>

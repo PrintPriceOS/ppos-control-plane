@@ -47,7 +47,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ requestId, stages 
         {stages.map((stage, idx) => (
           <div key={idx} className="relative group transition-all">
             {/* Stage Icon Dot */}
-            <div className={`absolute -left-8 top-0.5 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center transition-all ${
+            <div className={`absolute -left-8 top-0.5 w-8 h-8 rounded-none border-4 border-white flex items-center justify-center transition-all ${
               stage.status === 'SUCCESS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 
               stage.status === 'FAILED' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 
               stage.status === 'PENDING' ? 'bg-blue-500 text-white animate-pulse-slow shadow-lg shadow-blue-500/20' : 'bg-slate-200 text-white'
@@ -58,7 +58,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ requestId, stages 
             </div>
 
             {/* Stage Content */}
-            <div className={`p-4 rounded-2xl border transition-all ${
+            <div className={`p-4 rounded-none border transition-all ${
               stage.status === 'SUCCESS' ? 'bg-white border-slate-100 group-hover:border-emerald-200' : 
               stage.status === 'FAILED' ? 'bg-red-50/20 border-red-100' : 
               stage.status === 'PENDING' ? 'bg-blue-50/20 border-blue-100' : 'bg-slate-50 border-slate-100 opacity-60'
@@ -66,7 +66,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ requestId, stages 
               <div className="flex items-center justify-between gap-4 mb-2">
                  <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{stage.label}</span>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                    <span className={`px-2 py-0.5 rounded-none text-[8px] font-black uppercase tracking-widest ${
                       stage.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' : 
                       stage.status === 'FAILED' ? 'bg-red-100 text-red-700' : 
                       stage.status === 'PENDING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
@@ -86,7 +86,7 @@ export const AuditTimeline: React.FC<AuditTimelineProps> = ({ requestId, stages 
 
               {stage.action_by && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">
-                    <div className="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center font-mono text-[8px] text-slate-500">
+                    <div className="w-4 h-4 rounded-none bg-slate-100 flex items-center justify-center font-mono text-[8px] text-slate-500">
                       {stage.action_by.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Enforced by {stage.action_by}</span>

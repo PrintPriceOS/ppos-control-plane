@@ -117,7 +117,7 @@ export const MachinesPage: React.FC = () => {
                 <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Machines</h1>
                     {q.data?.timestamp && (
-                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-none text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                             <ClockIcon className="w-3 h-3" />
                             <span>Sync: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
                         </div>
@@ -126,7 +126,7 @@ export const MachinesPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                    <button 
                      onClick={() => q.refetch()}
-                     className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/5 transition-colors text-slate-400"
+                     className="p-1.5 rounded-none border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/5 transition-colors text-slate-400"
                      title="Force Telemetry Refresh"
                    >
                      <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
@@ -141,8 +141,8 @@ export const MachinesPage: React.FC = () => {
                     { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, color: 'blue' },
                     { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, color: 'indigo' },
                 ].map((stat, i) => (
-                    <div key={i} className="glass p-3 rounded-xl border border-white flex items-center gap-3 shadow-sm">
-                        <div className={`p-2 rounded-lg ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
+                    <div key={i} className="glass p-3 rounded-none border border-white flex items-center gap-3 shadow-sm">
+                        <div className={`p-2 rounded-none ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
                                           stat.color === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
                                           stat.color === 'blue' ? 'bg-blue-100 text-blue-600' :
                                           'bg-indigo-100 text-indigo-600'}`}>
@@ -156,7 +156,7 @@ export const MachinesPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#131314]/[0.03] p-1.5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#131314]/[0.03] p-1.5 rounded-none border border-slate-200 dark:border-white/10 shadow-sm">
                 <div className="relative flex-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
@@ -173,7 +173,7 @@ export const MachinesPage: React.FC = () => {
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-[#131314]/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-3 py-1.5 rounded-none text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-[#131314]/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             {status}
                         </button>
@@ -182,8 +182,8 @@ export const MachinesPage: React.FC = () => {
             </div>
 
             {q.status === 'error' && (
-                <div className="glass px-5 py-4 rounded-2xl border border-red-200 bg-red-50 text-sm font-medium text-red-600 flex items-center gap-3">
-                    <div className="p-2 bg-red-100 rounded-lg">
+                <div className="glass px-5 py-4 rounded-none border border-red-200 bg-red-50 text-sm font-medium text-red-600 flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-none">
                         <SignalIcon className="w-5 h-5" />
                     </div>
                     <span>Failed to synchronize grid telemetry: {q.error}</span>
@@ -198,17 +198,17 @@ export const MachinesPage: React.FC = () => {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-[#131314]/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
+                                <div className="w-10 h-10 rounded-none bg-slate-50 dark:bg-[#131314]/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
                                     <CpuChipIcon className="w-5 h-5 text-slate-400" />
                                     {m.profileCompletenessScore < 100 && (
-                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full" />
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-none" />
                                     )}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-slate-900 dark:text-[#ECECF1] leading-tight">{m.companyName || 'Industrial Node'}</p>
                                         {m.profileCompletenessScore < 75 && (
-                                            <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-[8px] font-black text-amber-600 border border-amber-100 uppercase tracking-tighter">
+                                            <span className="px-1.5 py-0.5 rounded-none bg-amber-50 text-[8px] font-black text-amber-600 border border-amber-100 uppercase tracking-tighter">
                                                 Needs Profile
                                             </span>
                                         )}
@@ -216,7 +216,7 @@ export const MachinesPage: React.FC = () => {
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <span className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</span>
                                         {m.clusterId && (
-                                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
+                                            <span className="px-1 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
                                                 {m.clusterId}
                                             </span>
                                         )}
@@ -255,12 +255,12 @@ export const MachinesPage: React.FC = () => {
                         header: 'Grid Health',
                         accessor: (m) => (
                             <div className="flex flex-col gap-1.5">
-                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider w-fit ${getHealthPillClass(m.healthState)}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${getHealthColor(m.healthState)}`} />
+                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-none border text-[10px] font-black uppercase tracking-wider w-fit ${getHealthPillClass(m.healthState)}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-none ${getHealthColor(m.healthState)}`} />
                                     {m.healthState}
                                 </div>
                                 {m.healthState === 'OFFLINE' && (
-                                    <div className="px-1.5 py-0.5 rounded bg-slate-100 text-[8px] font-black text-slate-500 uppercase tracking-tighter w-fit">
+                                    <div className="px-1.5 py-0.5 rounded-none bg-slate-100 text-[8px] font-black text-slate-500 uppercase tracking-tighter w-fit">
                                         No live heartbeat
                                     </div>
                                 )}
@@ -286,10 +286,10 @@ export const MachinesPage: React.FC = () => {
                                             {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
                                         </span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-[#131314]/5 rounded-full overflow-hidden">
+                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-[#131314]/5 rounded-none overflow-hidden">
                                         {m.capacityUtilizationPct !== null && (
                                             <div 
-                                                className={`h-full rounded-full transition-all duration-1000 ${
+                                                className={`h-full rounded-none transition-all duration-1000 ${
                                                     m.capacityUtilizationPct > 90 ? 'bg-red-500' : 
                                                     m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-primary'
                                                 }`}
@@ -301,9 +301,9 @@ export const MachinesPage: React.FC = () => {
                                 <div className="flex justify-between items-center">
                                     <span className="text-[8px] font-black text-slate-400 uppercase">Completeness</span>
                                     <div className="flex items-center gap-1">
-                                        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="w-12 h-1 bg-slate-100 rounded-none overflow-hidden">
                                             <div 
-                                                className={`h-full rounded-full ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                                className={`h-full rounded-none ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-400'}`}
                                                 style={{ width: `${m.telemetryCompletenessScore}%` }}
                                             />
                                         </div>
@@ -362,13 +362,13 @@ export const MachinesPage: React.FC = () => {
                 </p>
                 <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> ONLINE
+                        <span className="w-2 h-2 rounded-none bg-emerald-500" /> ONLINE
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" /> DEGRADED
+                        <span className="w-2 h-2 rounded-none bg-amber-500" /> DEGRADED
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-red-500" /> OFFLINE
+                        <span className="w-2 h-2 rounded-none bg-red-500" /> OFFLINE
                     </div>
                 </div>
             </div>

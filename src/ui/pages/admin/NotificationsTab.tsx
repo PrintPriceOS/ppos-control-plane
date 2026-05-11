@@ -183,7 +183,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                             <td className="px-4 py-3 font-medium text-slate-700">{n.tenant_id}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1 rounded border border-slate-200 uppercase tracking-tighter">{n.channel}</span>
+                                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1 rounded-none border border-slate-200 uppercase tracking-tighter">{n.channel}</span>
                                                     <div className="font-bold text-slate-900 text-[11px] truncate">{n.event_type}</div>
                                                 </div>
                                                 <div className="text-slate-500 text-[10px] truncate max-w-[200px] font-medium">{n.subject}</div>
@@ -217,7 +217,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                 <div className="lg:col-span-1 border border-slate-200 rounded-none bg-slate-50/50 flex flex-col min-h-[500px]">
                     {detail ? (
                         <div className="flex flex-col h-full animate-slide-fade">
-                            <div className="p-4 border-b border-slate-200 bg-white rounded-t-xl flex justify-between items-start">
+                            <div className="p-4 border-b border-slate-200 bg-white rounded-none-t-xl flex justify-between items-start">
                                 <div>
                                     <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{detail.notification.channel} Channel</div>
                                     <h3 className="font-bold text-slate-900">{detail.notification.event_type}</h3>
@@ -254,7 +254,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                                 <div className="text-[11px] font-bold text-slate-800">{ev.event}</div>
                                                 <div className="text-[10px] text-slate-500 tabular-nums">{new Date(ev.created_at).toLocaleString()}</div>
                                                 {ev.metadata_json && (
-                                                    <pre className="mt-1 text-[9px] bg-white p-1.5 rounded border border-slate-100 overflow-x-auto text-slate-600 font-mono">
+                                                    <pre className="mt-1 text-[9px] bg-white p-1.5 rounded-none border border-slate-100 overflow-x-auto text-slate-600 font-mono">
                                                         {JSON.stringify(typeof ev.metadata_json === 'string' ? JSON.parse(ev.metadata_json) : ev.metadata_json, null, 2)}
                                                     </pre>
                                                 )}
@@ -294,7 +294,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
 
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dedupe Key</label>
-                                    <div className="text-[10px] font-mono text-slate-400 break-all bg-white px-2 py-1.5 rounded border border-slate-200">{detail.notification.dedupe_key}</div>
+                                    <div className="text-[10px] font-mono text-slate-400 break-all bg-white px-2 py-1.5 rounded-none border border-slate-200">{detail.notification.dedupe_key}</div>
                                 </div>
                             </div>
                         </div>

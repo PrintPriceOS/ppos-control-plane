@@ -23,7 +23,7 @@ export const NetworkHealthPanel: React.FC<Props> = ({ warnings, onWarningClick }
                     <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" />
                     Operational Risks & Alerts
                 </h3>
-                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[9px] font-black">
+                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded-none text-[9px] font-black">
                     {warnings.length} Active alerts
                 </span>
             </div>
@@ -32,13 +32,13 @@ export const NetworkHealthPanel: React.FC<Props> = ({ warnings, onWarningClick }
                     <div
                         key={idx}
                         onClick={() => onWarningClick(alert.printer_id)}
-                        className={`p-4 rounded-xl border-l-4 cursor-pointer hover:scale-[1.02] transition-all active:scale-95 group ${alert.severity === 'CRITICAL'
+                        className={`p-4 rounded-none border-l-4 cursor-pointer hover:scale-[1.02] transition-all active:scale-95 group ${alert.severity === 'CRITICAL'
                                 ? 'bg-rose-50/50 border-rose-500 hover:bg-rose-50'
                                 : 'bg-amber-50/50 border-amber-500 hover:bg-amber-50'
                             }`}
                     >
                         <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 p-1 rounded-lg ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                            <div className={`mt-0.5 p-1 rounded-none ${alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                                 <BoltIcon className="w-4 h-4" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -61,8 +61,8 @@ export const NetworkHealthPanel: React.FC<Props> = ({ warnings, onWarningClick }
                     </div>
                 ))}
                 {warnings.length === 0 && (
-                    <div className="p-8 text-center bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-400 text-xs font-black uppercase tracking-widest flex flex-col items-center gap-2">
-                        <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center">
+                    <div className="p-8 text-center bg-slate-50 border border-slate-200 border-dashed rounded-none text-slate-400 text-xs font-black uppercase tracking-widest flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-none flex items-center justify-center">
                             <ShieldCheckIcon className="w-5 h-5" />
                         </div>
                         No Risks Detected

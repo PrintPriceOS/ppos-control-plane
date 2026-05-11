@@ -21,9 +21,9 @@ export const OutcomeHistory: React.FC = () => {
 
             <div className="space-y-4">
                 {outcomes.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-xl">Memory ledger is empty.</div>
+                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-none">Memory ledger is empty.</div>
                 ) : outcomes.map((o, idx) => (
-                    <div key={idx} className="bg-white border rounded-xl p-5 shadow-sm text-sm">
+                    <div key={idx} className="bg-white border rounded-none p-5 shadow-sm text-sm">
                         <div className="flex justify-between items-center mb-2">
                             <span className="font-mono text-xs text-slate-400">{o.candidateId}</span>
                             <span className="text-xs text-slate-400">{new Date(o.timestamp).toLocaleString()}</span>
@@ -36,7 +36,7 @@ export const OutcomeHistory: React.FC = () => {
                                 </p>
                             </div>
                             <div className="text-right">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
+                                <span className={`px-3 py-1 rounded-none text-xs font-bold tracking-wide uppercase ${
                                     o.verdict === 'IMPROVED' ? 'bg-green-100 text-green-700' :
                                     o.verdict === 'UNSAFE' ? 'bg-red-100 text-red-700' :
                                     o.verdict === 'REGRESSED' ? 'bg-amber-100 text-amber-700' :
@@ -50,13 +50,13 @@ export const OutcomeHistory: React.FC = () => {
                         <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4 text-xs">
                             <div>
                                 <strong className="text-slate-500 block mb-1">Metrics Before</strong>
-                                <pre className="bg-slate-50 p-2 rounded text-slate-600 border overflow-x-auto">
+                                <pre className="bg-slate-50 p-2 rounded-none text-slate-600 border overflow-x-auto">
                                     {JSON.stringify(o.metricsBefore, null, 2)}
                                 </pre>
                             </div>
                             <div>
                                 <strong className="text-slate-500 block mb-1">Metrics After</strong>
-                                <pre className="bg-slate-50 p-2 rounded text-slate-600 border overflow-x-auto">
+                                <pre className="bg-slate-50 p-2 rounded-none text-slate-600 border overflow-x-auto">
                                     {JSON.stringify(o.metricsAfter, null, 2)}
                                 </pre>
                             </div>

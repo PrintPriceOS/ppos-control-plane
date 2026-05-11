@@ -64,7 +64,7 @@ export const OrdersPage: React.FC = () => {
                 </div>
                 <button
                     onClick={() => q.refetch?.()}
-                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
+                    className="p-2 rounded-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
                     title="Refresh"
                 >
                     <ArrowPathIcon className={`w-5 h-5 ${q.status === 'loading' ? 'animate-spin' : ''}`} />
@@ -72,7 +72,7 @@ export const OrdersPage: React.FC = () => {
             </div>
 
             {/* Filters */}
-            <div className="glass p-4 rounded-2xl border border-white dark:border-slate-700/30 flex flex-wrap items-center gap-3">
+            <div className="glass p-4 rounded-none border border-white dark:border-slate-700/30 flex flex-wrap items-center gap-3">
                 <div className="flex-1 min-w-48 relative">
                     <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
                     <input
@@ -80,7 +80,7 @@ export const OrdersPage: React.FC = () => {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search by ref, user, or print house..."
-                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20"
                     />
                 </div>
                 <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export const OrdersPage: React.FC = () => {
                     <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value as OrderStatus | '')}
-                        className="bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide focus:ring-2 focus:ring-primary/20"
+                        className="bg-slate-50 dark:bg-slate-800 border-none rounded-none px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide focus:ring-2 focus:ring-primary/20"
                     >
                         {STATUS_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -118,7 +118,7 @@ export const OrdersPage: React.FC = () => {
                     {
                         header: 'Status',
                         accessor: (o: Order) => (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[o.status]}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-none text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[o.status]}`}>
                                 {o.status.replace('_', ' ')}
                             </span>
                         ),
@@ -155,12 +155,12 @@ export const OrdersPage: React.FC = () => {
             {selectedOrder && (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-transparent dark:border-slate-700 w-full max-w-lg p-6 space-y-4"
+                        className="bg-white dark:bg-slate-900 rounded-none shadow-2xl border border-transparent dark:border-slate-700 w-full max-w-lg p-6 space-y-4"
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center">
+                                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-none flex items-center justify-center">
                                     <ClipboardDocumentListIcon className="w-5 h-5 text-slate-600" />
                                 </div>
                                 <div>
@@ -168,35 +168,35 @@ export const OrdersPage: React.FC = () => {
                                     <p className="text-xs text-slate-400 dark:text-slate-500">Order #{selectedOrder.id}</p>
                                 </div>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[selectedOrder.status]}`}>
+                            <span className={`px-2.5 py-1 rounded-none text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[selectedOrder.status]}`}>
                                 {selectedOrder.status.replace('_', ' ')}
                             </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">User</p>
                                 <p className="font-bold text-slate-700 dark:text-slate-300 truncate">{selectedOrder.user_id}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Price</p>
                                 <p className="font-bold text-slate-700 dark:text-slate-300">€{Number(selectedOrder.offer_price).toFixed(2)}</p>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-3 col-span-2">
+                            <div className="bg-slate-50 rounded-none p-3 col-span-2">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Print House</p>
                                 <p className="font-bold text-slate-700 dark:text-slate-300">{selectedOrder.offer_print_house}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Created</p>
                                 <p className="font-bold text-slate-700 dark:text-slate-300">{new Date(selectedOrder.created_at).toLocaleString('es-ES')}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Updated</p>
                                 <p className="font-bold text-slate-700 dark:text-slate-300">{new Date(selectedOrder.updated_at).toLocaleString('es-ES')}</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 rounded-xl p-3">
+                        <div className="bg-slate-50 rounded-none p-3">
                             <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Specs</p>
                             <pre className="text-xs text-slate-600 dark:text-slate-400 overflow-auto max-h-40 whitespace-pre-wrap">
                                 {JSON.stringify(
@@ -210,7 +210,7 @@ export const OrdersPage: React.FC = () => {
 
                         <button
                             onClick={() => setSelectedOrder(null)}
-                            className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-black hover:bg-slate-800 transition-colors"
+                            className="w-full py-2.5 rounded-none bg-slate-900 text-white text-sm font-black hover:bg-slate-800 transition-colors"
                         >
                             Close
                         </button>

@@ -29,7 +29,7 @@ export const PreflightJobDetailPage: React.FC = () => {
   if (jobQ.status === 'loading') {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-none animate-spin" />
       </div>
     );
   }
@@ -65,13 +65,13 @@ export const PreflightJobDetailPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 rounded-xl transition-colors">
+          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 rounded-none transition-colors">
             <ArrowLeftIcon className="w-5 h-5 text-slate-400" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Job Evidence</h1>
-              <span className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
+              <span className="px-2 py-0.5 rounded-none bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
                 {job.type}
               </span>
             </div>
@@ -80,7 +80,7 @@ export const PreflightJobDetailPage: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-           <div className={`px-4 py-2 rounded-xl flex items-center gap-2 border font-black text-xs uppercase tracking-widest ${
+           <div className={`px-4 py-2 rounded-none flex items-center gap-2 border font-black text-xs uppercase tracking-widest ${
              job.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
              job.status === 'FAILED' ? 'bg-red-50 border-red-100 text-red-600' : 'bg-blue-50 border-blue-100 text-blue-600'
            }`}>
@@ -92,13 +92,13 @@ export const PreflightJobDetailPage: React.FC = () => {
       </div>
 
       {job.status === 'FAILED' && job.error_json && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-start gap-3 text-red-600 dark:text-red-400">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-none flex items-start gap-3 text-red-600 dark:text-red-400">
           <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
           <div>
             <h4 className="text-sm font-black uppercase tracking-widest">Processing Error</h4>
             <p className="text-xs font-bold">{job.error_json.message || 'Unknown error occurred during upstream trigger or processing.'}</p>
             {job.error_json.details && (
-              <pre className="mt-2 text-[10px] bg-red-100/50 dark:bg-red-900/40 p-2 rounded-lg overflow-x-auto">
+              <pre className="mt-2 text-[10px] bg-red-100/50 dark:bg-red-900/40 p-2 rounded-none overflow-x-auto">
                 {JSON.stringify(job.error_json.details, null, 2)}
               </pre>
             )}
@@ -110,7 +110,7 @@ export const PreflightJobDetailPage: React.FC = () => {
         {/* Left Column: Metadata & Lifecycle */}
         <div className="lg:col-span-2 space-y-8">
           {/* Metadata Grid */}
-          <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] grid grid-cols-2 md:grid-cols-4 gap-6">
             <MetaItem label="Filename" value={job.metadata_json?.originalFilename || 'Untitled'} icon={DocumentIcon} />
             <MetaItem label="Tenant ID" value={job.tenant_id} icon={CircleStackIcon} />
             <MetaItem label="Policy" value={job.policy || 'N/A'} icon={ShieldCheckIcon} />
@@ -126,9 +126,9 @@ export const PreflightJobDetailPage: React.FC = () => {
             <SectionHeader label="Lifecycle & Trace" />
             <div className="mt-6">
             <div className="mt-4 space-y-4">
-               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
+               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-none border border-slate-100 dark:border-white/[0.05]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-none bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
                       <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" />
                     </div>
                     <div>
@@ -139,9 +139,9 @@ export const PreflightJobDetailPage: React.FC = () => {
                   <span className="text-xl font-black text-slate-900 dark:text-[#ECECF1]">{job.issueCount ?? 0}</span>
                </div>
                
-               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
+               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-none border border-slate-100 dark:border-white/[0.05]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-none bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
                       <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
                     </div>
                     <div>
@@ -159,14 +159,14 @@ export const PreflightJobDetailPage: React.FC = () => {
         {/* Right Column: Artifacts & Workers */}
         <div className="space-y-8">
           {/* Artifacts */}
-          <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08]">
+          <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08]">
             <SectionHeader label="Artifacts" />
             <div className="mt-4 space-y-2">
               {artifactsQ.data?.length === 0 ? (
                 <p className="text-xs font-bold text-slate-400 italic">No artifacts available.</p>
               ) : (
                 artifactsQ.data?.map((a, i) => (
-                  <button key={i} className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
+                  <button key={i} className="w-full flex items-center justify-between p-3 rounded-none bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
                     <div className="flex items-center gap-3">
                       <DocumentArrowDownIcon className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
                       <span className="text-xs font-bold text-slate-600 dark:text-zinc-300 truncate max-w-[150px]">{a.name}</span>
@@ -187,11 +187,11 @@ export const PreflightJobDetailPage: React.FC = () => {
           </div>
 
           {/* Worker Info */}
-          <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08]">
+          <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08]">
             <SectionHeader label="Execution Worker" />
-            <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white">
+            <div className="mt-4 p-4 rounded-none bg-slate-900 text-white">
                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-none bg-primary/20 flex items-center justify-center">
                     <CpuChipIcon className="w-4 h-4 text-primary" />
                   </div>
                   <div>
@@ -207,11 +207,11 @@ export const PreflightJobDetailPage: React.FC = () => {
           </div>
 
           {/* Certificates */}
-          <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08]">
+          <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08]">
             <SectionHeader label="Certificates" />
             <div className="mt-4">
                {job.noopFix ? (
-                 <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
+                 <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-none">
                     <ShieldCheckIcon className="w-8 h-8 text-emerald-500" />
                     <div>
                       <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Pure Certification</h4>
@@ -247,7 +247,7 @@ const SectionHeader = ({ label }: { label: string }) => (
 );
 
 const ArtifactButton = ({ label, type, icon: Icon }: any) => (
-  <button className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
+  <button className="w-full flex items-center justify-between p-3 rounded-none bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
     <div className="flex items-center gap-3">
       <Icon className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
       <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">{label}</span>
@@ -262,7 +262,7 @@ const WorkerStat = ({ label, value, progress }: any) => (
       <span>{label}</span>
       <span>{value}</span>
     </div>
-    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+    <div className="h-1 bg-white/10 rounded-none overflow-hidden">
       <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
     </div>
   </div>

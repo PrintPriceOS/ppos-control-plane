@@ -43,26 +43,26 @@ export const AuditExplorerPage: React.FC = () => {
                     <p className="text-sm text-slate-500 font-medium">Forensic-grade traceability across requests, policies, and actions.</p>
                 </div>
                 <div className="flex gap-2">
-                    <button className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-colors">
+                    <button className="p-2 rounded-none bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-colors">
                         <ArchiveBoxIcon className="w-5 h-5" />
                     </button>
                 </div>
             </div>
 
             {/* Filters Bar */}
-            <div className="glass p-4 rounded-2xl border border-white flex flex-col md:flex-row gap-4 italic-text-off">
+            <div className="glass p-4 rounded-none border border-white flex flex-col md:flex-row gap-4 italic-text-off">
                 <div className="flex-1 relative">
                     <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
                     <input 
                         type="text" 
                         placeholder="Search by Request ID, Job ID, or Tenant ID..." 
-                        className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 transition-all"
+                        className="w-full bg-slate-50 border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
                 <div className="flex gap-2">
-                    <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
+                    <div className="px-4 py-2 bg-slate-50 rounded-none border border-slate-100 flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
                         <FunnelIcon className="w-4 h-4" />
                         <span>All Actions</span>
                     </div>
@@ -120,7 +120,7 @@ export const AuditExplorerPage: React.FC = () => {
                     {
                         header: '',
                         accessor: () => (
-                            <button className="p-2 rounded-lg text-slate-200 hover:text-primary transition-colors hover:bg-slate-50">
+                            <button className="p-2 rounded-none text-slate-200 hover:text-primary transition-colors hover:bg-slate-50">
                                 <ArrowTopRightOnSquareIcon className="w-4 h-4" />
                             </button>
                         ),

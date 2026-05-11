@@ -11,13 +11,13 @@ import { ProductionTimeline } from './ProductionTimeline';
 import { ProductionBillingPage } from './ProductionBillingPage';
 // Placeholder components for other tabs
 const ProductionPackagesTab = () => (
-    <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl m-6">
+    <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-none m-6">
         Production Packages Catalog — Phase 11
     </div>
 );
 const DispatchHistoryTab = () => <ProductionTimeline />;
 const NodeMatchingTab = () => (
-    <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl m-6">
+    <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-none m-6">
         Node Matching Intelligence — Phase 11
     </div>
 );

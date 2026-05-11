@@ -106,7 +106,7 @@ const RoutingRule = ({ label, queue, condition }: any) => (
             <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{label}</p>
             <p className="text-[9px] font-bold text-slate-400 font-mono">{queue}</p>
         </div>
-        <span className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">{condition}</span>
+        <span className="px-2 py-0.5 bg-slate-100 rounded-none text-[9px] font-black text-slate-500 uppercase">{condition}</span>
     </div>
 );
 
@@ -114,7 +114,7 @@ const CircuitBreakerCard = ({ label, status, detail }: any) => (
     <div className="p-4 bg-white rounded-none border border-slate-200 shadow-none">
         <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-none ${status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
         </div>
         <p className="text-[10px] font-bold text-slate-900">{detail}</p>
     </div>

@@ -78,7 +78,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 py-12">
-            <div className="w-full max-w-2xl bg-white p-10 rounded-3xl shadow-xl border border-slate-100">
+            <div className="w-full max-w-2xl bg-white p-10 rounded-none shadow-xl border border-slate-100">
                 <div className="mb-8">
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Join PrintPrice Network</h1>
                     <p className="text-slate-500 mt-2">Register your printhouse to start receiving industrial jobs.</p>
@@ -95,7 +95,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 <BuildingOfficeIcon className="absolute left-3 top-3 w-5 h-5 text-slate-300" />
                                 <input 
                                     type="text" required
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:border-red-500/50 outline-none font-bold text-sm"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-none focus:border-red-500/50 outline-none font-bold text-sm"
                                     value={formData.companyName}
                                     onChange={e => setFormData({...formData, companyName: e.target.value})}
                                 />
@@ -108,7 +108,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 <GlobeAltIcon className="absolute left-3 top-3 w-5 h-5 text-slate-300" />
                                 <input 
                                     type="url"
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:border-red-500/50 outline-none font-bold text-sm"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-none focus:border-red-500/50 outline-none font-bold text-sm"
                                     value={formData.website}
                                     onChange={e => setFormData({...formData, website: e.target.value})}
                                 />
@@ -126,7 +126,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 <EnvelopeIcon className="absolute left-3 top-3 w-5 h-5 text-slate-300" />
                                 <input 
                                     type="email" required
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:border-red-500/50 outline-none font-bold text-sm"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-none focus:border-red-500/50 outline-none font-bold text-sm"
                                     value={formData.email}
                                     onChange={e => setFormData({...formData, email: e.target.value})}
                                 />
@@ -139,7 +139,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 <LockClosedIcon className="absolute left-3 top-3 w-5 h-5 text-slate-300" />
                                 <input 
                                     type="password" required
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:border-red-500/50 outline-none font-bold text-sm"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-none focus:border-red-500/50 outline-none font-bold text-sm"
                                     value={formData.password}
                                     onChange={e => setFormData({...formData, password: e.target.value})}
                                 />
@@ -148,7 +148,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     </div>
 
                     {error && (
-                        <div className="md:col-span-2 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold">
+                        <div className="md:col-span-2 p-3 bg-red-50 border border-red-100 rounded-none text-red-600 text-xs font-bold">
                             {error}
                         </div>
                     )}
@@ -157,7 +157,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                         <button 
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-[#dc0000] text-white font-black rounded-2xl shadow-lg shadow-red-500/20 hover:opacity-90 disabled:opacity-50 transition-all uppercase tracking-widest text-sm"
+                            className="w-full py-4 bg-[#dc0000] text-white font-black rounded-none shadow-lg shadow-red-500/20 hover:opacity-90 disabled:opacity-50 transition-all uppercase tracking-widest text-sm"
                         >
                             {loading ? 'Processing...' : 'Complete Registration'}
                         </button>

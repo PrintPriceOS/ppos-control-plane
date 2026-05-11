@@ -20,8 +20,8 @@ export const AgentsDashboard: React.FC = () => {
             <div className="flex justify-between items-center border-b pb-4">
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900">Multi-Agent Orchestration</h1>
                 <div className="space-x-3">
-                    <Link to="/intelligence/agents/decisions" className="px-4 py-2 bg-slate-100 text-slate-700 rounded font-medium text-sm hover:bg-slate-200">Decisions</Link>
-                    <Link to="/intelligence/agents/conflicts" className="px-4 py-2 bg-red-100 text-red-700 rounded font-medium text-sm hover:bg-red-200">Conflicts</Link>
+                    <Link to="/intelligence/agents/decisions" className="px-4 py-2 bg-slate-100 text-slate-700 rounded-none font-medium text-sm hover:bg-slate-200">Decisions</Link>
+                    <Link to="/intelligence/agents/conflicts" className="px-4 py-2 bg-red-100 text-red-700 rounded-none font-medium text-sm hover:bg-red-200">Conflicts</Link>
                 </div>
             </div>
 
@@ -31,10 +31,10 @@ export const AgentsDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
                 {agents.map((a, idx) => (
-                    <div key={idx} className="bg-white border rounded-xl p-5 shadow-sm border-slate-200">
+                    <div key={idx} className="bg-white border rounded-none p-5 shadow-sm border-slate-200">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-800">{a.agentType}</h3>
-                            <span className="px-2 py-1 text-xs font-bold bg-slate-100 text-slate-600 rounded">
+                            <span className="px-2 py-1 text-xs font-bold bg-slate-100 text-slate-600 rounded-none">
                                 {a.policy?.autonomyLevel || 'SHADOW'}
                             </span>
                         </div>
@@ -44,7 +44,7 @@ export const AgentsDashboard: React.FC = () => {
                                 <strong className="text-slate-400 uppercase text-xs">Allowed Actions</strong>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                     {(a.policy?.allowedActions || []).length > 0 ? a.policy.allowedActions.map((act: string) => (
-                                        <span key={act} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs">{act}</span>
+                                        <span key={act} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-none text-xs">{act}</span>
                                     )) : <span className="text-slate-400 italic">None</span>}
                                 </div>
                             </div>
@@ -52,7 +52,7 @@ export const AgentsDashboard: React.FC = () => {
                                 <strong className="text-slate-400 uppercase text-xs">Blocked Domains</strong>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                     {(a.policy?.blockedActions || []).length > 0 ? a.policy.blockedActions.map((act: string) => (
-                                        <span key={act} className="px-2 py-0.5 bg-red-50 text-red-700 rounded-full text-xs">{act}</span>
+                                        <span key={act} className="px-2 py-0.5 bg-red-50 text-red-700 rounded-none text-xs">{act}</span>
                                     )) : <span className="text-slate-400 italic">None</span>}
                                 </div>
                             </div>

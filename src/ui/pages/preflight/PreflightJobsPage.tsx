@@ -83,7 +83,7 @@ export const PreflightJobsPage: React.FC = () => {
         
         <div className="flex items-center gap-3">
           {/* Storage Quota Card */}
-          <div className="hidden lg:flex flex-col items-end glass px-4 py-2 rounded-2xl border border-white/20">
+          <div className="hidden lg:flex flex-col items-end glass px-4 py-2 rounded-none border border-white/20">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Storage</div>
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-black text-slate-700 dark:text-[#ECECF1]">
@@ -91,12 +91,12 @@ export const PreflightJobsPage: React.FC = () => {
               </span>
               <span className="text-[10px] font-bold text-slate-400">used</span>
             </div>
-            {storageQ.status === 'loading' && <div className="w-20 h-1 bg-slate-100 rounded-full mt-1 animate-pulse" />}
+            {storageQ.status === 'loading' && <div className="w-20 h-1 bg-slate-100 rounded-none mt-1 animate-pulse" />}
           </div>
 
           <button 
             onClick={() => setIsUploadOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-2xl font-black text-sm hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-none font-black text-sm hover:opacity-90 transition-all shadow-lg shadow-primary/20"
           >
             <CloudArrowUpIcon className="w-5 h-5" />
             <span>Execute New Job</span>
@@ -114,7 +114,7 @@ export const PreflightJobsPage: React.FC = () => {
       />
 
       {/* Filters Bar */}
-      <div className="glass p-4 rounded-2xl border border-white dark:border-white/[0.08] flex flex-wrap items-center gap-4 italic-text-off">
+      <div className="glass p-4 rounded-none border border-white dark:border-white/[0.08] flex flex-wrap items-center gap-4 italic-text-off">
           <div className="flex-1 min-w-[200px] relative">
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
               <input 
@@ -122,7 +122,7 @@ export const PreflightJobsPage: React.FC = () => {
                   placeholder="Filter by Tenant ID..." 
                   value={filter.tenant}
                   onChange={(e) => setFilter({ ...filter, tenant: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
               />
           </div>
           
@@ -130,7 +130,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.status}
               onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-none px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Status: All</option>
               <option value="COMPLETED">Completed</option>
@@ -142,7 +142,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.type}
               onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-none px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Type: All</option>
               <option value="ANALYZE">Analyze</option>
@@ -153,7 +153,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.risk}
               onChange={(e) => setFilter({ ...filter, risk: e.target.value })}
-              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-none px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Risk: All</option>
               <option value="CRITICAL">Critical</option>
@@ -163,19 +163,19 @@ export const PreflightJobsPage: React.FC = () => {
               <option value="NONE">None</option>
             </select>
 
-            <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-xl cursor-pointer">
+            <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-none cursor-pointer">
               <input 
                 type="checkbox" 
                 checked={filter.largeOnly}
                 onChange={(e) => setFilter({ ...filter, largeOnly: e.target.checked })}
-                className="rounded border-slate-300 text-primary focus:ring-primary"
+                className="rounded-none border-slate-300 text-primary focus:ring-primary"
               />
               <span className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest">Large Docs Only</span>
             </label>
 
             <button 
               onClick={() => q.refetch()}
-              className="p-2 bg-slate-100 dark:bg-[#131314]/[0.06] rounded-xl hover:bg-slate-200 dark:hover:bg-[#1a1a1b]/[0.1] transition-colors"
+              className="p-2 bg-slate-100 dark:bg-[#131314]/[0.06] rounded-none hover:bg-slate-200 dark:hover:bg-[#1a1a1b]/[0.1] transition-colors"
             >
               <ArrowPathIcon className={`w-4 h-4 text-slate-500 ${q.status === 'refetching' ? 'animate-spin' : ''}`} />
             </button>
@@ -207,7 +207,7 @@ export const PreflightJobsPage: React.FC = () => {
             header: 'Type / Policy',
             accessor: (j) => (
               <div className="flex flex-col gap-1">
-                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider w-fit">
+                <span className="px-2 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider w-fit">
                   {j.type}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 truncate max-w-[100px]">
@@ -247,7 +247,7 @@ export const PreflightJobsPage: React.FC = () => {
             header: 'Risk',
             accessor: (j) => (
               j.destructiveFixRisk ? (
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${getRiskColor(j.destructiveFixRisk)}`}>
+                <span className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider ${getRiskColor(j.destructiveFixRisk)}`}>
                   {j.destructiveFixRisk}
                 </span>
               ) : <span className="text-slate-300">—</span>
@@ -291,7 +291,7 @@ export const PreflightJobsPage: React.FC = () => {
       />
       
       {q.error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 italic-text-off">
+        <div className="p-4 bg-red-50 border border-red-100 rounded-none flex items-center gap-3 text-red-600 italic-text-off">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
           <div className="text-sm font-bold">
             Failed to load jobs: {q.error}

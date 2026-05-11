@@ -30,8 +30,8 @@ export const GovernancePage: React.FC = () => {
                     <h1 className="text-[32px] font-black text-slate-900 dark:text-[#ECECF1] tracking-tight leading-none mb-2">Governance & Policy Enforcement</h1>
                     <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">Real-time enforcement logic, active blocks, and posture tracking across EU-WEST-1.</p>
                 </div>
-                <div className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/15 rounded-2xl border border-emerald-100 dark:border-emerald-700/25 flex items-center gap-4 shadow-sm">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <div className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/15 rounded-none border border-emerald-100 dark:border-emerald-700/25 flex items-center gap-4 shadow-sm">
+                    <div className="w-10 h-10 rounded-none bg-emerald-500/10 flex items-center justify-center">
                         <ShieldCheckIcon className="w-6 h-6 text-emerald-500" />
                     </div>
                     <div>
@@ -82,7 +82,7 @@ export const GovernancePage: React.FC = () => {
                             header: 'Severity',
                             accessor: (a) => (
                                 <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${a.action === 'BLOCKED' ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`} />
+                                    <div className={`w-2 h-2 rounded-none ${a.action === 'BLOCKED' ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`} />
                                     <span className={`text-[10px] font-black uppercase tracking-widest ${a.action === 'BLOCKED' ? 'text-red-600' : 'text-amber-600'}`}>
                                         {a.action === 'BLOCKED' ? 'Critical' : 'Warning'}
                                     </span>
@@ -137,16 +137,16 @@ export const GovernancePage: React.FC = () => {
 };
 
 const PostureBlock = ({ title, subtitle, icon: Icon, color, points }: any) => (
-    <div className="p-8 rounded-[40px] bg-white dark:bg-[#3A3A3C] border border-slate-100/60 dark:border-white/[0.09] shadow-xl shadow-slate-100/50 dark:shadow-black/30 flex flex-col items-start italic-text-off">
-        <div className={`w-14 h-14 rounded-2xl bg-${color}-50 dark:bg-${color}-900/20 flex items-center justify-center mb-6`}>
+    <div className="p-8 rounded-none-[40px] bg-white dark:bg-[#3A3A3C] border border-slate-100/60 dark:border-white/[0.09] shadow-xl shadow-slate-100/50 dark:shadow-black/30 flex flex-col items-start italic-text-off">
+        <div className={`w-14 h-14 rounded-none bg-${color}-50 dark:bg-${color}-900/20 flex items-center justify-center mb-6`}>
             <Icon className={`w-8 h-8 text-${color}-500 dark:text-${color}-400`} />
         </div>
         <h3 className="text-lg font-black text-slate-900 dark:text-[#ECECF1] tracking-tight leading-none mb-1">{title}</h3>
         <p className="text-xs font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-6">{subtitle}</p>
         <div className="space-y-3 w-full">
             {points.map((p: string, i: number) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-[#131314]/[0.04] border border-slate-100 dark:border-white/[0.06] group hover:bg-white dark:hover:bg-[#1a1a1b]/[0.07] transition-all cursor-default">
-                    <div className={`w-1.5 h-1.5 rounded-full bg-${color}-400 group-hover:scale-125 transition-transform`} />
+                <div key={i} className="flex items-center gap-3 p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.04] border border-slate-100 dark:border-white/[0.06] group hover:bg-white dark:hover:bg-[#1a1a1b]/[0.07] transition-all cursor-default">
+                    <div className={`w-1.5 h-1.5 rounded-none bg-${color}-400 group-hover:scale-125 transition-transform`} />
                     <span className="text-xs font-bold text-slate-600 dark:text-zinc-400 transition-colors group-hover:text-slate-900 dark:group-hover:text-[#ECECF1]">{p}</span>
                 </div>
             ))}

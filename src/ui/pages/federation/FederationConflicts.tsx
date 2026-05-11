@@ -24,18 +24,18 @@ export const FederationConflicts: React.FC = () => {
 
             <div className="space-y-4 mt-6">
                 {conflicts.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-xl">No federation policy blocks registered.</div>
+                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-none">No federation policy blocks registered.</div>
                 ) : conflicts.map((c, i) => (
-                    <div key={i} className="bg-red-50 border border-red-100 rounded-xl p-5 shadow-sm text-sm flex flex-col md:flex-row gap-4">
+                    <div key={i} className="bg-red-50 border border-red-100 rounded-none p-5 shadow-sm text-sm flex flex-col md:flex-row gap-4">
                         <div className="flex-none">
-                            <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded">ACCESS DENIED</span>
+                            <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded-none">ACCESS DENIED</span>
                         </div>
                         <div className="flex-1">
                             <div className="mb-2 font-mono text-xs text-slate-600">ID: {c.id}</div>
                             <div className="mb-2 text-slate-800">
                                 <strong>Attempt:</strong> {c.originInstance} tried to interface with {c.targetInstance}
                             </div>
-                            <div className="text-red-700 bg-red-100 p-2 rounded inline-block font-mono text-xs break-all">
+                            <div className="text-red-700 bg-red-100 p-2 rounded-none inline-block font-mono text-xs break-all">
                                 {JSON.stringify(c.details)}
                             </div>
                         </div>

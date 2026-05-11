@@ -38,6 +38,7 @@ import {
   SparklesIcon,
   FingerPrintIcon,
   SignalIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { t } from '../i18n';
 
@@ -118,7 +119,7 @@ const IconMap: Record<string, any> = {
 
 import { getModuleReadiness } from '../config/moduleReadiness';
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const navigate = useNavigate();
   const userRole = getUserRole() as Role;
 
@@ -134,16 +135,28 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
-      <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-100 dark:border-white/5">
-        <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
-          <ShieldCheckIcon className="w-5 h-5 text-white" />
+      <div className="px-5 py-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
+            <ShieldCheckIcon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
+            <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
+              {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
-          <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
-            {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
-          </p>
-        </div>
+        
+        {/* Mobile Close Button */}
+        {onClose && (
+          <button 
+            onClick={onClose} 
+            className="lg:hidden p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}

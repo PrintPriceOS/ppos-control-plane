@@ -293,14 +293,14 @@ Deliver your answer in sections:
             <h2 className="text-xl font-bold flex items-center gap-2">
               {t('aiAuditTitle')}
               {showVisualBadge && (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-none border border-purple-200">
                   Vision Analysis
                 </span>
               )}
             </h2>
           </div>
           <button
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-none hover:bg-gray-100 transition-colors"
             onClick={onClose}
             aria-label={t('close')}
           >
@@ -312,13 +312,13 @@ Deliver your answer in sections:
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {loading && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+              <div className="animate-spin rounded-none h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
               <p className="text-gray-500 animate-pulse font-medium">{t('fetchingAIResponse')}</p>
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-lg">
+            <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-none">
               <p className="font-bold">Error</p>
               <p className="text-sm mt-1">{error}</p>
             </div>
@@ -340,7 +340,7 @@ Deliver your answer in sections:
         {/* Footer - Always visible */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0">
           <button
-            className="px-5 py-2.5 rounded-lg bg-gray-900 text-white hover:bg-black font-medium transition-colors shadow-sm"
+            className="px-5 py-2.5 rounded-none bg-gray-900 text-white hover:bg-black font-medium transition-colors shadow-sm"
             onClick={onClose}
           >
             {t('close')}

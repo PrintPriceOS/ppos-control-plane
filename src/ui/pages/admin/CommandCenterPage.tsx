@@ -303,7 +303,7 @@ const ManufacturingWorldMap = ({ data }: { data: any[] }) => {
                     <span className="text-[8px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-tighter">
                       {isDense ? `CLUSTER (${cluster.nodes.length} NODES)` : cluster.nodes[0].displayName}
                     </span>
-                    <span className={`text-[7px] font-black px-1 rounded uppercase ${
+                    <span className={`text-[7px] font-black px-1 rounded-none uppercase ${
                       cluster.routingState === 'OPTIMAL' ? 'bg-emerald-500/10 text-emerald-500' :
                       cluster.routingState === 'SATURATED' ? 'bg-red-500/10 text-red-500' :
                       'bg-slate-500/10 text-slate-500'
@@ -506,7 +506,7 @@ export const CommandCenterPage: React.FC = () => {
       {/* Dashboard Title Block */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-3">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tight uppercase">Control Plane</h1>
+          <h1 className="text-xl font-black text-white tracking-tight uppercase">PrintPrice OS</h1>
           <p className="text-[9px] font-bold text-zinc-500 uppercase">
             Operational Intelligence & Industrial Telemetry
           </p>
@@ -529,7 +529,7 @@ export const CommandCenterPage: React.FC = () => {
         {/* 2. MAIN OPERATIONAL GRID */}
         <div className="col-span-12 xl:col-span-9 grid grid-cols-12 auto-rows-min gap-3 h-fit">
           
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[260px]">
+          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[220px]">
             <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status} error={industrial.error}>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -546,16 +546,16 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[260px]">
+          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[220px]">
             <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
               <div className="space-y-2">
                 {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 4).map((w: any) => (
-                  <div key={w.id} className="flex items-center justify-between p-1.5 bg-emerald-500/10 border border-emerald-500/20">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-none ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                      <span className="text-[9px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 8) || '---'}</span>
+                  <div key={w.id} className="flex items-center justify-between p-1.5 bg-emerald-500/10 border border-emerald-500/20 overflow-hidden">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-1.5 h-1.5 rounded-none shrink-0 ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <span className="text-[9px] font-mono font-bold text-slate-600 dark:text-zinc-400 truncate">{w.id || '---'}</span>
                     </div>
-                    <span className="text-[8px] font-black text-slate-400 uppercase">{w.status}</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase shrink-0">{w.status}</span>
                   </div>
                 ))}
                 
@@ -566,7 +566,7 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          <div className="col-span-12 lg:col-span-6 min-h-[260px]">
+          <div className="col-span-12 lg:col-span-6 min-h-[220px]">
             <TacticalPanel title="Manufacturing Grid" icon={GlobeAltIcon} badge="Global" color="slate" status={capacity.status}>
                <div className="flex flex-col h-full">
                  <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-none overflow-hidden min-h-[160px]">
@@ -584,7 +584,7 @@ export const CommandCenterPage: React.FC = () => {
           </div>
 
           {(isSuper || isPrinthouse) && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[160px]">
               <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
                  <div className="space-y-3">
                    <div className="grid grid-cols-2 gap-4">
@@ -601,7 +601,7 @@ export const CommandCenterPage: React.FC = () => {
           )}
 
           {isSuper && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[160px]">
               <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="SOC Industrial" color="red" status={blocks.status}>
                 <div className="space-y-3">
                   <div className="flex flex-col mb-2">
@@ -749,8 +749,8 @@ export const CommandCenterPage: React.FC = () => {
                      </div>
                      <h4 className="text-[10px] font-black text-slate-900 dark:text-white leading-tight uppercase truncate">{inc.action?.replace(/_/g, ' ') || 'INCIDENT'}</h4>
                      <div className="grid grid-cols-2 gap-1.5">
-                        <button className="py-1 bg-red-500 text-white text-[8px] font-black uppercase rounded hover:bg-red-600">Triage</button>
-                        <button className="py-1 bg-slate-100 dark:bg-[#131314]/5 text-slate-600 dark:text-white text-[8px] font-black uppercase rounded">Mute</button>
+                        <button className="py-1 bg-red-500 text-white text-[8px] font-black uppercase rounded-none hover:bg-red-600">Triage</button>
+                        <button className="py-1 bg-slate-100 dark:bg-[#131314]/5 text-slate-600 dark:text-white text-[8px] font-black uppercase rounded-none">Mute</button>
                      </div>
                    </div>
                  ))}
@@ -819,14 +819,14 @@ const MiniMetric = ({ label, value }: { label: string, value: string | number })
 );
 
 const GovernanceRow = ({ label, status, color = 'emerald' }: { label: string, status: string, color?: string }) => (
-  <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/[0.02]">
+  <div className="flex items-center justify-between p-2 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/[0.02]">
     <span className="text-[9px] font-bold text-slate-600 dark:text-zinc-400 uppercase truncate pr-4">{label}</span>
     <span className={`text-[8px] font-black uppercase ${color === 'emerald' ? 'text-emerald-500' : 'text-red-500'}`}>{status}</span>
   </div>
 );
 
 const LifecycleTier = ({ label, value, color }: { label: string, value: number, color: string }) => (
-  <div className="p-2 rounded bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-100 dark:border-white/5 text-center">
+  <div className="p-2 rounded-none bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-100 dark:border-white/5 text-center">
     <span className="text-[7px] font-black text-slate-400 uppercase block mb-1">{label}</span>
     <span className={`text-sm font-black ${
       color === 'primary' ? 'text-primary' :
@@ -931,7 +931,7 @@ const RoutingSimulationPanel = () => {
                   type="text" 
                   value={input.destination_country} 
                   onChange={(e) => setInput({...input, destination_country: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded-none px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -940,7 +940,7 @@ const RoutingSimulationPanel = () => {
                   type="text" 
                   value={input.destination_city} 
                   onChange={(e) => setInput({...input, destination_city: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded-none px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -949,7 +949,7 @@ const RoutingSimulationPanel = () => {
                   type="number" 
                   value={input.required_delivery_days} 
                   onChange={(e) => setInput({...input, required_delivery_days: parseInt(e.target.value)})}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded-none px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -957,7 +957,7 @@ const RoutingSimulationPanel = () => {
                 <select 
                   value={input.product_type} 
                   onChange={(e) => setInput({...input, product_type: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.02] border border-slate-200 dark:border-white/5 rounded-none px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 >
                   <option value="SOFTCOVER_BOOK">Softcover Book</option>
                   <option value="HARDCOVER_BOOK">Hardcover Book</option>
@@ -968,7 +968,7 @@ const RoutingSimulationPanel = () => {
            <button 
              onClick={runSimulation}
              disabled={loading}
-             className="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded shadow-none shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all"
+             className="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-none shadow-none shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all"
            >
              {loading ? 'Simulating Decision...' : 'Execute Deterministic Scoring'}
            </button>
@@ -989,9 +989,9 @@ const RoutingSimulationPanel = () => {
                 </div>
                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                    {result.candidates?.map((c: any) => (
-                     <div key={c.node_id} className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group">
+                     <div key={c.node_id} className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group">
                         <div className="flex items-center gap-3">
-                           <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">
+                           <div className="w-6 h-6 rounded-none bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">
                              {c.rank}
                            </div>
                            <div>
@@ -1007,7 +1007,7 @@ const RoutingSimulationPanel = () => {
                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button 
                                 onClick={() => handleExecute(c)}
-                                className="px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded hover:bg-emerald-600 shadow-none shadow-emerald-500/20"
+                                className="px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-none hover:bg-emerald-600 shadow-none shadow-emerald-500/20"
                               >
                                 Execute
                               </button>
@@ -1016,9 +1016,9 @@ const RoutingSimulationPanel = () => {
                      </div>
                    ))}
                    {result.rejected?.map((r: any) => (
-                     <div key={r.node_id} className="p-2 rounded bg-red-500/5 border border-red-500/10 flex items-center justify-between opacity-60">
+                     <div key={r.node_id} className="p-2 rounded-none bg-red-500/5 border border-red-500/10 flex items-center justify-between opacity-60">
                         <div className="flex items-center gap-3">
-                           <div className="w-5 h-5 rounded bg-red-500/10 flex items-center justify-center text-[8px] font-black text-red-500">X</div>
+                           <div className="w-5 h-5 rounded-none bg-red-500/10 flex items-center justify-center text-[8px] font-black text-red-500">X</div>
                            <div className="text-[9px] font-black text-slate-400 uppercase">{r.display_name}</div>
                         </div>
                         <span className="text-[8px] font-black text-red-500/60 uppercase">{r.reason}</span>
@@ -1065,13 +1065,13 @@ const ManufacturingDispatchConsole = () => {
     <TacticalPanel title="Manufacturing Dispatch Console" icon={ArchiveBoxIcon} badge="Orchestration" color="slate" status={dispatches.status}>
       <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
         {Array.isArray(dispatches.data?.dispatches) && dispatches.data.dispatches.map((d: any) => (
-          <div key={d.id} className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group">
+          <div key={d.id} className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group">
             <div className="flex items-center gap-4">
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase leading-tight">DISPATCH #{d.id?.slice(0, 8)}</span>
                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">NODE: {d.print_node_id?.slice(0, 8)}</span>
               </div>
-              <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getStatusColor(d.status)}`}>
+              <div className={`px-2 py-0.5 rounded-none text-[8px] font-black uppercase ${getStatusColor(d.status)}`}>
                 {d.status}
               </div>
             </div>
@@ -1085,7 +1085,7 @@ const ManufacturingDispatchConsole = () => {
               {d.status !== 'ROLLED_BACK' && (
                 <button 
                   onClick={() => handleRollback(d.id)}
-                  className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-[8px] font-black uppercase rounded hover:bg-red-500/20 transition-all"
+                  className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-[8px] font-black uppercase rounded-none hover:bg-red-500/20 transition-all"
                 >
                   Rollback
                 </button>
@@ -1120,19 +1120,19 @@ const IndustrialHeartbeatMatrix = () => {
   return (
     <TacticalPanel title="Industrial Heartbeat Matrix" icon={BoltIcon} badge="Live Synchronization" color="primary" status={telemetry.status}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
+        <div className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Active Nodes</span>
           <div className="text-xl font-black text-slate-900 dark:text-slate-900 dark:text-white">{stats.active}</div>
         </div>
-        <div className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
+        <div className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Health Risks</span>
           <div className="text-xl font-black text-amber-500">{stats.degraded + stats.saturated}</div>
         </div>
-        <div className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
+        <div className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Global Load</span>
           <div className="text-xl font-black text-primary">{stats.avg_load || 0}%</div>
         </div>
-        <div className="p-3 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
+        <div className="p-3 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Sync Freshness</span>
           <div className="text-xl font-black text-emerald-500">{stats.freshness_pct}%</div>
         </div>
@@ -1143,7 +1143,7 @@ const IndustrialHeartbeatMatrix = () => {
           <div 
             key={node.id} 
             onClick={() => (window as any).openMachine?.(node.id || node.node_id || node.print_node_id)}
-            className="p-2 rounded bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/40 transition-all cursor-pointer"
+            className="p-2 rounded-none bg-slate-50 dark:bg-[#131314]/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/40 transition-all cursor-pointer"
           >
             <div className="flex items-center gap-2 min-w-0">
               {getStatusIcon(node.status)}

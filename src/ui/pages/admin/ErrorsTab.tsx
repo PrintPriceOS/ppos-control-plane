@@ -55,12 +55,12 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
                                         <div className="w-8 h-8 rounded-none bg-red-50 flex items-center justify-center group-hover:bg-white transition-colors">
                                             <ExclamationTriangleIcon className="w-4 h-4 text-red-400" />
                                         </div>
-                                        <span className="font-bold text-red-900 font-mono tracking-tighter text-xs bg-red-50/50 px-2 py-1 rounded">
+                                        <span className="font-bold text-red-900 font-mono tracking-tighter text-xs bg-red-50/50 px-2 py-1 rounded-none">
                                             {r.errorCode}
                                         </span>
                                         <a
                                             href={getErrorArticleLink(r.errorCode)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-none border border-red-100 hover:bg-red-50"
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded-none shadow-none border border-red-100 hover:bg-red-50"
                                         >
                                             ℹ Explain
                                         </a>

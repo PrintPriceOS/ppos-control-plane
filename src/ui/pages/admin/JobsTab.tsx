@@ -146,7 +146,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-none bg-slate-200 group-hover:bg-primary transition-colors" />
-                                                <span className="font-mono text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded">
+                                                <span className="font-mono text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-none">
                                                     {j.id.split('-')[0]}
                                                 </span>
                                             </div>
@@ -254,7 +254,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Transmission State</span>
                                         <span className={[
-                                            "px-2 py-0.5 rounded text-[10px] font-black tracking-widest",
+                                            "px-2 py-0.5 rounded-none text-[10px] font-black tracking-widest",
                                             selectedJob.status === "FAILED" ? "bg-red-50 text-red-700" :
                                                 selectedJob.status === "SUCCEEDED" ? "bg-emerald-50 text-emerald-700" :
                                                     selectedJob.status === "RUNNING" ? "bg-sky-50 text-sky-700" :
@@ -272,7 +272,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                             </div>
                                             <a
                                                 href={getErrorArticleLink(typeof selectedJob.error === 'string' ? selectedJob.error : (selectedJob.error?.code || 'unknown'))}
-                                                className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-none border border-red-100 hover:bg-red-50 transition-colors"
+                                                className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded-none shadow-none border border-red-100 hover:bg-red-50 transition-colors"
                                             >
                                                 ℹ Explain this error
                                             </a>
@@ -302,7 +302,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                                         {new Date(a.created_at).toLocaleString()}
                                                     </div>
                                                     {a.policy_slug && (
-                                                        <div className="mt-2 text-[9px] font-mono bg-slate-50 px-2 py-1 rounded text-slate-500 w-fit">
+                                                        <div className="mt-2 text-[9px] font-mono bg-slate-50 px-2 py-1 rounded-none text-slate-500 w-fit">
                                                             policy_ref: {a.policy_slug}
                                                         </div>
                                                     )}

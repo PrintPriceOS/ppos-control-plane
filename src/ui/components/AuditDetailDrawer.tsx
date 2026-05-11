@@ -59,7 +59,7 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
         <div>
            <SectionHeader label="Resource & Evidence" />
            <div className="mt-4 flex flex-col gap-2">
-              <div className="p-4 rounded-xl border border-slate-100 bg-white font-mono text-[10px] text-slate-500 overflow-auto max-h-40">
+              <div className="p-4 rounded-none border border-slate-100 bg-white font-mono text-[10px] text-slate-500 overflow-auto max-h-40">
                   {JSON.stringify(auditEntry, null, 2)}
               </div>
               <p className="text-[10px] text-slate-400 font-bold px-4">
@@ -73,7 +73,7 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
 };
 
 const MetadataItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
-  <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm">
+  <div className="flex flex-col gap-1 px-4 py-3 rounded-none bg-white border border-slate-100 shadow-sm">
      <div className="flex items-center gap-1.5 text-slate-400">
         {Icon && <Icon className="w-3.5 h-3.5" />}
         <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>

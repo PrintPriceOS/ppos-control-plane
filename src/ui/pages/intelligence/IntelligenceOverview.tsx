@@ -54,16 +54,16 @@ export const IntelligenceOverview: React.FC = () => {
     ];
 
     if (loading) return <div className="animate-pulse space-y-8">
-        <div className="h-32 bg-slate-100 rounded-3xl" />
+        <div className="h-32 bg-slate-100 rounded-none" />
         <div className="grid grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => <div key={i} className="h-48 bg-slate-100 rounded-3xl" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-48 bg-slate-100 rounded-none" />)}
         </div>
     </div>;
 
     return (
         <div className="space-y-6">
             {/* Header section - Compact & Industrial */}
-            <div className="relative overflow-hidden rounded-3xl bg-slate-900 px-8 py-8 text-white shadow-xl">
+            <div className="relative overflow-hidden rounded-none bg-slate-900 px-8 py-8 text-white shadow-xl">
                 <div className="relative z-10 max-w-2xl">
                     <h2 className="text-2xl font-black tracking-tight mb-2 flex items-center gap-3">
                         <BoltIcon className="w-8 h-8 text-primary" />
@@ -74,8 +74,8 @@ export const IntelligenceOverview: React.FC = () => {
                         Live anomaly detection and explainable operational signals.
                     </p>
                 </div>
-                <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-[80px]" />
-                <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-blue-500/5 rounded-full blur-[60px]" />
+                <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-none blur-[80px]" />
+                <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-blue-500/5 rounded-none blur-[60px]" />
             </div>
 
             {/* Stats Grid - High Density */}
@@ -84,9 +84,9 @@ export const IntelligenceOverview: React.FC = () => {
                     <Link 
                         key={card.title} 
                         to={card.link}
-                        className="group relative p-6 bg-white border border-slate-200 rounded-3xl hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 overflow-hidden"
+                        className="group relative p-6 bg-white border border-slate-200 rounded-none hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 overflow-hidden"
                     >
-                        <div className={`w-12 h-12 ${card.bg} ${card.color} rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
+                        <div className={`w-12 h-12 ${card.bg} ${card.color} rounded-none flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
                             <card.icon className="w-6 h-6" />
                         </div>
                         <div className="space-y-1">
@@ -109,8 +109,8 @@ export const IntelligenceOverview: React.FC = () => {
 
             {/* Critical Anomalies Block */}
             {summary?.criticalCount > 0 && (
-                <div className="p-8 bg-rose-50 border border-rose-100 rounded-[2rem] flex items-center gap-6">
-                    <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+                <div className="p-8 bg-rose-50 border border-rose-100 rounded-none-[2rem] flex items-center gap-6">
+                    <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-none flex items-center justify-center flex-shrink-0 animate-pulse">
                         <ExclamationTriangleIcon className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
@@ -119,7 +119,7 @@ export const IntelligenceOverview: React.FC = () => {
                     </div>
                     <Link 
                         to="/intelligence/anomalies" 
-                        className="px-6 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20"
+                        className="px-6 py-3 bg-rose-600 text-white font-bold rounded-none hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20"
                     >
                         Review Now
                     </Link>

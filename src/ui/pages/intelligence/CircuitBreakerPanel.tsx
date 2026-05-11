@@ -51,7 +51,7 @@ const CircuitBreakerPanel: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Current State Card */}
-                <div className={`p-8 rounded-3xl border-2 shadow-sm flex flex-col items-center justify-center space-y-4 ${stateColors[status?.state] || 'bg-slate-50'}`}>
+                <div className={`p-8 rounded-none border-2 shadow-sm flex flex-col items-center justify-center space-y-4 ${stateColors[status?.state] || 'bg-slate-50'}`}>
                     {status?.state === 'CLOSED' ? (
                         <BoltIcon className="w-16 h-16 opacity-20" />
                     ) : (
@@ -63,7 +63,7 @@ const CircuitBreakerPanel: React.FC = () => {
                         <span className="text-[10px] font-medium opacity-60">Last fault: {status?.lastFaultAt ? new Date(status.lastFaultAt).toLocaleTimeString() : 'None'}</span>
                         <button 
                             onClick={manualReset}
-                            className="mt-4 px-6 py-2 bg-white rounded-full shadow-sm text-xs font-bold hover:shadow-md transition-all active:scale-95 border border-slate-200"
+                            className="mt-4 px-6 py-2 bg-white rounded-none shadow-sm text-xs font-bold hover:shadow-md transition-all active:scale-95 border border-slate-200"
                         >
                             Reset Manually
                         </button>
@@ -71,7 +71,7 @@ const CircuitBreakerPanel: React.FC = () => {
                 </div>
 
                 {/* Metrics Cards */}
-                <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between">
+                <div className="bg-white p-6 rounded-none shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <ChartBarIcon className="w-8 h-8 text-slate-200" />
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stability Profile</span>
@@ -81,13 +81,13 @@ const CircuitBreakerPanel: React.FC = () => {
                             <span className="text-sm text-slate-500 font-medium">Accumulated Faults</span>
                             <span className="text-lg font-bold text-slate-700">{status?.faultCount || 0}</span>
                         </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-slate-100 h-1.5 rounded-none overflow-hidden">
                             <div className="bg-rose-400 h-full transition-all duration-1000" style={{ width: `${Math.min(100, (status?.faultCount || 0) * 10)}%` }}></div>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between">
+                <div className="bg-white p-6 rounded-none shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <ReceiptRefundIcon className="w-8 h-8 text-slate-200" />
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recovery Success</span>
@@ -97,7 +97,7 @@ const CircuitBreakerPanel: React.FC = () => {
                             <span className="text-sm text-slate-500 font-medium">Successful Probes</span>
                             <span className="text-lg font-bold text-slate-700">{status?.recoveryCount || 0}/5</span>
                         </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-slate-100 h-1.5 rounded-none overflow-hidden">
                             <div className="bg-emerald-400 h-full transition-all duration-1000" style={{ width: `${(status?.recoveryCount || 0) * 20}%` }}></div>
                         </div>
                     </div>
@@ -105,7 +105,7 @@ const CircuitBreakerPanel: React.FC = () => {
             </div>
 
             {/* Explanation / Logic Box */}
-            <div className="bg-slate-900 rounded-3xl p-8 text-slate-300 relative overflow-hidden">
+            <div className="bg-slate-900 rounded-none p-8 text-slate-300 relative overflow-hidden">
                 <div className="relative z-10">
                     <h3 className="font-bold text-white mb-2 underline decoration-indigo-500 underline-offset-4">Breaker Policy Engine</h3>
                     <p className="text-sm leading-relaxed max-w-2xl text-slate-400">

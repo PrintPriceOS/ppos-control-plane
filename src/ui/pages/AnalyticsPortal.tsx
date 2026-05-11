@@ -49,9 +49,9 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'indigo' }: {
         rose: 'from-rose-500 to-rose-600'
     };
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
+        <div className="bg-white rounded-none border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
             <div className="flex items-start justify-between mb-4">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[color] || colors.indigo} flex items-center justify-center shadow-sm`}>
+                <div className={`w-10 h-10 rounded-none bg-gradient-to-br ${colors[color] || colors.indigo} flex items-center justify-center shadow-sm`}>
                     <Icon className="w-5 h-5 text-white" />
                 </div>
             </div>
@@ -65,10 +65,10 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'indigo' }: {
 function RangeSelector({ range, onChange }: { range: Range; onChange: (r: Range) => void }) {
     const opts: Range[] = ['7d', '30d', '90d'];
     return (
-        <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+        <div className="flex bg-slate-100 rounded-none p-1 gap-1">
             {opts.map(r => (
                 <button key={r} onClick={() => onChange(r)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${range === r
+                    className={`px-4 py-1.5 rounded-none text-sm font-semibold transition-all ${range === r
                         ? 'bg-white text-slate-900 shadow-sm'
                         : 'text-slate-500 hover:text-slate-700'}`}
                 >{r}</button>
@@ -80,8 +80,8 @@ function RangeSelector({ range, onChange }: { range: Range; onChange: (r: Range)
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
     const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
     return (
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+        <div className="w-full h-1.5 bg-slate-100 rounded-none overflow-hidden">
+            <div className={`h-full ${color} rounded-none transition-all`} style={{ width: `${pct}%` }} />
         </div>
     );
 }
@@ -95,7 +95,7 @@ function StatusBadge({ status }: { status: string }) {
         QUEUED: 'bg-slate-50 text-slate-600 border-slate-200',
     };
     return (
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${map[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-none border ${map[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
             {status}
         </span>
     );
@@ -106,14 +106,14 @@ function ApiKeyGate({ onKeySet }: { onKeySet: (k: string) => void }) {
     const [input, setInput] = useState('');
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8 max-w-md w-full">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-6">
+            <div className="bg-white rounded-none border border-slate-200 shadow-lg p-8 max-w-md w-full">
+                <div className="w-12 h-12 rounded-none bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-6">
                     <ShieldCheckIcon className="w-6 h-6 text-white" />
                 </div>
                 <h1 className="text-xl font-bold text-slate-900 mb-1">Print Analytics Portal</h1>
                 <p className="text-slate-500 text-sm mb-6">Enter your API key to access your analytics dashboard.</p>
                 <input
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono mb-4 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                    className="w-full border border-slate-200 rounded-none px-4 py-3 text-sm font-mono mb-4 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                     placeholder="ppk_live_xxxxxxxxxxxxxxxx"
                     value={input}
                     onChange={e => setInput(e.target.value)}
@@ -121,7 +121,7 @@ function ApiKeyGate({ onKeySet }: { onKeySet: (k: string) => void }) {
                 />
                 <button
                     onClick={() => onKeySet(input)}
-                    className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                    className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 text-white font-semibold py-3 rounded-none hover:opacity-90 transition-opacity"
                 >
                     Access Dashboard
                 </button>
@@ -182,7 +182,7 @@ export function AnalyticsPortal() {
             <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-none bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
                             <ChartBarIcon className="w-4 h-4 text-white" />
                         </div>
                         <div>
@@ -193,7 +193,7 @@ export function AnalyticsPortal() {
                     <div className="flex items-center gap-3">
                         <RangeSelector range={range} onChange={setRange} />
                         <button onClick={() => load(apiKey, range)}
-                            className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                            className="w-8 h-8 rounded-none bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
                             <ArrowPathIcon className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
@@ -202,14 +202,14 @@ export function AnalyticsPortal() {
 
             <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
                 {error && (
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 text-rose-700 text-sm font-medium">
+                    <div className="bg-rose-50 border border-rose-200 rounded-none px-5 py-4 text-rose-700 text-sm font-medium">
                         {error}
                     </div>
                 )}
 
                 {/* Value Banner */}
                 {summary && summary.value_generated_total > 0 && (
-                    <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-6 text-white">
+                    <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-none p-6 text-white">
                         <p className="text-indigo-200 text-sm font-medium mb-1">ROI Generated</p>
                         <p className="text-3xl font-black">
                             PrintPrice has generated <span className="text-yellow-300">${summary.value_generated_total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> in prepress efficiency value for your organization.
@@ -232,7 +232,7 @@ export function AnalyticsPortal() {
 
                 {/* Timeseries */}
                 {timeseries.length > 0 && (
-                    <section className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                    <section className="bg-white rounded-none border border-slate-100 p-6 shadow-sm">
                         <h2 className="text-sm font-bold text-slate-700 mb-5 flex items-center gap-2">
                             <ArrowTrendingUpIcon className="w-4 h-4 text-indigo-500" /> Activity — Last {range}
                         </h2>
@@ -260,7 +260,7 @@ export function AnalyticsPortal() {
                 <div className="grid md:grid-cols-2 gap-6">
                     {/* Policy Performance */}
                     {policies.length > 0 && (
-                        <section className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                        <section className="bg-white rounded-none border border-slate-100 p-6 shadow-sm">
                             <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                                 <BoltIcon className="w-4 h-4 text-amber-500" /> Policy Performance
                             </h2>
@@ -283,14 +283,14 @@ export function AnalyticsPortal() {
 
                     {/* Top Errors */}
                     {errors.length > 0 && (
-                        <section className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                        <section className="bg-white rounded-none border border-slate-100 p-6 shadow-sm">
                             <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                                 <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" /> Top Errors
                             </h2>
                             <div className="space-y-3">
                                 {errors.map((e, i) => (
                                     <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                                        <span className="w-6 h-6 rounded-full bg-rose-50 text-rose-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{e.count}</span>
+                                        <span className="w-6 h-6 rounded-none bg-rose-50 text-rose-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{e.count}</span>
                                         <div className="min-w-0">
                                             <p className="text-xs font-mono text-slate-700 truncate">{e.error_message}</p>
                                             <p className="text-xs text-slate-400">{new Date(e.last_seen).toLocaleDateString()}</p>
@@ -304,7 +304,7 @@ export function AnalyticsPortal() {
 
                 {/* Batch History */}
                 {batches.length > 0 && (
-                    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    <section className="bg-white rounded-none border border-slate-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
                             <CalendarIcon className="w-4 h-4 text-blue-500" />
                             <h2 className="text-sm font-bold text-slate-700">Batch History</h2>
@@ -342,7 +342,7 @@ export function AnalyticsPortal() {
                                                 {['SUCCEEDED', 'PARTIAL'].includes(b.status) && (
                                                     <a
                                                         href={b.links.download}
-                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg"
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1 rounded-none"
                                                         download
                                                     >
                                                         <ArrowDownTrayIcon className="w-3 h-3" /> ZIP

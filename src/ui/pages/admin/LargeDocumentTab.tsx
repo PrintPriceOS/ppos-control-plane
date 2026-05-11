@@ -34,7 +34,7 @@ export const LargeDocumentTab: React.FC = () => {
                         <DocumentDuplicateIcon className="w-5 h-5 text-slate-400" />
                         <div className="font-bold text-slate-800 text-sm tracking-tight">Isolated Large Document Queue</div>
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">DEDICATED-RESOURCES</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-none">DEDICATED-RESOURCES</span>
                 </div>
                 <div className="p-0">
                     {jobs.length === 0 ? (

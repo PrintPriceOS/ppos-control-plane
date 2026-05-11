@@ -17,9 +17,9 @@ import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
 
 const KpiCard = ({ title, value, sub, Icon, color }: { title: string; value: string; sub?: string; Icon: any; color: string }) => (
-  <div className="glass p-5 rounded-2xl border border-white dark:border-slate-700/30 flex flex-col gap-4 group hover:border-primary/20 transition-all">
+  <div className="glass p-5 rounded-none border border-white dark:border-slate-700/30 flex flex-col gap-4 group hover:border-primary/20 transition-all">
     <div className="flex items-center justify-between">
-      <div className={`p-3 rounded-xl bg-${color}/10 text-${color}`}>
+      <div className={`p-3 rounded-none bg-${color}/10 text-${color}`}>
         <Icon className="w-6 h-6" />
       </div>
       {sub && <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{sub}</span>}
@@ -62,7 +62,7 @@ export const DashboardPage: React.FC = () => {
                           : 'Global governance, real-time vitals, and infrastructure coordination.'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest">
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-none text-xs font-black uppercase tracking-widest">
                    <ClockIcon className="w-4 h-4" />
                    <span>Last 24 Hours</span>
                 </div>
@@ -78,7 +78,7 @@ export const DashboardPage: React.FC = () => {
             {!isPrinthouse && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
                     {/* Governance Summary */}
-                    <div className="lg:col-span-2 glass rounded-2xl border border-white dark:border-slate-700/30 p-6 flex flex-col gap-6">
+                    <div className="lg:col-span-2 glass rounded-none border border-white dark:border-slate-700/30 p-6 flex flex-col gap-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <ShieldCheckIcon className="w-5 h-5 text-slate-400" />
@@ -90,9 +90,9 @@ export const DashboardPage: React.FC = () => {
                         </div>
                         <div className="space-y-4 italic-text-off">
                             {(gov.data?.blocks ?? []).map(block => (
-                                <div key={block.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/40">
+                                <div key={block.id} className="flex items-center justify-between p-4 rounded-none bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/40">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center font-mono text-[10px] font-black text-slate-700 dark:text-slate-300">
+                                        <div className="w-10 h-10 rounded-none bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center font-mono text-[10px] font-black text-slate-700 dark:text-slate-300">
                                         {abbreviateId(block.id)}
                                         </div>
                                         <div>
@@ -100,7 +100,7 @@ export const DashboardPage: React.FC = () => {
                                             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase">{block.id} · {block.impact}</p>
                                         </div>
                                     </div>
-                                    <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-700/30">
+                                    <span className="px-2 py-0.5 rounded-none bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-700/30">
                                         {block.status}
                                     </span>
                                 </div>
@@ -112,7 +112,7 @@ export const DashboardPage: React.FC = () => {
                     </div>
 
                     {/* Worker Status */}
-                    <div className="glass rounded-2xl border border-white dark:border-slate-700/30 p-6 flex flex-col gap-6">
+                    <div className="glass rounded-none border border-white dark:border-slate-700/30 p-6 flex flex-col gap-6">
                         <div className="flex items-center gap-3">
                             <ServerIcon className="w-5 h-5 text-slate-400" />
                             <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Worker Cluster</h3>

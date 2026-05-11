@@ -47,7 +47,7 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children
                         <div className="ml-3 flex h-7 items-center">
                           <button
                             type="button"
-                            className="rounded-xl bg-slate-50 text-slate-400 hover:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 p-2 transition-all"
+                            className="rounded-none bg-slate-50 text-slate-400 hover:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 p-2 transition-all"
                             onClick={onClose}
                           >
                             <span className="sr-only">Close panel</span>

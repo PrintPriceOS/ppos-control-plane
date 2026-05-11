@@ -22,8 +22,8 @@ export const PreflightCertificatesPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 italic-text-off">
-         <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center shadow-sm">
+         <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] flex items-center gap-4">
+            <div className="w-12 h-12 rounded-none bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center shadow-sm">
                <CheckBadgeIcon className="w-6 h-6 text-emerald-500" />
             </div>
             <div>
@@ -31,8 +31,8 @@ export const PreflightCertificatesPage: React.FC = () => {
                <h3 className="text-xl font-black text-slate-900 dark:text-[#ECECF1] leading-none">{certJobs.length}</h3>
             </div>
          </div>
-         <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center shadow-sm">
+         <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] flex items-center gap-4">
+            <div className="w-12 h-12 rounded-none bg-primary/5 flex items-center justify-center shadow-sm">
                <ShieldCheckIcon className="w-6 h-6 text-primary" />
             </div>
             <div>
@@ -63,7 +63,7 @@ export const PreflightCertificatesPage: React.FC = () => {
           {
             header: 'Policy',
             accessor: (j) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 tracking-wider">
+              <span className="px-2 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 tracking-wider">
                 {j.policy || 'STANDARD'}
               </span>
             )
@@ -81,7 +81,7 @@ export const PreflightCertificatesPage: React.FC = () => {
       />
       
       {certJobs.length === 0 && q.status === 'success' && (
-        <div className="p-20 text-center border-2 border-dashed border-slate-100 dark:border-white/[0.05] rounded-3xl">
+        <div className="p-20 text-center border-2 border-dashed border-slate-100 dark:border-white/[0.05] rounded-none">
            <TicketIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
            <p className="text-slate-400 font-bold italic">No certification records found in the current ledger.</p>
         </div>

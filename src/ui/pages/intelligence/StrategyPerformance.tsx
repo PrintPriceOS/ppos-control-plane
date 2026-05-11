@@ -21,9 +21,9 @@ export const StrategyPerformance: React.FC = () => {
 
             <div className="space-y-4">
                 {strategies.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-xl">Accumulating evaluation history... minimum sample size required.</div>
+                    <div className="p-8 text-center text-slate-400 border-2 border-dashed rounded-none">Accumulating evaluation history... minimum sample size required.</div>
                 ) : strategies.map((s, idx) => (
-                    <div key={idx} className="bg-white border rounded-xl p-5 shadow-sm flex justify-between items-center">
+                    <div key={idx} className="bg-white border rounded-none p-5 shadow-sm flex justify-between items-center">
                         <div>
                             <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Rank #{idx+1}</span>
                             <h3 className="font-bold text-lg text-slate-800 mt-1">{s.type}</h3>

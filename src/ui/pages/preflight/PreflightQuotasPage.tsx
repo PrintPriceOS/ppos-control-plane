@@ -41,7 +41,7 @@ export const PreflightQuotasPage: React.FC = () => {
             header: 'Used Storage',
             accessor: (t) => (
               <div className="flex flex-col gap-1 w-48">
-                <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-none overflow-hidden">
                   <div className={`h-full ${t.usedBytes / t.quotaBytes > 0.9 ? 'bg-red-500' : 'bg-primary'}`}
                     style={{ width: `${(t.usedBytes / t.quotaBytes) * 100}%` }} />
                 </div>
@@ -59,7 +59,7 @@ export const PreflightQuotasPage: React.FC = () => {
           {
             header: 'Capacity',
             accessor: (t) => (
-              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+              <span className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider ${t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
                 }`}>
                 {((t.usedBytes / t.quotaBytes) * 100).toFixed(1)}% Full
               </span>
@@ -77,14 +77,14 @@ export const PreflightQuotasPage: React.FC = () => {
 };
 
 const QuotaCard = ({ label, value, limit, progress }: any) => (
-  <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] space-y-4">
+  <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] space-y-4">
     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</div>
     <div className="flex items-baseline gap-2">
       <span className="text-3xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">{value}</span>
       <span className="text-xs font-bold text-slate-400">/ {limit}</span>
     </div>
     <div className="space-y-1.5">
-      <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
+      <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-none overflow-hidden">
         <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
       </div>
       <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">

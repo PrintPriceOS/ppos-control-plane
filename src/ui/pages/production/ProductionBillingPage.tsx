@@ -64,9 +64,9 @@ export const ProductionBillingPage: React.FC = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-white/5 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-none border border-slate-100 dark:border-white/5 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-none">
               <BanknotesIcon className="w-6 h-6 text-emerald-600" />
             </div>
             <div>
@@ -76,9 +76,9 @@ export const ProductionBillingPage: React.FC = () => {
           </div>
         </div>
         
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-white/5 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-none border border-slate-100 dark:border-white/5 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-2xl">
+            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-none">
               <ArrowUpRightIcon className="w-6 h-6 text-blue-600" />
             </div>
             <div>
@@ -88,9 +88,9 @@ export const ProductionBillingPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-white/5 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-none border border-slate-100 dark:border-white/5 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-slate-50 dark:bg-slate-500/10 rounded-2xl">
+            <div className="p-3 bg-slate-50 dark:bg-slate-500/10 rounded-none">
               <ScaleIcon className="w-6 h-6 text-slate-600" />
             </div>
             <div>
@@ -102,7 +102,7 @@ export const ProductionBillingPage: React.FC = () => {
       </div>
 
       {/* Ledger Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-white/5 shadow-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-none border border-slate-100 dark:border-white/5 shadow-xl overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">General Ledger Entries</h3>
           <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -150,7 +150,7 @@ export const ProductionBillingPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wider ${
                         entry.entry_type === 'DEBIT' 
                           ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10' 
                           : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10'

@@ -23,7 +23,7 @@ export const AnomalyList: React.FC = () => {
         { 
             header: 'Severity', 
             accessor: (a: any) => (
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${
+                <span className={`px-2 py-1 rounded-none text-[10px] font-black border ${
                     a.severity === 'CRITICAL' ? 'bg-rose-50 text-rose-600 border-rose-100' :
                     a.severity === 'HIGH' ? 'bg-orange-50 text-orange-600 border-orange-100' :
                     'bg-amber-50 text-amber-600 border-amber-100'

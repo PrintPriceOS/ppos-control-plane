@@ -18,7 +18,7 @@ export const RuntimeContextPage: React.FC = () => {
                     { label: 'Isolation Mode', value: 'Strict Tenant-Bound', icon: ShieldCheckIcon },
                     { label: 'OS Version', value: 'v2.1.0-alpha', icon: CpuChipIcon }
                 ].map((item, i) => (
-                    <div key={i} className="glass p-5 rounded-2xl border border-white flex flex-col gap-2">
+                    <div key={i} className="glass p-5 rounded-none border border-white flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-slate-400">
                             <item.icon className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
@@ -28,26 +28,26 @@ export const RuntimeContextPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="glass p-8 rounded-2xl border border-white italic-text-off">
+            <div className="glass p-8 rounded-none border border-white italic-text-off">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Active Node Stats</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                     <div>
                         <p className="text-xs font-bold text-slate-500 mb-2">CPU Utilization</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
                             <div className="w-[12%] h-full bg-emerald-500" />
                         </div>
                         <p className="text-right text-[10px] font-black text-slate-400 mt-1">12.4%</p>
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-500 mb-2">Memory (RSS)</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
                             <div className="w-[45%] h-full bg-blue-500" />
                         </div>
                         <p className="text-right text-[10px] font-black text-slate-400 mt-1">45.1% (3.2GB / 8GB)</p>
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-500 mb-2">Internal Latency</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
                             <div className="w-[8%] h-full bg-emerald-500" />
                         </div>
                         <p className="text-right text-[10px] font-black text-slate-400 mt-1">4ms (avg)</p>

@@ -40,8 +40,8 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
 
       <div className="space-y-10 italic-text-off">
         {/* Status Header */}
-        <div className="flex items-center gap-6 p-6 rounded-3xl bg-slate-50 border border-slate-100 shadow-sm">
-           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${
+        <div className="flex items-center gap-6 p-6 rounded-none bg-slate-50 border border-slate-100 shadow-sm">
+           <div className={`w-14 h-14 rounded-none flex items-center justify-center shadow-lg ${
              job.status === 'COMPLETED' ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 
              job.status === 'FAILED' ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-blue-500 text-white shadow-blue-500/20'
            }`}>
@@ -98,7 +98,7 @@ const SectionHeader = ({ label }: { label: string }) => (
 );
 
 const ArtifactLink = ({ icon: Icon, label }: any) => (
-  <button className="flex items-center gap-3 p-4 rounded-2xl bg-white border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all text-left group">
+  <button className="flex items-center gap-3 p-4 rounded-none bg-white border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all text-left group">
      <Icon className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
      <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{label}</span>
   </button>

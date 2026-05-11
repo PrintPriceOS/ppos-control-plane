@@ -52,7 +52,7 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
   if (loading) {
     return (
       <div className="p-10 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-none h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -74,22 +74,22 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
           <div key={event.id} className="relative pl-8">
             {/* Timeline Dot */}
             <div className={`
-              absolute -left-[11px] top-1 h-5 w-5 rounded-full border-4 border-white shadow-sm ring-1 ring-slate-200
+              absolute -left-[11px] top-1 h-5 w-5 rounded-none border-4 border-white shadow-sm ring-1 ring-slate-200
               ${getEventColor(event.event_type)}
             `}></div>
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter border ${getEventBadgeStyle(event.event_type)}`}>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-none uppercase tracking-tighter border ${getEventBadgeStyle(event.event_type)}`}>
                       {event.event_type.replace(/_/g, ' ')}
                     </span>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                       {new Date(event.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[10px] font-bold text-slate-500 uppercase">
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-none text-[10px] font-bold text-slate-500 uppercase">
                     {getActorIcon(event.actor_type)}
                     {event.actor_type}: {event.actor_id.substring(0, 8)}
                   </div>
@@ -108,7 +108,7 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
                     </button>
                     
                     {expandedEvent === event.id && (
-                      <pre className="mt-2 p-3 bg-slate-900 text-indigo-300 text-[10px] rounded-lg overflow-x-auto font-mono leading-relaxed">
+                      <pre className="mt-2 p-3 bg-slate-900 text-indigo-300 text-[10px] rounded-none overflow-x-auto font-mono leading-relaxed">
                         {JSON.stringify(event.metadata_json, null, 2)}
                       </pre>
                     )}

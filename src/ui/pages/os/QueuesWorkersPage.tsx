@@ -33,10 +33,10 @@ export const QueuesWorkersPage: React.FC = () => {
                     const isPaused = stats?.paused;
                     
                     return (
-                        <div key={queueName} className="glass p-6 rounded-2xl border border-white flex flex-col gap-6">
+                        <div key={queueName} className="glass p-6 rounded-none border border-white flex flex-col gap-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-3 rounded-xl ${isPaused ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                                    <div className={`p-3 rounded-none ${isPaused ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>
                                         <QueueListIcon className="w-6 h-6" />
                                     </div>
                                     <div>
@@ -50,7 +50,7 @@ export const QueuesWorkersPage: React.FC = () => {
                                     {isPaused ? (
                                         <button 
                                             onClick={() => handleResume(queueName)}
-                                            className="p-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+                                            className="p-2 rounded-none bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
                                             title="Resume Queue"
                                         >
                                             <PlayIcon className="w-4 h-4" />
@@ -58,14 +58,14 @@ export const QueuesWorkersPage: React.FC = () => {
                                     ) : (
                                         <button 
                                             onClick={() => handlePause(queueName)}
-                                            className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                                            className="p-2 rounded-none bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
                                             title="Pause Queue"
                                         >
                                             <PauseIcon className="w-4 h-4" />
                                         </button>
                                     )}
                                     <button 
-                                        className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 transition-all"
+                                        className="p-2 rounded-none bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 transition-all"
                                         title="Drain Queue"
                                     >
                                         <TrashIcon className="w-4 h-4" />
@@ -74,18 +74,18 @@ export const QueuesWorkersPage: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 italic-text-off">
+                                <div className="p-3 rounded-none bg-slate-50 border border-slate-100 italic-text-off">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Queue Depth</p>
                                     <p className="text-lg font-black text-slate-900">{stats?.size || 0}</p>
                                 </div>
-                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 italic-text-off">
+                                <div className="p-3 rounded-none bg-slate-50 border border-slate-100 italic-text-off">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Workers</p>
                                     <p className="text-lg font-black text-slate-900">{stats?.active || 0}</p>
                                 </div>
-                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 italic-text-off">
+                                <div className="p-3 rounded-none bg-slate-50 border border-slate-100 italic-text-off">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Heartbeat</p>
                                     <div className="flex items-center gap-1.5 mt-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <div className="w-1.5 h-1.5 rounded-none bg-emerald-500 animate-pulse" />
                                         <span className="text-[10px] font-bold text-slate-500 uppercase">Synced</span>
                                     </div>
                                 </div>
@@ -95,7 +95,7 @@ export const QueuesWorkersPage: React.FC = () => {
                 })}
             </div>
 
-            <div className="glass p-8 rounded-2xl border border-white">
+            <div className="glass p-8 rounded-none border border-white">
                 <div className="flex items-center gap-3 mb-6">
                     <UsersIcon className="w-5 h-5 text-slate-400" />
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Regional Workers</h3>
@@ -106,9 +106,9 @@ export const QueuesWorkersPage: React.FC = () => {
                        { id: 'worker-eu-w1-02', region: 'eu-west-1', load: '85%', status: 'BUSY' },
                        { id: 'worker-eu-w1-03', region: 'eu-west-1', load: '0%', status: 'IDLE' }
                    ].map(worker => (
-                       <div key={worker.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-50 hover:bg-slate-50 transition-all cursor-pointer group">
+                       <div key={worker.id} className="flex items-center justify-between p-4 rounded-none border border-slate-50 hover:bg-slate-50 transition-all cursor-pointer group">
                            <div className="flex items-center gap-4">
-                               <div className="p-2.5 rounded-lg bg-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                               <div className="p-2.5 rounded-none bg-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                                    <BoltIcon className="w-5 h-5" />
                                </div>
                                <div>

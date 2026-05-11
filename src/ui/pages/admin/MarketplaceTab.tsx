@@ -92,7 +92,7 @@ export const MarketplaceTab: React.FC = () => {
                                 >
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="font-bold text-slate-900 truncate pr-4">{s.job_name}</div>
-                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${s.session_status === 'SELECTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-none border uppercase tracking-wider ${s.session_status === 'SELECTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                             s.session_status === 'OPEN' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-50 text-slate-500 border-slate-200'
                                             }`}>
                                             {s.session_status}
@@ -140,8 +140,8 @@ export const MarketplaceTab: React.FC = () => {
                                                     <div>
                                                         <div className="font-black text-slate-900 text-sm tracking-tight">{o.printer_name}</div>
                                                         <div className="flex items-center gap-2 mt-1">
-                                                            {i === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter flex items-center gap-1 shadow-none"><ShieldCheckIcon className="w-2.5 h-2.5" /> Best Choice</span>}
-                                                            {o.offer_selected && <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter flex items-center gap-1 shadow-none"><BoltIcon className="w-2.5 h-2.5" /> Active</span>}
+                                                            {i === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-1 shadow-none"><ShieldCheckIcon className="w-2.5 h-2.5" /> Best Choice</span>}
+                                                            {o.offer_selected && <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-1 shadow-none"><BoltIcon className="w-2.5 h-2.5" /> Active</span>}
                                                         </div>
                                                     </div>
                                                 </div>

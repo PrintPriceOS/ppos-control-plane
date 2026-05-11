@@ -46,13 +46,13 @@ export const IntelligenceDetailDrawer: React.FC<IntelligenceDetailDrawerProps> =
     <Drawer isOpen={isOpen} onClose={onClose} title={`${type.toUpperCase()} DETAILS`}>
       <div className="space-y-8">
         {/* Header Info */}
-        <div className="flex items-start gap-5 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-          <div className="p-3 bg-white rounded-2xl shadow-sm">
+        <div className="flex items-start gap-5 p-6 bg-slate-50 rounded-none border border-slate-100">
+          <div className="p-3 bg-white rounded-none shadow-sm">
             {getHeaderIcon()}
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${getBadgeColor(data.severity)}`}>
+              <span className={`px-2.5 py-0.5 rounded-none text-[10px] font-black uppercase border ${getBadgeColor(data.severity)}`}>
                 {data.severity}
               </span>
               <span className="text-[11px] font-black text-slate-400 font-mono">
@@ -77,11 +77,11 @@ export const IntelligenceDetailDrawer: React.FC<IntelligenceDetailDrawerProps> =
           </section>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+            <div className="p-4 bg-slate-50 rounded-none border border-slate-100 space-y-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Affected Entity</span>
               <p className="font-bold text-slate-900 truncate">{data.entityType}: {data.entityId}</p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+            <div className="p-4 bg-slate-50 rounded-none border border-slate-100 space-y-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detection Time</span>
               <div className="flex items-center gap-2 font-bold text-slate-900">
                 <ClockIcon className="w-4 h-4 text-slate-400" />
@@ -96,7 +96,7 @@ export const IntelligenceDetailDrawer: React.FC<IntelligenceDetailDrawerProps> =
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <BeakerIcon className="w-4 h-4" /> Evidence Captured
               </h4>
-              <div className="p-5 bg-slate-900 rounded-2xl font-mono text-xs text-blue-300 overflow-x-auto shadow-inner">
+              <div className="p-5 bg-slate-900 rounded-none font-mono text-xs text-blue-300 overflow-x-auto shadow-inner">
                 <pre>{JSON.stringify(data.evidence, null, 2)}</pre>
               </div>
             </section>
@@ -110,7 +110,7 @@ export const IntelligenceDetailDrawer: React.FC<IntelligenceDetailDrawerProps> =
               </h4>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(data.contractContext).map(([k, v]: [string, any]) => (
-                  <span key={k} className="px-3 py-1.5 bg-primary/5 text-primary border border-primary/10 rounded-lg text-xs font-bold">
+                  <span key={k} className="px-3 py-1.5 bg-primary/5 text-primary border border-primary/10 rounded-none text-xs font-bold">
                     {k}: {v}
                   </span>
                 ))}
@@ -120,14 +120,14 @@ export const IntelligenceDetailDrawer: React.FC<IntelligenceDetailDrawerProps> =
 
           {/* Action Call for Recommendations */}
           {type === 'recommendation' && (
-            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl space-y-4">
+            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-none space-y-4">
               <div className="flex items-center gap-3 text-emerald-800">
                 <WrenchScrewdriverIcon className="w-6 h-6" />
                 <h4 className="font-black">Suggested Manual Action</h4>
               </div>
               <p className="text-emerald-700 font-medium">{data.suggestedAction}</p>
               <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="w-2 h-2 bg-emerald-500 rounded-none animate-pulse" />
                 Manual Only Mode Active
               </div>
             </div>

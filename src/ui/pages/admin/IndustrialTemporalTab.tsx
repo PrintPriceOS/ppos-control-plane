@@ -30,7 +30,7 @@ export const IndustrialTemporalTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Temporal Header */}
-            <div className="p-10 bg-slate-950 rounded-[3rem] text-white shadow-none relative overflow-hidden border border-slate-900">
+            <div className="p-10 bg-slate-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-slate-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-indigo-500/20 rounded-none border border-indigo-500/30">
@@ -56,7 +56,7 @@ export const IndustrialTemporalTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Timeline Stability Radar */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <SparklesIcon className="w-4 h-4 text-indigo-500" />
                         Parallel Timeline Stability
@@ -78,7 +78,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                 </div>
 
                 {/* Future Federation Projection Map */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <VariableIcon className="w-4 h-4 text-purple-400" />
                         Future-State Federation Projections
@@ -111,7 +111,7 @@ export const IndustrialTemporalTab: React.FC = () => {
             {/* Temporal Risk & Optimization Feed */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Temporal Risk Heatmap */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <VariableIcon className="w-4 h-4 text-pink-500" />
                         Temporal Risk Heatmap
@@ -133,7 +133,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                 </div>
 
                 {/* Future-State Optimization Feed */}
-                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ArrowPathIcon className="w-4 h-4 text-indigo-500" />
                         Future-State Optimization Feed

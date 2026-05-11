@@ -129,7 +129,7 @@ export const EngagementSignalsTab: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <pre className="text-[9px] bg-slate-50 p-1.5 rounded border border-slate-100 text-slate-600 font-mono max-w-[300px] truncate">
+                                            <pre className="text-[9px] bg-slate-50 p-1.5 rounded-none border border-slate-100 text-slate-600 font-mono max-w-[300px] truncate">
                                                 {JSON.stringify(typeof sig.metadata_json === 'string' ? JSON.parse(sig.metadata_json) : sig.metadata_json)}
                                             </pre>
                                         </td>

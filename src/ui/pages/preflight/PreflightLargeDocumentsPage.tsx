@@ -59,7 +59,7 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
           {
             header: 'Impact',
             accessor: (j) => (
-              <span className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-mono text-xs font-black">
+              <span className="px-2 py-1 rounded-none bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-mono text-xs font-black">
                 {formatSize(j.file_size)}
               </span>
             )
@@ -68,7 +68,7 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
             header: 'Status',
             accessor: (j) => (
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
+                <div className={`w-2 h-2 rounded-none ${
                   j.status === 'COMPLETED' ? 'bg-emerald-500' : 
                   j.status === 'FAILED' ? 'bg-red-500' : 'bg-blue-500 animate-pulse'
                 }`} />
@@ -80,7 +80,7 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
             header: 'Progress',
             accessor: (j) => (
               <div className="flex flex-col gap-1 w-24">
-                 <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
+                 <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-none overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${j.progress || 0}%` }} />
                  </div>
                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{j.progress || 0}% Complete</span>
@@ -107,8 +107,8 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
 };
 
 const StatsCard = ({ label, value, icon: Icon, color }: any) => (
-  <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] flex items-center gap-4">
-    <div className={`w-12 h-12 rounded-2xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center shadow-sm`}>
+  <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] flex items-center gap-4">
+    <div className={`w-12 h-12 rounded-none bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center shadow-sm`}>
       <Icon className={`w-6 h-6 ${color}`} />
     </div>
     <div>

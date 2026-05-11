@@ -120,7 +120,7 @@ export const AutonomousOpsTab: React.FC = () => {
                                 >
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="font-bold text-slate-900 truncate pr-4 text-xs">{p.job_name || 'Autonomous Job'}</div>
-                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${p.pipeline_status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-none border uppercase tracking-wider ${p.pipeline_status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                             p.pipeline_status === 'FAILED' ? 'bg-red-50 text-red-600 border-red-100' :
                                                 p.pipeline_status === 'PAUSED' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-blue-50 text-blue-600 border-blue-100'
                                             }`}>

@@ -113,7 +113,7 @@ export const IncomingJobsPage: React.FC = () => {
   if (loading) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        <div className="animate-spin rounded-none h-12 w-12 border-b-2 border-indigo-500"></div>
         <p className="mt-4 text-slate-500 font-medium animate-pulse">Syncing production pipeline...</p>
       </div>
     );
@@ -122,7 +122,7 @@ export const IncomingJobsPage: React.FC = () => {
   if (error) {
     return (
       <div className="p-8">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-center gap-4">
+        <div className="bg-red-50 border border-red-200 rounded-none p-6 flex items-center gap-4">
           <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
           <div>
             <h3 className="text-red-800 font-bold uppercase tracking-wider text-sm">Pipeline Error</h3>
@@ -168,7 +168,7 @@ export const IncomingJobsPage: React.FC = () => {
 
       {/* Content */}
       <div className="p-6 overflow-auto flex-1">
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-none shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -200,10 +200,10 @@ export const IncomingJobsPage: React.FC = () => {
                       {pkg ? (
                         <div className="flex flex-col gap-1">
                           <div className="flex gap-2">
-                            <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-black text-slate-600 rounded border border-slate-200 uppercase tracking-tighter">
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-black text-slate-600 rounded-none border border-slate-200 uppercase tracking-tighter">
                               {pkg.book_spec_json?.binding || 'STANDARD'}
                             </span>
-                            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] font-black text-indigo-600 rounded border border-indigo-100 uppercase tracking-tighter">
+                            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] font-black text-indigo-600 rounded-none border border-indigo-100 uppercase tracking-tighter">
                               {pkg.book_spec_json?.color || 'CMYK'}
                             </span>
                           </div>
@@ -236,7 +236,7 @@ export const IncomingJobsPage: React.FC = () => {
                           <>
                             <button 
                               onClick={() => handleAction(dispatch.id, 'accept')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                             >
                               Accept
                             </button>
@@ -254,7 +254,7 @@ export const IncomingJobsPage: React.FC = () => {
                             {pkg?.status === 'ACCEPTED_BY_PRINTER' && (
                               <button 
                                 onClick={() => handleAction(dispatch.id, 'IN_PRODUCTION')}
-                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                               >
                                 Start Production
                               </button>
@@ -262,19 +262,19 @@ export const IncomingJobsPage: React.FC = () => {
                             {pkg?.status === 'IN_PRODUCTION' && (
                               <button 
                                 onClick={() => handleAction(dispatch.id, 'COMPLETED')}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                               >
                                 Complete
                               </button>
                             )}
                             {pkg?.status === 'COMPLETED' && (
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-none text-[10px] font-black uppercase tracking-widest">
                                 <CheckCircleIcon className="h-4 w-4" />
                                 Finished
                               </div>
                             )}
                             {pkg?.status !== 'COMPLETED' && (
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 text-slate-500 border border-slate-100 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 text-slate-500 border border-slate-100 rounded-none text-[10px] font-black uppercase tracking-widest">
                                 <ClockIcon className="h-4 w-4" />
                                 {pkg?.status.replace(/_/g, ' ')}
                               </div>
@@ -319,7 +319,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   };
 
   return (
-    <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${styles[status] || styles['CANCELLED']}`}>
+    <span className={`px-2 py-1 rounded-none text-[10px] font-black uppercase tracking-widest border ${styles[status] || styles['CANCELLED']}`}>
       {status}
     </span>
   );

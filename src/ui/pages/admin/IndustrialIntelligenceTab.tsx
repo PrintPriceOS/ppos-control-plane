@@ -32,7 +32,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Intelligence Header */}
-            <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-none relative overflow-hidden">
+            <div className="p-8 bg-slate-900 rounded-none-[2.5rem] text-white shadow-none relative overflow-hidden">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-blue-500/20 rounded-none border border-blue-500/30">
@@ -53,7 +53,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
             {/* Predictive Failure Radar & Congestion */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Predictive Failure Radar */}
-                <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-none">
+                <div className="bg-white rounded-none-[2rem] border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ChartBarIcon className="w-4 h-4" />
                         Live Failure Prediction Radar
@@ -84,7 +84,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                 </div>
 
                 {/* Congestion Forecast Timeline */}
-                <div className="bg-slate-50 rounded-[2rem] border border-slate-200 p-6 shadow-none">
+                <div className="bg-slate-50 rounded-none-[2rem] border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ArrowTrendingUpIcon className="w-4 h-4" />
                         60m Congestion Forecast
@@ -113,7 +113,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
             {/* Reliability Ranking & Federation Resilience */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Reliability Ranking */}
-                <div className="lg:col-span-2 bg-white rounded-[2rem] border border-slate-200 shadow-none overflow-hidden">
+                <div className="lg:col-span-2 bg-white rounded-none-[2rem] border border-slate-200 shadow-none overflow-hidden">
                     <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <CpuChipIcon className="w-4 h-4" />
@@ -161,7 +161,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                 </div>
 
                 {/* Federation Resilience Map */}
-                <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-none">
+                <div className="bg-slate-900 rounded-none-[2rem] p-6 text-white shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <GlobeAltIcon className="w-4 h-4 text-blue-400" />
                         Federation Resilience
@@ -195,7 +195,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
             {/* Optimization Activity Feed & Learning Console */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Optimization Loop */}
-                <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-none">
+                <div className="bg-white rounded-none-[2rem] border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <BeakerIcon className="w-4 h-4" />
                         Autonomous Learning Console
@@ -216,7 +216,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                 </div>
 
                 {/* System Efficiency Metric */}
-                <div className="bg-emerald-500 rounded-[2rem] p-10 text-white flex flex-col justify-center relative overflow-hidden group">
+                <div className="bg-emerald-500 rounded-none-[2rem] p-10 text-white flex flex-col justify-center relative overflow-hidden group">
                     <div className="relative z-10">
                         <p className="text-xs font-black uppercase tracking-[0.2em] mb-2 opacity-80">Orchestration Efficiency Gain</p>
                         <h2 className="text-6xl font-black italic tracking-tighter mb-4">+14.2%</h2>

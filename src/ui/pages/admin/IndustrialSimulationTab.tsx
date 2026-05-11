@@ -38,7 +38,7 @@ export const IndustrialSimulationTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Simulation Header */}
-            <div className="p-10 bg-emerald-950 rounded-[3rem] text-white shadow-none relative overflow-hidden border border-emerald-900">
+            <div className="p-10 bg-emerald-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-emerald-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-emerald-500/20 rounded-none border border-emerald-500/30">
@@ -69,7 +69,7 @@ export const IndustrialSimulationTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Recommendation Feed */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <LightBulbIcon className="w-4 h-4 text-emerald-500" />
                         Autonomous Recommendations
@@ -93,7 +93,7 @@ export const IndustrialSimulationTab: React.FC = () => {
                 </div>
 
                 {/* Simulation Run History */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <BeakerIcon className="w-4 h-4 text-emerald-400" />
                         Synthetic Timeline Branching
@@ -125,7 +125,7 @@ export const IndustrialSimulationTab: React.FC = () => {
 
             {/* Future Projection Radar */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <RocketLaunchIcon className="w-4 h-4 text-emerald-500" />
                         Simulation Future Radar
@@ -153,7 +153,7 @@ export const IndustrialSimulationTab: React.FC = () => {
                 </div>
 
                 {/* Systemic Instability Monitor */}
-                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ShieldExclamationIcon className="w-4 h-4 text-rose-500" />
                         Synthetic Instability Monitor

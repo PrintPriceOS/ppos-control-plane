@@ -60,13 +60,13 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 border-4 border-slate-200 dark:border-white/10 border-t-primary rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-slate-200 dark:border-white/10 border-t-primary rounded-none animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="glass overflow-hidden rounded-2xl border border-white dark:border-white/[0.07]">
+    <div className="glass overflow-hidden rounded-none border border-white dark:border-white/[0.07]">
       <table className="min-w-full divide-y divide-slate-100 dark:divide-white/[0.05] italic-text-off">
         <thead className="bg-slate-50/50 dark:bg-[#131314]/[0.03] uppercase tracking-widest text-[10px] font-black text-slate-400 dark:text-zinc-500">
           <tr>

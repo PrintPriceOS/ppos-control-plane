@@ -22,7 +22,7 @@ export const PreflightWorkersPage: React.FC = () => {
             header: 'Worker ID',
             accessor: (w) => (
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#131314]/[0.05] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-none bg-slate-100 dark:bg-[#131314]/[0.05] flex items-center justify-center">
                   <CpuChipIcon className="w-4 h-4 text-slate-400" />
                 </div>
                 <span className="font-bold">{w.name}</span>
@@ -64,7 +64,7 @@ export const PreflightWorkersPage: React.FC = () => {
       />
       
       {!q.data?.workers && q.status !== 'loading' && (
-        <div className="p-10 text-center font-bold text-slate-300 italic uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-3xl">
+        <div className="p-10 text-center font-bold text-slate-300 italic uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-none">
           Endpoint Unavailable: Worker Health data could not be fetched.
         </div>
       )}
@@ -74,7 +74,7 @@ export const PreflightWorkersPage: React.FC = () => {
 
 const UsageBar = ({ value }: { value: number }) => (
   <div className="flex flex-col gap-1 w-24">
-    <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
+    <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-none overflow-hidden">
       <div className={`h-full ${value > 80 ? 'bg-red-500' : value > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
            style={{ width: `${value}%` }} />
     </div>

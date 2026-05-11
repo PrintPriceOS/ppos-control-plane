@@ -19,8 +19,8 @@ export const TenantsPage: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex-1 glass p-5 rounded-2xl border border-white flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-primary/10 text-primary">
+        <div className="flex-1 glass p-5 rounded-none border border-white flex items-center gap-4">
+            <div className="p-3 rounded-none bg-primary/10 text-primary">
                 <GlobeAltIcon className="w-6 h-6" />
             </div>
             <div>
@@ -39,7 +39,7 @@ export const TenantsPage: React.FC = () => {
             header: 'Tenant ID', 
             accessor: (t) => (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center">
+                <div className="w-4 h-4 rounded-none bg-slate-100 flex items-center justify-center">
                   <GlobeAltIcon className="w-3 h-3 text-slate-400" />
                 </div>
                 <span className="font-mono">{t.tenant_id}</span>
@@ -59,8 +59,8 @@ export const TenantsPage: React.FC = () => {
             header: 'Success', 
             accessor: (t) => (
               <div className="flex items-center gap-2">
-                <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, t.successRate)}%` }} />
+                <div className="w-16 h-1 bg-slate-100 rounded-none overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-none" style={{ width: `${Math.min(100, t.successRate)}%` }} />
                 </div>
                 <span className="text-[10px] font-black text-slate-400">{t.successRate.toFixed(1)}%</span>
               </div>
@@ -69,7 +69,7 @@ export const TenantsPage: React.FC = () => {
           { 
             header: 'Latency', 
             accessor: (t) => (
-              <span className="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-bold text-[10px] uppercase tracking-widest">
+              <span className="px-2 py-0.5 rounded-none bg-blue-50 text-blue-700 font-bold text-[10px] uppercase tracking-widest">
                 {t.avgLatencyMs}ms
               </span>
             )
@@ -87,7 +87,7 @@ export const TenantsPage: React.FC = () => {
           {
             header: '',
             accessor: () => (
-              <button className="p-2 rounded-lg text-slate-300 hover:text-primary transition-colors">
+              <button className="p-2 rounded-none text-slate-300 hover:text-primary transition-colors">
                 <ArrowTopRightOnSquareIcon className="w-4 h-4" />
               </button>
             ),

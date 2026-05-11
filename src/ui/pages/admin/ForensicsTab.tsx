@@ -113,7 +113,7 @@ export const ForensicsTab: React.FC = () => {
                                                 <div className="text-[10px] font-bold text-slate-400 uppercase tabular-nums">{new Date(event.timestamp).toLocaleString()}</div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded">{event.actor}</span>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded-none">{event.actor}</span>
                                                 {event.metadata.requestId && (
                                                     <span className="text-[10px] font-mono text-slate-400 truncate">REQ: {event.metadata.requestId}</span>
                                                 )}
