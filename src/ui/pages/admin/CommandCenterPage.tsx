@@ -13,7 +13,8 @@ import {
   ArchiveBoxIcon,
   LinkIcon,
   ArrowPathIcon,
-  LockClosedIcon
+  LockClosedIcon,
+  ServerIcon
 } from "@heroicons/react/24/outline";
 import { 
   getGovernanceBlocks, 
