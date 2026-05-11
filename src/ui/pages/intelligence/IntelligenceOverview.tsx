@@ -61,47 +61,47 @@ export const IntelligenceOverview: React.FC = () => {
     </div>;
 
     return (
-        <div className="space-y-10">
-            {/* Header section with glassmorphism */}
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 px-10 py-12 text-white shadow-2xl">
+        <div className="space-y-6">
+            {/* Header section - Compact & Industrial */}
+            <div className="relative overflow-hidden rounded-3xl bg-slate-900 px-8 py-8 text-white shadow-xl">
                 <div className="relative z-10 max-w-2xl">
-                    <h2 className="text-4xl font-black tracking-tight mb-4 flex items-center gap-4">
-                        <BoltIcon className="w-10 h-10 text-primary" />
+                    <h2 className="text-2xl font-black tracking-tight mb-2 flex items-center gap-3">
+                        <BoltIcon className="w-8 h-8 text-primary" />
                         Intelligence Layer
                     </h2>
-                    <p className="text-slate-400 text-lg font-medium leading-relaxed">
-                        Continuous analysis of jobs, governance, and tenant posture. 
-                        Batch A: Anomaly detection and explainable insights.
+                    <p className="text-slate-400 text-sm font-medium leading-tight">
+                        Continuous telemetry analysis across EU-WEST-1 federation clusters. 
+                        Live anomaly detection and explainable operational signals.
                     </p>
                 </div>
-                <div className="absolute -right-20 -top-20 w-96 h-96 bg-primary/20 rounded-full blur-[100px]" />
-                <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-blue-500/10 rounded-full blur-[80px]" />
+                <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-[80px]" />
+                <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-blue-500/5 rounded-full blur-[60px]" />
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Stats Grid - High Density */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cards.map((card) => (
                     <Link 
                         key={card.title} 
                         to={card.link}
-                        className="group relative p-8 bg-white border border-slate-200 rounded-[2rem] hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 overflow-hidden"
+                        className="group relative p-6 bg-white border border-slate-200 rounded-3xl hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 overflow-hidden"
                     >
-                        <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110`}>
-                            <card.icon className="w-8 h-8" />
+                        <div className={`w-12 h-12 ${card.bg} ${card.color} rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
+                            <card.icon className="w-6 h-6" />
                         </div>
-                        <div className="space-y-2">
-                            <h3 className="text-5xl font-black text-slate-900 tabular-nums">
+                        <div className="space-y-1">
+                            <h3 className="text-4xl font-black text-slate-900 tabular-nums tracking-tighter">
                                 {card.count}
                             </h3>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                 {card.title}
                             </p>
                         </div>
-                        <p className="mt-6 text-slate-500 text-sm font-medium">
+                        <p className="mt-4 text-slate-500 text-xs font-medium leading-snug">
                             {card.desc}
                         </p>
-                        <div className="absolute right-8 bottom-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowRightIcon className="w-6 h-6 text-primary" />
+                        <div className="absolute right-6 bottom-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowRightIcon className="w-5 h-5 text-primary" />
                         </div>
                     </Link>
                 ))}
