@@ -35,7 +35,41 @@ import {
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
 
-// --- Geolocation Intelligence ---
+const resolveNodeLocation = (node: any) => {
+  if (!node) return null;
+
+  // 1. Resolve coordinates from direct fields or 'location' JSON
+  let lat = node.latitude !== undefined ? node.latitude : node.lat;
+  let lng = node.longitude !== undefined ? node.longitude : node.lng;
+
+  if ((lat === undefined || lng === undefined) && node.location) {
+    try {
+      const loc = typeof node.location === 'string' ? JSON.parse(node.location) : node.location;
+      lat = loc.latitude !== undefined ? loc.latitude : loc.lat;
+      lng = loc.longitude !== undefined ? loc.longitude : loc.lng;
+    } catch (e) {}
+  }
+
+  // 2. Normalize to numbers
+  if (typeof lat === 'string') lat = parseFloat(lat);
+  if (typeof lng === 'string') lng = parseFloat(lng);
+
+  const hasValidCoords = typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng);
+
+  // 3. Return normalized object if coordinates exist, otherwise null
+  // (Returning null ensures the node is handled by the UnlocatedCapacityStrip and skipped on the map)
+  if (!hasValidCoords) return null;
+
+  return {
+    lat: lat as number,
+    lng: lng as number,
+    country: node.country || '',
+    city: node.city || '',
+    region: node.region || null,
+    address: node.address_line || node.address || '',
+    type: 'GPS'
+  };
+};
 
 const deriveOperationalRegion = (country: string, timezone?: string) => {
   const c = (country || '').toUpperCase();
