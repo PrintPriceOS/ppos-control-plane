@@ -114,7 +114,8 @@ const productionDispatchAdminRouter = require('./productionDispatchAdmin');
 /**
  * Mount Sub-routers (Top Priority)
  */
-router.use('/network', connectAdminRouter);
+router.use('/connect', connectAdminRouter);
+router.use('/network', require('./networkOpsAdmin'));
 router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
