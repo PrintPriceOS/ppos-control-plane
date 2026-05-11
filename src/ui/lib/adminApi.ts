@@ -408,6 +408,10 @@ export async function getPrinters(filters: string = "") {
     return adminFetch<any[]>(`/api/admin/network/printers${filters ? '?' + filters : ''}`);
 }
 
+export async function getMachines() {
+    return adminFetch<{ ok: boolean; total: number; machines: any[]; status: string }>('/api/admin/machines');
+}
+
 export async function getNetworkOverview() {
     return adminFetch<any>(`/api/admin/network/overview`);
 }

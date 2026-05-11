@@ -14,6 +14,7 @@ import { PrinthouseDetailPage } from './pages/os/PrinthouseDetailPage';
 import { OrdersPage } from './pages/os/OrdersPage';
 import { SystemHealthPage } from './pages/os/SystemHealthPage';
 import { RuntimeContextPage } from './pages/os/RuntimeContextPage';
+import { MachinesPage } from './pages/os/MachinesPage';
 import { AdminDashboard } from './pages/AdminDashboard'; // Legacy Dashboard
 import { MarketplaceTab } from './pages/admin/MarketplaceTab';
 import { PricingIntelligenceTab } from './pages/admin/PricingIntelligenceTab';
@@ -159,7 +160,7 @@ export const App: React.FC = () => {
                 <Route path="/ops/marketplace" element={<MarketplaceTab />} />
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
-                <Route path="/machines" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Machine Inventory & Fleet Management Deferred to Batch 3</div>} />
+                <Route path="/machines" element={<MachinesPage />} />
                 <Route path="/materials" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Material & Paper Catalog Deferred to Batch 3</div>} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />

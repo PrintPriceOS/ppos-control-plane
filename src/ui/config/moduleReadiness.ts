@@ -72,9 +72,9 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         id: 'machines',
         label: 'Machine Fleet',
         route: '/machines',
-        status: 'NOT_CONFIGURED',
+        status: 'ACTIVE',
         requiredEndpoints: ['/api/admin/machines'],
-        requiredTables: ['printer_machines'],
+        requiredTables: ['printer_machines', 'print_nodes'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN'],
         description: 'Industrial equipment inventory.'
     },
