@@ -123,8 +123,8 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* MES Operational Stats */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* MES Operational Stats - High Density Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
                             <StatCard 
                                 label="Active Dispatches" 
                                 value={statsLoading ? '...' : (nodeStats?.activeDispatches ?? 0)} 
@@ -132,79 +132,79 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                 color="text-blue-600"
                             />
                             <StatCard 
-                                label="Real-time Utilization" 
+                                label="Utilization" 
                                 value={statsLoading ? '...' : `${nodeStats?.utilization || 0}%`} 
                                 icon={ChartBarIcon}
                                 color="text-purple-600"
                             />
                             <StatCard 
-                                label="Production Faults" 
+                                label="Faults" 
                                 value={statsLoading ? '...' : (nodeStats?.failedDispatches ?? 0)} 
                                 icon={ExclamationTriangleIcon}
                                 color="text-rose-600"
                             />
                             <StatCard 
-                                label="Capacity Reservations" 
+                                label="Reservations" 
                                 value={statsLoading ? '...' : (nodeStats?.activeReservations ?? 0)} 
                                 icon={ClockIcon}
                                 color="text-amber-600"
                             />
                             <StatCard 
-                                 label="Projected Saturation" 
+                                 label="Saturation" 
                                  value={statsLoading ? '...' : `${nodeStats?.projectedSaturation || 0}%`} 
                                  icon={BoltIcon}
                                  color="text-cyan-600"
                             />
                             <StatCard 
-                                 label="Industrial Drift" 
+                                 label="Drift Score" 
                                  value={statsLoading ? '...' : `${nodeStats?.driftScore || 0}`} 
                                  icon={ExclamationTriangleIcon}
                                  color={(nodeStats?.driftScore || 0) > 20 ? 'text-rose-600' : 'text-slate-400'}
                             />
                             <StatCard 
-                                 label="Process Efficiency" 
+                                 label="Efficiency" 
                                  value={statsLoading ? '...' : `${nodeStats?.efficiencyScore || 0}%`} 
                                  icon={BoltIcon}
                                  color="text-emerald-500"
                             />
                             <StatCard 
-                                 label="Federation ID" 
+                                 label="Federation" 
                                  value={selectedNode.federation_id || 'LOCAL'} 
                                  icon={ShieldCheckIcon}
                                  color="text-indigo-600"
                             />
                             <StatCard 
-                                 label="Swarm Stability" 
+                                 label="Swarm Stab." 
                                  value={`${selectedNode.swarm_score || 100}%`} 
                                  icon={ArrowPathIcon}
                                  color="text-cyan-600"
                             />
                             <StatCard 
-                                 label="Marketplace Reputation" 
+                                 label="Reputation" 
                                  value={`${selectedNode.marketplace_reputation || 98.5}`} 
                                  icon={ShieldCheckIcon}
                                  color="text-amber-500"
                             />
                             <StatCard 
-                                 label="Liquidity Score" 
+                                 label="Liquidity" 
                                  value={`${selectedNode.liquidity_score || 85.0}`} 
                                  icon={CurrencyEuroIcon}
                                  color="text-emerald-500"
                             />
                             <StatCard 
-                                 label="Economic Rank" 
+                                 label="Econ. Rank" 
                                  value={`#${selectedNode.economic_efficiency_rank || 1}`} 
                                  icon={ChartBarIcon}
                                  color="text-indigo-500"
                             />
                             <StatCard 
-                                 label="Gov Stability" 
+                                 label="Gov. Stab." 
                                  value={`${selectedNode.governance_stability_score || 100}%`} 
                                  icon={ShieldCheckIcon}
                                  color="text-fuchsia-500"
                             />
                             <StatCard 
-                                 label="Learning Score" 
+                                 label="Learning" 
                                  value={`${selectedNode.federation_learning_score || 0}%`} 
                                  icon={ArrowPathIcon}
                                  color="text-blue-400"
@@ -216,82 +216,22 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                  color="text-emerald-400"
                             />
                             <StatCard 
-                                 label="Cont. Cluster" 
+                                 label="Cluster" 
                                  value={`${selectedNode.continental_cluster_id || 'EU-WEST'}`} 
                                  icon={ShieldCheckIcon}
                                  color="text-sky-500"
                             />
                             <StatCard 
-                                 label="Planetary Rel." 
+                                 label="Reliability" 
                                  value={`${selectedNode.planetary_reliability_index || 100}%`} 
                                  icon={BoltIcon}
                                  color="text-indigo-400"
                             />
                             <StatCard 
-                                 label="Civ. Contrib." 
+                                 label="Contribution" 
                                  value={`${selectedNode.civilization_contribution_score || 0}%`} 
                                  icon={ChartBarIcon}
                                  color="text-fuchsia-400"
-                            />
-                            <StatCard 
-                                 label="Orbital Cluster" 
-                                 value={`${selectedNode.orbital_cluster_id || 'LSA-01'}`} 
-                                 icon={BoltIcon}
-                                 color="text-violet-500"
-                            />
-                            <StatCard 
-                                 label="Synth. Aware." 
-                                 value={`${selectedNode.synthetic_awareness_score || 100}%`} 
-                                 icon={ShieldCheckIcon}
-                                 color="text-emerald-400"
-                            />
-                            <StatCard 
-                                 label="Survival Score" 
-                                 value={`${selectedNode.civilization_survival_score || 100}%`} 
-                                 icon={CheckCircleIcon}
-                                 color="text-sky-400"
-                            />
-                            <StatCard 
-                                 label="Sim. Coherence" 
-                                 value={`${selectedNode.simulation_coherence || 100}%`} 
-                                 icon={ShieldCheckIcon}
-                                 color="text-pink-500"
-                            />
-                            <StatCard 
-                                 label="Univ. Sync" 
-                                 value={`${selectedNode.universal_synchronization || 100}%`} 
-                                 icon={BoltIcon}
-                                 color="text-emerald-400"
-                            />
-                            <StatCard 
-                                 label="Reality Stability" 
-                                 value={`${selectedNode.reality_stability_index || 100}%`} 
-                                 icon={ChartBarIcon}
-                                 color="text-blue-400"
-                            />
-                            <StatCard 
-                                 label="Recursive Cont." 
-                                 value={`${selectedNode.recursive_continuity || 100}%`} 
-                                 icon={ArrowPathIcon}
-                                 color="text-indigo-500"
-                            />
-                            <StatCard 
-                                 label="Omniv. Coherence" 
-                                 value={`${selectedNode.omniversal_coherence || 100}%`} 
-                                 icon={ShieldCheckIcon}
-                                 color="text-fuchsia-500"
-                            />
-                            <StatCard 
-                                 label="Transcend. Aware." 
-                                 value={`${selectedNode.transcendent_awareness || 100}%`} 
-                                 icon={BoltIcon}
-                                 color="text-pink-400"
-                            />
-                            <StatCard 
-                                 label="Singularity Stab." 
-                                 value={`${selectedNode.singularity_stability || 100}%`} 
-                                 icon={CheckCircleIcon}
-                                 color="text-emerald-400"
                             />
                         </div>
 
@@ -364,14 +304,14 @@ export const ProductionNodeRegistryTab: React.FC = () => {
 };
 
 const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{label}</span>
+    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-3">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{label}</span>
             <div className={`p-1.5 rounded-lg bg-slate-50`}>
-                <Icon className={`w-4 h-4 ${color}`} />
+                <Icon className={`w-3.5 h-3.5 ${color}`} />
             </div>
         </div>
-        <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
+        <div className="text-2xl font-black text-slate-900 tracking-tight">{value}</div>
     </div>
 );
 

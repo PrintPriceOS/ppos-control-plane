@@ -44,92 +44,96 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-2xl w-fit border border-slate-200">
-                <TabButton 
-                    active={activeTab === 'artifacts'} 
-                    onClick={() => setActiveTab('artifacts')}
-                    icon={CircleStackIcon}
-                    label="Artifacts"
-                />
-                <TabButton 
-                    active={activeTab === 'workers'} 
-                    onClick={() => setActiveTab('workers')}
-                    icon={CpuChipIcon}
-                    label="Fleet"
-                />
-                <TabButton 
-                    active={activeTab === 'nodes'} 
-                    onClick={() => setActiveTab('nodes')}
-                    icon={ShieldCheckIcon}
-                    label="Nodes"
-                />
-                <TabButton 
-                    active={activeTab === 'live'} 
-                    onClick={() => setActiveTab('live')}
-                    icon={BoltIcon}
-                    label="Live Orchestration"
-                />
-                <TabButton 
-                    active={activeTab === 'intelligence'} 
-                    onClick={() => setActiveTab('intelligence')}
-                    icon={AcademicCapIcon}
-                    label="Intelligence"
-                />
-                <TabButton 
-                    active={activeTab === 'economics'} 
-                    onClick={() => setActiveTab('economics')}
-                    icon={BanknotesIcon}
-                    label="Economics"
-                />
-                <TabButton 
-                    active={activeTab === 'governance'} 
-                    onClick={() => setActiveTab('governance')}
-                    icon={ShieldCheckIcon}
-                    label="Governance"
-                />
-                <TabButton 
-                    active={activeTab === 'temporal'} 
-                    onClick={() => setActiveTab('temporal')}
-                    icon={ClockIcon}
-                    label="Temporal"
-                />
-                <TabButton 
-                    active={activeTab === 'simulation'} 
-                    onClick={() => setActiveTab('simulation')}
-                    icon={CpuChipIcon}
-                    label="Simulation"
-                />
-                <TabButton 
-                    active={activeTab === 'orchestration'} 
-                    onClick={() => setActiveTab('orchestration')}
-                    icon={BoltIcon}
-                    label="Orchestration"
-                />
-                <TabButton 
-                    active={activeTab === 'incidents'} 
-                    onClick={() => setActiveTab('incidents')}
-                    icon={ExclamationTriangleIcon}
-                    label="Incidents"
-                />
-                <TabButton 
-                    active={activeTab === 'lifecycle'} 
-                    onClick={() => setActiveTab('lifecycle')}
-                    icon={ClockIcon}
-                    label="Lifecycle"
-                />
-                <TabButton 
-                    active={activeTab === 'large-docs'} 
-                    onClick={() => setActiveTab('large-docs')}
-                    icon={DocumentDuplicateIcon}
-                    label="Heavy Loads"
-                />
-                <TabButton 
-                    active={activeTab === 'storage'} 
-                    onClick={() => setActiveTab('storage')}
-                    icon={ShieldCheckIcon}
-                    label="Storage"
-                />
+            {/* High-Fidelity Scrollable Tab Navigation */}
+            <div className="relative group">
+                <div className="overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                    <div className="flex items-center gap-1 bg-slate-100/50 p-1.5 rounded-2xl w-max border border-slate-200">
+                        <TabButton 
+                            active={activeTab === 'artifacts'} 
+                            onClick={() => setActiveTab('artifacts')}
+                            icon={CircleStackIcon}
+                            label="Artifacts"
+                        />
+                        <TabButton 
+                            active={activeTab === 'workers'} 
+                            onClick={() => setActiveTab('workers')}
+                            icon={CpuChipIcon}
+                            label="Fleet"
+                        />
+                        <TabButton 
+                            active={activeTab === 'nodes'} 
+                            onClick={() => setActiveTab('nodes')}
+                            icon={ShieldCheckIcon}
+                            label="Nodes"
+                        />
+                        <TabButton 
+                            active={activeTab === 'live'} 
+                            onClick={() => setActiveTab('live')}
+                            icon={BoltIcon}
+                            label="Live Orchestration"
+                        />
+                        <TabButton 
+                            active={activeTab === 'intelligence'} 
+                            onClick={() => setActiveTab('intelligence')}
+                            icon={AcademicCapIcon}
+                            label="Intelligence"
+                        />
+                        <TabButton 
+                            active={activeTab === 'economics'} 
+                            onClick={() => setActiveTab('economics')}
+                            icon={BanknotesIcon}
+                            label="Economics"
+                        />
+                        <TabButton 
+                            active={activeTab === 'governance'} 
+                            onClick={() => setActiveTab('governance')}
+                            icon={ShieldCheckIcon}
+                            label="Governance"
+                        />
+                        <TabButton 
+                            active={activeTab === 'temporal'} 
+                            onClick={() => setActiveTab('temporal')}
+                            icon={ClockIcon}
+                            label="Temporal"
+                        />
+                        <TabButton 
+                            active={activeTab === 'simulation'} 
+                            onClick={() => setActiveTab('simulation')}
+                            icon={CpuChipIcon}
+                            label="Simulation"
+                        />
+                        <TabButton 
+                            active={activeTab === 'orchestration'} 
+                            onClick={() => setActiveTab('orchestration')}
+                            icon={BoltIcon}
+                            label="Orchestration"
+                        />
+                        <TabButton 
+                            active={activeTab === 'incidents'} 
+                            onClick={() => setActiveTab('incidents')}
+                            icon={ExclamationTriangleIcon}
+                            label="Incidents"
+                        />
+                        <TabButton 
+                            active={activeTab === 'lifecycle'} 
+                            onClick={() => setActiveTab('lifecycle')}
+                            icon={ClockIcon}
+                            label="Lifecycle"
+                        />
+                        <TabButton 
+                            active={activeTab === 'large-docs'} 
+                            onClick={() => setActiveTab('large-docs')}
+                            icon={DocumentDuplicateIcon}
+                            label="Heavy Loads"
+                        />
+                        <TabButton 
+                            active={activeTab === 'storage'} 
+                            onClick={() => setActiveTab('storage')}
+                            icon={ShieldCheckIcon}
+                            label="Storage"
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Tab Content */}
