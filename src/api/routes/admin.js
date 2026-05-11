@@ -109,12 +109,15 @@ const orchestrationAdminRouter = require('./orchestrationAdmin');
 const industrialProvisioningAdminRouter = require('./industrialProvisioningAdmin');
 const industrialRoutingAdminRouter = require('./industrialRoutingAdmin');
 const productionDispatchAdminRouter = require('./productionDispatchAdmin');
+const machineDetailsAdminRouter = require('./machineDetailsAdmin');
 
 
 /**
  * Mount Sub-routers (Top Priority)
  */
+router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
 router.use('/connect', connectAdminRouter);
+
 router.use('/network', require('./networkOpsAdmin'));
 router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
 router.use('/routing', routingAdminRouter);

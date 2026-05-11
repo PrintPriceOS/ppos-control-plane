@@ -24,12 +24,22 @@ import {
     ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
+import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
+
 export const IndustrialLiveTab: React.FC = () => {
     const liveState = useAdminQuery('industrial-live-state', getIndustrialLiveState, 5000);
     const activeDispatches = useAdminQuery('active-dispatches', getActiveDispatches, 5000);
     const slaRisks = useAdminQuery('sla-risks-live', getLiveSLARisks, 10000);
     const reroutes = useAdminQuery('reroute-events', getRerouteEvents, 10000);
     const capacity = useAdminQuery('capacity-live', getLiveCapacity, 5000);
+
+    const [selectedMachineId, setSelectedMachineId] = React.useState<string | null>(null);
+    const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+
+    const openMachine = (id: string) => {
+        setSelectedMachineId(id);
+        setIsDrawerOpen(true);
+    };
 
     const handleScan = async () => {
         await triggerSLAScan();
@@ -83,7 +93,11 @@ export const IndustrialLiveTab: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {(capacity.data?.overview || []).map((node: any) => (
-                            <div key={node.node_id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-200 transition-all">
+                            <button 
+                                key={node.node_id} 
+                                onClick={() => openMachine(node.node_id)}
+                                className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-500 hover:bg-white hover:shadow-xl transition-all text-left"
+                            >
                                 <div className="flex items-center justify-between mb-3">
                                     <div className={`w-2 h-2 rounded-full ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                                     <span className="text-[10px] font-black text-slate-400 uppercase">{node.city || 'GLOBAL'}</span>
@@ -104,7 +118,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -117,7 +131,11 @@ export const IndustrialLiveTab: React.FC = () => {
                     </h3>
                     <div className="space-y-4">
                         {(slaRisks.data?.risks || []).map((risk: any) => (
-                            <div key={risk.dispatch_id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 relative overflow-hidden group">
+                            <div 
+                                key={risk.dispatch_id} 
+                                onClick={() => openMachine(risk.node_id)}
+                                className="p-4 rounded-2xl bg-slate-50 border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-500 transition-all"
+                            >
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                                     risk.risk_level === 'CRITICAL' ? 'bg-red-500' : 
                                     risk.risk_level === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500'
@@ -177,7 +195,11 @@ export const IndustrialLiveTab: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {(activeDispatches.data?.dispatches || []).map((d: any) => (
-                                <tr key={d.id} className="hover:bg-slate-50/50 transition-all">
+                                <tr 
+                                    key={d.id} 
+                                    onClick={() => openMachine(d.print_node_id)}
+                                    className="hover:bg-slate-50 cursor-pointer transition-all"
+                                >
                                     <td className="px-6 py-4 text-xs font-mono font-bold text-blue-600">#{d.id.slice(0, 12)}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
@@ -213,6 +235,16 @@ export const IndustrialLiveTab: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            <MachineDetailDrawer 
+                isOpen={isDrawerOpen} 
+                machineId={selectedMachineId} 
+                onClose={() => setIsDrawerOpen(false)} 
+            />
+        </div>
+    );
+};
+
 
             {/* Reroute Timeline */}
             <div className="bg-slate-50 rounded-3xl border border-slate-200 p-6 shadow-sm">

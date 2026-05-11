@@ -397,7 +397,56 @@ export async function cancelJob(jobId: string, reason: string) {
     });
 }
 
+// --- Node Orchestration API ---
+export async function drainNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/drain`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function lockNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/lock`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function purgeNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/purge`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function shiftNode(sourceNodeId: string, targetNodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, sourceNodeId: string, targetNodeId: string }>(`/api/admin/control/node/${sourceNodeId}/shift`, {
+        method: 'POST',
+        body: JSON.stringify({ targetNodeId, reason })
+    });
+}
+
+
+// --- Machine Intelligence API (Phase 34) ---
+export async function getMachineFederationDetails(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/federation/machines/${id}`);
+}
+
+export async function getMachineTelemetry(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/telemetry/machines/${id}`);
+}
+
+export async function getMachineDispatchHistory(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/dispatch/machines/${id}`);
+}
+
+export async function getMachineCapacityAnalysis(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/capacity/machines/${id}`);
+}
+
+
 export async function getAdminQueueStats() {
+
     return adminFetch<{ ok: boolean, stats: any }>(`/api/admin/control/queue/stats`);
 }
 export async function getQueue() {

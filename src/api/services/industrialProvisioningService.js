@@ -499,15 +499,50 @@ class IndustrialProvisioningService {
             this._logStepError('createFederationFactories', err);
         }
 
-        // Data Migration: Sync company_name with factory_name for federation_factories
+        // Phase 34: Autonomous Routing Infrastructure
         try {
             await db.query(`
-                UPDATE federation_factories 
-                SET company_name = factory_name 
-                WHERE company_name IS NULL
+                CREATE TABLE IF NOT EXISTS routing_decisions (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64),
+                    selected_machine_id VARCHAR(64),
+                    routing_score DECIMAL(5,2),
+                    explanation TEXT,
+                    status ENUM('PENDING', 'COMMITTED', 'REJECTED') DEFAULT 'PENDING',
+                    metadata_json JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_job (job_id),
+                    INDEX idx_machine (selected_machine_id)
+                ) ENGINE=InnoDB;
+            `);
+            
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS routing_scores (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    decision_id VARCHAR(64) NOT NULL,
+                    cost_score DECIMAL(5,2),
+                    time_score DECIMAL(5,2),
+                    capability_score DECIMAL(5,2),
+                    risk_score DECIMAL(5,2),
+                    geographic_score DECIMAL(5,2),
+                    carbon_score DECIMAL(5,2),
+                    total_score DECIMAL(5,2),
+                    INDEX idx_decision (decision_id)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS routing_history (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    job_id VARCHAR(64),
+                    action VARCHAR(128),
+                    details_json JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_job (job_id)
+                ) ENGINE=InnoDB;
             `);
         } catch (err) {
-            this._logStepError('migrateFederationFactoriesCompanyName', err);
+            this._logStepError('createRoutingInfrastructure', err);
         }
 
         return ensured;

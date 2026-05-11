@@ -12,6 +12,7 @@ import {
     CheckCircleIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { MachineDetailDrawer } from "../../components/MachineDetailDrawer";
 
 export const ProductionNodeRegistryTab: React.FC = () => {
     const [nodes, setNodes] = useState<any[]>([]);
@@ -19,6 +20,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
     const [nodeStats, setNodeStats] = useState<any | null>(null);
     const [loading, setLoading] = useState(false);
     const [statsLoading, setStatsLoading] = useState(false);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     useEffect(() => {
         loadNodes();
@@ -119,9 +121,25 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                     </span>
                                 </div>
                                 <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-2">{selectedNode.name}</h2>
-                                <p className="text-slate-500 font-medium tracking-tight">Production Facility & Manufacturing Execution Node</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-slate-500 font-medium tracking-tight">Production Facility & Manufacturing Execution Node</p>
+                                    <button 
+                                        onClick={() => setIsDrawerOpen(true)}
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase hover:bg-black transition-all shadow-xl shadow-slate-200"
+                                    >
+                                        <BoltIcon className="w-4 h-4 text-red-500" />
+                                        Full Machine Intelligence
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        <MachineDetailDrawer 
+                            isOpen={isDrawerOpen} 
+                            machineId={selectedNode.id || selectedNode.printer_id || selectedNode._id} 
+                            onClose={() => setIsDrawerOpen(false)} 
+                        />
+
 
                         {/* MES Operational Stats - High Density Grid */}
                         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">

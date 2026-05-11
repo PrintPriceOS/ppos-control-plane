@@ -15,6 +15,7 @@ import {
   ArrowPathIcon,
   LockClosedIcon
 } from "@heroicons/react/24/outline";
+import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
 import { 
   getGovernanceBlocks, 
   getIndustrialSnapshot,
@@ -30,7 +31,11 @@ import {
   createDispatch,
   rollbackDispatch,
   getDispatches,
-  getIndustrialTelemetryOverview
+  getIndustrialTelemetryOverview,
+  drainNode,
+  lockNode,
+  purgeNode,
+  shiftNode
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
@@ -408,6 +413,21 @@ export const CommandCenterPage: React.FC = () => {
   const blocks = useAdminQuery('hawk-eye:blocks', getGovernanceBlocks, 30000);
   const industrialTelemetry = useAdminQuery('hawk-eye:industrial-telemetry', getIndustrialTelemetryOverview, 5000);
 
+  const [selectedMachineId, setSelectedMachineId] = React.useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+
+  const openMachine = (id: string) => {
+    setSelectedMachineId(id);
+    setIsDrawerOpen(true);
+  };
+
+  React.useEffect(() => {
+    (window as any).openMachine = openMachine;
+    return () => {
+      delete (window as any).openMachine;
+    };
+  }, []);
+
   // Derivation Helpers
   const complianceScore = useMemo(() => {
     const healthyStatuses = ['ACTIVE', 'ENFORCED', 'OPERATIONAL', 'LIVE'];
@@ -441,6 +461,10 @@ export const CommandCenterPage: React.FC = () => {
   const handleCommand = async (action: string) => {
     if (!window.confirm(`Are you sure you want to trigger: ${action.toUpperCase()}? This will be logged to the immutable audit stream.`)) return;
     
+    // For demo/tactical purposes, we target the first active worker node if one exists
+    const targetNode = industrial.data?.workers?.activeFleet?.[0];
+    const nodeId = targetNode?.id;
+
     try {
       switch (action) {
         case 'pause':
@@ -448,6 +472,26 @@ export const CommandCenterPage: React.FC = () => {
           break;
         case 'resume':
           await resumeQueue('preflight', 'Admin Manual Override');
+          break;
+        case 'drain':
+          if (!nodeId) throw new Error('No active node target identified for drain.');
+          await drainNode(nodeId, 'Admin Manual Drain');
+          break;
+        case 'lock':
+          if (!nodeId) throw new Error('No active node target identified for lock.');
+          await lockNode(nodeId, 'Admin Security Lockout');
+          break;
+        case 'purge':
+          if (!nodeId) throw new Error('No active node target identified for purge.');
+          await purgeNode(nodeId, 'Admin Data Purge');
+          break;
+        case 'shift':
+          if (!nodeId) throw new Error('No active node target identified for shift.');
+          // Simple demo: prompt for target or use a second node if available
+          const secondNode = industrial.data?.workers?.activeFleet?.[1];
+          const targetId = window.prompt('Enter target Node ID for shift:', secondNode?.id || '');
+          if (!targetId) return;
+          await shiftNode(nodeId, targetId, 'Admin Capacity Rebalancing');
           break;
       }
       industrial.refetch();
@@ -660,10 +704,10 @@ export const CommandCenterPage: React.FC = () => {
                  <div className="grid grid-cols-2 gap-2 h-full">
                     <CommandButton label="Pause" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
                     <CommandButton label="Resume" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
-                    <CommandButton label="Drain" icon={AdjustmentsHorizontalIcon} color="slate" badge="Soon" disabled />
-                    <CommandButton label="Lock" icon={LockClosedIcon} color="slate" badge="Soon" disabled />
-                    <CommandButton label="Purge" icon={ArchiveBoxIcon} color="slate" badge="Soon" disabled />
-                    <CommandButton label="Shift" icon={LinkIcon} color="slate" badge="Soon" disabled />
+                    <CommandButton label="Drain" icon={AdjustmentsHorizontalIcon} color="slate" onClick={() => handleCommand('drain')} />
+                    <CommandButton label="Lock" icon={LockClosedIcon} color="slate" onClick={() => handleCommand('lock')} />
+                    <CommandButton label="Purge" icon={ArchiveBoxIcon} color="slate" onClick={() => handleCommand('purge')} />
+                    <CommandButton label="Shift" icon={LinkIcon} color="slate" onClick={() => handleCommand('shift')} />
                  </div>
               </TacticalPanel>
             </div>
@@ -736,13 +780,16 @@ export const CommandCenterPage: React.FC = () => {
               </div>
            </div>
         </div>
-
       </div>
+      <MachineDetailDrawer 
+        isOpen={isDrawerOpen} 
+        machineId={selectedMachineId} 
+        onClose={() => setIsDrawerOpen(false)} 
+      />
     </div>
   );
 };
 
-// --- Helper Components ---
 
 
 const StatBar = ({ label, value, color }: { label: string, value: number, color: string }) => (
@@ -1093,7 +1140,11 @@ const IndustrialHeartbeatMatrix = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {Array.isArray(nodes.data) && nodes.data.map((node: any) => (
-          <div key={node.id} className="p-2 rounded bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/40 transition-all cursor-default">
+          <div 
+            key={node.id} 
+            onClick={() => (window as any).openMachine?.(node.id || node.node_id || node.print_node_id)}
+            className="p-2 rounded bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/40 transition-all cursor-pointer"
+          >
             <div className="flex items-center gap-2 min-w-0">
               {getStatusIcon(node.status)}
               <div className="flex flex-col min-w-0">
