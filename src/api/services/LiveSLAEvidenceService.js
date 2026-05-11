@@ -16,7 +16,7 @@ class LiveSLAEvidenceService {
             // 1. Get all active dispatches
             const activeDispatches = await db.query(`
                 SELECT d.*, n.status as node_status, n.last_heartbeat_at
-                FROM production_dispatches d
+                FROM manufacturing_dispatches d
                 JOIN print_nodes n ON d.print_node_id = n.id
                 WHERE d.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'REROUTED', 'ROLLED_BACK')
             `);
@@ -114,7 +114,7 @@ class LiveSLAEvidenceService {
         return db.query(`
             SELECT s.*, d.print_node_id, n.company_name as node_name
             FROM sla_evidence_snapshots s
-            JOIN production_dispatches d ON s.dispatch_id = d.id
+            JOIN manufacturing_dispatches d ON s.dispatch_id = d.id
             JOIN print_nodes n ON d.print_node_id = n.id
             WHERE s.captured_at IN (
                 SELECT MAX(captured_at) 

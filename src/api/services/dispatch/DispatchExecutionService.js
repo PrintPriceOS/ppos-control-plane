@@ -39,7 +39,7 @@ class DispatchExecutionService {
       slaEta.setHours(slaEta.getHours() + (node.production_lead_days || 24)); // Default 24h lead if not set
 
       await connection.query(`
-        INSERT INTO production_dispatches 
+        INSERT INTO manufacturing_dispatches 
         (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, status, orchestration_metadata_json, sla_estimate_json, operator_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
@@ -141,12 +141,12 @@ class DispatchExecutionService {
     await connection.beginTransaction();
 
     try {
-      const [dispatches] = await connection.query('SELECT * FROM production_dispatches WHERE id = ?', [dispatchId]);
+      const [dispatches] = await connection.query('SELECT * FROM manufacturing_dispatches WHERE id = ?', [dispatchId]);
       const dispatch = dispatches[0];
       if (!dispatch) throw new Error('DISPATCH_NOT_FOUND');
 
       // Update Dispatch
-      await connection.query('UPDATE production_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
+      await connection.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
 
       // Handle specific transitions
       if (newStatus === 'IN_PRODUCTION') {
@@ -204,12 +204,12 @@ class DispatchExecutionService {
     await connection.beginTransaction();
 
     try {
-      const [dispatches] = await connection.query('SELECT * FROM production_dispatches WHERE id = ?', [dispatchId]);
+      const [dispatches] = await connection.query('SELECT * FROM manufacturing_dispatches WHERE id = ?', [dispatchId]);
       const dispatch = dispatches[0];
       if (!dispatch) throw new Error('DISPATCH_NOT_FOUND');
 
       // Update Dispatch
-      await connection.query('UPDATE production_dispatches SET status = ? WHERE id = ?', ['ROLLED_BACK', dispatchId]);
+      await connection.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', ['ROLLED_BACK', dispatchId]);
       await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['ROLLED_BACK', dispatchId]);
       await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', dispatch.production_package_id]);
 

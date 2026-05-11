@@ -252,7 +252,7 @@ router.get('/active', requireAdmin, async (req, res) => {
     try {
         const dispatches = await db.query(`
             SELECT d.*, n.company_name as node_name, p.status as package_status
-            FROM production_dispatches d
+            FROM manufacturing_dispatches d
             JOIN print_nodes n ON d.print_node_id = n.id
             JOIN production_packages p ON d.production_package_id = p.id
             WHERE d.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'REROUTED', 'ROLLED_BACK')
@@ -273,7 +273,7 @@ router.get('/sla-risks', requireAdmin, async (req, res) => {
         const risks = await db.query(`
             SELECT f.*, d.print_node_id, n.company_name as node_name
             FROM failure_prediction_snapshots f
-            JOIN production_dispatches d ON f.dispatch_id = d.id
+            JOIN manufacturing_dispatches d ON f.dispatch_id = d.id
             JOIN print_nodes n ON d.print_node_id = n.id
             WHERE f.snapshot_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
             ORDER BY f.failure_probability DESC
@@ -328,7 +328,7 @@ router.get('/node/:id', requireAdmin, async (req, res) => {
         if (!node) return res.status(404).json({ ok: false, error: 'NODE_NOT_FOUND' });
         
         const heartbeats = await db.query('SELECT * FROM node_heartbeats WHERE node_id = ? ORDER BY heartbeat_at DESC LIMIT 20', [req.params.id]);
-        const dispatches = await db.query('SELECT * FROM production_dispatches WHERE print_node_id = ? ORDER BY created_at DESC LIMIT 10', [req.params.id]);
+        const dispatches = await db.query('SELECT * FROM manufacturing_dispatches WHERE print_node_id = ? ORDER BY created_at DESC LIMIT 10', [req.params.id]);
         
         res.json({ ok: true, node, heartbeats, dispatches });
     } catch (err) {

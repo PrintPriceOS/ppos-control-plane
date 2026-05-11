@@ -411,7 +411,7 @@ class TelemetryService {
                     SUM(CASE WHEN status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'REROUTED', 'ROLLED_BACK') THEN 1 ELSE 0 END) as active_dispatches,
                     SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_dispatches,
                     SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as rerouted_dispatches
-                FROM production_dispatches
+                FROM manufacturing_dispatches
                 WHERE print_node_id = ?
             `, [nodeId]);
  
@@ -463,7 +463,7 @@ class TelemetryService {
                     SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as autonomous_recoveries,
                     SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as capacity_conflicts,
                     SUM(CASE WHEN status = 'REROUTED' THEN 1 ELSE 0 END) as manual_reroutes
-                FROM production_dispatches
+                FROM manufacturing_dispatches
             `);
 
             const [reliability] = await db.query(`

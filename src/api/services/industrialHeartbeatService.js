@@ -91,7 +91,7 @@ class IndustrialHeartbeatService {
    */
   async auditDispatchSla(nodeId, heartbeat) {
     const activeDispatches = await db.query(`
-      SELECT * FROM production_dispatches 
+      SELECT * FROM manufacturing_dispatches 
       WHERE print_node_id = ? AND status IN ('RESERVED', 'QUEUED', 'IN_PRODUCTION')
     `, [nodeId]);
 

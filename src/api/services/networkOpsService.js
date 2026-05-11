@@ -44,17 +44,17 @@ class NetworkOpsService {
 
             const { rows: resMetrics } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN reservation_status = 'ACTIVE' THEN 1 END) as active,
-                    COUNT(CASE WHEN reservation_status = 'EXPIRED' THEN 1 END) as expired
-                FROM capacity_reservations
+                    COUNT(CASE WHEN reservation_status = 'ACTIVE' OR status = 'PENDING' OR status = 'CONFIRMED' THEN 1 END) as active,
+                    COUNT(CASE WHEN reservation_status = 'EXPIRED' OR status = 'EXPIRED' THEN 1 END) as expired
+                FROM manufacturing_capacity_reservations
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             `);
 
             const { rows: dispatchMetrics } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN assignment_status = 'DISPATCHED' THEN 1 END) as active,
-                    COUNT(CASE WHEN dispatch_attempt > 1 THEN 1 END) / NULLIF(COUNT(*), 0) as reroute_rate
-                FROM job_assignments
+                    COUNT(CASE WHEN status IN ('ALLOCATED', 'IN_PRODUCTION') THEN 1 END) as active,
+                    COUNT(CASE WHEN status = 'REROUTED' THEN 1 END) / NULLIF(COUNT(*), 0) as reroute_rate
+                FROM manufacturing_dispatches
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             `);
 
@@ -165,11 +165,11 @@ class NetworkOpsService {
             const { rows: capacity } = await db.query('SELECT * FROM printer_capacity WHERE printer_id = ? ORDER BY date DESC LIMIT 7', [id]);
             const { rows: regions } = await db.query('SELECT * FROM printer_service_regions WHERE printer_id = ?', [id]);
             const { rows: reservations } = await db.query(
-                "SELECT * FROM capacity_reservations WHERE printer_id = ? AND reservation_status = 'ACTIVE' ORDER BY created_at DESC",
+                "SELECT * FROM manufacturing_capacity_reservations WHERE printer_id = ? AND (reservation_status = 'ACTIVE' OR status = 'PENDING' OR status = 'CONFIRMED') ORDER BY created_at DESC",
                 [id]
             );
             const { rows: assignments } = await db.query(
-                "SELECT * FROM job_assignments WHERE printer_id = ? ORDER BY created_at DESC LIMIT 10",
+                "SELECT * FROM manufacturing_dispatches WHERE print_node_id = ? ORDER BY created_at DESC LIMIT 10",
                 [id]
             );
             const { rows: economicMetrics } = await db.query(`

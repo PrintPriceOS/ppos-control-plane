@@ -22,7 +22,7 @@ class AutonomousRerouteService {
       const candidates = await db.query(`
         SELECT d.*, n.status as node_status, n.capacity_utilization_pct,
                p.book_spec_json
-        FROM production_dispatches d
+        FROM manufacturing_dispatches d
         JOIN print_nodes n ON d.print_node_id = n.id
         JOIN production_packages p ON d.production_package_id = p.id
         WHERE d.status IN ('QUEUED', 'ALLOCATED')
@@ -78,14 +78,14 @@ class AutonomousRerouteService {
 
     try {
       // 2. Rollback current dispatch
-      await connection.query('UPDATE production_dispatches SET status = ? WHERE id = ?', ['REROUTED', dispatch.id]);
+      await connection.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', ['REROUTED', dispatch.id]);
       await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['ROLLED_BACK', dispatch.id]);
 
       // 3. Create new dispatch via Execution Service logic (inlined for transaction safety)
       const newDispatchId = uuidv4();
       
       await connection.query(`
-        INSERT INTO production_dispatches 
+        INSERT INTO manufacturing_dispatches 
         (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, status, orchestration_metadata_json, operator_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [

@@ -19,7 +19,7 @@ class SLARiskMonitor {
       const activeDispatches = await db.query(`
         SELECT d.*, n.capacity_utilization_pct, n.status as node_status, n.last_heartbeat_at,
                p.book_spec_json
-        FROM production_dispatches d
+        FROM manufacturing_dispatches d
         JOIN print_nodes n ON d.print_node_id = n.id
         JOIN production_packages p ON d.production_package_id = p.id
         WHERE d.status IN ('QUEUED', 'ALLOCATED', 'IN_PRODUCTION')
