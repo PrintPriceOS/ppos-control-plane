@@ -108,6 +108,17 @@ export const GlobalSettingsPage: React.FC = () => {
                     {active === 'general' && (
                         <>
                             <SectionHeader icon={GlobeAltIcon} title="General" description="Core platform preferences." />
+                            <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Theme Toggle</p>
+                                <div className="flex gap-2">
+                                    {(['light', 'dark'] as const).map(t => (
+                                        <button key={t} onClick={() => setTheme(t)}
+                                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === t ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400'}`}>
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <Field label="Primary Region">
                                 <select value={region} onChange={e => setRegion(e.target.value)} className={inputCls}>
                                     <option>EU-WEST-1</option>
@@ -172,7 +183,24 @@ export const GlobalSettingsPage: React.FC = () => {
 
                     {active === 'appearance' && (
                         <>
-                            <SectionHeader icon={PaintBrushIcon} title="Appearance" description="Visual preferences for the control plane." />
+                            <SectionHeader icon={PaintBrushIcon} title="System Theme" description="Choose between corporate light and industrial dark mode." />
+                            <div className="flex gap-3 mb-8">
+                                {(['light', 'dark'] as const).map(t => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setTheme(t)}
+                                        className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
+                                            theme === t 
+                                                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                                                : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
+                                        }`}
+                                    >
+                                        {t} MODE
+                                    </button>
+                                ))}
+                            </div>
+
+                            <SectionHeader icon={PaintBrushIcon} title="UI Layout" description="Visual density preferences." />
                             <Field label="UI Density">
                                 <div className="flex gap-3">
                                     {(['compact', 'comfortable'] as const).map(d => (
@@ -187,24 +215,6 @@ export const GlobalSettingsPage: React.FC = () => {
                                 </div>
                             </Field>
                             <ToggleRow label="UI Animations" desc="Enable smooth transitions and motion." checked={animations} onChange={() => setAnimations(v => !v)} />
-                            <div className="py-4 border-t border-slate-100 dark:border-white/5">
-                                <SectionHeader icon={PaintBrushIcon} title="System Theme" description="Choose between corporate light and industrial dark mode." />
-                                <div className="mt-4 flex gap-3">
-                                    {(['light', 'dark'] as const).map(t => (
-                                        <button
-                                            key={t}
-                                            onClick={() => setTheme(t)}
-                                            className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
-                                                theme === t 
-                                                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
-                                                    : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
-                                            }`}
-                                        >
-                                            {t} MODE
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
                         </>
                     )}
 
