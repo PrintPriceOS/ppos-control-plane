@@ -5,7 +5,7 @@
  * Monolith Pure aesthetic: high-density, high-contrast command system visualization.
  */
 import React, { useMemo, useEffect, useState } from 'react';
-import { useAdminQuery } from '../../hooks/useAdminData';
+import { useAdminQuery } from '../hooks/useAdminData';
 
 interface MapNode {
     id: string;
