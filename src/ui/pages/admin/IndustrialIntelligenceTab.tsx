@@ -51,7 +51,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
             </div>
 
             {/* Predictive Failure Radar & Congestion */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Predictive Failure Radar */}
                 <div className="bg-white rounded-none-[2rem] border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -193,7 +193,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
             </div>
 
             {/* Optimization Activity Feed & Learning Console */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Optimization Loop */}
                 <div className="bg-white rounded-none-[2rem] border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">

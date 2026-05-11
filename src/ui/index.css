@@ -1733,7 +1733,7 @@ div[role="button"]:focus-visible,
     color-scheme: dark;
   }
   
-  .dark, .dark body, .dark #root {
+  html.dark, .dark, .dark body, .dark #root {
     background-color: #0e0e0f !important;
     color: #ffffff !important;
   }

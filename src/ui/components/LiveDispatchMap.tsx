@@ -55,25 +55,39 @@ export const LiveDispatchMap: React.FC = () => {
                  style={{ backgroundImage: 'linear-gradient(#111 1px, transparent 1px), linear-gradient(90deg, #111 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
             
             {/* Map Canvas */}
-            <svg className="absolute inset-0 w-full h-full p-12">
+            <svg className="absolute inset-0 w-full h-full p-4 sm:p-12" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+                {/* Tactical World Map Background */}
+                <g className="text-slate-500/10 dark:text-white/[0.03]">
+                   {/* Simplified Continents for Tactical feel */}
+                   <path d="M10,20 L25,15 L40,25 L35,45 L20,50 L10,40 Z" fill="currentColor" /> {/* N. America */}
+                   <path d="M25,55 L35,50 L40,65 L30,85 L20,75 Z" fill="currentColor" /> {/* S. America */}
+                   <path d="M50,15 L70,10 L90,15 L95,45 L75,50 L55,45 Z" fill="currentColor" /> {/* Eurasia */}
+                   <path d="M55,50 L70,45 L75,65 L65,85 L50,75 Z" fill="currentColor" /> {/* Africa */}
+                   <path d="M80,65 L95,60 L98,75 L85,85 Z" fill="currentColor" /> {/* Australia */}
+                </g>
+
+                {/* Europe Region Highlight (Focus Area) */}
+                <rect x="45" y="15" width="20" height="25" fill="currentColor" className="text-primary/5" stroke="currentColor" strokeWidth="0.2" />
+
                 {/* Connection Lines (Routes) */}
                 {Array.isArray(mapState?.routes) && mapState.routes.map((route: MapRoute) => {
                     const start = project(route.origin.lat, route.origin.lng);
                     const end = project(route.destination.lat, route.destination.lng);
                     const isDegraded = route.status === 'DEGRADED';
 
+                    // Parse percentage strings to numbers for paths if needed, or keep as strings for attributes
                     return (
                         <g key={route.id} className="routing-line">
                             <line 
                                 x1={start.x} y1={start.y} 
                                 x2={end.x} y2={end.y} 
                                 stroke={isDegraded ? '#f59e0b' : '#ef4444'} 
-                                strokeWidth={1 + route.intensity}
+                                strokeWidth="0.5"
                                 strokeOpacity={0.4}
-                                strokeDasharray="5,5"
+                                strokeDasharray="1,1"
                             />
                             {/* Animated Particle */}
-                            <circle r="2" fill={isDegraded ? '#f59e0b' : '#ef4444'}>
+                            <circle r="0.5" fill={isDegraded ? '#f59e0b' : '#ef4444'}>
                                 <animateMotion 
                                     path={`M ${start.x} ${start.y} L ${end.x} ${end.y}`} 
                                     dur="3s" 
@@ -92,9 +106,9 @@ export const LiveDispatchMap: React.FC = () => {
                         <circle 
                             key={h.region}
                             cx={pos.x} cy={pos.y}
-                            r={20 + (h.pressure / 2)}
+                            r={3 + (h.pressure / 20)}
                             fill={isSaturated ? '#ef4444' : '#3b82f6'}
-                            fillOpacity={0.05}
+                            fillOpacity={0.1}
                             className={isSaturated ? 'animate-pulse' : ''}
                         />
                     );
@@ -110,15 +124,15 @@ export const LiveDispatchMap: React.FC = () => {
                     return (
                         <g key={node.id} className="cursor-pointer group/node" onClick={() => (window as any).openMachine?.(node.id)}>
                             <circle 
-                                cx={pos.x} cy={pos.y} r="3" 
+                                cx={pos.x} cy={pos.y} r="0.8" 
                                 fill={color} 
-                                className="transition-all group-hover/node:r-4"
+                                className="transition-all group-hover/node:r-1.5 shadow-lg"
                             />
                             <text 
                                 x={pos.x} y={pos.y} 
-                                dy="-10" 
+                                dy="-2" 
                                 textAnchor="middle" 
-                                className="text-[6px] font-black fill-white/40 uppercase tracking-tighter opacity-0 group-hover/node:opacity-100 transition-opacity pointer-events-none"
+                                className="text-[1.5px] font-black fill-white/60 uppercase tracking-tighter opacity-0 group-hover/node:opacity-100 transition-opacity pointer-events-none"
                             >
                                 {node.name}
                             </text>

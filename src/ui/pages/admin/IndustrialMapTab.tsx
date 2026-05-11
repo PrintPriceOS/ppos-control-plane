@@ -8,8 +8,25 @@ import { LiveDispatchMap } from '../../components/LiveDispatchMap';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingLive } from '../../lib/adminApi';
 
+import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
+
 export const IndustrialMapTab: React.FC = () => {
     const { data: liveData } = useAdminQuery('routing:live', getRoutingLive, 5000);
+
+    const [selectedMachineId, setSelectedMachineId] = React.useState<string | null>(null);
+    const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+
+    const openMachine = (id: string) => {
+        setSelectedMachineId(id);
+        setIsDrawerOpen(true);
+    };
+
+    React.useEffect(() => {
+        (window as any).openMachine = openMachine;
+        return () => {
+            delete (window as any).openMachine;
+        };
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -69,6 +86,11 @@ export const IndustrialMapTab: React.FC = () => {
                 <StatusCard label="Cross-Border Load" value="28.5%" trend="-2.1%" />
                 <StatusCard label="Carbon Reduction" value="12.4kg" trend="+0.8kg" />
             </div>
+            <MachineDetailDrawer 
+                isOpen={isDrawerOpen} 
+                machineId={selectedMachineId} 
+                onClose={() => setIsDrawerOpen(false)} 
+            />
         </div>
     );
 };
