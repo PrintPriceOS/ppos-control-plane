@@ -115,4 +115,24 @@ router.post('/snapshot', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/sessions
+ * Returns active marketplace sessions.
+ * COMPATIBILITY FALLBACK.
+ */
+router.get('/sessions', async (req, res) => {
+    try {
+        // Placeholder until marketplace sessions are fully integrated
+        res.json({ 
+            ok: true, 
+            sessions: [], 
+            total: 0, 
+            status: "NOT_CONFIGURED",
+            message: "Marketplace session tracking is initializing."
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;
