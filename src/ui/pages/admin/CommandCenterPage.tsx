@@ -529,7 +529,7 @@ export const CommandCenterPage: React.FC = () => {
         {/* 2. MAIN OPERATIONAL GRID */}
         <div className="col-span-12 xl:col-span-9 grid grid-cols-12 auto-rows-min gap-3 h-fit">
           
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[220px]">
+          <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
             <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status} error={industrial.error}>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -546,7 +546,7 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          <div className="col-span-12 md:col-span-6 lg:col-span-3 min-h-[220px]">
+          <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
             <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
               <div className="space-y-2">
                 {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 4).map((w: any) => (
@@ -566,7 +566,7 @@ export const CommandCenterPage: React.FC = () => {
             </TacticalPanel>
           </div>
 
-          <div className="col-span-12 lg:col-span-6 min-h-[220px]">
+          <div className="col-span-12 lg:col-span-4 min-h-[220px]">
             <TacticalPanel title="Manufacturing Grid" icon={GlobeAltIcon} badge="Global" color="slate" status={capacity.status}>
                <div className="flex flex-col h-full">
                  <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-none overflow-hidden min-h-[160px]">
