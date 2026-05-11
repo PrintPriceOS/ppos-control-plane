@@ -113,73 +113,67 @@ export const MachinesPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Machines</h1>
-                    <div className="flex items-center gap-2 mt-1">
-                        <p className="text-sm text-slate-500 font-medium tracking-tight">Fleet telemetry with high-fidelity validation. No synthetic data.</p>
-                        {q.data?.timestamp && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                <ClockIcon className="w-3 h-3" />
-                                <span>Refreshed: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
-                            </div>
-                        )}
-                    </div>
+                    {q.data?.timestamp && (
+                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                            <ClockIcon className="w-3 h-3" />
+                            <span>Sync: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                    <button 
                      onClick={() => q.refetch()}
-                     className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-500"
+                     className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-400"
                      title="Force Telemetry Refresh"
                    >
-                     <ArrowPathIcon className={`w-5 h-5 ${q.isFetching ? 'animate-spin' : ''}`} />
+                     <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { label: 'Total Fleet', value: rawMachines.length, icon: CpuChipIcon, color: 'primary' },
                     { label: 'Active Nodes', value: activeNodes, icon: SignalIcon, color: 'emerald' },
                     { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, color: 'blue' },
                     { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, color: 'indigo' },
                 ].map((stat, i) => (
-                    <div key={i} className="glass p-5 rounded-2xl border border-white flex items-center gap-4 shadow-sm">
-                        <div className={`p-3 rounded-xl ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
+                    <div key={i} className="glass p-3 rounded-xl border border-white flex items-center gap-3 shadow-sm">
+                        <div className={`p-2 rounded-lg ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
                                           stat.color === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
                                           stat.color === 'blue' ? 'bg-blue-100 text-blue-600' :
                                           'bg-indigo-100 text-indigo-600'}`}>
-                            <stat.icon className="w-6 h-6" />
+                            <stat.icon className="w-4 h-4" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                            <p className="text-xl font-black text-slate-900 tracking-tighter">{stat.value}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
+                            <p className="text-lg font-black text-slate-900 tracking-tighter leading-none">{stat.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
+            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-white/[0.03] p-1.5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
+                <div className="relative flex-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
                         type="text"
-                        placeholder="Search by company, ID, or location..."
+                        placeholder="Search fleet..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium"
+                        className="w-full pl-9 pr-4 py-1.5 bg-transparent text-sm focus:ring-0 border-none outline-none font-medium"
                     />
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/[0.03] p-1 rounded-xl border border-slate-200 dark:border-white/10">
-                    <div className="px-3 py-1.5 flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
-                        <FunnelIcon className="w-3.5 h-3.5" />
-                        Status
-                    </div>
+                <div className="h-6 w-[1px] bg-slate-200 dark:bg-white/10 hidden md:block" />
+                <div className="flex items-center gap-1">
                     {['ALL', 'ONLINE', 'DEGRADED', 'OFFLINE'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             {status}
                         </button>
