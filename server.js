@@ -42,7 +42,13 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url.includes('/api/v2/analytics/public')) return;
 
     // 3. PROTECTED ROUTES
-    if (url.startsWith('/api') || url.startsWith('/federation')) {
+    if (
+        (url.startsWith('/api') || url.startsWith('/federation')) &&
+        !url.startsWith('/api/admin') &&
+        !url.startsWith('/api/auth') &&
+        !url.startsWith('/api/v2/analytics') &&
+        !url.startsWith('/api/connectors/factory')
+    ) {
         const authHeader = request.headers['authorization'];
         const jwtSecret = process.env.JWT_SECRET;
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
