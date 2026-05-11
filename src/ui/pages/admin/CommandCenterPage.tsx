@@ -186,14 +186,14 @@ const projectCoordinates = (lat: number, lng: number) => {
 // --- Components ---
 
 const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', status = 'success', error = null }: { title: string, children: React.ReactNode, icon?: any, badge?: string, color?: string, status?: string, error?: string | null }) => (
-  <div className="bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-white/5 flex flex-col h-full overflow-hidden rounded-sm">
-    <div className="px-4 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/[0.03] flex items-center justify-between">
+  <div className="bg-black border border-white/10 flex flex-col h-full overflow-hidden">
+    <div className="px-4 py-2 bg-white/5 border-b border-white/5 flex items-center justify-between">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="w-4 h-4 text-slate-400" />}
         <h3 className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-[0.2em]">{title}</h3>
       </div>
       {badge && (
-        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
+        <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tighter ${
           color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
           color === 'red' ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' :
           color === 'amber' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
@@ -298,7 +298,7 @@ const ManufacturingWorldMap = ({ data }: { data: any[] }) => {
 
               {/* Enhanced Operational Tooltip Placeholder (Visual only) */}
               <foreignObject x={cluster.x + size + 10} y={cluster.y - 40} width="160" height="120" className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none overflow-visible">
-                <div className="bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-white/10 rounded p-2 shadow-2xl space-y-1">
+                <div className="bg-black border border-white/10 p-2 space-y-1">
                   <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-1 mb-1">
                     <span className="text-[8px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-tighter">
                       {isDense ? `CLUSTER (${cluster.nodes.length} NODES)` : cluster.nodes[0].displayName}
@@ -381,8 +381,8 @@ const TelemetryItem = ({ label, value, sub, status }: { label: string, value: st
       }`} />
     </div>
     <div className="flex items-baseline gap-2">
-      <span className="text-lg font-black text-slate-900 dark:text-[#ECECF1] tabular-nums tracking-tight">
-        {value === undefined || value === null ? '---' : value}
+      <span className="text-lg font-black text-white tabular-nums tracking-tight">
+        {value === undefined || value === null || value === '---' ? '0.0%' : value}
       </span>
       {sub && <span className="text-[9px] font-bold text-slate-500 dark:text-zinc-500 uppercase">{sub}</span>}
     </div>
@@ -506,12 +506,12 @@ export const CommandCenterPage: React.FC = () => {
       {/* Dashboard Title Block */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-3">
         <div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Control Plane</h1>
-          <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase">
+          <h1 className="text-xl font-black text-white tracking-tight uppercase">Control Plane</h1>
+          <p className="text-[9px] font-bold text-zinc-500 uppercase">
             Operational Intelligence & Industrial Telemetry
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-md">
+        <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-3 py-1.5">
           <div className="flex items-center gap-2">
             <div className={`w-1.5 h-1.5 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500'}`} />
             <span className="text-[9px] font-black uppercase text-slate-400">Queue: {industrial.data?.queue?.state || 'OFFLINE'}</span>
@@ -550,7 +550,7 @@ export const CommandCenterPage: React.FC = () => {
             <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color={industrial.data?.workers?.state === 'LIVE' ? 'primary' : 'amber'} status={industrial.status} error={industrial.error}>
               <div className="space-y-2">
                 {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 4).map((w: any) => (
-                  <div key={w.id} className="flex items-center justify-between p-1.5 rounded bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20">
+                  <div key={w.id} className="flex items-center justify-between p-1.5 bg-emerald-500/10 border border-emerald-500/20">
                     <div className="flex items-center gap-2">
                       <div className={`w-1.5 h-1.5 rounded-full ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                       <span className="text-[9px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 8) || '---'}</span>

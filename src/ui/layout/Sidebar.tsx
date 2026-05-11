@@ -52,10 +52,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, badge }) => (
   <NavLink
     to={to}
     className={({ isActive }) => [
-      "flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group",
+      "flex items-center justify-between px-3 py-1.5 text-xs font-bold transition-all duration-100 group",
       isActive
-        ? "bg-primary/10 text-primary border border-primary/20"
-        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+        ? "bg-primary text-white"
+        : "text-zinc-400 hover:text-white hover:bg-white/[0.05]"
     ].join(" ")}
   >
     <div className="flex items-center gap-3">
@@ -63,7 +63,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, badge }) => (
       <span>{label}</span>
     </div>
     {badge && (
-      <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">
+      <span className="bg-primary text-white text-[9px] font-black px-1 py-0.5 uppercase">
         {badge}
       </span>
     )}
@@ -132,15 +132,15 @@ export const Sidebar: React.FC = () => {
   );
 
   return (
-    <aside className="w-72 bg-white/50 dark:bg-[#1C1C1E] border-r border-slate-200/60 dark:border-white/[0.08] h-screen sticky top-0 flex flex-col overflow-hidden">
+    <aside className="w-64 bg-black border-r border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
-      <div className="px-6 py-7 flex items-center gap-3.5">
-        <div className="w-10 h-10 bg-[#dc0000] rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20 ring-1 ring-transparent">
-          <ShieldCheckIcon className="w-6 h-6 text-white" />
+      <div className="px-5 py-6 flex items-center gap-3 border-b border-white/5">
+        <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
+          <ShieldCheckIcon className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-black text-slate-900 dark:text-[#ECECF1] leading-none tracking-tight">PrintPrice OS</h1>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-400 mt-1 uppercase tracking-widest">
+          <h1 className="text-sm font-black text-white leading-none tracking-tight">PrintPrice OS</h1>
+          <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
             {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
           </p>
         </div>
@@ -166,21 +166,21 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-4 bg-slate-50/50 dark:bg-black/20 border-t border-slate-200/60 dark:border-white/[0.08] space-y-2">
+      <div className="p-3 bg-white/5 border-t border-white/10 space-y-1">
         <a 
           href="/admin/help" 
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/10 group"
+          className="flex items-center gap-3 px-3 py-2 text-primary hover:bg-primary hover:text-white transition-colors border border-primary/20 group"
         >
-          <BookOpenIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
-          <span className="text-sm font-bold">OS Help Console</span>
+          <BookOpenIcon className="w-4 h-4" />
+          <span className="text-[10px] font-black uppercase">OS Help Console</span>
         </a>
         
         <button 
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/20 group"
+          className="w-full flex items-center gap-3 px-3 py-2 text-zinc-500 hover:text-white hover:bg-red-600 transition-all group"
         >
-          <ArrowPathIcon className="w-5 h-5 transition-transform group-hover:rotate-180" />
-          <span className="text-sm font-bold">Logout Session</span>
+          <ArrowPathIcon className="w-4 h-4" />
+          <span className="text-[10px] font-black uppercase">Logout Session</span>
         </button>
       </div>
     </aside>

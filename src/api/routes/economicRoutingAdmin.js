@@ -23,7 +23,10 @@ router.get('/overview', async (req, res) => {
         `);
 
         res.json({
-            metrics: rows[0],
+            metrics: {
+                ...rows[0],
+                avg_margin_pct: rows[0].avg_margin_pct || 0
+            },
             avg_final_score: auditRows[0].avg_final_score || 0
         });
     } catch (err) {

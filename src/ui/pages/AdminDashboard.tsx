@@ -106,20 +106,20 @@ const AdminDashboardInner: React.FC = () => {
 
     if (!isAuthorized) {
         return (
-            <div className="min-h-screen premium-gradient flex items-center justify-center p-6">
-                <div className="max-w-3xl w-full glass rounded-3xl p-10 border border-white shadow-2xl animate-slide-fade">
+            <div className="min-h-screen bg-black flex items-center justify-center p-6">
+                <div className="max-w-3xl w-full bg-black border border-white/20 p-10">
                     <div className="flex flex-col items-center text-center gap-6">
-                        <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20">
+                        <div className="w-16 h-16 bg-primary flex items-center justify-center">
                             <ShieldCheckIcon className="w-8 h-8 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Admin Gate</h2>
+                            <h2 className="text-2xl font-black text-white tracking-tight">Admin Gate</h2>
                             <p className="text-sm text-slate-500 font-medium mt-2">Enter your secure API key to access control systems.</p>
                         </div>
                         <div className="w-full space-y-4">
                             <input
                                 type="password"
-                                className="w-full bg-white/50 border border-slate-200 rounded-xl px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"
+                                className="w-full bg-white/5 border border-white/10 px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:border-primary transition-all"
                                 placeholder="••••••••••••"
                                 value={authKey}
                                 onChange={(e) => setAuthKey(e.target.value)}
@@ -127,7 +127,7 @@ const AdminDashboardInner: React.FC = () => {
                             />
                             <button
                                 onClick={handleConnect}
-                                className="btn-primary-premium w-full !py-4"
+                                className="w-full py-4 bg-primary text-white font-black uppercase hover:bg-primary/90"
                             >
                                 Establish Connection
                             </button>
@@ -139,14 +139,14 @@ const AdminDashboardInner: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 premium-gradient">
-            <header className="sticky top-0 z-50 glass px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/20">
+        <div className="min-h-screen bg-black">
+            <header className="sticky top-0 z-50 bg-black border-b border-white/10 px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                    <div className="w-10 h-10 bg-primary flex items-center justify-center">
                         <ShieldCheckIcon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-none">
+                        <h1 className="text-xl font-bold text-white tracking-tight leading-none">
                             {t("admin.title" as any)}
                         </h1>
                         <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">
@@ -156,48 +156,48 @@ const AdminDashboardInner: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <ClockIcon className="w-4 h-4 text-slate-400 ml-1" />
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={range}
                             onChange={(e) => setRange(e.target.value as Range)}
                         >
-                            <option value="24h">{t("admin.range.24h" as any)}</option>
-                            <option value="7d">{t("admin.range.7d" as any)}</option>
-                            <option value="30d">{t("admin.range.30d" as any)}</option>
+                            <option value="24h" className="bg-black text-white">{t("admin.range.24h" as any)}</option>
+                            <option value="7d" className="bg-black text-white">{t("admin.range.7d" as any)}</option>
+                            <option value="30d" className="bg-black text-white">{t("admin.range.30d" as any)}</option>
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <ArrowPathIcon className={`w-4 h-4 text-slate-400 ml-1 ${refresh > 0 ? "animate-spin" : ""}`} />
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={refresh}
                             onChange={(e) => setRefresh(Number(e.target.value))}
                         >
-                            <option value={0}>{ctxT("admin.refresh.off")}</option>
-                            <option value={10000}>10s</option>
-                            <option value={30000}>30s</option>
+                            <option value={0} className="bg-black text-white">{ctxT("admin.refresh.off")}</option>
+                            <option value={10000} className="bg-black text-white">10s</option>
+                            <option value={30000} className="bg-black text-white">30s</option>
                         </select>
                     </div>
 
                     {/* Language Toggle */}
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <span className="text-xs font-bold text-slate-400 ml-1">LA</span>
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={locale}
                             onChange={(e) => setLocale(e.target.value as any)}
                         >
-                            <option value="en">EN</option>
-                            <option value="es">ES</option>
+                            <option value="en" className="bg-black text-white">EN</option>
+                            <option value="es" className="bg-black text-white">ES</option>
                         </select>
                     </div>
 
                     <a
                         href="/admin/help"
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100 font-medium text-sm ml-2"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors border border-blue-500/20 font-black text-xs ml-2 uppercase"
                         title="Operations Knowledge Console"
                     >
                         <BookOpenIcon className="w-5 h-5" />
@@ -206,7 +206,7 @@ const AdminDashboardInner: React.FC = () => {
 
                     <button
                         onClick={handleDisconnect}
-                        className="p-2.5 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100 ml-2"
+                        className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 ml-2"
                         title="Disconnect"
                     >
                         <XMarkIcon className="w-5 h-5" />
@@ -216,7 +216,7 @@ const AdminDashboardInner: React.FC = () => {
 
             <div className="max-w-7xl mx-auto px-6 pb-12">
                 <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
-                    <nav className="flex gap-1 bg-slate-200/40 p-1 rounded-xl mb-8 w-fit border border-slate-200/60 transition-all duration-300 whitespace-nowrap">
+                    <nav className="flex gap-1 bg-white/5 p-1 mb-8 w-fit border border-white/10 transition-all duration-300 whitespace-nowrap">
                         {tabs.map(([id, label, Icon]) => (
                             <button
                                 key={id}
@@ -234,7 +234,7 @@ const AdminDashboardInner: React.FC = () => {
                     </nav>
                 </div>
 
-                <main className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl shadow-slate-200/50 border border-white p-6 relative overflow-hidden animate-slide-fade">
+                <main className="bg-black border border-white/10 p-6 relative overflow-hidden">
                     {/* Background glass decoration */}
                     <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-slate-200 rounded-full blur-3xl pointer-events-none" />

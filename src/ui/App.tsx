@@ -91,7 +91,7 @@ export const App: React.FC = () => {
                 <Route path="/legacy-dashboard" element={<DashboardPage />} />
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
-                <Route path="/audit" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Audit Explorer Logic Deferred to Batch 3</div>} />
+                <Route path="/audit" element={<div className="p-10 text-center font-bold text-slate-500 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-white/10">Audit Explorer Logic Deferred to Batch 3</div>} />
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
@@ -161,7 +161,7 @@ export const App: React.FC = () => {
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />
-                <Route path="/materials" element={<div className="p-10 text-center font-bold text-slate-400 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-3xl">Material & Paper Catalog Deferred to Batch 3</div>} />
+                <Route path="/materials" element={<div className="p-10 text-center font-bold text-slate-500 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-white/10">Material & Paper Catalog Deferred to Batch 3</div>} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />

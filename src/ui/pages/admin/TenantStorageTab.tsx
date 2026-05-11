@@ -21,27 +21,27 @@ export const TenantStorageTab: React.FC = () => {
         <div className="space-y-6 animate-slide-fade">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Global Capacity */}
-                <div className="glass rounded-2xl border border-white p-6 shadow-sm">
+                <div className="bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <CloudIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Global Registry Footprint</span>
                     </div>
-                    <div className="text-3xl font-black text-slate-900 tracking-tighter">
+                    <div className="text-3xl font-black text-white tracking-tighter">
                         {(storage.totalSizeBytes / (1024 ** 3)).toFixed(2)} GB
                     </div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                         of {(storage.capacityBytes / (1024 ** 3)).toFixed(0)} GB Industrial Quota
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full mt-6 overflow-hidden border border-slate-200">
+                    <div className="w-full h-2 bg-white/5 mt-6 overflow-hidden border border-white/10">
                         <div 
-                            className="h-full bg-indigo-500 rounded-full" 
+                            className="h-full bg-primary" 
                             style={{ width: `${(storage.totalSizeBytes / storage.capacityBytes) * 100}%` }} 
                         />
                     </div>
                 </div>
 
                 {/* Tier Distribution */}
-                <div className="glass rounded-2xl border border-white p-6 shadow-sm">
+                <div className="bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ChartPieIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Tier Distribution</span>
@@ -54,13 +54,13 @@ export const TenantStorageTab: React.FC = () => {
                 </div>
 
                 {/* Governance Warnings */}
-                <div className="glass rounded-2xl border border-white p-6 shadow-sm">
+                <div className="bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ExclamationTriangleIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Governance Alerts</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-white">
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
+                        <div className="w-8 h-8 bg-amber-500 flex items-center justify-center text-white">
                             <ArrowTrendingUpIcon className="w-5 h-5" />
                         </div>
                         <div>
@@ -72,12 +72,12 @@ export const TenantStorageTab: React.FC = () => {
             </div>
 
             {/* Tenant Breakdown */}
-            <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm">
-                <div className="px-6 py-4 bg-slate-50/50 border-b border-white">
+            <div className="bg-black border border-white/10 overflow-hidden">
+                <div className="px-6 py-4 bg-white/5 border-b border-white/10">
                     <div className="font-bold text-slate-800 text-sm tracking-tight">Tenant Storage Governance</div>
                 </div>
                 <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-100">
+                    <thead className="bg-white/5 text-slate-400 font-black uppercase tracking-widest border-b border-white/10">
                         <tr>
                             <th className="px-6 py-3">Tenant</th>
                             <th className="px-6 py-3">Artifacts</th>
@@ -88,23 +88,23 @@ export const TenantStorageTab: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {tenants.data?.map((t: any) => (
-                            <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                            <tr key={t.id} className="hover:bg-white/5 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="font-bold text-slate-800">{t.name}</div>
                                     <div className="text-[10px] text-slate-400 font-mono">{t.id}</div>
                                 </td>
-                                <td className="px-6 py-4 font-bold text-slate-600">842</td>
-                                <td className="px-6 py-4 font-black text-slate-900">4.21 GB</td>
+                                <td className="px-6 py-4 font-bold text-slate-400">842</td>
+                                <td className="px-6 py-4 font-black text-white">4.21 GB</td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-blue-500 rounded-full" style={{ width: '42%' }} />
+                                        <div className="w-20 h-1.5 bg-white/5 overflow-hidden">
+                                            <div className="h-full bg-primary" style={{ width: '42%' }} />
                                         </div>
                                         <span className="font-bold text-slate-500">42%</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase">Standard-Industrial</span>
+                                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase">Standard-Industrial</span>
                                 </td>
                             </tr>
                         ))}
@@ -121,7 +121,7 @@ const TierRow = ({ label, percentage, color }: { label: string, percentage: numb
             <span className="text-slate-400">{label}</span>
             <span className={`text-${color}-600`}>{percentage}%</span>
         </div>
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-white/5 overflow-hidden">
             <div className={`h-full bg-${color}-500`} style={{ width: `${percentage}%` }} />
         </div>
     </div>

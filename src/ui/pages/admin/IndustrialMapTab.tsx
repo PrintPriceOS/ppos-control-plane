@@ -20,15 +20,15 @@ export const IndustrialMapTab: React.FC = () => {
 
                 {/* Live Event Stream */}
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-[#0a0a0b] border border-slate-200 dark:border-white/5 rounded-sm overflow-hidden flex flex-col h-[700px]">
+                    <div className="bg-black border border-white/10 overflow-hidden flex flex-col h-[700px]">
                         <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] flex items-center justify-between">
                             <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Routing Decalog</h3>
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            <div className="w-1.5 h-1.5 bg-primary animate-pulse" />
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                             {liveData?.decisions?.map((d: any) => (
-                                <div key={d.id} className="p-3 bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 rounded-sm">
+                                <div key={d.id} className="p-3 bg-white/5 border border-white/5">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="text-[8px] font-mono font-bold text-blue-600 uppercase tracking-tighter">#{d.id.slice(-8)}</span>
                                         <span className="text-[9px] font-black text-emerald-500 uppercase">{d.routing_score}%</span>
@@ -45,7 +45,7 @@ export const IndustrialMapTab: React.FC = () => {
 
                             {(!liveData?.decisions || liveData.decisions.length === 0) && (
                                 <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale">
-                                    <div className="w-12 h-12 border-2 border-dashed border-slate-400 rounded-full mb-4" />
+                                    <div className="w-12 h-12 border-2 border-dashed border-white/10 mb-4" />
                                     <span className="text-[8px] font-black uppercase">Scanning for Routing Events...</span>
                                 </div>
                             )}
@@ -73,7 +73,7 @@ export const IndustrialMapTab: React.FC = () => {
 };
 
 const StatusCard = ({ label, value, trend }: { label: string, value: string, trend: string }) => (
-    <div className="p-4 bg-white dark:bg-[#0a0a0b] border border-slate-200 dark:border-white/5 rounded-sm">
+    <div className="p-4 bg-black border border-white/10">
         <div className="flex justify-between items-start mb-2">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
             <span className={`text-[8px] font-black ${trend.startsWith('+') ? 'text-emerald-500' : 'text-blue-500'}`}>{trend}</span>

@@ -57,7 +57,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Header Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
+                    <div className="p-3 bg-white/5 border border-white/10">
                         <BoltIcon className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
@@ -68,14 +68,14 @@ export const IndustrialLiveTab: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleScan}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-black text-xs font-bold hover:bg-zinc-200 transition-all shadow-none"
                     >
                         <ArrowPathIcon className="w-4 h-4" />
                         RUN SLA SCAN
                     </button>
                     <button 
                         onClick={handleRebalance}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-none"
                     >
                         <BoltIcon className="w-4 h-4" />
                         AUTO REBALANCE
@@ -86,7 +86,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Industrial Heatmap & Risks */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Capacity Heatmap */}
-                <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+                <div className="lg:col-span-2 bg-black border border-white/10 p-6">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ServerIcon className="w-4 h-4" />
                         Global Capacity Heatmap (Live Telemetry)
@@ -96,7 +96,7 @@ export const IndustrialLiveTab: React.FC = () => {
                             <button 
                                 key={node.node_id} 
                                 onClick={() => openMachine(node.node_id)}
-                                className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-blue-500 hover:bg-white hover:shadow-xl transition-all text-left"
+                                className="p-4 bg-zinc-900 border border-white/5 group hover:border-primary hover:bg-black transition-all text-left"
                             >
                                 <div className="flex items-center justify-between mb-3">
                                     <div className={`w-2 h-2 rounded-full ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
