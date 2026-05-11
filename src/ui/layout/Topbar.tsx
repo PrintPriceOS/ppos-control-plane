@@ -150,6 +150,17 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             </button>
           )}
 
+          {/* Corporate Branding */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
+              <ShieldCheckIcon className="w-5 h-5 text-white" />
+            </div>
+            <div className="hidden lg:block">
+              <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
+              <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">Control Plane</p>
+            </div>
+          </div>
+
           {/* Environment Badge */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
             <div className="w-1 h-1 bg-emerald-500" />

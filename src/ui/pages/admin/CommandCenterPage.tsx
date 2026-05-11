@@ -584,7 +584,7 @@ export const CommandCenterPage: React.FC = () => {
           </div>
 
           {(isSuper || isPrinthouse) && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[160px]">
+            <div className="col-span-12 md:col-span-6 lg:col-span-4">
               <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
                  <div className="space-y-3">
                    <div className="grid grid-cols-2 gap-4">
@@ -601,7 +601,7 @@ export const CommandCenterPage: React.FC = () => {
           )}
 
           {isSuper && (
-            <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[160px]">
+            <div className="col-span-12 md:col-span-6 lg:col-span-4">
               <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="SOC Industrial" color="red" status={blocks.status}>
                 <div className="space-y-3">
                   <div className="flex flex-col mb-2">
@@ -619,7 +619,7 @@ export const CommandCenterPage: React.FC = () => {
             </div>
           )}
 
-          <div className="col-span-12 md:col-span-6 lg:col-span-4 min-h-[220px]">
+          <div className="col-span-12 md:col-span-6 lg:col-span-4">
             <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Pressure" color="slate" status={industrial.status}>
                <div className="space-y-4">
                  <div className="flex items-center justify-between">
@@ -1148,7 +1148,7 @@ const IndustrialHeartbeatMatrix = () => {
             <div className="flex items-center gap-2 min-w-0">
               {getStatusIcon(node.status)}
               <div className="flex flex-col min-w-0">
-                <span className="text-[8px] font-black text-slate-900 dark:text-white uppercase truncate leading-tight">{node.company_name || String(node.id || node.node_id || node.print_node_id || 'UNKNOWN').slice(0, 8)}</span>
+                <span className="text-[8px] font-black text-slate-900 dark:text-white uppercase truncate leading-tight w-full block">{node.company_name || String(node.id || node.node_id || node.print_node_id || 'UNKNOWN').slice(0, 8)}</span>
                 <span className="text-[6px] font-bold text-slate-400 uppercase truncate tracking-tighter">{node.region || 'UNK'} / {node.capacity_utilization_pct || 0}% LOAD</span>
               </div>
             </div>

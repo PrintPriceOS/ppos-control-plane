@@ -133,7 +133,7 @@ export const Sidebar: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   );
 
   return (
-    <aside className="w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
+    <aside className={`${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-50 w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen flex flex-col overflow-hidden transition-transform duration-300 ease-in-out`}>
       {/* Brand Header */}
       <div className="px-5 py-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-3">
