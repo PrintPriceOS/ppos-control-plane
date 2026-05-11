@@ -29,7 +29,8 @@ import {
   scoreDispatch,
   createDispatch,
   rollbackDispatch,
-  getDispatches
+  getDispatches,
+  getIndustrialTelemetryOverview
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
