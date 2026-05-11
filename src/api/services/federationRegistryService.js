@@ -39,7 +39,7 @@ class FederationRegistryService {
             factoryDef.federation_state || 'ACTIVE'
         ]);
 
-        logger.info({ event: 'factory_registered', id, name: factoryDef.factory_name });
+        logger.info({ event: 'factory_registered', id, factory_name: factoryDef.factory_name });
         return { id, ...factoryDef };
     }
 

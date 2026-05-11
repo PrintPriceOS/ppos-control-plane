@@ -361,7 +361,8 @@ class IndustrialProvisioningService {
             { table: 'manufacturing_dispatch_events', column: 'correlation_id', type: 'VARCHAR(64) NULL' },
             { table: 'manufacturing_dispatch_events', column: 'source_service', type: 'VARCHAR(128) NULL' },
             { table: 'manufacturing_dispatch_events', column: 'routing_reason', type: 'VARCHAR(255) NULL' },
-            { table: 'manufacturing_dispatch_events', column: 'orchestration_metadata', type: 'JSON NULL' }
+            { table: 'manufacturing_dispatch_events', column: 'orchestration_metadata', type: 'JSON NULL' },
+            { table: 'federation_factories', column: 'company_name', type: 'VARCHAR(255) NULL' }
         ];
 
         for (const gm of eventOrchestrationMigrations) {
@@ -469,6 +470,17 @@ class IndustrialProvisioningService {
             `);
         } catch (err) {
             this._logStepError('createFederationFactories', err);
+        }
+
+        // Data Migration: Sync company_name with factory_name for federation_factories
+        try {
+            await db.query(`
+                UPDATE federation_factories 
+                SET company_name = factory_name 
+                WHERE company_name IS NULL
+            `);
+        } catch (err) {
+            this._logStepError('migrateFederationFactoriesCompanyName', err);
         }
 
         return ensured;

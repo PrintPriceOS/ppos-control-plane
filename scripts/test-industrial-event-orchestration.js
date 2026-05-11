@@ -77,12 +77,25 @@ async function runTests() {
         logger.info('--------------------------');
         
         logger.info('Industrial Event Orchestration Validation COMPLETED SUCCESSFULLY.');
+
     } catch (err) {
-        logger.error({ event: 'test_failed', error: err.message });
+
+        console.error('\n[TEST-FAILED-FULL]\n');
+
+        console.error({
+            message: err?.message,
+            code: err?.code,
+            stack: err?.stack,
+            cause: err?.cause,
+            raw: err
+        });
+
         process.exit(1);
+
     } finally {
-        // Give some time for background processes if any
+
         setTimeout(() => process.exit(0), 1000);
+
     }
 }
 

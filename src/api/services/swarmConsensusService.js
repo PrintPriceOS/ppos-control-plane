@@ -25,7 +25,7 @@ class SwarmConsensusService {
             const score = (factory.economic_score + factory.energy_score) / 2 - loadPenalty + reliabilityBonus;
 
             if (score < 40) {
-                rejected.push({ id: factory.id, name: factory.factory_name, reason: 'LOW_CONSENSUS_SCORE', score });
+                rejected.push({ id: factory.id, factory_name: factory.factory_name, reason: 'LOW_CONSENSUS_SCORE', score });
                 continue;
             }
 
