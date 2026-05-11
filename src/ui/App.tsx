@@ -74,6 +74,7 @@ import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
 import { AuthGuard } from './components/AuthGuard';
+import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
 
 export const App: React.FC = () => {
     return (
@@ -85,7 +86,7 @@ export const App: React.FC = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             
-            <Route element={<AuthGuard><Layout /></AuthGuard>}>
+            <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<CommandCenterPage />} />
                 <Route path="/legacy-dashboard" element={<DashboardPage />} />

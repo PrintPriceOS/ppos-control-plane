@@ -14,7 +14,7 @@ class RoutingMapService {
     async getMapState() {
         try {
             // 1. Get All Active Industrial Nodes with Coordinates
-            const nodes = await db.query(`
+            const [nodes] = await db.query(`
                 SELECT 
                     id, company_name, region, status, 
                     latitude, longitude, capacity_utilization_pct,
@@ -24,7 +24,7 @@ class RoutingMapService {
             `);
 
             // 2. Get Active Dispatches with Origin/Destination
-            const dispatches = await db.query(`
+            const [dispatches] = await db.query(`
                 SELECT 
                     md.id, md.status, md.federation_node_id, 
                     md.created_at,
@@ -37,7 +37,7 @@ class RoutingMapService {
             `);
 
             // 3. Map Nodes to DTO
-            const mapNodes = nodes.map(n => ({
+            const mapNodes = (nodes || []).map(n => ({
                 id: n.id,
                 name: n.company_name,
                 region: n.region,
@@ -51,7 +51,7 @@ class RoutingMapService {
             // 4. Map Routing Lines
             // Note: In a real system, we'd also have origin coords (client/tenant location)
             // For now, we'll use a fixed "Hub" or derive from tenant metadata if available
-            const routes = dispatches.map(d => ({
+            const routes = (dispatches || []).map(d => ({
                 id: d.id,
                 status: d.status,
                 origin: { lat: 52.5200, lng: 13.4050 }, // Mocking Berlin as default origin for EU

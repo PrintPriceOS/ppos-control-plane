@@ -12,7 +12,7 @@ class RoutingHeatmapService {
      */
     async getRegionalHeatmap() {
         try {
-            const regions = await db.query(`
+            const [regions] = await db.query(`
                 SELECT 
                     region, 
                     COUNT(*) as node_count,
@@ -24,7 +24,7 @@ class RoutingHeatmapService {
                 GROUP BY region
             `);
 
-            return regions.map(r => {
+            return (regions || []).map(r => {
                 const util = parseFloat(r.avg_utilization || 0);
                 const pressure = (util * 0.7) + (Math.min(100, (r.total_backlog / 10)) * 0.3);
                 

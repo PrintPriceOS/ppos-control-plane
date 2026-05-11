@@ -288,12 +288,13 @@ class IndustrialProvisioningService {
             { table: 'printer_nodes', column: 'active_jobs', type: 'INT DEFAULT 0' },
             { table: 'printer_nodes', column: 'capacity_utilization_pct', type: 'INT DEFAULT 0' },
             { table: 'printer_nodes', column: 'company_name', type: 'VARCHAR(255) NULL' },
-            { table: 'print_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
-            { table: 'print_nodes', column: 'worker_state', type: 'VARCHAR(64) NULL' },
-            { table: 'print_nodes', column: 'sync_version', type: 'VARCHAR(32) NULL' },
+            { table: 'print_nodes', column: 'active_jobs', type: 'INT DEFAULT 0' },
+            { table: 'print_nodes', column: 'queue_depth', type: 'INT DEFAULT 0' },
             { table: 'print_nodes', column: 'region', type: 'VARCHAR(128) NULL' },
             { table: 'print_nodes', column: 'federation_id', type: 'VARCHAR(64) NULL' },
-            { table: 'print_nodes', column: 'cluster_id', type: 'VARCHAR(64) NULL' }
+            { table: 'print_nodes', column: 'cluster_id', type: 'VARCHAR(64) NULL' },
+            { table: 'print_nodes', column: 'latitude', type: 'DECIMAL(10, 8) NULL' },
+            { table: 'print_nodes', column: 'longitude', type: 'DECIMAL(11, 8) NULL' }
         ];
 
         for (const gm of agentMigrations) {
@@ -576,8 +577,9 @@ class IndustrialProvisioningService {
                         max_file_size_mb, api_enabled, rates_json,
                         supported_products, binding_capabilities, color_profiles,
                         throughput, uptime_score, economic_efficiency,
-                        federation_id, cluster_id
-                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, ?, 500, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        federation_id, cluster_id, active_jobs, queue_depth,
+                        latitude, longitude
+                    ) VALUES (?, ?, ?, 'ONLINE', 'ACTIVE', ?, ?, ?, ?, ?, ?, 500, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         company_name = VALUES(company_name),
                         country = VALUES(country),
@@ -591,7 +593,11 @@ class IndustrialProvisioningService {
                         uptime_score = VALUES(uptime_score),
                         economic_efficiency = VALUES(economic_efficiency),
                         federation_id = VALUES(federation_id),
-                        cluster_id = VALUES(cluster_id)
+                        cluster_id = VALUES(cluster_id),
+                        active_jobs = VALUES(active_jobs),
+                        queue_depth = VALUES(queue_depth),
+                        latitude = VALUES(latitude),
+                        longitude = VALUES(longitude)
                 `, [
                     pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null, pn.region || null,
                     this.normalizeJsonForMysql(pn.capabilities_json, {}),
@@ -602,7 +608,9 @@ class IndustrialProvisioningService {
                     this.normalizeJsonForMysql(pn.binding_capabilities, []),
                     this.normalizeJsonForMysql(pn.color_profiles, []),
                     pn.throughput || 0.00, pn.uptime_score || 100.00, pn.economic_efficiency || 1.00,
-                    pn.federation_id || null, pn.cluster_id || null
+                    pn.federation_id || null, pn.cluster_id || null,
+                    pn.active_jobs || 0, pn.queue_depth || 0,
+                    pn.latitude || null, pn.longitude || null
                 ]);
                 synced++;
             } catch (err) {

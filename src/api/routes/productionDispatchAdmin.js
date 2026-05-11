@@ -248,6 +248,55 @@ router.get('/telemetry/topology', requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/admin/dispatch/simulation/runs
+ */
+router.get('/simulation/runs', requireAdmin, async (req, res) => {
+    try {
+        const runs = await realitySimulation.getSimulationRuns().catch(() => []);
+        res.json({ ok: true, runs });
+    } catch (err) {
+        res.json({ ok: true, runs: [] });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/future-projections
+ */
+router.get('/future-projections', requireAdmin, async (req, res) => {
+    try {
+        const projections = await simulationProjector.getLatestProjections().catch(() => []);
+        res.json({ ok: true, projections });
+    } catch (err) {
+        res.json({ ok: true, projections: [] });
+    }
+});
+
+/**
+ * GET /api/admin/dispatch/economic-risks
+ */
+router.get('/economic-risks', requireAdmin, async (req, res) => {
+    try {
+        const risks = await riskForecastService.forecastGlobalEconomicRisks().catch(() => []);
+        res.json({ ok: true, risks });
+    } catch (err) {
+        res.json({ ok: true, risks: [] });
+    }
+});
+
+/**
+ * POST /api/admin/dispatch/simulation/trigger
+ */
+router.post('/simulation/trigger', requireAdmin, async (req, res) => {
+    try {
+        const { type, config } = req.body;
+        const result = await realitySimulation.runSimulation(type || 'DISPATCH_OPTIMIZATION', config || {});
+        res.json({ ok: true, ...result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
  * GET /api/admin/events/recent
  */
 router.get('/events/recent', requireAdmin, async (req, res) => {

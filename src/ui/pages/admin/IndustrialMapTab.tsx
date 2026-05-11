@@ -4,36 +4,23 @@
  * Visualization tab for the global federation dispatch map.
  */
 import React from 'react';
-import { LiveDispatchMap } from '../../components/LiveDispatchMap';
+import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingLive } from '../../lib/adminApi';
 
-import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
+
 
 export const IndustrialMapTab: React.FC = () => {
     const { data: liveData } = useAdminQuery('routing:live', getRoutingLive, 5000);
 
-    const [selectedMachineId, setSelectedMachineId] = React.useState<string | null>(null);
-    const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
-    const openMachine = (id: string) => {
-        setSelectedMachineId(id);
-        setIsDrawerOpen(true);
-    };
-
-    React.useEffect(() => {
-        (window as any).openMachine = openMachine;
-        return () => {
-            delete (window as any).openMachine;
-        };
-    }, []);
 
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Main Tactical Surface */}
-                <div className="xl:col-span-3">
-                    <LiveDispatchMap />
+                <div className="xl:col-span-3 min-h-[700px]">
+                    <FederationMap />
                 </div>
 
                 {/* Live Event Stream */}
@@ -86,11 +73,7 @@ export const IndustrialMapTab: React.FC = () => {
                 <StatusCard label="Cross-Border Load" value="28.5%" trend="-2.1%" />
                 <StatusCard label="Carbon Reduction" value="12.4kg" trend="+0.8kg" />
             </div>
-            <MachineDetailDrawer 
-                isOpen={isDrawerOpen} 
-                machineId={selectedMachineId} 
-                onClose={() => setIsDrawerOpen(false)} 
-            />
+
         </div>
     );
 };

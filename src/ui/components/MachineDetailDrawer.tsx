@@ -130,9 +130,9 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
 
                <div className="grid grid-cols-4 gap-4">
                   <StatItem label="Uptime" value={`${data.header.uptime_pct}%`} color="zinc" />
-                  <StatItem label="Cluster" value="EU-ALPHA-01" color="zinc" />
+                  <StatItem label="Region" value={data.header.region} color="zinc" />
                   <StatItem label="Mode" value={data.header.mode} color="zinc" />
-                  <StatItem label="Routing" value="ACTIVE" color="emerald" />
+                  <StatItem label="Federation" value="CONNECTED" color="emerald" />
                </div>
             </section>
 
@@ -293,8 +293,8 @@ const StatItem = ({ label, value, color }: { label: string, value: any, color: s
 );
 
 const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
-  <div className="flex items-center gap-3 mb-6">
-    <Icon className="w-5 h-5 text-red-600" />
+  <div className="flex items-center gap-3 mb-6 border-l-2 border-primary pl-4">
+    <Icon className="w-5 h-5 text-primary" />
     <h2 className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">{title}</h2>
   </div>
 );
