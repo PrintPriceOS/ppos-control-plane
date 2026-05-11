@@ -1063,7 +1063,7 @@ const IndustrialHeartbeatMatrix = () => {
             <div className="flex items-center gap-2 min-w-0">
               {getStatusIcon(node.status)}
               <div className="flex flex-col min-w-0">
-                <span className="text-[8px] font-black text-slate-900 dark:text-white uppercase truncate leading-tight">{node.company_name || node.id.slice(0, 8)}</span>
+                <span className="text-[8px] font-black text-slate-900 dark:text-white uppercase truncate leading-tight">{node.company_name || String(node.id || node.node_id || node.print_node_id || 'UNKNOWN').slice(0, 8)}</span>
                 <span className="text-[6px] font-bold text-slate-400 uppercase truncate tracking-tighter">{node.region || 'UNK'} / {node.capacity_utilization_pct || 0}% LOAD</span>
               </div>
             </div>
