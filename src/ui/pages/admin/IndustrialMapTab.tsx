@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { LiveDispatchMap } from '../../components/LiveDispatchMap';
-import { useAdminQuery } from '../../hooks/useAdminQuery';
+import { useAdminQuery } from '../../hooks/useAdminData';
 
 export const IndustrialMapTab: React.FC = () => {
     const { data: liveData } = useAdminQuery('routing:live', () => fetch('/api/admin/routing/live').then(res => res.json()), 5000);
