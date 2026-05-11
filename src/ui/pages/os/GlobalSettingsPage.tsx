@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Cog6ToothIcon,
     GlobeAltIcon,
@@ -22,9 +22,9 @@ const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
 const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked, onChange }) => (
     <button
         onClick={onChange}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-none transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
     >
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+        <span className={`inline-block h-4 w-4 transform rounded-none bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
 );
 
@@ -55,6 +55,21 @@ export const GlobalSettingsPage: React.FC = () => {
     // Appearance
     const [density, setDensity] = useState<'compact' | 'comfortable'>('comfortable');
     const [animations, setAnimations] = useState(true);
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('ppos-theme') as 'light' | 'dark') || 'light';
+        }
+        return 'light';
+    });
+
+    useEffect(() => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('ppos-theme', theme);
+    }, [theme]);
 
     const handleSave = () => {
         setSaved(true);
@@ -75,7 +90,7 @@ export const GlobalSettingsPage: React.FC = () => {
                         <button
                             key={id}
                             onClick={() => setActive(id)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-none text-sm font-bold transition-all ${
                                 active === id
                                     ? 'bg-slate-900 text-white'
                                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
@@ -88,7 +103,7 @@ export const GlobalSettingsPage: React.FC = () => {
                 </nav>
 
                 {/* Panel */}
-                <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-8 space-y-6">
+                <div className="flex-1 bg-white dark:bg-black rounded-none border border-slate-200 dark:border-white/10 p-8 space-y-6">
 
                     {active === 'general' && (
                         <>
@@ -164,7 +179,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                         <button
                                             key={d}
                                             onClick={() => setDensity(d)}
-                                            className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-500 hover:border-slate-400'}`}
+                                            className={`px-4 py-2 rounded-none text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-black border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}
                                         >
                                             {d}
                                         </button>
@@ -172,6 +187,24 @@ export const GlobalSettingsPage: React.FC = () => {
                                 </div>
                             </Field>
                             <ToggleRow label="UI Animations" desc="Enable smooth transitions and motion." checked={animations} onChange={() => setAnimations(v => !v)} />
+                            <div className="py-4 border-t border-slate-100 dark:border-white/5">
+                                <SectionHeader icon={PaintBrushIcon} title="System Theme" description="Choose between corporate light and industrial dark mode." />
+                                <div className="mt-4 flex gap-3">
+                                    {(['light', 'dark'] as const).map(t => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setTheme(t)}
+                                            className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
+                                                theme === t 
+                                                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                                                    : 'bg-white dark:bg-black border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
+                                            }`}
+                                        >
+                                            {t} MODE
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </>
                     )}
 
@@ -179,7 +212,7 @@ export const GlobalSettingsPage: React.FC = () => {
                     <div className="pt-4 border-t border-slate-100 flex items-center gap-4">
                         <button
                             onClick={handleSave}
-                            className="px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-700 transition-colors"
+                            className="px-6 py-2.5 bg-slate-900 dark:bg-primary text-white text-sm font-bold rounded-none hover:bg-slate-700 transition-colors"
                         >
                             Save Changes
                         </button>
@@ -197,11 +230,11 @@ export const GlobalSettingsPage: React.FC = () => {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const inputCls = "w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/20 bg-slate-50";
+const inputCls = "w-full px-4 py-2.5 rounded-none border border-slate-200 dark:border-white/10 text-sm font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 dark:bg-white/5";
 
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({ icon: Icon, title, description }) => (
     <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-        <div className="p-2 rounded-xl bg-slate-100 text-slate-600">
+        <div className="p-2 rounded-none bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400">
             <Icon className="w-5 h-5" />
         </div>
         <div>

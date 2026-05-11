@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
 export const Layout: React.FC = () => {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('ppos-theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-slate-50/50 dark:bg-[#131314]">
       <Sidebar />
