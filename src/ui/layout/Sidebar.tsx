@@ -119,7 +119,7 @@ const IconMap: Record<string, any> = {
 
 import { getModuleReadiness } from '../config/moduleReadiness';
 
-export const Sidebar: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
+export const Sidebar: React.FC<{ isOpen: boolean; onClose?: () => void }> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const userRole = getUserRole() as Role;
 
