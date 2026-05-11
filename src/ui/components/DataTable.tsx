@@ -68,7 +68,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
   return (
     <div className="glass overflow-hidden rounded-2xl border border-white dark:border-white/[0.07]">
       <table className="min-w-full divide-y divide-slate-100 dark:divide-white/[0.05] italic-text-off">
-        <thead className="bg-slate-50/50 dark:bg-white/[0.03] uppercase tracking-widest text-[10px] font-black text-slate-400 dark:text-zinc-500">
+        <thead className="bg-slate-50/50 dark:bg-[#131314]/[0.03] uppercase tracking-widest text-[10px] font-black text-slate-400 dark:text-zinc-500">
           <tr>
             {columns.map((col, i) => {
               const sortable = !!col.sortKey || typeof col.accessor !== 'function';
@@ -78,7 +78,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
                 <th 
                   key={i} 
                   onClick={() => sortable && requestSort(col)}
-                  className={`px-6 py-4 text-left ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-white/[0.04] transition-colors group' : ''}`}
+                  className={`px-6 py-4 text-left ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-[#1a1a1b]/[0.04] transition-colors group' : ''}`}
                 >
                   <div className="flex items-center gap-2">
                     {col.header}
@@ -99,7 +99,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
             <tr
               key={i}
               onClick={() => onRowClick?.(item)}
-              className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50/80 dark:hover:bg-white/[0.04]' : ''}`}
+              className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50/80 dark:hover:bg-[#1a1a1b]/[0.04]' : ''}`}
             >
               {columns.map((col, j) => (
                 <td key={j} className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-[#ECECF1] ${col.className || ''}`}>

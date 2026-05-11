@@ -21,8 +21,8 @@ export const IndustrialMapTab: React.FC = () => {
 
                 {/* Live Event Stream */}
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-black border border-white/10 overflow-hidden flex flex-col h-[700px]">
-                        <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] flex items-center justify-between">
+                    <div className="bg-white dark:bg-[#131314] border border-white/10 overflow-hidden flex flex-col h-[700px]">
+                        <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#131314]/[0.02] flex items-center justify-between">
                             <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Routing Decalog</h3>
                             <div className="w-1.5 h-1.5 bg-primary animate-pulse" />
                         </div>
@@ -52,7 +52,7 @@ export const IndustrialMapTab: React.FC = () => {
                             )}
                         </div>
                         
-                        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
+                        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-[#131314]/[0.01]">
                             <div className="flex items-center justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
                                 <span>Session Decisions</span>
                                 <span className="text-slate-900 dark:text-slate-900 dark:text-white">{liveData?.decisions?.length || 0}</span>
@@ -74,7 +74,7 @@ export const IndustrialMapTab: React.FC = () => {
 };
 
 const StatusCard = ({ label, value, trend }: { label: string, value: string, trend: string }) => (
-    <div className="p-4 bg-white dark:bg-black border border-white/10">
+    <div className="p-4 bg-white dark:bg-[#131314] border border-white/10">
         <div className="flex justify-between items-start mb-2">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
             <span className={`text-[8px] font-black ${trend.startsWith('+') ? 'text-emerald-500' : 'text-blue-500'}`}>{trend}</span>

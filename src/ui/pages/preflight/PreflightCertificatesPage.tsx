@@ -63,7 +63,7 @@ export const PreflightCertificatesPage: React.FC = () => {
           {
             header: 'Policy',
             accessor: (j) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.06] text-[9px] font-black uppercase text-slate-500 tracking-wider">
+              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 tracking-wider">
                 {j.policy || 'STANDARD'}
               </span>
             )

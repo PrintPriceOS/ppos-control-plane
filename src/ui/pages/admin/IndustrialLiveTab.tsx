@@ -57,7 +57,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Header Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    <div className="p-3 bg-slate-50 dark:bg-[#131314]/5 border border-slate-200 dark:border-white/10">
                         <BoltIcon className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
@@ -68,7 +68,7 @@ export const IndustrialLiveTab: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleScan}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white text-slate-900 dark:text-black text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-200 transition-all shadow-none"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-[#131314] text-slate-900 dark:text-white text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-200 transition-all shadow-none"
                     >
                         <ArrowPathIcon className="w-4 h-4" />
                         RUN SLA SCAN
@@ -86,7 +86,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Industrial Heatmap & Risks */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Capacity Heatmap */}
-                <div className="lg:col-span-2 bg-white dark:bg-black border border-slate-200 dark:border-white/10 p-6">
+                <div className="lg:col-span-2 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 p-6">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ServerIcon className="w-4 h-4" />
                         Global Capacity Heatmap (Live Telemetry)
@@ -96,7 +96,7 @@ export const IndustrialLiveTab: React.FC = () => {
                             <button 
                                 key={node.node_id} 
                                 onClick={() => openMachine(node.node_id)}
-                                className="p-4 bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 group hover:border-primary hover:bg-white dark:hover:bg-black transition-all text-left"
+                                className="p-4 bg-slate-50 dark:bg-[#1a1a1b] border border-slate-100 dark:border-white/5 group hover:border-primary hover:bg-white dark:hover:bg-[#1a1a1b] transition-all text-left"
                             >
                                 <div className="flex items-center justify-between mb-3">
                                     <div className={`w-2 h-2 rounded-none ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
@@ -108,7 +108,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                         <span className="text-[10px] font-bold text-slate-500 uppercase">{node.freshness_state} LOAD</span>
                                         <span className="text-[10px] font-black text-slate-900">{node.utilization_pct}%</span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-white/5 rounded-none overflow-hidden">
+                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#131314]/5 rounded-none overflow-hidden">
                                         <div 
                                             className={`h-full rounded-none transition-all duration-1000 ${
                                                 node.utilization_pct > 90 ? 'bg-red-500' : 

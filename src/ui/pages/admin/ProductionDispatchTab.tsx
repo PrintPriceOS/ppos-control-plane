@@ -934,7 +934,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </button>
                                     </div>
                                     {showJson && (
-                                        <div className="p-4 bg-white dark:bg-black/50 rounded-none border border-slate-800 font-mono text-[10px] text-indigo-300/80 overflow-x-auto whitespace-pre">
+                                        <div className="p-4 bg-white dark:bg-[#131314]/50 rounded-none border border-slate-800 font-mono text-[10px] text-indigo-300/80 overflow-x-auto whitespace-pre">
                                             {JSON.stringify(selectedDispatch.metadata_json, null, 2)}
                                         </div>
                                     )}

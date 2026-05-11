@@ -80,7 +80,7 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
             header: 'Progress',
             accessor: (j) => (
               <div className="flex flex-col gap-1 w-24">
-                 <div className="h-1.5 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+                 <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
                     <div className="h-full bg-primary" style={{ width: `${j.progress || 0}%` }} />
                  </div>
                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{j.progress || 0}% Complete</span>
@@ -108,7 +108,7 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
 
 const StatsCard = ({ label, value, icon: Icon, color }: any) => (
   <div className="glass p-6 rounded-3xl border border-white dark:border-white/[0.08] flex items-center gap-4">
-    <div className={`w-12 h-12 rounded-2xl bg-white dark:bg-white/[0.05] flex items-center justify-center shadow-sm`}>
+    <div className={`w-12 h-12 rounded-2xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center shadow-sm`}>
       <Icon className={`w-6 h-6 ${color}`} />
     </div>
     <div>

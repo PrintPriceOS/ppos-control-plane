@@ -53,7 +53,7 @@ export const PreflightArtifactsPage: React.FC = () => {
                   placeholder="Enter Job ID to view artifacts..." 
                   value={searchJobId}
                   onChange={(e) => setSearchJobId(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
               />
           </div>
       </div>
@@ -86,7 +86,7 @@ export const PreflightArtifactsPage: React.FC = () => {
           {
             header: 'Type',
             accessor: (a) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
+              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
                 {a.type}
               </span>
             )

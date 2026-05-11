@@ -55,7 +55,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, badge }) => (
       "flex items-center justify-between px-3 py-1.5 text-xs font-bold transition-all duration-100 group",
       isActive
         ? "bg-primary text-white"
-        : "text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.05]"
+        : "text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#1a1a1b]/[0.05]"
     ].join(" ")}
   >
     <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export const Sidebar: React.FC = () => {
   );
 
   return (
-    <aside className="w-64 bg-white dark:bg-[#131314] border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
+    <aside className="w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
       <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-100 dark:border-white/5">
         <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
@@ -166,7 +166,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-3 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/10 space-y-1">
+      <div className="p-3 bg-slate-50 dark:bg-[#131314]/5 border-t border-slate-100 dark:border-white/10 space-y-1">
         <a 
           href="/admin/help" 
           className="flex items-center gap-3 px-3 py-2 text-primary hover:bg-primary hover:text-white transition-colors border border-primary/20 group"

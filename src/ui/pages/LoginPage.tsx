@@ -65,7 +65,7 @@ export const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#131314] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0e0e0f] flex items-center justify-center p-6">
             <div className="w-full max-w-md">
                 {/* Branding */}
                 <div className="flex flex-col items-center mb-8 text-center">
@@ -77,7 +77,7 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-white dark:bg-black p-8 rounded-none border border-slate-200 dark:border-white/[0.08] shadow-none">
+                <div className="bg-white dark:bg-[#131314] p-8 rounded-none border border-slate-200 dark:border-white/[0.08] shadow-none">
                     <div className="mb-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-[#ECECF1]">Authentication Required</h2>
                         <p className="text-sm text-slate-500 mt-1">Access the platform using your credentials.</p>
@@ -98,7 +98,7 @@ export const LoginPage: React.FC = () => {
                                     value={email}
                                     onChange={(e) => { setEmail(e.target.value); setError(null); }}
                                     placeholder="admin@printprice.pro"
-                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
+                                    className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
                                     autoFocus
                                 />
                             </div>
@@ -118,7 +118,7 @@ export const LoginPage: React.FC = () => {
                                     value={password}
                                     onChange={(e) => { setPassword(e.target.value); setError(null); }}
                                     placeholder="••••••••••••"
-                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
+                                    className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
                                 />
                             </div>
                         </div>

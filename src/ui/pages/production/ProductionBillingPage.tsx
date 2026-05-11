@@ -114,7 +114,7 @@ export const ProductionBillingPage: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 dark:bg-white/[0.02]">
+              <tr className="bg-slate-50/50 dark:bg-[#131314]/[0.02]">
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Transaction ID</th>
                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Account</th>
@@ -134,7 +134,7 @@ export const ProductionBillingPage: React.FC = () => {
                 </tr>
               ) : (
                 financials.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors">
+                  <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/[0.01] transition-colors">
                     <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">
                       {new Date(entry.created_at).toLocaleString()}
                     </td>

@@ -65,7 +65,7 @@ export const PreflightJobDetailPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors">
+          <Link to="/preflight/jobs" className="p-2 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 rounded-xl transition-colors">
             <ArrowLeftIcon className="w-5 h-5 text-slate-400" />
           </Link>
           <div>
@@ -126,9 +126,9 @@ export const PreflightJobDetailPage: React.FC = () => {
             <SectionHeader label="Lifecycle & Trace" />
             <div className="mt-6">
             <div className="mt-4 space-y-4">
-               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
+               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/[0.05] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
                       <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" />
                     </div>
                     <div>
@@ -139,9 +139,9 @@ export const PreflightJobDetailPage: React.FC = () => {
                   <span className="text-xl font-black text-slate-900 dark:text-[#ECECF1]">{job.issueCount ?? 0}</span>
                </div>
                
-               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
+               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-2xl border border-slate-100 dark:border-white/[0.05]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/[0.05] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center">
                       <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
                     </div>
                     <div>
@@ -166,7 +166,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                 <p className="text-xs font-bold text-slate-400 italic">No artifacts available.</p>
               ) : (
                 artifactsQ.data?.map((a, i) => (
-                  <button key={i} className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-white/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
+                  <button key={i} className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
                     <div className="flex items-center gap-3">
                       <DocumentArrowDownIcon className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
                       <span className="text-xs font-bold text-slate-600 dark:text-zinc-300 truncate max-w-[150px]">{a.name}</span>
@@ -242,12 +242,12 @@ const MetaItem = ({ label, value, icon: Icon, color = 'text-slate-900 dark:text-
 const SectionHeader = ({ label }: { label: string }) => (
   <div className="flex items-center gap-4">
      <span className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em] whitespace-nowrap">{label}</span>
-     <div className="h-[1px] w-full bg-slate-100 dark:bg-white/[0.05]" />
+     <div className="h-[1px] w-full bg-slate-100 dark:bg-[#131314]/[0.05]" />
   </div>
 );
 
 const ArtifactButton = ({ label, type, icon: Icon }: any) => (
-  <button className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-white/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
+  <button className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#131314]/[0.05] border border-slate-100 dark:border-white/[0.08] hover:border-primary/20 transition-all group">
     <div className="flex items-center gap-3">
       <Icon className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
       <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">{label}</span>

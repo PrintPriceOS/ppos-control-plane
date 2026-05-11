@@ -103,7 +103,7 @@ export const GlobalSettingsPage: React.FC = () => {
                 </nav>
 
                 {/* Panel */}
-                <div className="flex-1 bg-white dark:bg-black rounded-none border border-slate-200 dark:border-white/10 p-8 space-y-6">
+                <div className="flex-1 bg-white dark:bg-[#131314] rounded-none border border-slate-200 dark:border-white/10 p-8 space-y-6">
 
                     {active === 'general' && (
                         <>
@@ -179,7 +179,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                         <button
                                             key={d}
                                             onClick={() => setDensity(d)}
-                                            className={`px-4 py-2 rounded-none text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-black border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}
+                                            className={`px-4 py-2 rounded-none text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}
                                         >
                                             {d}
                                         </button>
@@ -197,7 +197,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                             className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
                                                 theme === t 
                                                     ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
-                                                    : 'bg-white dark:bg-black border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
+                                                    : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
                                             }`}
                                         >
                                             {t} MODE
@@ -230,11 +230,11 @@ export const GlobalSettingsPage: React.FC = () => {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const inputCls = "w-full px-4 py-2.5 rounded-none border border-slate-200 dark:border-white/10 text-sm font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 dark:bg-white/5";
+const inputCls = "w-full px-4 py-2.5 rounded-none border border-slate-200 dark:border-white/10 text-sm font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 dark:bg-[#131314]/5";
 
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({ icon: Icon, title, description }) => (
     <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-        <div className="p-2 rounded-none bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400">
+        <div className="p-2 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-slate-600 dark:text-zinc-400">
             <Icon className="w-5 h-5" />
         </div>
         <div>

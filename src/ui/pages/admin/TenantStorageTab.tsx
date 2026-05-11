@@ -21,7 +21,7 @@ export const TenantStorageTab: React.FC = () => {
         <div className="space-y-6 animate-slide-fade">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Global Capacity */}
-                <div className="bg-white dark:bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-[#131314] border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <CloudIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Global Registry Footprint</span>
@@ -41,7 +41,7 @@ export const TenantStorageTab: React.FC = () => {
                 </div>
 
                 {/* Tier Distribution */}
-                <div className="bg-white dark:bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-[#131314] border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ChartPieIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Tier Distribution</span>
@@ -54,7 +54,7 @@ export const TenantStorageTab: React.FC = () => {
                 </div>
 
                 {/* Governance Warnings */}
-                <div className="bg-white dark:bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-[#131314] border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ExclamationTriangleIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Governance Alerts</span>
@@ -72,7 +72,7 @@ export const TenantStorageTab: React.FC = () => {
             </div>
 
             {/* Tenant Breakdown */}
-            <div className="bg-white dark:bg-black border border-white/10 overflow-hidden">
+            <div className="bg-white dark:bg-[#131314] border border-white/10 overflow-hidden">
                 <div className="px-6 py-4 bg-white/5 border-b border-white/10">
                     <div className="font-bold text-slate-800 text-sm tracking-tight">Tenant Storage Governance</div>
                 </div>

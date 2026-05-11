@@ -22,7 +22,7 @@ export const PreflightWorkersPage: React.FC = () => {
             header: 'Worker ID',
             accessor: (w) => (
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#131314]/[0.05] flex items-center justify-center">
                   <CpuChipIcon className="w-4 h-4 text-slate-400" />
                 </div>
                 <span className="font-bold">{w.name}</span>
@@ -74,7 +74,7 @@ export const PreflightWorkersPage: React.FC = () => {
 
 const UsageBar = ({ value }: { value: number }) => (
   <div className="flex flex-col gap-1 w-24">
-    <div className="h-1.5 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+    <div className="h-1.5 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
       <div className={`h-full ${value > 80 ? 'bg-red-500' : value > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
            style={{ width: `${value}%` }} />
     </div>

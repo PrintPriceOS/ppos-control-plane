@@ -341,7 +341,7 @@ export default function TenantManagement() {
                     return (
                         <div
                             key={tenant.id}
-                            className={`bg-white dark:bg-black border ${usagePercent >= 100 ? 'border-rose-500/50' : 'border-white/10'} overflow-hidden hover:border-white/20 transition-all relative`}
+                            className={`bg-white dark:bg-[#131314] border ${usagePercent >= 100 ? 'border-rose-500/50' : 'border-white/10'} overflow-hidden hover:border-white/20 transition-all relative`}
                         >
                             {(usagePercent >= 100 || expiryWarning) && (
                                 <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
@@ -482,7 +482,7 @@ export default function TenantManagement() {
                                         <CurrencyEuroIcon className="w-3 h-3" />
                                         Billing
                                     </button>
-                                    <span className="flex items-center gap-1.5 font-mono text-[10px] bg-white dark:bg-black border border-white/10 px-2 py-0.5 shadow-none hover:text-primary transition-colors cursor-help" title={`Full ID: ${tenant.id}`}>
+                                    <span className="flex items-center gap-1.5 font-mono text-[10px] bg-white dark:bg-[#131314] border border-white/10 px-2 py-0.5 shadow-none hover:text-primary transition-colors cursor-help" title={`Full ID: ${tenant.id}`}>
                                         ID: {tenant.id.substring(0, 8)}...
                                     </span>
                                 </div>
@@ -509,7 +509,7 @@ export default function TenantManagement() {
             {/* Edit Modal */}
             {editingTenant && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-black border border-white/10 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 shadow-[0_0_50px_rgba(0,0,0,1)]">
+                    <div className="bg-white dark:bg-[#131314] border border-white/10 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 shadow-[0_0_50px_rgba(0,0,0,1)]">
                         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-xl font-bold text-slate-900">Manage Tenant</h3>
                             <button onClick={() => setEditingTenant(null)} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">

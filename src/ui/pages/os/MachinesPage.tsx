@@ -126,7 +126,7 @@ export const MachinesPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                    <button 
                      onClick={() => q.refetch()}
-                     className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-400"
+                     className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/5 transition-colors text-slate-400"
                      title="Force Telemetry Refresh"
                    >
                      <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
@@ -156,7 +156,7 @@ export const MachinesPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-white/[0.03] p-1.5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#131314]/[0.03] p-1.5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
                 <div className="relative flex-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
@@ -167,13 +167,13 @@ export const MachinesPage: React.FC = () => {
                         className="w-full pl-9 pr-4 py-1.5 bg-transparent text-sm focus:ring-0 border-none outline-none font-medium"
                     />
                 </div>
-                <div className="h-6 w-[1px] bg-slate-200 dark:bg-white/10 hidden md:block" />
+                <div className="h-6 w-[1px] bg-slate-200 dark:bg-[#131314]/10 hidden md:block" />
                 <div className="flex items-center gap-1">
                     {['ALL', 'ONLINE', 'DEGRADED', 'OFFLINE'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-[#131314]/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             {status}
                         </button>
@@ -198,7 +198,7 @@ export const MachinesPage: React.FC = () => {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
+                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-[#131314]/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
                                     <CpuChipIcon className="w-5 h-5 text-slate-400" />
                                     {m.profileCompletenessScore < 100 && (
                                         <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full" />
@@ -216,7 +216,7 @@ export const MachinesPage: React.FC = () => {
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <span className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</span>
                                         {m.clusterId && (
-                                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
+                                            <span className="px-1 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
                                                 {m.clusterId}
                                             </span>
                                         )}
@@ -286,7 +286,7 @@ export const MachinesPage: React.FC = () => {
                                             {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
                                         </span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-[#131314]/5 rounded-full overflow-hidden">
                                         {m.capacityUtilizationPct !== null && (
                                             <div 
                                                 className={`h-full rounded-full transition-all duration-1000 ${

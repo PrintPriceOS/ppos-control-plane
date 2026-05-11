@@ -70,7 +70,7 @@ export const GovernancePage: React.FC = () => {
             <div className="space-y-4">
                 <div className="flex items-center gap-4">
                     <h2 className="text-sm font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Active Enforcement Decision Logs</h2>
-                    <div className="h-[1px] flex-1 bg-slate-100 dark:bg-white/[0.07]" />
+                    <div className="h-[1px] flex-1 bg-slate-100 dark:bg-[#131314]/[0.07]" />
                 </div>
                 
                 <DataTable 
@@ -145,7 +145,7 @@ const PostureBlock = ({ title, subtitle, icon: Icon, color, points }: any) => (
         <p className="text-xs font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-6">{subtitle}</p>
         <div className="space-y-3 w-full">
             {points.map((p: string, i: number) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-white/[0.04] border border-slate-100 dark:border-white/[0.06] group hover:bg-white dark:hover:bg-white/[0.07] transition-all cursor-default">
+                <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-[#131314]/[0.04] border border-slate-100 dark:border-white/[0.06] group hover:bg-white dark:hover:bg-[#1a1a1b]/[0.07] transition-all cursor-default">
                     <div className={`w-1.5 h-1.5 rounded-full bg-${color}-400 group-hover:scale-125 transition-transform`} />
                     <span className="text-xs font-bold text-slate-600 dark:text-zinc-400 transition-colors group-hover:text-slate-900 dark:group-hover:text-[#ECECF1]">{p}</span>
                 </div>

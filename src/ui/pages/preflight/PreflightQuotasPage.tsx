@@ -41,7 +41,7 @@ export const PreflightQuotasPage: React.FC = () => {
             header: 'Used Storage',
             accessor: (t) => (
               <div className="flex flex-col gap-1 w-48">
-                <div className="h-2 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
                   <div className={`h-full ${t.usedBytes / t.quotaBytes > 0.9 ? 'bg-red-500' : 'bg-primary'}`}
                     style={{ width: `${(t.usedBytes / t.quotaBytes) * 100}%` }} />
                 </div>
@@ -84,7 +84,7 @@ const QuotaCard = ({ label, value, limit, progress }: any) => (
       <span className="text-xs font-bold text-slate-400">/ {limit}</span>
     </div>
     <div className="space-y-1.5">
-      <div className="h-2 bg-slate-100 dark:bg-white/[0.05] rounded-full overflow-hidden">
+      <div className="h-2 bg-slate-100 dark:bg-[#131314]/[0.05] rounded-full overflow-hidden">
         <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
       </div>
       <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">

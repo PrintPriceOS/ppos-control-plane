@@ -325,7 +325,7 @@ export const ControlsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 })
                                     onChange={e => setDangerObliterateConfirm(e.target.value)}
                                 />
                                 <button
-                                    className="w-full bg-slate-900 text-red-500 py-3 rounded-none text-xs font-black tracking-[0.2em] uppercase hover:bg-white dark:bg-black transition-all hover:text-red-400 disabled:opacity-20 disabled:grayscale border-b-2 border-red-900"
+                                    className="w-full bg-slate-900 text-red-500 py-3 rounded-none text-xs font-black tracking-[0.2em] uppercase hover:bg-white dark:bg-[#131314] transition-all hover:text-red-400 disabled:opacity-20 disabled:grayscale border-b-2 border-red-900"
                                     disabled={dangerObliterateConfirm !== 'OBLITERATE' || !queueReason}
                                     onClick={() => {
                                         confirmAction('OBLITERATE SYSTEM 💀', `CRITICAL DESTRUCTION: State reset for ${queueTarget}.`, () => obliterateQueue(queueTarget, queueReason), true);

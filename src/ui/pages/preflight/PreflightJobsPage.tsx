@@ -122,7 +122,7 @@ export const PreflightJobsPage: React.FC = () => {
                   placeholder="Filter by Tenant ID..." 
                   value={filter.tenant}
                   onChange={(e) => setFilter({ ...filter, tenant: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-white/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
               />
           </div>
           
@@ -130,7 +130,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.status}
               onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-              className="bg-slate-50 dark:bg-white/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Status: All</option>
               <option value="COMPLETED">Completed</option>
@@ -142,7 +142,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.type}
               onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-              className="bg-slate-50 dark:bg-white/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Type: All</option>
               <option value="ANALYZE">Analyze</option>
@@ -153,7 +153,7 @@ export const PreflightJobsPage: React.FC = () => {
             <select 
               value={filter.risk}
               onChange={(e) => setFilter({ ...filter, risk: e.target.value })}
-              className="bg-slate-50 dark:bg-white/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
+              className="bg-slate-50 dark:bg-[#131314]/[0.03] border-none rounded-xl px-3 py-2 text-xs font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Risk: All</option>
               <option value="CRITICAL">Critical</option>
@@ -163,7 +163,7 @@ export const PreflightJobsPage: React.FC = () => {
               <option value="NONE">None</option>
             </select>
 
-            <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-white/[0.03] rounded-xl cursor-pointer">
+            <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-[#131314]/[0.03] rounded-xl cursor-pointer">
               <input 
                 type="checkbox" 
                 checked={filter.largeOnly}
@@ -175,7 +175,7 @@ export const PreflightJobsPage: React.FC = () => {
 
             <button 
               onClick={() => q.refetch()}
-              className="p-2 bg-slate-100 dark:bg-white/[0.06] rounded-xl hover:bg-slate-200 dark:hover:bg-white/[0.1] transition-colors"
+              className="p-2 bg-slate-100 dark:bg-[#131314]/[0.06] rounded-xl hover:bg-slate-200 dark:hover:bg-[#1a1a1b]/[0.1] transition-colors"
             >
               <ArrowPathIcon className={`w-4 h-4 text-slate-500 ${q.status === 'refetching' ? 'animate-spin' : ''}`} />
             </button>
@@ -207,7 +207,7 @@ export const PreflightJobsPage: React.FC = () => {
             header: 'Type / Policy',
             accessor: (j) => (
               <div className="flex flex-col gap-1">
-                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider w-fit">
+                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider w-fit">
                   {j.type}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 truncate max-w-[100px]">

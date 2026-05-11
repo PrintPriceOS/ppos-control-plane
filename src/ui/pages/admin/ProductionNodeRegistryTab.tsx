@@ -125,7 +125,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                     <p className="text-slate-500 font-medium tracking-tight">Production Facility & Manufacturing Execution Node</p>
                                     <button 
                                         onClick={() => setIsDrawerOpen(true)}
-                                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-none text-xs font-black uppercase hover:bg-white dark:bg-black transition-all shadow-none shadow-slate-200"
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-none text-xs font-black uppercase hover:bg-white dark:bg-[#131314] transition-all shadow-none shadow-slate-200"
                                     >
                                         <BoltIcon className="w-4 h-4 text-red-500" />
                                         Full Machine Intelligence
