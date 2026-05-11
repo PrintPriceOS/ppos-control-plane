@@ -190,83 +190,93 @@ class PreflightOperationsService {
     const upstreamJobId = metadata.upstreamJobId || job.upstreamJobId;
 
     if (!upstreamJobId) {
-        console.warn(`[PREFLIGHT-SYNC] Job ${jobId} has no upstream ID. Skipping sync.`);
-        return job;
+      console.warn(`[PREFLIGHT-SYNC][${jobId}] No upstream ID found. Job may have failed to trigger initially.`);
+      if (job.status === 'QUEUED' || job.status === 'PROCESSING') {
+        await persistence.updateJob(jobId, {
+          status: 'FAILED',
+          error: { code: 'UPSTREAM_TRIGGER_MISSING', message: 'Job was never successfully triggered upstream' }
+        });
+      }
+      return await persistence.getJob(jobId);
     }
 
     try {
-        const upstreamStatus = await upstream.getJobStatus(upstreamJobId, authHeader, job.tenant_id);
-        if (!upstreamStatus) throw new Error('UPSTREAM_UNAVAILABLE');
+      const upstreamStatus = await upstream.getJobStatus(upstreamJobId, authHeader, job.tenant_id);
+      if (!upstreamStatus) throw new Error('UPSTREAM_UNAVAILABLE');
 
-        const localStatus = this._mapUpstreamStatus(upstreamStatus.status);
-        const updates = {
-            status: localStatus,
-            progress: upstreamStatus.progress || 0,
-            step: upstreamStatus.step || null,
-            last_synced_at: new Date().toISOString()
-        };
+      const localStatus = this._mapUpstreamStatus(upstreamStatus.status);
+      const updates = {
+        status: localStatus,
+        progress: upstreamStatus.progress || 0,
+        step: upstreamStatus.step || null,
+        last_synced_at: new Date().toISOString()
+      };
 
-        // If upstream is active, update heartbeat
-        if (['PROCESSING', 'QUEUED'].includes(localStatus)) {
-            updates.last_heartbeat_at = new Date().toISOString();
+      // If upstream is active, update heartbeat
+      if (['PROCESSING', 'QUEUED'].includes(localStatus)) {
+        updates.last_heartbeat_at = new Date().toISOString();
+      }
+
+      if (upstreamStatus.error) {
+        updates.error = upstreamStatus.error;
+      } else {
+        // If it's successful or processing, we should ensure no old stale error is shown
+        if (['COMPLETED', 'PROCESSING', 'QUEUED'].includes(localStatus)) {
+          updates.error = null;
         }
+      }
 
-        if (upstreamStatus.error) {
-            updates.error = upstreamStatus.error;
-        }
+      if (upstreamStatus.completedAt || upstreamStatus.completed_at) {
+        updates.completedAt = upstreamStatus.completedAt || upstreamStatus.completed_at;
+      }
 
-        if (upstreamStatus.completedAt || upstreamStatus.completed_at) {
-            updates.completedAt = upstreamStatus.completedAt || upstreamStatus.completed_at;
-        }
-
-        // Detect transition for audit log
-        if (job.status !== localStatus) {
-            console.log(`[PREFLIGHT-SYNC] Job ${jobId} status transition: ${job.status} -> ${localStatus}`);
-            const auditLogger = require('./auditLoggerService');
-            await auditLogger.log({
-                type: 'JOB_STATUS_SYNC',
-                tenantId: job.tenant_id,
-                userId: 'SYSTEM',
-                status: 'SUCCESS',
-                metadata: { jobId, oldStatus: job.status, newStatus: localStatus, upstreamJobId }
-            });
-
-            // If job just completed, register artifacts if provided by upstream
-            if (localStatus === 'COMPLETED' && upstreamStatus.artifacts && Array.isArray(upstreamStatus.artifacts)) {
-                for (const art of upstreamStatus.artifacts) {
-                    await persistence.createArtifact({
-                        tenantId: job.tenant_id,
-                        jobId,
-                        type: art.type || 'OUTPUT',
-                        filename: art.filename,
-                        storageKey: art.storageKey || art.path,
-                        sizeBytes: art.sizeBytes || 0,
-                        mimeType: art.mimeType || 'application/pdf',
-                        metadata: art.metadata || {}
-                    });
-                }
-            }
-        }
-
-        await persistence.updateJob(jobId, updates);
-        
-        // Return updated job
-        return await persistence.getJob(jobId);
-
-    } catch (err) {
-        console.error(`[PREFLIGHT-SYNC] Failed to sync job ${jobId}:`, err.message);
-        
-        // Non-destructive fallback: record sync failure in logs
+      // Detect transition for audit log
+      if (job.status !== localStatus) {
+        console.log(`[PREFLIGHT-SYNC][${jobId}] Status transition: ${job.status} -> ${localStatus}`);
         const auditLogger = require('./auditLoggerService');
         await auditLogger.log({
-            type: 'JOB_STATUS_SYNC',
-            tenantId: job.tenant_id,
-            userId: 'SYSTEM',
-            status: 'FAILURE',
-            metadata: { jobId, error: err.message, upstreamJobId }
+          type: 'JOB_STATUS_SYNC',
+          tenantId: job.tenant_id,
+          userId: 'SYSTEM',
+          status: 'SUCCESS',
+          metadata: { jobId, oldStatus: job.status, newStatus: localStatus, upstreamJobId }
         });
 
-        return job; // Return current local state
+        // If job just completed, register artifacts if provided by upstream
+        if (localStatus === 'COMPLETED' && upstreamStatus.artifacts && Array.isArray(upstreamStatus.artifacts)) {
+          for (const art of upstreamStatus.artifacts) {
+            await persistence.createArtifact({
+              tenantId: job.tenant_id,
+              jobId,
+              type: art.type || 'OUTPUT',
+              filename: art.filename,
+              storageKey: art.storageKey || art.path,
+              sizeBytes: art.sizeBytes || 0,
+              mimeType: art.mimeType || 'application/pdf',
+              metadata: art.metadata || {}
+            });
+          }
+        }
+      }
+
+      await persistence.updateJob(jobId, updates);
+      console.log(`[PREFLIGHT-SYNC][${jobId}] Successfully synced with upstream ${upstreamJobId}. Status: ${localStatus}`);
+      
+      return await persistence.getJob(jobId);
+
+    } catch (err) {
+      console.error(`[PREFLIGHT-SYNC][${jobId}] Failed to sync:`, err.message);
+      
+      const auditLogger = require('./auditLoggerService');
+      await auditLogger.log({
+        type: 'JOB_STATUS_SYNC',
+        tenantId: job.tenant_id,
+        userId: 'SYSTEM',
+        status: 'FAILURE',
+        metadata: { jobId, error: err.message, upstreamJobId }
+      });
+
+      return job;
     }
   }
 
@@ -313,7 +323,7 @@ class PreflightOperationsService {
     const job = await persistence.getJob(jobId);
     if (!job) throw new Error('JOB_NOT_FOUND');
 
-    const allowable = ['FAILED', 'STALLED', 'CANCELLED'];
+    const allowable = ['FAILED', 'STALLED', 'CANCELLED', 'QUEUED'];
     if (!allowable.includes(job.status)) {
         throw new Error(`CANNOT_RETRY: Job is in ${job.status} state`);
     }
@@ -322,36 +332,82 @@ class PreflightOperationsService {
         throw new Error(`MAX_RETRIES_EXCEEDED: Already retried ${job.retry_count} times`);
     }
 
-    console.log(`[PREFLIGHT-OPS] Retrying job ${jobId} (Attempt ${job.retry_count + 1})`);
+    console.log(`[PREFLIGHT-OPS] Retry requested for job ${jobId} (Current Status: ${job.status}, Attempt: ${job.retry_count + 1})`);
 
-    // 1. Prepare for retry: reset status and increment count
+    // 1. Prepare for retry: clear old error, reset status and increment count
+    const metadata = job.metadata_json || {};
+    const previousError = job.error_json || null;
+
     await persistence.updateJob(jobId, {
         status: 'QUEUED',
         retry_count: job.retry_count + 1,
-        error: null,
-        progress: 0
+        error: null, // Clear error column
+        progress: 0,
+        metadata: {
+            ...metadata,
+            previousError,
+            lastRetryRequestedAt: new Date().toISOString()
+        }
     });
 
-    // 2. Re-trigger upstream (re-using createJob logic but for existing job)
+    // 2. Re-verify input artifact existence
     const artifactData = await persistence.listArtifacts({ jobId, type: 'INPUT' });
     const inputPath = artifactData[0]?.storage_key;
-    if (!inputPath) throw new Error('INPUT_ARTIFACT_MISSING');
+    if (!inputPath) {
+        console.error(`[PREFLIGHT-OPS] Retry failed for ${jobId}: SOURCE_ARTIFACT_NOT_FOUND`);
+        await persistence.updateJob(jobId, { status: 'FAILED', error: { code: 'SOURCE_ARTIFACT_NOT_FOUND', message: 'The input file is no longer available in the artifact registry' } });
+        throw new Error('SOURCE_ARTIFACT_NOT_FOUND');
+    }
 
-    const storage = require('./preflightStorageService');
     const resolvedInputPath = storage.resolveStorageKey(inputPath);
+    if (!fs.existsSync(resolvedInputPath)) {
+        console.error(`[PREFLIGHT-OPS] Retry failed for ${jobId}: FILE_NOT_FOUND_ON_DISK at ${resolvedInputPath}`);
+        await persistence.updateJob(jobId, { status: 'FAILED', error: { code: 'SOURCE_FILE_NOT_FOUND', message: 'The physical file is missing from storage' } });
+        throw new Error('SOURCE_FILE_NOT_FOUND');
+    }
 
+    const stats = fs.statSync(resolvedInputPath);
+
+    // 3. Re-trigger Upstream with fresh Orchestration Plan
     try {
+        console.log(`[PREFLIGHT-OPS] Planning fresh execution for retry of ${jobId}`);
+        const executionPlan = await orchestration.planExecution({
+            id: job.id,
+            tenantId: job.tenant_id,
+            type: job.type,
+            fileSize: stats.size,
+            metadata: job.metadata_json
+        });
+
+        console.log(`[PREFLIGHT-OPS] Attempting upstream trigger for ${jobId} on queue ${executionPlan.queueName}`);
         const upstreamResult = await upstream.enqueueJob({
             id: job.id,
             tenantId: job.tenant_id,
             type: job.type,
             policy: job.policy,
             inputPath: resolvedInputPath,
-            metadata: job.metadata_json
+            queueName: executionPlan.queueName,
+            metadata: { 
+                ...metadata,
+                executionPlan,
+                isRetry: true,
+                retryCount: job.retry_count + 1
+            }
         }, authHeader);
 
+        const upstreamJobId = upstreamResult.jobId || upstreamResult.id;
+        console.log(`[PREFLIGHT-OPS] Upstream trigger success for ${jobId}. Upstream ID: ${upstreamJobId}`);
+
         await persistence.updateJob(jobId, {
-            upstreamJobId: upstreamResult.jobId || upstreamResult.id
+            status: 'QUEUED',
+            upstreamJobId,
+            last_synced_at: new Date().toISOString(),
+            metadata: {
+                ...metadata,
+                executionPlan,
+                upstreamJobId,
+                lastTriggeredAt: new Date().toISOString()
+            }
         });
 
         const auditLogger = require('./auditLoggerService');
@@ -360,12 +416,20 @@ class PreflightOperationsService {
             tenantId: job.tenant_id,
             userId: 'SYSTEM',
             status: 'SUCCESS',
-            metadata: { jobId, attempt: job.retry_count + 1 }
+            metadata: { jobId, attempt: job.retry_count + 1, upstreamJobId }
         });
 
         return await persistence.getJob(jobId);
     } catch (err) {
-        await persistence.updateJob(jobId, { status: 'FAILED', error: { code: 'RETRY_TRIGGER_FAILED', message: err.message } });
+        console.error(`[PREFLIGHT-OPS] Retry trigger failed for ${jobId}:`, err.message);
+        await persistence.updateJob(jobId, { 
+            status: 'FAILED', 
+            error: { 
+                code: 'RETRY_TRIGGER_FAILED', 
+                message: err.message,
+                details: err.details || {}
+            } 
+        });
         throw err;
     }
   }
