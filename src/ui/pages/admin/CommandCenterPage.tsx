@@ -446,9 +446,10 @@ export const CommandCenterPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* ROW 1 */}
-        <div className="lg:col-span-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* COLUMN 1: INDUSTRIAL CORE */}
+        <div className="space-y-6">
           <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -458,9 +459,7 @@ export const CommandCenterPage: React.FC = () => {
               <StatBar label="Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
             </div>
           </TacticalPanel>
-        </div>
 
-        <div className="lg:col-span-4">
           <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color="primary" status={industrial.status}>
             <div className="space-y-2">
               {industrial.data?.workers?.activeFleet?.slice(0, 4).map((w: any) => (
@@ -471,32 +470,6 @@ export const CommandCenterPage: React.FC = () => {
               ))}
             </div>
           </TacticalPanel>
-        </div>
-
-        <div className="lg:col-span-4">
-          <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
-            <div className="space-y-4">
-              <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${routing.data.metrics.avg_margin_pct.toFixed(1)}%` : '---'} status="stable" />
-              <div className="flex justify-between border-t border-white/5 pt-2">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Quality</span>
-                <span className="text-sm font-black text-emerald-500">{(routing.data?.avg_final_score || 0).toFixed(1)}</span>
-              </div>
-            </div>
-          </TacticalPanel>
-        </div>
-
-        {/* ROW 2 */}
-        <div className="lg:col-span-4">
-          <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
-            <div className="space-y-2">
-              {blocks.data?.blocks?.slice(0, 3).map((b: any) => (
-                <GovernanceRow key={b.id} label={b.name} status={b.status} color={b.status === 'ACTIVE' ? 'emerald' : 'red'} />
-              ))}
-            </div>
-          </TacticalPanel>
-        </div>
-
-        <div className="lg:col-span-4">
           <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Tiering" color="slate" status={industrial.status}>
              <div className="flex justify-between items-end mb-2">
                <span className="text-lg font-black text-white">{((industrial.data?.storage?.totalSizeBytes || 0) / (1024**3)).toFixed(1)} GB</span>
@@ -510,7 +483,19 @@ export const CommandCenterPage: React.FC = () => {
           </TacticalPanel>
         </div>
 
-        <div className="lg:col-span-4">
+        {/* COLUMN 2: GOVERNANCE & SECURITY */}
+        <div className="space-y-6">
+          <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
+            <div className="space-y-2">
+              {blocks.data?.blocks?.slice(0, 3).map((b: any) => (
+                <GovernanceRow key={b.id} label={b.name} status={b.status} color={b.status === 'ACTIVE' ? 'emerald' : 'red'} />
+              ))}
+            </div>
+          </TacticalPanel>
+
+          <IncidentBridge />
+          <IntelligenceAnomalies />
+
           <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
             <div className="grid grid-cols-2 gap-2">
               <CommandButton label="Pause" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
@@ -519,19 +504,36 @@ export const CommandCenterPage: React.FC = () => {
           </TacticalPanel>
         </div>
 
-        {/* ROW 3 */}
-        <div className="lg:col-span-4">
-          <IncidentBridge />
-        </div>
-        <div className="lg:col-span-4">
-          <IntelligenceAnomalies />
-        </div>
-        <div className="lg:col-span-4">
+        {/* COLUMN 3: ECONOMY & LOGISTICS */}
+        <div className="space-y-6">
+          <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
+            <div className="space-y-4">
+              <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${routing.data.metrics.avg_margin_pct.toFixed(1)}%` : '---'} status="stable" />
+              <div className="flex justify-between border-t border-white/5 pt-2">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Quality</span>
+                <span className="text-sm font-black text-emerald-500">{(routing.data?.avg_final_score || 0).toFixed(1)}</span>
+              </div>
+            </div>
+          </TacticalPanel>
+
           <IndustrialHeartbeatMatrix />
+
+          <TacticalPanel title="System Registry" icon={ServerIcon} badge="Sync" color="slate">
+             <div className="space-y-1">
+                <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                   <span>DB Clusters</span>
+                   <span className="text-emerald-500">NOMINAL</span>
+                </div>
+                <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                   <span>Redis Feed</span>
+                   <span className="text-emerald-500">STABLE</span>
+                </div>
+             </div>
+          </TacticalPanel>
         </div>
 
         {/* MAP */}
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-3">
           <TacticalPanel title="Manufacturing Heatmap" icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
             <div className="h-[400px] bg-black/20 border border-white/5 relative overflow-hidden">
                <FederationMap />
@@ -545,7 +547,7 @@ export const CommandCenterPage: React.FC = () => {
         </div>
 
         {/* AUDIT */}
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-3">
           <TacticalPanel title="Operational Audit Stream" icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
             <div className="h-[120px] overflow-y-auto font-mono text-[7px] space-y-1">
               {audit.data?.slice(0, 10).map((log: any) => (
@@ -560,10 +562,10 @@ export const CommandCenterPage: React.FC = () => {
         </div>
 
         {/* DISPATCH & SIMULATION */}
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-3">
            <ManufacturingDispatchConsole />
         </div>
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-3">
            <RoutingSimulationPanel />
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   InformationCircleIcon,
   CheckBadgeIcon,
   CheckIcon,
+  Bars3Icon
 } from "@heroicons/react/24/outline";
 import { clearAdminKey, getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/adminApi';
 import { getAuthUser, getUserRole } from '../lib/authStore';
@@ -52,7 +53,7 @@ const SEVERITY_CONFIG: Record<NotifSeverity, { icon: React.ElementType; bg: stri
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-import { Bars3Icon, ShieldCheckIcon, MapPinIcon, UserCircleIcon, BellIcon, Cog6ToothIcon, ArrowRightStartOnRectangleIcon, ChevronDownIcon, ExclamationTriangleIcon, ExclamationCircleIcon, InformationCircleIcon, CheckBadgeIcon } from "@heroicons/react/24/outline";
+
 
 export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) => {
   const navigate = useNavigate();

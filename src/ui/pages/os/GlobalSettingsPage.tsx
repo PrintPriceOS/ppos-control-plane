@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getTheme, setTheme, Theme } from '../../lib/themeStore';
 import {
     Cog6ToothIcon,
     GlobeAltIcon,
@@ -55,21 +56,12 @@ export const GlobalSettingsPage: React.FC = () => {
     // Appearance
     const [density, setDensity] = useState<'compact' | 'comfortable'>('comfortable');
     const [animations, setAnimations] = useState(true);
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-        if (typeof window !== 'undefined') {
-            return (localStorage.getItem('ppos-theme') as 'light' | 'dark') || 'light';
-        }
-        return 'light';
-    });
+    const [theme, setThemeState] = useState<Theme>(getTheme());
 
-    useEffect(() => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('ppos-theme', theme);
-    }, [theme]);
+    const handleThemeChange = (newTheme: Theme) => {
+        setThemeState(newTheme);
+        setTheme(newTheme);
+    };
 
     const handleSave = () => {
         setSaved(true);
@@ -112,7 +104,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Theme Toggle</p>
                                 <div className="flex gap-2">
                                     {(['light', 'dark'] as const).map(t => (
-                                        <button key={t} onClick={() => setTheme(t)}
+                                        <button key={t} onClick={() => handleThemeChange(t)}
                                             className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === t ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400'}`}>
                                             {t}
                                         </button>
@@ -188,7 +180,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                 {(['light', 'dark'] as const).map(t => (
                                     <button
                                         key={t}
-                                        onClick={() => setTheme(t)}
+                                        onClick={() => handleThemeChange(t)}
                                         className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
                                             theme === t 
                                                 ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 

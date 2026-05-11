@@ -12,7 +12,7 @@ class RoutingHeatmapService {
      */
     async getRegionalHeatmap() {
         try {
-            const [regions] = await db.query(`
+            const regions = await db.query(`
                 SELECT 
                     region, 
                     COUNT(*) as node_count,

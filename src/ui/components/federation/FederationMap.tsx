@@ -14,7 +14,7 @@ export const FederationMap: React.FC = () => {
   const project = (lat: number, lng: number) => {
     const x = ((lng + 15) / 55) * 100;
     const y = 100 - (((lat - 35) / 35) * 100);
-    return { x: `${x}%`, y: `${y}%` };
+    return { x, y };
   };
 
   const processedNodes = useMemo(() => {

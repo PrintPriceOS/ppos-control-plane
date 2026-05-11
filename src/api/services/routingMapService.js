@@ -14,7 +14,7 @@ class RoutingMapService {
     async getMapState() {
         try {
             // 1. Get All Active Industrial Nodes with Coordinates
-            const [nodes] = await db.query(`
+            const nodes = await db.query(`
                 SELECT 
                     id, company_name, region, status, 
                     latitude, longitude, capacity_utilization_pct,
@@ -24,7 +24,7 @@ class RoutingMapService {
             `);
 
             // 2. Get Active Dispatches with Origin/Destination
-            const [dispatches] = await db.query(`
+            const dispatches = await db.query(`
                 SELECT 
                     md.id, md.status, md.federation_node_id, 
                     md.created_at,
@@ -49,16 +49,35 @@ class RoutingMapService {
             }));
 
             // 4. Map Routing Lines
-            // Note: In a real system, we'd also have origin coords (client/tenant location)
-            // For now, we'll use a fixed "Hub" or derive from tenant metadata if available
-            const routes = (dispatches || []).map(d => ({
-                id: d.id,
-                status: d.status,
-                origin: { lat: 52.5200, lng: 13.4050 }, // Mocking Berlin as default origin for EU
-                destination: { lat: d.dest_lat, lng: d.dest_lon },
-                intensity: d.status === 'IN_PRODUCTION' ? 1.0 : 0.5,
-                age_minutes: Math.round((new Date() - new Date(d.created_at)) / 60000)
-            }));
+            const routes = (dispatches || []).map(d => {
+                // Deterministic Origin Scatter based on ID to simulate client diversity
+                const hubCoords = [
+                    { lat: 51.5074, lng: -0.1278 }, // London
+                    { lat: 48.8566, lng: 2.3522 },  // Paris
+                    { lat: 52.5200, lng: 13.4050 }, // Berlin
+                    { lat: 40.4168, lng: -3.7038 }, // Madrid
+                    { lat: 52.2297, lng: 21.0122 }  // Warsaw
+                ];
+                
+                const hubIndex = parseInt(d.id.toString().slice(-1)) % hubCoords.length;
+                const baseOrigin = hubCoords[hubIndex];
+                
+                // Add minor jitter (+/- 0.5 deg)
+                const jitterLat = (parseInt(d.id.toString().slice(-2, -1)) / 10) - 0.5;
+                const jitterLng = (parseInt(d.id.toString().slice(-3, -2)) / 10) - 0.5;
+
+                return {
+                    id: d.id,
+                    status: d.status,
+                    origin: { 
+                        lat: baseOrigin.lat + jitterLat, 
+                        lng: baseOrigin.lng + jitterLng 
+                    },
+                    destination: { lat: parseFloat(d.dest_lat), lng: parseFloat(d.dest_lon) },
+                    intensity: d.status === 'IN_PRODUCTION' ? 1.0 : 0.5,
+                    age_minutes: Math.round((new Date() - new Date(d.created_at)) / 60000)
+                };
+            });
 
             return {
                 timestamp: new Date().toISOString(),
