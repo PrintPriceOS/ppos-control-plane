@@ -17,7 +17,7 @@ export const SystemHealthPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {services.map(s => (
                     <div key={s.id} className="glass p-6 rounded-2xl border border-white flex flex-col gap-4 group hover:border-primary/20 transition-all">
                         <div className="flex items-center justify-between">

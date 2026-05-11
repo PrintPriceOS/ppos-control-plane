@@ -107,7 +107,7 @@ export const UsageQuotasPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat, i) => (
                     <div key={i} className="glass p-5 rounded-2xl border border-white flex items-center gap-4">
                         <div className={`p-3 rounded-xl bg-${stat.color || 'primary'}/10 text-${stat.color || 'primary'}`}>
@@ -204,7 +204,7 @@ export const UsageQuotasPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="glass p-6 rounded-2xl border border-white">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">

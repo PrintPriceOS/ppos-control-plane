@@ -68,7 +68,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KpiCard title={isPrinthouse ? "Assigned Jobs" : "Global Jobs"} value={String(o.data?.totalJobs || 0)} Icon={Square3Stack3DIcon} color="primary" />
                 <KpiCard title="SLA Success" value={`${(o.data?.successRate || 0).toFixed(1)}%`} Icon={CheckBadgeIcon} color="emerald" />
                 <KpiCard title={isPrinthouse ? "Avg. Turnaround" : "Mean Latency"} value={`${o.data?.avgLatencyMs || 0}ms`} Icon={BoltIcon} color="amber" />
