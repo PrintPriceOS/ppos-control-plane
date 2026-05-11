@@ -25,7 +25,9 @@ export const MarketplaceTab: React.FC = () => {
         setLoading(true);
         try {
             const data = await adminApi.getMarketplaceSessions();
-            setSessions(Array.isArray(data) ? data : []);
+            // Handle both array (legacy) and object { ok, sessions } responses
+            const sessionList = Array.isArray(data) ? data : (data as any)?.sessions || [];
+            setSessions(sessionList);
         } catch (err) {
             console.error('Failed to fetch marketplace sessions:', err);
         } finally {
@@ -36,7 +38,8 @@ export const MarketplaceTab: React.FC = () => {
     const fetchSessionDetail = async (id: string) => {
         try {
             const data = await adminApi.getMarketplaceSessionDetail(id);
-            setSelectedSession(data);
+            const session = data?.session || data; // Handle wrapper or direct object
+            setSelectedSession(session);
         } catch (err) {
             console.error('Failed to fetch session detail:', err);
         }

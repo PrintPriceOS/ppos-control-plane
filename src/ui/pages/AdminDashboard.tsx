@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { t, LocaleProvider, useLocale } from "../i18n";
 import { getAdminKey, setAdminKey, clearAdminKey } from "../lib/adminApi";
+import { isSuperAdmin } from "../lib/authStore";
 import { OverviewTab } from "./admin/OverviewTab";
 import { PricingIntelligenceTab } from "./admin/PricingIntelligenceTab";
 import { OffersTab } from "./admin/OffersTab";
@@ -11,7 +12,7 @@ import { CommercialCommitmentsTab } from "./admin/CommercialCommitmentsTab";
 import { AutonomousOpsTab } from "./admin/AutonomousOpsTab";
 import { RoutingDecisionTab } from "./admin/RoutingDecisionTab";
 import { ProductionDispatchTab } from "./admin/ProductionDispatchTab";
-
+import { IndustrialLiveTab } from "./admin/IndustrialLiveTab";
 
 import { FinancialOpsTab } from "./admin/FinancialOpsTab";
 import TenantManagement from "./admin/TenantManagement";
@@ -48,7 +49,7 @@ import {
     TruckIcon
 } from "@heroicons/react/24/outline";
 
-type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
 
 
 type Range = "24h" | "7d" | "30d";
@@ -75,6 +76,7 @@ const AdminDashboardInner: React.FC = () => {
         setAuthKey("");
     };
 
+    const superAdmin = isSuperAdmin();
     const tabs = useMemo(
         () =>
         ([
@@ -87,11 +89,10 @@ const AdminDashboardInner: React.FC = () => {
             ["marketplace", "Marketplace", BuildingStorefrontIcon],
             ["negotiations", "Negotiation & Readiness", ArrowsRightLeftIcon],
             ["routing", "Autonomous Routing", ArrowsRightLeftIcon],
-            ["dispatch", "Production Dispatch", TruckIcon],
-            ["commitments", "Commercial Commitments", DocumentCheckIcon],
-
-
-            ["autonomy", "Autonomous Operations", CpuChipIcon],
+            superAdmin && ["dispatch", "Production Dispatch", TruckIcon],
+            superAdmin && ["execution", "Execution Loop", BoltIcon],
+            superAdmin && ["commitments", "Commercial Commitments", DocumentCheckIcon],
+            superAdmin && ["autonomy", "Autonomous Operations", CpuChipIcon],
             ["finance", "Financial Operations", BanknotesIcon],
             ["notifications", "Notifications", BellIcon],
             ["jobs", t("admin.tabs.jobs" as any), QueueListIcon],
@@ -99,8 +100,8 @@ const AdminDashboardInner: React.FC = () => {
             ["audit", t("admin.tabs.audit" as any), ShieldCheckIcon],
             ["controls", t("admin.tabs.controls" as any), WrenchScrewdriverIcon],
             ["engagement", "Engagement", BoltIcon],
-        ] as Array<[Tab, string, any]>),
-        [locale]
+        ].filter(Boolean) as Array<[Tab, string, any]>),
+        [locale, superAdmin]
     );
 
     if (!isAuthorized) {
@@ -250,6 +251,7 @@ const AdminDashboardInner: React.FC = () => {
                         {activeTab === "commitments" && <CommercialCommitmentsTab key={`commitments-${reloadKey}`} />}
                         {activeTab === "routing" && <RoutingDecisionTab key={`routing-${reloadKey}`} />}
                         {activeTab === "dispatch" && <ProductionDispatchTab key={`dispatch-${reloadKey}`} />}
+                        {activeTab === "execution" && <IndustrialLiveTab key={`execution-${reloadKey}`} />}
                         {activeTab === "autonomy" && <AutonomousOpsTab key={`autonomy-${reloadKey}`} />}
 
 

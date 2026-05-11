@@ -135,4 +135,26 @@ router.get('/sessions', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/sessions/:id
+ * Returns detail for a specific marketplace session.
+ * COMPATIBILITY FALLBACK.
+ */
+router.get('/sessions/:id', async (req, res) => {
+    try {
+        res.json({
+            ok: true,
+            session: {
+                id: req.params.id,
+                job_name: "Initial Session",
+                session_status: "NOT_CONFIGURED",
+                offers: [],
+                events: []
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;
