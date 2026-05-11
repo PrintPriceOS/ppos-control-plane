@@ -26,6 +26,7 @@ interface Machine {
     city: string;
     country: string;
     region: string;
+    needsProfile: boolean;
     capacityUtilizationPct: number | null;
     throughput: number | null;
     uptimeScore: number | null;
@@ -33,6 +34,10 @@ interface Machine {
     lastHeartbeatAt: string | null;
     federationId?: string;
     clusterId?: string;
+    telemetryCompletenessScore: number;
+    missingTelemetry: string[];
+    profileCompletenessScore: number;
+    missingProfileFields: string[];
 }
 
 export const MachinesPage: React.FC = () => {
@@ -57,21 +62,21 @@ export const MachinesPage: React.FC = () => {
         });
     }, [rawMachines, search, filterStatus]);
 
-    // Derived stats (from ALL machines, not just filtered)
+    // Derived stats (Strictly truthful)
     const activeNodes = rawMachines.filter(m => 
-        ['ONLINE', 'PROCESSING', 'READY', 'HEALTHY', 'SYNCED'].includes(m.healthState)
+        m.healthState === 'ONLINE' || m.healthState === 'PROCESSING' || m.healthState === 'HEALTHY'
     ).length;
 
     const avgUptime = useMemo(() => {
-        const withData = rawMachines.filter(m => m.uptimeScore !== null);
+        const withData = rawMachines.filter(m => m.uptimeScore !== null && m.healthState !== 'OFFLINE');
         if (!withData.length) return null;
         return (withData.reduce((s, m) => s + (m.uptimeScore || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
 
     const avgEfficiency = useMemo(() => {
-        const withData = rawMachines.filter(m => m.economicEfficiency !== null);
+        const withData = rawMachines.filter(m => m.economicEfficiency !== null && m.healthState !== 'OFFLINE');
         if (!withData.length) return null;
-        return (withData.reduce((s, m) => s + (m.economicEfficiency || 0), 0) / withData.length).toFixed(2);
+        return (withData.reduce((s, m) => s + (m.economicEfficiency || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
 
     const getHealthColor = (state: string) => {
@@ -112,7 +117,7 @@ export const MachinesPage: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Machines</h1>
                     <div className="flex items-center gap-2 mt-1">
-                        <p className="text-sm text-slate-500 font-medium tracking-tight">Real-time industrial telemetry for the global manufacturing grid.</p>
+                        <p className="text-sm text-slate-500 font-medium tracking-tight">Fleet telemetry with high-fidelity validation. No synthetic data.</p>
                         {q.data?.timestamp && (
                             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                 <ClockIcon className="w-3 h-3" />
@@ -199,11 +204,21 @@ export const MachinesPage: React.FC = () => {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10">
+                                <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
                                     <CpuChipIcon className="w-5 h-5 text-slate-400" />
+                                    {m.profileCompletenessScore < 100 && (
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full" />
+                                    )}
                                 </div>
                                 <div>
-                                    <p className="font-bold text-slate-900 dark:text-[#ECECF1] leading-tight">{m.companyName || 'Industrial Node'}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-slate-900 dark:text-[#ECECF1] leading-tight">{m.companyName || 'Industrial Node'}</p>
+                                        {m.profileCompletenessScore < 75 && (
+                                            <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-[8px] font-black text-amber-600 border border-amber-100 uppercase tracking-tighter">
+                                                Needs Profile
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <span className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</span>
                                         {m.clusterId && (
@@ -222,10 +237,17 @@ export const MachinesPage: React.FC = () => {
                         accessor: (m) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                                    <GlobeAltIcon className="w-3.5 h-3.5 text-slate-300" />
-                                    <span className="text-xs font-bold">{m.locationLabel}</span>
+                                    <GlobeAltIcon className={`w-3.5 h-3.5 ${m.needsProfile ? 'text-amber-400' : 'text-slate-300'}`} />
+                                    <span className={`text-xs font-bold ${m.needsProfile ? 'text-amber-600 italic' : ''}`}>
+                                        {m.locationLabel}
+                                    </span>
                                 </div>
-                                {m.region && (
+                                {m.needsProfile && (
+                                    <p className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">
+                                        Complete print node profile
+                                    </p>
+                                )}
+                                {m.region && !m.needsProfile && (
                                     <div className="flex items-center gap-1.5 text-slate-400">
                                         <MapPinIcon className="w-3 h-3" />
                                         <span className="text-[10px] font-black uppercase tracking-widest">{m.region}</span>
@@ -243,6 +265,11 @@ export const MachinesPage: React.FC = () => {
                                     <span className={`w-1.5 h-1.5 rounded-full ${getHealthColor(m.healthState)}`} />
                                     {m.healthState}
                                 </div>
+                                {m.healthState === 'OFFLINE' && (
+                                    <div className="px-1.5 py-0.5 rounded bg-slate-100 text-[8px] font-black text-slate-500 uppercase tracking-tighter w-fit">
+                                        No live heartbeat
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-black text-slate-400 uppercase">Proc:</span>
                                     <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400">{m.machineState}</span>
@@ -255,13 +282,13 @@ export const MachinesPage: React.FC = () => {
                         sortKey: 'healthState'
                     },
                     {
-                        header: 'Grid Telemetry',
+                        header: 'Industrial Stats',
                         accessor: (m) => (
                             <div className="space-y-2 w-36">
                                 <div>
                                     <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
                                         <span>Util / Cap</span>
-                                        <span className={m.capacityUtilizationPct === null ? 'italic' : ''}>
+                                        <span className={m.capacityUtilizationPct === null ? 'italic font-medium' : ''}>
                                             {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
                                         </span>
                                     </div>
@@ -277,6 +304,18 @@ export const MachinesPage: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">Completeness</span>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full rounded-full ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                                style={{ width: `${m.telemetryCompletenessScore}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-[8px] font-bold text-slate-500">{m.telemetryCompletenessScore}%</span>
+                                    </div>
+                                </div>
                             </div>
                         ),
                         sortKey: 'capacityUtilizationPct'
@@ -287,13 +326,13 @@ export const MachinesPage: React.FC = () => {
                             <div className="flex items-center gap-4">
                                 <div className="text-center">
                                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Uptime</p>
-                                    <p className={`text-xs font-bold ${m.uptimeScore !== null && m.uptimeScore > 95 ? 'text-emerald-600' : 'text-slate-900 dark:text-[#ECECF1]'}`}>
+                                    <p className={`text-xs font-bold ${m.uptimeScore !== null && m.uptimeScore > 95 ? 'text-emerald-600' : 'text-slate-400'}`}>
                                         {m.uptimeScore !== null ? `${m.uptimeScore}%` : 'N/A'}
                                     </p>
                                 </div>
                                 <div className="text-center">
                                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Efficiency</p>
-                                    <p className="text-xs font-bold text-slate-900 dark:text-[#ECECF1]">
+                                    <p className="text-xs font-bold text-slate-400">
                                         {m.economicEfficiency !== null ? `${m.economicEfficiency}%` : 'N/A'}
                                     </p>
                                 </div>
@@ -302,7 +341,7 @@ export const MachinesPage: React.FC = () => {
                         sortKey: 'uptimeScore'
                     },
                     {
-                        header: 'Heartbeat',
+                        header: 'Telemetry Integrity',
                         accessor: (m) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
@@ -313,7 +352,7 @@ export const MachinesPage: React.FC = () => {
                                 </div>
                                 {m.lastHeartbeatAt && (
                                     <p className="text-[9px] font-medium text-slate-400">
-                                        {Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000)}m ago
+                                        Sync: {Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000)}m ago
                                     </p>
                                 )}
                             </div>

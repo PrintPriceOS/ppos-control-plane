@@ -22,41 +22,27 @@ const normalizeJson = (val) => {
 const resolveMachineLocation = (node) => {
     const profile = normalizeJson(node.machine_profile_json);
     const metadata = normalizeJson(node.metadata_json);
+    const caps = normalizeJson(node.capabilities_json);
     
-    const city = node.city || metadata.city || profile.city || '';
-    const country = node.country || metadata.country || profile.country || '';
-    const region = node.region || metadata.region || profile.region || '';
+    const city = node.city || metadata.city || profile.city || caps.city || '';
+    const country = node.country || metadata.country || profile.country || caps.country || '';
+    const region = node.region || metadata.region || profile.region || caps.region || '';
     
-    let label = 'Unknown';
-    if (city && country) label = `${city}, ${country}`;
-    else if (region) label = region;
-    else if (country) label = country;
+    let label = '';
+    let needsProfile = false;
     
-    return { city, country, region, label };
-};
-
-const resolveEconomicEfficiency = (node) => {
-    const telemetry = normalizeJson(node.telemetry_json);
-    const metrics = normalizeJson(node.metrics_json);
+    if (city && country) {
+        label = `${city}, ${country}`;
+    } else if (region) {
+        label = region;
+    } else if (country) {
+        label = country;
+    } else {
+        label = "Unassigned location";
+        needsProfile = true;
+    }
     
-    const efficiency = node.economic_efficiency || 
-                      telemetry.economic_efficiency || 
-                      metrics.economic_efficiency;
-    
-    if (efficiency === undefined || efficiency === null) return null;
-    return parseFloat(efficiency);
-};
-
-const resolveCapacityUtilization = (node) => {
-    const telemetry = normalizeJson(node.telemetry_json);
-    const metrics = normalizeJson(node.metrics_json);
-    
-    let cap = node.capacity_utilization_pct || 
-              telemetry.capacity || 
-              metrics.capacity_pct;
-              
-    if (cap === undefined || cap === null) return null;
-    return Math.min(100, Math.max(0, parseFloat(cap)));
+    return { city, country, region, label, needsProfile };
 };
 
 const resolveLastHeartbeat = (node) => {
@@ -82,10 +68,82 @@ const resolveMachineHealth = (node, lastHeartbeatAt) => {
     if (node.worker_state === 'BLOCKED' || node.machine_state === 'BLOCKED') return 'CAPACITY_BLOCKED';
     if (node.machine_state === 'PROCESSING') return 'PROCESSING';
     
-    const cap = resolveCapacityUtilization(node);
-    if (cap !== null && cap > 95) return 'DEGRADED';
+    // Check utilization for degradation
+    const cap = node.capacity_utilization_pct;
+    if (cap !== null && cap !== undefined && parseFloat(cap) > 95) return 'DEGRADED';
     
     return node.status || 'ONLINE';
+};
+
+const resolveEconomicEfficiency = (node, healthState) => {
+    if (healthState === 'OFFLINE') return null;
+    
+    const telemetry = normalizeJson(node.telemetry_json);
+    const metrics = normalizeJson(node.metrics_json);
+    
+    const efficiency = node.economic_efficiency || 
+                      telemetry.economic_efficiency || 
+                      metrics.economic_efficiency;
+    
+    if (efficiency === undefined || efficiency === null || parseFloat(efficiency) === 0) return null;
+    
+    // Special case: ignore static 1.00% if it feels like a default/fake value
+    // (In this system, 1.00 is often the unconfigured default)
+    if (parseFloat(efficiency) === 1.00 && !node.economic_efficiency) return null;
+
+    return parseFloat(efficiency);
+};
+
+const resolveCapacityUtilization = (node, healthState) => {
+    // Capacity can persist even if offline if it was recorded, but usually N/A is safer for live telemetry
+    if (healthState === 'OFFLINE') return null;
+
+    const telemetry = normalizeJson(node.telemetry_json);
+    const metrics = normalizeJson(node.metrics_json);
+    
+    let cap = node.capacity_utilization_pct || 
+              telemetry.capacity || 
+              metrics.capacity_pct;
+              
+    if (cap === undefined || cap === null) return null;
+    return Math.min(100, Math.max(0, parseFloat(cap)));
+};
+
+const calculateCompleteness = (node, location, healthState) => {
+    const missingProfileFields = [];
+    if (!node.company_name || node.company_name.includes('Node')) missingProfileFields.push('company_name');
+    if (location.needsProfile) missingProfileFields.push('location');
+    
+    const caps = normalizeJson(node.capabilities_json);
+    if (!caps || Object.keys(caps).length === 0) missingProfileFields.push('capabilities');
+    
+    const rates = normalizeJson(node.rates_json);
+    if (!rates || Object.keys(rates).length === 0) missingProfileFields.push('rates');
+    
+    const profileScore = Math.max(0, 100 - (missingProfileFields.length * 25));
+    
+    const missingTelemetry = [];
+    if (healthState === 'OFFLINE') missingTelemetry.push('heartbeat');
+    
+    const cap = resolveCapacityUtilization(node, healthState);
+    if (cap === null) missingTelemetry.push('capacity');
+    
+    if (node.uptime_score === null || (parseFloat(node.uptime_score) === 100 && healthState === 'OFFLINE')) {
+        // If offline, 100% uptime is dishonest
+        missingTelemetry.push('uptime');
+    }
+    
+    const efficiency = resolveEconomicEfficiency(node, healthState);
+    if (efficiency === null) missingTelemetry.push('efficiency');
+    
+    const telemetryScore = Math.max(0, 100 - (missingTelemetry.length * 25));
+    
+    return {
+        profileCompletenessScore: profileScore,
+        missingProfileFields,
+        telemetryCompletenessScore: telemetryScore,
+        missingTelemetry
+    };
 };
 
 /**
@@ -94,7 +152,6 @@ const resolveMachineHealth = (node, lastHeartbeatAt) => {
  */
 router.get('/', async (req, res) => {
     try {
-        // Fetch from print_nodes as the primary registry
         const rows = await db.query('SELECT * FROM print_nodes');
         
         if (!rows || rows.length === 0) {
@@ -111,6 +168,16 @@ router.get('/', async (req, res) => {
             const location = resolveMachineLocation(node);
             const healthState = resolveMachineHealth(node, lastHeartbeatAt);
             
+            const completeness = calculateCompleteness(node, location, healthState);
+            
+            // Truthful metrics
+            const capacityUtilizationPct = resolveCapacityUtilization(node, healthState);
+            const economicEfficiency = resolveEconomicEfficiency(node, healthState);
+            
+            // Uptime is dishonest if 100% for offline machines
+            let uptimeScore = node.uptime_score !== undefined && node.uptime_score !== null ? parseFloat(node.uptime_score) : null;
+            if (healthState === 'OFFLINE') uptimeScore = null;
+
             return {
                 id: node.id,
                 tenantId: node.tenant_id,
@@ -125,16 +192,20 @@ router.get('/', async (req, res) => {
                 country: location.country,
                 region: location.region,
                 locationLabel: location.label,
+                needsProfile: location.needsProfile,
                 
                 // Telemetry Normalization
-                capacityUtilizationPct: resolveCapacityUtilization(node),
+                capacityUtilizationPct,
                 throughput: node.throughput || null,
-                uptimeScore: node.uptime_score !== undefined ? parseFloat(node.uptime_score) : null,
-                economicEfficiency: resolveEconomicEfficiency(node),
+                uptimeScore,
+                economicEfficiency,
                 
                 // Federation Metadata
                 federationId: node.federation_id || null,
-                clusterId: node.cluster_id || node.continental_cluster_id || null,
+                clusterId: node.cluster_id || null,
+                
+                // Completeness Scores
+                ...completeness,
                 
                 // Metadata
                 capabilities: normalizeJson(node.capabilities_json),
