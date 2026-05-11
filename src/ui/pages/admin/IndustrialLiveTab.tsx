@@ -236,16 +236,6 @@ export const IndustrialLiveTab: React.FC = () => {
                 </div>
             </div>
 
-            <MachineDetailDrawer 
-                isOpen={isDrawerOpen} 
-                machineId={selectedMachineId} 
-                onClose={() => setIsDrawerOpen(false)} 
-            />
-        </div>
-    );
-};
-
-
             {/* Reroute Timeline */}
             <div className="bg-slate-50 rounded-3xl border border-slate-200 p-6 shadow-sm">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Autonomous Reroute & Event Log</h3>
@@ -274,6 +264,12 @@ export const IndustrialLiveTab: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            <MachineDetailDrawer 
+                isOpen={isDrawerOpen} 
+                machineId={selectedMachineId} 
+                onClose={() => setIsDrawerOpen(false)} 
+            />
         </div>
     );
 };
