@@ -1738,6 +1738,9 @@ div[role="button"]:focus-visible,
     color: #ffffff !important;
   }
 
+  .dark .bg-white { background-color: #131314 !important; }
+  .dark aside, .dark header, .dark .bg-background-dark { background-color: #0e0e0f !important; }
+
   /* Map and specific containers */
   .dark .bg-white:not(aside):not(header):not(.glass):not(.bg-white.border) { 
     background-color: #131314; 

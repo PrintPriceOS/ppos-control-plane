@@ -133,7 +133,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose?: () => void }> = ({ i
   );
 
   return (
-    <aside className={`${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static top-0 left-0 z-50 w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen flex flex-col overflow-hidden transition-transform duration-300 ease-in-out shrink-0`}>
+    <aside className={`${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative z-50 w-64 bg-white dark:bg-[#0e0e0f] border-r border-slate-200 dark:border-white/10 h-screen flex flex-col overflow-hidden transition-transform duration-300 ease-in-out shrink-0`}>
       {/* Brand Header */}
       <div className="px-5 py-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-3">

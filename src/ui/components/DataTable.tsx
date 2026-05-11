@@ -66,7 +66,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading }: DataTable
   }
 
   return (
-    <div className="glass overflow-hidden rounded-none border border-white dark:border-white/[0.07]">
+    <div className="bg-white/50 dark:bg-[#131314] overflow-hidden rounded-none border border-slate-100 dark:border-white/[0.07]">
       <table className="min-w-full divide-y divide-slate-100 dark:divide-white/[0.05] italic-text-off">
         <thead className="bg-slate-50/50 dark:bg-[#131314]/[0.03] uppercase tracking-widest text-[10px] font-black text-slate-400 dark:text-zinc-500">
           <tr>

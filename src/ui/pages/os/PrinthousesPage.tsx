@@ -712,7 +712,7 @@ export const PrinthousesPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Printhouses</h1>
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Printhouses</h1>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
                 </div>
                 <button onClick={openAdd}
@@ -728,13 +728,13 @@ export const PrinthousesPage: React.FC = () => {
                     { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon, color: 'blue' },
                     { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon, color: 'indigo' },
                 ].map((stat, i) => (
-                    <div key={i} className="glass p-5 rounded-none border border-white flex items-center gap-2">
-                        <div className={`p-3 rounded-none bg-${stat.color}/10 text-${stat.color}`}>
+                    <div key={i} className="bg-white dark:bg-[#131314] p-5 rounded-none border border-slate-100 dark:border-white/5 flex items-center gap-4">
+                        <div className={`p-3 rounded-none bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-zinc-400`}>
                             <stat.icon className="w-6 h-6" />
                         </div>
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                            <p className="text-xl font-black text-slate-900">{stat.value}</p>
+                            <p className="text-xl font-black text-slate-900 dark:text-white">{stat.value}</p>
                         </div>
                     </div>
                 ))}

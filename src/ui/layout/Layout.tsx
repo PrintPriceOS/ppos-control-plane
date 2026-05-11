@@ -17,7 +17,7 @@ export const Layout: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-[#0e0e0f]">
+    <div className="flex h-screen w-full bg-white dark:bg-[#0e0e0f] overflow-hidden">
       {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div 
