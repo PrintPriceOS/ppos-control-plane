@@ -51,7 +51,7 @@ class IndustrialDispatchExecutionService {
 
       // 4. Create Dispatch Record (Immutable Snapshot)
       await db.query(`
-        INSERT INTO production_dispatches (
+        INSERT INTO manufacturing_dispatches (
           id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id,
           status, score_snapshot_json, routing_state_json, sla_estimate_json,
           orchestration_metadata_json, operator_id, expires_at
@@ -141,7 +141,7 @@ class IndustrialDispatchExecutionService {
     }
 
     await db.query(`
-      UPDATE production_dispatches 
+      UPDATE manufacturing_dispatches 
       SET status = ?, message = ?
       WHERE id = ?
     `, [DISPATCH_LIFECYCLE.ROLLED_BACK, reason, dispatchId]);

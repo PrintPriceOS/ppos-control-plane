@@ -103,10 +103,6 @@ body {
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
-/* Glass consolidation */
-.glass {
-  @apply bg-white/80 dark:bg-[#131314]/80 backdrop-blur-md border border-slate-200 dark:border-white/10 shadow-sm;
-}
 
 /* Markdown Support */
 .markdown-body {

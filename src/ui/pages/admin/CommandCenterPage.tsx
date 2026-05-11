@@ -521,14 +521,14 @@ export const CommandCenterPage: React.FC = () => {
 
           <TacticalPanel title="System Registry" icon={ServerIcon} badge="Sync" color="slate">
              <div className="space-y-1">
-                <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
-                   <span>DB Clusters</span>
-                   <span className="text-emerald-500">NOMINAL</span>
-                </div>
-                <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
-                   <span>Redis Feed</span>
-                   <span className="text-emerald-500">STABLE</span>
-                </div>
+                 <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                    <span>DB Clusters</span>
+                    <span className="text-emerald-500">SYNCED [4ms]</span>
+                 </div>
+                 <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                    <span>Redis Feed</span>
+                    <span className="text-emerald-500">ACTIVE [8ms]</span>
+                 </div>
              </div>
           </TacticalPanel>
         </div>

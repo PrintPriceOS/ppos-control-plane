@@ -6,8 +6,7 @@ const db = require('../services/db');
 const qualityService = require('../services/printerQualityService');
 const recommendationService = require('../services/routingRecommendationService');
 const routingEngine = require('../services/routing/AutonomousRoutingEngine');
-const mapService = require('../services/routingMapService');
-const heatmapService = require('../services/routingHeatmapService');
+const topologyService = require('../services/FederationTopologyService');
 
 router.use(requireAdmin);
 
@@ -208,7 +207,7 @@ router.post('/dispatch', async (req, res) => {
  */
 router.get('/map', async (req, res) => {
     try {
-        const state = await mapService.getMapState();
+        const state = await topologyService.getMapState();
         res.json(state);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -220,7 +219,7 @@ router.get('/map', async (req, res) => {
  */
 router.get('/heatmap', async (req, res) => {
     try {
-        const heatmap = await heatmapService.getRegionalHeatmap();
+        const heatmap = await topologyService.getRegionalHeatmap();
         res.json(heatmap);
     } catch (err) {
         res.status(500).json({ error: err.message });

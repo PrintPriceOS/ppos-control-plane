@@ -21,14 +21,14 @@ class MachinePressureService {
         // 2. Fetch Active Dispatches
         const [dispatches] = await db.query(`
             SELECT COUNT(*) as count 
-            FROM production_dispatches 
+            FROM manufacturing_dispatches 
             WHERE print_node_id = ? AND status IN ('RESERVED', 'QUEUED', 'ASSIGNED', 'IN_PRODUCTION')
         `, [machineId]);
 
         // 3. Fetch Oldest Queued Job
         const [oldestJob] = await db.query(`
             SELECT created_at 
-            FROM production_dispatches 
+            FROM manufacturing_dispatches 
             WHERE print_node_id = ? AND status = 'QUEUED'
             ORDER BY created_at ASC LIMIT 1
         `, [machineId]);

@@ -102,7 +102,7 @@ class ProductionPersistenceService {
       `);
 
       await db.query(`
-        CREATE TABLE IF NOT EXISTS production_dispatches (
+        CREATE TABLE IF NOT EXISTS manufacturing_dispatches (
           id VARCHAR(64) PRIMARY KEY,
           production_package_id VARCHAR(64) NOT NULL,
           print_node_id VARCHAR(64) NOT NULL,
@@ -210,7 +210,7 @@ class ProductionPersistenceService {
           mitigation_recommendation TEXT NULL,
           snapshot_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_dispatch (dispatch_id),
-          CONSTRAINT fk_failure_dispatch FOREIGN KEY (dispatch_id) REFERENCES production_dispatches(id) ON DELETE CASCADE
+          CONSTRAINT fk_failure_dispatch FOREIGN KEY (dispatch_id) REFERENCES manufacturing_dispatches(id) ON DELETE CASCADE
         ) ENGINE=InnoDB;
       `);
 
@@ -807,7 +807,7 @@ class ProductionPersistenceService {
     } = dispatchData;
 
     await db.query(`
-      INSERT INTO production_dispatches 
+      INSERT INTO manufacturing_dispatches 
       (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, message, expires_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
@@ -819,12 +819,12 @@ class ProductionPersistenceService {
   }
 
   async getDispatch(id) {
-    const rows = await db.query('SELECT * FROM production_dispatches WHERE id = ?', [id]);
+    const rows = await db.query('SELECT * FROM manufacturing_dispatches WHERE id = ?', [id]);
     return rows[0] || null;
   }
 
   async listDispatches(filters = {}) {
-    let sql = 'SELECT * FROM production_dispatches WHERE 1=1';
+    let sql = 'SELECT * FROM manufacturing_dispatches WHERE 1=1';
     const params = [];
 
     if (filters.senderTenantId && filters.receiverTenantId) {
@@ -874,7 +874,7 @@ class ProductionPersistenceService {
     if (fields.length === 0) return this.getDispatch(id);
 
     params.push(id);
-    await db.query(`UPDATE production_dispatches SET ${fields.join(', ')} WHERE id = ?`, params);
+    await db.query(`UPDATE manufacturing_dispatches SET ${fields.join(', ')} WHERE id = ?`, params);
     return this.getDispatch(id);
   }
 

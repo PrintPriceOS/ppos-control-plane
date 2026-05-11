@@ -79,17 +79,16 @@ import { MachineDrawerProvider } from './components/federation/MachineDrawerCont
 export const App: React.FC = () => {
     return (
         <Routes>
-            {/* Legacy Entry - For Backward Compatibility */}
-            <Route path="/legacy" element={<AdminDashboard />} />
+            {/* Legacy Redirects */}
+            <Route path="/legacy" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/legacy-dashboard" element={<Navigate to="/dashboard" replace />} />
 
-            {/* New OS Control Plane Layout */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<CommandCenterPage />} />
-                <Route path="/legacy-dashboard" element={<DashboardPage />} />
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
                 <Route path="/audit" element={<div className="p-10 text-center font-bold text-slate-500 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-white/10">Audit Explorer Logic Deferred to Batch 3</div>} />

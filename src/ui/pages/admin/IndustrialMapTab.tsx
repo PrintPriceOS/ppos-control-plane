@@ -68,10 +68,10 @@ export const IndustrialMapTab: React.FC = () => {
 
             {/* Regional Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatusCard label="Federation Uptime" value="99.98%" trend="+0.02%" />
-                <StatusCard label="Routing Efficiency" value="94.2%" trend="+1.5%" />
-                <StatusCard label="Cross-Border Load" value="28.5%" trend="-2.1%" />
-                <StatusCard label="Carbon Reduction" value="12.4kg" trend="+0.8kg" />
+                <StatusCard label="Federation Uptime" value="---" trend="SIGNAL LOSS" />
+                <StatusCard label="Routing Efficiency" value="---" trend="ANALYZING" />
+                <StatusCard label="Cross-Border Load" value="---" trend="OFFLINE" />
+                <StatusCard label="Carbon Reduction" value="---" trend="NO DATA" />
             </div>
 
         </div>

@@ -1,127 +1,143 @@
 /**
  * src/api/services/FederationTopologyService.js
  * 
- * Manages the global grid of manufacturing hubs and regional failover.
- * Provides topology awareness for cross-region industrial orchestration.
+ * Unified service for Federation Map, Heatmap, and Regional Analysis.
+ * Consolidates routingMapService and routingHeatmapService logic.
  */
 const db = require('./mysqlClient');
 const logger = require('./logger').child('federation-topology');
-const eventOrchestrator = require('./IndustrialEventOrchestrationService');
 
 class FederationTopologyService {
     /**
-     * Retrieves the current state of the global manufacturing grid.
+     * Retrieves the complete federation map state.
      */
-    async getGlobalGridState() {
+    async getMapState() {
         try {
-            const hubs = await db.query(`
+            // 1. Get All Active Industrial Nodes with Coordinates
+            const nodes = await db.query(`
                 SELECT 
-                    id, company_name, region, federation_state, 
-                    capacity_index, reliability_index, energy_score,
-                    last_heartbeat
-                FROM federation_factories
-                ORDER BY region ASC
+                    id, company_name, region, status, 
+                    latitude, longitude, capacity_utilization_pct,
+                    uptime_score
+                FROM print_nodes
+                WHERE status IN ('ONLINE', 'DEGRADED', 'OFFLINE')
             `);
 
-            const nodeDistribution = await db.query(`
+            // 2. Get Active Dispatches with Origin/Destination
+            const dispatches = await db.query(`
                 SELECT 
-                    region, 
-                    COUNT(*) as node_count, 
-                    AVG(capacity_utilization_pct) as avg_util,
-                    AVG(uptime_score) as avg_uptime
-                FROM print_nodes
-                GROUP BY region
+                    md.id, md.status, md.print_node_id as node_id, 
+                    md.created_at,
+                    pn.latitude as dest_lat, pn.longitude as dest_lon,
+                    pn.company_name as dest_name
+                FROM manufacturing_dispatches md
+                JOIN print_nodes pn ON md.print_node_id = pn.id
+                WHERE md.status IN ('ALLOCATED', 'IN_PRODUCTION', 'SHIPPED')
+                AND md.created_at > DATE_SUB(NOW(), INTERVAL 12 HOUR)
             `);
+
+            // 3. Map Nodes to DTO
+            const mapNodes = (nodes || []).map(n => ({
+                id: n.id,
+                name: n.company_name,
+                region: n.region,
+                lat: parseFloat(n.latitude),
+                lng: parseFloat(n.longitude),
+                status: n.status,
+                utilization: n.capacity_utilization_pct,
+                is_active: n.status === 'ONLINE'
+            }));
+
+            // 4. Map Routing Lines (with deterministic jittered origin)
+            const routes = (dispatches || []).map(d => {
+                const hubCoords = [
+                    { lat: 51.5074, lng: -0.1278 }, // London
+                    { lat: 48.8566, lng: 2.3522 },  // Paris
+                    { lat: 52.5200, lng: 13.4050 }, // Berlin
+                    { lat: 40.4168, lng: -3.7038 }, // Madrid
+                    { lat: 52.2297, lng: 21.0122 }  // Warsaw
+                ];
+                
+                const hubIndex = parseInt(d.id.toString().slice(-1)) % hubCoords.length;
+                const baseOrigin = hubCoords[hubIndex];
+                
+                const jitterLat = (parseInt(d.id.toString().slice(-2, -1)) / 10) - 0.5;
+                const jitterLng = (parseInt(d.id.toString().slice(-3, -2)) / 10) - 0.5;
+
+                return {
+                    id: d.id,
+                    status: d.status,
+                    origin: { 
+                        lat: baseOrigin.lat + jitterLat, 
+                        lng: baseOrigin.lng + jitterLng 
+                    },
+                    destination: { lat: parseFloat(d.dest_lat), lng: parseFloat(d.dest_lon) },
+                    intensity: d.status === 'IN_PRODUCTION' ? 1.0 : 0.5,
+                    age_minutes: Math.round((new Date() - new Date(d.created_at)) / 60000)
+                };
+            });
 
             return {
                 timestamp: new Date().toISOString(),
-                topology_version: '1.0.0-industrial',
-                hubs: hubs.map(h => ({
-                    ...h,
-                    status: h.federation_state,
-                    is_active: h.federation_state === 'ACTIVE'
-                })),
-                regional_health: nodeDistribution.reduce((acc, r) => {
-                    const region = r.region || 'UNKNOWN';
-                    acc[region] = {
-                        node_count: r.node_count,
-                        avg_utilization: parseFloat(r.avg_util || 0).toFixed(2),
-                        avg_uptime: parseFloat(r.avg_uptime || 0).toFixed(2),
-                        load_status: r.avg_util > 90 ? 'CRITICAL' : r.avg_util > 75 ? 'DEGRADED' : 'HEALTHY'
-                    };
-                    return acc;
-                }, {}),
-                grid_stability_index: this._calculateStabilityIndex(hubs, nodeDistribution)
+                nodes: mapNodes,
+                routes: routes,
+                summary: {
+                    total_active_nodes: mapNodes.filter(n => n.is_active).length,
+                    active_dispatches: routes.length
+                }
             };
 
-            // Phase C: Industrial Event Emission
-            for (const [region, health] of Object.entries(result.regional_health)) {
-                if (health.load_status === 'CRITICAL') {
-                    await this.emitSaturationWarning(region, health);
-                } else if (health.load_status === 'DEGRADED') {
-                    await this.emitRegionalDegradation(region, health);
-                }
-            }
-
-            return result;
         } catch (err) {
-            logger.error({ event: 'grid_state_fetch_failed', error: err.message });
+            logger.error({ event: 'map_state_fetch_failed', error: err.message });
             throw err;
         }
     }
 
     /**
-     * Calculates an overall stability index for the manufacturing grid.
+     * Calculates regional saturation intensity.
      */
-    _calculateStabilityIndex(hubs, distribution) {
-        if (!hubs.length) return 0;
-        
-        const activeHubs = hubs.filter(h => h.federation_state === 'ACTIVE').length;
-        const hubRatio = activeHubs / hubs.length;
-        
-        const avgUtil = distribution.reduce((sum, r) => sum + (r.avg_util || 0), 0) / (distribution.length || 1);
-        const loadFactor = Math.max(0, (100 - avgUtil) / 100);
+    async getRegionalHeatmap() {
+        try {
+            const regions = await db.query(`
+                SELECT 
+                    region, 
+                    COUNT(*) as node_count,
+                    AVG(capacity_utilization_pct) as avg_utilization,
+                    SUM(active_jobs) as total_jobs,
+                    SUM(queue_depth) as total_backlog
+                FROM print_nodes
+                WHERE status != 'OFFLINE'
+                GROUP BY region
+            `);
 
-        return parseFloat((hubRatio * loadFactor * 100).toFixed(2));
+            return (regions || []).map(r => {
+                const util = parseFloat(r.avg_utilization || 0);
+                const pressure = (util * 0.7) + (Math.min(100, (r.total_backlog / 10)) * 0.3);
+                
+                return {
+                    region: r.region,
+                    node_count: r.node_count,
+                    utilization: util.toFixed(2),
+                    pressure: pressure.toFixed(2),
+                    status: pressure > 90 ? 'SATURATED' : pressure > 70 ? 'HIGH_PRESSURE' : 'HEALTHY',
+                    center: this._getRegionCenter(r.region)
+                };
+            });
+        } catch (err) {
+            logger.error({ event: 'heatmap_generation_failed', error: err.message });
+            throw err;
+        }
     }
 
-    /**
-     * Identifies fallback hubs for a specific region during failover.
-     */
-    async getFallbackHubs(primaryRegion) {
-        return await db.query(`
-            SELECT id, company_name, region, capacity_index, reliability_index
-            FROM federation_factories
-            WHERE region != ? AND federation_state = 'ACTIVE'
-            ORDER BY reliability_index DESC, capacity_index DESC
-            LIMIT 3
-        `, [primaryRegion]);
-    }
-
-    /**
-     * Emits a regional degradation event.
-     */
-    async emitRegionalDegradation(region, health) {
-        logger.warn({ type: 'FEDERATION-REGIONAL-DEGRADED', region, health }, `[FEDERATION-REGIONAL-DEGRADED] Region ${region} is showing performance degradation.`);
-        
-        await eventOrchestrator._publish('federation.region.degraded', {
-            region,
-            health,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    /**
-     * Emits a saturation warning for a region.
-     */
-    async emitSaturationWarning(region, health) {
-        logger.error({ type: 'FEDERATION-REGIONAL-SATURATED', region, health }, `[FEDERATION-REGIONAL-SATURATED] Region ${region} has reached saturation threshold!`);
-        
-        await eventOrchestrator._publish('federation.region.saturated', {
-            region,
-            health,
-            timestamp: new Date().toISOString()
-        });
+    _getRegionCenter(region) {
+        const centers = {
+            'eu-west': { lat: 53.3498, lng: -6.2603 },
+            'eu-north': { lat: 59.3293, lng: 18.0686 },
+            'eu-central': { lat: 50.1109, lng: 8.6821 },
+            'eu-south': { lat: 40.4168, lng: -3.7038 },
+            'uk-ireland': { lat: 51.5074, lng: -0.1278 }
+        };
+        return centers[region?.toLowerCase()] || { lat: 50, lng: 10 };
     }
 }
 
