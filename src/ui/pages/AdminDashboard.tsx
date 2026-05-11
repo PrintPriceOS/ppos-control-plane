@@ -107,19 +107,19 @@ const AdminDashboardInner: React.FC = () => {
     if (!isAuthorized) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center p-6">
-                <div className="max-w-3xl w-full bg-black border border-white/20 p-10">
+                <div className="max-w-3xl w-full bg-white dark:bg-black border border-slate-200 dark:border-white/20 p-10 shadow-2xl">
                     <div className="flex flex-col items-center text-center gap-6">
                         <div className="w-16 h-16 bg-primary flex items-center justify-center">
                             <ShieldCheckIcon className="w-8 h-8 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-white tracking-tight">Admin Gate</h2>
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Admin Gate</h2>
                             <p className="text-sm text-slate-500 font-medium mt-2">Enter your secure API key to access control systems.</p>
                         </div>
                         <div className="w-full space-y-4">
                             <input
                                 type="password"
-                                className="w-full bg-white/5 border border-white/10 px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:border-primary transition-all"
+                                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:border-primary transition-all dark:text-white"
                                 placeholder="••••••••••••"
                                 value={authKey}
                                 onChange={(e) => setAuthKey(e.target.value)}
@@ -139,14 +139,14 @@ const AdminDashboardInner: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-black">
-            <header className="sticky top-0 z-50 bg-black border-b border-white/10 px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-h-screen bg-white dark:bg-[#131314]">
+            <header className="sticky top-0 z-50 bg-white dark:bg-[#131314] border-b border-slate-200 dark:border-white/10 px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary flex items-center justify-center">
                         <ShieldCheckIcon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-white tracking-tight leading-none">
+                        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">
                             {t("admin.title" as any)}
                         </h1>
                         <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">
@@ -216,7 +216,7 @@ const AdminDashboardInner: React.FC = () => {
 
             <div className="max-w-7xl mx-auto px-6 pb-12">
                 <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
-                    <nav className="flex gap-1 bg-white/5 p-1 mb-8 w-fit border border-white/10 transition-all duration-300 whitespace-nowrap">
+                    <nav className="flex gap-1 bg-slate-50 dark:bg-white/5 p-1 mb-8 w-fit border border-slate-200 dark:border-white/10 transition-all duration-300 whitespace-nowrap">
                         {tabs.map(([id, label, Icon]) => (
                             <button
                                 key={id}
@@ -234,7 +234,7 @@ const AdminDashboardInner: React.FC = () => {
                     </nav>
                 </div>
 
-                <main className="bg-black border border-white/10 p-6 relative overflow-hidden">
+                <main className="bg-white dark:bg-black border border-slate-200 dark:border-white/10 p-6 relative overflow-hidden">
                     {/* Background glass decoration */}
                     <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-slate-200 rounded-full blur-3xl pointer-events-none" />

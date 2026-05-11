@@ -28,7 +28,7 @@ export const WorkerFleetTab: React.FC = () => {
         <div className="space-y-6 animate-slide-fade">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {fleet.map((w: any) => (
-                    <div key={w.id} className="bg-black border border-white/10 p-6 flex flex-col gap-4">
+                    <div key={w.id} className="bg-white dark:bg-black border border-white/10 p-6 flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 ${w.isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 text-white/20'}`}>

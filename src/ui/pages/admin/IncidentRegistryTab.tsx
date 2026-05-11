@@ -37,7 +37,7 @@ export const IncidentRegistryTab: React.FC = () => {
                     {
                         header: 'Severity',
                         accessor: (i) => (
-                            <span className={`px-2 py-1 rounded-lg font-black text-[10px] uppercase tracking-widest ${
+                            <span className={`px-2 py-1 rounded-none font-black text-[10px] uppercase tracking-widest ${
                                 i.status === 'CRITICAL' ? 'bg-red-100 text-red-700' :
                                 i.status === 'WARNING' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                             }`}>
@@ -66,7 +66,7 @@ export const IncidentRegistryTab: React.FC = () => {
                         header: 'RCA Status',
                         accessor: (i) => (
                             <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${i.metadata_json?.details?.remediated ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                <div className={`w-2 h-2 rounded-none ${i.metadata_json?.details?.remediated ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                                 <span className="text-[10px] font-black uppercase text-slate-500">{i.metadata_json?.details?.remediated ? 'REMEDIATED' : 'INVESTIGATING'}</span>
                             </div>
                         )
@@ -83,8 +83,8 @@ export const IncidentRegistryTab: React.FC = () => {
 };
 
 const IncidentStat = ({ label, value, icon: Icon, color, bg }: any) => (
-    <div className={`p-6 rounded-3xl ${bg} border border-white flex items-center gap-4`}>
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+    <div className={`p-6 rounded-none ${bg} border border-white flex items-center gap-4`}>
+        <div className="w-12 h-12 bg-white rounded-none flex items-center justify-center shadow-none">
             <Icon className={`w-6 h-6 ${color}`} />
         </div>
         <div>

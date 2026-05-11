@@ -55,7 +55,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, badge }) => (
       "flex items-center justify-between px-3 py-1.5 text-xs font-bold transition-all duration-100 group",
       isActive
         ? "bg-primary text-white"
-        : "text-zinc-400 hover:text-white hover:bg-white/[0.05]"
+        : "text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.05]"
     ].join(" ")}
   >
     <div className="flex items-center gap-3">
@@ -132,14 +132,14 @@ export const Sidebar: React.FC = () => {
   );
 
   return (
-    <aside className="w-64 bg-black border-r border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
+    <aside className="w-64 bg-white dark:bg-[#131314] border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand Header */}
-      <div className="px-5 py-6 flex items-center gap-3 border-b border-white/5">
+      <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-100 dark:border-white/5">
         <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
           <ShieldCheckIcon className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-sm font-black text-white leading-none tracking-tight">PrintPrice OS</h1>
+          <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
           <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
             {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
           </p>
@@ -166,7 +166,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-3 bg-white/5 border-t border-white/10 space-y-1">
+      <div className="p-3 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/10 space-y-1">
         <a 
           href="/admin/help" 
           className="flex items-center gap-3 px-3 py-2 text-primary hover:bg-primary hover:text-white transition-colors border border-primary/20 group"
@@ -177,7 +177,7 @@ export const Sidebar: React.FC = () => {
         
         <button 
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-zinc-500 hover:text-white hover:bg-red-600 transition-all group"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-slate-200 dark:hover:bg-red-600 transition-all group"
         >
           <ArrowPathIcon className="w-4 h-4" />
           <span className="text-[10px] font-black uppercase">Logout Session</span>

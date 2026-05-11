@@ -30,10 +30,10 @@ export const IndustrialTemporalTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Temporal Header */}
-            <div className="p-10 bg-slate-950 rounded-[3rem] text-white shadow-2xl relative overflow-hidden border border-slate-900">
+            <div className="p-10 bg-slate-950 rounded-[3rem] text-white shadow-none relative overflow-hidden border border-slate-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
+                        <div className="p-2 bg-indigo-500/20 rounded-none border border-indigo-500/30">
                             <ClockIcon className="w-6 h-6 text-indigo-400" />
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Phase 32 — Temporal Intelligence</span>
@@ -56,20 +56,20 @@ export const IndustrialTemporalTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Timeline Stability Radar */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
+                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <SparklesIcon className="w-4 h-4 text-indigo-500" />
                         Parallel Timeline Stability
                     </h3>
                     <div className="space-y-6">
                         {(timelines.data?.timelines || []).map((t: any, idx: number) => (
-                            <div key={idx} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl group hover:border-indigo-200 transition-all">
+                            <div key={idx} className="p-6 bg-slate-50 border border-slate-100 rounded-none group hover:border-indigo-200 transition-all">
                                 <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase">{t.id.split('_')[1]}</span>
+                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-none uppercase">{t.id.split('_')[1]}</span>
                                     <span className="text-sm font-black text-slate-900 italic">{t.ranking}%</span>
                                 </div>
                                 <p className="text-xs font-bold text-slate-600 leading-tight mb-4">{t.desc}</p>
-                                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                <div className="h-1.5 w-full bg-slate-200 rounded-none overflow-hidden">
                                     <div className="h-full bg-indigo-500" style={{ width: `${t.ranking}%` }} />
                                 </div>
                             </div>
@@ -78,16 +78,16 @@ export const IndustrialTemporalTab: React.FC = () => {
                 </div>
 
                 {/* Future Federation Projection Map */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <VariableIcon className="w-4 h-4 text-purple-400" />
                         Future-State Federation Projections
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {(futures.data?.forecasts || []).slice(0, 4).map((f: any, idx: number) => (
-                            <div key={idx} className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all">
+                            <div key={idx} className="p-6 bg-white/5 border border-white/10 rounded-none hover:bg-white/10 transition-all">
                                 <div className="flex items-center justify-between mb-6">
-                                    <div className="p-3 bg-white/5 rounded-2xl">
+                                    <div className="p-3 bg-white/5 rounded-none">
                                         <ArrowTrendingUpIcon className="w-5 h-5 text-purple-400" />
                                     </div>
                                     <span className="text-[10px] font-black text-slate-500 uppercase">+{f.horizon_hours}H HORIZON</span>
@@ -111,16 +111,16 @@ export const IndustrialTemporalTab: React.FC = () => {
             {/* Temporal Risk & Optimization Feed */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Temporal Risk Heatmap */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
+                <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <VariableIcon className="w-4 h-4 text-pink-500" />
                         Temporal Risk Heatmap
                     </h3>
                     <div className="space-y-4">
                         {(risks.data?.risks || []).map((r: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-none border border-slate-100">
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-3 h-3 rounded-full ${r.probability > 0.1 ? 'bg-pink-500 animate-pulse' : 'bg-slate-300'}`} />
+                                    <div className={`w-3 h-3 rounded-none ${r.probability > 0.1 ? 'bg-pink-500 animate-pulse' : 'bg-slate-300'}`} />
                                     <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{r.risk_type}</span>
                                 </div>
                                 <div className="text-right">
@@ -133,15 +133,15 @@ export const IndustrialTemporalTab: React.FC = () => {
                 </div>
 
                 {/* Future-State Optimization Feed */}
-                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
+                <div className="bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ArrowPathIcon className="w-4 h-4 text-indigo-500" />
                         Future-State Optimization Feed
                     </h3>
                     <div className="space-y-4">
                         {(overview.data?.snapshots || []).slice(0, 5).map((s: any, idx: number) => (
-                            <div key={idx} className="flex items-start gap-4 p-4 hover:bg-white rounded-2xl transition-all group">
-                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-indigo-200">
+                            <div key={idx} className="flex items-start gap-4 p-4 hover:bg-white rounded-none transition-all group">
+                                <div className="w-10 h-10 rounded-none bg-white border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-indigo-200">
                                     <ClockIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-500" />
                                 </div>
                                 <div>

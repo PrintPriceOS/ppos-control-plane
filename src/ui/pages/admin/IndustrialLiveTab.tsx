@@ -57,7 +57,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Header Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 border border-white/10">
+                    <div className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
                         <BoltIcon className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
@@ -68,7 +68,7 @@ export const IndustrialLiveTab: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleScan}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-black text-xs font-bold hover:bg-zinc-200 transition-all shadow-none"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white text-slate-900 dark:text-black text-xs font-bold hover:bg-slate-200 dark:hover:bg-zinc-200 transition-all shadow-none"
                     >
                         <ArrowPathIcon className="w-4 h-4" />
                         RUN SLA SCAN
@@ -86,7 +86,7 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Industrial Heatmap & Risks */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Capacity Heatmap */}
-                <div className="lg:col-span-2 bg-black border border-white/10 p-6">
+                <div className="lg:col-span-2 bg-white dark:bg-black border border-slate-200 dark:border-white/10 p-6">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ServerIcon className="w-4 h-4" />
                         Global Capacity Heatmap (Live Telemetry)
@@ -96,10 +96,10 @@ export const IndustrialLiveTab: React.FC = () => {
                             <button 
                                 key={node.node_id} 
                                 onClick={() => openMachine(node.node_id)}
-                                className="p-4 bg-zinc-900 border border-white/5 group hover:border-primary hover:bg-black transition-all text-left"
+                                className="p-4 bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 group hover:border-primary hover:bg-white dark:hover:bg-black transition-all text-left"
                             >
                                 <div className="flex items-center justify-between mb-3">
-                                    <div className={`w-2 h-2 rounded-full ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                    <div className={`w-2 h-2 rounded-none ${node.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                                     <span className="text-[10px] font-black text-slate-400 uppercase">{node.city || 'GLOBAL'}</span>
                                 </div>
                                 <p className="text-sm font-black text-slate-800 mb-1 truncate">{node.company_name}</p>
@@ -108,9 +108,9 @@ export const IndustrialLiveTab: React.FC = () => {
                                         <span className="text-[10px] font-bold text-slate-500 uppercase">{node.freshness_state} LOAD</span>
                                         <span className="text-[10px] font-black text-slate-900">{node.utilization_pct}%</span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-white/5 rounded-none overflow-hidden">
                                         <div 
-                                            className={`h-full rounded-full transition-all duration-1000 ${
+                                            className={`h-full rounded-none transition-all duration-1000 ${
                                                 node.utilization_pct > 90 ? 'bg-red-500' : 
                                                 node.utilization_pct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
                                             }`} 
@@ -124,7 +124,7 @@ export const IndustrialLiveTab: React.FC = () => {
                 </div>
 
                 {/* Live SLA Risks */}
-                <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+                <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ExclamationCircleIcon className="w-4 h-4" />
                         Evidence-Backed SLA Risks
@@ -134,7 +134,7 @@ export const IndustrialLiveTab: React.FC = () => {
                             <div 
                                 key={risk.dispatch_id} 
                                 onClick={() => openMachine(risk.node_id)}
-                                className="p-4 rounded-2xl bg-slate-50 border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-500 transition-all"
+                                className="p-4 rounded-none bg-slate-50 border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-500 transition-all"
                             >
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                                     risk.risk_level === 'CRITICAL' ? 'bg-red-500' : 
@@ -150,7 +150,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                 <p className="text-xs font-black text-slate-800 mb-1">{risk.node_name}</p>
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">DRIFT: +{risk.sla_drift_minutes}m</span>
-                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-none ${
                                         risk.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700' : 
                                         risk.risk_level === 'HIGH' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                                     }`}>
@@ -161,7 +161,7 @@ export const IndustrialLiveTab: React.FC = () => {
                         ))}
                         {(!slaRisks.data?.risks || slaRisks.data.risks.length === 0) && (
                             <div className="text-center py-10">
-                                <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <div className="w-10 h-10 bg-slate-50 rounded-none flex items-center justify-center mx-auto mb-3">
                                     <ShieldCheckIcon className="w-5 h-5 text-slate-300" />
                                 </div>
                                 <p className="text-xs font-bold text-slate-400">All dispatches within SLA.</p>
@@ -172,13 +172,13 @@ export const IndustrialLiveTab: React.FC = () => {
             </div>
 
             {/* Active Dispatch Queue */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-none border border-slate-200 shadow-none overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         <QueueListIcon className="w-4 h-4" />
                         Active Industrial Dispatch Queue
                     </h3>
-                    <span className="text-[10px] font-black px-2 py-1 bg-slate-100 text-slate-600 rounded-lg">
+                    <span className="text-[10px] font-black px-2 py-1 bg-slate-100 text-slate-600 rounded-none">
                         {activeDispatches.data?.dispatches?.length || 0} ACTIVE
                     </span>
                 </div>
@@ -208,7 +208,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                        <span className={`px-2 py-1 rounded-none text-[10px] font-black uppercase ${
                                             d.status === 'IN_PRODUCTION' ? 'bg-emerald-50 text-emerald-600' :
                                             d.status === 'ALLOCATED' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
                                         }`}>
@@ -237,13 +237,13 @@ export const IndustrialLiveTab: React.FC = () => {
             </div>
 
             {/* Reroute Timeline */}
-            <div className="bg-slate-50 rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <div className="bg-slate-50 rounded-none border border-slate-200 p-6 shadow-none">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Autonomous Reroute & Event Log</h3>
                 <div className="space-y-3">
                     {(reroutes.data?.events || []).map((e: any) => (
-                        <div key={e.id} className="p-4 bg-white rounded-2xl border border-slate-100 flex items-center justify-between hover:shadow-md transition-all">
+                        <div key={e.id} className="p-4 bg-white rounded-none border border-slate-100 flex items-center justify-between hover:shadow-none transition-all">
                             <div className="flex items-center gap-4">
-                                <div className={`p-2 rounded-xl ${e.event_type === 'AUTONOMOUS_REROUTE' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                                <div className={`p-2 rounded-none ${e.event_type === 'AUTONOMOUS_REROUTE' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                     {e.event_type === 'AUTONOMOUS_REROUTE' ? <BoltIcon className="w-5 h-5" /> : <ExclamationCircleIcon className="w-5 h-5" />}
                                 </div>
                                 <div>

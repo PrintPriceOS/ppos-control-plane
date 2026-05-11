@@ -1268,6 +1268,18 @@ export async function getEconomicConflicts() {
     return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
 }
 
+export async function getRoutingMap() {
+    return adminFetch<{ nodes: any[], routes: any[], summary: any }>('/api/admin/routing/map');
+}
+
+export async function getRoutingHeatmap() {
+    return adminFetch<any[]>('/api/admin/routing/heatmap');
+}
+
+export async function getRoutingLive() {
+    return adminFetch<any>('/api/admin/routing/live');
+}
+
 // --- Phase 34 — Live Federation Activation ---
 export async function getLiveCapacity() {
     return adminFetch<{ ok: boolean, overview: any[] }>('/api/admin/nodes/capacity/live');

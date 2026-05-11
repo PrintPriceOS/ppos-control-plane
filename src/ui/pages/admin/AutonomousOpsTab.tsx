@@ -76,7 +76,7 @@ export const AutonomousOpsTab: React.FC = () => {
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Real-time production orchestration & state monitoring.</p>
                 </div>
                 <div className="flex gap-2">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-none border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
                         <BoltIcon className="w-3 h-3" /> System Live
                     </div>
                 </div>
@@ -85,19 +85,19 @@ export const AutonomousOpsTab: React.FC = () => {
             {/* Global Metrics */}
             {metrics && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-4 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Jobs</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.total_jobs}</div>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-4 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Autonomous Rate</div>
                         <div className="text-2xl font-black text-slate-900">{((metrics.completed_autonomously / metrics.total_jobs) * 100 || 0).toFixed(1)}%</div>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-4 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Interventions</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.requiring_intervention}</div>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-4 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Failures</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.failed_pipelines}</div>
                     </div>
@@ -107,7 +107,7 @@ export const AutonomousOpsTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Pipelines List */}
                 <div className="lg:col-span-1 space-y-4">
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                         <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Pipelines</span>
                         </div>
@@ -130,7 +130,7 @@ export const AutonomousOpsTab: React.FC = () => {
                                     <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                         <ClockIcon className="w-3 h-3" /> {p.pipeline_state.replace(/_/g, ' ')}
                                     </div>
-                                    <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="mt-2 h-1 bg-slate-100 rounded-none overflow-hidden">
                                         <div
                                             className={`h-full transition-all duration-500 ${p.pipeline_status === 'FAILED' ? 'bg-red-400' : 'bg-indigo-500'}`}
                                             style={{ width: `${((pipelines.indexOf(p) + 1) / pipelines.length) * 100}%` }}
@@ -146,7 +146,7 @@ export const AutonomousOpsTab: React.FC = () => {
                 <div className="lg:col-span-2">
                     {selectedPipeline ? (
                         <div className="space-y-6">
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none">
                                 <div className="flex justify-between items-start mb-6">
                                     <div>
                                         <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -157,16 +157,16 @@ export const AutonomousOpsTab: React.FC = () => {
                                     </div>
                                     <div className="flex gap-2">
                                         {selectedPipeline.pipeline_status === 'RUNNING' ? (
-                                            <button onClick={() => handleAction(selectedPipeline.id, 'pause')} className="p-2 bg-amber-50 text-amber-600 rounded-lg border border-amber-100 hover:bg-amber-100 transition-colors">
+                                            <button onClick={() => handleAction(selectedPipeline.id, 'pause')} className="p-2 bg-amber-50 text-amber-600 rounded-none border border-amber-100 hover:bg-amber-100 transition-colors">
                                                 <PauseIcon className="w-5 h-5" />
                                             </button>
                                         ) : (
-                                            <button onClick={() => handleAction(selectedPipeline.id, 'resume')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                                            <button onClick={() => handleAction(selectedPipeline.id, 'resume')} className="p-2 bg-emerald-50 text-emerald-600 rounded-none border border-emerald-100 hover:bg-emerald-100 transition-colors">
                                                 <PlayIcon className="w-5 h-5" />
                                             </button>
                                         )}
                                         {selectedPipeline.pipeline_status === 'FAILED' && (
-                                            <button onClick={() => handleAction(selectedPipeline.id, 'retry-step')} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors">
+                                            <button onClick={() => handleAction(selectedPipeline.id, 'retry-step')} className="p-2 bg-indigo-50 text-indigo-600 rounded-none border border-indigo-100 hover:bg-indigo-100 transition-colors">
                                                 <ArrowPathIcon className="w-5 h-5" />
                                             </button>
                                         )}
@@ -176,21 +176,21 @@ export const AutonomousOpsTab: React.FC = () => {
                                 <div className="space-y-6 relative before:absolute before:inset-0 before:left-5 before:w-0.5 before:bg-slate-100">
                                     {selectedPipeline.events.map((e: any, i: number) => (
                                         <div key={i} className="relative pl-12">
-                                            <div className={`absolute left-0 top-0 w-10 h-10 rounded-xl flex items-center justify-center border-2 ${e.event_type === 'STEP_FAILED' ? 'bg-red-50 border-red-100' :
+                                            <div className={`absolute left-0 top-0 w-10 h-10 rounded-none flex items-center justify-center border-2 ${e.event_type === 'STEP_FAILED' ? 'bg-red-50 border-red-100' :
                                                 e.event_type === 'STEP_COMPLETED' ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200'
                                                 }`}>
                                                 {e.event_type === 'STEP_FAILED' ? <ExclamationTriangleIcon className="w-5 h-5 text-red-500" /> :
                                                     e.event_type === 'STEP_COMPLETED' ? <CheckBadgeIcon className="w-5 h-5 text-emerald-500" /> :
                                                         <ClockIcon className="w-5 h-5 text-slate-400" />}
                                             </div>
-                                            <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30">
+                                            <div className="p-4 rounded-none border border-slate-100 bg-slate-50/30">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{e.event_type}</span>
                                                     <span className="text-[9px] text-slate-400 font-medium">{new Date(e.created_at).toLocaleTimeString()}</span>
                                                 </div>
                                                 <div className="text-xs font-bold text-slate-600">{e.step_name.replace(/_/g, ' ')}</div>
                                                 {e.metadata_json && Object.keys(e.metadata_json).length > 0 && (
-                                                    <pre className="mt-2 p-2 bg-slate-900 text-slate-300 text-[9px] rounded-lg overflow-x-auto">
+                                                    <pre className="mt-2 p-2 bg-slate-900 text-slate-300 text-[9px] rounded-none overflow-x-auto">
                                                         {JSON.stringify(e.metadata_json, null, 2)}
                                                     </pre>
                                                 )}
@@ -201,7 +201,7 @@ export const AutonomousOpsTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-none border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
                             <ChartPieIcon className="w-12 h-12 opacity-20" />
                             <p className="font-black uppercase text-xs tracking-widest opacity-40">Select a pipeline to inspect state</p>
                         </div>

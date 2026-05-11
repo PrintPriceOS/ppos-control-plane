@@ -35,7 +35,7 @@ export const LifecyclePolicyTab: React.FC = () => {
                 <button 
                     onClick={handleProcessLifecycle}
                     disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-600/10"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-none text-xs font-black hover:bg-blue-700 disabled:opacity-50 transition-all shadow-none shadow-blue-600/10"
                 >
                     <ArrowPathIcon className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} />
                     EXECUTE LIFECYCLE SYNC
@@ -43,7 +43,7 @@ export const LifecyclePolicyTab: React.FC = () => {
             </div>
 
             {results && (
-                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-4 animate-in zoom-in-95">
+                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-none flex items-center gap-4 animate-in zoom-in-95">
                     <ShieldCheckIcon className="w-5 h-5 text-emerald-600" />
                     <span className="text-xs font-bold text-emerald-800">
                         Lifecycle Process Complete: {results.transitioned} tiers updated, {results.purged} artifacts purged.
@@ -57,7 +57,7 @@ export const LifecyclePolicyTab: React.FC = () => {
                 <TierCard tier="COLD" label="Deep Archive" color="text-slate-600" icon={ClockIcon} policy="90 Days" />
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-8">
+            <div className="bg-slate-50 border border-slate-200 rounded-none p-8">
                 <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-6">Retention Policies</h3>
                 <div className="space-y-4">
                     <PolicyRow 
@@ -85,25 +85,25 @@ export const LifecyclePolicyTab: React.FC = () => {
 };
 
 const TierCard = ({ tier, label, color, icon: Icon, policy }: any) => (
-    <div className="glass p-6 rounded-3xl border border-white">
+    <div className="glass p-6 rounded-none border border-white">
         <div className="flex items-center justify-between mb-4">
-            <div className={`p-3 rounded-2xl bg-white shadow-sm`}>
+            <div className={`p-3 rounded-none bg-white shadow-none`}>
                 <Icon className={`w-6 h-6 ${color}`} />
             </div>
             <span className={`text-xs font-black ${color}`}>{tier}</span>
         </div>
         <h4 className="text-sm font-black text-slate-900 mb-1">{label}</h4>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Retention: {policy}</p>
-        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-slate-100 rounded-none overflow-hidden">
             <div className={`h-full bg-slate-300`} style={{ width: '60%' }} />
         </div>
     </div>
 );
 
 const PolicyRow = ({ icon: Icon, title, description, status }: any) => (
-    <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+    <div className="flex items-center justify-between p-4 bg-white rounded-none border border-slate-100 shadow-none">
         <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+            <div className="w-10 h-10 bg-slate-50 rounded-none flex items-center justify-center text-slate-400">
                 <Icon className="w-5 h-5" />
             </div>
             <div>
@@ -111,7 +111,7 @@ const PolicyRow = ({ icon: Icon, title, description, status }: any) => (
                 <p className="text-[10px] font-medium text-slate-500">{description}</p>
             </div>
         </div>
-        <span className={`text-[9px] font-black px-2 py-1 rounded-full ${status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+        <span className={`text-[9px] font-black px-2 py-1 rounded-none ${status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
             {status}
         </span>
     </div>

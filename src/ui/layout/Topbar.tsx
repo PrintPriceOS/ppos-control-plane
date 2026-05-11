@@ -136,7 +136,7 @@ export const Topbar: React.FC = () => {
 
   return (
     <>
-      <header className="h-16 bg-black border-b border-white/10 sticky top-0 z-40 px-8 flex items-center justify-between">
+      <header className="h-16 bg-white dark:bg-[#131314] border-b border-slate-200 dark:border-white/10 sticky top-0 z-40 px-8 flex items-center justify-between">
         <div className="flex items-center gap-6">
           {/* Environment Badge */}
           <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
@@ -162,7 +162,7 @@ export const Topbar: React.FC = () => {
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setNotifOpen(v => !v)}
-              className="p-2 transition-all relative text-zinc-500 hover:text-white hover:bg-white/5"
+              className="p-2 transition-all relative text-slate-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
             >
               <BellIcon className="w-5 h-5" />
               {hasUnread && (
@@ -174,11 +174,11 @@ export const Topbar: React.FC = () => {
 
             {/* Notifications Dropdown */}
             {notifOpen && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-black border border-white/10 overflow-hidden z-50">
+              <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-black border border-slate-200 dark:border-white/10 overflow-hidden z-50 shadow-xl">
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5">
                   <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-black text-white uppercase tracking-widest">Notifications</p>
+                    <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notifications</p>
                     {hasUnread && (
                       <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] font-black uppercase">
                         {unreadCount} new
@@ -196,7 +196,7 @@ export const Topbar: React.FC = () => {
                 </div>
 
                 {/* List */}
-                <div className="divide-y divide-white/5 max-h-[380px] overflow-y-auto">
+                <div className="divide-y divide-slate-100 dark:divide-white/5 max-h-[380px] overflow-y-auto">
                   {notifications.map(n => {
                     const cfg = SEVERITY_CONFIG[n.severity];
                     const Icon = cfg.icon;
@@ -205,7 +205,7 @@ export const Topbar: React.FC = () => {
                         key={n.id}
                         onClick={() => handleMarkAsRead(n.id)}
                         className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
-                          n.read ? 'hover:bg-white/5' : 'bg-white/[0.02] hover:bg-white/5'
+                          n.read ? 'hover:bg-slate-50 dark:hover:bg-white/5' : 'bg-slate-50/50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/5'
                         }`}
                       >
                         {/* Severity Icon */}
@@ -216,7 +216,7 @@ export const Topbar: React.FC = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-[11px] leading-snug ${n.read ? 'font-medium text-zinc-400' : 'font-bold text-white'}`}>
+                            <p className={`text-[11px] leading-snug ${n.read ? 'font-medium text-slate-500 dark:text-zinc-400' : 'font-bold text-slate-900 dark:text-white'}`}>
                               {n.title}
                             </p>
                             {!n.read && (
@@ -253,15 +253,15 @@ export const Topbar: React.FC = () => {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(v => !v)}
-              className="flex items-center gap-3 pl-2 hover:bg-white/5 pr-2 py-1 transition-all group"
+              className="flex items-center gap-3 pl-2 hover:bg-slate-100 dark:hover:bg-white/5 pr-2 py-1 transition-all group"
             >
               <div className="text-right">
-                <p className="text-xs font-black text-white leading-tight">{getAuthUser()?.name || 'Authorized User'}</p>
+                <p className="text-xs font-black text-slate-900 dark:text-white leading-tight">{getAuthUser()?.name || 'Authorized User'}</p>
                 <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-tight">
                   {getUserRole()}
                 </p>
               </div>
-              <div className="w-8 h-8 bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:border-white/20 transition-colors">
+              <div className="w-8 h-8 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 dark:text-zinc-500 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">
                 <UserCircleIcon className="w-6 h-6" />
               </div>
               <ChevronDownIcon className={`w-3 h-3 text-zinc-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
@@ -269,11 +269,11 @@ export const Topbar: React.FC = () => {
 
             {/* Dropdown */}
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-black border border-white/10 z-50">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-black border border-slate-200 dark:border-white/10 z-50 shadow-xl">
                 <div className="p-0">
                   <button
                     onClick={handleSettings}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-black dark:hover:text-white transition-colors"
                   >
                     <Cog6ToothIcon className="w-4 h-4" />
                     Settings
@@ -300,12 +300,12 @@ export const Topbar: React.FC = () => {
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={() => setLogoutModal(false)}
           />
-          <div className="relative bg-black border border-white/10 p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5">
+          <div className="relative bg-white dark:bg-black border border-slate-200 dark:border-white/10 p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5 shadow-2xl">
             <div className="w-12 h-12 bg-red-500/10 flex items-center justify-center">
               <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-black text-white uppercase tracking-widest">Close Session?</p>
+              <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Close Session?</p>
               <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase">
                 Are you sure you want to log out of the Control Plane?
               </p>

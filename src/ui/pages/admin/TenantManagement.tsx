@@ -53,7 +53,7 @@ const BillingViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () =>
             </div>
 
             <div className="flex items-center gap-4 mb-6">
-                <div className="p-2.5 bg-indigo-600 text-white">
+                <div className="p-2.5 bg-indigo-600 text-slate-900 dark:text-white">
                     <CurrencyEuroIcon className="w-5 h-5" />
                 </div>
                 <div>
@@ -65,7 +65,7 @@ const BillingViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () =>
                     <select
                         value={year}
                         onChange={(e) => setYear(e.target.value)}
-                        className="text-[10px] font-bold bg-white/5 border border-indigo-500/20 px-2 py-1 outline-none text-white"
+                        className="text-[10px] font-bold bg-white/5 border border-indigo-500/20 px-2 py-1 outline-none text-slate-900 dark:text-white"
                     >
                         <option value="2024">2024</option>
                         <option value="2025">2025</option>
@@ -74,7 +74,7 @@ const BillingViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () =>
                     <select
                         value={month}
                         onChange={(e) => setMonth(e.target.value)}
-                        className="text-[10px] font-bold bg-white/5 border border-indigo-500/20 px-2 py-1 outline-none text-white"
+                        className="text-[10px] font-bold bg-white/5 border border-indigo-500/20 px-2 py-1 outline-none text-slate-900 dark:text-white"
                     >
                         {Array.from({ length: 12 }).map((_, i) => (
                             <option key={i} value={(i + 1).toString().padStart(2, '0')}>
@@ -146,7 +146,7 @@ const TimelineViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () =
                 <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-slate-200">
                     {events.map((event, idx) => (
                         <div key={idx} className="relative pl-7 group">
-                            <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${event.type === 'PLAN' ? 'bg-amber-500' :
+                            <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-none border-2 border-white shadow-none z-10 ${event.type === 'PLAN' ? 'bg-amber-500' :
                                 event.event.includes('100') ? 'bg-rose-500' : 'bg-blue-500'
                                 }`} />
                             <div className="flex flex-col">
@@ -341,7 +341,7 @@ export default function TenantManagement() {
                     return (
                         <div
                             key={tenant.id}
-                            className={`bg-black border ${usagePercent >= 100 ? 'border-rose-500/50' : 'border-white/10'} overflow-hidden hover:border-white/20 transition-all relative`}
+                            className={`bg-white dark:bg-black border ${usagePercent >= 100 ? 'border-rose-500/50' : 'border-white/10'} overflow-hidden hover:border-white/20 transition-all relative`}
                         >
                             {(usagePercent >= 100 || expiryWarning) && (
                                 <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
@@ -469,20 +469,20 @@ export default function TenantManagement() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
-                                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 transition-colors ${expandedTenant === tenant.id ? 'bg-primary text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 transition-colors ${expandedTenant === tenant.id ? 'bg-primary text-slate-900 dark:text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'
                                             }`}
                                     >
                                         <ClockIcon className="w-3 h-3" />
                                         History
                                     </button>
                                     <button
-                                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 transition-colors ${billingTenant === tenant.id ? 'bg-indigo-600 text-white' : 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20'
+                                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 transition-colors ${billingTenant === tenant.id ? 'bg-indigo-600 text-slate-900 dark:text-white' : 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20'
                                             }`}
                                     >
                                         <CurrencyEuroIcon className="w-3 h-3" />
                                         Billing
                                     </button>
-                                    <span className="flex items-center gap-1.5 font-mono text-[10px] bg-black border border-white/10 px-2 py-0.5 shadow-sm hover:text-primary transition-colors cursor-help" title={`Full ID: ${tenant.id}`}>
+                                    <span className="flex items-center gap-1.5 font-mono text-[10px] bg-white dark:bg-black border border-white/10 px-2 py-0.5 shadow-none hover:text-primary transition-colors cursor-help" title={`Full ID: ${tenant.id}`}>
                                         ID: {tenant.id.substring(0, 8)}...
                                     </span>
                                 </div>
@@ -509,7 +509,7 @@ export default function TenantManagement() {
             {/* Edit Modal */}
             {editingTenant && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-black border border-white/10 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 shadow-[0_0_50px_rgba(0,0,0,1)]">
+                    <div className="bg-white dark:bg-black border border-white/10 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 shadow-[0_0_50px_rgba(0,0,0,1)]">
                         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-xl font-bold text-slate-900">Manage Tenant</h3>
                             <button onClick={() => setEditingTenant(null)} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
@@ -637,7 +637,7 @@ export default function TenantManagement() {
                                                     email_to: e.target.value
                                                 }
                                             })}
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-primary-light transition-all"
+                                            className="w-full px-4 py-2 rounded-none border border-slate-200 text-sm focus:ring-2 focus:ring-primary-light transition-all"
                                         />
                                     </div>
 
@@ -649,7 +649,7 @@ export default function TenantManagement() {
                                         <p className="text-[10px] text-slate-500 mb-3 uppercase tracking-wider font-bold">Select events to dispatch</p>
                                         <div className="grid grid-cols-1 gap-2">
                                             {['quota.80', 'quota.100', 'plan.expiring', 'plan.expired', 'churn.risk'].map(evt => (
-                                                <label key={evt} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/50 transition-colors cursor-pointer">
+                                                <label key={evt} className="flex items-center gap-3 p-2 rounded-none hover:bg-white/50 transition-colors cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={editingTenant.notification_settings_json?.webhooks?.includes(evt)}
@@ -690,7 +690,7 @@ export default function TenantManagement() {
                                 className="px-8 py-2 bg-white text-black font-bold hover:bg-white/90 transition-all flex items-center gap-2"
                             >
                                 {isSaving ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-none animate-spin"></div>
                                 ) : (
                                     <CheckCircleIcon className="w-5 h-5" />
                                 )}

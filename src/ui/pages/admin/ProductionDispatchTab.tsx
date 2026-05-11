@@ -126,7 +126,7 @@ export const ProductionDispatchTab: React.FC = () => {
                     <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Autonomous Manufacturing Execution System</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-none shadow-none">
                         <div className="flex flex-col">
                             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Federation Health</span>
                             <span className="text-[10px] font-bold text-emerald-400">98.5% STABLE</span>
@@ -134,10 +134,10 @@ export const ProductionDispatchTab: React.FC = () => {
                         <div className="w-px h-6 bg-slate-800 mx-1"></div>
                         <div className="flex flex-col">
                             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Swarm Nodes</span>
-                            <span className="text-[10px] font-bold text-white">12 ACTIVE</span>
+                            <span className="text-[10px] font-bold text-slate-900 dark:text-white">12 ACTIVE</span>
                         </div>
                     </div>
-                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-none">
                         <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Execution Layer: LIVE</span>
                     </div>
                 </div>
@@ -145,39 +145,39 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Federation Visibility Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Stability</div>
                         <div className="text-xl font-black text-white tracking-tighter">99.2%</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Federation Risk</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">LOW</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Recovery Pressure</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">STABLE</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cross-Factory Traffic</div>
                         <div className="text-xl font-black text-indigo-400 tracking-tighter">14.2 GB/s</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <TruckIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -185,48 +185,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Singularity Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-fuchsia-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(217,70,239,0.12)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-fuchsia-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(217,70,239,0.12)]">
                     <div>
                         <div className="text-[8px] font-black text-fuchsia-500 uppercase tracking-widest mb-1">Omniversal Coherence</div>
                         <div className="text-xl font-black text-white tracking-tighter">100%</div>
                     </div>
-                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-xl flex items-center justify-center text-fuchsia-500">
+                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-none flex items-center justify-center text-fuchsia-500">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Singularity Vector</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">STABLE</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <CheckCircleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Entropy Level</div>
                         <div className="text-xl font-black text-blue-400 tracking-tighter">ZERO</div>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-none flex items-center justify-center text-blue-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Causal Stability</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">INTACT</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Transcend. Aware.</div>
                         <div className="text-xl font-black text-fuchsia-400 tracking-tighter">PEAK</div>
                     </div>
-                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-xl flex items-center justify-center text-fuchsia-400">
+                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-none flex items-center justify-center text-fuchsia-400">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -234,48 +234,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Reality Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-pink-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(236,72,153,0.1)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-pink-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(236,72,153,0.1)]">
                     <div>
                         <div className="text-[8px] font-black text-pink-500 uppercase tracking-widest mb-1">Timeline Stability</div>
                         <div className="text-xl font-black text-white tracking-tighter">100%</div>
                     </div>
-                    <div className="w-10 h-10 bg-pink-500/10 rounded-xl flex items-center justify-center text-pink-500">
+                    <div className="w-10 h-10 bg-pink-500/10 rounded-none flex items-center justify-center text-pink-500">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Univ. Continuity</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">INTACT</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <CheckCircleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existence Health</div>
                         <div className="text-xl font-black text-blue-400 tracking-tighter">OPTIMAL</div>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-none flex items-center justify-center text-blue-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Sim Integrity</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">NOMINAL</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Reality Divergence</div>
                         <div className="text-xl font-black text-indigo-400 tracking-tighter">ZERO</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -283,48 +283,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Interplanetary Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-violet-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(139,92,246,0.1)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-violet-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(139,92,246,0.1)]">
                     <div>
                         <div className="text-[8px] font-black text-violet-500 uppercase tracking-widest mb-1">Galactic Stability</div>
                         <div className="text-xl font-black text-white tracking-tighter">100%</div>
                     </div>
-                    <div className="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-500">
+                    <div className="w-10 h-10 bg-violet-500/10 rounded-none flex items-center justify-center text-violet-500">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Civ. Continuity</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">INTACT</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <CheckCircleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Interplan. Eq.</div>
                         <div className="text-xl font-black text-blue-400 tracking-tighter">BALANCED</div>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-none flex items-center justify-center text-blue-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Expansion Read.</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">NOMINAL</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existential Risk</div>
                         <div className="text-xl font-black text-rose-400 tracking-tighter">ZERO</div>
                     </div>
-                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400">
+                    <div className="w-10 h-10 bg-rose-500/10 rounded-none flex items-center justify-center text-rose-400">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -332,48 +332,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Civilization Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-sky-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(14,165,233,0.1)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-sky-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(14,165,233,0.1)]">
                     <div>
                         <div className="text-[8px] font-black text-sky-500 uppercase tracking-widest mb-1">Planetary Health</div>
                         <div className="text-xl font-black text-white tracking-tighter">100%</div>
                     </div>
-                    <div className="w-10 h-10 bg-sky-500/10 rounded-xl flex items-center justify-center text-sky-500">
+                    <div className="w-10 h-10 bg-sky-500/10 rounded-none flex items-center justify-center text-sky-500">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Stability</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">STABLE</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <CheckCircleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Equilibrium</div>
                         <div className="text-xl font-black text-blue-400 tracking-tighter">BALANCED</div>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-none flex items-center justify-center text-blue-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Expansion Press.</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">NOMINAL</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Macro Risk</div>
                         <div className="text-xl font-black text-indigo-400 tracking-tighter">LOW</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -381,48 +381,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Governance Intelligence Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-fuchsia-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(217,70,239,0.1)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-fuchsia-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(217,70,239,0.1)]">
                     <div>
                         <div className="text-[8px] font-black text-fuchsia-500 uppercase tracking-widest mb-1">Governance Health</div>
                         <div className="text-xl font-black text-white tracking-tighter">100%</div>
                     </div>
-                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-xl flex items-center justify-center text-fuchsia-500">
+                    <div className="w-10 h-10 bg-fuchsia-500/10 rounded-none flex items-center justify-center text-fuchsia-500">
                         <ShieldCheckIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fed Cognition</div>
                         <div className="text-xl font-black text-blue-400 tracking-tighter">AWARE</div>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-none flex items-center justify-center text-blue-400">
                         <BoltIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Constitution</div>
                         <div className="text-xl font-black text-emerald-400 tracking-tighter">INTACT</div>
                     </div>
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-none flex items-center justify-center text-emerald-400">
                         <CheckCircleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Ethics Pressure</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">LOW</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Optimization</div>
                         <div className="text-xl font-black text-indigo-400 tracking-tighter">GEN-12</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -430,48 +430,48 @@ export const ProductionDispatchTab: React.FC = () => {
 
             {/* Marketplace Economic Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="p-4 bg-slate-900 rounded-2xl border border-amber-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                <div className="p-4 bg-slate-900 rounded-none border border-amber-500/20 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                     <div>
                         <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest mb-1">Liquidity Index</div>
                         <div className="text-xl font-black text-white tracking-tighter">84.5</div>
                     </div>
-                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
+                    <div className="w-10 h-10 bg-amber-500/10 rounded-none flex items-center justify-center text-amber-500">
                         <CurrencyEuroIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Demand Pressure</div>
                         <div className="text-xl font-black text-rose-400 tracking-tighter">HIGH</div>
                     </div>
-                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400">
+                    <div className="w-10 h-10 bg-rose-500/10 rounded-none flex items-center justify-center text-rose-400">
                         <ExclamationTriangleIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Trade Velocity</div>
                         <div className="text-xl font-black text-cyan-400 tracking-tighter">1,240 /hr</div>
                     </div>
-                    <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center text-cyan-400">
+                    <div className="w-10 h-10 bg-cyan-500/10 rounded-none flex items-center justify-center text-cyan-400">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Open Auctions</div>
                         <div className="text-xl font-black text-indigo-400 tracking-tighter">12</div>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-none flex items-center justify-center text-indigo-400">
                         <TagIcon className="w-6 h-6" />
                     </div>
                 </div>
-                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
+                <div className="p-4 bg-slate-900 rounded-none border border-slate-800 flex items-center justify-between shadow-none">
                     <div>
                         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Pressure</div>
                         <div className="text-xl font-black text-slate-400 tracking-tighter">MODERATE</div>
                     </div>
-                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500">
+                    <div className="w-10 h-10 bg-slate-800 rounded-none flex items-center justify-center text-slate-500">
                         <ArrowPathIcon className="w-6 h-6" />
                     </div>
                 </div>
@@ -480,10 +480,10 @@ export const ProductionDispatchTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Dispatch Ledger */}
                 <div className="lg:col-span-4 space-y-4">
-                    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+                    <div className="bg-slate-900 rounded-none border border-slate-800 overflow-hidden shadow-none">
                         <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Industrial Ledger</span>
-                            <button onClick={fetchDispatches} className="p-1 hover:bg-slate-800 rounded-lg transition-colors">
+                            <button onClick={fetchDispatches} className="p-1 hover:bg-slate-800 rounded-none transition-colors">
                                 <ArrowPathIcon className={`w-3 h-3 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                             </button>
                         </div>
@@ -519,15 +519,15 @@ export const ProductionDispatchTab: React.FC = () => {
                 <div className="lg:col-span-8">
                     {selectedDispatch ? (
                         <div className="space-y-6 animate-slide-fade">
-                            <div className="bg-slate-900 rounded-3xl border border-slate-800 p-8 shadow-2xl relative overflow-hidden">
+                            <div className="bg-slate-900 rounded-none border border-slate-800 p-8 shadow-none relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-8">
-                                    <div className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${getStatusColor(selectedDispatch.status)}`}>
+                                    <div className={`px-4 py-1.5 rounded-none border text-[10px] font-black uppercase tracking-widest ${getStatusColor(selectedDispatch.status)}`}>
                                         {selectedDispatch.status}
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-6 mb-10">
-                                    <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-500 border border-slate-700 shadow-inner">
+                                    <div className="w-20 h-20 bg-slate-800 rounded-none flex items-center justify-center text-indigo-500 border border-slate-700 shadow-none">
                                         <TruckIcon className="w-10 h-10" />
                                     </div>
                                     <div>
@@ -542,7 +542,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </div>
                                         <p className="text-xs text-slate-500 font-mono tracking-tight uppercase">Trace ID: {selectedDispatch.id}</p>
                                         {selectedDispatch.status === 'SLA_AT_RISK' && (
-                                            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
+                                            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-none flex items-center gap-2">
                                                 <ExclamationTriangleIcon className="w-4 h-4 text-amber-500" />
                                                 <div>
                                                     <span className="text-[10px] font-black text-amber-400 uppercase tracking-tight block">SLA BREACH RISK DETECTED</span>
@@ -551,7 +551,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             </div>
                                         )}
                                         {selectedDispatch.status === 'CAPACITY_BLOCKED' && (
-                                            <div className="mt-2 p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+                                            <div className="mt-2 p-2 bg-rose-500/10 border border-rose-500/20 rounded-none flex items-center gap-2">
                                                 <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" />
                                                 <div>
                                                     <span className="text-[10px] font-black text-rose-400 uppercase tracking-tight block">CAPACITY CONFLICT DETECTED</span>
@@ -564,31 +564,31 @@ export const ProductionDispatchTab: React.FC = () => {
 
                                 {/* Operational Metrics Grid */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <MapPinIcon className="w-3 h-3" /> Node
                                         </div>
                                         <div className="text-xs font-bold text-white font-mono">{selectedDispatch.node_id.slice(0, 12)}...</div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Machine
                                         </div>
                                         <div className="text-xs font-bold text-white font-mono">{selectedDispatch.machine_id?.slice(0, 12) || 'AUTO'}</div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <CurrencyEuroIcon className="w-3 h-3" /> Est. Cost
                                         </div>
                                         <div className="text-xs font-bold text-emerald-400">€{selectedDispatch.estimated_cost}</div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <TagIcon className="w-3 h-3" /> Est. Margin
                                         </div>
                                         <div className="text-xs font-bold text-indigo-400">{selectedDispatch.estimated_margin}%</div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <ExclamationTriangleIcon className="w-3 h-3" /> Anomaly Score
                                         </div>
@@ -600,7 +600,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             {selectedDispatch.anomaly_score || '0.00'}
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Stability
                                         </div>
@@ -608,13 +608,13 @@ export const ProductionDispatchTab: React.FC = () => {
                                             {Math.max(0, 100 - (selectedDispatch.anomaly_score || 0)).toFixed(1)}%
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Reliability
                                         </div>
                                         <div className="text-xs font-bold text-cyan-400">{selectedDispatch.reliability_score || 0}%</div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <CurrencyEuroIcon className="w-3 h-3" /> Econ Score
                                         </div>
@@ -622,7 +622,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             {selectedDispatch.economic_score || '0'}
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Energy
                                         </div>
@@ -630,7 +630,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             {selectedDispatch.energy_efficiency_score || '0'}%
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50">
+                                    <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <ShieldCheckIcon className="w-3 h-3" /> Risk Score
                                         </div>
@@ -646,7 +646,7 @@ export const ProductionDispatchTab: React.FC = () => {
 
                                 {/* Predictive Risk Intelligence */}
                                 {selectedDispatch.metadata_json?.predictive_risk && (
-                                    <div className="mb-10 p-6 bg-rose-500/5 rounded-2xl border border-rose-500/10">
+                                    <div className="mb-10 p-6 bg-rose-500/5 rounded-none border border-rose-500/10">
                                         <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-4 flex items-center gap-2">
                                             <ShieldCheckIcon className="w-4 h-4" /> Predictive Industrial Risk Analysis
                                         </h4>
@@ -678,7 +678,7 @@ export const ProductionDispatchTab: React.FC = () => {
 
                                 {/* Reservation & Recovery Context */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-                                    <div className="p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                                    <div className="p-6 bg-indigo-500/5 rounded-none border border-indigo-500/10">
                                         <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
                                             <CalendarIcon className="w-4 h-4" /> Capacity Reservation Window
                                         </h4>
@@ -696,7 +696,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                     </div>
 
                                     {selectedDispatch.metadata_json?.autonomous_recovery && (
-                                        <div className="p-6 bg-cyan-500/5 rounded-2xl border border-cyan-500/10">
+                                        <div className="p-6 bg-cyan-500/5 rounded-none border border-cyan-500/10">
                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-4 flex items-center gap-2">
                                                 <BoltIcon className="w-4 h-4" /> Autonomous Recovery Node
                                             </h4>
@@ -719,175 +719,175 @@ export const ProductionDispatchTab: React.FC = () => {
                                 </div>
 
                                 {/* Dispatch Marketplace Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <CurrencyEuroIcon className="w-4 h-4 text-amber-500" /> Marketplace Economics
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Marketplace Bid Score</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.marketplace_bid_id ? '89.2' : 'N/A'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.marketplace_bid_id ? '89.2' : 'N/A'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Federated Margin Score</div>
                                             <div className="text-lg font-black text-emerald-400">{selectedDispatch.federated_margin_score || '92.5'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Auction Participation</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.marketplace_bid_id ? 'ACTIVE' : 'NO'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Delegation Cost</div>
                                             <div className="text-lg font-black text-amber-400">€ {selectedDispatch.delegated_factory_id ? '15.50' : '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Exchange Priority</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.exchange_priority_score || 'LOW'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.exchange_priority_score || 'LOW'}</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Dispatch Singularity Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <ShieldCheckIcon className="w-4 h-4 text-fuchsia-500" /> Omniversal Singularity Intelligence
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Singularity Weight</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.singularity_weight || '1.00'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.singularity_weight || '1.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Omniversal Priority</div>
                                             <div className="text-lg font-black text-fuchsia-400">{selectedDispatch.omniversal_priority || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Entropy Score</div>
                                             <div className="text-lg font-black text-rose-400">{selectedDispatch.entropy_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Causal Chain</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.causal_chain_id ? 'ACTIVE' : 'N/A'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Post-Reality</div>
-                                            <div className="text-lg font-black text-white">TRANSCENDENT</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">TRANSCENDENT</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Dispatch Reality Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <ShieldCheckIcon className="w-4 h-4 text-pink-500" /> Reality Simulation Intelligence
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Timeline Weight</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.timeline_weight || '1.00'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.timeline_weight || '1.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existence Priority</div>
                                             <div className="text-lg font-black text-emerald-400">{selectedDispatch.existence_priority || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Reality Risk</div>
                                             <div className="text-lg font-black text-rose-400">{selectedDispatch.reality_risk_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Univ. Dependency</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.universal_dependency || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Optimization</div>
-                                            <div className="text-lg font-black text-white">NOMINAL</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Dispatch Interplanetary Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <ShieldCheckIcon className="w-4 h-4 text-violet-500" /> Interplanetary Manufacturing Intelligence
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Interplan. Priority</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.interplanetary_priority_score || '0.00'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.interplanetary_priority_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Existential Risk</div>
                                             <div className="text-lg font-black text-rose-400">{selectedDispatch.existential_risk_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Orbital Route</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.orbital_route_id ? 'ACTIVE' : 'N/A'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Continuity Weight</div>
                                             <div className="text-lg font-black text-emerald-400">{selectedDispatch.continuity_weight || '1.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Deep Space Rel.</div>
-                                            <div className="text-lg font-black text-white">NOMINAL</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Dispatch Civilization Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <ShieldCheckIcon className="w-4 h-4 text-sky-500" /> Planetary Civilization Coordination
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Planetary Priority</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.planetary_priority_score || '0.00'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.planetary_priority_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Civilization Risk</div>
                                             <div className="text-lg font-black text-rose-400">{selectedDispatch.civilization_risk_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Intercont. Route</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.intercontinental_route_id ? 'ACTIVE' : 'N/A'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Equilibrium Weight</div>
                                             <div className="text-lg font-black text-emerald-400">{selectedDispatch.planetary_equilibrium_weight || '1.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Expansion Rel.</div>
-                                            <div className="text-lg font-black text-white">NOMINAL</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Dispatch Governance Intelligence */}
-                                <div className="mb-10 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 shadow-inner">
+                                <div className="mb-10 p-6 bg-slate-900/50 rounded-none border border-slate-800 shadow-none">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                                         <ShieldCheckIcon className="w-4 h-4 text-fuchsia-500" /> Industrial AI Governance
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Governance Risk</div>
-                                            <div className="text-lg font-black text-white">{selectedDispatch.governance_risk_score || '0.00'}</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">{selectedDispatch.governance_risk_score || '0.00'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Constitution</div>
                                             <div className="text-lg font-black text-emerald-400">{selectedDispatch.constitutional_compliance || '100'}%</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cognition Priority</div>
                                             <div className="text-lg font-black text-indigo-400">{selectedDispatch.cognition_priority || '0'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Generation ID</div>
                                             <div className="text-lg font-black text-cyan-400">{selectedDispatch.recursive_generation_id ? selectedDispatch.recursive_generation_id.slice(0,6) : 'N/A'}</div>
                                         </div>
-                                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                                        <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Ethics Class</div>
-                                            <div className="text-lg font-black text-white">NOMINAL</div>
+                                            <div className="text-lg font-black text-slate-900 dark:text-white">NOMINAL</div>
                                         </div>
                                     </div>
                                 </div>
@@ -904,9 +904,9 @@ export const ProductionDispatchTab: React.FC = () => {
                                                 key={status}
                                                 disabled={!isTransitionValid(selectedDispatch.status, status) || updating}
                                                 onClick={() => handleStatusUpdate(selectedDispatch.id, status)}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                                className={`px-3 py-1.5 rounded-none text-[9px] font-black uppercase tracking-widest border transition-all ${
                                                     selectedDispatch.status === status 
-                                                    ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
+                                                    ? 'bg-indigo-500 border-indigo-400 text-white shadow-none shadow-indigo-500/20' 
                                                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed'
                                                 }`}
                                             >
@@ -915,7 +915,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                         ))}
                                         <button 
                                             onClick={() => handleReroute(selectedDispatch.id)}
-                                            className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all"
+                                            className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-none text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all"
                                         >
                                             Reroute Node
                                         </button>
@@ -934,7 +934,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </button>
                                     </div>
                                     {showJson && (
-                                        <div className="p-4 bg-black/50 rounded-2xl border border-slate-800 font-mono text-[10px] text-indigo-300/80 overflow-x-auto whitespace-pre">
+                                        <div className="p-4 bg-white dark:bg-black/50 rounded-none border border-slate-800 font-mono text-[10px] text-indigo-300/80 overflow-x-auto whitespace-pre">
                                             {JSON.stringify(selectedDispatch.metadata_json, null, 2)}
                                         </div>
                                     )}
@@ -943,10 +943,10 @@ export const ProductionDispatchTab: React.FC = () => {
                                     <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-px before:bg-slate-800/50 pt-4">
                                         {selectedDispatch.events?.map((e: any, i: number) => (
                                             <div key={i} className="relative pl-10">
-                                                <div className="absolute left-0 top-0 w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
+                                                <div className="absolute left-0 top-0 w-8 h-8 rounded-none bg-slate-900 border border-slate-800 flex items-center justify-center">
                                                     {e.event_type === 'STATUS_CHANGED' ? <ClockIcon className="w-4 h-4 text-indigo-500" /> : <BoltIcon className="w-4 h-4 text-amber-500" />}
                                                 </div>
-                                                <div className="p-4 rounded-2xl bg-slate-800/20 border border-slate-800/50">
+                                                <div className="p-4 rounded-none bg-slate-800/20 border border-slate-800/50">
                                                     <div className="flex justify-between items-center mb-1">
                                                         <span className="text-[9px] font-black text-white uppercase tracking-widest">{e.event_type}</span>
                                                         <span className="text-[8px] text-slate-500 font-bold font-mono">{new Date(e.created_at).toLocaleString()}</span>
@@ -963,8 +963,8 @@ export const ProductionDispatchTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[600px] bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-6">
-                            <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 shadow-xl">
+                        <div className="h-full min-h-[600px] bg-slate-900/50 rounded-none border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-6">
+                            <div className="w-20 h-20 bg-slate-900 rounded-none flex items-center justify-center border border-slate-800 shadow-none">
                                 <DocumentTextIcon className="w-10 h-10 opacity-20" />
                             </div>
                             <div className="text-center">

@@ -35,7 +35,7 @@ export const OrchestrationTab: React.FC = () => {
                 <button 
                     onClick={handleRunAnalysis}
                     disabled={isAnalyzing}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg shadow-slate-900/10"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-none text-xs font-black hover:bg-slate-800 disabled:opacity-50 transition-all shadow-none shadow-slate-900/10"
                 >
                     <ArrowPathIcon className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
                     RUN HEALTH ANALYSIS
@@ -44,13 +44,13 @@ export const OrchestrationTab: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Fleet Health Card */}
-                <div className="glass p-6 rounded-3xl border border-white relative overflow-hidden">
+                <div className="glass p-6 rounded-none border border-white relative overflow-hidden">
                     <div className="flex items-start justify-between mb-8">
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Health Score</p>
                             <h3 className="text-4xl font-black text-slate-900">{snapshot?.fleetHealth?.score || 0}%</h3>
                         </div>
-                        <div className={`p-3 rounded-2xl ${snapshot?.fleetHealth?.score > 70 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                        <div className={`p-3 rounded-none ${snapshot?.fleetHealth?.score > 70 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
                             <ShieldCheckIcon className={`w-6 h-6 ${snapshot?.fleetHealth?.score > 70 ? 'text-emerald-600' : 'text-amber-600'}`} />
                         </div>
                     </div>
@@ -62,7 +62,7 @@ export const OrchestrationTab: React.FC = () => {
                 </div>
 
                 {/* Queue Routing Rules */}
-                <div className="glass p-6 rounded-3xl border border-white">
+                <div className="glass p-6 rounded-none border border-white">
                     <div className="flex items-center gap-2 mb-6">
                         <BoltIcon className="w-5 h-5 text-slate-900" />
                         <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Active Routing Rules</h3>
@@ -76,7 +76,7 @@ export const OrchestrationTab: React.FC = () => {
             </div>
 
             {/* Circuit Breaker Status */}
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-none p-6">
                 <div className="flex items-center gap-2 mb-4">
                     <ExclamationTriangleIcon className="w-5 h-5 text-slate-900" />
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Circuit Breaker & Quarantine</h3>
@@ -101,7 +101,7 @@ const HealthStat = ({ label, value, total, color = "text-slate-900" }: any) => (
 );
 
 const RoutingRule = ({ label, queue, condition }: any) => (
-    <div className="flex items-center justify-between p-3 bg-white/50 rounded-2xl border border-slate-100">
+    <div className="flex items-center justify-between p-3 bg-white/50 rounded-none border border-slate-100">
         <div>
             <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{label}</p>
             <p className="text-[9px] font-bold text-slate-400 font-mono">{queue}</p>
@@ -111,7 +111,7 @@ const RoutingRule = ({ label, queue, condition }: any) => (
 );
 
 const CircuitBreakerCard = ({ label, status, detail }: any) => (
-    <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div className="p-4 bg-white rounded-none border border-slate-200 shadow-none">
         <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>

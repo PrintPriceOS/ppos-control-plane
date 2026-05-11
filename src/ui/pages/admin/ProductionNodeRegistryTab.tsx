@@ -74,14 +74,14 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                             <button
                                 key={nodeId}
                                 onClick={() => handleSelectNode(node)}
-                                className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                                className={`w-full text-left p-4 rounded-none border transition-all ${
                                     isSelected
-                                    ? 'bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200'
+                                    ? 'bg-slate-900 border-slate-900 text-white shadow-none shadow-slate-200'
                                     : 'bg-white border-slate-200 text-slate-900 hover:border-slate-400'
                                 }`}
                             >
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className={`p-2 rounded-lg ${isSelected ? 'bg-white/10' : 'bg-slate-100'}`}>
+                                    <div className={`p-2 rounded-none ${isSelected ? 'bg-white/10' : 'bg-slate-100'}`}>
                                         <CpuChipIcon className="w-4 h-4" />
                                     </div>
                                     <span className="text-sm font-black truncate">{node.name || 'Printhouse Node'}</span>
@@ -94,7 +94,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                         );
                     })}
                     {nodes.length === 0 && !loading && (
-                        <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <div className="text-center py-8 bg-slate-50 rounded-none border border-dashed border-slate-200">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No nodes discovered</p>
                         </div>
                     )}
@@ -106,17 +106,17 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                 {selectedNode ? (
                     <div className="space-y-6">
                         {/* Node Profile Header */}
-                        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm relative overflow-hidden">
+                        <div className="bg-white rounded-none border border-slate-200 p-8 shadow-none relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
                                 <CpuChipIcon className="w-48 h-48" />
                             </div>
                             
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200">
+                                    <span className="px-3 py-1 bg-slate-100 rounded-none text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200">
                                         NODE ID: {selectedNode.id || selectedNode.printer_id || selectedNode._id}
                                     </span>
-                                    <span className="px-3 py-1 bg-emerald-100 rounded-full text-[10px] font-black text-emerald-700 uppercase tracking-widest border border-emerald-200">
+                                    <span className="px-3 py-1 bg-emerald-100 rounded-none text-[10px] font-black text-emerald-700 uppercase tracking-widest border border-emerald-200">
                                         INDUSTRIAL READY
                                     </span>
                                 </div>
@@ -125,7 +125,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                     <p className="text-slate-500 font-medium tracking-tight">Production Facility & Manufacturing Execution Node</p>
                                     <button 
                                         onClick={() => setIsDrawerOpen(true)}
-                                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase hover:bg-black transition-all shadow-xl shadow-slate-200"
+                                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-none text-xs font-black uppercase hover:bg-white dark:bg-black transition-all shadow-none shadow-slate-200"
                                     >
                                         <BoltIcon className="w-4 h-4 text-red-500" />
                                         Full Machine Intelligence
@@ -254,7 +254,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                         </div>
 
                         {/* Performance Details */}
-                        <div className="bg-slate-900 rounded-3xl p-8 text-white min-h-[300px] shadow-2xl shadow-slate-900/20">
+                        <div className="bg-slate-900 rounded-none p-8 text-white min-h-[300px] shadow-none shadow-slate-900/20">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                                     <ChartBarIcon className="w-5 h-5 text-emerald-400" />
@@ -267,7 +267,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
 
                             {statsLoading ? (
                                 <div className="flex flex-col items-center justify-center h-48 space-y-4">
-                                    <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                                    <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-none animate-spin" />
                                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40 text-emerald-500">Aggregating industrial telemetry...</p>
                                 </div>
                             ) : (
@@ -281,11 +281,11 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                         <PerformanceMetric label="Backlog / Queue Depth" value={nodeStats?.queuedJobs} />
                                     </div>
                                     
-                                    <div className="bg-white/5 rounded-2xl border border-white/10 p-6 flex flex-col justify-center">
+                                    <div className="bg-white/5 rounded-none border border-white/10 p-6 flex flex-col justify-center">
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-4 text-emerald-400 tracking-widest">Node Health Diagnostic</p>
                                         <div className="space-y-4">
                                             <div className="flex items-start gap-3">
-                                                <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                                                <div className="p-1.5 bg-emerald-500/20 rounded-none">
                                                     <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
                                                 </div>
                                                 <div>
@@ -294,7 +294,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-3">
-                                                <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                                                <div className="p-1.5 bg-blue-500/20 rounded-none">
                                                     <BoltIcon className="w-5 h-5 text-blue-500" />
                                                 </div>
                                                 <div>
@@ -309,8 +309,8 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full min-h-[600px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-400">
-                        <div className="p-6 bg-white rounded-full shadow-sm mb-4">
+                    <div className="h-full min-h-[600px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-none flex flex-col items-center justify-center text-slate-400">
+                        <div className="p-6 bg-white rounded-none shadow-none mb-4">
                             <CpuChipIcon className="w-12 h-12 opacity-10" />
                         </div>
                         <p className="text-[10px] font-black uppercase tracking-widest opacity-30">Select a Production Node to Begin Operational Audit</p>
@@ -322,10 +322,10 @@ export const ProductionNodeRegistryTab: React.FC = () => {
 };
 
 const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white p-4 rounded-none border border-slate-200 shadow-none hover:shadow-none transition-shadow">
         <div className="flex items-center justify-between mb-3">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{label}</span>
-            <div className={`p-1.5 rounded-lg bg-slate-50`}>
+            <div className={`p-1.5 rounded-none bg-slate-50`}>
                 <Icon className={`w-3.5 h-3.5 ${color}`} />
             </div>
         </div>

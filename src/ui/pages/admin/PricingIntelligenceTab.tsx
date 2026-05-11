@@ -88,7 +88,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                    className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-none text-sm font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-none active:scale-95"
                 >
                     <PlusIcon className="w-4 h-4" /> New Profile
                 </button>
@@ -97,7 +97,7 @@ export const PricingIntelligenceTab: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+                    <div className="bg-white rounded-none p-8 max-w-md w-full shadow-none border border-slate-100">
                         <h3 className="text-xl font-black text-slate-900 mb-6">Create Pricing Profile</h3>
                         <div className="space-y-4">
                             <div>
@@ -106,7 +106,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                     type="text" 
                                     value={formData.printer_id}
                                     onChange={e => setFormData({...formData, printer_id: e.target.value})}
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                    className="w-full px-4 py-3 rounded-none bg-slate-50 border border-slate-100 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
                                     placeholder="e.g. adv-2025"
                                 />
                             </div>
@@ -118,7 +118,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                         step="0.001"
                                         value={formData.base_cost_per_sheet}
                                         onChange={e => setFormData({...formData, base_cost_per_sheet: parseFloat(e.target.value)})}
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                        className="w-full px-4 py-3 rounded-none bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
                                     />
                                 </div>
                                 <div>
@@ -127,7 +127,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                         type="number" 
                                         value={formData.setup_cost}
                                         onChange={e => setFormData({...formData, setup_cost: parseFloat(e.target.value)})}
-                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                        className="w-full px-4 py-3 rounded-none bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
                                     />
                                 </div>
                             </div>
@@ -137,7 +137,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                     type="number" 
                                     value={formData.minimum_job_fee}
                                     onChange={e => setFormData({...formData, minimum_job_fee: parseFloat(e.target.value)})}
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
+                                    className="w-full px-4 py-3 rounded-none bg-slate-50 border border-slate-100 text-sm font-bold outline-none"
                                 />
                             </div>
                         </div>
@@ -145,13 +145,13 @@ export const PricingIntelligenceTab: React.FC = () => {
                             <button 
                                 onClick={handleCreateProfile}
                                 disabled={isSaving || !formData.printer_id}
-                                className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest disabled:opacity-50"
+                                className="flex-1 bg-slate-900 text-white py-3 rounded-none font-black uppercase text-xs tracking-widest disabled:opacity-50"
                             >
                                 {isSaving ? 'Saving...' : 'Save Profile'}
                             </button>
                             <button 
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-3 border border-slate-200 rounded-xl font-black uppercase text-xs tracking-widest text-slate-400 hover:bg-slate-50"
+                                className="px-6 py-3 border border-slate-200 rounded-none font-black uppercase text-xs tracking-widest text-slate-400 hover:bg-slate-50"
                             >
                                 Cancel
                             </button>
@@ -168,12 +168,12 @@ export const PricingIntelligenceTab: React.FC = () => {
                     { label: "Avg Markup", value: "35%", icon: CalculatorIcon, color: "text-amber-600", bg: "bg-amber-50" },
                     { label: "Economic Health", value: "92%", icon: ChartPieIcon, color: "text-rose-600", bg: "bg-rose-50" }
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div key={i} className="bg-white p-4 rounded-none border border-slate-100 shadow-none flex items-center justify-between">
                         <div>
                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
                             <div className="text-xl font-black text-slate-900 mt-0.5">{stat.value}</div>
                         </div>
-                        <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center`}>
+                        <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-none flex items-center justify-center`}>
                             <stat.icon className="w-5 h-5" />
                         </div>
                     </div>
@@ -183,7 +183,7 @@ export const PricingIntelligenceTab: React.FC = () => {
             {/* Conditional Views */}
             {view === 'profiles' ? (
                 /* Profiles Table */
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                     {/* ... (Existing Profiles Table Content) ... */}
                     <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                         <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest">Active Economic Profiles</h3>
@@ -212,7 +212,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                             <div className="text-[10px] text-slate-400 uppercase font-bold">{p.machine_nickname || 'Printer-wide'}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${p.pricing_scope === 'MACHINE' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
+                                            <span className={`px-2 py-0.5 rounded-none text-[8px] font-black uppercase ${p.pricing_scope === 'MACHINE' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
                                                 {p.pricing_scope}
                                             </span>
                                         </td>
@@ -221,7 +221,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                         <td className="px-6 py-4 font-mono text-xs text-slate-600">{p.minimum_job_fee} {p.currency}</td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1.5">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${p.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                                <div className={`w-1.5 h-1.5 rounded-none ${p.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                                                 <span className="text-[10px] font-black uppercase text-slate-600">{p.active ? 'Active' : 'Disabled'}</span>
                                             </div>
                                         </td>
@@ -244,7 +244,7 @@ export const PricingIntelligenceTab: React.FC = () => {
             ) : (
                 <div className="space-y-6">
                     {/* Economic Routing History */}
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest">Economic Routing Decisions</h3>
                         </div>
@@ -274,7 +274,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <div className="text-sm font-black text-slate-900">{decision.final_routing_score}</div>
-                                                        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="w-12 h-1 bg-slate-100 rounded-none overflow-hidden">
                                                             <div className="h-full bg-primary" style={{ width: `${decision.final_routing_score}%` }} />
                                                         </div>
                                                     </div>
@@ -295,14 +295,14 @@ export const PricingIntelligenceTab: React.FC = () => {
                     </div>
 
                     {/* Conflict Inspector */}
-                    <div className="bg-white rounded-2xl border border-rose-100 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-rose-100 overflow-hidden shadow-none">
                         <div className="px-6 py-4 border-b border-rose-50 flex items-center justify-between bg-rose-50/30">
                             <h3 className="font-black text-rose-900 text-xs uppercase tracking-widest">Economic Conflict Inspector</h3>
                         </div>
                         <div className="divide-y divide-rose-50">
                             {conflicts.map((c, i) => (
                                 <div key={i} className="px-6 py-4 flex items-start gap-4 hover:bg-rose-50/10">
-                                    <div className={`mt-1 w-2 h-2 rounded-full ${c.severity === 'HIGH' ? 'bg-rose-500 animate-pulse' : c.severity === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                                    <div className={`mt-1 w-2 h-2 rounded-none ${c.severity === 'HIGH' ? 'bg-rose-500 animate-pulse' : c.severity === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-500'}`} />
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black uppercase text-rose-600">{c.conflict_type}</span>

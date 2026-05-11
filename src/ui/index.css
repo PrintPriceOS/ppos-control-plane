@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
+
 
 /* ===================== */
 /* Tailwind theme override*/
@@ -94,16 +96,16 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #000;
+  background-color: #fff;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', 'Roboto Mono', monospace;
+  font-family: 'Manrope', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #e5e5e5;
-  background-color: #000000;
+  color: #000;
+  background-color: #fff;
   line-height: 1.4;
 }
 
@@ -2098,3 +2100,5 @@ div[role="button"]:focus-visible,
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
+
+.dark body, .dark #root { background-color: #131314 !important; color: #ffffff !important; }

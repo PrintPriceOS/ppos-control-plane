@@ -14,7 +14,7 @@ export const LargeDocumentTab: React.FC = () => {
     const { data, status, error } = useAdminQuery("large-document-jobs", () => getPreflightJobs({ largeOnly: true }));
 
     if (status === "loading") return <div className="p-20 text-center animate-pulse font-bold text-slate-400">Syncing Industrial Pipeline...</div>;
-    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-xl">Error: {error}</div>;
+    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-none">Error: {error}</div>;
 
     const jobs = data?.jobs || [];
 
@@ -28,7 +28,7 @@ export const LargeDocumentTab: React.FC = () => {
                 <VitalCard label="Stalled Artifacts" value="0" icon={ExclamationCircleIcon} color="emerald" />
             </div>
 
-            <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm">
+            <div className="glass rounded-none border border-white overflow-hidden shadow-none">
                 <div className="px-6 py-4 bg-slate-50/50 border-b border-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <DocumentDuplicateIcon className="w-5 h-5 text-slate-400" />
@@ -63,8 +63,8 @@ export const LargeDocumentTab: React.FC = () => {
                                             <StatusBadge status={j.status} />
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${j.progress}%` }} />
+                                            <div className="w-24 h-1.5 bg-slate-100 rounded-none overflow-hidden border border-slate-200">
+                                                <div className="h-full bg-blue-500 rounded-none" style={{ width: `${j.progress}%` }} />
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-slate-400">{new Date(j.createdAt).toLocaleString()}</td>
@@ -80,8 +80,8 @@ export const LargeDocumentTab: React.FC = () => {
 };
 
 const VitalCard = ({ label, value, icon: Icon, color }: { label: string, value: string, icon: any, color: string }) => (
-    <div className="glass rounded-xl p-4 border border-white flex items-center gap-4">
-        <div className={`p-2 rounded-lg bg-${color}-50 text-${color}-600`}>
+    <div className="glass rounded-none p-4 border border-white flex items-center gap-4">
+        <div className={`p-2 rounded-none bg-${color}-50 text-${color}-600`}>
             <Icon className="w-5 h-5" />
         </div>
         <div>
@@ -92,7 +92,7 @@ const VitalCard = ({ label, value, icon: Icon, color }: { label: string, value: 
 );
 
 const StatusBadge = ({ status }: { status: string }) => (
-    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+    <span className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-widest border ${
         status === 'PROCESSING' ? 'bg-blue-50 border-blue-100 text-blue-700 animate-pulse' : 
         status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
         'bg-slate-50 border-slate-100 text-slate-500'

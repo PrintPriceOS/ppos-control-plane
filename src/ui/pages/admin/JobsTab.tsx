@@ -49,11 +49,11 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
     return (
         <div className="space-y-6 relative animate-slide-fade">
             {/* Filters Header */}
-            <div className="flex flex-col lg:flex-row gap-4 p-4 glass rounded-2xl border border-white">
+            <div className="flex flex-col lg:flex-row gap-4 p-4 glass rounded-none border border-white">
                 <div className="flex-1 relative group">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <input
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                        className="w-full bg-white/50 border border-slate-200 rounded-none pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                         placeholder={t("admin.jobs.filterTenant" as any)}
                         value={tenant}
                         onChange={(e) => { setTenant(e.target.value); setPage(0); }}
@@ -62,7 +62,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                 <div className="flex-1 relative group">
                     <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <input
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                        className="w-full bg-white/50 border border-slate-200 rounded-none pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                         placeholder={t("admin.jobs.filterType" as any)}
                         value={type}
                         onChange={(e) => { setType(e.target.value); setPage(0); }}
@@ -71,7 +71,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                 <div className="lg:w-48 relative">
                     <AdjustmentsHorizontalIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <select
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                        className="w-full bg-white/50 border border-slate-200 rounded-none pl-10 pr-4 py-2.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                         value={status}
                         onChange={(e) => { setStatus(e.target.value); setPage(0); }}
                     >
@@ -87,19 +87,19 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
 
             {q.status === "loading" && (
                 <div className="py-20 flex justify-center">
-                    <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+                    <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-none animate-spin" />
                 </div>
             )}
 
             {q.status === "error" && (
-                <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-100 text-red-700 font-bold">
+                <div className="p-8 text-center bg-red-50 rounded-none border border-red-100 text-red-700 font-bold">
                     {q.error}
                 </div>
             )}
 
             {q.status === "success" && q.data && (
                 <>
-                    <div className="glass rounded-2xl border border-white overflow-hidden">
+                    <div className="glass rounded-none border border-white overflow-hidden">
                         <table className="w-full text-sm text-left border-collapse">
                             <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white">
                                 <tr>
@@ -145,7 +145,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                     >
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-slate-200 group-hover:bg-primary transition-colors" />
+                                                <div className="w-2 h-2 rounded-none bg-slate-200 group-hover:bg-primary transition-colors" />
                                                 <span className="font-mono text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded">
                                                     {j.id.split('-')[0]}
                                                 </span>
@@ -160,7 +160,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                         </td>
                                         <td className="py-4 px-6">
                                             <span className={[
-                                                "px-2 py-1 rounded-md text-[10px] font-black tracking-widest uppercase",
+                                                "px-2 py-1 rounded-none text-[10px] font-black tracking-widest uppercase",
                                                 j.status === "FAILED" ? "bg-red-100 text-red-700" :
                                                     j.status === "SUCCEEDED" ? "bg-emerald-100 text-emerald-700" :
                                                         j.status === "RUNNING" ? "bg-sky-100 text-sky-700 animate-pulse" :
@@ -168,7 +168,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                             ].join(" ")}>{j.status}</span>
                                         </td>
                                         <td className="py-4 px-6">
-                                            <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                            <div className="w-24 bg-slate-100 h-1.5 rounded-none overflow-hidden">
                                                 <div
                                                     className={`h-full transition-all duration-500 ${j.status === 'FAILED' ? 'bg-red-400' : 'bg-primary'}`}
                                                     style={{ width: `${Math.round((j.progress || 0) * 100)}%` }}
@@ -200,14 +200,14 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                         </div>
                         <div className="flex gap-2">
                             <button
-                                className="p-2 glass rounded-xl border border-white hover:bg-white text-slate-600 disabled:opacity-30 transition-all hover:scale-105 active:scale-95"
+                                className="p-2 glass rounded-none border border-white hover:bg-white text-slate-600 disabled:opacity-30 transition-all hover:scale-105 active:scale-95"
                                 disabled={page === 0}
                                 onClick={() => setPage((p) => Math.max(p - 1, 0))}
                             >
                                 <ChevronLeftIcon className="w-5 h-5" />
                             </button>
                             <button
-                                className="p-2 glass rounded-xl border border-white hover:bg-white text-slate-600 disabled:opacity-30 transition-all hover:scale-105 active:scale-95"
+                                className="p-2 glass rounded-none border border-white hover:bg-white text-slate-600 disabled:opacity-30 transition-all hover:scale-105 active:scale-95"
                                 disabled={(page + 1) * limit >= q.data.total}
                                 onClick={() => setPage((p) => p + 1)}
                             >
@@ -224,7 +224,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                     <h2 className="text-xl font-black text-slate-900 tracking-tight">Transmission Details</h2>
                                     <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mt-1">Ref: {selectedJob.id}</p>
                                 </div>
-                                <button onClick={() => setSelectedJob(null)} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                                <button onClick={() => setSelectedJob(null)} className="p-2 rounded-none bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
                                     <XMarkIcon className="w-6 h-6" />
                                 </button>
                             </div>
@@ -245,8 +245,8 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Vector Progress</span>
                                         <div className="flex items-center gap-3">
-                                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-primary rounded-full" style={{ width: `${Math.round((selectedJob.progress || 0) * 100)}%` }} />
+                                            <div className="flex-1 h-2 bg-slate-100 rounded-none overflow-hidden">
+                                                <div className="h-full bg-primary rounded-none" style={{ width: `${Math.round((selectedJob.progress || 0) * 100)}%` }} />
                                             </div>
                                             <span className="text-xs font-black text-slate-900">{Math.round((selectedJob.progress || 0) * 100)}%</span>
                                         </div>
@@ -264,7 +264,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                 </div>
 
                                 {selectedJob.error && (
-                                    <div className="p-5 bg-red-500/[0.03] border border-red-100 rounded-2xl">
+                                    <div className="p-5 bg-red-500/[0.03] border border-red-100 rounded-none">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2 text-red-600">
                                                 <ExclamationCircleIcon className="w-5 h-5" />
@@ -272,12 +272,12 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                             </div>
                                             <a
                                                 href={getErrorArticleLink(typeof selectedJob.error === 'string' ? selectedJob.error : (selectedJob.error?.code || 'unknown'))}
-                                                className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
+                                                className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-none border border-red-100 hover:bg-red-50 transition-colors"
                                             >
                                                 ℹ Explain this error
                                             </a>
                                         </div>
-                                        <pre className="p-4 bg-white/80 border border-red-100 text-red-900 text-[11px] font-mono rounded-xl overflow-auto max-h-60 whitespace-pre-wrap leading-relaxed">
+                                        <pre className="p-4 bg-white/80 border border-red-100 text-red-900 text-[11px] font-mono rounded-none overflow-auto max-h-60 whitespace-pre-wrap leading-relaxed">
                                             {typeof selectedJob.error === 'string' ? selectedJob.error : JSON.stringify(selectedJob.error, null, 2)}
                                         </pre>
                                     </div>
@@ -295,7 +295,7 @@ export const JobsTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) => 
                                         <div className="relative pl-6 space-y-8 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
                                             {qAudit.data.map(a => (
                                                 <div key={a.id} className="relative">
-                                                    <div className="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white bg-primary shadow-sm" />
+                                                    <div className="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-none border-2 border-white bg-primary shadow-none" />
                                                     <div className="font-black text-[11px] text-slate-900 uppercase tracking-widest">{a.action.replace('_', ' ')}</div>
                                                     <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400 font-bold">
                                                         <ClockIcon className="w-3 h-3" />

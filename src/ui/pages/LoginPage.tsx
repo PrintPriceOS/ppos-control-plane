@@ -65,11 +65,11 @@ export const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#121214] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-slate-50 dark:bg-[#131314] flex items-center justify-center p-6">
             <div className="w-full max-w-md">
                 {/* Branding */}
                 <div className="flex flex-col items-center mb-8 text-center">
-                    <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-none flex items-center justify-center mb-4">
                         <ShieldCheckIcon className="w-10 h-10 text-[#dc0000]" />
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">PrintPrice Control Plane</h1>
@@ -77,7 +77,7 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 {/* Login Card */}
-                <div className="glass p-8 rounded-3xl border border-white dark:border-white/[0.08] shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
+                <div className="bg-white dark:bg-black p-8 rounded-none border border-slate-200 dark:border-white/[0.08] shadow-none">
                     <div className="mb-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-[#ECECF1]">Authentication Required</h2>
                         <p className="text-sm text-slate-500 mt-1">Access the platform using your credentials.</p>
@@ -98,7 +98,7 @@ export const LoginPage: React.FC = () => {
                                     value={email}
                                     onChange={(e) => { setEmail(e.target.value); setError(null); }}
                                     placeholder="admin@printprice.pro"
-                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border-2 border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
+                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
                                     autoFocus
                                 />
                             </div>
@@ -118,7 +118,7 @@ export const LoginPage: React.FC = () => {
                                     value={password}
                                     onChange={(e) => { setPassword(e.target.value); setError(null); }}
                                     placeholder="••••••••••••"
-                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border-2 border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
+                                    className="w-full bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.05] focus:border-red-500/50 rounded-none pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 transition-all outline-none"
                                 />
                             </div>
                         </div>
@@ -132,7 +132,7 @@ export const LoginPage: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[#dc0000] text-white font-black py-4 rounded-2xl shadow-lg shadow-red-500/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                            className="w-full bg-[#dc0000] text-white font-black py-4 rounded-none shadow-none hover:opacity-90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                         >
                             {loading ? (
                                 <ArrowPathIcon className="w-5 h-5 animate-spin" />

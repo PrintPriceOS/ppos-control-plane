@@ -76,7 +76,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
                     </h2>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Immutable production agreements and payout preparation.</p>
                 </div>
-                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-none hover:bg-slate-50 transition-colors shadow-none">
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
@@ -84,7 +84,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
             {/* Metrics Ribbon - Enhanced Density */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                 {stats.map((s, i) => (
-                    <div key={i} className="bg-white overflow-hidden rounded-2xl border border-slate-200 shadow-sm relative group hover:border-indigo-300 transition-all">
+                    <div key={i} className="bg-white overflow-hidden rounded-none border border-slate-200 shadow-none relative group hover:border-indigo-300 transition-all">
                         <div className="absolute top-0 left-0 w-1 h-full bg-slate-100 group-hover:bg-indigo-500 transition-colors" />
                         <div className="p-4">
                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{s.settlement_readiness_status.replace(/_/g, ' ')}</div>
@@ -97,7 +97,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Commitments Table */}
                 <div className="lg:col-span-2">
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                         <table className="w-full text-left bg-white">
                             <thead>
                                 <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -154,7 +154,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
                 <div className="lg:col-span-1">
                     {selectedCommitment ? (
                         <div className="space-y-6">
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none">
                                 <h3 className="text-lg font-black text-slate-900 tracking-tight mb-6 flex items-center gap-2">
                                     <IdentificationIcon className="w-5 h-5 text-indigo-500" />
                                     Commitment Detail
@@ -162,18 +162,18 @@ export const CommercialCommitmentsTab: React.FC = () => {
 
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="p-3 bg-slate-50 rounded-none border border-slate-100">
                                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mb-1">Gross Value</div>
                                             <div className="text-lg font-black text-slate-900">{selectedCommitment.committed_price} €</div>
                                         </div>
-                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="p-3 bg-slate-50 rounded-none border border-slate-100">
                                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mb-1">Commission</div>
                                             <div className="text-lg font-black text-emerald-600">+{selectedCommitment.committed_margin} €</div>
                                         </div>
                                     </div>
 
                                     {selectedCommitment.settlement_placeholder && (
-                                        <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 mt-4">
+                                        <div className="p-4 bg-indigo-50/50 rounded-none border border-indigo-100 mt-4">
                                             <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                 <ChartBarIcon className="w-4 h-4" /> Settlement Projection
                                             </div>
@@ -193,7 +193,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
                                         <div className="space-y-3">
                                             {selectedCommitment.events.map((e: any, i: number) => (
                                                 <div key={i} className="flex gap-3">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-200 mt-1.5 shrink-0" />
+                                                    <div className="w-1.5 h-1.5 rounded-none bg-slate-200 mt-1.5 shrink-0" />
                                                     <div>
                                                         <div className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{e.event_type}</div>
                                                         <div className="text-[9px] text-slate-400 font-medium">{new Date(e.created_at).toLocaleString()}</div>
@@ -207,13 +207,13 @@ export const CommercialCommitmentsTab: React.FC = () => {
                                         <div className="pt-6 flex gap-3">
                                             <button
                                                 onClick={() => handleAction(selectedCommitment.id, 'lock')}
-                                                className="flex-1 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-lg"
+                                                className="flex-1 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-none hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-none"
                                             >
                                                 <LockClosedIcon className="w-4 h-4" /> Lock Agreement
                                             </button>
                                             <button
                                                 onClick={() => handleAction(selectedCommitment.id, 'void')}
-                                                className="px-4 py-3 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors"
+                                                className="px-4 py-3 bg-white border border-slate-200 text-slate-400 rounded-none hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors"
                                             >
                                                 <NoSymbolIcon className="w-4 h-4" />
                                             </button>
@@ -223,7 +223,7 @@ export const CommercialCommitmentsTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-none border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
                             <DocumentCheckIcon className="w-12 h-12 opacity-20" />
                             <p className="font-black uppercase text-xs tracking-widest opacity-40">Select a commitment to view ledger</p>
                         </div>

@@ -110,7 +110,7 @@ export const SuccessWorkspace: React.FC = () => {
                     bg="bg-indigo-50"
                     tooltip="Tenants consistently hitting >90% of their current quota"
                 />
-                <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl" title="Estimated daily revenue lost from suspended accounts and at-risk renewals">
+                <div className="bg-slate-900 rounded-none p-6 text-white shadow-none" title="Estimated daily revenue lost from suspended accounts and at-risk renewals">
                     <div className="flex items-center gap-3 mb-4">
                         <CurrencyEuroIcon className="w-6 h-6 text-primary-light" />
                         <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Revenue at Risk</span>
@@ -122,7 +122,7 @@ export const SuccessWorkspace: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Active CS Workflows */}
-                <div className="bg-slate-50/50 rounded-3xl border border-slate-200 overflow-hidden col-span-1 lg:col-span-2">
+                <div className="bg-slate-50/50 rounded-none border border-slate-200 overflow-hidden col-span-1 lg:col-span-2">
                     <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
                         <div className="flex items-center gap-3">
                             <RocketLaunchIcon className="w-6 h-6 text-indigo-600" />
@@ -147,7 +147,7 @@ export const SuccessWorkspace: React.FC = () => {
                                             <div className="font-bold text-sm text-slate-900">{w.tenant_name}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md uppercase">
+                                            <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-2 py-1 rounded-none uppercase">
                                                 {w.workflow_type.replace('_', ' ')}
                                             </span>
                                         </td>
@@ -155,7 +155,7 @@ export const SuccessWorkspace: React.FC = () => {
                                             Stage {w.current_step}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
+                                            <span className={`text-[10px] font-black px-2 py-1 rounded-none uppercase ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
                                                 w.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
                                                 }`}>
                                                 {w.status}
@@ -178,13 +178,13 @@ export const SuccessWorkspace: React.FC = () => {
                 </div>
 
                 {/* Upgrade Recommendations */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-none border border-slate-100 shadow-none overflow-hidden">
                     <div className="p-6 border-b border-slate-50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <ArrowUpCircleIcon className="w-6 h-6 text-primary" />
                             <h3 className="font-bold text-slate-900">Upgrade Recommendations</h3>
                         </div>
-                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full uppercase">
+                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-none uppercase">
                             {stats.recommendations.length} Leads
                         </span>
                     </div>
@@ -197,7 +197,7 @@ export const SuccessWorkspace: React.FC = () => {
                                         Consistently hitting {((t.dailyUsage / t.daily_job_limit) * 100).toFixed(0)}% of {t.plan} quota
                                     </div>
                                 </div>
-                                <button className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-lg hover:bg-primary hover:text-white transition-all">
+                                <button className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-none hover:bg-primary hover:text-white transition-all">
                                     Prepare Offer
                                 </button>
                             </div>
@@ -208,7 +208,7 @@ export const SuccessWorkspace: React.FC = () => {
                 </div>
 
                 {/* Upcoming Renewals */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-none border border-slate-100 shadow-none overflow-hidden">
                     <div className="p-6 border-b border-slate-50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <UserGroupIcon className="w-6 h-6 text-blue-600" />
@@ -225,7 +225,7 @@ export const SuccessWorkspace: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.dailyUsage > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-none ${t.dailyUsage > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                         {t.dailyUsage > 0 ? 'ACTIVE USE' : 'ZERO ACTIVITY'}
                                     </div>
                                 </div>
@@ -241,7 +241,7 @@ export const SuccessWorkspace: React.FC = () => {
 };
 
 const HealthCard = ({ title, count, icon: Icon, color, bg, tooltip }: any) => (
-    <div className={`p-6 rounded-3xl ${bg} border border-white/50 shadow-sm`} title={tooltip}>
+    <div className={`p-6 rounded-none ${bg} border border-white/50 shadow-none`} title={tooltip}>
         <div className="flex items-center justify-between mb-4">
             <Icon className={`w-6 h-6 ${color}`} />
             <span className="text-2xl font-black text-slate-900">{count}</span>

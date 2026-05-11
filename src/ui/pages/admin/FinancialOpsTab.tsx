@@ -61,7 +61,7 @@ export const FinancialOpsTab: React.FC = () => {
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Immutable settlement ledger & global remittance tracking.</p>
                 </div>
                 <div className="flex gap-2">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-none border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
                         <BoltIcon className="w-3 h-3" /> Ledger Active
                     </div>
                 </div>
@@ -70,19 +70,19 @@ export const FinancialOpsTab: React.FC = () => {
             {/* Financial Metrics */}
             {metrics && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-5 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Gross Volume</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.total_gross?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) || '0 €'}</div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-5 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Platform Revenue</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.total_fees?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) || '0 €'}</div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-5 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">Settled Trans.</div>
                         <div className="text-2xl font-black text-slate-900">{metrics.settled_count}</div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="bg-white p-5 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Settlement Rate</div>
                         <div className="text-2xl font-black text-slate-900">{((metrics.settled_count / metrics.total_count) * 100 || 0).toFixed(1)}%</div>
                     </div>
@@ -92,7 +92,7 @@ export const FinancialOpsTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Transactions Table */}
                 <div className="lg:col-span-2">
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50/50 border-b border-slate-100">
                                 <tr>
@@ -143,14 +143,14 @@ export const FinancialOpsTab: React.FC = () => {
                 <div className="lg:col-span-1">
                     {selectedTx ? (
                         <div className="space-y-4">
-                            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                            <div className="bg-white rounded-none border border-slate-200 p-5 shadow-none">
                                 <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2 mb-4">
                                     <IdentificationIcon className="w-4 h-4 text-indigo-500" />
                                     Ledger Inspector
                                 </h3>
                                 <div className="space-y-3">
                                     {selectedTx.ledger.map((entry: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded-xl border flex justify-between items-center ${entry.entry_type === 'DEBIT' ? 'bg-red-50/30 border-red-100' : 'bg-emerald-50/30 border-emerald-100'
+                                        <div key={i} className={`p-3 rounded-none border flex justify-between items-center ${entry.entry_type === 'DEBIT' ? 'bg-red-50/30 border-red-100' : 'bg-emerald-50/30 border-emerald-100'
                                             }`}>
                                             <div>
                                                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{entry.account_type}</div>
@@ -167,7 +167,7 @@ export const FinancialOpsTab: React.FC = () => {
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Documents & Audit</h4>
                                     <div className="space-y-2">
                                         {selectedTx.invoices.map((inv: any, i: number) => (
-                                            <div key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                                            <div key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded-none">
                                                 <div className="flex items-center gap-2">
                                                     <DocumentTextIcon className="w-3 h-3 text-slate-400" />
                                                     <span className="text-[10px] font-bold text-slate-600">{inv.invoice_number}</span>
@@ -176,7 +176,7 @@ export const FinancialOpsTab: React.FC = () => {
                                             </div>
                                         ))}
                                         {selectedTx.payouts.map((p: any, i: number) => (
-                                            <div key={i} className="flex items-center justify-between p-2 bg-emerald-50/50 rounded-lg border border-emerald-100/50">
+                                            <div key={i} className="flex items-center justify-between p-2 bg-emerald-50/50 rounded-none border border-emerald-100/50">
                                                 <div className="flex items-center gap-2">
                                                     <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
                                                     <span className="text-[10px] font-bold text-emerald-600">{p.payout_status}</span>
@@ -189,7 +189,7 @@ export const FinancialOpsTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-none border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
                             <CurrencyEuroIcon className="w-12 h-12 opacity-20" />
                             <p className="font-black uppercase text-[10px] tracking-widest opacity-40">Select transaction to inspect ledger</p>
                         </div>

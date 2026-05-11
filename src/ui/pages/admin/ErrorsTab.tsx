@@ -19,12 +19,12 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
 
     if (q.status === "loading") return (
         <div className="flex items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-slate-200 border-t-red-500 rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-slate-200 border-t-red-500 rounded-none animate-spin" />
         </div>
     );
 
     if (q.status === "error") return (
-        <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-100 text-red-700 font-bold">
+        <div className="p-8 text-center bg-red-50 rounded-none border border-red-100 text-red-700 font-bold">
             {q.error}
         </div>
     );
@@ -38,7 +38,7 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
                 <h2 className="text-lg font-bold text-slate-800 tracking-tight">System Fault Log</h2>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <div className="overflow-x-auto rounded-none border border-slate-100">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                         <tr>
@@ -52,7 +52,7 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
                             <tr key={r.errorCode} className="group hover:bg-red-50/30 transition-all duration-200">
                                 <td className="py-4 px-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-white transition-colors">
+                                        <div className="w-8 h-8 rounded-none bg-red-50 flex items-center justify-center group-hover:bg-white transition-colors">
                                             <ExclamationTriangleIcon className="w-4 h-4 text-red-400" />
                                         </div>
                                         <span className="font-bold text-red-900 font-mono tracking-tighter text-xs bg-red-50/50 px-2 py-1 rounded">
@@ -60,7 +60,7 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
                                         </span>
                                         <a
                                             href={getErrorArticleLink(r.errorCode)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-sm border border-red-100 hover:bg-red-50"
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded shadow-none border border-red-100 hover:bg-red-50"
                                         >
                                             ℹ Explain
                                         </a>
@@ -85,9 +85,9 @@ export const ErrorsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ rang
             </div>
 
             {q.data.length === 0 && (
-                <div className="py-20 text-center glass rounded-2xl border border-white">
+                <div className="py-20 text-center glass rounded-none border border-white">
                     <div className="flex flex-col items-center gap-3">
-                        <div className="p-3 rounded-full bg-emerald-50 text-emerald-500">
+                        <div className="p-3 rounded-none bg-emerald-50 text-emerald-500">
                             <ExclamationCircleIcon className="w-6 h-6" />
                         </div>
                         <div className="text-slate-400 font-bold uppercase tracking-widest text-xs">No errors detected in this interval</div>

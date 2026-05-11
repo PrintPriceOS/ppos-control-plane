@@ -21,7 +21,7 @@ export const TenantStorageTab: React.FC = () => {
         <div className="space-y-6 animate-slide-fade">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Global Capacity */}
-                <div className="bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <CloudIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Global Registry Footprint</span>
@@ -41,7 +41,7 @@ export const TenantStorageTab: React.FC = () => {
                 </div>
 
                 {/* Tier Distribution */}
-                <div className="bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ChartPieIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Tier Distribution</span>
@@ -54,13 +54,13 @@ export const TenantStorageTab: React.FC = () => {
                 </div>
 
                 {/* Governance Warnings */}
-                <div className="bg-black border border-white/10 p-6">
+                <div className="bg-white dark:bg-black border border-white/10 p-6">
                     <div className="flex items-center gap-2 text-slate-400 mb-4">
                         <ExclamationTriangleIcon className="w-5 h-5" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Governance Alerts</span>
                     </div>
                     <div className="p-3 bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
-                        <div className="w-8 h-8 bg-amber-500 flex items-center justify-center text-white">
+                        <div className="w-8 h-8 bg-amber-500 flex items-center justify-center text-slate-900 dark:text-white">
                             <ArrowTrendingUpIcon className="w-5 h-5" />
                         </div>
                         <div>
@@ -72,7 +72,7 @@ export const TenantStorageTab: React.FC = () => {
             </div>
 
             {/* Tenant Breakdown */}
-            <div className="bg-black border border-white/10 overflow-hidden">
+            <div className="bg-white dark:bg-black border border-white/10 overflow-hidden">
                 <div className="px-6 py-4 bg-white/5 border-b border-white/10">
                     <div className="font-bold text-slate-800 text-sm tracking-tight">Tenant Storage Governance</div>
                 </div>
@@ -94,7 +94,7 @@ export const TenantStorageTab: React.FC = () => {
                                     <div className="text-[10px] text-slate-400 font-mono">{t.id}</div>
                                 </td>
                                 <td className="px-6 py-4 font-bold text-slate-400">842</td>
-                                <td className="px-6 py-4 font-black text-white">4.21 GB</td>
+                                <td className="px-6 py-4 font-black text-slate-900 dark:text-white">4.21 GB</td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                         <div className="w-20 h-1.5 bg-white/5 overflow-hidden">

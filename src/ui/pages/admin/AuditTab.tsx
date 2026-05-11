@@ -21,11 +21,11 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
 
     return (
         <div className="space-y-6 animate-slide-fade">
-            <div className="flex flex-col lg:flex-row gap-4 p-4 glass rounded-2xl border border-white">
+            <div className="flex flex-col lg:flex-row gap-4 p-4 glass rounded-none border border-white">
                 <div className="flex-1 relative group">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <input
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                        className="w-full bg-white/50 border border-slate-200 rounded-none pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                         placeholder={t("admin.audit.filterTenant" as any)}
                         value={tenant}
                         onChange={(e) => setTenant(e.target.value)}
@@ -39,18 +39,18 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
 
             {q.status === "loading" && (
                 <div className="py-20 flex justify-center">
-                    <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+                    <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-none animate-spin" />
                 </div>
             )}
 
             {q.status === "error" && (
-                <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-100 text-red-700 font-bold">
+                <div className="p-8 text-center bg-red-50 rounded-none border border-red-100 text-red-700 font-bold">
                     {q.error}
                 </div>
             )}
 
             {q.status === "success" && q.data && (
-                <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm">
+                <div className="glass rounded-none border border-white overflow-hidden shadow-none">
                     <table className="w-full text-sm text-left border-collapse">
                         <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white">
                             <tr>
@@ -97,11 +97,11 @@ export const AuditTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 0 }) =>
                                     <td className="py-4 px-6 font-bold text-slate-900 font-mono tracking-tight text-xs uppercase">{r.tenant_id}</td>
                                     <td className="py-4 px-6 relative group/action">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                            <div className="w-1.5 h-1.5 rounded-none bg-primary/40" />
                                             <span className="font-bold text-slate-700">{r.action.replace('_', ' ')}</span>
                                             <a
                                                 href={`/admin/help?q=${r.action.toLowerCase()}`}
-                                                className="opacity-0 group-hover/action:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-blue-600 px-2 py-1 rounded shadow-sm border border-blue-100 hover:bg-blue-50"
+                                                className="opacity-0 group-hover/action:opacity-100 transition-opacity ml-2 text-[10px] font-bold bg-white text-blue-600 px-2 py-1 rounded shadow-none border border-blue-100 hover:bg-blue-50"
                                             >
                                                 ℹ What is this?
                                             </a>

@@ -186,7 +186,7 @@ const projectCoordinates = (lat: number, lng: number) => {
 // --- Components ---
 
 const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', status = 'success', error = null }: { title: string, children: React.ReactNode, icon?: any, badge?: string, color?: string, status?: string, error?: string | null }) => (
-  <div className="bg-black border border-white/10 flex flex-col h-full overflow-hidden">
+  <div className="bg-white dark:bg-black border border-white/10 flex flex-col h-full overflow-hidden">
     <div className="px-4 py-2 bg-white/5 border-b border-white/5 flex items-center justify-between">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="w-4 h-4 text-slate-400" />}
@@ -206,8 +206,8 @@ const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', st
     </div>
     <div className="flex-1 overflow-auto p-3 custom-scrollbar relative">
       {status === 'loading' && (
-        <div className="absolute inset-0 bg-white/50 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center z-10">
-          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div className="absolute inset-0 bg-white/50 dark:bg-white dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center z-10">
+          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-none animate-spin" />
         </div>
       )}
       {status === 'error' ? (
@@ -282,7 +282,7 @@ const ManufacturingWorldMap = ({ data }: { data: any[] }) => {
               <circle 
                 cx={cluster.x} cy={cluster.y} r={size} 
                 fill={color}
-                className="shadow-xl"
+                className="shadow-none"
                 filter="url(#glow)"
               />
               
@@ -298,7 +298,7 @@ const ManufacturingWorldMap = ({ data }: { data: any[] }) => {
 
               {/* Enhanced Operational Tooltip Placeholder (Visual only) */}
               <foreignObject x={cluster.x + size + 10} y={cluster.y - 40} width="160" height="120" className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none overflow-visible">
-                <div className="bg-black border border-white/10 p-2 space-y-1">
+                <div className="bg-white dark:bg-black border border-white/10 p-2 space-y-1">
                   <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-1 mb-1">
                     <span className="text-[8px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-tighter">
                       {isDense ? `CLUSTER (${cluster.nodes.length} NODES)` : cluster.nodes[0].displayName}
@@ -353,7 +353,7 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 
   return (
     <div className="mt-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between px-2 py-1.5 bg-amber-500/5 border border-amber-500/10 rounded-sm">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-amber-500/5 border border-amber-500/10 rounded-none">
         <div className="flex items-center gap-2">
           <ExclamationTriangleIcon className="w-3 h-3 text-amber-500 opacity-60" />
           <span className="text-[9px] font-black text-amber-600/80 uppercase tracking-tight">
@@ -373,7 +373,7 @@ const TelemetryItem = ({ label, value, sub, status }: { label: string, value: st
   <div className="flex flex-col gap-0.5 mb-4 last:mb-0">
     <div className="flex items-center justify-between">
       <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-600 uppercase tracking-widest">{label}</span>
-      <div className={`w-1.5 h-1.5 rounded-full ${
+      <div className={`w-1.5 h-1.5 rounded-none ${
         status === 'stable' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
         status === 'warning' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
         status === 'critical' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' :
@@ -513,12 +513,12 @@ export const CommandCenterPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-3 py-1.5">
           <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500'}`} />
+            <div className={`w-1.5 h-1.5 rounded-none ${industrial.data?.queue?.state === 'LIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500'}`} />
             <span className="text-[9px] font-black uppercase text-slate-400">Queue: {industrial.data?.queue?.state || 'OFFLINE'}</span>
           </div>
           <div className="w-[1px] h-2 bg-slate-200 dark:bg-white/10" />
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+            <div className="w-1.5 h-1.5 rounded-none bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
             <span className="text-[9px] font-black uppercase text-slate-400">Health: Stable</span>
           </div>
         </div>
@@ -552,7 +552,7 @@ export const CommandCenterPage: React.FC = () => {
                 {Array.isArray(industrial.data?.workers?.activeFleet) && industrial.data.workers.activeFleet.slice(0, 4).map((w: any) => (
                   <div key={w.id} className="flex items-center justify-between p-1.5 bg-emerald-500/10 border border-emerald-500/20">
                     <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <div className={`w-1.5 h-1.5 rounded-none ${w.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                       <span className="text-[9px] font-mono font-bold text-slate-600 dark:text-zinc-400">{w.id?.slice(0, 8) || '---'}</span>
                     </div>
                     <span className="text-[8px] font-black text-slate-400 uppercase">{w.status}</span>
@@ -569,10 +569,10 @@ export const CommandCenterPage: React.FC = () => {
           <div className="col-span-12 lg:col-span-6 min-h-[260px]">
             <TacticalPanel title="Manufacturing Grid" icon={GlobeAltIcon} badge="Global" color="slate" status={capacity.status}>
                <div className="flex flex-col h-full">
-                 <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-md overflow-hidden min-h-[160px]">
+                 <div className="flex-1 relative bg-slate-100 dark:bg-[#111112] border border-slate-200 dark:border-white/5 rounded-none overflow-hidden min-h-[160px]">
                     <ManufacturingWorldMap data={capacity.data || []} />
                     
-                    <div className="absolute bottom-0 left-0 right-0 h-10 bg-white/90 dark:bg-black/60 backdrop-blur-md border-t border-slate-200 dark:border-white/10 px-3 flex items-center justify-between">
+                    <div className="absolute bottom-0 left-0 right-0 h-10 bg-white/90 dark:bg-white dark:bg-black/60 backdrop-blur-md border-t border-slate-200 dark:border-white/10 px-3 flex items-center justify-between">
                        <MiniMetric label="TOTAL" value={network.data?.total_printers || 0} />
                        <MiniMetric label="LOAD" value={`${network.data?.capacity_utilization_pct || 0}%`} />
                        <MiniMetric label="SYNC" value={syncHealth} />
@@ -623,13 +623,13 @@ export const CommandCenterPage: React.FC = () => {
             <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Pressure" color="slate" status={industrial.status}>
                <div className="space-y-4">
                  <div className="flex items-center justify-between">
-                   <span className="text-lg font-black text-slate-900 dark:text-white">
+                   <span className="text-lg font-black text-slate-900 dark:text-slate-900 dark:text-white">
                       {( (industrial.data?.storage?.totalSizeBytes || 0) / (1024 * 1024 * 1024)).toFixed(1)} GB
                    </span>
                    <span className="text-sm font-black text-slate-400 tabular-nums">{(industrial.data?.storage?.artifactCount || 0).toLocaleString()}</span>
                  </div>
                  <div className="space-y-1">
-                    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-none overflow-hidden">
                       <div 
                         className="h-full bg-primary" 
                         style={{ width: `${Math.min(100, ((industrial.data?.storage?.totalSizeBytes || 0) / (industrial.data?.storage?.capacityBytes || 1)) * 100)}%` }} 
@@ -664,7 +664,7 @@ export const CommandCenterPage: React.FC = () => {
                       <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Confidence</span>
                       <div className="text-2xl font-black text-primary">{autonomyConfidence}</div>
                     </div>
-                    <div className="p-2 bg-primary/5 border border-primary/10 rounded-md">
+                    <div className="p-2 bg-primary/5 border border-primary/10 rounded-none">
                        <p className="text-[9px] font-bold text-slate-500 dark:text-zinc-500 leading-tight uppercase">
                           The neural network is identifying emerging routing patterns in EU-WEST.
                        </p>
@@ -676,22 +676,22 @@ export const CommandCenterPage: React.FC = () => {
                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
                   <div className="space-y-1">
                     <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Route Simulation</span>
-                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
+                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-none" />
                     <p className="text-[6px] font-bold text-slate-500 uppercase">Predicting latency spikes</p>
                   </div>
                   <div className="space-y-1">
                     <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Dispatch Balancing</span>
-                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
+                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-none" />
                     <p className="text-[6px] font-bold text-slate-500 uppercase">Load optimization active</p>
                   </div>
                   <div className="space-y-1">
                     <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">SLA Estimation</span>
-                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
+                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-none" />
                     <p className="text-[6px] font-bold text-slate-500 uppercase">Real-time transit audit</p>
                   </div>
                   <div className="space-y-1">
                     <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Node Failover</span>
-                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
+                    <div className="h-1 bg-slate-200 dark:bg-white/10 rounded-none" />
                     <p className="text-[6px] font-bold text-slate-500 uppercase">Auto-routing standby</p>
                   </div>
                </div>
@@ -729,20 +729,20 @@ export const CommandCenterPage: React.FC = () => {
 
         {/* 3. GLOBAL INCIDENT CENTER (STICKY) */}
         <div className="col-span-12 xl:col-span-3 flex flex-col gap-4 sticky top-6 self-start max-h-[calc(100vh-140px)]">
-           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-fit max-h-[180px]">
+           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-none overflow-hidden h-fit max-h-[180px]">
               <div className="p-3 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
                  <div className="flex items-center gap-2">
                     <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
                     <h2 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Incident Bridge</h2>
                  </div>
-                 <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[8px] font-black animate-pulse">
+                 <span className="px-1.5 py-0.5 rounded-none bg-red-500 text-white text-[8px] font-black animate-pulse">
                    {Array.isArray(incidents.data) ? incidents.data.length : 0}
                  </span>
               </div>
               
               <div className="overflow-y-auto p-3 space-y-2 custom-scrollbar">
                  {Array.isArray(incidents.data) && incidents.data.map((inc: any) => (
-                   <div key={inc.id} className="p-3 rounded-md bg-red-500/5 border border-red-500/10 space-y-2">
+                   <div key={inc.id} className="p-3 rounded-none bg-red-500/5 border border-red-500/10 space-y-2">
                      <div className="flex items-start justify-between">
                        <span className="text-[8px] font-black text-red-500 uppercase">CRITICAL</span>
                        <span className="text-[8px] font-bold text-slate-400 font-mono">#{inc.id?.slice(0,4)}</span>
@@ -764,10 +764,10 @@ export const CommandCenterPage: React.FC = () => {
            </div>
 
            {/* Telemetry Stream */}
-           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-sm overflow-hidden h-[300px]">
+           <div className="bg-white dark:bg-[#111112] border border-slate-200 dark:border-white/5 flex flex-col rounded-none overflow-hidden h-[300px]">
               <div className="px-3 py-2 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Live Stream</span>
-                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="w-1 h-1 rounded-none bg-emerald-500 animate-pulse" />
               </div>
               <div className="flex-1 overflow-y-auto p-3 font-mono text-[7px] space-y-1.5 custom-scrollbar text-slate-500 dark:text-zinc-500 leading-tight">
                  {Array.isArray(audit.data) && audit.data.slice(0, 15).map((log: any) => (
@@ -798,7 +798,7 @@ const StatBar = ({ label, value, color }: { label: string, value: number, color:
       <span>{label}</span>
       <span>{Math.round(value)}%</span>
     </div>
-    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-none overflow-hidden">
       <div 
         className={`h-full transition-all duration-1000 ${
           color === 'emerald' ? 'bg-emerald-500' :
@@ -837,9 +837,9 @@ const LifecycleTier = ({ label, value, color }: { label: string, value: number, 
 );
 
 const AnomalyRow = ({ title, tenant, confidence, severity, job }: { title: string, tenant?: string, confidence: number, severity: string, job?: string }) => (
-  <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all">
+  <div className="p-3 rounded-none bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all">
     <div className="flex items-center gap-3 min-w-0">
-      <div className={`w-1 h-8 rounded-full flex-shrink-0 ${
+      <div className={`w-1 h-8 rounded-none flex-shrink-0 ${
         severity === 'CRITICAL' ? 'bg-red-500' :
         severity === 'HIGH' ? 'bg-amber-500' :
         'bg-primary'
@@ -861,7 +861,7 @@ const AnomalyRow = ({ title, tenant, confidence, severity, job }: { title: strin
     onClick={onClick}
     disabled={disabled}
     aria-disabled={disabled}
-    className={`flex items-center gap-2.5 p-2.5 rounded-md border transition-all text-left relative ${
+    className={`flex items-center gap-2.5 p-2.5 rounded-none border transition-all text-left relative ${
       disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-95'
     } ${
       color === 'red' && !disabled ? 'bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10' :
@@ -931,7 +931,7 @@ const RoutingSimulationPanel = () => {
                   type="text" 
                   value={input.destination_country} 
                   onChange={(e) => setInput({...input, destination_country: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -940,7 +940,7 @@ const RoutingSimulationPanel = () => {
                   type="text" 
                   value={input.destination_city} 
                   onChange={(e) => setInput({...input, destination_city: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -949,7 +949,7 @@ const RoutingSimulationPanel = () => {
                   type="number" 
                   value={input.required_delivery_days} 
                   onChange={(e) => setInput({...input, required_delivery_days: parseInt(e.target.value)})}
-                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 />
               </div>
               <div className="space-y-1">
@@ -957,7 +957,7 @@ const RoutingSimulationPanel = () => {
                 <select 
                   value={input.product_type} 
                   onChange={(e) => setInput({...input, product_type: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-900 dark:text-white"
                 >
                   <option value="SOFTCOVER_BOOK">Softcover Book</option>
                   <option value="HARDCOVER_BOOK">Hardcover Book</option>
@@ -968,7 +968,7 @@ const RoutingSimulationPanel = () => {
            <button 
              onClick={runSimulation}
              disabled={loading}
-             className="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all"
+             className="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded shadow-none shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all"
            >
              {loading ? 'Simulating Decision...' : 'Execute Deterministic Scoring'}
            </button>
@@ -1007,7 +1007,7 @@ const RoutingSimulationPanel = () => {
                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button 
                                 onClick={() => handleExecute(c)}
-                                className="px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded hover:bg-emerald-600 shadow-md shadow-emerald-500/20"
+                                className="px-3 py-1 bg-emerald-500 text-white text-[8px] font-black uppercase rounded hover:bg-emerald-600 shadow-none shadow-emerald-500/20"
                               >
                                 Execute
                               </button>
@@ -1109,11 +1109,11 @@ const IndustrialHeartbeatMatrix = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ONLINE': return <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />;
-      case 'DEGRADED': return <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />;
-      case 'SATURATED': return <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />;
-      case 'OFFLINE': return <div className="w-2 h-2 rounded-full bg-slate-400" />;
-      default: return <div className="w-2 h-2 rounded-full bg-slate-200" />;
+      case 'ONLINE': return <div className="w-2 h-2 rounded-none bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />;
+      case 'DEGRADED': return <div className="w-2 h-2 rounded-none bg-amber-500 animate-pulse" />;
+      case 'SATURATED': return <div className="w-2 h-2 rounded-none bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />;
+      case 'OFFLINE': return <div className="w-2 h-2 rounded-none bg-slate-400" />;
+      default: return <div className="w-2 h-2 rounded-none bg-slate-200" />;
     }
   };
 
@@ -1122,7 +1122,7 @@ const IndustrialHeartbeatMatrix = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div className="p-3 rounded bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Active Nodes</span>
-          <div className="text-xl font-black text-slate-900 dark:text-white">{stats.active}</div>
+          <div className="text-xl font-black text-slate-900 dark:text-slate-900 dark:text-white">{stats.active}</div>
         </div>
         <div className="p-3 rounded bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5">
           <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Health Risks</span>

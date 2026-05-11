@@ -65,7 +65,7 @@ export const MarketplaceReadinessTab: React.FC = () => {
                     </h2>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">Manage structured negotiations and commercial commitment states.</p>
                 </div>
-                <button onClick={fetchNegotiations} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                <button onClick={fetchNegotiations} className="p-2 bg-white border border-slate-200 rounded-none hover:bg-slate-50 transition-colors shadow-none">
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
@@ -73,7 +73,7 @@ export const MarketplaceReadinessTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Active Negotiations */}
                 <div className="lg:col-span-1 space-y-4">
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                         <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Negotiations</span>
                         </div>
@@ -116,7 +116,7 @@ export const MarketplaceReadinessTab: React.FC = () => {
                 <div className="lg:col-span-2">
                     {selectedOfferId ? (
                         <div className="space-y-6">
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none">
                                 <h3 className="text-lg font-black text-slate-900 tracking-tight mb-6 flex items-center gap-2">
                                     <ChatBubbleLeftRightIcon className="w-5 h-5 text-blue-500" />
                                     Negotiation Chain
@@ -125,11 +125,11 @@ export const MarketplaceReadinessTab: React.FC = () => {
                                 <div className="space-y-8 relative before:absolute before:inset-0 before:left-5 before:w-0.5 before:bg-slate-100">
                                     {negotiationChain.map((co, i) => (
                                         <div key={i} className="relative pl-12">
-                                            <div className={`absolute left-0 top-0 w-10 h-10 rounded-xl flex items-center justify-center border-2 ${co.counterparty === 'PRINTER' ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'
+                                            <div className={`absolute left-0 top-0 w-10 h-10 rounded-none flex items-center justify-center border-2 ${co.counterparty === 'PRINTER' ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'
                                                 }`}>
                                                 {co.counterparty === 'PRINTER' ? <UserCircleIcon className="w-6 h-6 text-blue-400" /> : <CpuChipIcon className="w-6 h-6 text-slate-400" />}
                                             </div>
-                                            <div className={`p-4 rounded-2xl border ${co.counteroffer_status === 'ACCEPTED' ? 'bg-emerald-50 border-emerald-100' :
+                                            <div className={`p-4 rounded-none border ${co.counteroffer_status === 'ACCEPTED' ? 'bg-emerald-50 border-emerald-100' :
                                                 co.counteroffer_status === 'REJECTED' ? 'bg-red-50 border-red-100' : 'bg-white border-slate-100'
                                                 }`}>
                                                 <div className="flex justify-between items-start mb-2">
@@ -153,7 +153,7 @@ export const MarketplaceReadinessTab: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 {co.proposed_notes && (
-                                                    <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 italic">
+                                                    <div className="bg-slate-50/50 p-3 rounded-none border border-slate-100 text-xs text-slate-600 italic">
                                                         "{co.proposed_notes}"
                                                     </div>
                                                 )}
@@ -162,11 +162,11 @@ export const MarketplaceReadinessTab: React.FC = () => {
                                                     <div className="mt-4 flex gap-3">
                                                         <button
                                                             onClick={() => handleAcceptCounter(co.offer_id, co.id)}
-                                                            className="flex-1 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
+                                                            className="flex-1 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-none hover:bg-emerald-600 transition-colors shadow-none"
                                                         >
                                                             Accept Terms
                                                         </button>
-                                                        <button className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
+                                                        <button className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-none hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
                                                             Reject
                                                         </button>
                                                     </div>
@@ -181,16 +181,16 @@ export const MarketplaceReadinessTab: React.FC = () => {
                             </div>
 
                             {/* Readiness Controls */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm border-t-4 border-t-emerald-500">
+                            <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none border-t-4 border-t-emerald-500">
                                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
                                     <ClipboardDocumentCheckIcon className="w-5 h-5 text-emerald-500" />
                                     Commercial Readiness
                                 </h4>
-                                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                <div className="p-4 bg-emerald-50 rounded-none border border-emerald-100">
                                     <p className="text-xs text-emerald-800 font-medium mb-4">
                                         Once terms are final, mark the session as commercially ready to prepare for settlement.
                                     </p>
-                                    <button className="w-full py-3 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                                    <button className="w-full py-3 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-none hover:bg-emerald-700 transition-all shadow-none active:scale-95 flex items-center justify-center gap-2">
                                         Mark Commercially Ready
                                         <ArrowRightIcon className="w-4 h-4" />
                                     </button>
@@ -198,7 +198,7 @@ export const MarketplaceReadinessTab: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <div className="h-full min-h-[400px] bg-slate-50/50 rounded-none border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-3">
                             <BanknotesIcon className="w-12 h-12 opacity-20" />
                             <p className="font-black uppercase text-xs tracking-widest opacity-40">Select a negotiation to inspect history</p>
                         </div>

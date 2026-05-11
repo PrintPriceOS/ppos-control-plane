@@ -40,14 +40,14 @@ export const IndustrialOpsPage: React.FC = () => {
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Operations</h1>
                     <p className="text-sm text-slate-500 font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-none">
+                    <div className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
                     <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">System Operational</span>
                 </div>
             </div>
 
             {/* Categorized Industrial Navigation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-2 rounded-3xl border border-slate-200 shadow-inner">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-2 rounded-none border border-slate-200 shadow-none">
                 {/* Operational Group */}
                 <div className="space-y-2">
                     <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -118,9 +118,9 @@ export const IndustrialOpsPage: React.FC = () => {
 const TabButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+        className={`flex items-center gap-2 px-4 py-2 rounded-none transition-all ${
             active 
-            ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black' 
+            ? 'bg-white text-slate-900 shadow-none border border-slate-200 font-black' 
             : 'text-slate-500 hover:text-slate-700 font-bold hover:bg-white/50'
         }`}
     >

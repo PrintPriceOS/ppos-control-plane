@@ -31,9 +31,9 @@ const COLOR_MAP: Record<string, { bg: string; text: string }> = {
 const KpiCard = ({ title, value, sub, Icon, color, helpKey }: { title: string; value: string; sub?: string; Icon: any; color: keyof typeof COLOR_MAP; helpKey?: string }) => {
     const theme = COLOR_MAP[color];
     return (
-        <div className="glass rounded-xl p-3.5 border border-white hover-slide flex items-start justify-between gap-2 group relative">
+        <div className="glass rounded-none p-3.5 border border-white hover-slide flex items-start justify-between gap-2 group relative">
             <div className="flex items-center gap-4">
-                <div className={`p-2.5 rounded-lg ${theme.bg} shrink-0`}>
+                <div className={`p-2.5 rounded-none ${theme.bg} shrink-0`}>
                     <Icon className={`w-5 h-5 ${theme.text}`} />
                 </div>
                 <div className="min-w-0">
@@ -49,7 +49,7 @@ const KpiCard = ({ title, value, sub, Icon, color, helpKey }: { title: string; v
             {helpKey && (
                 <a
                     href={`/admin/help?doc=${helpKey}`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 px-2 py-1 rounded-md shadow-sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 px-2 py-1 rounded-none shadow-none"
                 >
                     <div title="Explain this metric">ℹ Explain</div>
                 </a>
@@ -65,14 +65,14 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
     if (o.status === "loading") return (
         <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-none animate-spin" />
                 <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t("common.loading" as any)}</span>
             </div>
         </div>
     );
 
     if (o.status === "error") return (
-        <div className="p-8 rounded-2xl bg-red-50 border border-red-100 text-center">
+        <div className="p-8 rounded-none bg-red-50 border border-red-100 text-center">
             <ExclamationTriangleIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
             <div className="text-red-700 font-bold mb-1">Telemetry Error</div>
             <div className="text-red-500 text-sm">{o.error}</div>
@@ -96,14 +96,14 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                 <KpiCard Icon={QueueListIcon} color="orange" title="Live Buffer (Queue)" value={String(d.queueBacklog || 0)} helpKey="metric-queue-backlog" />
             </div>
 
-            <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm hover-slide">
+            <div className="glass rounded-none border border-white overflow-hidden shadow-none hover-slide">
                 <div className="px-6 py-4 bg-slate-50/50 border-b border-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CircleStackIcon className="w-5 h-5 text-slate-400" />
                         <div className="font-bold text-slate-800 text-sm tracking-tight">{t("admin.queue.title" as any)}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Buffer Trace</span>
                     </div>
                 </div>

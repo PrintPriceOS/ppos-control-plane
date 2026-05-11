@@ -6,6 +6,7 @@
  */
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAdminQuery } from '../hooks/useAdminData';
+import { getRoutingMap, getRoutingHeatmap } from '../lib/adminApi';
 
 interface MapNode {
     id: string;
@@ -25,8 +26,8 @@ interface MapRoute {
 }
 
 export const LiveDispatchMap: React.FC = () => {
-    const { data: mapState, isLoading } = useAdminQuery('routing:map', () => fetch('/api/admin/routing/map').then(res => res.json()), 5000);
-    const { data: heatmap } = useAdminQuery('routing:heatmap', () => fetch('/api/admin/routing/heatmap').then(res => res.json()), 10000);
+    const { data: mapState, isLoading } = useAdminQuery('routing:map', getRoutingMap, 5000);
+    const { data: heatmap } = useAdminQuery('routing:heatmap', getRoutingHeatmap, 10000);
 
     // Coordinate Projection (Simple linear for EU focus)
     // Map Range: Lat 35 to 65, Lng -15 to 35
@@ -56,7 +57,7 @@ export const LiveDispatchMap: React.FC = () => {
             {/* Map Canvas */}
             <svg className="absolute inset-0 w-full h-full p-12">
                 {/* Connection Lines (Routes) */}
-                {mapState?.routes?.map((route: MapRoute) => {
+                {Array.isArray(mapState?.routes) && mapState.routes.map((route: MapRoute) => {
                     const start = project(route.origin.lat, route.origin.lng);
                     const end = project(route.destination.lat, route.destination.lng);
                     const isDegraded = route.status === 'DEGRADED';
@@ -84,7 +85,7 @@ export const LiveDispatchMap: React.FC = () => {
                 })}
 
                 {/* Regional Clusters (Heatmap) */}
-                {heatmap?.map((h: any) => {
+                {Array.isArray(heatmap) && heatmap.map((h: any) => {
                     const pos = project(h.center.lat, h.center.lng);
                     const isSaturated = h.status === 'SATURATED';
                     return (
@@ -100,7 +101,7 @@ export const LiveDispatchMap: React.FC = () => {
                 })}
 
                 {/* Nodes */}
-                {mapState?.nodes?.map((node: MapNode) => {
+                {Array.isArray(mapState?.nodes) && mapState.nodes.map((node: MapNode) => {
                     const pos = project(node.lat, node.lng);
                     const color = node.status === 'ONLINE' ? '#10b981' : 
                                   node.status === 'DEGRADED' ? '#f59e0b' : 
@@ -145,7 +146,7 @@ export const LiveDispatchMap: React.FC = () => {
                 <div className="p-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-sm">
                     <h3 className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-3">Regional Pressure</h3>
                     <div className="space-y-2">
-                        {heatmap?.slice(0, 4).map((h: any) => (
+                        {Array.isArray(heatmap) && heatmap.slice(0, 4).map((h: any) => (
                             <div key={h.region} className="flex items-center gap-3">
                                 <div className="w-20 h-1 bg-white/5 rounded-full overflow-hidden">
                                     <div className="h-full bg-primary" style={{ width: `${h.pressure}%` }} />
