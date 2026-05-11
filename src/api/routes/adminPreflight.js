@@ -30,6 +30,18 @@ const { resolveActorContext, requireApprovedPrinthouse } = require('../middlewar
 
 // Apply admin protection to all routes
 router.use(requireAdmin);
+
+// Diagnostic: Log identity for preflight admin operations
+router.use((req, res, next) => {
+    const context = resolveActorContext(req);
+    const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
+    
+    if (process.env.NODE_ENV !== 'production' || context.isSuperAdmin) {
+        console.log(`[ADMIN-PREFLIGHT-AUTH] Trace: ${traceId} | User: ${context.userId} | Role: ${context.role} | SuperAdmin: ${context.context?.isSuperAdmin || context.isSuperAdmin}`);
+    }
+    next();
+});
+
 router.use(requirePrinterLicense);
 router.use(requireApprovedPrinthouse);
 
@@ -157,8 +169,9 @@ router.get('/jobs/:jobId', async (req, res) => {
       return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Preflight job not found' } });
     }
 
+    const context = resolveActorContext(req);
     // Security: Tenant Isolation
-    if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+    if (!context.isSuperAdmin && job.tenant_id !== req.user.tenantId) {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
     }
 
@@ -189,8 +202,9 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
         const job = await operations.getJob(req.params.jobId);
         if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
 
+        const context = resolveActorContext(req);
         // Security: Tenant Isolation
-        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+        if (!context.isSuperAdmin && job.tenant_id !== req.user.tenantId) {
             return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
         }
 
@@ -209,8 +223,9 @@ router.post('/jobs/:jobId/retry', async (req, res) => {
         const job = await operations.getJob(req.params.jobId);
         if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
 
+        const context = resolveActorContext(req);
         // Security: Tenant Isolation
-        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+        if (!context.isSuperAdmin && job.tenant_id !== req.user.tenantId) {
             return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
         }
 
@@ -229,8 +244,9 @@ router.post('/jobs/:jobId/cancel', async (req, res) => {
         const job = await operations.getJob(req.params.jobId);
         if (!job) return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } });
 
+        const context = resolveActorContext(req);
         // Security: Tenant Isolation
-        if (req.user.role !== 'SUPER_ADMIN' && job.tenant_id !== req.user.tenantId) {
+        if (!context.isSuperAdmin && job.tenant_id !== req.user.tenantId) {
             return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
         }
 
@@ -246,7 +262,8 @@ router.post('/jobs/:jobId/cancel', async (req, res) => {
  * Trigger artifact garbage collection
  */
 router.post('/artifacts/gc', async (req, res) => {
-    if (req.user.role !== 'SUPER_ADMIN') {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'GC requires SUPER_ADMIN' } });
     }
     try {
@@ -263,7 +280,8 @@ router.post('/artifacts/gc', async (req, res) => {
  * Maintenance route to detect and recover stuck jobs
  */
 router.post('/jobs/recover-stalled', async (req, res) => {
-    if (req.user.role !== 'SUPER_ADMIN') {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Maintenance operations require SUPER_ADMIN' } });
     }
     try {
@@ -300,9 +318,10 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
  */
 router.get('/artifacts', async (req, res) => {
   try {
+    const context = resolveActorContext(req);
     const filters = { ...req.query };
     // Security: Tenant Isolation
-    if (req.user.role !== 'SUPER_ADMIN') {
+    if (!context.isSuperAdmin) {
         filters.tenantId = req.user.tenantId;
     }
 
@@ -319,11 +338,12 @@ router.get('/artifacts', async (req, res) => {
  */
 router.get('/artifacts/:artifactId', async (req, res) => {
   try {
+    const context = resolveActorContext(req);
     const item = await artifact.getArtifact(req.params.artifactId);
     if (!item) return res.status(404).json({ ok: false, error: { code: 'ARTIFACT_NOT_FOUND', message: 'Artifact record not found' } });
 
     // Security: Tenant Isolation
-    if (req.user.role !== 'SUPER_ADMIN' && item.tenant_id !== req.user.tenantId) {
+    if (!context.isSuperAdmin && item.tenant_id !== req.user.tenantId) {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Artifact belongs to another tenant' } });
     }
 
@@ -338,8 +358,9 @@ router.get('/artifacts/:artifactId', async (req, res) => {
  * Secure stream download
  */
 router.get('/artifacts/:artifactId/download', async (req, res) => {
+  const context = resolveActorContext(req);
   const logPrefix = `[ARTIFACT-DOWNLOAD][${req.params.artifactId}]`;
-  const targetTenantId = req.user.role === 'SUPER_ADMIN' ? null : req.user.tenantId;
+  const targetTenantId = context.isSuperAdmin ? null : req.user.tenantId;
 
   try {
     const { stream, filename, mimeType, sizeBytes, tenantId } = await artifact.getArtifactDownloadStream(req.params.artifactId, targetTenantId);
@@ -382,11 +403,12 @@ router.get('/artifacts/:artifactId/download', async (req, res) => {
  */
 router.delete('/artifacts/:artifactId', async (req, res) => {
   try {
+    const context = resolveActorContext(req);
     const item = await artifact.getArtifact(req.params.artifactId);
     if (!item) return res.status(404).json({ ok: false, error: { code: 'ARTIFACT_NOT_FOUND', message: 'Artifact not found' } });
 
     // Security: Tenant Isolation
-    if (req.user.role !== 'SUPER_ADMIN' && item.tenant_id !== req.user.tenantId) {
+    if (!context.isSuperAdmin && item.tenant_id !== req.user.tenantId) {
         return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Permission denied' } });
     }
 
@@ -411,7 +433,8 @@ router.delete('/artifacts/:artifactId', async (req, res) => {
  * Global storage overview
  */
 router.get('/storage', async (req, res) => {
-  if (req.user.role !== 'SUPER_ADMIN') {
+  const context = resolveActorContext(req);
+  if (!context.isSuperAdmin) {
       return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Global storage access requires SUPER_ADMIN' } });
   }
   try {
@@ -427,10 +450,11 @@ router.get('/storage', async (req, res) => {
  * Specific tenant storage and quota status
  */
 router.get('/storage/:tenantId', async (req, res) => {
+  const context = resolveActorContext(req);
   const targetTenantId = req.params.tenantId;
   
   // Security: Tenant Isolation
-  if (req.user.role !== 'SUPER_ADMIN' && targetTenantId !== req.user.tenantId) {
+  if (!context.isSuperAdmin && targetTenantId !== req.user.tenantId) {
       return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Access denied to other tenant storage' } });
   }
 

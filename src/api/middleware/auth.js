@@ -119,15 +119,19 @@ function fail(req, res, message) {
  */
 function resolveActorContext(req) {
     const user = req.user || {};
-    const role = (user.role || 'viewer').toUpperCase();
+    // Industrial Hardening: Ensure role is always a string and uppercase
+    const rawRole = user.role || user.userRole || 'VIEWER';
+    const role = String(rawRole).toUpperCase();
+    
     return {
-        userId: user.id,
+        userId: user.id || 'anonymous',
         role,
         tenantId: user.tenantId,
         printhouseId: user.printhouseId,
         isSuperAdmin: role === 'SUPER_ADMIN',
-        isMachine: !!user.isMachine,
-        isPrinthouseUser: ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role)
+        isMachine: !!user.isMachine || role === 'WORKER_AGENT',
+        isPrinthouseUser: ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role),
+        authMode: user.authMode || 'NONE'
     };
 }
 

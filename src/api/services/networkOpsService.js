@@ -44,8 +44,8 @@ class NetworkOpsService {
 
             const { rows: resMetrics } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN reservation_status = 'ACTIVE' OR status = 'PENDING' OR status = 'CONFIRMED' THEN 1 END) as active,
-                    COUNT(CASE WHEN reservation_status = 'EXPIRED' OR status = 'EXPIRED' THEN 1 END) as expired
+                    COUNT(CASE WHEN reservation_status IN ('ACTIVE', 'PENDING', 'CONFIRMED') THEN 1 END) as active,
+                    COUNT(CASE WHEN reservation_status = 'EXPIRED' THEN 1 END) as expired
                 FROM manufacturing_capacity_reservations
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             `);
@@ -165,7 +165,7 @@ class NetworkOpsService {
             const { rows: capacity } = await db.query('SELECT * FROM printer_capacity WHERE printer_id = ? ORDER BY date DESC LIMIT 7', [id]);
             const { rows: regions } = await db.query('SELECT * FROM printer_service_regions WHERE printer_id = ?', [id]);
             const { rows: reservations } = await db.query(
-                "SELECT * FROM manufacturing_capacity_reservations WHERE printer_id = ? AND (reservation_status = 'ACTIVE' OR status = 'PENDING' OR status = 'CONFIRMED') ORDER BY created_at DESC",
+                "SELECT * FROM manufacturing_capacity_reservations WHERE printer_id = ? AND reservation_status IN ('ACTIVE', 'PENDING', 'CONFIRMED') ORDER BY created_at DESC",
                 [id]
             );
             const { rows: assignments } = await db.query(

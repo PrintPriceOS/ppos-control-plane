@@ -28,6 +28,28 @@ class IndustrialProvisioningService {
     }
 
     /**
+     * Helper to ensure JSON values are MySQL-safe.
+     */
+    normalizeJsonForMysql(value, fallback = {}) {
+        if (value === null || value === undefined || value === '') {
+            return JSON.stringify(fallback);
+        }
+        if (typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+        if (typeof value === 'string') {
+            try {
+                JSON.parse(value);
+                return value;
+            } catch (e) {
+                return JSON.stringify(fallback);
+            }
+        }
+        // Fallback for primitives or other types
+        return JSON.stringify(fallback);
+    }
+
+    /**
      * Entry point for full system provisioning.
      * Consolidates modern migrations and legacy column hardening.
      */
@@ -528,9 +550,13 @@ class IndustrialProvisioningService {
                         economic_efficiency = VALUES(economic_efficiency)
                 `, [
                     pn.id, pn.tenant_id, pn.company_name || pn.name || 'Industrial Node', pn.country || null, pn.city || null,
-                    pn.capabilities_json || '{}', pn.machine_profile_json || '{}', 
-                    pn.supported_policies_json || '[]', pn.rates_json || null,
-                    pn.supported_products || null, pn.binding_capabilities || null, pn.color_profiles || null,
+                    this.normalizeJsonForMysql(pn.capabilities_json, {}),
+                    this.normalizeJsonForMysql(pn.machine_profile_json, {}),
+                    this.normalizeJsonForMysql(pn.supported_policies_json, []),
+                    this.normalizeJsonForMysql(pn.rates_json, {}),
+                    this.normalizeJsonForMysql(pn.supported_products, []),
+                    this.normalizeJsonForMysql(pn.binding_capabilities, []),
+                    this.normalizeJsonForMysql(pn.color_profiles, []),
                     pn.throughput || 0.00, pn.uptime_score || 100.00, pn.economic_efficiency || 1.00
                 ]);
                 synced++;

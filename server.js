@@ -199,8 +199,17 @@ const start = async () => {
         // 0.3 Industrial Event Orchestration (Phase 10 Integration)
         try {
             const industrialOrchestrator = require('./src/api/services/IndustrialEventOrchestrationService');
-            industrialOrchestrator.initializeConsumers();
-            console.log('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers initialized.');
+            // Hardening: Support both init() and initializeConsumers() with typeof check
+            const initFn = industrialOrchestrator.init || industrialOrchestrator.initializeConsumers;
+            if (typeof initFn === 'function') {
+                const result = initFn.call(industrialOrchestrator);
+                if (result instanceof Promise) {
+                    result.catch(err => console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Async init failed:', err.message));
+                }
+                console.log('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers initialization triggered.');
+            } else {
+                console.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Warning: No valid initialization method found on industrialOrchestrator.');
+            }
         } catch (err) {
             console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Startup failed:', err.message);
         }
