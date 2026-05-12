@@ -1612,4 +1612,120 @@ export async function listProductionNodes(params: Record<string, any> = {}) {
     return adminFetch<{ ok: boolean, nodes: any[] }>(`/api/admin/production/nodes?${qs.toString()}`);
 }
 
+// --- Industrial Preflight Console API (High-Fidelity Unmocked Integration) ---
+
+export interface AdminPreflightJob {
+    jobId: string;
+    tenantId: string;
+    printhouseId?: string;
+    operatorId?: string;
+    batchId?: string;
+    status: string;
+    policy?: string;
+    type?: string;
+    progress: number;
+    fileSize: number;
+    filename?: string;
+    createdAt: string;
+    updatedAt: string;
+    canonicalData?: any;
+}
+
+export async function listAdminPreflightJobs(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, total: number, jobs: AdminPreflightJob[], source_status?: string }>(`/api/admin/preflight/jobs?${qs.toString()}`);
+}
+
+export async function createAdminPreflightJob(formData: FormData) {
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const res = await fetch('/api/admin/preflight/jobs', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        throw { status: res.status, ...data };
+    }
+    return data;
+}
+
+export async function getAdminPreflightJob(jobId: string) {
+    return adminFetch<{ ok: boolean, jobId: string, status: string, source_status: string, canonicalPayload?: any, registryRecord?: any }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export async function requestAdminPreflightFix(jobId: string, options: any = {}) {
+    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/actions/fix`, {
+        method: 'POST',
+        body: JSON.stringify(options)
+    });
+}
+
+export async function retryAdminPreflightJob(jobId: string) {
+    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/actions/retry`, {
+        method: 'POST'
+    });
+}
+
+export async function listAdminPreflightArtifacts(jobId: string) {
+    return adminFetch<{ ok: boolean, artifacts: any[], source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
+}
+
+export async function downloadAdminPreflightArtifact(jobId: string, artifactId: string) {
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const res = await fetch(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw { status: res.status, message: `Download failed: ${res.statusText}`, ...errorData };
+    }
+    return res.blob();
+}
+
+export async function listAdminPreflightPolicies() {
+    return adminFetch<{ ok: boolean, policies: any[], source_status?: string }>('/api/admin/preflight/policies');
+}
+
+export async function listAdminPreflightBatches(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    return adminFetch<{ ok: boolean, batches: any[], source_status?: string }>(`/api/admin/preflight/batches?${qs.toString()}`);
+}
+
+export async function createAdminPreflightBatch(formData: FormData) {
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const res = await fetch('/api/admin/preflight/batches', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw { status: res.status, ...data };
+    return data;
+}
+
+export async function getAdminPreflightAudit(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    return adminFetch<{ ok: boolean, total: number, events: any[], source_status?: string }>(`/api/admin/preflight/audit?${qs.toString()}`);
+}
+
+export async function getAdminPreflightGovernance(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    return adminFetch<{ ok: boolean, total: number, governanceEvents: any[], source_status?: string }>(`/api/admin/preflight/governance?${qs.toString()}`);
+}
+
 
