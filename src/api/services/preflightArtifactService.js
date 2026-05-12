@@ -98,6 +98,7 @@ class PreflightArtifactService {
     const { storage_key, ...safe } = artifact;
     return {
       ...safe,
+      name: artifact.filename || artifact.name || 'document.pdf',
       downloadUrl: `/api/admin/preflight/artifacts/${artifact.id}/download`
     };
   }

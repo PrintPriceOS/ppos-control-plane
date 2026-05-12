@@ -159,20 +159,85 @@ class PreflightOperationsService {
       job.upstreamJobId = upstreamResult.jobId || upstreamResult.id;
 
     } catch (err) {
-      console.error(`[PREFLIGHT-OPS] Upstream trigger failed for ${job.id}:`, err.message);
+      const simulationEnabled = process.env.PPOS_PREFLIGHT_ENABLE_SIMULATION === 'true';
       
-      // Update local record to FAILED if upstream rejected it
-      await persistence.updateJob(job.id, {
-        status: 'FAILED',
-        error: {
-          code: 'UPSTREAM_TRIGGER_FAILED',
-          message: err.message,
-          details: err.details || {}
-        }
-      });
+      if (!simulationEnabled) {
+        console.error(`[PREFLIGHT-OPS] Upstream trigger failed for ${job.id} (Simulation Disabled):`, err.message);
+        const isAuth = err.status === 401 || err.status === 403;
+        const sourceStat = isAuth ? 'UPSTREAM_AUTH_FAILED' : 'UPSTREAM_UNAVAILABLE';
+        
+        await persistence.updateJob(job.id, {
+          status: 'FAILED',
+          error: {
+            code: sourceStat,
+            message: err.message,
+            details: err.details || {}
+          }
+        });
+        
+        job.status = 'FAILED';
+        job.progress = 0;
+        job.source_status = sourceStat;
+        job.error_json = { code: sourceStat, message: err.message };
+        return job;
+      }
+
+      console.warn(`[PREFLIGHT-OPS] Upstream trigger unavailable for ${job.id}. Gated Dev simulation enabled: persisting virtual dev-only lifecycle.`);
       
-      job.status = 'FAILED';
-      job.error_json = { code: 'UPSTREAM_TRIGGER_FAILED', message: err.message };
+      const simUpstreamJobId = `sim-upstream-${job.id}`;
+      const simMeta = {
+          ...job.metadata_json,
+          upstreamJobId: simUpstreamJobId,
+          originalFilename: filename,
+          strategy: type,
+          policy,
+          simulation: true,
+          source_status: 'SIMULATED_DEV_ONLY',
+          issueCount: type === 'CERTIFY' ? 0 : 2,
+          fixCount: type === 'ANALYZE' ? 0 : 1,
+          destructiveFixRisk: type === 'AUTOFIX' ? 'LOW' : null,
+          file: {
+              name: filename,
+              sizeBytes: stats.size,
+              mime: 'application/pdf'
+          }
+      };
+
+      const db = require('./mysqlClient');
+      await db.query('UPDATE preflight_jobs SET status = ?, progress = 100, completed_at = NOW(), metadata_json = ? WHERE id = ?', [
+          'COMPLETED',
+          JSON.stringify(simMeta),
+          job.id
+      ]);
+
+      // Automatically register simulated output artifact evidence for visual dev demonstration
+      try {
+          const { v4: uuidv4 } = require('uuid');
+          await db.query(`
+            INSERT INTO preflight_artifacts
+            (id, tenant_id, job_id, upload_id, type, filename, storage_key, size_bytes, mime_type, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+              uuidv4(),
+              tenantId,
+              job.id,
+              uploadId,
+              'REPORT',
+              'preflight_report.json',
+              `simulated/${job.id}/report.json`,
+              1250,
+              'application/json',
+              JSON.stringify({ simulated: true, source_status: 'SIMULATED_DEV_ONLY' })
+          ]);
+      } catch (artErr) {
+          console.warn('[PREFLIGHT-OPS] Optional simulated artifact registration skipped:', artErr.message);
+      }
+
+      job.status = 'COMPLETED';
+      job.progress = 100;
+      job.upstreamJobId = simUpstreamJobId;
+      job.source_status = 'SIMULATED_DEV_ONLY';
+      job.metadata_json = simMeta;
     }
 
     return job;
@@ -775,6 +840,11 @@ class PreflightOperationsService {
 
     // 1. Attempt Live Upstream Job Creation
     let upstreamRes;
+    let sourceStatus = 'LIVE_UPSTREAM';
+    let initialStatus = 'QUEUED';
+    let progressVal = 0;
+    const simulationEnabled = process.env.PPOS_PREFLIGHT_ENABLE_SIMULATION === 'true';
+
     try {
       upstreamRes = await upstream.createJob({
         file,
@@ -786,15 +856,21 @@ class PreflightOperationsService {
         authHeader: reqContext?.authHeader
       });
     } catch (err) {
-      console.warn('[PREFLIGHT-OPS] Upstream createJob failed, returning unavailable state:', err.message);
-      return {
-        ok: false,
-        error: 'UPSTREAM_UNAVAILABLE',
-        source_status: 'UPSTREAM_UNAVAILABLE'
-      };
+      if (!simulationEnabled) {
+        console.warn('[PREFLIGHT-OPS] Upstream createJob unavailable, persisting honest failure state (Simulation Disabled):', err.message);
+        const isAuth = err.status === 401 || err.status === 403;
+        sourceStatus = isAuth ? 'UPSTREAM_AUTH_FAILED' : 'UPSTREAM_UNAVAILABLE';
+        initialStatus = 'FAILED';
+        progressVal = 0;
+      } else {
+        console.warn('[PREFLIGHT-OPS] Upstream createJob unavailable, triggering gated dev-only simulated fallback state:', err.message);
+        sourceStatus = 'SIMULATED_DEV_ONLY';
+        initialStatus = 'COMPLETED';
+        progressVal = 100;
+      }
     }
 
-    const upstreamJobId = upstreamRes?.jobId || upstreamRes?.id || upstreamRes?.upstreamJobId || `upstream-${uuidv4()}`;
+    const upstreamJobId = upstreamRes?.jobId || upstreamRes?.id || upstreamRes?.upstreamJobId || (sourceStatus === 'SIMULATED_DEV_ONLY' ? `sim-upstream-${localJobId}` : null);
 
     // 2. Persist local job record in Control DB
     const metadataJson = {
@@ -809,11 +885,18 @@ class PreflightOperationsService {
       }
     };
 
+    if (sourceStatus === 'SIMULATED_DEV_ONLY') {
+      metadataJson.simulation = true;
+      metadataJson.source_status = 'SIMULATED_DEV_ONLY';
+    } else {
+      metadataJson.source_status = sourceStatus;
+    }
+
     const db = require('./mysqlClient');
     await db.query(`
       INSERT INTO preflight_jobs 
-      (id, tenant_id, user_id, submitted_by_role, visibility_scope, upload_id, type, status, policy, original_name, metadata_json)
-      VALUES (?, ?, ?, ?, 'PRIVATE', ?, ?, 'QUEUED', ?, ?, ?)
+      (id, tenant_id, user_id, submitted_by_role, visibility_scope, upload_id, type, status, progress, policy, original_name, metadata_json)
+      VALUES (?, ?, ?, ?, 'PRIVATE', ?, ?, ?, ?, ?, ?, ?)
     `, [
       localJobId,
       tenantId,
@@ -821,10 +904,16 @@ class PreflightOperationsService {
       reqContext?.role || 'ADMIN',
       uploadId,
       dbType,
+      initialStatus,
+      progressVal,
       policy,
       originalName,
       JSON.stringify(metadataJson)
     ]);
+
+    if (initialStatus === 'COMPLETED') {
+      await db.query('UPDATE preflight_jobs SET completed_at = NOW() WHERE id = ?', [localJobId]);
+    }
 
     // 3. Register input artifact mapping for lifecycle consistency
     try {
@@ -843,6 +932,24 @@ class PreflightOperationsService {
         file.mimetype || 'application/pdf',
         JSON.stringify({ upstreamJobId })
       ]);
+
+      if (sourceStatus === 'SIMULATED_DEV_ONLY') {
+        await db.query(`
+          INSERT INTO preflight_artifacts
+          (id, tenant_id, job_id, upload_id, type, filename, storage_key, size_bytes, mime_type, metadata_json)
+          VALUES (?, ?, ?, ?, 'REPORT', ?, ?, ?, ?, ?)
+        `, [
+          uuidv4(),
+          tenantId,
+          localJobId,
+          uploadId,
+          'preflight_report.json',
+          `simulated/${localJobId}/report.json`,
+          1250,
+          'application/json',
+          JSON.stringify({ simulated: true, source_status: 'SIMULATED_DEV_ONLY' })
+        ]);
+      }
     } catch (artErr) {
       console.warn('[PREFLIGHT-OPS] Optional local input artifact registration warning:', artErr.message);
     }
@@ -862,14 +969,14 @@ class PreflightOperationsService {
         id: localJobId,
         upstreamJobId,
         tenantId,
-        status: savedJob.status || 'QUEUED',
+        status: savedJob.status || initialStatus,
         strategy,
         policy,
         originalName,
         sizeBytes,
         createdAt: savedJob.created_at || new Date().toISOString()
       },
-      source_status: 'LIVE_UPSTREAM'
+      source_status: sourceStatus
     };
   }
 
@@ -908,16 +1015,31 @@ class PreflightOperationsService {
         }
       } catch (e) {}
 
+      const simulationEnabled = process.env.PPOS_PREFLIGHT_ENABLE_SIMULATION === 'true';
+      const fileSz = metaObj?.file?.sizeBytes || row.size_bytes || 0;
+      const fName = row.original_name || metaObj?.file?.name || metaObj?.originalFilename || 'document.pdf';
+      const isSimulatedDev = simulationEnabled && (metaObj?.source_status === 'SIMULATED_DEV_ONLY' || metaObj?.simulation);
+      const resolvedStatus = isSimulatedDev ? 'COMPLETED' : row.status;
+      
       return {
         id: row.id,
+        jobId: row.id,
         upstreamJobId: metaObj?.upstreamJobId || null,
         tenantId: row.tenant_id,
-        status: row.status,
+        status: resolvedStatus,
+        type: row.type || metaObj?.strategy || 'ANALYZE',
         strategy: metaObj?.strategy || row.type,
         policy: row.policy || metaObj?.policy,
-        originalName: row.original_name || metaObj?.file?.name || 'document.pdf',
-        sizeBytes: metaObj?.file?.sizeBytes || 0,
+        filename: fName,
+        originalName: fName,
+        fileSize: fileSz,
+        sizeBytes: fileSz,
         createdAt: row.created_at,
+        sourceStatus: metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : 'LIVE_UPSTREAM'),
+        source_status: metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : 'LIVE_UPSTREAM'),
+        issueCount: upstreamMeta?.findings?.length ?? metaObj?.issueCount ?? (isSimulatedDev ? 2 : 0),
+        fixCount: upstreamMeta?.evidence?.length ?? metaObj?.fixCount ?? (isSimulatedDev ? 1 : 0),
+        destructiveFixRisk: upstreamMeta?.destructiveFixRisk || metaObj?.destructiveFixRisk || (isSimulatedDev ? 'LOW' : null),
         upstreamState: upstreamMeta
       };
     }));
@@ -964,23 +1086,65 @@ class PreflightOperationsService {
       }
     }
 
+    const simulationEnabled = process.env.PPOS_PREFLIGHT_ENABLE_SIMULATION === 'true';
+    const isSimulatedDev = simulationEnabled && (metaObj?.source_status === 'SIMULATED_DEV_ONLY' || metaObj?.simulation);
+    const resolvedStatus = isSimulatedDev ? 'COMPLETED' : jobRow.status;
+    const fName = jobRow.original_name || metaObj?.file?.name || metaObj?.originalFilename || 'document.pdf';
+    const fileSz = metaObj?.file?.sizeBytes || jobRow.size_bytes || 0;
+    const strat = metaObj?.strategy || jobRow.type || 'ANALYZE';
+    const pol = jobRow.policy || metaObj?.policy || 'OFFSET_MODERN_COATED';
+
+    // Build rich simulated/hydrated upstream object if missing and simulation is enabled
+    const hydratedUpstreamData = upstreamData || (isSimulatedDev ? {
+        status: resolvedStatus,
+        findings: [{ id: 'f1', type: 'TRIMBOX', risk: 'LOW', message: 'Trimbox missing, auto-generated.' }, { id: 'f2', type: 'FONTS', risk: 'MEDIUM', message: 'Non-embedded fonts normalized.' }],
+        evidence: [{ id: 'e1', action: 'FIXED_TRIMBOX', certified: true }],
+        destructiveFixRisk: 'LOW'
+    } : null);
+
+    const finalSourceStatus = metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : source_status);
+
     return {
       ok: true,
       job: {
+        // camelCase schema
         id: jobRow.id,
+        jobId: jobRow.id,
         upstreamJobId,
         tenantId: jobRow.tenant_id,
-        status: jobRow.status,
-        strategy: metaObj?.strategy || jobRow.type,
-        policy: jobRow.policy || metaObj?.policy,
-        originalName: jobRow.original_name || metaObj?.file?.name || 'document.pdf',
-        sizeBytes: metaObj?.file?.sizeBytes || 0,
+        status: resolvedStatus,
+        type: strat,
+        strategy: strat,
+        policy: pol,
+        filename: fName,
+        originalName: fName,
+        fileSize: fileSz,
+        sizeBytes: fileSz,
         createdAt: jobRow.created_at,
         updatedAt: jobRow.updated_at,
+        completedAt: jobRow.completed_at || jobRow.created_at,
+        progress: jobRow.progress ?? (resolvedStatus === 'COMPLETED' ? 100 : 0),
+        issueCount: hydratedUpstreamData?.findings?.length || 0,
+        fixCount: hydratedUpstreamData?.evidence?.length || 0,
+        destructiveFixRisk: hydratedUpstreamData?.destructiveFixRisk || null,
         metadata: metaObj,
-        upstreamData
+        upstreamData: hydratedUpstreamData,
+        sourceStatus: finalSourceStatus,
+        source_status: finalSourceStatus,
+
+        // snake_case schema support for raw DB accessor components
+        tenant_id: jobRow.tenant_id,
+        created_at: jobRow.created_at,
+        updated_at: jobRow.updated_at,
+        completed_at: jobRow.completed_at || jobRow.created_at,
+        upstream_job_id: upstreamJobId,
+        metadata_json: {
+            ...metaObj,
+            originalFilename: fName,
+            upstreamJobId
+        }
       },
-      source_status
+      source_status: finalSourceStatus
     };
   }
 }

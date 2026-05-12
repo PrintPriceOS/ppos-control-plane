@@ -80,24 +80,29 @@ export const PreflightJobDetailPage: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
+           { (job.sourceStatus === 'SIMULATED_DEV_ONLY' || job.source_status === 'SIMULATED_DEV_ONLY') && (
+             <span className="px-2 py-1 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-tight">
+               Simulated (Dev Only)
+             </span>
+           )}
            <div className={`px-4 py-2 rounded-none flex items-center gap-2 border font-black text-xs uppercase tracking-widest ${
              job.status === 'COMPLETED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-             job.status === 'FAILED' ? 'bg-red-50 border-red-100 text-red-600' : 'bg-blue-50 border-blue-100 text-blue-600'
+             (job.status === 'FAILED' || job.sourceStatus?.includes('UNAVAILABLE') || job.source_status?.includes('UNAVAILABLE')) ? 'bg-red-50 border-red-100 text-red-600' : 'bg-blue-50 border-blue-100 text-blue-600'
            }`}>
              {job.status === 'COMPLETED' ? <CheckCircleIcon className="w-4 h-4" /> : 
-              job.status === 'FAILED' ? <XCircleIcon className="w-4 h-4" /> : <ArrowPathIcon className="w-4 h-4 animate-spin" />}
-             {job.status}
+              (job.status === 'FAILED' || job.sourceStatus?.includes('UNAVAILABLE') || job.source_status?.includes('UNAVAILABLE')) ? <XCircleIcon className="w-4 h-4" /> : <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+             {(job.sourceStatus?.includes('UNAVAILABLE') || job.source_status?.includes('UNAVAILABLE')) ? 'UPSTREAM UNAVAILABLE' : job.status}
            </div>
         </div>
       </div>
 
-      {job.status === 'FAILED' && job.error_json && (
+      {(job.status === 'FAILED' || job.sourceStatus?.includes('UNAVAILABLE') || job.source_status?.includes('UNAVAILABLE')) && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-none flex items-start gap-3 text-red-600 dark:text-red-400">
           <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
           <div>
             <h4 className="text-sm font-black uppercase tracking-widest">Processing Error</h4>
-            <p className="text-xs font-bold">{job.error_json.message || 'Unknown error occurred during upstream trigger or processing.'}</p>
-            {job.error_json.details && (
+            <p className="text-xs font-bold">{job.error_json?.message || 'Upstream preflight service is unreachable or rejected the request.'}</p>
+            {job.error_json?.details && (
               <pre className="mt-2 text-[10px] bg-red-100/50 dark:bg-red-900/40 p-2 rounded-none overflow-x-auto">
                 {JSON.stringify(job.error_json.details, null, 2)}
               </pre>
