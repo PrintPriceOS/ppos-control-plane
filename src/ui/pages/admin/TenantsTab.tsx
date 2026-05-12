@@ -108,7 +108,7 @@ export const TenantsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ran
                                         <div className="w-12 h-1.5 bg-white/5 overflow-hidden">
                                             <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, r.successRate)}%` }} />
                                         </div>
-                                        <span className="font-bold text-slate-600 text-xs">{r.successRate.toFixed(1)}%</span>
+                                        <span className="font-bold text-slate-600 text-xs">{Number(r.successRate || 0).toFixed(1)}%</span>
                                     </div>
                                 </td>
                                 <td className="py-4 px-6">
@@ -123,7 +123,7 @@ export const TenantsTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ran
                                 </td>
                                 <td className="py-4 px-6 text-right">
                                     <span className="font-bold text-blue-600">
-                                        {r.totalHoursSaved.toFixed(1)}h
+                                        {Number(r.totalHoursSaved || 0).toFixed(1)}h
                                     </span>
                                 </td>
                                 <td className="py-4 px-4 text-right">

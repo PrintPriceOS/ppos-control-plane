@@ -29,7 +29,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
     const runSimulation = async () => {
         const res = await runResilienceSimulation();
         if (res.ok) {
-            alert(`Simulation Complete: Global Survivability Index ${res.simulation.global_survivability_index.toFixed(1)}%`);
+            alert(`Simulation Complete: Global Survivability Index ${Number(res.simulation?.global_survivability_index || 0).toFixed(1)}%`);
         }
     };
 

@@ -119,10 +119,10 @@ export const FinancialOpsTab: React.FC = () => {
                                             <div className="text-[11px] font-bold text-slate-700 truncate max-w-[150px]">{tx.job_name || 'N/A'}</div>
                                         </td>
                                         <td className="px-4 py-4 text-right font-black text-slate-900 text-xs">
-                                            {parseFloat(tx.gross_amount).toFixed(2)} {tx.currency}
+                                            {Number(tx.gross_amount || 0).toFixed(2)} {tx.currency}
                                         </td>
                                         <td className="px-4 py-4 text-right font-black text-emerald-600 text-xs">
-                                            {parseFloat(tx.platform_fee).toFixed(2)} {tx.currency}
+                                            {Number(tx.platform_fee || 0).toFixed(2)} {tx.currency}
                                         </td>
                                         <td className="px-4 py-4">
                                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-none border uppercase tracking-widest ${tx.transaction_status === 'SETTLED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -157,7 +157,7 @@ export const FinancialOpsTab: React.FC = () => {
                                                 <div className="text-[10px] font-black text-slate-900">{entry.entry_type}</div>
                                             </div>
                                             <div className={`text-xs font-black ${entry.entry_type === 'DEBIT' ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                {parseFloat(entry.amount).toFixed(2)} {entry.currency}
+                                                {Number(entry.amount || 0).toFixed(2)} {entry.currency}
                                             </div>
                                         </div>
                                     ))}

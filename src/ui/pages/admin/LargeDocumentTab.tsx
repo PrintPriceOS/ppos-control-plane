@@ -58,7 +58,7 @@ export const LargeDocumentTab: React.FC = () => {
                                         <td className="px-6 py-4 font-mono text-slate-600">{String(j.jobId || '').substring(0, 12)}...</td>
                                         <td className="px-6 py-4 font-bold text-slate-800">{j.filename || 'anonymous_industrial.pdf'}</td>
                                         <td className="px-6 py-4">
-                                            <span className="font-black text-indigo-600">{(j.fileSize / (1024 * 1024)).toFixed(0)} MB</span>
+                                            <span className="font-black text-indigo-600">{Number((j.fileSize || 0) / (1024 * 1024)).toFixed(0)} MB</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusBadge status={j.status} />

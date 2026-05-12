@@ -96,7 +96,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Congestion</p>
-                                        <p className="text-2xl font-black italic">{f.predicted_congestion_pct.toFixed(1)}%</p>
+                                        <p className="text-2xl font-black italic">{Number(f.predicted_congestion_pct || 0).toFixed(1)}%</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Survivability</p>
@@ -126,7 +126,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-slate-400 uppercase">T-Minus {r.time_to_impact_hours}H</p>
-                                    <p className="text-xs font-black text-pink-500">{(r.probability * 100).toFixed(0)}% PROBABILITY</p>
+                                    <p className="text-xs font-black text-pink-500">{Number((r.probability || 0) * 100).toFixed(0)}% PROBABILITY</p>
                                 </div>
                             </div>
                         ))}

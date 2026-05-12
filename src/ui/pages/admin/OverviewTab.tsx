@@ -87,11 +87,11 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
         <div className="space-y-6 animate-slide-fade">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
                 <KpiCard Icon={Square3Stack3DIcon} color="blue" title="Ledger Total (DB)" value={String(d.totalJobs)} helpKey="metric-total-jobs" />
-                <KpiCard Icon={CheckBadgeIcon} color="emerald" title="SLA Success Rate" value={`${d.successRate.toFixed(1)}%`} helpKey="metric-success-rate" />
-                <KpiCard Icon={BanknotesIcon} color="emerald" title="AutoFix Value" value={`$${Math.round(d.totalValueGenerated).toLocaleString()}`} sub="USD Generated" />
-                <KpiCard Icon={ClockIcon} color="blue" title="Prepress Saved" value={`${d.totalHoursSaved.toFixed(1)} h`} sub="Time ROI" />
-                <KpiCard Icon={ArrowTrendingUpIcon} color="indigo" title="Optimization Delta" value={`${d.deltaImprovementRate.toFixed(1)}%`} />
-                <KpiCard Icon={ScaleIcon} color="violet" title="Risk Reduction" value={`${(d.avgRiskBefore - d.avgRiskAfter).toFixed(1)} pts`} sub={`${d.avgRiskBefore.toFixed(0)} → ${d.avgRiskAfter.toFixed(0)}`} />
+                <KpiCard Icon={CheckBadgeIcon} color="emerald" title="SLA Success Rate" value={`${Number(d.successRate || 0).toFixed(1)}%`} helpKey="metric-success-rate" />
+                <KpiCard Icon={BanknotesIcon} color="emerald" title="AutoFix Value" value={`$${Math.round(d.totalValueGenerated || 0).toLocaleString()}`} sub="USD Generated" />
+                <KpiCard Icon={ClockIcon} color="blue" title="Prepress Saved" value={`${Number(d.totalHoursSaved || 0).toFixed(1)} h`} sub="Time ROI" />
+                <KpiCard Icon={ArrowTrendingUpIcon} color="indigo" title="Optimization Delta" value={`${Number(d.deltaImprovementRate || 0).toFixed(1)}%`} />
+                <KpiCard Icon={ScaleIcon} color="violet" title="Risk Reduction" value={`${Number((d.avgRiskBefore || 0) - (d.avgRiskAfter || 0)).toFixed(1)} pts`} sub={`${Number(d.avgRiskBefore || 0).toFixed(0)} → ${Number(d.avgRiskAfter || 0).toFixed(0)}`} />
                 <KpiCard Icon={BoltIcon} color="amber" title="Mean Latency" value={`${d.avgLatencyMs} ms`} />
                 <KpiCard Icon={QueueListIcon} color="orange" title="Live Buffer (Queue)" value={String(d.queueBacklog || 0)} helpKey="metric-queue-backlog" />
             </div>

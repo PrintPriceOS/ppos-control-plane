@@ -111,18 +111,18 @@ export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 500
                         <StatusBadge status={storage.state} />
                     </div>
                     <div className="p-6 flex-1 flex flex-col justify-center items-center text-center">
-                        <div className="text-4xl font-black text-slate-900 tracking-tighter">{(storage.totalSizeBytes / (1024 ** 3)).toFixed(1)} GB</div>
+                        <div className="text-4xl font-black text-slate-900 tracking-tighter">{Number((storage.totalSizeBytes || 0) / (1024 ** 3)).toFixed(1)} GB</div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total Artifact footprint</div>
                         
                         <div className="w-full h-2 bg-slate-100 rounded-none mt-6 overflow-hidden border border-slate-200">
                             <div 
                                 className="h-full bg-blue-500 rounded-none" 
-                                style={{ width: `${(storage.totalSizeBytes / storage.capacityBytes) * 100}%` }} 
+                                style={{ width: `${((storage.totalSizeBytes || 0) / (storage.capacityBytes || 1)) * 100}%` }} 
                             />
                         </div>
                         <div className="w-full flex justify-between mt-2">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase">Usage: {((storage.totalSizeBytes / storage.capacityBytes) * 100).toFixed(1)}%</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase">Limit: {(storage.capacityBytes / (1024 ** 3)).toFixed(1)} GB</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Usage: {Number(((storage.totalSizeBytes || 0) / (storage.capacityBytes || 1)) * 100).toFixed(1)}%</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Limit: {Number((storage.capacityBytes || 1024**4) / (1024 ** 3)).toFixed(1)} GB</span>
                         </div>
                     </div>
                 </div>

@@ -51,7 +51,7 @@ export const ArtifactRegistryTab: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 font-mono text-slate-400">{String(a.job_id || '').substring(0, 8)}...</td>
-                                    <td className="px-6 py-4 font-bold text-slate-700">{(a.size_bytes / (1024 * 1024)).toFixed(2)} MB</td>
+                                    <td className="px-6 py-4 font-bold text-slate-700">{Number((a.size_bytes || 0) / (1024 * 1024)).toFixed(2)} MB</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-0.5 rounded-none text-[10px] font-black uppercase ${
                                             a.retention_class === 'HOT' ? 'bg-orange-50 text-orange-600' : 'bg-slate-100 text-slate-500'

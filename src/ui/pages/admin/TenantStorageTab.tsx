@@ -27,10 +27,10 @@ export const TenantStorageTab: React.FC = () => {
                         <span className="text-[10px] font-black uppercase tracking-widest">Global Registry Footprint</span>
                     </div>
                     <div className="text-3xl font-black text-white tracking-tighter">
-                        {(storage.totalSizeBytes / (1024 ** 3)).toFixed(2)} GB
+                        {Number((storage.totalSizeBytes || 0) / (1024 ** 3)).toFixed(2)} GB
                     </div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                        of {(storage.capacityBytes / (1024 ** 3)).toFixed(0)} GB Industrial Quota
+                        of {Number((storage.capacityBytes || 1024**4) / (1024 ** 3)).toFixed(0)} GB Industrial Quota
                     </div>
                     <div className="w-full h-2 bg-white/5 mt-6 overflow-hidden border border-white/10">
                         <div 
