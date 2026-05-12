@@ -14,6 +14,7 @@ import {
   getMachineDispatchHistory, 
   getMachineCapacityAnalysis 
 } from '../lib/adminApi';
+import { toDisplayText } from '../lib/formatters';
 
 interface MachineDetailDrawerProps {
   machineId: string | null;
@@ -115,7 +116,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
         capacity: capacityData
       });
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || String(e));
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
              <div className="space-y-4">
                 <ExclamationCircleIcon className="w-12 h-12 text-red-600 mx-auto" />
                 <h3 className="text-lg font-black uppercase italic">Telemetry Failure</h3>
-                <p className="text-zinc-500 text-sm max-w-xs">{error}</p>
+                <p className="text-zinc-500 text-sm max-w-xs">{toDisplayText(error)}</p>
                 <button onClick={fetchAllData} className="px-6 py-2 border border-red-600 text-red-600 text-[10px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Retry Synchronization</button>
              </div>
           </div>
@@ -169,11 +170,11 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
             <section className="p-8 border-b border-white/5">
                <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h1 className="text-3xl font-black uppercase leading-none mb-2 tracking-tighter">{data.header.name}</h1>
+                    <h1 className="text-3xl font-black uppercase leading-none mb-2 tracking-tighter">{toDisplayText(data.header?.name)}</h1>
                     <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                       <span>{data.header.manufacturer} / {data.header.model}</span>
+                       <span>{toDisplayText(data.header?.manufacturer)} / {toDisplayText(data.header?.model)}</span>
                        <span className="w-1 h-1 bg-zinc-800 rounded-none" />
-                       <span>{data.header.region}</span>
+                       <span>{toDisplayText(data.header?.region)}</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -321,15 +322,15 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
                <SectionHeader icon={ExclamationCircleIcon} title="Recent Incidents" />
                <div className="space-y-2">
                   {(data.history?.incidents || []).map((incident: any) => (
-                    <div key={incident.id} className="p-4 border border-white/5 bg-zinc-900 flex items-start justify-between group">
+                    <div key={incident?.id || Math.random()} className="p-4 border border-white/5 bg-zinc-900 flex items-start justify-between group">
                        <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                             <span className={`w-1.5 h-1.5 rounded-none ${incident.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-amber-500'}`} />
-                             <span className="text-[10px] font-black uppercase text-white tracking-widest">{incident.type}</span>
+                             <span className={`w-1.5 h-1.5 rounded-none ${incident?.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-amber-500'}`} />
+                             <span className="text-[10px] font-black uppercase text-white tracking-widest">{toDisplayText(incident?.type || 'INCIDENT')}</span>
                           </div>
-                          <p className="text-xs text-zinc-400 font-medium">{incident.message}</p>
+                          <p className="text-xs text-zinc-400 font-medium">{toDisplayText(incident?.message)}</p>
                        </div>
-                       <span className="text-[8px] font-bold text-zinc-600 uppercase whitespace-nowrap">{incident.created_at ? new Date(incident.created_at).toLocaleTimeString() : ''}</span>
+                       <span className="text-[8px] font-bold text-zinc-600 uppercase whitespace-nowrap">{incident?.created_at ? new Date(incident.created_at).toLocaleTimeString() : ''}</span>
                     </div>
                   ))}
                   {(data.history?.incidents || []).length === 0 && (

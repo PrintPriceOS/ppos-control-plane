@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 
+import { toDisplayText } from '../lib/formatters';
+
 interface Column<T> {
   header: string;
   accessor: keyof T | ((item: T) => React.ReactNode);
@@ -105,7 +107,18 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading, compact, ro
             >
               {columns.map((col, j) => (
                 <td key={j} className={`${compact ? 'px-3 py-2 text-xs' : 'px-6 py-4 text-sm'} font-medium text-slate-900 dark:text-[#ECECF1] ${col.className || ''}`}>
-                  {typeof col.accessor === 'function' ? col.accessor(item) : (item[col.accessor] as React.ReactNode)}
+                  {(() => {
+                    if (typeof col.accessor === 'function') {
+                      return col.accessor(item);
+                    }
+                    const val = item[col.accessor] as any;
+                    if (val === null || val === undefined) return '';
+                    if (React.isValidElement(val)) return val;
+                    if (typeof val === 'object') {
+                      return <span className="font-mono text-[10px] text-zinc-500">{toDisplayText(val, '[OBJECT]')}</span>;
+                    }
+                    return String(val);
+                  })()}
                 </td>
               ))}
             </tr>

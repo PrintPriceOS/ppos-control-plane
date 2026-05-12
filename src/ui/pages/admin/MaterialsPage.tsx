@@ -11,6 +11,7 @@ import {
     EyeIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { toDisplayText } from "../../lib/formatters";
 
 export const MaterialsPage: React.FC = () => {
     const [materials, setMaterials] = useState<any[]>([]);
@@ -226,7 +227,7 @@ export const MaterialsPage: React.FC = () => {
                         ) : (
                             <ExclamationTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0" />
                         )}
-                        <span>{actionFeedback.message}</span>
+                        <span>{toDisplayText(actionFeedback.message)}</span>
                     </div>
                     <button onClick={() => setActionFeedback(null)} className="text-[10px] underline uppercase tracking-wider hover:text-white ml-2">
                         Dismiss

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingLive, getRoutingMap } from '../../lib/adminApi';
+import { toDisplayText } from '../../lib/formatters';
 
 export const IndustrialMapTab: React.FC = () => {
     const { data: liveData } = useAdminQuery('routing:live', getRoutingLive, 5000);
@@ -29,7 +30,7 @@ export const IndustrialMapTab: React.FC = () => {
                         <div className="flex items-center gap-3">
                             <div className="w-1.5 h-1.5 bg-amber-500 animate-pulse" />
                             <span className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-wider">
-                                {sourceStatus.replace(/_/g, ' ')} — {warnings.length} {warnings.length === 1 ? 'node' : 'nodes'} excluded from map
+                                {toDisplayText(sourceStatus).replace(/_/g, ' ')} — {warnings.length} {warnings.length === 1 ? 'node' : 'nodes'} excluded from map
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -45,20 +46,20 @@ export const IndustrialMapTab: React.FC = () => {
                     {isExpanded && warnings.length > 0 && (
                         <div className="border-t border-amber-500/10 bg-white/50 dark:bg-black/20 divide-y divide-amber-500/5 max-h-60 overflow-y-auto custom-scrollbar">
                             {warnings.map((w: any, idx: number) => (
-                                <div key={w.id || idx} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono">
+                                <div key={w?.id || idx} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono">
                                     <div className="flex items-center gap-2">
                                         <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[8px]">
-                                            {w.type || w.entityType || 'NODE'}
+                                            {toDisplayText(w?.type || w?.entityType || 'NODE')}
                                         </span>
                                         <span className="font-bold text-slate-800 dark:text-zinc-200">
-                                            {w.name}
+                                            {toDisplayText(w?.name || 'Unknown')}
                                         </span>
                                         <span className="text-slate-400 dark:text-zinc-500 text-[8px]">
-                                            ({w.id || w.entityId})
+                                            ({toDisplayText(w?.id || w?.entityId || 'N/A')})
                                         </span>
                                     </div>
                                     <span className="text-amber-600 dark:text-amber-500/90 text-[8px] max-w-md truncate">
-                                        {w.message || w.reason}
+                                        {toDisplayText(w?.message || w?.reason || w)}
                                     </span>
                                 </div>
                             ))}
@@ -84,21 +85,24 @@ export const IndustrialMapTab: React.FC = () => {
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                            {Array.isArray(liveData?.decisions) && liveData.decisions.map((d: any) => (
-                                <div key={d.id} className="p-3 bg-white/5 border border-white/5 rounded-none">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="text-[8px] font-mono font-bold text-blue-600 uppercase tracking-tighter">#{d.id.slice(-8)}</span>
-                                        <span className="text-[9px] font-black text-emerald-500 uppercase">{d.routing_score}%</span>
+                            {Array.isArray(liveData?.decisions) && liveData.decisions.map((d: any) => {
+                                const safeDecId = d?.id ? String(d.id).substring(0, 8) : 'N/A';
+                                return (
+                                    <div key={d?.id || Math.random()} className="p-3 bg-white/5 border border-white/5 rounded-none">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-[8px] font-mono font-bold text-blue-600 uppercase tracking-tighter">#{safeDecId}</span>
+                                            <span className="text-[9px] font-black text-emerald-500 uppercase">{toDisplayText(d?.routing_score)}%</span>
+                                        </div>
+                                        <p className="text-[9px] font-bold text-slate-800 dark:text-zinc-300 leading-relaxed mb-2">
+                                            {toDisplayText(d?.explanation)}
+                                        </p>
+                                        <div className="flex justify-between items-center text-[7px] font-black text-slate-400 uppercase">
+                                            <span>Node: {toDisplayText(d?.selected_machine_id)}</span>
+                                            <span>{d?.created_at ? new Date(d.created_at).toLocaleTimeString() : ''}</span>
+                                        </div>
                                     </div>
-                                    <p className="text-[9px] font-bold text-slate-800 dark:text-zinc-300 leading-relaxed mb-2">
-                                        {d.explanation}
-                                    </p>
-                                    <div className="flex justify-between items-center text-[7px] font-black text-slate-400 uppercase">
-                                        <span>Node: {d.selected_machine_id}</span>
-                                        <span>{new Date(d.created_at).toLocaleTimeString()}</span>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
 
                             {(!liveData?.decisions || liveData.decisions.length === 0) && (
                                 <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale">

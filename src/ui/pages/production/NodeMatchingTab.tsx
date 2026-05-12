@@ -14,6 +14,7 @@ import {
     InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import * as adminApi from '../../lib/adminApi';
+import { toDisplayText } from '../../lib/formatters';
 
 export const NodeMatchingTab: React.FC = () => {
     const [packages, setPackages] = useState<adminApi.ProductionPackage[]>([]);
@@ -198,7 +199,7 @@ export const NodeMatchingTab: React.FC = () => {
             {error && (
                 <div className="p-4 bg-red-950 text-red-300 border border-red-800 text-xs font-mono rounded-none">
                     <span className="font-bold block uppercase tracking-wider">Engine Evaluation Interruption</span>
-                    {error}
+                    {toDisplayText(error)}
                 </div>
             )}
 
@@ -273,10 +274,10 @@ export const NodeMatchingTab: React.FC = () => {
                                                         </button>
                                                         <div>
                                                             <span className="font-bold text-[11px] text-slate-900 block truncate max-w-[160px]" title={matchObj.printHouseId || matchObj.companyName}>
-                                                                {matchObj.printHouseId || matchObj.companyName || 'Industrial Node'}
+                                                                {toDisplayText(matchObj.printHouseId || matchObj.companyName || 'Industrial Node')}
                                                             </span>
                                                             <span className="text-[9px] text-slate-400 block font-mono">
-                                                                ID: {nodeId.substring(0,8)} • <span className="underline cursor-pointer text-indigo-800" onClick={() => toggleNodeExpanded(nodeId)}>{machineCount} Hardware Profiles</span>
+                                                                ID: {String(nodeId || '').substring(0, 8)} • <span className="underline cursor-pointer text-indigo-800" onClick={() => toggleNodeExpanded(nodeId)}>{machineCount} Hardware Profiles</span>
                                                             </span>
                                                         </div>
                                                     </div>
@@ -402,7 +403,7 @@ export const NodeMatchingTab: React.FC = () => {
 
                                                                             {m.reasons && m.reasons.length > 0 && (
                                                                                 <div className="text-[9px] text-amber-800 bg-amber-50 p-1 border border-amber-200">
-                                                                                    Sub-reasons: {m.reasons.join('; ')}
+                                                                                    Sub-reasons: {m.reasons.map((r: any) => toDisplayText(r)).join('; ')}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -410,9 +411,9 @@ export const NodeMatchingTab: React.FC = () => {
                                                                 </div>
                                                             ) : matchObj.matchedMachines && matchObj.matchedMachines.length > 0 ? (
                                                                 <div className="flex flex-wrap gap-1">
-                                                                    {matchObj.matchedMachines.map((mName: string, midx: number) => (
+                                                                    {matchObj.matchedMachines.map((mName: any, midx: number) => (
                                                                         <span key={midx} className="px-2 py-0.5 bg-white border border-slate-200 text-[10px] font-bold text-slate-800">
-                                                                            {mName}
+                                                                            {toDisplayText(mName)}
                                                                         </span>
                                                                     ))}
                                                                 </div>

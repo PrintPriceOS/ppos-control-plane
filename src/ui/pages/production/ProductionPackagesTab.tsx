@@ -16,6 +16,7 @@ import {
     InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import * as adminApi from '../../lib/adminApi';
+import { toDisplayText } from '../../lib/formatters';
 
 export const ProductionPackagesTab: React.FC = () => {
     const [packages, setPackages] = useState<adminApi.ProductionPackage[]>([]);
@@ -216,7 +217,7 @@ export const ProductionPackagesTab: React.FC = () => {
             {error && (
                 <div className="p-4 bg-red-950 text-red-300 border border-red-800 text-xs font-mono rounded-none">
                     <span className="font-bold block uppercase">Datastore Error Snapshot</span>
-                    {error}
+                    {toDisplayText(error)}
                 </div>
             )}
 
@@ -275,16 +276,16 @@ export const ProductionPackagesTab: React.FC = () => {
                                                 <td className="p-2.5 font-bold text-[11px] text-slate-900 truncate max-w-[120px]" title={pkg.id}>
                                                     {pkg.id}
                                                     <span className="text-[9px] text-slate-400 block font-normal">
-                                                        {pkg.created_at ? pkg.created_at.substring(0, 10) : ''}
+                                                        {pkg.created_at ? String(pkg.created_at).substring(0, 10) : ''}
                                                     </span>
                                                 </td>
 
                                                 <td className="p-2.5 text-[11px] text-slate-700">
                                                     <span className="block truncate max-w-[140px]" title={pkg.source_job_id}>
-                                                        Job: {pkg.source_job_id.substring(0, 12)}...
+                                                        Job: {String(pkg.source_job_id || '').substring(0, 12)}...
                                                     </span>
                                                     <span className="text-[9px] text-slate-400 block truncate max-w-[140px]" title={pkg.source_artifact_id}>
-                                                        Base: {pkg.source_artifact_id.substring(0, 12)}...
+                                                        Base: {String(pkg.source_artifact_id || '').substring(0, 12)}...
                                                     </span>
                                                 </td>
 
@@ -300,7 +301,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                                 <td className="p-2.5 text-[10px] text-slate-600 truncate max-w-[100px]">
                                                     {pkg.assigned_printer_tenant_id ? (
                                                         <span className="text-indigo-900 font-bold" title={pkg.assigned_printer_tenant_id}>
-                                                            {pkg.assigned_printer_tenant_id.substring(0, 10)}...
+                                                            {String(pkg.assigned_printer_tenant_id || '').substring(0, 10)}...
                                                         </span>
                                                     ) : (
                                                         <span className="text-slate-400 italic-text-off">Unassigned</span>
@@ -376,7 +377,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                             <span className="text-slate-500">Fixed PDF Base:</span>
                                             {selectedPackage.fixed_pdf_artifact_id ? (
                                                 <span className="font-bold text-emerald-800 truncate max-w-[140px]" title={selectedPackage.fixed_pdf_artifact_id}>
-                                                    ✓ {selectedPackage.fixed_pdf_artifact_id.substring(0, 10)}...
+                                                    ✓ {String(selectedPackage.fixed_pdf_artifact_id || '').substring(0, 10)}...
                                                 </span>
                                             ) : (
                                                 <span className="text-red-600 font-bold text-[10px]">Missing Autofix</span>
@@ -449,7 +450,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                                 matchingResults.map((m: any, idx: number) => (
                                                     <div key={idx} className="p-1 bg-white border border-slate-200 text-[10px] flex justify-between items-center">
                                                         <span className="truncate font-bold text-slate-800" title={m.nodeId || m.id}>
-                                                            Node: {(m.nodeId || m.id)?.substring(0,8)}
+                                                            Node: {String(m.nodeId || m.id || '').substring(0, 8)}
                                                         </span>
                                                         <span className="text-emerald-700 font-bold">Fit Score: {m.score ? `${(m.score * 100).toFixed(0)}%` : '98%'}</span>
                                                     </div>
@@ -477,7 +478,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                                     ) : (
                                                         availableNodes.map(n => (
                                                             <option key={n.id} value={n.id}>
-                                                                {n.companyName || n.company_name} [{n.id.substring(0,8)}]
+                                                                {toDisplayText(n.companyName || n.company_name)} [{String(n.id || '').substring(0, 8)}]
                                                             </option>
                                                         ))
                                                     )}

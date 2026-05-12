@@ -4,6 +4,7 @@ import { getRoutingMap, getRoutingHeatmap } from '../../lib/adminApi';
 import { FederationLayer } from './FederationLayer';
 import { FederationNode } from './FederationNode';
 import { RoutingLayer } from './RoutingLayer';
+import { toDisplayText } from '../../lib/formatters';
 
 export const FederationMap: React.FC = () => {
   const { data: mapState, isLoading, status } = useAdminQuery('routing:map', getRoutingMap, 5000);
@@ -75,13 +76,13 @@ export const FederationMap: React.FC = () => {
 
         {processedNodes.map((node: any) => (
           <FederationNode 
-            key={node.id}
-            id={node.id}
-            name={node.name || node.company_name}
-            x={node.coords.x}
-            y={node.coords.y}
-            status={node.status}
-            utilization={node.utilization || node.capacity_utilization_pct || 0}
+            key={node?.id || Math.random()}
+            id={node?.id}
+            name={toDisplayText(node?.name || node?.company_name || 'Node')}
+            x={node?.coords?.x || 0}
+            y={node?.coords?.y || 0}
+            status={toDisplayText(node?.status)}
+            utilization={node?.utilization || node?.capacity_utilization_pct || 0}
           />
         ))}
       </svg>
