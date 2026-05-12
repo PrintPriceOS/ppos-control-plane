@@ -11,25 +11,73 @@ class MaterialAvailabilityService {
      * Retrieves all materials across the federation.
      */
     async getAllMaterials() {
-        return await db.query("SELECT * FROM predictive_material_inventory ORDER BY created_at DESC");
+        try {
+            let columns = [];
+            try {
+                columns = await db.query("SHOW COLUMNS FROM predictive_material_inventory");
+            } catch (err) {
+                return {
+                    ok: true,
+                    materials: [],
+                    data: [],
+                    source_status: "MATERIAL_INVENTORY_UNAVAILABLE"
+                };
+            }
+
+            if (!columns || columns.length === 0) {
+                return {
+                    ok: true,
+                    materials: [],
+                    data: [],
+                    source_status: "MATERIAL_INVENTORY_UNAVAILABLE"
+                };
+            }
+
+            const colNames = columns.map(c => c.Field);
+            let orderBy = "id DESC";
+            if (colNames.includes('created_at')) {
+                orderBy = "created_at DESC";
+            } else if (colNames.includes('material_name')) {
+                orderBy = "material_name ASC";
+            }
+
+            const rows = await db.query(`SELECT * FROM predictive_material_inventory ORDER BY ${orderBy}`);
+            return rows;
+        } catch (e) {
+            logger.warn({ event: 'get_all_materials_schema_drift', error: e.message });
+            return {
+                ok: true,
+                materials: [],
+                data: [],
+                source_status: "MATERIAL_INVENTORY_UNAVAILABLE"
+            };
+        }
     }
 
     /**
      * Retrieves a single material by ID.
      */
     async getMaterialById(id) {
-        const rows = await db.query("SELECT * FROM predictive_material_inventory WHERE id = ?", [id]);
-        return rows[0] || null;
+        try {
+            const rows = await db.query("SELECT * FROM predictive_material_inventory WHERE id = ?", [id]);
+            return rows[0] || null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**
      * Retrieves current inventory for a specific node.
      */
     async getInventory(nodeId) {
-        return await db.query(
-            "SELECT * FROM predictive_material_inventory WHERE node_id = ?",
-            [nodeId]
-        );
+        try {
+            return await db.query(
+                "SELECT * FROM predictive_material_inventory WHERE node_id = ?",
+                [nodeId]
+            );
+        } catch (e) {
+            return [];
+        }
     }
 
     /**

@@ -55,13 +55,14 @@ export const IncomingJobsPage: React.FC = () => {
       if (dData.ok) {
         setDispatches(dData.dispatches);
         
-        // Fetch linked packages
-        const packageIds = [...new Set(dData.dispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id))];
+        // Fetch linked packages safely
+        const rawPackageIds = dData.dispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id);
+        const validPids = [...new Set(rawPackageIds)].filter(id => id && id !== 'undefined') as string[];
         const pkgMap: Record<string, Package> = {};
         
-        for (const pid of packageIds as string[]) {
+        for (const pid of validPids) {
           const pData = await adminFetch<any>(`/api/admin/manufacturing/packages/${pid}`);
-          if (pData.ok) {
+          if (pData?.ok && pData.package) {
             pkgMap[pid] = pData.package;
           }
         }
@@ -87,6 +88,10 @@ export const IncomingJobsPage: React.FC = () => {
 
       if (action === 'IN_PRODUCTION' || action === 'COMPLETED') {
         const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
+        if (!pkgId || pkgId === 'undefined') {
+          alert('Cannot mutate state: linked manufacturing package is undefined.');
+          return;
+        }
         endpoint = `/api/admin/manufacturing/packages/${pkgId}/status`;
         method = 'PATCH';
         body = JSON.stringify({ status: action });
@@ -98,10 +103,10 @@ export const IncomingJobsPage: React.FC = () => {
         method,
         body
       });
-      if (data.ok) {
-        fetchData(); // Refresh
+      if (data?.ok) {
+        fetchData();
       } else {
-        alert(data.error?.message || `Failed to ${action} job`);
+        alert(data?.error?.message || `Failed to ${action} job`);
       }
     } catch (err: any) {
       alert(err.message);
@@ -109,6 +114,7 @@ export const IncomingJobsPage: React.FC = () => {
   };
 
   const downloadBundle = (packageId: string) => {
+    if (!packageId || packageId === 'undefined') return;
     window.open(`/api/admin/manufacturing/packages/${packageId}/bundle`, '_blank');
   };
 
@@ -185,12 +191,14 @@ export const IncomingJobsPage: React.FC = () => {
               {filteredDispatches.map(dispatch => {
                 const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
                 const pkg = packages[pkgId];
+                const safeId = dispatch.id ? String(dispatch.id).substring(0, 8) : 'N/A';
+                const safePkgStr = pkgId ? String(pkgId).substring(0, 8) : 'N/A';
                 return (
                   <tr key={dispatch.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4">
                       <div className="flex flex-col">
-                        <span className="font-mono text-xs font-bold text-slate-900 uppercase">#{dispatch.id.substring(0, 8)}</span>
-                        <span className="text-xs text-slate-400 mt-1">PKG: {(dispatch.manufacturing_package_id || dispatch.production_package_id || '').substring(0, 8)}</span>
+                        <span className="font-mono text-xs font-bold text-slate-900 uppercase">#{safeId}</span>
+                        <span className="text-xs text-slate-400 mt-1">PKG: {safePkgStr}</span>
                         <div className="flex items-center gap-2 mt-2">
                           <ClockIcon className="h-3 w-3 text-slate-400" />
                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">

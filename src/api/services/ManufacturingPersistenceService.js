@@ -255,12 +255,26 @@ class ManufacturingPersistenceService {
         ) ENGINE=InnoDB;
       `);
 
-      // Backward Compatibility Views
-      await db.query('CREATE OR REPLACE VIEW production_packages AS SELECT * FROM manufacturing_packages');
-      await db.query('CREATE OR REPLACE VIEW production_events AS SELECT * FROM manufacturing_dispatch_events');
-      await db.query('CREATE OR REPLACE VIEW production_notifications AS SELECT * FROM manufacturing_notifications');
-      await db.query('CREATE OR REPLACE VIEW capacity_reservations AS SELECT * FROM manufacturing_capacity_reservations');
-      await db.query('CREATE OR REPLACE VIEW production_dispatches AS SELECT * FROM manufacturing_dispatches');
+      // Backward Compatibility Views logic
+      const setupCompatView = async (viewName, tableName) => {
+        try {
+          await db.query(`CREATE OR REPLACE VIEW ${viewName} AS SELECT * FROM ${tableName}`);
+        } catch (err) {
+          try {
+            await db.query(`SELECT 1 FROM ${viewName} LIMIT 1`);
+            console.log(`[MANUFACTURING-PERSISTENCE] Base table ${viewName} exists natively, bypassing VIEW creation.`);
+          } catch (verifyErr) {
+            console.error(`[MANUFACTURING-PERSISTENCE] Fatal: Neither usable view nor table exists for ${viewName}`);
+            throw err;
+          }
+        }
+      };
+
+      await setupCompatView('production_packages', 'manufacturing_packages');
+      await setupCompatView('production_events', 'manufacturing_dispatch_events');
+      await setupCompatView('production_notifications', 'manufacturing_notifications');
+      await setupCompatView('capacity_reservations', 'manufacturing_capacity_reservations');
+      await setupCompatView('production_dispatches', 'manufacturing_dispatches');
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS manufacturing_evidence_ledger (
@@ -277,7 +291,7 @@ class ManufacturingPersistenceService {
           INDEX idx_node (node_id)
         ) ENGINE=InnoDB;
       `);
-      await db.query('CREATE OR REPLACE VIEW production_evidence_ledger AS SELECT * FROM manufacturing_evidence_ledger');
+      await setupCompatView('production_evidence_ledger', 'manufacturing_evidence_ledger');
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS manufacturing_offers (
@@ -315,8 +329,8 @@ class ManufacturingPersistenceService {
           INDEX idx_offer (offer_id)
         ) ENGINE=InnoDB;
       `);
-      await db.query('CREATE OR REPLACE VIEW production_offers AS SELECT * FROM manufacturing_offers');
-      await db.query('CREATE OR REPLACE VIEW production_offer_events AS SELECT * FROM manufacturing_offer_events');
+      await setupCompatView('production_offers', 'manufacturing_offers');
+      await setupCompatView('production_offer_events', 'manufacturing_offer_events');
 
       console.log('[MANUFACTURING-PERSISTENCE] Canonical tables and views initialized.');
 
@@ -691,6 +705,14 @@ class ManufacturingPersistenceService {
         ) ENGINE=InnoDB;
       `);
       
+      // TASK 2 Hotfix: Idempotently add nullable compatibility columns
+      try {
+        await db.query("ALTER TABLE manufacturing_dispatches ADD COLUMN production_package_id VARCHAR(64) NULL");
+      } catch (e) {}
+      try {
+        await db.query("ALTER TABLE manufacturing_dispatches ADD COLUMN print_node_id VARCHAR(64) NULL");
+      } catch (e) {}
+
       console.log('[PRODUCTION-PERSISTENCE] Tables verified.');
     } catch (err) {
       console.error('[PRODUCTION-PERSISTENCE] Initialization failed:', err.message);

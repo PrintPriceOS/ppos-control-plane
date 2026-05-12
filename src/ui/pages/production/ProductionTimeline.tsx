@@ -36,12 +36,12 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const url = packageId 
+      const url = (packageId && packageId !== 'undefined')
         ? `/api/admin/manufacturing/packages/${packageId}/events`
         : '/api/admin/manufacturing/events';
       const data = await adminFetch<any>(url);
-      if (data.ok) {
-        setEvents(data.events);
+      if (data?.ok) {
+        setEvents(data.events || []);
       }
     } catch (err) {
       console.error('Failed to fetch events', err);
@@ -58,45 +58,50 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
     );
   }
 
+  const isSpecificPkg = packageId && packageId !== 'undefined';
+  const safePkgLabel = isSpecificPkg ? String(packageId).substring(0, 8) : '';
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <ClockIcon className="h-6 w-6 text-indigo-600" />
-            {packageId ? `PACKAGE TIMELINE: #${packageId.substring(0,8)}` : 'GLOBAL MANUFACTURING STREAM'}
+            {isSpecificPkg ? `PACKAGE TIMELINE: #${safePkgLabel}` : 'GLOBAL MANUFACTURING STREAM'}
           </h2>
           <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Operational Audit Trail</p>
         </div>
       </div>
 
       <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pb-8">
-        {events.map((event, idx) => (
-          <div key={event.id} className="relative pl-8">
-            {/* Timeline Dot */}
-            <div className={`
-              absolute -left-[11px] top-1 h-5 w-5 rounded-none border-4 border-white shadow-sm ring-1 ring-slate-200
-              ${getEventColor(event.event_type)}
-            `}></div>
+        {events.map((event, idx) => {
+          const safeActorId = event.actor_id ? String(event.actor_id).substring(0, 8) : 'N/A';
+          return (
+            <div key={event.id || idx} className="relative pl-8">
+              {/* Timeline Dot */}
+              <div className={`
+                absolute -left-[11px] top-1 h-5 w-5 rounded-none border-4 border-white shadow-sm ring-1 ring-slate-200
+                ${getEventColor(event.event_type || '')}
+              `}></div>
 
-            <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-none uppercase tracking-tighter border ${getEventBadgeStyle(event.event_type)}`}>
-                      {event.event_type.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      {new Date(event.created_at).toLocaleString()}
-                    </span>
+              <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-none uppercase tracking-tighter border ${getEventBadgeStyle(event.event_type || '')}`}>
+                        {(event.event_type || 'UNKNOWN').replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        {event.created_at ? new Date(event.created_at).toLocaleString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-none text-[10px] font-bold text-slate-500 uppercase">
+                      {getActorIcon(event.actor_type || '')}
+                      {event.actor_type || 'SYSTEM'}: {safeActorId}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-none text-[10px] font-bold text-slate-500 uppercase">
-                    {getActorIcon(event.actor_type)}
-                    {event.actor_type}: {event.actor_id.substring(0, 8)}
-                  </div>
-                </div>
 
-                <p className="text-sm text-slate-700 font-medium">{event.message}</p>
+                  <p className="text-sm text-slate-700 font-medium">{event.message || ''}</p>
 
                 {event.metadata_json && Object.keys(event.metadata_json).length > 0 && (
                   <div className="mt-4 pt-4 border-t border-slate-50">
@@ -118,7 +123,8 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {events.length === 0 && (
           <div className="pl-8 text-slate-400 text-sm font-bold uppercase tracking-widest italic py-10">

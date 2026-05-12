@@ -11,28 +11,36 @@ class MachineCapabilityService {
      * Get industrial capabilities for a machine
      */
     async getCapabilities(machineId) {
-        const [capabilityRows] = await db.query(`
-            SELECT * FROM machine_capabilities WHERE machine_id = ?
-        `, [machineId]);
-
-        // If not found in our specific table, try to derive from print_nodes (Phase 10 fallback)
-        if (!capabilityRows) {
-            const [nodeRows] = await db.query(`
-                SELECT id, capabilities_json FROM print_nodes WHERE id = ?
-            `, [machineId]);
-
-            if (nodeRows && nodeRows.capabilities_json) {
-                const caps = typeof nodeRows.capabilities_json === 'string' 
-                    ? JSON.parse(nodeRows.capabilities_json) 
-                    : nodeRows.capabilities_json;
-                
-                return this.normalizeCapabilities(machineId, caps);
-            }
-            
-            return this.getDefaultCapabilities(machineId);
+        let targetId = machineId;
+        if (targetId && targetId.startsWith('machine_') && targetId.endsWith('_primary')) {
+            targetId = targetId.substring(8, targetId.length - 8);
         }
 
-        return capabilityRows;
+        try {
+            const [capabilityRows] = await db.query(`
+                SELECT * FROM machine_capabilities WHERE machine_id = ?
+            `, [targetId]);
+
+            if (!capabilityRows) {
+                const [nodeRows] = await db.query(`
+                    SELECT id, capabilities_json FROM print_nodes WHERE id = ?
+                `, [targetId]);
+
+                if (nodeRows && nodeRows.capabilities_json) {
+                    const caps = typeof nodeRows.capabilities_json === 'string' 
+                        ? JSON.parse(nodeRows.capabilities_json) 
+                        : nodeRows.capabilities_json;
+                    
+                    return this.normalizeCapabilities(machineId, caps);
+                }
+                
+                return this.getDefaultCapabilities(machineId);
+            }
+
+            return capabilityRows;
+        } catch (e) {
+            return this.getDefaultCapabilities(machineId);
+        }
     }
 
     /**

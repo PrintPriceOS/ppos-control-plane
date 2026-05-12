@@ -15,6 +15,9 @@ const materialService = require('../services/materialAvailabilityService');
 router.get('/', async (req, res) => {
     try {
         const rows = await materialService.getAllMaterials();
+        if (rows && rows.source_status) {
+            return res.json(rows);
+        }
         res.json({ ok: true, data: rows });
     } catch (err) {
         console.error('[MATERIALS-API] Failed to fetch catalog:', err);
