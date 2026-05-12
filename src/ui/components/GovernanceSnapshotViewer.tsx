@@ -102,7 +102,7 @@ const StatItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
        <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
     </div>
     <p className={`text-[11px] font-black tracking-tight ${color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : 'text-slate-900'}`}>
-        {value}
+        {typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')}
     </p>
   </div>
 );

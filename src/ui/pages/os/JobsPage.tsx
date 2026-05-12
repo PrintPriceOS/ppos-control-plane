@@ -11,6 +11,14 @@ export const JobsPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = React.useState<any | null>(null);
   const q = useAdminQuery("jobs:global", () => getJobs({ limit: 50 }), 10000);
 
+  const sStr = (v: any): string => {
+    if (!v) return '';
+    if (typeof v === 'object') {
+      const msg = v.message || v.code || v.error || JSON.stringify(v);
+      return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    }
+    return String(v);
+  };
   const jobs = safeArray(q.data?.jobs || (q.data as any)?.data);
 
   return (
@@ -79,7 +87,7 @@ export const JobsPage: React.FC = () => {
               const isQuiet = j.status === 'COMPLETED';
               return (
                 <span className={`font-mono text-[11px] ${isQuiet ? 'text-slate-400 dark:text-zinc-600' : 'text-slate-600 dark:text-zinc-400 font-bold'}`}>
-                  {j.tenant_id}
+                  {sStr(j.tenant_id)}
                 </span>
               );
             }
@@ -93,7 +101,7 @@ export const JobsPage: React.FC = () => {
                   isQuiet ? 'border-slate-100 bg-transparent text-slate-400 dark:border-white/[0.03] dark:text-zinc-600' : 
                   'border-slate-200 bg-white dark:bg-[#1a1a1b] text-slate-700 dark:text-zinc-300 dark:border-white/10'
                 }`}>
-                  {j.type}
+                  {sStr(j.type)}
                 </span>
               );
             }
@@ -113,7 +121,7 @@ export const JobsPage: React.FC = () => {
                     isQuiet ? 'text-emerald-700/60 dark:text-emerald-500/50 font-normal' : 
                     isFail ? 'text-red-700 dark:text-red-400 font-black' : 'text-blue-700 dark:text-blue-400'
                   }`}>
-                    {j.status}
+                    {sStr(j.status)}
                   </span>
                 </div>
               );
@@ -132,7 +140,7 @@ export const JobsPage: React.FC = () => {
                     isQuiet ? 'bg-transparent border-slate-100 text-slate-300 dark:border-white/[0.02] dark:text-zinc-700' : 
                     'bg-slate-50 border-slate-200 text-slate-500 dark:bg-[#1a1a1b] dark:border-white/[0.05] dark:text-zinc-400'
                   }`} title="Retries Applied">
-                    R:{j.attempts || 0}
+                    R:{typeof j.attempts === 'object' ? 0 : (j.attempts || 0)}
                   </span>
 
                   {/* Error Indicator: elevated if present */}
@@ -155,7 +163,7 @@ export const JobsPage: React.FC = () => {
                       isQuiet ? 'bg-transparent border-transparent text-slate-400 dark:text-zinc-600 font-normal' : 
                       'bg-white border-slate-100 text-slate-700 dark:bg-[#1a1a1b] dark:border-white/[0.05] dark:text-zinc-300 font-bold'
                     }`} title="Runtime Latency">
-                      {j.duration_ms}ms
+                      {typeof j.duration_ms === 'object' ? '---' : j.duration_ms}ms
                     </span>
                   )}
                 </div>

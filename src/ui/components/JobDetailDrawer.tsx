@@ -103,6 +103,16 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
 
   if (!job) return null;
 
+  const renderErrorString = (errVal: any): string => {
+    if (!errVal) return '';
+    if (typeof errVal === 'string') return errVal;
+    if (typeof errVal === 'object') {
+      const msg = errVal.message || errVal.code || errVal.error || JSON.stringify(errVal);
+      return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    }
+    return String(errVal);
+  };
+
   const currentJobStatus = forensics.detail?.status || job.status || 'UNKNOWN';
   const durationValue = forensics.detail?.duration_ms ?? job.duration_ms;
   const inputData = forensics.detail?.input_payload || {};
@@ -137,9 +147,9 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
               <span className={`font-black tracking-tight ${
                 isFailed ? 'text-red-700 dark:text-red-400' : 
                 currentJobStatus === 'COMPLETED' ? 'text-slate-500 dark:text-zinc-500 font-normal' : 'text-slate-900 dark:text-white'
-              }`}>{currentJobStatus}</span>
+              }`}>{renderErrorString(currentJobStatus)}</span>
               <span className="text-slate-300 dark:text-zinc-700">|</span>
-              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase">Type: {job.type}</span>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase">Type: {renderErrorString(job.type)}</span>
             </div>
 
             <div className="flex items-center gap-3 text-[10px]">
@@ -154,7 +164,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                   {durationValue !== null && durationValue !== undefined ? `${durationValue}ms` : '---'}
                 </strong>
               </span>
-              <span className="text-slate-400 dark:text-zinc-600">Tenant: <strong className="text-slate-700 dark:text-zinc-400">{job.tenant_id || 'system'}</strong></span>
+              <span className="text-slate-400 dark:text-zinc-600">Tenant: <strong className="text-slate-700 dark:text-zinc-400">{renderErrorString(job.tenant_id || 'system')}</strong></span>
             </div>
           </div>
 
@@ -172,7 +182,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                 {isFailed && (
                   <span className="font-bold flex items-center gap-1 text-red-700 dark:text-red-400">
                     <strong className="text-[10px] uppercase bg-red-100 dark:bg-red-900/50 px-1 border border-red-300 dark:border-red-700">Failure Triggered</strong>
-                    <span>{resultData.error_reason || job.error || 'Execution halted'}</span>
+                    <span>{renderErrorString(resultData.error_reason || job.error) || 'Execution halted'}</span>
                   </span>
                 )}
                 {hasRetries && (
@@ -310,7 +320,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                             }`}>
                               {logItem.severity || 'INFO'}
                             </span>
-                            <span className="text-slate-200 dark:text-zinc-300 break-all">{logItem.message}</span>
+                            <span className="text-slate-200 dark:text-zinc-300 break-all">{renderErrorString(logItem.message)}</span>
                           </div>
                         ))}
                       </div>
@@ -342,7 +352,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                           <div className="p-2 bg-slate-50 dark:bg-[#1a1a1b] border border-slate-200 dark:border-white/[0.04] flex items-center justify-between gap-2 text-[11px]">
                             <div className="min-w-0">
                               <span className="text-[8px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest block leading-none">Machine/Node Bind</span>
-                              <span className="font-bold text-slate-900 dark:text-white truncate block mt-0.5">{workerData.machine_node}</span>
+                              <span className="font-bold text-slate-900 dark:text-white truncate block mt-0.5">{renderErrorString(workerData.machine_node)}</span>
                               {workerData.hostname && (
                                 <span className="text-[9px] text-slate-500 dark:text-zinc-500 truncate block">Host: {workerData.hostname}</span>
                               )}
@@ -379,19 +389,19 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                         <strong className={`font-black uppercase ${
                           resultData.final_job_status === 'COMPLETED' ? 'text-emerald-700 dark:text-emerald-500/80 font-normal' : 'text-slate-900 dark:text-white font-bold'
                         }`}>
-                          {resultData.final_job_status || currentJobStatus}
+                          {renderErrorString(resultData.final_job_status || currentJobStatus)}
                         </strong>
                       </div>
                       <div className="truncate max-w-[200px]">
                         <span className="text-slate-400 dark:text-zinc-500 font-bold uppercase">Block Ref:</span>{' '}
-                        <strong className="text-slate-800 dark:text-zinc-300 font-mono truncate">{resultData.audit_correlation || job.id}</strong>
+                        <strong className="text-slate-800 dark:text-zinc-300 font-mono truncate">{renderErrorString(resultData.audit_correlation || job.id)}</strong>
                       </div>
                     </div>
 
                     {resultData.error_reason && (
                       <div className="p-2 bg-red-50/20 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-900 dark:text-red-200 text-[10px] space-y-0.5 select-text font-mono">
                         <span className="text-[8px] font-black uppercase tracking-wider block text-red-600 dark:text-red-400">Captured Output Error Signature</span>
-                        <p className="font-bold leading-tight break-all">{resultData.error_reason}</p>
+                        <p className="font-bold leading-tight break-all">{renderErrorString(resultData.error_reason)}</p>
                       </div>
                     )}
 
@@ -414,8 +424,8 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                             <div key={artifactItem.artifact_id || i} className="p-2 bg-white dark:bg-[#1a1a1b] border border-slate-200 dark:border-white/[0.05] flex flex-col justify-between text-[10px] leading-tight space-y-1">
                               <div className="min-w-0">
                                 <div className="flex items-center justify-between gap-1">
-                                  <span className="font-bold text-slate-900 dark:text-zinc-100 truncate" title={artifactItem.filename}>
-                                    {artifactItem.filename}
+                                  <span className="font-bold text-slate-900 dark:text-zinc-100 truncate" title={typeof artifactItem.filename === 'string' ? artifactItem.filename : renderErrorString(artifactItem.filename)}>
+                                    {renderErrorString(artifactItem.filename)}
                                   </span>
                                   <span className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 shrink-0">
                                     {artifactItem.size_bytes ? `${Number((artifactItem.size_bytes || 0) / 1024).toFixed(1)} KB` : '---'}
@@ -443,7 +453,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                                   </a>
                                 ) : (
                                   <span className="font-black text-slate-400 dark:text-zinc-600 uppercase tracking-tighter truncate font-normal">
-                                    {artifactItem.reason || 'STORAGE UNLINKED'}
+                                    {renderErrorString(artifactItem.reason || 'STORAGE UNLINKED')}
                                   </span>
                                 )}
                               </div>
@@ -456,7 +466,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                     {resultData.certified_bundle_id && (
                       <div className="p-1.5 bg-slate-50 dark:bg-[#131314] border border-slate-200 dark:border-white/[0.04] flex items-center justify-between text-[10px] font-mono">
                         <span className="text-slate-500 dark:text-zinc-500 font-bold">Bundle Seal:</span>
-                        <span className="text-slate-900 dark:text-zinc-200 font-black">{resultData.certified_bundle_id}</span>
+                        <span className="text-slate-900 dark:text-zinc-200 font-black">{renderErrorString(resultData.certified_bundle_id)}</span>
                       </div>
                     )}
                   </div>
@@ -502,10 +512,10 @@ const SectionHeader = ({ label }: { label: string }) => (
   </div>
 );
 
-const InlineMeta = ({ label, val }: { label: string, val: string }) => (
+const InlineMeta = ({ label, val }: { label: string, val: any }) => (
   <div className="p-1.5 bg-slate-50 dark:bg-[#1a1a1b] border border-slate-200 dark:border-white/[0.04] min-w-0">
     <span className="text-[8px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-wider block leading-none truncate">{label}</span>
-    <span className="font-bold text-slate-900 dark:text-zinc-200 block truncate mt-0.5">{val}</span>
+    <span className="font-bold text-slate-900 dark:text-zinc-200 block truncate mt-0.5">{typeof val === 'object' ? JSON.stringify(val) : String(val ?? '')}</span>
   </div>
 );
 

@@ -532,11 +532,39 @@ class PreflightOperationsService {
   async getLivePolicies(authHeader = null, tenantId = null) {
     try {
       const res = await upstream.getLivePolicies(authHeader, tenantId);
-      const policies = res && res.policies ? res.policies : (Array.isArray(res) ? res : []);
-      return { policies, source_status: 'LIVE_UPSTREAM' };
+      const rawPolicies = res && res.policies ? res.policies : (Array.isArray(res) ? res : []);
+      
+      const policies = rawPolicies.map(policy => {
+        const p = policy || {};
+        const part1 = p.standard || p.category;
+        const part2 = p.profile || p.colorSpace;
+        const descParts = [];
+        if (part1) descParts.push(part1);
+        if (part2) descParts.push(part2);
+        const derivedDesc = descParts.length > 0 ? descParts.join(' · ') : 'Industrial Preflight Policy';
+
+        return {
+          ...p,
+          id: p.id,
+          slug: p.slug || p.id,
+          name: p.name || p.id,
+          description: p.description || derivedDesc,
+          profile: p.profile,
+          category: p.category,
+          colorSpace: p.colorSpace,
+          substrate: p.substrate,
+          standard: p.standard,
+          rules: p.rules
+        };
+      });
+
+      return { policies, source_status: 'LIVE_UPSTREAM', upstream_status: 200 };
     } catch (err) {
       console.warn('[PREFLIGHT-OPS] Live policy fetch failed, falling back to default standards:', err.message);
-      const source_status = err.status ? 'UPSTREAM_UNAVAILABLE' : 'LOCAL_FALLBACK';
+      let source_status = err.status ? 'UPSTREAM_UNAVAILABLE' : 'LOCAL_FALLBACK';
+      if (err.status === 401 || err.status === 403) {
+        source_status = 'UPSTREAM_AUTH_FAILED';
+      }
       return {
         policies: [
           { slug: 'OFFSET_MODERN_COATED', name: 'Offset Modern Coated (ISO 12647-2)', description: 'Strict verification for premium coated web/sheetfed offset.' },
@@ -544,7 +572,7 @@ class PreflightOperationsService {
           { slug: 'LARGE_FORMAT_INKJET', name: 'Wide Format UV/Latex', description: 'Optimized raster resolution and ink limits for banners and displays.' }
         ],
         source_status,
-        upstream_status: err.status
+        upstream_status: err.status || 500
       };
     }
   }
@@ -565,6 +593,9 @@ class PreflightOperationsService {
         }
       } catch (err) {
         console.warn(`[PREFLIGHT-OPS] Upstream timeline fetch failed for ${jobId}:`, err.message);
+        if (err.status === 401 || err.status === 403) {
+          return { timeline: [], source_status: 'UPSTREAM_AUTH_FAILED' };
+        }
       }
     }
 
@@ -595,6 +626,9 @@ class PreflightOperationsService {
         }
       } catch (err) {
         console.warn(`[PREFLIGHT-OPS] Upstream findings fetch failed for ${jobId}:`, err.message);
+        if (err.status === 401 || err.status === 403) {
+          return { findings: [], source_status: 'UPSTREAM_AUTH_FAILED' };
+        }
       }
     }
 
@@ -628,6 +662,9 @@ class PreflightOperationsService {
         }
       } catch (err) {
         console.warn(`[PREFLIGHT-OPS] Upstream evidence fetch failed for ${jobId}:`, err.message);
+        if (err.status === 401 || err.status === 403) {
+          return { evidence: {}, artifacts: [], source_status: 'UPSTREAM_AUTH_FAILED' };
+        }
       }
     }
 
@@ -683,6 +720,11 @@ class PreflightOperationsService {
       };
     } catch (err) {
       console.error(`[PREFLIGHT-OPS] Native fix trigger failed for ${jobId}:`, err.message);
+      if (err.status === 401 || err.status === 403) {
+        const customErr = new Error('UPSTREAM_AUTH_FAILED');
+        customErr.status = err.status;
+        throw customErr;
+      }
       throw err;
     }
   }

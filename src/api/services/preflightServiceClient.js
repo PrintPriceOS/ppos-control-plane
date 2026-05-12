@@ -5,6 +5,7 @@
  * Handles identity preservation and contract enforcement.
  */
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 
 class PreflightServiceClient {
   constructor() {
@@ -13,23 +14,58 @@ class PreflightServiceClient {
   }
 
   /**
-   * Internal request wrapper with identity preservation
+   * Generates internally signed JWT for preflight service communication
+   */
+  getInternalPreflightJwt(actorContext = {}) {
+    const secret = process.env.JWT_SECRET || 'fallback-jwt-secret';
+    const payload = {
+      sub: actorContext.actorId || actorContext.id || actorContext.userId || 'control-plane',
+      tenantId: actorContext.tenantId || 'system',
+      role: actorContext.role || 'SUPER_ADMIN',
+      scopes: ['preflight:read', 'preflight:write', 'admin:preflight'],
+      origin: 'ppos-control-plane'
+    };
+    const options = {
+      issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro',
+      audience: process.env.PPOS_PREFLIGHT_JWT_AUDIENCE || process.env.JWT_AUDIENCE || 'ppos:control',
+      expiresIn: process.env.PPOS_PREFLIGHT_JWT_EXPIRES_IN || '15m'
+    };
+    return jwt.sign(payload, secret, options);
+  }
+
+  /**
+   * Internal request wrapper enforcing internal JWT identity preservation
    */
   async _request(method, path, data = null, headers = {}) {
     const url = `${this.baseUrl}${path}`;
     
-    // 1. Prepare secure headers
-    const secureHeaders = {
-      'Content-Type': 'application/json',
-      'X-Admin-Api-Key': this.systemToken, // Control Plane identify
-      ...headers
+    // Resolve contextual parameters from incoming forwarded headers
+    const tenantId = headers['X-Tenant-Id'] || headers['tenantId'] || 'system';
+    const actorId = headers['X-Actor-Id'] || 'control-plane';
+    const role = headers['X-Actor-Role'] || 'SUPER_ADMIN';
+    const traceId = headers['X-Trace-Id'] || `trace_${Date.now()}`;
+
+    const actorContext = {
+      actorId,
+      tenantId,
+      role
     };
 
-    // 2. Ensure Authorization header is present (forwarded or fallback)
-    if (!secureHeaders['Authorization']) {
-      console.warn(`[AUDIT][UPSTREAM-AUTH] No user Authorization provided. Falling back to system token for ${method} ${path}`);
-      secureHeaders['Authorization'] = `Bearer ${this.systemToken}`;
-    }
+    const internalJwt = this.getInternalPreflightJwt(actorContext);
+    
+    // 1. Prepare secure headers satisfying Task 2 requirements
+    const secureHeaders = {
+      'Content-Type': 'application/json',
+      'X-Admin-Api-Key': this.systemToken, // Legacy system identifier
+      'X-Tenant-Id': tenantId,
+      'X-Trace-Id': traceId,
+      'X-Actor-Id': actorId,
+      'X-Actor-Role': role,
+      'X-Origin-Service': 'ppos-control-plane',
+      ...headers,
+      // Ensure upstream Authorization uses internally signed JWT, overriding any forwarded user token
+      'Authorization': `Bearer ${internalJwt}`
+    };
 
     try {
       const response = await axios({

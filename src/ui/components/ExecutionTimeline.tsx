@@ -32,6 +32,14 @@ interface ExecutionTimelineProps {
 
 export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, isLoading }) => {
   const safeEvents = safeArray(events);
+  const safeStr = (val: any): string => {
+    if (!val) return '';
+    if (typeof val === 'object') {
+      const msg = val.message || val.code || val.error || JSON.stringify(val);
+      return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    }
+    return String(val);
+  };
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [compactMode, setCompactMode] = useState<boolean>(true); // Default to compact noise mode
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -175,7 +183,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
 
                     {/* Stage Chip */}
                     <span className={`px-1.5 py-0.5 text-[8px] font-black tracking-widest border uppercase shrink-0 ${accentClasses}`}>
-                      {evt.stage}
+                      {safeStr(evt.stage)}
                     </span>
 
                     {/* Action Title: Dimmed if healthy, bold if risky */}
@@ -183,8 +191,8 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
                       isError ? 'text-red-800 dark:text-red-300 font-black' : 
                       isRetry ? 'text-amber-900 dark:text-amber-300 font-bold' : 
                       evt.stage === 'COMPLETED' ? 'text-slate-500 dark:text-zinc-500 font-normal' : 'text-slate-900 dark:text-white font-medium'
-                    }`} title={evt.title}>
-                      {evt.title}
+                    }`} title={typeof evt.title === 'string' ? evt.title : safeStr(evt.title)}>
+                      {safeStr(evt.title)}
                     </span>
 
                     {/* Inline Delta Indicator: elevated if bottlenecked */}
@@ -240,7 +248,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
                         isError ? 'text-red-800 dark:text-red-300 font-bold' : 
                         isRetry ? 'text-amber-900 dark:text-amber-300 font-medium' : 'text-slate-600 dark:text-zinc-400'
                       }`}>
-                        {evt.details}
+                        {safeStr(evt.details)}
                       </p>
                     )}
 

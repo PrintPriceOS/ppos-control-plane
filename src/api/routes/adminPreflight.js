@@ -690,8 +690,12 @@ router.post('/jobs/:jobId/fix', async (req, res) => {
       source_status: result.source_status || 'LIVE_UPSTREAM'
     });
   } catch (error) {
-    const status = error.message.includes('NOT_FOUND') ? 404 : 400;
-    res.status(status).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'FIX_TRIGGER_FAILED', message: error.message } });
+    const status = error.message.includes('NOT_FOUND') ? 404 : (error.message === 'UPSTREAM_AUTH_FAILED' ? 401 : 400);
+    res.status(status).json({ 
+      ok: false, 
+      source_status: error.message === 'UPSTREAM_AUTH_FAILED' ? 'UPSTREAM_AUTH_FAILED' : 'UPSTREAM_UNAVAILABLE', 
+      error: { code: 'FIX_TRIGGER_FAILED', message: error.message } 
+    });
   }
 });
 
