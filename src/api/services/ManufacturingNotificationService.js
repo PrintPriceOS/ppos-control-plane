@@ -1,16 +1,17 @@
 /**
- * Production Notification Service
+ * Manufacturing Notification Service
  * 
  * Logic for generating and delivering operational notifications.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 
-class ProductionNotificationService {
+class ManufacturingNotificationService {
   /**
    * Process a production event and generate notifications if needed
    */
   async handleEvent(event) {
-    const { eventType, tenantId, metadata, message, productionPackageId, dispatchId } = event;
+    const { eventType, tenantId, metadata, message, manufacturingPackageId, productionPackageId, dispatchId } = event;
+    const pkgId = manufacturingPackageId || productionPackageId;
 
     try {
       switch (eventType) {
@@ -40,8 +41,8 @@ class ProductionNotificationService {
     // Notify the receiver (printer)
     await persistence.createNotification({
       tenantId: metadata.receiverTenantId,
-      title: 'New Production Job Received',
-      message: `You have a new incoming production job from ${metadata.senderTenantId}.`,
+      title: 'New Manufacturing Job Received',
+      message: `You have a new incoming manufacturing job from ${metadata.senderTenantId}.`,
       severity: 'info',
       type: 'DISPATCH_RECEIVED',
       relatedEntityType: 'DISPATCH',
@@ -51,42 +52,45 @@ class ProductionNotificationService {
 
   async notifyDispatchAccepted(event) {
     const { metadata } = event;
+    const pkgId = event.manufacturingPackageId || event.productionPackageId;
     // Notify the sender (customer)
     await persistence.createNotification({
       tenantId: metadata.senderTenantId,
       title: 'Job Accepted',
-      message: `Your production job ${event.productionPackageId} has been accepted by the printer.`,
+      message: `Your manufacturing job ${pkgId} has been accepted by the printer.`,
       severity: 'success',
       type: 'DISPATCH_ACCEPTED',
       relatedEntityType: 'PACKAGE',
-      relatedEntityId: event.productionPackageId
+      relatedEntityId: pkgId
     });
   }
 
   async notifyDispatchRejected(event) {
     const { metadata } = event;
+    const pkgId = event.manufacturingPackageId || event.productionPackageId;
     // Notify the sender (customer)
     await persistence.createNotification({
       tenantId: metadata.senderTenantId,
       title: 'Job Rejected',
-      message: `Your production job ${event.productionPackageId} was rejected. Reason: ${metadata.reason || 'Not specified'}.`,
+      message: `Your manufacturing job ${pkgId} was rejected. Reason: ${metadata.reason || 'Not specified'}.`,
       severity: 'error',
       type: 'DISPATCH_REJECTED',
       relatedEntityType: 'PACKAGE',
-      relatedEntityId: event.productionPackageId
+      relatedEntityId: pkgId
     });
   }
 
   async notifyProductionCompleted(event) {
+    const pkgId = event.manufacturingPackageId || event.productionPackageId;
     // Notify the customer
     await persistence.createNotification({
       tenantId: event.tenantId, // Original package owner
-      title: 'Production Completed',
-      message: `Great news! Production for package ${event.productionPackageId} is complete.`,
+      title: 'Manufacturing Completed',
+      message: `Great news! Manufacturing for package ${pkgId} is complete.`,
       severity: 'success',
       type: 'PRODUCTION_COMPLETED',
       relatedEntityType: 'PACKAGE',
-      relatedEntityId: event.productionPackageId
+      relatedEntityId: pkgId
     });
   }
 
@@ -103,4 +107,4 @@ class ProductionNotificationService {
   }
 }
 
-module.exports = new ProductionNotificationService();
+module.exports = new ManufacturingNotificationService();

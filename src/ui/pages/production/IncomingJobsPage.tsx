@@ -15,6 +15,7 @@ import { adminFetch } from '../../lib/adminApi';
 interface Dispatch {
   id: string;
   production_package_id: string;
+  manufacturing_package_id?: string;
   print_node_id: string;
   sender_tenant_id: string;
   receiver_tenant_id: string;
@@ -49,17 +50,17 @@ export const IncomingJobsPage: React.FC = () => {
     setLoading(true);
     try {
       // Fetch dispatches
-      const dData = await adminFetch<any>('/api/admin/production/dispatches');
+      const dData = await adminFetch<any>('/api/admin/manufacturing/dispatches');
       
       if (dData.ok) {
         setDispatches(dData.dispatches);
         
         // Fetch linked packages
-        const packageIds = [...new Set(dData.dispatches.map((d: any) => d.production_package_id))];
+        const packageIds = [...new Set(dData.dispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id))];
         const pkgMap: Record<string, Package> = {};
         
         for (const pid of packageIds as string[]) {
-          const pData = await adminFetch<any>(`/api/admin/production/packages/${pid}`);
+          const pData = await adminFetch<any>(`/api/admin/manufacturing/packages/${pid}`);
           if (pData.ok) {
             pkgMap[pid] = pData.package;
           }
@@ -80,12 +81,13 @@ export const IncomingJobsPage: React.FC = () => {
       const dispatch = dispatches.find(d => d.id === dispatchId);
       if (!dispatch) return;
 
-      let endpoint = `/api/admin/production/dispatches/${dispatchId}/${action}`;
+      let endpoint = `/api/admin/manufacturing/dispatches/${dispatchId}/${action}`;
       let method = 'POST';
       let body = undefined;
 
       if (action === 'IN_PRODUCTION' || action === 'COMPLETED') {
-        endpoint = `/api/admin/production/packages/${dispatch.production_package_id}/status`;
+        const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
+        endpoint = `/api/admin/manufacturing/packages/${pkgId}/status`;
         method = 'PATCH';
         body = JSON.stringify({ status: action });
       } else if (action === 'reject') {
@@ -107,14 +109,14 @@ export const IncomingJobsPage: React.FC = () => {
   };
 
   const downloadBundle = (packageId: string) => {
-    window.open(`/api/admin/production/packages/${packageId}/bundle`, '_blank');
+    window.open(`/api/admin/manufacturing/packages/${packageId}/bundle`, '_blank');
   };
 
   if (loading) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-none h-12 w-12 border-b-2 border-indigo-500"></div>
-        <p className="mt-4 text-slate-500 font-medium animate-pulse">Syncing production pipeline...</p>
+        <p className="mt-4 text-slate-500 font-medium animate-pulse">Syncing manufacturing pipeline...</p>
       </div>
     );
   }
@@ -142,7 +144,7 @@ export const IncomingJobsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <InboxIcon className="h-8 w-8 text-indigo-600" />
-            INCOMING PRODUCTION JOBS
+            INCOMING MANUFACTURING JOBS
           </h1>
           <p className="text-slate-500 text-sm font-medium mt-1 uppercase tracking-[0.1em]">Operational Cockpit — Phase 11</p>
         </div>
@@ -181,13 +183,14 @@ export const IncomingJobsPage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDispatches.map(dispatch => {
-                const pkg = packages[dispatch.production_package_id];
+                const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
+                const pkg = packages[pkgId];
                 return (
                   <tr key={dispatch.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4">
                       <div className="flex flex-col">
                         <span className="font-mono text-xs font-bold text-slate-900 uppercase">#{dispatch.id.substring(0, 8)}</span>
-                        <span className="text-xs text-slate-400 mt-1">PKG: {dispatch.production_package_id.substring(0, 8)}</span>
+                        <span className="text-xs text-slate-400 mt-1">PKG: {(dispatch.manufacturing_package_id || dispatch.production_package_id || '').substring(0, 8)}</span>
                         <div className="flex items-center gap-2 mt-2">
                           <ClockIcon className="h-3 w-3 text-slate-400" />
                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
@@ -225,7 +228,7 @@ export const IncomingJobsPage: React.FC = () => {
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button 
-                          onClick={() => downloadBundle(dispatch.production_package_id)}
+                          onClick={() => downloadBundle(dispatch.manufacturing_package_id || dispatch.production_package_id)}
                           className="btn-premium !p-2"
                           title="Download Bundle"
                         >

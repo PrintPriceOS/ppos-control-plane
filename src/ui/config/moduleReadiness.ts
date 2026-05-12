@@ -69,6 +69,16 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         description: 'Real-time manufacturing queue management.'
     },
     {
+        id: 'manufacturing',
+        label: 'Manufacturing Control',
+        route: '/manufacturing',
+        status: 'ACTIVE',
+        requiredEndpoints: ['/api/admin/manufacturing/notifications'],
+        requiredTables: ['manufacturing_notifications'],
+        roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'],
+        description: 'Real-time manufacturing queue management.'
+    },
+    {
         id: 'machines',
         label: 'Machine Fleet',
         route: '/machines',

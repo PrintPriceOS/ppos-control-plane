@@ -112,9 +112,11 @@ export const App: React.FC = () => {
                 <Route path="/preflight/quotas" element={<PreflightQuotasPage />} />
                 <Route path="/preflight/workers" element={<PreflightWorkersPage />} />
 
-                {/* PRODUCTION OPERATIONS */}
+                {/* MANUFACTURING OPERATIONS */}
                 <Route path="/production" element={<ProductionDashboard />} />
+                <Route path="/manufacturing" element={<ProductionDashboard />} />
                 <Route path="/production/billing" element={<ProductionBillingPage />} />
+                <Route path="/manufacturing/billing" element={<ProductionBillingPage />} />
 
                 {/* INTELLIGENCE LAYER */}
                 <Route path="/intelligence" element={<IntelligenceOverview />} />

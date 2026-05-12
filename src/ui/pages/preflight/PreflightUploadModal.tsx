@@ -112,10 +112,10 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
               leaveFrom="opacity-100 scale-100 translate-y-0"
               leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-none-[2.5rem] bg-white dark:bg-[#1C1C1E] p-1 text-left align-middle shadow-[0_32px_120px_-16px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 transition-all">
-                <div className="bg-white dark:bg-[#1C1C1E] rounded-none-[2.2rem] overflow-hidden">
+              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-none ppos-surface p-1 text-left align-middle shadow-none border ppos-border transition-all">
+                <div className="ppos-surface rounded-none overflow-hidden">
                   {/* Header */}
-                  <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50 dark:border-white/[0.03]">
+                  <div className="px-8 py-6 flex items-center justify-between border-b ppos-border">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-none bg-primary/10 flex items-center justify-center border border-primary/20">
                         <CloudArrowUpIcon className="w-6 h-6 text-primary" />
@@ -149,7 +149,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                         <p className="text-slate-500 dark:text-zinc-400 max-w-sm mb-8">
                           Your document has been registered. The intelligence layer is now processing the telemetry.
                         </p>
-                        <div className="px-6 py-4 rounded-none bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/5 w-full max-w-xs mb-8">
+                        <div className="px-6 py-4 rounded-none ppos-surface-muted border ppos-border w-full max-w-xs mb-8">
                           <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">Generated Job ID</span>
                           <span className="font-mono text-primary font-bold text-lg select-all">#{result?.job?.id?.slice(0, 12)}</span>
                         </div>
@@ -166,10 +166,10 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                         <div 
                           onClick={() => fileInputRef.current?.click()}
                           className={`
-                            group relative border-2 border-dashed rounded-none-[2rem] p-10 text-center cursor-pointer transition-all duration-300
+                            group relative border-2 border-dashed rounded-none p-10 text-center cursor-pointer transition-all duration-300
                             ${file 
                               ? 'border-primary bg-primary/[0.02] shadow-[0_0_40px_-10px_rgba(var(--primary-rgb),0.1)]' 
-                              : 'border-slate-200 dark:border-white/10 hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/[0.02]'}
+                              : 'ppos-border hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-white/5'}
                           `}
                         >
                           <input 
@@ -195,7 +195,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                               </div>
                             ) : (
                               <div className="flex flex-col items-center">
-                                <div className="w-16 h-16 rounded-none bg-slate-50 dark:bg-[#131314]/5 flex items-center justify-center mb-4 text-slate-300 dark:text-zinc-600 group-hover:text-primary transition-colors">
+                                <div className="w-16 h-16 rounded-none ppos-surface-muted flex items-center justify-center mb-4 text-slate-300 dark:text-zinc-600 group-hover:text-primary transition-colors">
                                   <CloudArrowUpIcon className="w-10 h-10" />
                                 </div>
                                 <div className="text-base font-black text-slate-900 dark:text-[#ECECF1]">
@@ -220,7 +220,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                                 type="text" 
                                 value={tenantId}
                                 onChange={(e) => setTenantId(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/5 rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none"
+                                className="w-full ppos-surface-muted border ppos-border rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none"
                                 placeholder="system"
                               />
                             </div>
@@ -233,7 +233,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                             <select 
                               value={jobType}
                               onChange={(e) => setJobType(e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/5 rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
+                              className="w-full ppos-surface-muted border ppos-border rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
                             >
                               <option value="ANALYZE">ANALYZE ONLY</option>
                               <option value="AUTOFIX">AUTO-REPAIR</option>
@@ -254,7 +254,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                             <select 
                               value={policy}
                               onChange={(e) => setPolicy(e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-[#131314]/[0.03] border border-slate-100 dark:border-white/5 rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
+                              className="w-full ppos-surface-muted border ppos-border rounded-none px-5 py-4 text-sm font-bold text-slate-700 dark:text-[#ECECF1] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 transition-all outline-none appearance-none cursor-pointer"
                             >
                               {policies.length > 0 ? (
                                 policies.map((p: any) => (
@@ -291,7 +291,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
 
                   {/* Footer */}
                   {status !== 'success' && (
-                    <div className="px-8 py-6 bg-slate-50/50 dark:bg-[#131314]/[0.01] border-t border-slate-50 dark:border-white/[0.03] flex items-center justify-between">
+                    <div className="px-8 py-6 ppos-surface-muted border-t ppos-border flex items-center justify-between">
                       <button 
                         disabled={status !== 'idle' && status !== 'error'}
                         onClick={resetAndClose}

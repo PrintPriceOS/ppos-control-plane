@@ -139,7 +139,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
   return (
     <>
-      <header className="h-16 bg-white dark:bg-[#0e0e0f] border-b border-slate-200 dark:border-white/10 sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between">
+      <header className="h-16 ppos-bg border-b ppos-border sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between">
         <div className="flex items-center gap-3 lg:gap-6">
           {/* Mobile Menu Button */}
           {onMenuClick && (
@@ -198,9 +198,9 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
             {/* Notifications Dropdown */}
             {notifOpen && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 overflow-hidden z-50 shadow-xl">
+              <div className="absolute right-0 top-full mt-1 w-80 ppos-surface border ppos-border overflow-hidden z-50 shadow-none">
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#131314]/5">
+                <div className="flex items-center justify-between px-4 py-3 border-b ppos-border ppos-surface-muted">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notifications</p>
                     {hasUnread && (
@@ -229,7 +229,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
                         key={n.id}
                         onClick={() => handleMarkAsRead(n.id)}
                         className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
-                          n.read ? 'hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/5' : 'bg-slate-50/50 dark:bg-[#131314]/[0.02] hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5'
+                          n.read ? 'hover:bg-slate-50 dark:hover:bg-white/5' : 'bg-slate-50/50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/5'
                         }`}
                       >
                         {/* Severity Icon */}
@@ -271,7 +271,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
           </div>
 
           {/* Role & Profile */}
-          <div className="h-10 w-[1px] bg-slate-200 dark:bg-[#131314]/10 mx-1" />
+          <div className="h-10 w-[1px] ppos-border mx-1" />
 
           {/* User Menu */}
           <div className="relative" ref={menuRef}>
@@ -285,7 +285,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
                   {getUserRole()}
                 </p>
               </div>
-              <div className="w-8 h-8 bg-slate-100 dark:bg-[#1a1a1b] border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 dark:text-zinc-500 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">
+              <div className="w-8 h-8 ppos-surface-muted border ppos-border flex items-center justify-center text-slate-400 dark:text-zinc-500 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">
                 <UserCircleIcon className="w-6 h-6" />
               </div>
               <ChevronDownIcon className={`w-3 h-3 text-zinc-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
@@ -293,7 +293,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
             {/* Dropdown */}
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 z-50 shadow-xl">
+              <div className="absolute right-0 top-full mt-1 w-48 ppos-surface border ppos-border z-50 shadow-none">
                 <div className="p-0">
                   <button
                     onClick={handleSettings}
@@ -324,7 +324,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={() => setLogoutModal(false)}
           />
-          <div className="relative bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5 shadow-2xl">
+          <div className="relative ppos-surface border ppos-border p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5 shadow-none">
             <div className="w-12 h-12 bg-red-500/10 flex items-center justify-center">
               <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
             </div>

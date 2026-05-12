@@ -5,7 +5,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const orchestrationService = require('../services/productionOrchestrationService');
+const orchestrationService = require('../services/ManufacturingOrchestrationService');
 const scoringService = require('../services/industrialDispatchScoringService');
 const executionService = require('../services/dispatch/DispatchExecutionService');
 const heartbeatService = require('../services/industrialHeartbeatService');

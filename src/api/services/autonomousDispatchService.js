@@ -6,7 +6,7 @@
 const db = require('./mysqlClient');
 const logger = require('./logger').child('autonomous-dispatch');
 const recommendationService = require('./dispatchRecommendationService');
-const productionOrchestration = require('./productionOrchestrationService');
+const productionOrchestration = require('./ManufacturingOrchestrationService');
 
 class AutonomousDispatchService {
     /**

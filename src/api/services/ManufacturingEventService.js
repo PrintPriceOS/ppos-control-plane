@@ -1,11 +1,11 @@
 /**
- * Production Event Service
+ * Manufacturing Event Service
  * 
- * Unified timeline system for tracking the granular history of production jobs.
+ * Unified timeline system for tracking the granular history of manufacturing jobs.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 
-class ProductionEventService {
+class ManufacturingEventService {
   /**
    * Record a new production event
    * @param {Object} event { tenantId, packageId, dispatchId, type, actorType, actorId, message, metadata }
@@ -24,7 +24,7 @@ class ProductionEventService {
 
     // Trigger Notification Engine (Async)
     // We require here to avoid circular dependencies if any
-    const notificationService = require('./productionNotificationService');
+    const notificationService = require('./ManufacturingNotificationService');
     notificationService.handleEvent(event).catch(err => {
       console.error('[EVENT-SERVICE] Notification trigger failed:', err);
     });
@@ -62,4 +62,4 @@ class ProductionEventService {
   }
 }
 
-module.exports = new ProductionEventService();
+module.exports = new ManufacturingEventService();

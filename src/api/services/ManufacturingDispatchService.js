@@ -1,13 +1,13 @@
 /**
- * Production Dispatch Service
+ * Manufacturing Dispatch Service
  * 
- * Manages the transactional flow of production packages to print nodes.
+ * Manages the transactional flow of manufacturing packages to print nodes.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 const auditLogger = require('./auditLoggerService');
-const eventService = require('./productionEventService');
+const eventService = require('./ManufacturingEventService');
 
-class ProductionDispatchService {
+class ManufacturingDispatchService {
   /**
    * Dispatch a package to a specific node
    * @param {string} packageId
@@ -18,7 +18,7 @@ class ProductionDispatchService {
   async createDispatch(packageId, nodeId, options, context) {
     // 1. Fetch Package and Node
     const pkg = await persistence.getPackage(packageId);
-    if (!pkg) throw new Error('NOT_FOUND: Production package not found');
+    if (!pkg) throw new Error('NOT_FOUND: Manufacturing package not found');
 
     const node = await persistence.getNode(nodeId);
     if (!node) throw new Error('NOT_FOUND: Print node not found');
@@ -26,7 +26,7 @@ class ProductionDispatchService {
     // 2. Validations
     // Sender ownership check
     if (pkg.tenant_id !== context.tenantId && context.role !== 'SUPER_ADMIN') {
-      throw new Error('FORBIDDEN: You do not own this production package');
+      throw new Error('FORBIDDEN: You do not own this manufacturing package');
     }
 
     // Printer license check
@@ -141,7 +141,8 @@ class ProductionDispatchService {
     }
 
     // Ensure package is still waiting for dispatch
-    const pkg = await persistence.getPackage(dispatch.production_package_id);
+    const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
+    const pkg = await persistence.getPackage(pkgId);
     if (!pkg || pkg.status !== 'DISPATCHED') {
         throw new Error(`INVALID_STATE: Package is in status ${pkg?.status || 'UNKNOWN'}, cannot accept dispatch`);
     }
@@ -150,24 +151,24 @@ class ProductionDispatchService {
     const updatedDispatch = await persistence.updateDispatch(dispatchId, { status: 'ACCEPTED' });
 
     // 2. Update Package
-    await persistence.updatePackage(dispatch.production_package_id, { status: 'ACCEPTED_BY_PRINTER' });
+    await persistence.updatePackage(pkgId, { status: 'ACCEPTED_BY_PRINTER' });
 
     await auditLogger.log({
       type: 'DISPATCH_ACCEPT',
       tenantId: context.tenantId,
       userId: context.userId,
       status: 'SUCCESS',
-      metadata: { dispatchId, packageId: dispatch.production_package_id }
+      metadata: { dispatchId, packageId: pkgId }
     });
 
     await eventService.record({
       tenantId: context.tenantId,
-      packageId: dispatch.production_package_id,
+      packageId: pkgId,
       dispatchId,
       type: 'DISPATCH_ACCEPTED',
       actorType: 'NODE',
       actorId: context.userId, // or node identity if available
-      message: `Printer accepted production job #${dispatch.id.substring(0,8)}`,
+      message: `Printer accepted manufacturing job #${dispatch.id.substring(0,8)}`,
       metadata: { dispatchId }
     });
 
@@ -186,6 +187,7 @@ class ProductionDispatchService {
       throw new Error('FORBIDDEN: Only the target printer can reject this dispatch');
     }
 
+    const pkgId = dispatch.manufacturing_package_id || dispatch.production_package_id;
     // 1. Update Dispatch
     const updatedDispatch = await persistence.updateDispatch(dispatchId, { 
         status: 'REJECTED',
@@ -193,7 +195,7 @@ class ProductionDispatchService {
     });
 
     // 2. Update Package
-    await persistence.updatePackage(dispatch.production_package_id, { status: 'REJECTED_BY_PRINTER' });
+    await persistence.updatePackage(pkgId, { status: 'REJECTED_BY_PRINTER' });
 
     await auditLogger.log({
       type: 'DISPATCH_REJECT',
@@ -205,12 +207,12 @@ class ProductionDispatchService {
 
     await eventService.record({
       tenantId: context.tenantId,
-      packageId: dispatch.production_package_id,
+      packageId: pkgId,
       dispatchId,
       type: 'DISPATCH_REJECTED',
       actorType: 'NODE',
       actorId: context.userId,
-      message: `Printer rejected production job: ${reason}`,
+      message: `Printer rejected manufacturing job: ${reason}`,
       metadata: { dispatchId, reason }
     });
 
@@ -218,4 +220,4 @@ class ProductionDispatchService {
   }
 }
 
-module.exports = new ProductionDispatchService();
+module.exports = new ManufacturingDispatchService();

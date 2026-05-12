@@ -12,7 +12,7 @@ import { ProductionBillingPage } from './ProductionBillingPage';
 // Placeholder components for other tabs
 const ProductionPackagesTab = () => (
     <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-[0.2em] border-2 border-dashed border-slate-200 rounded-none m-6">
-        Production Packages Catalog — Phase 11
+        Manufacturing Packages Catalog — Phase 11
     </div>
 );
 const DispatchHistoryTab = () => <ProductionTimeline />;
@@ -27,7 +27,7 @@ export const ProductionDashboard: React.FC = () => {
 
   const tabs = [
     { id: 'incoming', name: 'Incoming Jobs', icon: InboxIcon },
-    { id: 'packages', name: 'Production Packages', icon: Square3Stack3DIcon },
+    { id: 'packages', name: 'Manufacturing Packages', icon: Square3Stack3DIcon },
     { id: 'history', name: 'Dispatch History', icon: ArrowsRightLeftIcon },
     { id: 'matching', name: 'Node Matching', icon: SparklesIcon },
     { id: 'billing', name: 'Financial Settlement', icon: BanknotesIcon }

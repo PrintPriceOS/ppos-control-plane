@@ -25,7 +25,7 @@ class DispatchExecutionService {
 
     try {
       // 1. Verify Package exists and is READY
-      const [packages] = await connection.query('SELECT * FROM production_packages WHERE id = ?', [packageId]);
+      const [packages] = await connection.query('SELECT * FROM manufacturing_packages WHERE id = ?', [packageId]);
       const pkg = packages[0];
       if (!pkg) throw new Error('PACKAGE_NOT_FOUND');
       
@@ -40,7 +40,7 @@ class DispatchExecutionService {
 
       await connection.query(`
         INSERT INTO manufacturing_dispatches 
-        (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, status, orchestration_metadata_json, sla_estimate_json, operator_id)
+        (id, manufacturing_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, status, orchestration_metadata_json, sla_estimate_json, operator_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         dispatchId, packageId, selectedNodeId, pkg.tenant_id, node.tenant_id, 'ALLOCATED',
@@ -69,14 +69,14 @@ class DispatchExecutionService {
       ]);
 
       // 5. Update Package Status
-      await connection.query('UPDATE production_packages SET status = ?, assigned_printer_tenant_id = ? WHERE id = ?', [
+      await connection.query('UPDATE manufacturing_packages SET status = ?, assigned_printer_tenant_id = ? WHERE id = ?', [
         'DISPATCHED', node.tenant_id, packageId
       ]);
 
       // 6. Log Event
       await connection.query(`
-        INSERT INTO production_events 
-        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message, metadata_json)
+        INSERT INTO manufacturing_dispatch_events 
+        (id, tenant_id, manufacturing_package_id, dispatch_id, event_type, actor_type, actor_id, message, metadata_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         uuidv4(), pkg.tenant_id, packageId, dispatchId, 'DISPATCH_CREATED', 'USER', operatorId || 'SYSTEM',
@@ -88,7 +88,7 @@ class DispatchExecutionService {
       
       // Phase 34: Immutable Evidence Ledger - Record Dispatch Creation
       try {
-        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        const evidenceLedger = require('../ManufacturingEvidenceLedgerService');
         await evidenceLedger.appendEvidence({
           dispatch_id: dispatchId,
           node_id: selectedNodeId,
@@ -148,24 +148,25 @@ class DispatchExecutionService {
       // Update Dispatch
       await connection.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', [newStatus, dispatchId]);
 
+      const pkgCol = dispatch.manufacturing_package_id || dispatch.production_package_id;
       // Handle specific transitions
       if (newStatus === 'IN_PRODUCTION') {
         await connection.query('UPDATE manufacturing_reservations SET status = ? WHERE dispatch_id = ?', ['CONFIRMED', dispatchId]);
-        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['IN_PRODUCTION', dispatch.production_package_id]);
+        await connection.query('UPDATE manufacturing_packages SET status = ? WHERE id = ?', ['IN_PRODUCTION', pkgCol]);
       } else if (newStatus === 'COMPLETED') {
         await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['RELEASED', dispatchId]);
-        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['COMPLETED', dispatch.production_package_id]);
+        await connection.query('UPDATE manufacturing_packages SET status = ? WHERE id = ?', ['COMPLETED', pkgCol]);
       } else if (newStatus === 'FAILED' || newStatus === 'BLOCKED') {
-        await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', dispatch.production_package_id]);
+        await connection.query('UPDATE manufacturing_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', pkgCol]);
       }
 
       // Log Event
       await connection.query(`
-        INSERT INTO production_events 
-        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message)
+        INSERT INTO manufacturing_dispatch_events 
+        (id, tenant_id, manufacturing_package_id, dispatch_id, event_type, actor_type, actor_id, message)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        uuidv4(), dispatch.sender_tenant_id, dispatch.production_package_id, dispatchId, `DISPATCH_${newStatus}`, 'SYSTEM', actorId || 'SYSTEM',
+        uuidv4(), dispatch.sender_tenant_id, pkgCol, dispatchId, `DISPATCH_${newStatus}`, 'SYSTEM', actorId || 'SYSTEM',
         message || `Dispatch transitioned to ${newStatus}`
       ]);
 
@@ -173,7 +174,7 @@ class DispatchExecutionService {
 
       // Phase 34: Immutable Evidence Ledger - Record Lifecycle Transition
       try {
-        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        const evidenceLedger = require('../ManufacturingEvidenceLedgerService');
         await evidenceLedger.appendEvidence({
           dispatch_id: dispatchId,
           evidence_type: 'LIFECYCLE_TRANSITION',
@@ -208,18 +209,19 @@ class DispatchExecutionService {
       const dispatch = dispatches[0];
       if (!dispatch) throw new Error('DISPATCH_NOT_FOUND');
 
+      const pkgCol = dispatch.manufacturing_package_id || dispatch.production_package_id;
       // Update Dispatch
       await connection.query('UPDATE manufacturing_dispatches SET status = ? WHERE id = ?', ['ROLLED_BACK', dispatchId]);
       await connection.query('UPDATE manufacturing_reservations SET status = ?, released_at = CURRENT_TIMESTAMP WHERE dispatch_id = ?', ['ROLLED_BACK', dispatchId]);
-      await connection.query('UPDATE production_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', dispatch.production_package_id]);
+      await connection.query('UPDATE manufacturing_packages SET status = ? WHERE id = ?', ['READY_FOR_DISPATCH', pkgCol]);
 
       // Log Event
       await connection.query(`
-        INSERT INTO production_events 
-        (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message)
+        INSERT INTO manufacturing_dispatch_events 
+        (id, tenant_id, manufacturing_package_id, dispatch_id, event_type, actor_type, actor_id, message)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        uuidv4(), dispatch.sender_tenant_id, dispatch.production_package_id, dispatchId, 'DISPATCH_ROLLED_BACK', 'USER', operatorId || 'SYSTEM',
+        uuidv4(), dispatch.sender_tenant_id, pkgCol, dispatchId, 'DISPATCH_ROLLED_BACK', 'USER', operatorId || 'SYSTEM',
         reason || 'Dispatch rolled back by operator'
       ]);
 
@@ -227,7 +229,7 @@ class DispatchExecutionService {
 
       // Phase 34: Immutable Evidence Ledger - Record Rollback
       try {
-        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        const evidenceLedger = require('../ManufacturingEvidenceLedgerService');
         await evidenceLedger.appendEvidence({
           dispatch_id: dispatchId,
           evidence_type: 'DISPATCH_ROLLBACK',

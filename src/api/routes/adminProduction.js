@@ -6,12 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const { requireAdmin, resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
-const nodeService = require('../services/productionNodeService');
-const packageService = require('../services/productionPackageService');
-const bundleService = require('../services/productionBundleService');
+const nodeService = require('../services/ManufacturingNodeService');
+const packageService = require('../services/ManufacturingPackageService');
+const bundleService = require('../services/ManufacturingBundleService');
 const matchingService = require('../services/printNodeMatchingService');
-const dispatchService = require('../services/productionDispatchService');
-const eventService = require('../services/productionEventService');
+const dispatchService = require('../services/ManufacturingDispatchService');
+const eventService = require('../services/ManufacturingEventService');
 const machineRegistry = require('../services/machineRegistryService');
 
 // Apply admin protection to all routes
@@ -386,7 +386,7 @@ router.get('/financials', async (req, res) => {
     let sql = `
       SELECT le.*, pkg.id as package_id
       FROM financial_ledger_entries le
-      JOIN production_packages pkg ON le.transaction_id = CONCAT('prod_tx_', SUBSTRING(pkg.id, 1, 12))
+      JOIN manufacturing_packages pkg ON le.transaction_id = CONCAT('prod_tx_', SUBSTRING(pkg.id, 1, 12))
       WHERE 1=1
     `;
     const params = [];

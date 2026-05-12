@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const notificationService = require('../services/productionNotificationService');
+const notificationService = require('../services/ManufacturingNotificationService');
 const logger = require('../services/logger').child('admin-notifications');
 
 /**

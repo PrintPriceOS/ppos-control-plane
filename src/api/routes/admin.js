@@ -60,7 +60,8 @@ router.use((req, res, next) => {
   const isFrequent = [
     '/workers/heartbeat',
     '/telemetry/industrial',
-    '/production/notifications'
+    '/production/notifications',
+    '/manufacturing/notifications'
   ].includes(path);
 
   const showDebug = process.env.PPOS_DEBUG_ADMIN_ROUTER === 'true';
@@ -145,7 +146,9 @@ router.use('/printhouses', printhousesAdminRouter);
 router.use('/orders', ordersAdminRouter);
 router.use('/preflight', preflightAdminRouter);
 router.use('/production/notifications', notificationsRouter);
+router.use('/manufacturing/notifications', notificationsRouter);
 router.use('/production', productionAdminRouter);
+router.use('/manufacturing', productionAdminRouter);
 router.use('/forensics', forensicsAdminRouter);
 router.use('/telemetry', telemetryAdminRouter);
 router.use('/artifacts', artifactAdminRouter);

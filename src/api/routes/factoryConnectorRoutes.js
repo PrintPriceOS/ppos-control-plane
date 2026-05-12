@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 const connectorAuth = require('../services/FactoryConnectorAuthService');
 const heartbeatService = require('../services/industrialHeartbeatService');
-const orchestrationService = require('../services/productionOrchestrationService');
+const orchestrationService = require('../services/ManufacturingOrchestrationService');
 const auditLogger = require('../services/auditLoggerService');
 const db = require('../services/mysqlClient');
 

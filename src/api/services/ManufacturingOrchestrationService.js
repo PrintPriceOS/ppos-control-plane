@@ -1,11 +1,11 @@
 /**
- * src/api/services/productionOrchestrationService.js
+ * src/api/services/ManufacturingOrchestrationService.js
  * 
- * Manages production dispatch lifecycle, capacity reservation, and rerouting logic.
+ * Manages manufacturing dispatch lifecycle, capacity reservation, and rerouting logic.
  * Uses manufacturing_* tables to avoid collision with legacy production_dispatches.
  */
 const db = require('./mysqlClient');
-const logger = require('./logger').child('production-orchestration');
+const logger = require('./logger').child('manufacturing-orchestration');
 const crypto = require('crypto');
 const reservationService = require('./CapacityReservationService');
 const eventOrchestrator = require('./IndustrialEventOrchestrationService');
@@ -22,7 +22,7 @@ const DISPATCH_LIFECYCLE = {
     FAILED: 'FAILED'
 };
 
-class ProductionOrchestrationService {
+class ManufacturingOrchestrationService {
     /**
      * Creates a new manufacturing dispatch based on a routing recommendation.
      */
@@ -283,4 +283,4 @@ class ProductionOrchestrationService {
     }
 }
 
-module.exports = new ProductionOrchestrationService();
+module.exports = new ManufacturingOrchestrationService();

@@ -2,9 +2,9 @@
  * Print Node Matching Engine
  * 
  * Deterministic rule-based system for finding compatible PrintHouse nodes
- * for a specific Production Package.
+ * for a specific Manufacturing Package.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 const preflightPersistence = require('./preflightPersistenceService');
 const auditLogger = require('./auditLoggerService');
 const machineRegistry = require('./machineRegistryService');

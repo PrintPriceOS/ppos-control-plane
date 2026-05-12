@@ -109,8 +109,8 @@ class CapacityConflictService {
             WHERE id = ?
         `, [JSON.stringify(conflictMetadata), dispatchId]);
 
-        const productionOrchestration = require('./productionOrchestrationService');
-        await productionOrchestration.logEvent(
+        const manufacturingOrchestration = require('./ManufacturingOrchestrationService');
+        await manufacturingOrchestration.logEvent(
             dispatchId, 
             'CAPACITY_CONFLICT_DETECTED', 
             dispatch.status, 

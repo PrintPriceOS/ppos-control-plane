@@ -1,7 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @variant dark (&:where(.dark, .dark *));
-
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
 
 /* ===================== */
 /* Tailwind theme override*/
@@ -30,6 +29,38 @@
   --transition-fast: 0.1s linear;
   --transition-normal: 0.2s linear;
   --transition-slow: 0.3s linear;
+
+  --ppos-bg: #ffffff;
+  --ppos-surface: #ffffff;
+  --ppos-surface-muted: #f8fafc;
+  --ppos-border: #e5e7eb;
+  --ppos-text: #0f172a;
+  --ppos-text-muted: #64748b;
+  --ppos-accent: #dc0000;
+}
+
+.dark {
+  --ppos-bg: #0e0e0f;
+  --ppos-surface: #131314;
+  --ppos-surface-muted: #1a1a1b;
+  --ppos-border: rgba(255,255,255,0.10);
+  --ppos-text: #f4f4f5;
+  --ppos-text-muted: #a1a1aa;
+  --ppos-accent: #dc0000;
+}
+
+.ppos-bg { background-color: var(--ppos-bg); }
+.ppos-surface { background-color: var(--ppos-surface); }
+.ppos-surface-muted { background-color: var(--ppos-surface-muted); }
+.ppos-border { border-color: var(--ppos-border); }
+.ppos-text { color: var(--ppos-text); }
+.ppos-text-muted { color: var(--ppos-text-muted); }
+.ppos-accent { color: var(--ppos-accent); }
+
+.glass {
+  background: var(--ppos-surface);
+  border: 1px solid var(--ppos-border);
+  box-shadow: none;
 }
 
 /* Force sharp edges globally */
@@ -49,7 +80,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.4;
-  @apply bg-white dark:bg-[#0e0e0f] text-black dark:text-white transition-colors duration-200;
+  background-color: var(--ppos-bg);
+  color: var(--ppos-text);
+  transition: background-color 0.2s linear, color 0.2s linear;
 }
 
 /* ===================== */

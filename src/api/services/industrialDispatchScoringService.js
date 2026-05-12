@@ -64,7 +64,7 @@ class IndustrialDispatchScoringService {
 
       // Phase 34: Immutable Evidence Ledger - Record Scoring Decision
       try {
-        const evidenceLedger = require('./ProductionEvidenceLedgerService');
+        const evidenceLedger = require('./ManufacturingEvidenceLedgerService');
         const evidencePayload = {
           dispatch_id: jobInput.id || 'SCORING_SIMULATION',
           tenant_id: jobInput.tenant_id,

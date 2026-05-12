@@ -1,10 +1,10 @@
 /**
- * Production Signal Service
+ * Manufacturing Signal Service
  * 
  * Translates raw technical facts into boolean signals for 
- * production intent classification and binding analysis.
+ * manufacturing intent classification and binding analysis.
  */
-class ProductionSignalService {
+class ManufacturingSignalService {
     /**
      * Extracts all signals from deterministic results.
      */
@@ -82,4 +82,4 @@ class ProductionSignalService {
     }
 }
 
-module.exports = new ProductionSignalService();
+module.exports = new ManufacturingSignalService();

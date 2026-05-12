@@ -1,19 +1,19 @@
 /**
- * Production Bundle Service
+ * Manufacturing Bundle Service
  * 
- * Generates downloadable ZIP bundles for Production Packages.
+ * Generates downloadable ZIP bundles for Manufacturing Packages.
  */
 const archiver = require('archiver');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 const preflightPersistence = require('./preflightPersistenceService');
 const storage = require('./preflightStorageService');
 const auditLogger = require('./auditLoggerService');
-const eventService = require('./productionEventService');
+const eventService = require('./ManufacturingEventService');
 
-class ProductionBundleService {
+class ManufacturingBundleService {
   /**
    * Generate a ZIP bundle for a production package
    * @param {string} packageId
@@ -23,7 +23,7 @@ class ProductionBundleService {
   async generateBundle(packageId, context) {
     // 1. Fetch Package
     const pkg = await persistence.getPackage(packageId);
-    if (!pkg) throw new Error('NOT_FOUND: Production package not found');
+    if (!pkg) throw new Error('NOT_FOUND: Manufacturing package not found');
 
     // 2. RBAC Validation
     const isOwner = pkg.tenant_id === context.tenantId;
@@ -94,9 +94,9 @@ class ProductionBundleService {
     archive.append(JSON.stringify(ticket, null, 2), { name: 'production-ticket.json' });
 
     // 8. Add Audit Log Snapshot
-    // Note: In a real system, we'd fetch actual events from a production_events table.
+    // Note: In a real system, we'd fetch actual events from a manufacturing_dispatch_events table.
     // For now, we'll provide a placeholder or fetch from audit_logs if available.
-    archive.append(JSON.stringify({ note: 'Operational audit log snapshot included in production package.' }, null, 2), { name: 'audit-log.json' });
+    archive.append(JSON.stringify({ note: 'Operational audit log snapshot included in manufacturing package.' }, null, 2), { name: 'audit-log.json' });
 
     // 9. Add Checksums File
     archive.append(checksums.join('\n'), { name: 'checksums.txt' });
@@ -118,13 +118,13 @@ class ProductionBundleService {
       type: 'BUNDLE_DOWNLOADED',
       actorType: 'USER',
       actorId: context.userId,
-      message: `Production bundle generated for download (ZIP)`,
+      message: `Manufacturing bundle generated for download (ZIP)`,
       metadata: { packageId, artifactCount: artifactRecords.length }
     });
 
     return {
       stream: archive,
-      filename: `production-bundle-${pkg.id.substring(0, 8)}.zip`
+      filename: `manufacturing-bundle-${pkg.id.substring(0, 8)}.zip`
     };
   }
 
@@ -156,4 +156,4 @@ class ProductionBundleService {
   }
 }
 
-module.exports = new ProductionBundleService();
+module.exports = new ManufacturingBundleService();

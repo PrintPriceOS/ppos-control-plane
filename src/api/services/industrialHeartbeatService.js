@@ -5,7 +5,7 @@
  * Phase 27 - Industrial Heartbeat Layer.
  */
 const db = require('./mysqlClient');
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 
 const NODE_STATES = {
   ONLINE: 'ONLINE',
@@ -61,7 +61,7 @@ class IndustrialHeartbeatService {
     
     // Phase 34: Immutable Evidence Ledger - Record Heartbeat
     try {
-        const evidenceLedger = require('./ProductionEvidenceLedgerService');
+        const evidenceLedger = require('./ManufacturingEvidenceLedgerService');
         await evidenceLedger.appendEvidence({
             dispatch_id: `TELEMETRY-${node_id}`,
             node_id: node_id,
@@ -92,7 +92,7 @@ class IndustrialHeartbeatService {
   async auditDispatchSla(nodeId, heartbeat) {
     const activeDispatches = await db.query(`
       SELECT * FROM manufacturing_dispatches 
-      WHERE print_node_id = ? AND status IN ('RESERVED', 'QUEUED', 'IN_PRODUCTION')
+      WHERE node_id = ? AND status IN ('RESERVED', 'QUEUED', 'IN_PRODUCTION')
     `, [nodeId]);
 
     for (const dispatch of activeDispatches) {

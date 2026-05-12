@@ -5,7 +5,7 @@
  */
 const db = require('./mysqlClient');
 const logger = require('./logger').child('sla-monitor');
-const productionOrchestration = require('./productionOrchestrationService');
+const manufacturingOrchestration = require('./ManufacturingOrchestrationService');
 
 class SLAMonitoringService {
     /**
@@ -106,7 +106,7 @@ class SLAMonitoringService {
             WHERE id = ?
         `, [JSON.stringify(alertMetadata), dispatch.id]);
 
-        await productionOrchestration.logEvent(
+        await manufacturingOrchestration.logEvent(
             dispatch.id, 
             'SLA_ANOMALY_DETECTED', 
             dispatch.status, 

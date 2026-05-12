@@ -1,21 +1,21 @@
 /**
- * Production Package Service
+ * Manufacturing Package Service
  * 
- * Handles business logic for Production Packages, bridging Preflight and Production.
+ * Handles business logic for Manufacturing Packages, bridging Preflight and Manufacturing.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 const preflightPersistence = require('./preflightPersistenceService');
 const auditLogger = require('./auditLoggerService');
-const eventService = require('./productionEventService');
+const eventService = require('./ManufacturingEventService');
 
-class ProductionPackageService {
+class ManufacturingPackageService {
   /**
-   * Create a new Production Package from a preflight job/artifact
+   * Create a new Manufacturing Package from a preflight job/artifact
    * @param {Object} packageData
    * @param {Object} context { userId, tenantId, role }
    */
   async createPackage(packageData, context) {
-    const { sourceJobId, sourceArtifactId, bookSpec, productionMetadata } = packageData;
+    const { sourceJobId, sourceArtifactId, bookSpec, manufacturingMetadata } = packageData;
 
     // 1. Validate Job Existence and Ownership
     const job = await preflightPersistence.getJob(sourceJobId);
@@ -73,7 +73,7 @@ class ProductionPackageService {
       type: 'PACKAGE_CREATED',
       actorType: 'USER',
       actorId: context.userId,
-      message: `Production package initialized from preflight job #${sourceJobId.substring(0,8)}`,
+      message: `Manufacturing package initialized from preflight job #${sourceJobId.substring(0,8)}`,
       metadata: { sourceJobId, policy: job.policy }
     });
 
@@ -160,7 +160,7 @@ class ProductionPackageService {
     await eventService.record({
       tenantId: context.tenantId,
       packageId: packageId,
-      type: `PRODUCTION_${newStatus}`,
+      type: `MANUFACTURING_${newStatus}`,
       actorType: 'USER',
       actorId: context.userId,
       message: `Package transitioned to ${newStatus}`,
@@ -226,4 +226,4 @@ class ProductionPackageService {
   }
 }
 
-module.exports = new ProductionPackageService();
+module.exports = new ManufacturingPackageService();

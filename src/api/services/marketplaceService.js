@@ -1,6 +1,6 @@
 const db = require('./db');
 const crypto = require('crypto');
-const productionOfferService = require('./productionOfferService');
+const productionOfferService = require('./ManufacturingOfferService');
 
 /**
  * Marketplace Interaction Service
@@ -49,7 +49,7 @@ class MarketplaceService {
 
             // Link to session and update rank
             await db.query(`
-                UPDATE production_offers 
+                UPDATE manufacturing_offers 
                 SET marketplace_session_id = ?, 
                     offer_rank = ?, 
                     offer_priority_score = ? 
@@ -79,11 +79,11 @@ class MarketplaceService {
             `, [offerId, mode, sessionId]);
 
             // 2. Mark selected offer
-            await db.query('UPDATE production_offers SET offer_selected = TRUE WHERE id = ?', [offerId]);
+            await db.query('UPDATE manufacturing_offers SET offer_selected = TRUE WHERE id = ?', [offerId]);
 
             // 3. Cancel remaining offers in the session
             await db.query(`
-                UPDATE production_offers 
+                UPDATE manufacturing_offers 
                 SET offer_status = 'CANCELLED' 
                 WHERE marketplace_session_id = ? AND id != ? AND offer_status IN ('PENDING', 'SENT', 'VIEWED')
             `, [sessionId, offerId]);

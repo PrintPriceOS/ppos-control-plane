@@ -4,7 +4,7 @@
  * Real-time evaluation of print nodes for industrial dispatch eligibility.
  * REJECTS nodes based on live operational telemetry and policy compliance.
  */
-const persistence = require('../productionPersistenceService');
+const persistence = require('../ManufacturingPersistenceService');
 
 class NodeEligibilityService {
   /**

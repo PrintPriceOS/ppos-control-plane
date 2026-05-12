@@ -1182,22 +1182,22 @@ export async function recoverStalledPreflightJobs() {
 // --- Production Notifications ---
 
 export async function getNotifications(limit = 20) {
-  const res = await adminFetch<any>(`/api/admin/production/notifications?limit=${limit}`);
+  const res = await adminFetch<any>(`/api/admin/manufacturing/notifications?limit=${limit}`);
   return res.notifications || [];
 }
 
 export async function markNotificationRead(id: string) {
-  return adminFetch<any>(`/api/admin/production/notifications/${id}/read`, { method: 'POST' });
+  return adminFetch<any>(`/api/admin/manufacturing/notifications/${id}/read`, { method: 'POST' });
 }
 
 export async function markAllNotificationsRead() {
-  return adminFetch<any>(`/api/admin/production/notifications/read-all`, { method: 'POST' });
+  return adminFetch<any>(`/api/admin/manufacturing/notifications/read-all`, { method: 'POST' });
 }
 
 // --- Production Financials ---
 
 export async function getProductionFinancials(packageId?: string) {
-  const url = packageId ? `/api/admin/production/financials/${packageId}` : '/api/admin/production/financials';
+  const url = packageId ? `/api/admin/manufacturing/financials/${packageId}` : '/api/admin/manufacturing/financials';
   return adminFetch<any>(url);
 }
 // --- Forensics & Telemetry API --- //

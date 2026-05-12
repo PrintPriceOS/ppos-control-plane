@@ -6,7 +6,7 @@
 const db = require('./mysqlClient');
 const { v4: uuidv4 } = require('uuid');
 
-class ProductionPersistenceService {
+class ManufacturingPersistenceService {
   /**
    * Initialize tables if they don't exist
    */
@@ -78,7 +78,7 @@ class ProductionPersistenceService {
       `);
 
       await db.query(`
-        CREATE TABLE IF NOT EXISTS production_packages (
+        CREATE TABLE IF NOT EXISTS manufacturing_packages (
           id VARCHAR(64) PRIMARY KEY,
           tenant_id VARCHAR(64) NOT NULL,
           source VARCHAR(32) DEFAULT 'PREFLIGHT',
@@ -104,10 +104,13 @@ class ProductionPersistenceService {
       await db.query(`
         CREATE TABLE IF NOT EXISTS manufacturing_dispatches (
           id VARCHAR(64) PRIMARY KEY,
-          production_package_id VARCHAR(64) NOT NULL,
-          print_node_id VARCHAR(64) NOT NULL,
-          sender_tenant_id VARCHAR(64) NOT NULL,
-          receiver_tenant_id VARCHAR(64) NOT NULL,
+          manufacturing_package_id VARCHAR(64) NULL,
+          print_node_id VARCHAR(64) NULL,
+          node_id VARCHAR(64) NULL,
+          job_id VARCHAR(64) NULL,
+          machine_id VARCHAR(64) NULL,
+          sender_tenant_id VARCHAR(64) NULL,
+          receiver_tenant_id VARCHAR(64) NULL,
           status VARCHAR(32) DEFAULT 'PENDING',
           message TEXT NULL,
           score_snapshot_json JSON NULL,
@@ -115,23 +118,35 @@ class ProductionPersistenceService {
           sla_estimate_json JSON NULL,
           orchestration_metadata_json JSON NULL,
           operator_id VARCHAR(64) NULL,
+          estimated_cost DECIMAL(10,2) DEFAULT 0,
+          estimated_margin DECIMAL(10,2) DEFAULT 0,
+          reserved_from TIMESTAMP NULL,
+          reserved_until TIMESTAMP NULL,
+          economic_score FLOAT DEFAULT 0,
+          profitability_score FLOAT DEFAULT 0,
+          energy_efficiency_score FLOAT DEFAULT 0,
+          federation_node_id VARCHAR(64) NULL,
+          governance_policy_score FLOAT DEFAULT 0,
+          evidence_snapshot_json JSON NULL,
+          metadata_json JSON NULL,
           expires_at TIMESTAMP NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           accepted_at TIMESTAMP NULL,
           rejected_at TIMESTAMP NULL,
-          INDEX idx_package (production_package_id),
-          INDEX idx_node (print_node_id),
+          INDEX idx_package (manufacturing_package_id),
+          INDEX idx_print_node (print_node_id),
+          INDEX idx_node (node_id),
+          INDEX idx_job (job_id),
           INDEX idx_sender (sender_tenant_id),
           INDEX idx_receiver (receiver_tenant_id),
           INDEX idx_status (status),
-          CONSTRAINT fk_dispatch_package FOREIGN KEY (production_package_id) REFERENCES production_packages(id) ON DELETE CASCADE,
-          CONSTRAINT fk_dispatch_node FOREIGN KEY (print_node_id) REFERENCES print_nodes(id) ON DELETE CASCADE
+          CONSTRAINT fk_dispatch_package FOREIGN KEY (manufacturing_package_id) REFERENCES manufacturing_packages(id) ON DELETE CASCADE
         ) ENGINE=InnoDB;
       `);
 
       await db.query(`
-        CREATE TABLE IF NOT EXISTS manufacturing_reservations (
+        CREATE TABLE IF NOT EXISTS manufacturing_capacity_reservations (
           id VARCHAR(64) PRIMARY KEY,
           node_id VARCHAR(64) NOT NULL,
           dispatch_id VARCHAR(64) NULL,
@@ -149,10 +164,10 @@ class ProductionPersistenceService {
       `);
 
       await db.query(`
-        CREATE TABLE IF NOT EXISTS production_events (
+        CREATE TABLE IF NOT EXISTS manufacturing_dispatch_events (
           id VARCHAR(64) PRIMARY KEY,
           tenant_id VARCHAR(64) NOT NULL,
-          production_package_id VARCHAR(64) NULL,
+          manufacturing_package_id VARCHAR(64) NULL,
           dispatch_id VARCHAR(64) NULL,
           event_type VARCHAR(64) NOT NULL,
           actor_type ENUM('USER', 'SYSTEM', 'NODE', 'API') NOT NULL,
@@ -161,14 +176,14 @@ class ProductionPersistenceService {
           metadata_json JSON NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_tenant (tenant_id),
-          INDEX idx_package (production_package_id),
+          INDEX idx_package (manufacturing_package_id),
           INDEX idx_dispatch (dispatch_id),
           INDEX idx_type (event_type)
         ) ENGINE=InnoDB;
       `);
       
       await db.query(`
-        CREATE TABLE IF NOT EXISTS production_notifications (
+        CREATE TABLE IF NOT EXISTS manufacturing_notifications (
           id VARCHAR(64) PRIMARY KEY,
           tenant_id VARCHAR(64) NOT NULL,
           user_id VARCHAR(64) NULL,
@@ -230,7 +245,7 @@ class ProductionPersistenceService {
       `);
 
       await db.query(`
-        CREATE TABLE IF NOT EXISTS industrial_learning_cycles (
+        CREATE TABLE IF NOT EXISTS manufacturing_learning_cycles (
           id INT AUTO_INCREMENT PRIMARY KEY,
           cycle_type VARCHAR(64) NOT NULL,
           input_size INT DEFAULT 0,
@@ -239,6 +254,71 @@ class ProductionPersistenceService {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB;
       `);
+
+      // Backward Compatibility Views
+      await db.query('CREATE OR REPLACE VIEW production_packages AS SELECT * FROM manufacturing_packages');
+      await db.query('CREATE OR REPLACE VIEW production_events AS SELECT * FROM manufacturing_dispatch_events');
+      await db.query('CREATE OR REPLACE VIEW production_notifications AS SELECT * FROM manufacturing_notifications');
+      await db.query('CREATE OR REPLACE VIEW capacity_reservations AS SELECT * FROM manufacturing_capacity_reservations');
+      await db.query('CREATE OR REPLACE VIEW production_dispatches AS SELECT * FROM manufacturing_dispatches');
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS manufacturing_evidence_ledger (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          dispatch_id VARCHAR(64) NOT NULL,
+          node_id VARCHAR(64) NULL,
+          tenant_id VARCHAR(64) NULL,
+          evidence_type VARCHAR(64) NOT NULL,
+          payload_json JSON NULL,
+          hash VARCHAR(64) NOT NULL,
+          previous_hash VARCHAR(64) NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_dispatch (dispatch_id),
+          INDEX idx_node (node_id)
+        ) ENGINE=InnoDB;
+      `);
+      await db.query('CREATE OR REPLACE VIEW production_evidence_ledger AS SELECT * FROM manufacturing_evidence_ledger');
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS manufacturing_offers (
+          id VARCHAR(64) PRIMARY KEY,
+          job_id VARCHAR(64) NOT NULL,
+          printer_id VARCHAR(64) NOT NULL,
+          machine_id VARCHAR(64) NULL,
+          quote_id VARCHAR(64) NULL,
+          routing_audit_id VARCHAR(64) NULL,
+          economic_routing_audit_id VARCHAR(64) NULL,
+          production_cost DECIMAL(10,2) DEFAULT 0,
+          suggested_price DECIMAL(10,2) DEFAULT 0,
+          estimated_margin DECIMAL(10,2) DEFAULT 0,
+          margin_pct DECIMAL(5,2) DEFAULT 0,
+          lead_time_days INT DEFAULT 0,
+          offer_expires_at TIMESTAMP NULL,
+          offer_status VARCHAR(32) DEFAULT 'PENDING',
+          marketplace_session_id VARCHAR(64) NULL,
+          offer_rank INT NULL,
+          offer_priority_score FLOAT NULL,
+          offer_selected BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_job (job_id),
+          INDEX idx_printer (printer_id),
+          INDEX idx_session (marketplace_session_id)
+        ) ENGINE=InnoDB;
+      `);
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS manufacturing_offer_events (
+          id VARCHAR(64) PRIMARY KEY,
+          offer_id VARCHAR(64) NOT NULL,
+          event_type VARCHAR(64) NOT NULL,
+          metadata_json JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_offer (offer_id)
+        ) ENGINE=InnoDB;
+      `);
+      await db.query('CREATE OR REPLACE VIEW production_offers AS SELECT * FROM manufacturing_offers');
+      await db.query('CREATE OR REPLACE VIEW production_offer_events AS SELECT * FROM manufacturing_offer_events');
+
+      console.log('[MANUFACTURING-PERSISTENCE] Canonical tables and views initialized.');
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS dispatch_outcome_history (
@@ -739,7 +819,7 @@ class ProductionPersistenceService {
     } = packageData;
 
     await db.query(`
-      INSERT INTO production_packages 
+      INSERT INTO manufacturing_packages 
       (id, tenant_id, source, source_job_id, source_artifact_id, fixed_pdf_artifact_id, certified_pdf_artifact_id, book_spec_json, preflight_report_json, policy_id, created_by_user_id, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
@@ -753,12 +833,12 @@ class ProductionPersistenceService {
   }
 
   async getPackage(id) {
-    const rows = await db.query('SELECT * FROM production_packages WHERE id = ?', [id]);
+    const rows = await db.query('SELECT * FROM manufacturing_packages WHERE id = ?', [id]);
     return rows[0] || null;
   }
 
   async listPackages(filters = {}) {
-    let sql = 'SELECT * FROM production_packages WHERE 1=1';
+    let sql = 'SELECT * FROM manufacturing_packages WHERE 1=1';
     const params = [];
 
     if (filters.tenantId) {
@@ -793,7 +873,7 @@ class ProductionPersistenceService {
     if (fields.length === 0) return this.getPackage(id);
 
     params.push(id);
-    await db.query(`UPDATE production_packages SET ${fields.join(', ')} WHERE id = ?`, params);
+    await db.query(`UPDATE manufacturing_packages SET ${fields.join(', ')} WHERE id = ?`, params);
     return this.getPackage(id);
   }
 
@@ -808,7 +888,7 @@ class ProductionPersistenceService {
 
     await db.query(`
       INSERT INTO manufacturing_dispatches 
-      (id, production_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, message, expires_at, status)
+      (id, manufacturing_package_id, print_node_id, sender_tenant_id, receiver_tenant_id, message, expires_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id, packageId, nodeId, senderTenantId, receiverTenantId, 
@@ -844,7 +924,7 @@ class ProductionPersistenceService {
     }
 
     if (filters.packageId) {
-      sql += ' AND production_package_id = ?';
+      sql += ' AND manufacturing_package_id = ?';
       params.push(filters.packageId);
     }
 
@@ -888,8 +968,8 @@ class ProductionPersistenceService {
     } = eventData;
 
     await db.query(`
-      INSERT INTO production_events 
-      (id, tenant_id, production_package_id, dispatch_id, event_type, actor_type, actor_id, message, metadata_json)
+      INSERT INTO manufacturing_dispatch_events 
+      (id, tenant_id, manufacturing_package_id, dispatch_id, event_type, actor_type, actor_id, message, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id, tenantId, packageId || null, dispatchId || null, eventType, 
@@ -901,7 +981,7 @@ class ProductionPersistenceService {
   }
 
   async listEvents(filters = {}) {
-    let sql = 'SELECT * FROM production_events WHERE 1=1';
+    let sql = 'SELECT * FROM manufacturing_dispatch_events WHERE 1=1';
     const params = [];
 
     if (filters.tenantId) {
@@ -909,7 +989,7 @@ class ProductionPersistenceService {
       params.push(filters.tenantId);
     }
     if (filters.packageId) {
-      sql += ' AND production_package_id = ?';
+      sql += ' AND manufacturing_package_id = ?';
       params.push(filters.packageId);
     }
     if (filters.dispatchId) {
@@ -938,7 +1018,7 @@ class ProductionPersistenceService {
     } = data;
 
     await db.query(`
-      INSERT INTO production_notifications 
+      INSERT INTO manufacturing_notifications 
       (id, tenant_id, user_id, title, message, severity, type, related_entity_type, related_entity_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
@@ -950,7 +1030,7 @@ class ProductionPersistenceService {
   }
 
   async listNotifications(filters = {}) {
-    let sql = 'SELECT * FROM production_notifications WHERE 1=1';
+    let sql = 'SELECT * FROM manufacturing_notifications WHERE 1=1';
     const params = [];
 
     if (filters.tenantId) {
@@ -974,12 +1054,12 @@ class ProductionPersistenceService {
   }
 
   async markNotificationRead(id, tenantId) {
-    await db.query('UPDATE production_notifications SET is_read = 1 WHERE id = ? AND tenant_id = ?', [id, tenantId]);
+    await db.query('UPDATE manufacturing_notifications SET is_read = 1 WHERE id = ? AND tenant_id = ?', [id, tenantId]);
     return true;
   }
 
   async markAllNotificationsRead(tenantId, userId) {
-    let sql = 'UPDATE production_notifications SET is_read = 1 WHERE tenant_id = ?';
+    let sql = 'UPDATE manufacturing_notifications SET is_read = 1 WHERE tenant_id = ?';
     const params = [tenantId];
     if (userId) {
       sql += ' AND user_id = ?';
@@ -990,7 +1070,7 @@ class ProductionPersistenceService {
   }
 }
 
-const service = new ProductionPersistenceService();
-service.init().catch(err => console.error('[PRODUCTION-PERSISTENCE] Critical init error:', err));
+const service = new ManufacturingPersistenceService();
+service.init().catch(err => console.error('[MANUFACTURING-PERSISTENCE] Critical init error:', err));
 
 module.exports = service;

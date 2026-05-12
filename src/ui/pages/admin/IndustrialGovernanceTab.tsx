@@ -36,7 +36,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Governance Header */}
-            <div className="p-10 bg-indigo-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-indigo-900">
+            <div className="p-10 bg-indigo-950 rounded-none text-white shadow-none relative overflow-hidden border border-indigo-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-indigo-500/20 rounded-none border border-indigo-500/30">
@@ -66,20 +66,20 @@ export const IndustrialGovernanceTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Systemic Risk Radar */}
-                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ExclamationTriangleIcon className="w-4 h-4 text-orange-500" />
                         Cascading Failure Radar
                     </h3>
                     <div className="space-y-6">
                         {(systemic.data?.risks || []).map((r: any, idx: number) => (
-                            <div key={idx} className="p-5 bg-orange-50 border border-orange-100 rounded-none-[1.5rem] relative overflow-hidden">
+                            <div key={idx} className="p-5 bg-orange-50 dark:bg-orange-950/30 border border-orange-100 dark:border-orange-900/30 rounded-none relative overflow-hidden">
                                 <p className="text-[10px] font-black text-orange-600 uppercase mb-1">{r.risk_type}</p>
                                 <div className="flex items-end justify-between">
-                                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Systemic Impact</p>
-                                    <p className="text-2xl font-black text-orange-700 italic">{r.systemic_impact_pct}%</p>
+                                    <p className="text-sm font-black text-slate-800 dark:text-zinc-200 uppercase tracking-tight">Systemic Impact</p>
+                                    <p className="text-2xl font-black text-orange-700 dark:text-orange-400 italic">{r.systemic_impact_pct}%</p>
                                 </div>
-                                <div className="mt-4 h-1 w-full bg-orange-200 rounded-none overflow-hidden">
+                                <div className="mt-4 h-1 w-full bg-orange-200 dark:bg-orange-950 rounded-none overflow-hidden">
                                     <div className="h-full bg-orange-500" style={{ width: `${r.probability * 100}%` }} />
                                 </div>
                             </div>
@@ -93,7 +93,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                 </div>
 
                 {/* Planetary Resilience Map */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none border border-slate-800 p-8 text-white shadow-none relative overflow-hidden">
                     <div className="relative z-10">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                             <GlobeAltIcon className="w-4 h-4 text-indigo-400" />
@@ -118,22 +118,22 @@ export const IndustrialGovernanceTab: React.FC = () => {
             {/* Continuity & Enforcement */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Governance Enforcement Feed */}
-                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ScaleIcon className="w-4 h-4" />
                         Governance Enforcement Feed
                     </h3>
                     <div className="space-y-4">
                         {(overview.data?.snapshots || []).slice(0, 5).map((s: any) => (
-                            <div key={s.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-none border border-slate-100">
+                            <div key={s.id} className="flex items-center justify-between p-4 ppos-surface-muted rounded-none border ppos-border">
                                 <div className="flex items-center gap-4">
                                     <div className="w-8 h-8 rounded-none bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
                                         <ShieldCheckIcon className="w-4 h-4 text-indigo-500" />
                                     </div>
-                                    <span className="text-xs font-black text-slate-900 uppercase tracking-tight">RESILIENCE_SNAPSHOT</span>
+                                    <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">RESILIENCE_SNAPSHOT</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-none">{s.governance_status}</span>
+                                    <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-1 rounded-none">{s.governance_status}</span>
                                 </div>
                             </div>
                         ))}
@@ -141,21 +141,21 @@ export const IndustrialGovernanceTab: React.FC = () => {
                 </div>
 
                 {/* Continuity Stability Timeline */}
-                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ServerStackIcon className="w-4 h-4 text-indigo-500" />
                         Federation Survivability Index
                     </h3>
                     <div className="flex flex-col items-center justify-center py-6">
-                        <div className="text-6xl font-black text-slate-900 italic tracking-tighter mb-2">88.4</div>
+                        <div className="text-6xl font-black text-slate-900 dark:text-white italic tracking-tighter mb-2">88.4</div>
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Stability Rating</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-6">
-                        <div className="p-4 bg-white rounded-none text-center shadow-none">
+                        <div className="p-4 ppos-surface-muted rounded-none border ppos-border text-center shadow-none">
                             <p className="text-[10px] font-black text-slate-400 uppercase">Redundancy</p>
                             <p className="text-lg font-black text-indigo-500">1.4x</p>
                         </div>
-                        <div className="p-4 bg-white rounded-none text-center shadow-none">
+                        <div className="p-4 ppos-surface-muted rounded-none border ppos-border text-center shadow-none">
                             <p className="text-[10px] font-black text-slate-400 uppercase">Diversity</p>
                             <p className="text-lg font-black text-indigo-500">85%</p>
                         </div>

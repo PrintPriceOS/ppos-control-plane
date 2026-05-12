@@ -23,9 +23,9 @@ const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
 const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked, onChange }) => (
     <button
         onClick={onChange}
-        className={`relative inline-flex h-6 w-11 items-center rounded-none transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-none transition-colors ${checked ? 'bg-primary' : 'bg-slate-200 dark:bg-white/10'}`}
     >
-        <span className={`inline-block h-4 w-4 transform rounded-none bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+        <span className={`inline-block h-4 w-4 transform rounded-none bg-white shadow-none border border-black/10 dark:border-white/10 transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
 );
 
@@ -71,8 +71,8 @@ export const GlobalSettingsPage: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Global Settings</h1>
-                <p className="text-sm text-slate-500 font-medium">Platform-wide configuration for PrintPrice OS Control Plane.</p>
+                <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Global Settings</h1>
+                <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">Platform-wide configuration for PrintPrice OS Control Plane.</p>
             </div>
 
             <div className="flex gap-6 min-h-[520px]">
@@ -84,8 +84,8 @@ export const GlobalSettingsPage: React.FC = () => {
                             onClick={() => setActive(id)}
                             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-none text-sm font-bold transition-all ${
                                 active === id
-                                    ? 'bg-slate-900 text-white'
-                                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                                    ? 'bg-slate-900 dark:bg-primary text-white'
+                                    : 'text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
                             <Icon className="w-4 h-4" />
@@ -95,17 +95,17 @@ export const GlobalSettingsPage: React.FC = () => {
                 </nav>
 
                 {/* Panel */}
-                <div className="flex-1 bg-white dark:bg-[#131314] rounded-none border border-slate-200 dark:border-white/10 p-8 space-y-6">
+                <div className="flex-1 ppos-surface rounded-none border ppos-border p-8 space-y-6">
 
                     {active === 'general' && (
                         <>
                             <SectionHeader icon={GlobeAltIcon} title="General" description="Core platform preferences." />
-                            <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Theme Toggle</p>
+                            <div className="mb-8 p-4 ppos-surface-muted border ppos-border">
+                                <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-3">Quick Theme Toggle</p>
                                 <div className="flex gap-2">
                                     {(['light', 'dark'] as const).map(t => (
                                         <button key={t} onClick={() => handleThemeChange(t)}
-                                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === t ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400'}`}>
+                                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${theme === t ? 'bg-primary text-white border-primary shadow-none' : 'ppos-surface ppos-border text-slate-400 dark:text-zinc-500'}`}>
                                             {t}
                                         </button>
                                     ))}
@@ -183,8 +183,8 @@ export const GlobalSettingsPage: React.FC = () => {
                                         onClick={() => handleThemeChange(t)}
                                         className={`flex-1 px-4 py-4 rounded-none text-xs font-black uppercase tracking-[0.2em] border transition-all ${
                                             theme === t 
-                                                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
-                                                : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-400 dark:text-zinc-600 hover:border-slate-400'
+                                                ? 'bg-primary text-white border-primary shadow-none' 
+                                                : 'ppos-surface ppos-border text-slate-400 dark:text-zinc-500 hover:border-slate-400'
                                         }`}
                                     >
                                         {t} MODE
@@ -199,7 +199,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                         <button
                                             key={d}
                                             onClick={() => setDensity(d)}
-                                            className={`px-4 py-2 rounded-none text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-[#131314] border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}
+                                            className={`px-4 py-2 rounded-none text-sm font-bold border transition-all capitalize ${density === d ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'ppos-surface ppos-border text-slate-500 dark:text-zinc-400 hover:border-slate-400'}`}
                                         >
                                             {d}
                                         </button>
@@ -211,7 +211,7 @@ export const GlobalSettingsPage: React.FC = () => {
                     )}
 
                     {/* Save */}
-                    <div className="pt-4 border-t border-slate-100 flex items-center gap-4">
+                    <div className="pt-4 border-t ppos-border flex items-center gap-4">
                         <button
                             onClick={handleSave}
                             className="px-6 py-2.5 bg-slate-900 dark:bg-primary text-white text-sm font-bold rounded-none hover:bg-slate-700 transition-colors"
@@ -232,23 +232,23 @@ export const GlobalSettingsPage: React.FC = () => {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const inputCls = "w-full px-4 py-2.5 rounded-none border border-slate-200 dark:border-white/10 text-sm font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 dark:bg-[#131314]/5";
+const inputCls = "w-full px-4 py-2.5 rounded-none border ppos-border text-sm font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/20 ppos-surface-muted";
 
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({ icon: Icon, title, description }) => (
-    <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-        <div className="p-2 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-slate-600 dark:text-zinc-400">
+    <div className="flex items-center gap-3 pb-2 border-b ppos-border">
+        <div className="p-2 rounded-none ppos-surface-muted text-slate-600 dark:text-zinc-400">
             <Icon className="w-5 h-5" />
         </div>
         <div>
-            <p className="text-sm font-black text-slate-900">{title}</p>
-            <p className="text-xs text-slate-400 font-medium">{description}</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white">{title}</p>
+            <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">{description}</p>
         </div>
     </div>
 );
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div className="space-y-1.5">
-        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">{label}</label>
+        <label className="text-xs font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest">{label}</label>
         {children}
     </div>
 );
@@ -256,8 +256,8 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 const ToggleRow: React.FC<{ label: string; desc: string; checked: boolean; onChange: () => void }> = ({ label, desc, checked, onChange }) => (
     <div className="flex items-center justify-between py-2">
         <div>
-            <p className="text-sm font-bold text-slate-800">{label}</p>
-            <p className="text-xs text-slate-400 font-medium">{desc}</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-zinc-200">{label}</p>
+            <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">{desc}</p>
         </div>
         <Toggle checked={checked} onChange={onChange} />
     </div>

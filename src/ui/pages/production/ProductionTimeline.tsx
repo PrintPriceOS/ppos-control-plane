@@ -14,6 +14,7 @@ interface ProductionEvent {
   id: string;
   tenant_id: string;
   production_package_id: string;
+  manufacturing_package_id?: string;
   dispatch_id: string;
   event_type: string;
   actor_type: 'USER' | 'SYSTEM' | 'NODE' | 'API';
@@ -36,8 +37,8 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
     setLoading(true);
     try {
       const url = packageId 
-        ? `/api/admin/production/packages/${packageId}/events`
-        : '/api/admin/production/events';
+        ? `/api/admin/manufacturing/packages/${packageId}/events`
+        : '/api/admin/manufacturing/events';
       const data = await adminFetch<any>(url);
       if (data.ok) {
         setEvents(data.events);
@@ -63,7 +64,7 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <ClockIcon className="h-6 w-6 text-indigo-600" />
-            {packageId ? `PACKAGE TIMELINE: #${packageId.substring(0,8)}` : 'GLOBAL PRODUCTION STREAM'}
+            {packageId ? `PACKAGE TIMELINE: #${packageId.substring(0,8)}` : 'GLOBAL MANUFACTURING STREAM'}
           </h2>
           <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Operational Audit Trail</p>
         </div>
@@ -121,7 +122,7 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
 
         {events.length === 0 && (
           <div className="pl-8 text-slate-400 text-sm font-bold uppercase tracking-widest italic py-10">
-            No production events recorded for this context.
+            No manufacturing events recorded for this context.
           </div>
         )}
       </div>

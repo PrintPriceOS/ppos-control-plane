@@ -1,5 +1,5 @@
 /**
- * src/api/services/ProductionEvidenceLedgerService.js
+ * src/api/services/ManufacturingEvidenceLedgerService.js
  * 
  * Phase 34 - Live Federation Activation.
  * Provides an immutable, chained ledger for manufacturing dispatch evidence.
@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const db = require('./mysqlClient');
 const logger = require('./logger').child('evidence-ledger');
 
-class ProductionEvidenceLedgerService {
+class ManufacturingEvidenceLedgerService {
     /**
      * Appends a new piece of evidence to the ledger, chaining it to the previous entry.
      */
@@ -18,7 +18,7 @@ class ProductionEvidenceLedgerService {
         try {
             // 1. Get previous hash for this dispatch_id
             const prev = await db.query(`
-                SELECT hash FROM production_evidence_ledger 
+                SELECT hash FROM manufacturing_evidence_ledger 
                 WHERE dispatch_id = ? 
                 ORDER BY id DESC LIMIT 1
             `, [dispatch_id]);
@@ -32,7 +32,7 @@ class ProductionEvidenceLedgerService {
 
             // 3. Persist to ledger
             await db.query(`
-                INSERT INTO production_evidence_ledger (
+                INSERT INTO manufacturing_evidence_ledger (
                     dispatch_id, node_id, tenant_id, evidence_type, payload_json, hash, previous_hash
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
             `, [
@@ -59,7 +59,7 @@ class ProductionEvidenceLedgerService {
     async verifyChain(dispatch_id) {
         try {
             const entries = await db.query(`
-                SELECT * FROM production_evidence_ledger 
+                SELECT * FROM manufacturing_evidence_ledger 
                 WHERE dispatch_id = ? 
                 ORDER BY id ASC
             `, [dispatch_id]);
@@ -109,7 +109,7 @@ class ProductionEvidenceLedgerService {
      */
     async getEvidence(dispatch_id) {
         return db.query(`
-            SELECT * FROM production_evidence_ledger 
+            SELECT * FROM manufacturing_evidence_ledger 
             WHERE dispatch_id = ? 
             ORDER BY id ASC
         `, [dispatch_id]);
@@ -129,4 +129,4 @@ class ProductionEvidenceLedgerService {
     }
 }
 
-module.exports = new ProductionEvidenceLedgerService();
+module.exports = new ManufacturingEvidenceLedgerService();

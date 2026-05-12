@@ -5,7 +5,7 @@
  */
 const db = require('./mysqlClient');
 const logger = require('./logger').child('auto-reroute');
-const productionOrchestration = require('./productionOrchestrationService');
+const productionOrchestration = require('./ManufacturingOrchestrationService');
 const recommendationService = require('./dispatchRecommendationService');
 
 class AutonomousRerouteService {

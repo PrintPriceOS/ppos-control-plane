@@ -133,8 +133,8 @@ class IndustrialEventOrchestrationService {
     logger.info({ type: 'INDUSTRIAL-EVENT-CONSUMED', eventType: type, trace_id }, `[INDUSTRIAL-EVENT-CONSUMED] ${type}`);
 
     try {
-      const productionOrchestrationService = require('./productionOrchestrationService');
-      await productionOrchestrationService.handleExternalDispatchRequest(payload, { trace_id });
+      const manufacturingOrchestrationService = require('./ManufacturingOrchestrationService');
+      await manufacturingOrchestrationService.handleExternalDispatchRequest(payload, { trace_id });
     } catch (error) {
       logger.error({ type: 'DISPATCH-ORCHESTRATION-FAILED', error: error.message, trace_id }, `[DISPATCH-ORCHESTRATION-FAILED] ${error.message}`);
     }

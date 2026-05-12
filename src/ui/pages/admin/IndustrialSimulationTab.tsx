@@ -38,7 +38,7 @@ export const IndustrialSimulationTab: React.FC = () => {
     return (
         <div className="space-y-8 pb-20">
             {/* Simulation Header */}
-            <div className="p-10 bg-emerald-950 rounded-none-[3rem] text-white shadow-none relative overflow-hidden border border-emerald-900">
+            <div className="p-10 bg-emerald-950 rounded-none text-white shadow-none relative overflow-hidden border border-emerald-900">
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-emerald-500/20 rounded-none border border-emerald-500/30">
@@ -69,31 +69,31 @@ export const IndustrialSimulationTab: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Recommendation Feed */}
-                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <LightBulbIcon className="w-4 h-4 text-emerald-500" />
                         Autonomous Recommendations
                     </h3>
                     <div className="space-y-4">
                         {(recs.data?.recommendations || []).map((r: any, idx: number) => (
-                            <div key={idx} className="p-5 bg-slate-50 border border-slate-100 rounded-none">
+                            <div key={idx} className="p-5 ppos-surface-muted border ppos-border rounded-none">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className={`text-[10px] font-black px-2 py-1 rounded-none uppercase ${
-                                        r.action === 'EXECUTE' ? 'bg-emerald-100 text-emerald-700' : 
-                                        r.action === 'HOLD' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                                        r.action === 'EXECUTE' ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 
+                                        r.action === 'HOLD' ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400'
                                     }`}>
                                         {r.action}
                                     </span>
                                     <span className="text-[10px] font-black text-slate-400">{Math.round(r.confidence_score * 100)}% CONFIDENCE</span>
                                 </div>
-                                <p className="text-xs font-bold text-slate-800 leading-tight">{r.reason}</p>
+                                <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 leading-tight">{r.reason}</p>
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {/* Simulation Run History */}
-                <div className="lg:col-span-2 bg-slate-900 rounded-none-[2.5rem] p-8 text-white shadow-none relative overflow-hidden">
+                <div className="lg:col-span-2 bg-slate-900 rounded-none border border-slate-800 p-8 text-white shadow-none relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <BeakerIcon className="w-4 h-4 text-emerald-400" />
                         Synthetic Timeline Branching
@@ -125,7 +125,7 @@ export const IndustrialSimulationTab: React.FC = () => {
 
             {/* Future Projection Radar */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <RocketLaunchIcon className="w-4 h-4 text-emerald-500" />
                         Simulation Future Radar
@@ -134,16 +134,16 @@ export const IndustrialSimulationTab: React.FC = () => {
                         {(projections.data?.projections || []).slice(0, 4).map((p: any, idx: number) => {
                             const state = JSON.parse(p.projected_state);
                             return (
-                                <div key={idx} className="p-5 bg-slate-50 rounded-none border border-slate-100">
+                                <div key={idx} className="p-5 ppos-surface-muted rounded-none border ppos-border">
                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-4">Horizon {p.horizon_hours}H</p>
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase">Survivability</span>
-                                            <span className="text-xs font-black text-emerald-600">{Math.round(state.survivability * 100)}%</span>
+                                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{Math.round(state.survivability * 100)}%</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase">Congestion</span>
-                                            <span className="text-xs font-black text-slate-800">{Math.round(state.congestion * 100)}%</span>
+                                            <span className="text-xs font-black text-slate-800 dark:text-zinc-200">{Math.round(state.congestion * 100)}%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -153,16 +153,16 @@ export const IndustrialSimulationTab: React.FC = () => {
                 </div>
 
                 {/* Systemic Instability Monitor */}
-                <div className="bg-slate-50 rounded-none-[2.5rem] border border-slate-200 p-8 shadow-none">
+                <div className="ppos-surface rounded-none border ppos-border p-8 shadow-none">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                         <ShieldExclamationIcon className="w-4 h-4 text-rose-500" />
                         Synthetic Instability Monitor
                     </h3>
                     <div className="flex flex-col items-center justify-center py-10">
-                        <div className="text-6xl font-black text-slate-900 italic tracking-tighter mb-2">0.04</div>
+                        <div className="text-6xl font-black text-slate-900 dark:text-white italic tracking-tighter mb-2">0.04</div>
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Variance Index</p>
                     </div>
-                    <div className="p-4 bg-white rounded-none border border-slate-100 text-center">
+                    <div className="p-4 ppos-surface-muted rounded-none border ppos-border text-center">
                         <p className="text-[10px] font-black text-emerald-600 uppercase">System Status: NOMINAL</p>
                     </div>
                 </div>

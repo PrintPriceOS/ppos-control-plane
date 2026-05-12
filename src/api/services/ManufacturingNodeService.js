@@ -1,14 +1,14 @@
 /**
- * Production Node Service
+ * Manufacturing Node Service
  * 
  * Handles business logic for Print Nodes, including capability normalization
  * and RBAC enforcement.
  */
-const persistence = require('./productionPersistenceService');
+const persistence = require('./ManufacturingPersistenceService');
 const auditLogger = require('./auditLoggerService');
 const machineRegistry = require('./machineRegistryService');
 
-class ProductionNodeService {
+class ManufacturingNodeService {
   /**
    * Create a new Print Node from a machine profile
    * @param {Object} nodeData
@@ -131,5 +131,5 @@ class ProductionNodeService {
   }
 }
 
-module.exports = new ProductionNodeService();
+module.exports = new ManufacturingNodeService();
 
