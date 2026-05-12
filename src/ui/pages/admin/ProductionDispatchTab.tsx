@@ -18,6 +18,7 @@ import {
     ShieldCheckIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { toDisplayText } from '../../lib/display';
 
 export const ProductionDispatchTab: React.FC = () => {
     const [dispatches, setDispatches] = useState<any[]>([]);
@@ -495,9 +496,9 @@ export const ProductionDispatchTab: React.FC = () => {
                                     className={`w-full text-left p-4 hover:bg-slate-800/50 transition-all flex items-center justify-between border-l-4 ${selectedDispatch?.id === d.id ? 'bg-indigo-500/5 border-indigo-500' : 'border-transparent'}`}
                                 >
                                     <div>
-                                        <div className="font-mono text-[10px] text-white mb-1 uppercase tracking-tighter">#{d.id.slice(-8)}</div>
+                                        <div className="font-mono text-[10px] text-white mb-1 uppercase tracking-tighter">#{String(d?.id || '').slice(-8)}</div>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold tracking-tight">
-                                            <MapPinIcon className="w-3 h-3" /> {d.node_id.slice(0, 8)}
+                                            <MapPinIcon className="w-3 h-3" /> {String(d?.node_id || '').slice(0, 8)}
                                         </div>
                                     </div>
                                     <div className={`text-[8px] font-black px-2 py-0.5 rounded-none border uppercase tracking-widest ${getStatusColor(d.status)}`}>
@@ -532,7 +533,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-2xl font-black text-white tracking-tighter uppercase">DISPATCH {selectedDispatch.id.slice(-8)}</h3>
+                                            <h3 className="text-2xl font-black text-white tracking-tighter uppercase">DISPATCH {String(selectedDispatch.id || '').slice(-8)}</h3>
                                             <FingerPrintIcon className="w-4 h-4 text-slate-600" />
                                             {selectedDispatch.metadata_json?.autonomous && (
                                                 <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-none text-[8px] font-black text-blue-400 uppercase tracking-widest">
@@ -568,13 +569,13 @@ export const ProductionDispatchTab: React.FC = () => {
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <MapPinIcon className="w-3 h-3" /> Node
                                         </div>
-                                        <div className="text-xs font-bold text-white font-mono">{selectedDispatch.node_id.slice(0, 12)}...</div>
+                                        <div className="text-xs font-bold text-white font-mono">{String(selectedDispatch.node_id || '').slice(0, 12)}...</div>
                                     </div>
                                     <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
                                             <BoltIcon className="w-3 h-3" /> Machine
                                         </div>
-                                        <div className="text-xs font-bold text-white font-mono">{selectedDispatch.machine_id?.slice(0, 12) || 'AUTO'}</div>
+                                        <div className="text-xs font-bold text-white font-mono">{String(selectedDispatch.machine_id || '').slice(0, 12) || 'AUTO'}</div>
                                     </div>
                                     <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">
                                         <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -711,7 +712,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Old Node</span>
-                                                    <span className="text-[10px] font-mono text-slate-400">{selectedDispatch.metadata_json.autonomous_recovery.old_node.slice(0, 12)}...</span>
+                                                    <span className="text-[10px] font-mono text-slate-400">{String(selectedDispatch.metadata_json.autonomous_recovery.old_node || '').slice(0, 12)}...</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -883,7 +884,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </div>
                                         <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Generation ID</div>
-                                            <div className="text-lg font-black text-cyan-400">{selectedDispatch.recursive_generation_id ? selectedDispatch.recursive_generation_id.slice(0,6) : 'N/A'}</div>
+                                            <div className="text-lg font-black text-cyan-400">{selectedDispatch.recursive_generation_id ? String(selectedDispatch.recursive_generation_id).slice(0,6) : 'N/A'}</div>
                                         </div>
                                         <div className="p-4 bg-slate-900 rounded-none border border-slate-800">
                                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Ethics Class</div>

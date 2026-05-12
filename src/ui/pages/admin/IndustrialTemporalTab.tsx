@@ -5,6 +5,7 @@
  * Visualizes future federation states, parallel timelines, and temporal risks.
  */
 import React from 'react';
+import { safeArray } from '../../lib/display';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { 
     getTemporalOverview, 
@@ -62,11 +63,11 @@ export const IndustrialTemporalTab: React.FC = () => {
                         Parallel Timeline Stability
                     </h3>
                     <div className="space-y-6">
-                        {(timelines.data?.timelines || []).map((t: any, idx: number) => (
+                        {safeArray(timelines.data?.timelines).map((t: any, idx: number) => (
                             <div key={idx} className="p-6 ppos-surface-muted border ppos-border rounded-none group hover:border-indigo-500/40 transition-all">
                                 <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-1 rounded-none uppercase">{t.id.split('_')[1]}</span>
-                                    <span className="text-sm font-black text-slate-900 dark:text-white italic">{t.ranking}%</span>
+                                    <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-1 rounded-none uppercase">{String(t?.id || '').split('_')[1] || 'TL'}</span>
+                                    <span className="text-sm font-black text-slate-900 dark:text-white italic">{t?.ranking || 0}%</span>
                                 </div>
                                 <p className="text-xs font-bold text-slate-600 dark:text-zinc-400 leading-tight mb-4">{t.desc}</p>
                                 <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-none overflow-hidden">
@@ -84,7 +85,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                         Future-State Federation Projections
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {(futures.data?.forecasts || []).slice(0, 4).map((f: any, idx: number) => (
+                        {safeArray(futures.data?.forecasts).slice(0, 4).map((f: any, idx: number) => (
                             <div key={idx} className="p-6 bg-white/5 border border-white/10 rounded-none hover:bg-white/10 transition-all">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="p-3 bg-white/5 rounded-none">
@@ -117,7 +118,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                         Temporal Risk Heatmap
                     </h3>
                     <div className="space-y-4">
-                        {(risks.data?.risks || []).map((r: any, idx: number) => (
+                        {safeArray(risks.data?.risks).map((r: any, idx: number) => (
                             <div key={idx} className="flex items-center justify-between p-4 ppos-surface-muted rounded-none border ppos-border">
                                 <div className="flex items-center gap-4">
                                     <div className={`w-3 h-3 rounded-none ${r.probability > 0.1 ? 'bg-pink-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -139,7 +140,7 @@ export const IndustrialTemporalTab: React.FC = () => {
                         Future-State Optimization Feed
                     </h3>
                     <div className="space-y-4">
-                        {(overview.data?.snapshots || []).slice(0, 5).map((s: any, idx: number) => (
+                        {safeArray(overview.data?.snapshots).slice(0, 5).map((s: any, idx: number) => (
                             <div key={idx} className="flex items-start gap-4 p-4 hover:bg-white dark:hover:bg-white/5 rounded-none transition-all group">
                                 <div className="w-10 h-10 rounded-none ppos-surface border ppos-border flex items-center justify-center shrink-0 group-hover:border-indigo-500/40">
                                     <ClockIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-500" />

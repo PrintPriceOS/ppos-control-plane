@@ -5,6 +5,7 @@
  * Visualizes synthetic federation health, simulation runs, and autonomous recommendations.
  */
 import React from 'react';
+import { safeArray } from '../../lib/display';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { 
     getSimulationOverview, 
@@ -75,7 +76,7 @@ export const IndustrialSimulationTab: React.FC = () => {
                         Autonomous Recommendations
                     </h3>
                     <div className="space-y-4">
-                        {(recs.data?.recommendations || []).map((r: any, idx: number) => (
+                        {safeArray(recs.data?.recommendations).map((r: any, idx: number) => (
                             <div key={idx} className="p-5 ppos-surface-muted border ppos-border rounded-none">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className={`text-[10px] font-black px-2 py-1 rounded-none uppercase ${
@@ -99,7 +100,7 @@ export const IndustrialSimulationTab: React.FC = () => {
                         Synthetic Timeline Branching
                     </h3>
                     <div className="space-y-4">
-                        {(runs.data?.runs || []).slice(0, 5).map((run: any, idx: number) => (
+                        {safeArray(runs.data?.runs).slice(0, 5).map((run: any, idx: number) => (
                             <div key={idx} className="flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-none hover:bg-white/10 transition-all">
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 bg-emerald-500/10 rounded-none border border-emerald-500/20">
@@ -131,8 +132,9 @@ export const IndustrialSimulationTab: React.FC = () => {
                         Simulation Future Radar
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                        {(projections.data?.projections || []).slice(0, 4).map((p: any, idx: number) => {
-                            const state = JSON.parse(p.projected_state);
+                        {safeArray(projections.data?.projections).slice(0, 4).map((p: any, idx: number) => {
+                            let state: any = { survivability: 0, congestion: 0 };
+                            try { state = typeof p?.projected_state === 'string' ? JSON.parse(p.projected_state) : p?.projected_state || state; } catch (e) {}
                             return (
                                 <div key={idx} className="p-5 ppos-surface-muted rounded-none border ppos-border">
                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-4">Horizon {p.horizon_hours}H</p>

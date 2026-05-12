@@ -2,7 +2,7 @@
 import React from "react";
 import { getWorkerFleet, setWorkerStatus } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
-import { toDisplayText } from "../../lib/display";
+import { toDisplayText, safeArray } from "../../lib/display";
 import { 
     CpuChipIcon, 
     SignalIcon,
@@ -17,7 +17,7 @@ export const WorkerFleetTab: React.FC = () => {
     if (status === "loading") return <div className="p-20 text-center animate-pulse font-bold text-slate-400">Discovering Worker Topology...</div>;
     if (status === "error") return <div className="p-10 bg-red-500/10 text-red-500 border border-red-500/20">Error: {toDisplayText(error)}</div>;
 
-    const fleet = data?.fleet || [];
+    const fleet = safeArray(data?.fleet);
 
     const handleStatusChange = async (id: string, newStatus: string) => {
         if (!confirm(`Are you sure you want to set ${id} to ${newStatus}?`)) return;
@@ -55,7 +55,7 @@ export const WorkerFleetTab: React.FC = () => {
                             <div className="flex flex-wrap gap-1">
                                 {Object.entries(w.capabilities || {}).map(([cap, enabled]) => enabled && (
                                     <span key={cap} className="px-2 py-0.5 bg-white/5 text-white/40 text-[9px] font-bold uppercase">
-                                        {cap.replace(/_/g, ' ')}
+                                        {String(cap || '').replace(/_/g, ' ')}
                                     </span>
                                 ))}
                             </div>

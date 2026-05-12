@@ -5,6 +5,7 @@
  * Global operational dashboard for industrial execution.
  */
 import React from 'react';
+import { safeArray } from '../../lib/display';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { 
     getIndustrialLiveState, 
@@ -92,7 +93,7 @@ export const IndustrialLiveTab: React.FC = () => {
                         Global Capacity Heatmap (Live Telemetry)
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {(capacity.data?.overview || []).map((node: any) => (
+                        {safeArray(capacity.data?.overview).map((node: any) => (
                             <button 
                                 key={node.node_id} 
                                 onClick={() => openMachine(node.node_id)}
@@ -130,7 +131,7 @@ export const IndustrialLiveTab: React.FC = () => {
                         Evidence-Backed SLA Risks
                     </h3>
                     <div className="space-y-4">
-                        {(slaRisks.data?.risks || []).map((risk: any) => (
+                        {safeArray(slaRisks.data?.risks).map((risk: any) => (
                             <div 
                                 key={risk.dispatch_id} 
                                 onClick={() => openMachine(risk.node_id)}
@@ -141,7 +142,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                     risk.risk_level === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500'
                                 }`} />
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">#{risk.dispatch_id.slice(-8)}</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">#{String(risk?.dispatch_id || '').slice(-8)}</span>
                                     <div className="flex items-center gap-1">
                                         <ShieldCheckIcon className="w-3 h-3 text-emerald-500" />
                                         <span className="text-[10px] font-bold text-emerald-600 uppercase">{risk.evidence_count} Proofs</span>
@@ -194,13 +195,13 @@ export const IndustrialLiveTab: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {(activeDispatches.data?.dispatches || []).map((d: any) => (
+                            {safeArray(activeDispatches.data?.dispatches).map((d: any) => (
                                 <tr 
                                     key={d.id} 
                                     onClick={() => openMachine(d.print_node_id)}
                                     className="hover:bg-slate-50 cursor-pointer transition-all"
                                 >
-                                    <td className="px-6 py-4 text-xs font-mono font-bold text-blue-600">#{d.id.slice(0, 12)}</td>
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-blue-600">#{String(d?.id || '').slice(0, 12)}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
                                             <span className="text-xs font-black text-slate-800">{d.node_name}</span>
@@ -240,7 +241,7 @@ export const IndustrialLiveTab: React.FC = () => {
             <div className="bg-slate-50 rounded-none border border-slate-200 p-6 shadow-none">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Autonomous Reroute & Event Log</h3>
                 <div className="space-y-3">
-                    {(reroutes.data?.events || []).map((e: any) => (
+                    {safeArray(reroutes.data?.events).map((e: any) => (
                         <div key={e.id} className="p-4 bg-white rounded-none border border-slate-100 flex items-center justify-between hover:shadow-none transition-all">
                             <div className="flex items-center gap-4">
                                 <div className={`p-2 rounded-none ${e.event_type === 'AUTONOMOUS_REROUTE' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>

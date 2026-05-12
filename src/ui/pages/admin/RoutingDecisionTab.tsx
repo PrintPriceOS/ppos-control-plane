@@ -11,6 +11,7 @@ import {
     QueueListIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { toDisplayText } from '../../lib/display';
 
 export const RoutingDecisionTab: React.FC = () => {
     const [specs, setSpecs] = useState({
@@ -52,7 +53,7 @@ export const RoutingDecisionTab: React.FC = () => {
 
     const handleDispatch = async (recommendation: any) => {
         const jobId = `job_${Math.floor(Math.random() * 1000000)}`;
-        if (!confirm(`Execute production dispatch to Node ${recommendation.nodeId.slice(0,8)}?`)) return;
+        if (!confirm(`Execute production dispatch to Node ${String(recommendation?.nodeId || '').slice(0,8)}?`)) return;
         
         try {
             const res = await adminApi.assignDispatch(jobId, recommendation);
@@ -220,8 +221,8 @@ export const RoutingDecisionTab: React.FC = () => {
                                                     #{i + 1}
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-lg font-black text-slate-900 tracking-tight">Node {rec.nodeId.slice(0, 8)}</h4>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Machine: {rec.machineId.replace(/machine_|_primary/g, '')}</p>
+                                                    <h4 className="text-lg font-black text-slate-900 tracking-tight">Node {String(rec?.nodeId || '').slice(0, 8)}</h4>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Machine: {String(rec?.machineId || '').replace(/machine_|_primary/g, '')}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">

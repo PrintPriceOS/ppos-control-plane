@@ -44,6 +44,7 @@ import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
 import { moduleReadinessRegistry } from '../../config/moduleReadiness';
+import { safeArray, toDisplayText } from '../../lib/display';
 
 // --- UTILS ---
 
@@ -354,13 +355,13 @@ const ManufacturingDispatchConsole = () => {
   return (
     <TacticalPanel title="Dispatch Console" icon={ArchiveBoxIcon} badge="Orchestration" color="slate" status={dispatches.status}>
       <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-        {Array.isArray(dispatches.data?.dispatches) && dispatches.data.dispatches.map((d: any) => (
-          <div key={d.id} className="p-2 bg-white/5 border border-white/5 flex items-center justify-between group">
+        {safeArray(dispatches.data?.dispatches).map((d: any) => (
+          <div key={d?.id || Math.random()} className="p-2 bg-white/5 border border-white/5 flex items-center justify-between group">
             <div className="flex flex-col">
-              <span className="text-[9px] font-black text-white uppercase">DISPATCH #{d.id?.slice(0, 8)}</span>
-              <span className="text-[7px] text-slate-500 uppercase">{d.status}</span>
+              <span className="text-[9px] font-black text-white uppercase">DISPATCH #{String(d?.id || '').slice(0, 8)}</span>
+              <span className="text-[7px] text-slate-500 uppercase">{toDisplayText(d?.status)}</span>
             </div>
-            <button onClick={() => handleRollback(d.id)} className="opacity-0 group-hover:opacity-100 text-[8px] font-black text-red-500 uppercase">Rollback</button>
+            <button onClick={() => handleRollback(d?.id)} className="opacity-0 group-hover:opacity-100 text-[8px] font-black text-red-500 uppercase">Rollback</button>
           </div>
         ))}
         {(!dispatches.data?.dispatches || dispatches.data.dispatches.length === 0) && (
@@ -461,12 +462,12 @@ export const CommandCenterPage: React.FC = () => {
             </div>
           </TacticalPanel>
 
-          <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={industrial.data?.workers?.state || 'IDLE'} color="primary" status={industrial.status}>
+          <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={toDisplayText(industrial.data?.workers?.state, 'IDLE')} color="primary" status={industrial.status}>
             <div className="space-y-2">
-              {industrial.data?.workers?.activeFleet?.slice(0, 4).map((w: any) => (
-                <div key={w.id} className="p-2 bg-white/5 border border-white/5 flex items-center justify-between">
-                  <span className="text-[9px] font-mono text-zinc-400 truncate">{w.id}</span>
-                  <span className="text-[8px] font-black text-slate-400 uppercase">{w.status}</span>
+              {safeArray(industrial.data?.workers?.activeFleet).slice(0, 4).map((w: any) => (
+                <div key={w?.id || Math.random()} className="p-2 bg-white/5 border border-white/5 flex items-center justify-between">
+                  <span className="text-[9px] font-mono text-zinc-400 truncate">{toDisplayText(w?.id)}</span>
+                  <span className="text-[8px] font-black text-slate-400 uppercase">{toDisplayText(w?.status)}</span>
                 </div>
               ))}
             </div>
@@ -488,8 +489,8 @@ export const CommandCenterPage: React.FC = () => {
         <div className="space-y-6">
           <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
             <div className="space-y-2">
-              {blocks.data?.blocks?.slice(0, 3).map((b: any) => (
-                <GovernanceRow key={b.id} label={b.name} status={b.status} color={b.status === 'ACTIVE' ? 'emerald' : 'red'} />
+              {safeArray(blocks.data?.blocks).slice(0, 3).map((b: any) => (
+                <GovernanceRow key={b?.id || Math.random()} label={toDisplayText(b?.name)} status={toDisplayText(b?.status)} color={b?.status === 'ACTIVE' ? 'emerald' : 'red'} />
               ))}
             </div>
           </TacticalPanel>
