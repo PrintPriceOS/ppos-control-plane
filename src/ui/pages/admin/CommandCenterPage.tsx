@@ -221,7 +221,8 @@ const CommandButton = ({ label, icon: Icon, color, onClick, badge, disabled }: {
 );
 
 const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
-  const unlocated = useMemo(() => data.filter(n => !resolveNodeLocation(n)), [data]);
+  const safeData = useMemo(() => safeArray(data), [data]);
+  const unlocated = useMemo(() => safeData.filter(n => !resolveNodeLocation(n)), [safeData]);
   if (unlocated.length === 0) return null;
 
   return (

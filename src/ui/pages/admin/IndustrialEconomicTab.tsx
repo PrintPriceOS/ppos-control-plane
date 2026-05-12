@@ -19,6 +19,7 @@ import {
     ArrowPathIcon,
     BoltIcon
 } from '@heroicons/react/24/outline';
+import { safeArray } from '../../lib/display';
 
 export const IndustrialEconomicTab: React.FC = () => {
     const overview = useAdminQuery('econ:overview', getDispatchEconomicOverview, 10000);
@@ -61,7 +62,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                         Predictive Economic Risk Radar
                     </h3>
                     <div className="space-y-6">
-                        {(risk.data?.risks || []).map((r: any, idx: number) => (
+                        {safeArray(risk.data?.risks).map((r: any, idx: number) => (
                             <div key={idx} className="p-5 ppos-surface-muted border ppos-border rounded-none relative overflow-hidden group hover:border-red-500/40 transition-all">
                                 <div className="relative z-10 flex items-center justify-between">
                                     <div>
@@ -96,7 +97,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        {(history.data?.history || []).slice(0, 5).map((h: any) => (
+                        {safeArray(history.data?.history).slice(0, 5).map((h: any) => (
                             <div key={h.id} className="p-5 bg-white/5 border border-white/10 rounded-none flex items-center justify-between group hover:bg-white/10 transition-all">
                                 <div className="flex items-center gap-6">
                                     <div className="w-12 h-12 rounded-none bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
@@ -183,7 +184,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                 </div>
                 <div className="p-8">
                     <div className="space-y-4">
-                        {(overview.data?.snapshots || []).slice(0, 5).map((s: any) => (
+                        {safeArray(overview.data?.snapshots).slice(0, 5).map((s: any) => (
                             <div key={s.id} className="flex items-start gap-4 p-4 hover:bg-slate-50 dark:hover:bg-white/5 rounded-none transition-all">
                                 <div className="w-10 h-10 rounded-none bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
                                     <PresentationChartLineIcon className="w-5 h-5 text-white" />

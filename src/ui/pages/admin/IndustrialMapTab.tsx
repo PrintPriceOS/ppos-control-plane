@@ -8,15 +8,18 @@ import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingLive, getRoutingMap } from '../../lib/adminApi';
 import { toDisplayText } from '../../lib/formatters';
+import { safeArray } from '../../lib/display';
 
 export const IndustrialMapTab: React.FC = () => {
     const { data: liveData } = useAdminQuery('routing:live', getRoutingLive, 5000);
     const { data: mapState } = useAdminQuery('routing:map', getRoutingMap, 5000);
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const warnings = mapState?.warnings || [];
+    const warnings = safeArray(mapState?.warnings);
     const sourceStatus = mapState?.source_status || '';
     const hasWarnings = warnings.length > 0 || sourceStatus === 'PARTIAL_COORDINATES' || sourceStatus === 'NO_COORDINATES_AVAILABLE';
+
+    const safeDecisions = safeArray(liveData?.decisions);
 
     return (
         <div className="space-y-6">
@@ -85,7 +88,7 @@ export const IndustrialMapTab: React.FC = () => {
                         </div>
                         
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                            {Array.isArray(liveData?.decisions) && liveData.decisions.map((d: any) => {
+                            {safeDecisions.map((d: any) => {
                                 const safeDecId = d?.id ? String(d.id).substring(0, 8) : 'N/A';
                                 return (
                                     <div key={d?.id || Math.random()} className="p-3 bg-white/5 border border-white/5 rounded-none">
@@ -104,7 +107,7 @@ export const IndustrialMapTab: React.FC = () => {
                                 );
                             })}
 
-                            {(!liveData?.decisions || liveData.decisions.length === 0) && (
+                            {safeDecisions.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale">
                                     <div className="w-12 h-12 border-2 border-dashed border-white/10 mb-4 rounded-none" />
                                     <span className="text-[8px] font-black uppercase">Scanning for Routing Events...</span>
@@ -115,7 +118,7 @@ export const IndustrialMapTab: React.FC = () => {
                         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-[#131314]/[0.01]">
                             <div className="flex items-center justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
                                 <span>Session Decisions</span>
-                                <span className="text-slate-900 dark:text-white">{liveData?.decisions?.length || 0}</span>
+                                <span className="text-slate-900 dark:text-white">{safeDecisions.length}</span>
                             </div>
                         </div>
                     </div>

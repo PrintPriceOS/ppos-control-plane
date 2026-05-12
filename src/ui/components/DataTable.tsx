@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 
-import { toDisplayText } from '../lib/display';
+import { toDisplayText, safeArray } from '../lib/display';
 
 interface Column<T> {
   header: string;
@@ -26,7 +26,7 @@ export function DataTable<T>({ columns, data, onRowClick, isLoading, compact, ro
   });
 
   const sortedData = useMemo(() => {
-    let sortableItems = Array.isArray(data) ? [...data] : [];
+    let sortableItems = [...safeArray(data)];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         const aValue = a[sortConfig.key!];

@@ -15,6 +15,7 @@ import {
   getMachineCapacityAnalysis 
 } from '../lib/adminApi';
 import { toDisplayText } from '../lib/formatters';
+import { safeArray } from '../lib/display';
 
 interface MachineDetailDrawerProps {
   machineId: string | null;
@@ -201,8 +202,8 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
             <section className="p-8 border-b border-white/5 bg-zinc-950/30">
                <SectionHeader icon={CpuChipIcon} title="Industrial Capabilities" />
                <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-                  <CapabilityGroup label="Media / GSM" items={(data.capacity?.capabilities?.paper_types || []).concat(data.capacity?.capabilities?.gsm_ranges || [])} />
-                  <CapabilityGroup label="Formats / Max Size" items={(data.capacity?.capabilities?.trim_formats || []).concat([data.capacity?.capabilities?.max_sheet_size || 'N/A'])} />
+                  <CapabilityGroup label="Media / GSM" items={safeArray(data.capacity?.capabilities?.paper_types).concat(safeArray(data.capacity?.capabilities?.gsm_ranges))} />
+                  <CapabilityGroup label="Formats / Max Size" items={safeArray(data.capacity?.capabilities?.trim_formats).concat([data.capacity?.capabilities?.max_sheet_size || 'N/A'])} />
                   <div className="col-span-2 grid grid-cols-4 gap-2 mt-2">
                      <CapabilityBadge label="UV" active={data.capacity.capabilities.uv_support} />
                      <CapabilityBadge label="Varnish" active={data.capacity.capabilities.varnish_support} />
@@ -306,12 +307,12 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
             <section className="p-8 border-b border-white/5 bg-zinc-950/30">
                <SectionHeader icon={ShieldCheckIcon} title="Routing Eligibility" />
                <div className="flex flex-wrap gap-2">
-                  {(data.capacity?.pressure?.routing_eligibility || []).map((tag: string) => (
+                  {safeArray(data.capacity?.pressure?.routing_eligibility).map((tag: string) => (
                     <div key={tag} className="px-3 py-1.5 border border-white/10 bg-white/5 text-[10px] font-black uppercase italic tracking-widest">
                        {tag.replace('_', ' ')}
                     </div>
                   ))}
-                  {(data.capacity?.pressure?.routing_eligibility || []).length === 0 && (
+                  {safeArray(data.capacity?.pressure?.routing_eligibility).length === 0 && (
                     <span className="text-[10px] font-black text-zinc-700 uppercase italic">NO SPECIAL ELIGIBILITY DETECTED</span>
                   )}
                </div>
@@ -321,7 +322,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
             <section className="p-8 pb-12">
                <SectionHeader icon={ExclamationCircleIcon} title="Recent Incidents" />
                <div className="space-y-2">
-                  {(data.history?.incidents || []).map((incident: any) => (
+                  {safeArray(data.history?.incidents).map((incident: any) => (
                     <div key={incident?.id || Math.random()} className="p-4 border border-white/5 bg-zinc-900 flex items-start justify-between group">
                        <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -333,7 +334,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
                        <span className="text-[8px] font-bold text-zinc-600 uppercase whitespace-nowrap">{incident?.created_at ? new Date(incident.created_at).toLocaleTimeString() : ''}</span>
                     </div>
                   ))}
-                  {(data.history?.incidents || []).length === 0 && (
+                  {safeArray(data.history?.incidents).length === 0 && (
                     <div className="py-8 text-center border border-dashed border-white/5 opacity-20 text-[10px] font-black uppercase italic">No active incidents detected.</div>
                   )}
                </div>

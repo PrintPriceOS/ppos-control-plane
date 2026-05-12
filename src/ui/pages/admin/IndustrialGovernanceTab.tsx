@@ -20,6 +20,7 @@ import {
     ServerStackIcon,
     ScaleIcon
 } from '@heroicons/react/24/outline';
+import { safeArray } from '../../lib/display';
 
 export const IndustrialGovernanceTab: React.FC = () => {
     const overview = useAdminQuery('gov:overview', getGovernanceOverview, 15000);
@@ -72,7 +73,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                         Cascading Failure Radar
                     </h3>
                     <div className="space-y-6">
-                        {(systemic.data?.risks || []).map((r: any, idx: number) => (
+                        {safeArray(systemic.data?.risks).map((r: any, idx: number) => (
                             <div key={idx} className="p-5 bg-orange-50 dark:bg-orange-950/30 border border-orange-100 dark:border-orange-900/30 rounded-none relative overflow-hidden">
                                 <p className="text-[10px] font-black text-orange-600 uppercase mb-1">{r.risk_type}</p>
                                 <div className="flex items-end justify-between">
@@ -84,7 +85,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                        {(!systemic.data?.risks || systemic.data?.risks.length === 0) && (
+                        {safeArray(systemic.data?.risks).length === 0 && (
                             <div className="text-center py-10">
                                 <p className="text-xs font-black text-slate-300 uppercase italic">No active systemic risks</p>
                             </div>
@@ -100,7 +101,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                             Planetary Resilience Map
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {(resilience.data?.resilience || []).slice(0, 6).map((r: any) => (
+                            {safeArray(resilience.data?.resilience).slice(0, 6).map((r: any) => (
                                 <div key={r.id} className="p-5 bg-white/5 border border-white/10 rounded-none">
                                     <p className="text-[10px] font-black text-slate-500 uppercase mb-2">{r.region}</p>
                                     <div className="flex items-end justify-between">
@@ -124,7 +125,7 @@ export const IndustrialGovernanceTab: React.FC = () => {
                         Governance Enforcement Feed
                     </h3>
                     <div className="space-y-4">
-                        {(overview.data?.snapshots || []).slice(0, 5).map((s: any) => (
+                        {safeArray(overview.data?.snapshots).slice(0, 5).map((s: any) => (
                             <div key={s.id} className="flex items-center justify-between p-4 ppos-surface-muted rounded-none border ppos-border">
                                 <div className="flex items-center gap-4">
                                     <div className="w-8 h-8 rounded-none bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">

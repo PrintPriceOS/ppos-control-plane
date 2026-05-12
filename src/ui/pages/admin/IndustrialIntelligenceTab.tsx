@@ -21,6 +21,7 @@ import {
     BeakerIcon,
     AcademicCapIcon
 } from '@heroicons/react/24/outline';
+import { safeArray } from '../../lib/display';
 
 export const IndustrialIntelligenceTab: React.FC = () => {
     const reliability = useAdminQuery('intel:reliability', getReliabilityRanking, 10000);
@@ -59,7 +60,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                         Live Failure Prediction Radar
                     </h3>
                     <div className="space-y-4">
-                        {(predictions.data?.predictions || []).map((p: any) => (
+                        {safeArray(predictions.data?.predictions).map((p: any) => (
                             <div key={p.id} className="p-4 ppos-surface-muted border ppos-border rounded-none flex items-center justify-between group hover:border-red-500/40 transition-all">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-none border-4 ppos-border shadow-none flex items-center justify-center ppos-surface overflow-hidden relative">
@@ -77,7 +78,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                        {(!predictions.data?.predictions || predictions.data.predictions.length === 0) && (
+                        {safeArray(predictions.data?.predictions).length === 0 && (
                             <div className="py-12 text-center opacity-30 italic text-xs font-bold uppercase tracking-widest text-slate-400">No imminent failures predicted</div>
                         )}
                     </div>
@@ -90,7 +91,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                         60m Congestion Forecast
                     </h3>
                     <div className="space-y-3">
-                        {(congestion.data?.forecasts || []).slice(0, 6).map((f: any) => (
+                        {safeArray(congestion.data?.forecasts).slice(0, 6).map((f: any) => (
                             <div key={f.node_id} className="p-4 ppos-surface-muted rounded-none border ppos-border flex items-center justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-2">
@@ -131,7 +132,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                                {(reliability.data?.ranking || []).map((r: any) => (
+                                {safeArray(reliability.data?.ranking).map((r: any) => (
                                     <tr key={r.printer_id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-all">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
@@ -167,7 +168,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                         Federation Resilience
                     </h3>
                     <div className="space-y-6">
-                        {(federation.data?.snapshots || []).map((s: any) => (
+                        {safeArray(federation.data?.snapshots).map((s: any) => (
                             <div key={s.region} className="p-4 bg-white/5 border border-white/10 rounded-none">
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{s.region}</span>
@@ -201,7 +202,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                         Autonomous Learning Console
                     </h3>
                     <div className="space-y-4">
-                        {(optimization.data?.cycles || []).slice(0, 5).map((c: any) => (
+                        {safeArray(optimization.data?.cycles).slice(0, 5).map((c: any) => (
                             <div key={c.id} className="p-4 ppos-surface-muted border ppos-border rounded-none flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-none bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center">
                                     <CpuChipIcon className="w-5 h-5 text-blue-600" />
