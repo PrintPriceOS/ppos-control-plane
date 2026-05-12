@@ -60,7 +60,7 @@ export const PreflightJobsPage: React.FC = () => {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat(Number((bytes || 0) / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const getRiskColor = (risk?: string) => {
@@ -87,7 +87,7 @@ export const PreflightJobsPage: React.FC = () => {
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Storage</div>
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-black text-slate-700 dark:text-[#ECECF1]">
-                {storageQ.data ? (storageQ.data.totalBytes / (1024*1024*1024)).toFixed(2) : '0.00'} GB
+                {storageQ.data ? Number((storageQ.data.totalBytes || 0) / (1024*1024*1024)).toFixed(2) : '0.00'} GB
               </span>
               <span className="text-[10px] font-bold text-slate-400">used</span>
             </div>

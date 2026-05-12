@@ -58,7 +58,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         },
         {
             label: "Capacity Available",
-            value: `${((stats.capacity_available_today / (stats.capacity_total_today || 1)) * 100).toFixed(0)}%`,
+            value: `${Number(((stats.capacity_available_today || 0) / (stats.capacity_total_today || 1)) * 100).toFixed(0)}%`,
             sub: `${stats.printers_full_today} Saturated nodes`,
             icon: CircleStackIcon,
             color: "text-blue-600",
@@ -74,7 +74,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         },
         {
             label: "Avg Quality",
-            value: `${(stats.avg_quality_score * 100).toFixed(0)}%`,
+            value: `${Number((stats.avg_quality_score || 0) * 100).toFixed(0)}%`,
             sub: "Network performance",
             icon: ShieldCheckIcon,
             color: "text-orange-600",
@@ -107,7 +107,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         {
             label: "Auto Dispatch",
             value: stats.dispatch?.active || 0,
-            sub: `${((stats.dispatch?.reroute_rate || 0) * 100).toFixed(1)}% Reroute`,
+            sub: `${Number((stats.dispatch?.reroute_rate || 0) * 100).toFixed(1)}% Reroute`,
             icon: RocketLaunchIcon,
             color: "text-rose-500",
             bg: "bg-rose-50"

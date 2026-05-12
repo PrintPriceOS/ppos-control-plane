@@ -295,7 +295,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
                         </div>
                         <div className="flex justify-between text-[11px] font-bold">
                            <span className="text-zinc-500 uppercase">Failure Ratio</span>
-                           <span className="text-red-600">{((data.history.t7d.failed / (data.history.t7d.completed || 1)) * 100).toFixed(2)}%</span>
+                           <span className="text-red-600">{Number(((data.history.t7d.failed || 0) / (data.history.t7d.completed || 1)) * 100).toFixed(2)}%</span>
                         </div>
                      </div>
                   </div>

@@ -606,7 +606,7 @@ export const ProductionDispatchTab: React.FC = () => {
                                             <BoltIcon className="w-3 h-3" /> Stability
                                         </div>
                                         <div className="text-xs font-bold text-cyan-400">
-                                            {Math.max(0, 100 - (selectedDispatch.anomaly_score || 0)).toFixed(1)}%
+                                            {Number(Math.max(0, 100 - (selectedDispatch.anomaly_score || 0))).toFixed(1)}%
                                         </div>
                                     </div>
                                     <div className="p-4 bg-slate-800/30 rounded-none border border-slate-800/50">

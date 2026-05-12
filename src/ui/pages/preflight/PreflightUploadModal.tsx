@@ -191,7 +191,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                                   {file.name}
                                 </div>
                                 <div className="text-xs font-bold text-primary mt-1 px-3 py-1 bg-primary/10 rounded-none">
-                                  {(file.size / (1024 * 1024)).toFixed(2)} MB • READY
+                                  {Number((file.size || 0) / (1024 * 1024)).toFixed(2)} MB • READY
                                 </div>
                               </div>
                             ) : (

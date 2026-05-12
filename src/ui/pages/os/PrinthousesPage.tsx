@@ -705,7 +705,7 @@ export const PrinthousesPage: React.FC = () => {
 
     const printhouses = q.data ?? [];
     const avgLeadDays = printhouses.length
-        ? (printhouses.reduce((s, p) => s + (p.production_lead_days ?? 0), 0) / printhouses.length).toFixed(1)
+        ? Number(printhouses.reduce((s, p) => s + (p.production_lead_days ?? 0), 0) / printhouses.length).toFixed(1)
         : '—';
 
     return (

@@ -6,7 +6,7 @@ export const PreflightQuotasPage: React.FC = () => {
   const q = useAdminQuery("preflight:storage:all", () => getStorageSummary(), 30000);
 
   const formatSize = (bytes: number) => {
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    return Number((bytes || 0) / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
   };
 
   const tenants = q.data?.tenants || [];
@@ -61,7 +61,7 @@ export const PreflightQuotasPage: React.FC = () => {
             accessor: (t) => (
               <span className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider ${t.usedBytes >= t.quotaBytes ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
                 }`}>
-                {((t.usedBytes / t.quotaBytes) * 100).toFixed(1)}% Full
+                {Number(((t.usedBytes || 0) / (t.quotaBytes || 1)) * 100).toFixed(1)}% Full
               </span>
             )
           },
@@ -89,7 +89,7 @@ const QuotaCard = ({ label, value, limit, progress }: any) => (
       </div>
       <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
         <span>Utilization</span>
-        <span>{progress.toFixed(1)}%</span>
+        <span>{Number(progress || 0).toFixed(1)}%</span>
       </div>
     </div>
   </div>

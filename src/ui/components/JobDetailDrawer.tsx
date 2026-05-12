@@ -417,7 +417,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                                     {artifactItem.filename}
                                   </span>
                                   <span className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 shrink-0">
-                                    {artifactItem.size_bytes ? `${(artifactItem.size_bytes / 1024).toFixed(1)} KB` : '---'}
+                                    {artifactItem.size_bytes ? `${Number((artifactItem.size_bytes || 0) / 1024).toFixed(1)} KB` : '---'}
                                   </span>
                                 </div>
                                 {artifactItem.checksum_sha256 ? (

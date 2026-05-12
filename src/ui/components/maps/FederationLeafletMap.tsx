@@ -160,7 +160,7 @@ export const FederationLeafletMap: React.FC = () => {
                       <span className="text-zinc-500 uppercase">Region:</span>
                       <span className="text-right text-zinc-300">{toDisplayText(node?.region || node?.country)}</span>
                       <span className="text-zinc-500 uppercase">Utilization:</span>
-                      <span className="text-right text-zinc-300 font-bold">{pressure.toFixed(0)}%</span>
+                      <span className="text-right text-zinc-300 font-bold">{Number(pressure || 0).toFixed(0)}%</span>
                     </div>
                   </div>
                 </Popup>

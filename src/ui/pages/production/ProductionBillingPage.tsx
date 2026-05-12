@@ -71,7 +71,7 @@ export const ProductionBillingPage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Platform Revenue</p>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">€{totalRevenue.toFixed(2)}</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">€{Number(totalRevenue || 0).toFixed(2)}</h2>
             </div>
           </div>
         </div>
@@ -83,7 +83,7 @@ export const ProductionBillingPage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Printer Payouts</p>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">€{totalPayouts.toFixed(2)}</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">€{Number(totalPayouts || 0).toFixed(2)}</h2>
             </div>
           </div>
         </div>

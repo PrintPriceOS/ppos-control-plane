@@ -115,7 +115,7 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                 </div>
                                 <div className="p-3 bg-white rounded-none border border-slate-200 text-center">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Quality</div>
-                                    <div className="text-xs font-bold text-slate-900">{(data.profile.quality_score * 100).toFixed(0)}%</div>
+                                    <div className="text-xs font-bold text-slate-900">{Number((data.profile.quality_score || 0) * 100).toFixed(0)}%</div>
                                 </div>
                                 <div className="p-3 bg-white rounded-none border border-slate-200 text-center col-span-3">
                                     <div className="text-[8px] font-black text-slate-400 uppercase mb-1">Last API Sync</div>
@@ -302,25 +302,25 @@ export const PrinterNodeDrawer: React.FC<Props> = ({ printerId, onClose, onActio
                                     <div className="text-right">
                                         <div className="text-[8px] font-black text-indigo-300 uppercase tracking-widest mb-1">Success Rate</div>
                                         <div className="text-3xl font-black text-emerald-400">
-                                            {((data.performance?.jobs_success / (data.performance?.jobs_processed || 1)) * 100 || 100).toFixed(0)}%
+                                            {Number(((data.performance?.jobs_success || 0) / (data.performance?.jobs_processed || 1)) * 100 || 100).toFixed(0)}%
                                         </div>
                                     </div>
                                 </div>
                                 <div className="space-y-4 pt-6 border-t border-indigo-800">
                                     <div className="flex items-center justify-between text-[10px]">
                                         <span className="font-bold uppercase text-indigo-300 tracking-wider">On-Time Delivery</span>
-                                        <span className="font-black">{(data.performance?.on_time_delivery_rate * 100 || 100).toFixed(0)}%</span>
+                                        <span className="font-black">{Number((data.performance?.on_time_delivery_rate || 0) * 100 || 100).toFixed(0)}%</span>
                                     </div>
                                     <div className="w-full bg-indigo-800 h-1.5 rounded-none overflow-hidden">
                                         <div
                                             className="bg-emerald-400 h-full transition-all duration-1000"
-                                            style={{ width: `${(data.performance?.on_time_delivery_rate * 100 || 100)}%` }}
+                                            style={{ width: `${Number((data.performance?.on_time_delivery_rate || 0) * 100 || 100)}%` }}
                                         />
                                     </div>
                                     <div className="flex items-center justify-between text-[10px]">
                                         <span className="font-bold uppercase text-indigo-300 tracking-wider">Reprint Rate</span>
                                         <span className={`font-black ${data.performance?.reprint_rate > 0.05 ? 'text-rose-400' : 'text-indigo-100'}`}>
-                                            {(data.performance?.reprint_rate * 100 || 0).toFixed(1)}%
+                                            {Number((data.performance?.reprint_rate || 0) * 100 || 0).toFixed(1)}%
                                         </span>
                                     </div>
                                 </div>

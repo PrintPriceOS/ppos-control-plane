@@ -73,7 +73,7 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
                <p className="text-[9px] font-bold text-slate-400 uppercase">Jobs</p>
             </div>
             <div className="text-center p-3 rounded-none bg-slate-50">
-               <p className="text-lg font-black text-slate-900">{tenant.successRate.toFixed(1)}%</p>
+               <p className="text-lg font-black text-slate-900">{Number(tenant.successRate || 0).toFixed(1)}%</p>
                <p className="text-[9px] font-bold text-slate-400 uppercase">Success</p>
             </div>
             <div className="text-center p-3 rounded-none bg-slate-50">
