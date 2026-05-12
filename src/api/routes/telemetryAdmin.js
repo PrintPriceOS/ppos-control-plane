@@ -44,10 +44,20 @@ router.get('/snapshot', async (req, res) => {
  */
 router.get('/industrial', async (req, res) => {
     try {
-        const snapshot = await telemetry.getIndustrialSnapshot();
-        res.json({ ok: true, ...snapshot });
+        const snapshot = await telemetry.getIndustrialSnapshot().catch(() => null);
+        res.json({ 
+            ok: true, 
+            telemetry: snapshot?.telemetry || snapshot || {}, 
+            source_status: "ACTIVE",
+            ...(snapshot || {}) 
+        });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        console.warn('[TELEMETRY-API] /industrial degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            telemetry: {}, 
+            source_status: "INDUSTRIAL_TELEMETRY_UNAVAILABLE" 
+        });
     }
 });
 

@@ -68,10 +68,18 @@ if (process.env.NODE_ENV !== 'test') {
  */
 router.get('/', requireAdmin, async (req, res) => {
     try {
-        const dispatches = await orchestrationService.getDispatches().catch(() => []);
-        res.json({ ok: true, dispatches });
+        const dispatches = await orchestrationService.getDispatches().catch(() => null);
+        res.json({ 
+            ok: true, 
+            dispatches: dispatches || [], 
+            source_status: dispatches ? "ACTIVE" : "NO_DISPATCH_DATA" 
+        });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        return res.json({ 
+            ok: true, 
+            dispatches: [], 
+            source_status: "NO_DISPATCH_DATA" 
+        });
     }
 });
 
@@ -202,10 +210,23 @@ router.get('/capacity', requireAdmin, async (req, res) => {
  */
 router.get('/telemetry/overview', requireAdmin, async (req, res) => {
     try {
-        const overview = await telemetryService.getTelemetryOverview().catch(() => ({}));
-        res.json({ ok: true, ...overview });
+        const overview = await telemetryService.getTelemetryOverview().catch(() => null);
+        if (!overview || Object.keys(overview).length === 0) {
+            return res.json({ 
+                ok: true, 
+                overview: {}, 
+                metrics: {}, 
+                source_status: "DISPATCH_TELEMETRY_UNAVAILABLE" 
+            });
+        }
+        res.json({ ok: true, overview: overview?.overview || {}, metrics: overview?.metrics || {}, source_status: "ACTIVE", ...overview });
     } catch (err) {
-        res.json({ ok: true, status: "NOT_CONFIGURED" });
+        res.json({ 
+            ok: true, 
+            overview: {}, 
+            metrics: {}, 
+            source_status: "DISPATCH_TELEMETRY_UNAVAILABLE" 
+        });
     }
 });
 

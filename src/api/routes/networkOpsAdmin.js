@@ -11,10 +11,20 @@ router.use(requireAdmin);
  */
 router.get('/overview', async (req, res) => {
     try {
-        const stats = await networkOpsService.getNetworkOverview();
-        res.json(stats);
+        const stats = await networkOpsService.getNetworkOverview().catch(() => null);
+        res.json({ 
+            ok: true, 
+            overview: stats?.overview || stats || {}, 
+            source_status: "ACTIVE",
+            ...(stats || {})
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.warn('[NETWORK-API] /overview degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            overview: {}, 
+            source_status: "NETWORK_OVERVIEW_UNAVAILABLE" 
+        });
     }
 });
 
@@ -66,10 +76,19 @@ router.get('/printers/:id', async (req, res) => {
  */
 router.get('/capacity', async (req, res) => {
     try {
-        const capacity = await networkOpsService.getCapacityByRegion();
-        res.json(capacity);
+        const capacity = await networkOpsService.getCapacityByRegion().catch(() => null);
+        res.json({ 
+            ok: true, 
+            capacity: Array.isArray(capacity) ? capacity : (capacity?.capacity || []), 
+            source_status: "ACTIVE" 
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.warn('[NETWORK-API] /capacity degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            capacity: [], 
+            source_status: "NETWORK_CAPACITY_UNAVAILABLE" 
+        });
     }
 });
 

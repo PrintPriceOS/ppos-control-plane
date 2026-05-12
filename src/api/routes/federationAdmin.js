@@ -106,9 +106,18 @@ router.post('/snapshot', async (req, res) => {
 router.get('/map', async (req, res) => {
     try {
         const state = await topologyService.getMapState();
-        res.json(state);
+        res.json({ ok: true, source_status: "ACTIVE", ...state });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_MAP_ERROR' });
+        console.warn('[FEDERATION-API] /map degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            nodes: [], 
+            routes: [], 
+            connections: [],
+            warnings: [],
+            counts: { operationalNodes: 0, activeDispatches: 0, missingCoordinates: 0 },
+            source_status: "MAP_UNAVAILABLE" 
+        });
     }
 });
 

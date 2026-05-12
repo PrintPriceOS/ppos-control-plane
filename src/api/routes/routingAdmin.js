@@ -208,9 +208,18 @@ router.post('/dispatch', async (req, res) => {
 router.get('/map', async (req, res) => {
     try {
         const state = await topologyService.getMapState();
-        res.json(state);
+        res.json({ ok: true, source_status: "ACTIVE", ...state });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.warn('[ROUTING-API] /map degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            nodes: [], 
+            routes: [], 
+            connections: [],
+            warnings: [],
+            counts: { operationalNodes: 0, activeDispatches: 0, missingCoordinates: 0 },
+            source_status: "MAP_UNAVAILABLE" 
+        });
     }
 });
 

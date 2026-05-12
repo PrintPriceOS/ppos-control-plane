@@ -135,14 +135,25 @@ router.get('/', async (req, res) => {
         // Sort unified timeline by timestamp descending
         combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+        const slicedData = combined.slice(0, limit);
         res.json({
             ok: true,
             count: combined.length,
-            data: combined.slice(0, limit)
+            data: slicedData,
+            events: slicedData,
+            audit: slicedData,
+            source_status: "ACTIVE"
         });
     } catch (err) {
-        logger.error({ event: 'audit_aggregation_error', error: err.message });
-        res.status(500).json({ ok: false, error: err.message });
+        logger.warn({ event: 'audit_aggregation_degraded', error: err.message });
+        return res.json({ 
+            ok: true, 
+            events: [], 
+            audit: [], 
+            data: [],
+            count: 0,
+            source_status: "AUDIT_SOURCE_UNAVAILABLE" 
+        });
     }
 });
 

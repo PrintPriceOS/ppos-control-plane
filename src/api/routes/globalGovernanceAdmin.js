@@ -78,23 +78,19 @@ router.get('/blocks', async (req, res) => {
       impact: r.scope_id || capitalize(r.scope_type),
     }));
 
-    res.json({ ok: true, blocks });
+    res.json({ ok: true, blocks: blocks || [], source_status: "ACTIVE" });
   } catch (err) {
-    logger.error({
-        event: 'BLOCK_FETCH_FAILED',
+    logger.warn({
+        event: 'BLOCK_FETCH_DEGRADED',
         error: err.message,
         traceId
     });
 
-    if (err.message === 'DATABASE_UNAVAILABLE' || err.code === 'ECONNREFUSED') {
-        return res.status(503).json({ 
-            ok: false, 
-            status: 'DEGRADED', 
-            error: { code: 'DATABASE_UNAVAILABLE', message: 'Governance database is unreachable' } 
-        });
-    }
-
-    res.status(500).json({ ok: false, error: { code: 'INTERNAL_ERROR', message: err.message } });
+    return res.json({ 
+        ok: true, 
+        blocks: [], 
+        source_status: "GLOBAL_BLOCKS_UNAVAILABLE" 
+    });
   }
 });
 

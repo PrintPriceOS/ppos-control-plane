@@ -34,9 +34,14 @@ router.get('/overview', async (req, res) => {
 router.get('/anomalies', async (req, res) => {
     try {
         const pkg = await intelligenceEngine.getIntelligencePackage();
-        res.json({ ok: true, anomalies: pkg.anomalies || [] });
+        res.json({ ok: true, anomalies: pkg?.anomalies || [], source_status: "ACTIVE" });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        console.warn('[INTEL-API] /anomalies degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            anomalies: [], 
+            source_status: "ANOMALY_SOURCE_UNAVAILABLE" 
+        });
     }
 });
 

@@ -16,27 +16,23 @@ router.get('/', async (req, res) => {
     context.traceId = traceId;
 
     const notifications = await notificationService.getMyNotifications(context.tenantId, context.userId, parseInt(limit));
-    res.json({ ok: true, notifications });
+    res.json({ ok: true, notifications: notifications || [], source_status: "ACTIVE" });
   } catch (err) {
-    logger.error({
-        event: 'NOTIFICATION_LIST_FAILED',
+    logger.warn({
+        event: 'NOTIFICATION_LIST_DEGRADED',
         error: err.message,
-        tenant: req.user.tenantId,
         traceId
     });
     
-    // Check if it's a service unavailability issue
-    if (err.message.includes('UNAVAILABLE') || err.message.includes('ECONNREFUSED')) {
-        return res.status(503).json({ 
-            ok: false, 
-            status: 'DEGRADED', 
-            error: { code: 'SERVICE_UNAVAILABLE', message: 'Notification service is currently unreachable' } 
-        });
-    }
-
-    res.status(500).json({ ok: false, error: { code: 'INTERNAL_ERROR', message: err.message } });
+    // Always return honest empty/degraded payload when data source is unavailable
+    return res.json({ 
+        ok: true, 
+        notifications: [], 
+        source_status: "NOTIFICATIONS_UNAVAILABLE" 
+    });
   }
 });
+
 
 /**
  * POST /api/admin/production/notifications/:id/read

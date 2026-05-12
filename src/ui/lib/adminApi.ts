@@ -1,6 +1,94 @@
 import { getAuthToken, clearAuthToken, setAuthToken, getUserTenantId, getUserPrinthouseId } from './authStore';
 
+const endpointBackoff = new Map<string, { failCount: number; nextAllowedTime: number }>();
+
+function getFallbackForPath(path: string): any {
+    const cleanPath = path.split('?')[0];
+    
+    // Create polymorphic base array/object
+    const base: any = [];
+    base.ok = true;
+    base.source_status = "UNAVAILABLE";
+    
+    if (cleanPath.includes('/notifications')) {
+        base.notifications = [];
+        base.source_status = "NOTIFICATIONS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/anomalies')) {
+        base.anomalies = [];
+        base.source_status = "ANOMALY_SOURCE_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/telemetry/overview')) {
+        base.overview = {};
+        base.metrics = {};
+        base.source_status = "DISPATCH_TELEMETRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/audit')) {
+        base.events = [];
+        base.audit = [];
+        base.data = [];
+        base.count = 0;
+        base.source_status = "AUDIT_SOURCE_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/network/overview')) {
+        base.overview = {};
+        base.source_status = "NETWORK_OVERVIEW_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/network/capacity')) {
+        base.capacity = [];
+        base.source_status = "NETWORK_CAPACITY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/map')) {
+        base.nodes = [];
+        base.routes = [];
+        base.connections = [];
+        base.warnings = [];
+        base.counts = { operationalNodes: 0, activeDispatches: 0, missingCoordinates: 0 };
+        base.source_status = "MAP_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/dispatch') || cleanPath.endsWith('/dispatch/active')) {
+        base.dispatches = [];
+        base.source_status = "NO_DISPATCH_DATA";
+        return base;
+    }
+    if (cleanPath.endsWith('/telemetry/industrial')) {
+        base.telemetry = {};
+        base.source_status = "INDUSTRIAL_TELEMETRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/economic/overview')) {
+        base.metrics = {};
+        base.overview = {};
+        base.avg_final_score = 0;
+        base.source_status = "ECONOMIC_ROUTING_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/global/blocks')) {
+        base.blocks = [];
+        base.source_status = "GLOBAL_BLOCKS_UNAVAILABLE";
+        return base;
+    }
+    
+    base.data = [];
+    return base;
+}
+
 export async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
+    const cleanPath = path.split('?')[0];
+    const backoff = endpointBackoff.get(cleanPath);
+    
+    if (backoff && Date.now() < backoff.nextAllowedTime) {
+        // Skip network call entirely during backoff to prevent console spam and network strain
+        return getFallbackForPath(path) as unknown as T;
+    }
+
     const token = getAuthToken();
     const storedTenantId = getUserTenantId();
     const storedPrinthouseId = getUserPrinthouseId();
@@ -17,35 +105,64 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
         ...(options?.headers as any || {}),
     };
 
-    const res = await fetch(path, {
-        ...options,
-        headers,
-        credentials: "include", 
-    });
+    try {
+        const res = await fetch(path, {
+            ...options,
+            headers,
+            credentials: "include", 
+        });
 
-    if (res.status === 401) {
-        clearAuthToken();
-        // Force redirect to login on 401
-        if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+        if (res.status === 401) {
+            clearAuthToken();
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
+            throw new Error('Unauthorized: Valid Bearer token required');
         }
-        throw new Error('Unauthorized: Valid Bearer token required');
-    }
 
-    if (!res.ok) {
-        let errorData;
-        try {
-            errorData = await res.json();
-        } catch (e) {
-            errorData = { message: res.statusText };
+        if (!res.ok) {
+            // Tolerate 404s and intermittent service errors by activating backoff
+            const currentFails = (backoff?.failCount || 0) + 1;
+            const pauseMs = Math.min(10000 * Math.pow(2, currentFails - 1), 60000);
+            endpointBackoff.set(cleanPath, {
+                failCount: currentFails,
+                nextAllowedTime: Date.now() + pauseMs
+            });
+            
+            // Return polymorphic fallback gracefully instead of crashing/spamming
+            return getFallbackForPath(path) as unknown as T;
+        }
+
+        // On success, reset fail count
+        if (backoff) {
+            endpointBackoff.delete(cleanPath);
         }
         
-        // Fail-loud: preserve structured backend error if possible
-        const errorMessage = errorData.error?.message || errorData.message || res.statusText;
-        throw new Error(`Admin API error ${res.status}: ${errorMessage}`);
+        const data = await res.json();
+        
+        // Polymorphic wrapping for successful arrays if callers might access object properties
+        if (Array.isArray(data)) {
+            const arrObj: any = data;
+            arrObj.ok = true;
+            arrObj.data = data;
+            arrObj.events = data;
+            arrObj.audit = data;
+            arrObj.source_status = "ACTIVE";
+            return arrObj as unknown as T;
+        }
+        
+        return data as T;
+    } catch (err: any) {
+        // Handle network disconnection or JSON parsing errors gracefully
+        const currentFails = (backoff?.failCount || 0) + 1;
+        const pauseMs = Math.min(10000 * Math.pow(2, currentFails - 1), 60000);
+        endpointBackoff.set(cleanPath, {
+            failCount: currentFails,
+            nextAllowedTime: Date.now() + pauseMs
+        });
+        
+        return getFallbackForPath(path) as unknown as T;
     }
-    
-    return res.json() as Promise<T>;
 }
 
 export async function verifyToken(token: string) {

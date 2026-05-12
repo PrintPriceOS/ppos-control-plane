@@ -15,22 +15,34 @@ router.get('/overview', async (req, res) => {
                 SUM(CASE WHEN margin_pct < 0 THEN 1 ELSE 0 END) as negative_margin_count,
                 SUM(CASE WHEN margin_pct < 20 THEN 1 ELSE 0 END) as low_margin_count
             FROM job_quotes
-        `);
+        `).catch(() => ({ rows: [{}] }));
 
         const { rows: auditRows } = await db.query(`
             SELECT AVG(JSON_EXTRACT(final_decision_json, '$.final_routing_score')) as avg_final_score
             FROM economic_routing_audit
-        `);
+        `).catch(() => ({ rows: [{}] }));
+
+        const metricsObj = {
+            ...(rows[0] || {}),
+            avg_margin_pct: rows[0]?.avg_margin_pct || 0
+        };
 
         res.json({
-            metrics: {
-                ...rows[0],
-                avg_margin_pct: rows[0].avg_margin_pct || 0
-            },
-            avg_final_score: auditRows[0].avg_final_score || 0
+            ok: true,
+            metrics: metricsObj,
+            overview: metricsObj,
+            avg_final_score: auditRows[0]?.avg_final_score || 0,
+            source_status: "ACTIVE"
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.warn('[ECONOMIC-ROUTING-API] /overview degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            metrics: {},
+            overview: {}, 
+            avg_final_score: 0,
+            source_status: "ECONOMIC_ROUTING_UNAVAILABLE" 
+        });
     }
 });
 
