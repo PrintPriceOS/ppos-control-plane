@@ -411,11 +411,34 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
 // --- 8. GET /api/admin/preflight/policies ---
 router.get('/policies', async (req, res) => {
     const context = buildGatewayContext(req);
+    const traceId = context.traceId;
+    console.log(`[ADMIN-PREFLIGHT][POLICIES][REQUEST] Fetching real policies from upstream (mode: ${gateway.mode}, traceId: ${traceId})`);
     try {
-        const policies = await gateway.listPolicies(context);
-        res.json({ ok: true, policies: Array.isArray(policies) ? policies : (policies?.policies || []), source_status: 'LIVE_UPSTREAM' });
+        const response = await gateway.getPolicies(context);
+        const policiesArray = Array.isArray(response) ? response : (response?.policies || []);
+        
+        if (policiesArray.length === 0) {
+            console.warn(`[ADMIN-PREFLIGHT][POLICIES][EMPTY-CATALOG] Upstream returned an empty policy catalog.`);
+        } else {
+            console.log(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-OK] Successfully loaded ${policiesArray.length} real policies.`);
+        }
+
+        return res.json({
+            ok: true,
+            source: gateway.mode,
+            policies: policiesArray
+        });
     } catch (err) {
-        res.status(err.status || 503).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: err.message } });
+        const upstreamStatus = err.status || 503;
+        console.error(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-FAIL] Upstream policy fetch failed with status ${upstreamStatus}:`, err.message);
+        
+        return res.status(502).json({
+            ok: false,
+            error: "PREFLIGHT_POLICIES_UNAVAILABLE",
+            message: "Could not load real preflight policies from upstream.",
+            upstreamStatus,
+            traceId
+        });
     }
 });
 

@@ -144,6 +144,11 @@ class PreflightContractGateway {
         return this._execute('GET', '/api/v2/jobs/policies', null, context);
     }
 
+    async getPolicies(context = {}) {
+        const targetPath = this.mode === 'service' ? '/api/preflight/jobs/policies' : '/api/v2/jobs/policies';
+        return this._execute('GET', targetPath, null, context);
+    }
+
     async createBatch(formOrPayload, context = {}) {
         // Supports FormData if uploading multiple files directly, or JSON payload
         return this._execute('POST', '/api/v2/batches', formOrPayload, context);

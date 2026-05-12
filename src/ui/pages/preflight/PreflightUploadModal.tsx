@@ -15,7 +15,7 @@ import {
   ArrowPathIcon,
   RectangleStackIcon
 } from "@heroicons/react/24/outline";
-import { createAdminPreflightJob, createAdminPreflightBatch, getLivePolicies } from "../../lib/adminApi";
+import { createAdminPreflightJob, createAdminPreflightBatch, getAdminPreflightPolicies } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
 
@@ -31,17 +31,24 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   const [tenantId, setTenantId] = useState('system');
   const [printhouseId, setPrinthouseId] = useState('');
   const [jobType, setJobType] = useState('ANALYZE');
-  const [policy, setPolicy] = useState('OFFSET_MODERN_COATED');
+  const [policy, setPolicy] = useState('');
   const [status, setStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const policiesQ = useAdminQuery('preflight:policies:live', () => getLivePolicies(), 60000);
+  const policiesQ = useAdminQuery('preflight:policies:admin', () => getAdminPreflightPolicies(), 60000);
   const policiesData: any = policiesQ.data;
-  const policies = Array.isArray(policiesData?.policies) ? policiesData.policies : (Array.isArray(policiesData) ? policiesData : []);
-  const sourceStatus = policiesData?.source_status;
+  const policies = Array.isArray(policiesData?.policies) ? policiesData.policies : [];
+  const sourceStatus = policiesData?.source;
+  const isPoliciesUnavailable = policiesData && (!policiesData.ok || policies.length === 0);
+
+  React.useEffect(() => {
+    if (policies.length > 0 && !policy) {
+      setPolicy(policies[0].slug || policies[0].id);
+    }
+  }, [policies, policy]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -348,15 +355,23 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                                   </option>
                                 ))
                               ) : (
-                                <>
-                                  <option value="OFFSET_MODERN_COATED">Offset Modern Coated (ISO Coated v2)</option>
-                                  <option value="DIGITAL_STANDARD">Digital Standard (sRGB)</option>
-                                  <option value="ISO_NEWSPAPER">ISO Newspaper</option>
-                                </>
+                                <option value="">No real policies available</option>
                               )}
                             </select>
                           </div>
                         </div>
+
+                        {isPoliciesUnavailable && (
+                          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-start gap-3 text-red-500">
+                            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider">Catalog Error</span>
+                              <span className="text-xs font-bold opacity-90">
+                                Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
                         {error && (
                           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-start gap-3 text-red-500 animate-in shake duration-300">
@@ -383,13 +398,13 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                       </button>
                       
                       <button 
-                        disabled={files.length === 0 || !policy || status === 'executing'}
+                        disabled={files.length === 0 || !policy || !!isPoliciesUnavailable || status === 'executing'}
                         onClick={handleExecute}
                         className={`
                           relative overflow-hidden group flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-none font-black text-xs uppercase tracking-widest
                           shadow-md shadow-primary/20 transition-all
                           hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 active:scale-95
-                          disabled:opacity-40 disabled:hover:translate-y-0
+                          disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0
                         `}
                       >
                         {status === 'executing' ? (

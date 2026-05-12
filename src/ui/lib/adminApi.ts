@@ -1219,6 +1219,21 @@ export async function getLargeDocumentJobs(params: { limit?: number; offset?: nu
     return getPreflightJobs({ ...params, largeOnly: true });
 }
 
+export async function getAdminPreflightPolicies(): Promise<{ ok: boolean; source?: string; policies: any[] }> {
+    try {
+        const res = await adminFetch<any>('/api/admin/preflight/policies');
+        const policies = res?.policies || (Array.isArray(res?.data) && res.data.length > 0 ? res.data : []) || [];
+        return {
+            ok: policies.length > 0 ? true : false,
+            source: res?.source || res?.source_status || 'unavailable',
+            policies
+        };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][POLICIES] getAdminPreflightPolicies failed:`, e);
+        return { ok: false, source: 'error', policies: [] };
+    }
+}
+
 export async function getGlobalArtifacts(params: { tenant?: string; type?: string; limit?: number; offset?: number } = {}) {
     const qs = new URLSearchParams();
     if (params.tenant) qs.set("tenantId", params.tenant);
@@ -1323,23 +1338,11 @@ export async function recoverStalledPreflightJobs() {
 }
 
 export async function getLivePolicies() {
-    try {
-        const res = await adminFetch<any>('/api/admin/preflight/policies');
-        return {
-            policies: res?.policies || [],
-            source_status: res?.source_status || 'LIVE_UPSTREAM'
-        };
-    } catch (e) {
-        console.warn('[PREFLIGHT] getLivePolicies failed, returning defaults:', e);
-        return {
-            policies: [
-                { slug: 'OFFSET_MODERN_COATED', name: 'Offset Modern Coated (ISO 12647-2)', description: 'Strict verification for premium coated web/sheetfed offset.' },
-                { slug: 'DIGITAL_GENERAL', name: 'Digital Press Standard', description: 'Standard compliance for modern dry/liquid toner digital production.' },
-                { slug: 'LARGE_FORMAT_INKJET', name: 'Wide Format UV/Latex', description: 'Optimized raster resolution and ink limits for banners and displays.' }
-            ],
-            source_status: 'LOCAL_FALLBACK'
-        };
-    }
+    const res = await getAdminPreflightPolicies();
+    return {
+        policies: res.policies || [],
+        source_status: res.source || 'UNAVAILABLE'
+    };
 }
 
 export async function getJobFindings(jobId: string) {

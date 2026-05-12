@@ -23,10 +23,12 @@ import {
   getAdminPreflightAudit, 
   getAdminPreflightGovernance, 
   getStorageSummary, 
+  getAdminPreflightPolicies,
   AdminPreflightJob 
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
+import { StatusBadge } from "../../components/StatusBadge";
 import { PreflightUploadModal } from "./PreflightUploadModal";
 import { short } from "../../lib/formatters";
 
@@ -83,6 +85,9 @@ export const PreflightJobsPage: React.FC = () => {
   );
 
   const storageQ = useAdminQuery('preflight:storage:global', () => getStorageSummary(), 30000);
+  const policiesQ = useAdminQuery('preflight:policies:admin', () => getAdminPreflightPolicies(), 30000);
+  const policiesData = policiesQ.data;
+  const isPoliciesUnavailable = policiesData && (!policiesData.ok || !policiesData.policies || policiesData.policies.length === 0);
 
   const formatSize = (bytes?: number) => {
     if (!bytes) return '0 B';
@@ -130,14 +135,24 @@ export const PreflightJobsPage: React.FC = () => {
           </div>
 
           <button 
+            disabled={!!isPoliciesUnavailable}
             onClick={() => setIsUploadOpen(true)}
-            className="flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-none font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 active:scale-95"
+            className="flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-none font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             <CloudArrowUpIcon className="w-4 h-4" />
             <span>Trigger Payload</span>
           </button>
         </div>
       </div>
+
+      {isPoliciesUnavailable && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
+          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+          <div className="text-xs font-bold flex-1">
+            Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.
+          </div>
+        </div>
+      )}
 
       <PreflightUploadModal 
         isOpen={isUploadOpen}
@@ -248,13 +263,18 @@ export const PreflightJobsPage: React.FC = () => {
             <option value="CERTIFY">Certify</option>
           </select>
 
-          <input 
-            type="text" 
-            placeholder="Policy slug..." 
+          <select 
             value={filter.policy}
             onChange={(e) => setFilter({ ...filter, policy: e.target.value })}
-            className="w-28 ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-1 focus:ring-primary/30 outline-none"
-          />
+            className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer max-w-[160px] truncate"
+          >
+            <option value="">Policy: All</option>
+            {(policiesData?.policies || []).map((p: any) => (
+              <option key={p.slug || p.id} value={p.slug || p.id}>
+                {p.name || p.slug}
+              </option>
+            ))}
+          </select>
 
           {(filter.tenant || filter.printhouse || filter.status || filter.type || filter.policy) && (
             <button 
@@ -326,31 +346,15 @@ export const PreflightJobsPage: React.FC = () => {
               },
               {
                 header: 'Status & Fidelity',
-                accessor: (j) => {
-                  const isFail = j.status === 'FAILED' || j.status?.includes('UNAVAILABLE');
-                  const isSuccess = j.status === 'COMPLETED' || j.status === 'SUCCESS';
-                  return (
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        {isSuccess ? (
-                          <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        ) : isFail ? (
-                          <XCircleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        ) : (
-                          <ArrowPathIcon className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
-                        )}
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${
-                          isSuccess ? 'text-emerald-600' : isFail ? 'text-red-600' : 'text-blue-600'
-                        }`}>
-                          {j.status}
-                        </span>
-                      </div>
-                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">
-                        {j.canonicalData?.status ? 'Synchronized' : 'Registry Initial'}
-                      </span>
-                    </div>
-                  );
-                }
+                align: 'center',
+                accessor: (j) => (
+                  <div className="flex flex-col items-center">
+                    <StatusBadge status={j.status || 'PENDING'} />
+                    <span className="text-[9px] font-manrope text-[#8F96A3] uppercase tracking-tighter mt-1 block">
+                      {j.canonicalData?.status ? 'Synchronized' : 'Registry Initial'}
+                    </span>
+                  </div>
+                )
               },
               {
                 header: 'Diagnostics',
@@ -411,11 +415,8 @@ export const PreflightJobsPage: React.FC = () => {
               },
               {
                 header: 'Execution Status',
-                accessor: (b) => (
-                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
-                    {b.status || 'PROPAGATED'}
-                  </span>
-                )
+                align: 'center',
+                accessor: (b) => <StatusBadge status={b.status || 'PROPAGATED'} />
               },
               {
                 header: 'Timestamp',
@@ -449,13 +450,8 @@ export const PreflightJobsPage: React.FC = () => {
               },
               {
                 header: 'Resolution Status',
-                accessor: (e) => (
-                  <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                    e.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'
-                  }`}>
-                    {e.status}
-                  </span>
-                )
+                align: 'center',
+                accessor: (e) => <StatusBadge status={e.status || 'SUCCESS'} />
               },
               {
                 header: 'Message Trail',
@@ -488,13 +484,8 @@ export const PreflightJobsPage: React.FC = () => {
               },
               {
                 header: 'Evaluation Status',
-                accessor: (g) => (
-                  <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                    g.evaluation_result === 'PASSED' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
-                  }`}>
-                    {g.evaluation_result}
-                  </span>
-                )
+                align: 'center',
+                accessor: (g) => <StatusBadge status={g.evaluation_result || 'PASSED'} />
               },
               {
                 header: 'Enforced Action',
