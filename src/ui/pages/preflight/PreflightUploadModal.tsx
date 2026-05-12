@@ -14,7 +14,7 @@ import {
   ExclamationCircleIcon,
   ArrowPathIcon
 } from "@heroicons/react/24/outline";
-import { uploadPreflightFile, createPreflightJob, getGlobalPolicies } from "../../lib/adminApi";
+import { uploadPreflightFile, createPreflightJob, getLivePolicies } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
 
@@ -35,8 +35,10 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const policiesQ = useAdminQuery('preflight:policies:global', () => getGlobalPolicies(), 60000);
-  const policies = policiesQ.data?.policies || [];
+  const policiesQ = useAdminQuery('preflight:policies:live', () => getLivePolicies(), 60000);
+  const policiesData: any = policiesQ.data;
+  const policies = Array.isArray(policiesData?.policies) ? policiesData.policies : (Array.isArray(policiesData) ? policiesData : []);
+  const sourceStatus = policiesData?.source_status;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -247,9 +249,11 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                               <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
                                 Compliance Policy / Profile
                               </label>
-                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-none bg-primary/10 border border-primary/20">
-                                <div className="w-1 h-1 rounded-none bg-primary animate-pulse" />
-                                <span className="text-[8px] font-black text-primary uppercase tracking-tight">Active Governance</span>
+                              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-none border ${sourceStatus && sourceStatus !== 'LIVE_UPSTREAM' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-primary/10 border-primary/20'}`}>
+                                <div className={`w-1 h-1 rounded-none animate-pulse ${sourceStatus && sourceStatus !== 'LIVE_UPSTREAM' ? 'bg-amber-500' : 'bg-primary'}`} />
+                                <span className={`text-[8px] font-black uppercase tracking-tight ${sourceStatus && sourceStatus !== 'LIVE_UPSTREAM' ? 'text-amber-500' : 'text-primary'}`}>
+                                  {sourceStatus && sourceStatus !== 'LIVE_UPSTREAM' ? `DEGRADED: ${sourceStatus}` : 'Active Governance'}
+                                </span>
                               </div>
                             </div>
                             <select 
@@ -303,7 +307,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                       
                       <div className="flex items-center gap-4">
                         <button 
-                          disabled={!file || (status !== 'idle' && status !== 'error')}
+                          disabled={!file || !policy || (status !== 'idle' && status !== 'error')}
                           onClick={handleUpload}
                           className={`
                             relative overflow-hidden group flex items-center gap-3 px-10 py-4 bg-primary text-white rounded-none font-black text-sm

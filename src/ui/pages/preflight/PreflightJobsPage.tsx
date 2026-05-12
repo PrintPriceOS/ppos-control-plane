@@ -77,8 +77,16 @@ export const PreflightJobsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Preflight Jobs</h1>
-          <p className="text-sm text-slate-500 font-medium">Operational overview of all preflight analysis and repair jobs.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Preflight Jobs</h1>
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-none border ${q.data?.source_status && q.data.source_status !== 'LIVE_UPSTREAM' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-primary/10 border-primary/20'}`}>
+              <div className={`w-1 h-1 rounded-none animate-pulse ${q.data?.source_status && q.data.source_status !== 'LIVE_UPSTREAM' ? 'bg-amber-500' : 'bg-primary'}`} />
+              <span className={`text-[8px] font-black uppercase tracking-tight ${q.data?.source_status && q.data.source_status !== 'LIVE_UPSTREAM' ? 'text-amber-500' : 'text-primary'}`}>
+                {q.data?.source_status && q.data.source_status !== 'LIVE_UPSTREAM' ? `DEGRADED: ${q.data.source_status}` : 'Active Upstream'}
+              </span>
+            </div>
+          </div>
+          <p className="text-sm text-slate-500 font-medium mt-1">Operational overview of all preflight analysis and repair jobs.</p>
         </div>
         
         <div className="flex items-center gap-3">

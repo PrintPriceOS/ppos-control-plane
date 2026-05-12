@@ -313,6 +313,7 @@ export type PreflightJob = {
 export type PreflightJobsResponse = {
     total: number;
     jobs: PreflightJob[];
+    source_status?: string;
 };
 
 export type PreflightWorker = {
@@ -1319,6 +1320,54 @@ export async function recoverStalledPreflightJobs() {
         method: 'POST'
     });
     return res;
+}
+
+export async function getLivePolicies() {
+    try {
+        const res = await adminFetch<any>('/api/admin/preflight/policies');
+        return {
+            policies: res?.policies || [],
+            source_status: res?.source_status || 'LIVE_UPSTREAM'
+        };
+    } catch (e) {
+        console.warn('[PREFLIGHT] getLivePolicies failed, returning defaults:', e);
+        return {
+            policies: [
+                { slug: 'OFFSET_MODERN_COATED', name: 'Offset Modern Coated (ISO 12647-2)', description: 'Strict verification for premium coated web/sheetfed offset.' },
+                { slug: 'DIGITAL_GENERAL', name: 'Digital Press Standard', description: 'Standard compliance for modern dry/liquid toner digital production.' },
+                { slug: 'LARGE_FORMAT_INKJET', name: 'Wide Format UV/Latex', description: 'Optimized raster resolution and ink limits for banners and displays.' }
+            ],
+            source_status: 'LOCAL_FALLBACK'
+        };
+    }
+}
+
+export async function getJobFindings(jobId: string) {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/findings`);
+        return res.findings || [];
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getJobFindings(${jobId}) failed:`, e);
+        return [];
+    }
+}
+
+export async function getJobEvidence(jobId: string) {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/evidence`);
+        return res.evidence || null;
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getJobEvidence(${jobId}) failed:`, e);
+        return null;
+    }
+}
+
+export async function triggerJobFix(jobId: string, policy?: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
+        method: 'POST',
+        body: JSON.stringify(policy ? { policy } : {})
+    });
+    return res.job;
 }
 
 // --- Production Notifications ---

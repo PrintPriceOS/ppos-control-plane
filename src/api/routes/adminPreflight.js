@@ -75,6 +75,10 @@ router.get('/health', async (req, res) => {
  * GET /api/admin/preflight/jobs
  * List and filter jobs
  */
+/**
+ * GET /api/admin/preflight/jobs
+ * List and filter jobs with upstream state hydration
+ */
 router.get('/jobs', async (req, res) => {
   const traceId = req.headers['x-trace-id'] || `trace_${Date.now()}`;
   const logger = require('../services/logger').child('admin-preflight');
@@ -82,46 +86,88 @@ router.get('/jobs', async (req, res) => {
     const filters = { ...req.query };
     const context = resolveActorContext(req);
     
-    // Security: Restrict non-SUPER_ADMIN to their own tenant
-    if (!context.isSuperAdmin) {
-        filters.tenantId = context.tenantId;
-    }
+    const targetTenantId = context.isSuperAdmin ? (filters.tenantId || 'system') : context.tenantId;
 
-    const result = await operations.listJobs(filters);
-    res.json({ ok: true, ...result });
+    // Use native pipeline hydration helper directly to satisfy Phase 35 requirements
+    const resData = await operations.listLocalPreflightJobs(targetTenantId, filters.limit || 50);
+    return res.json(resData);
   } catch (error) {
     logger.error({
         event: 'JOB_LIST_FAILED',
         error: error.message,
-        tenant: req.user.tenantId,
+        tenant: req.user?.tenantId || 'system',
         traceId
     });
 
     if (error.message.includes('UNAVAILABLE') || error.message.includes('ECONNREFUSED')) {
         return res.status(503).json({ 
             ok: false, 
+            source_status: 'UPSTREAM_UNAVAILABLE',
             status: 'DEGRADED', 
             error: { code: 'OPERATIONS_SERVICE_UNAVAILABLE', message: 'Preflight operations service is unreachable' } 
         });
     }
 
-    res.status(500).json({ ok: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+    res.status(500).json({ ok: false, source_status: 'LOCAL_FALLBACK', error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
 
 /**
  * POST /api/admin/preflight/jobs
- * Create a new persistent preflight job from an existing upload.
+ * Create a new native preflight job supporting direct multipart PDF upload or legacy staged upload.
  */
-router.post('/jobs', async (req, res) => {
+router.post('/jobs', upload.single('pdf'), async (req, res) => {
   const tenantId = resolveTargetTenantId(req);
+  const context = resolveActorContext(req);
   try {
-    const { uploadId, type, policy } = req.body;
+    // 1. Native Direct Pipeline check (file attached as 'pdf')
+    if (req.file) {
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileObj = {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: fileBuffer
+      };
+
+      const payload = {
+        tenantId: req.body.tenantId || tenantId,
+        strategy: req.body.strategy || req.body.type || 'ANALYZE_ONLY',
+        policy: req.body.policy || 'OFFSET_MODERN_COATED'
+      };
+
+      const result = await operations.createIndustrialPreflightJob({
+        userId: context.userId || req.user?.id,
+        role: context.role || 'ADMIN',
+        authHeader: req.headers.authorization
+      }, fileObj, payload);
+
+      // Clean up temp file safely
+      try {
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      } catch (e) {}
+
+      // Log audit trace securely
+      await auditLogger.log({
+        type: 'JOB_CREATE_NATIVE',
+        tenantId: payload.tenantId,
+        userId: context.userId || req.user?.id || 'system',
+        status: result.ok ? 'SUCCESS' : 'FAILURE',
+        metadata: { strategy: payload.strategy, policy: payload.policy }
+      });
+
+      const statusVal = result.ok ? 200 : 503;
+      return res.status(statusVal).json(result);
+    }
+
+    // 2. Legacy fallback
+    const { uploadId, type, policy } = req.body || {};
 
     if (!uploadId || !type) {
       return res.status(400).json({ 
         ok: false, 
-        error: { code: 'MISSING_PARAMS', message: 'uploadId and type are required' } 
+        source_status: 'LOCAL_FALLBACK',
+        error: { code: 'MISSING_PARAMS', message: 'uploadId and type are required for staged uploads' } 
       });
     }
 
@@ -136,23 +182,27 @@ router.post('/jobs', async (req, res) => {
     await auditLogger.log({
         type: 'JOB_CREATE',
         tenantId,
-        userId: req.user.id,
+        userId: req.user?.id || 'system',
         status: 'SUCCESS',
         metadata: { jobId: job.id, type, uploadId }
     });
 
-    res.json({ ok: true, job });
+    res.json({ ok: true, job, source_status: 'LIVE_UPSTREAM' });
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
     await auditLogger.log({
         type: 'JOB_CREATE',
         tenantId,
-        userId: req.user.id,
+        userId: req.user?.id || 'system',
         status: 'FAILURE',
         metadata: { error: error.message }
     });
     const status = error.message.includes('NOT_FOUND') ? 404 : 500;
     res.status(status).json({ 
       ok: false, 
+      source_status: 'UPSTREAM_UNAVAILABLE',
       error: { code: 'JOB_CREATION_FAILED', message: error.message } 
     });
   }
@@ -160,36 +210,21 @@ router.post('/jobs', async (req, res) => {
 
 /**
  * GET /api/admin/preflight/jobs/:jobId
- * Forensic detail for a specific job
+ * Deep state resolution combining local persistent record and upstream state
  */
 router.get('/jobs/:jobId', async (req, res) => {
   try {
-    const job = await operations.getJob(req.params.jobId);
-    if (!job) {
-      return res.status(404).json({ ok: false, error: { code: 'JOB_NOT_FOUND', message: 'Preflight job not found' } });
-    }
-
+    const result = await operations.getLocalPreflightJob(req.params.jobId, req.headers.authorization);
+    
     const context = resolveActorContext(req);
-    // Security: Tenant Isolation
-    if (!context.isSuperAdmin && job.tenant_id !== req.user.tenantId) {
-        return res.status(403).json({ ok: false, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
+    if (!context.isSuperAdmin && result.job?.tenantId !== req.user?.tenantId) {
+        return res.status(403).json({ ok: false, source_status: result.source_status, error: { code: 'ACCESS_DENIED', message: 'Job belongs to another tenant' } });
     }
 
-    // Auto-sync if job is in active/non-terminal state
-    const terminalStates = ['COMPLETED', 'FAILED', 'CANCELLED'];
-    let responseJob = job;
-    if (!terminalStates.includes(job.status) && job.metadata_json?.upstreamJobId) {
-        try {
-            responseJob = await operations.syncJobStatus(req.params.jobId, req.headers.authorization);
-        } catch (syncErr) {
-            console.warn(`[API] Auto-sync failed for ${req.params.jobId}:`, syncErr.message);
-            // Fallback to currently known local state
-        }
-    }
-
-    res.json({ ok: true, job: responseJob });
+    res.json(result);
   } catch (error) {
-    res.status(500).json({ ok: false, error: { code: 'JOB_FETCH_FAILED', message: error.message } });
+    const status = error.message.includes('NOT_FOUND') ? 404 : 500;
+    res.status(status).json({ ok: false, source_status: 'LOCAL_FALLBACK', error: { code: 'JOB_FETCH_FAILED', message: error.message } });
   }
 });
 
@@ -562,6 +597,101 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     });
 
     res.status(500).json({ ok: false, error: { code: 'UPLOAD_FAILED', message: error.message } });
+  }
+});
+
+/**
+   * GET /api/admin/preflight/policies
+   * Fetch live industrial compliance policies directly from upstream preflight engine
+   */
+router.get('/policies', async (req, res) => {
+  const tenantId = resolveTargetTenantId(req);
+  try {
+    const result = await operations.getLivePolicies(req.headers.authorization, tenantId);
+    res.json({
+      ok: true,
+      policies: result.policies || [],
+      source_status: result.source_status || 'LIVE_UPSTREAM',
+      upstream_status: result.upstream_status
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'POLICIES_FETCH_FAILED', message: error.message } });
+  }
+});
+
+/**
+   * GET /api/admin/preflight/jobs/:jobId/timeline
+   * Native bridge for real-time forensic timeline execution events
+   */
+router.get('/jobs/:jobId/timeline', async (req, res) => {
+  try {
+    const result = await operations.getJobTimeline(req.params.jobId, req.headers.authorization);
+    res.json({
+      ok: true,
+      timeline: result.timeline || [],
+      source_status: result.source_status || 'LIVE_UPSTREAM'
+    });
+  } catch (error) {
+    const status = error.message.includes('NOT_FOUND') ? 404 : 500;
+    res.status(status).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'TIMELINE_FETCH_FAILED', message: error.message } });
+  }
+});
+
+/**
+   * GET /api/admin/preflight/jobs/:jobId/findings
+   * Native bridge for preflight geometry/color/raster anomalies
+   */
+router.get('/jobs/:jobId/findings', async (req, res) => {
+  try {
+    const result = await operations.getJobFindings(req.params.jobId, req.headers.authorization);
+    res.json({
+      ok: true,
+      findings: result.findings || [],
+      source_status: result.source_status || 'LIVE_UPSTREAM'
+    });
+  } catch (error) {
+    const status = error.message.includes('NOT_FOUND') ? 404 : 500;
+    res.status(status).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'FINDINGS_FETCH_FAILED', message: error.message } });
+  }
+});
+
+/**
+   * GET /api/admin/preflight/jobs/:jobId/evidence
+   * Native bridge for detailed proof and certified evidence reports
+   */
+router.get('/jobs/:jobId/evidence', async (req, res) => {
+  try {
+    const result = await operations.getJobEvidence(req.params.jobId, req.headers.authorization);
+    res.json({
+      ok: true,
+      evidence: result.evidence || {},
+      artifacts: result.artifacts || [],
+      source_status: result.source_status || 'LIVE_UPSTREAM'
+    });
+  } catch (error) {
+    const status = error.message.includes('NOT_FOUND') ? 404 : 500;
+    res.status(status).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'EVIDENCE_FETCH_FAILED', message: error.message } });
+  }
+});
+
+/**
+   * POST /api/admin/preflight/jobs/:jobId/fix
+   * Native bridge to trigger automated engine repairs based on defined policies
+   */
+router.post('/jobs/:jobId/fix', async (req, res) => {
+  try {
+    const { policy } = req.body || {};
+    const result = await operations.triggerJobFix(req.params.jobId, req.headers.authorization, policy);
+    res.json({
+      ok: true,
+      jobId: result.jobId,
+      fixJobId: result.fixJobId,
+      status: result.status,
+      source_status: result.source_status || 'LIVE_UPSTREAM'
+    });
+  } catch (error) {
+    const status = error.message.includes('NOT_FOUND') ? 404 : 400;
+    res.status(status).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { code: 'FIX_TRIGGER_FAILED', message: error.message } });
   }
 });
 
