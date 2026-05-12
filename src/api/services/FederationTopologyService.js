@@ -20,13 +20,15 @@ class FederationTopologyService {
             let discoveredFromTables = false;
 
             // Remove fallback array entirely unless guarded by syntheticMapNodesEnabled
-            const coreHubs = syntheticMapNodesEnabled ? [
-                { city: 'Frankfurt', region: 'Central EU', lat: 50.1109, lng: 8.6821 },
-                { city: 'Amsterdam', region: 'West EU', lat: 52.3676, lng: 4.9041 },
-                { city: 'Lyon', region: 'South EU', lat: 45.7640, lng: 4.8357 },
-                { city: 'Stockholm', region: 'North EU', lat: 59.3293, lng: 18.0686 },
-                { city: 'Warsaw', region: 'East EU', lat: 52.2297, lng: 21.0122 }
-            ] : [];
+            const SYNTHETIC_DEV_HUBS = syntheticMapNodesEnabled
+              ? [
+                  { city: 'Frankfurt', region: 'Central EU', lat: 50.1109, lng: 8.6821 },
+                  { city: 'Amsterdam', region: 'West EU', lat: 52.3676, lng: 4.9041 },
+                  { city: 'Lyon', region: 'South EU', lat: 45.7640, lng: 4.8357 },
+                  { city: 'Stockholm', region: 'North EU', lat: 59.3293, lng: 18.0686 },
+                  { city: 'Warsaw', region: 'East EU', lat: 52.2297, lng: 21.0122 }
+                ]
+              : [];
 
             // 1. Query print_nodes
             try {
@@ -162,9 +164,9 @@ class FederationTopologyService {
             let usedSyntheticPlacement = false;
 
             // If absolutely no nodes discovered, inject baseline core hubs ONLY if synthetic mode is enabled
-            if (nodesMap.size === 0 && syntheticMapNodesEnabled && coreHubs.length > 0) {
+            if (nodesMap.size === 0 && syntheticMapNodesEnabled && SYNTHETIC_DEV_HUBS.length > 0) {
                 usedSyntheticPlacement = true;
-                coreHubs.forEach((hub, idx) => {
+                SYNTHETIC_DEV_HUBS.forEach((hub, idx) => {
                     const id = `hub_eu_${idx + 1}`;
                     nodesMap.set(id, {
                         id,
@@ -208,11 +210,11 @@ class FederationTopologyService {
 
                 // If still no coordinates:
                 if (isNaN(finalLat) || isNaN(finalLng) || (finalLat === 0 && finalLng === 0)) {
-                    if (syntheticMapNodesEnabled && coreHubs.length > 0) {
+                    if (syntheticMapNodesEnabled && SYNTHETIC_DEV_HUBS.length > 0) {
                         usedSyntheticPlacement = true;
                         let hIdx = 0;
                         for (let i = 0; i < n.id.length; i++) hIdx += n.id.charCodeAt(i);
-                        const hub = coreHubs[hIdx % coreHubs.length];
+                        const hub = SYNTHETIC_DEV_HUBS[hIdx % SYNTHETIC_DEV_HUBS.length];
                         finalLat = hub.lat;
                         finalLng = hub.lng;
                         if (!n.city) n.city = hub.city;
@@ -276,15 +278,15 @@ class FederationTopologyService {
                 const targetNodeId = d.node_id || d.print_node_id;
                 const targetNode = targetNodeId ? validNodes.find(m => m.id === targetNodeId) : null;
                 
-                if (!targetNode && (!syntheticMapNodesEnabled || coreHubs.length === 0)) {
+                if (!targetNode && (!syntheticMapNodesEnabled || SYNTHETIC_DEV_HUBS.length === 0)) {
                     return null;
                 }
                 
-                let destLat = targetNode ? targetNode.lat : coreHubs[dIdx % coreHubs.length].lat;
-                let destLng = targetNode ? targetNode.lng : coreHubs[dIdx % coreHubs.length].lng;
+                let destLat = targetNode ? targetNode.lat : SYNTHETIC_DEV_HUBS[dIdx % SYNTHETIC_DEV_HUBS.length].lat;
+                let destLng = targetNode ? targetNode.lng : SYNTHETIC_DEV_HUBS[dIdx % SYNTHETIC_DEV_HUBS.length].lng;
 
                 // Deterministic Jittered Origin Hub
-                const originHub = coreHubs[(dIdx + 2) % coreHubs.length];
+                const originHub = SYNTHETIC_DEV_HUBS[(dIdx + 2) % SYNTHETIC_DEV_HUBS.length];
                 const jitterLat = ((dIdx % 5) / 10) - 0.2;
                 const jitterLng = (((dIdx + 1) % 5) / 10) - 0.2;
 
