@@ -5,12 +5,13 @@ import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { JobDetailDrawer } from "../../components/JobDetailDrawer";
 import { short } from "../../lib/formatters";
+import { safeArray } from "../../lib/display";
 
 export const JobsPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = React.useState<any | null>(null);
   const q = useAdminQuery("jobs:global", () => getJobs({ limit: 50 }), 10000);
 
-  const jobs = q.data?.jobs || [];
+  const jobs = safeArray(q.data?.jobs || (q.data as any)?.data);
 
   return (
     <div className="space-y-4">

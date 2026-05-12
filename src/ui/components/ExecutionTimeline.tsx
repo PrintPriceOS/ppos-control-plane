@@ -12,6 +12,7 @@ import {
   EyeIcon,
   EyeSlashIcon
 } from '@heroicons/react/24/outline';
+import { safeArray } from '../lib/display';
 
 export interface TimelineEventItem {
   id: string;
@@ -30,6 +31,7 @@ interface ExecutionTimelineProps {
 }
 
 export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, isLoading }) => {
+  const safeEvents = safeArray(events);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [compactMode, setCompactMode] = useState<boolean>(true); // Default to compact noise mode
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -84,7 +86,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
     );
   }
 
-  if (!events || events.length === 0) {
+  if (!safeEvents || safeEvents.length === 0) {
     return (
       <div className="p-3 border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/20 dark:bg-transparent text-center italic-text-off">
         <InformationCircleIcon className="w-4 h-4 text-slate-400 mx-auto mb-1" />
@@ -99,7 +101,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
       <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-white/10 text-[10px]">
         <div className="flex items-center gap-2">
           <span className="font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Stage Traces</span>
-          <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-zinc-400 border dark:border-white/10 font-bold">{events.length} Checkpoints</span>
+          <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-zinc-400 border dark:border-white/10 font-bold">{safeEvents.length} Checkpoints</span>
         </div>
         
         <button 
@@ -116,7 +118,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
         {/* Compressed Backbone Guide */}
         <div className="absolute left-[9px] top-2 bottom-2 w-[1px] bg-slate-200 dark:bg-white/10" />
 
-        {events.map((evt, idx) => {
+        {safeEvents.map((evt, idx) => {
           const accentClasses = getStageAccent(evt.stage, evt.status);
           const isError = evt.status === 'FAILURE';
           const titleUpper = evt.title.toUpperCase();
@@ -127,8 +129,8 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events, is
           // Calculate precise runtime duration delta inline
           let deltaString = '';
           let diff = 0;
-          if (idx > 0 && events[idx - 1].timestamp && evt.timestamp) {
-            diff = new Date(evt.timestamp).getTime() - new Date(events[idx - 1].timestamp).getTime();
+          if (idx > 0 && safeEvents[idx - 1].timestamp && evt.timestamp) {
+            diff = new Date(evt.timestamp).getTime() - new Date(safeEvents[idx - 1].timestamp).getTime();
             if (!isNaN(diff) && diff >= 0) {
               deltaString = `+${diff}ms`;
             }

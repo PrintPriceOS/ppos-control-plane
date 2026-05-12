@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Drawer } from './Drawer';
 import { short } from '../lib/formatters';
+import { safeArray } from '../lib/display';
 import { GovernanceSnapshotViewer } from './GovernanceSnapshotViewer';
 import { ExecutionTimeline, TimelineEventItem } from './ExecutionTimeline';
 import { MachineDetailDrawer } from './MachineDetailDrawer';
@@ -81,11 +82,11 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
       setForensics({
         detail: detRes?.ok ? detRes.job : null,
         traceId: detRes?.trace_id,
-        timeline: timRes?.ok ? (timRes.timeline || []) : [],
+        timeline: safeArray(timRes?.ok ? (timRes.timeline || (timRes as any)?.data) : []),
         timelineStatus: timRes?.source_status,
-        logs: logRes?.ok ? (logRes.logs || []) : [],
+        logs: safeArray(logRes?.ok ? (logRes.logs || (logRes as any)?.data) : []),
         logsStatus: logRes?.source_status,
-        artifacts: artRes?.ok ? (artRes.artifacts || []) : [],
+        artifacts: safeArray(artRes?.ok ? (artRes.artifacts || (artRes as any)?.data) : []),
         artifactsStatus: artRes?.source_status,
         worker: wrkRes?.ok ? wrkRes.worker : null,
         workerStatus: wrkRes?.source_status,
@@ -298,7 +299,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                       </div>
                     ) : (
                       <div className="bg-slate-950 dark:bg-[#09090b] p-2 border border-slate-800 dark:border-white/5 text-slate-300 text-[9px] space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar select-text font-mono">
-                        {forensics.logs.map((logItem, index) => (
+                        {safeArray(forensics.logs).map((logItem, index) => (
                           <div key={index} className="flex items-start gap-2 hover:bg-slate-900 dark:hover:bg-white/[0.02] p-0.5 leading-tight">
                             <span className="text-slate-600 dark:text-zinc-600 select-none font-bold text-[8px] w-12 shrink-0">
                               {logItem.timestamp?.split('T')[1]?.substring(0, 8) || '00:00:00'}
@@ -409,7 +410,7 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {forensics.artifacts.map((artifactItem, i) => (
+                          {safeArray(forensics.artifacts).map((artifactItem, i) => (
                             <div key={artifactItem.artifact_id || i} className="p-2 bg-white dark:bg-[#1a1a1b] border border-slate-200 dark:border-white/[0.05] flex flex-col justify-between text-[10px] leading-tight space-y-1">
                               <div className="min-w-0">
                                 <div className="flex items-center justify-between gap-1">

@@ -19,6 +19,9 @@
   --color-primary-dark: #b90000;
   --color-error: #dc0000;
   --color-warning: #d97706;
+
+  --font-sans: 'Manrope', sans-serif;
+  --font-manrope: 'Manrope', sans-serif;
 }
 
 /* ===================== */

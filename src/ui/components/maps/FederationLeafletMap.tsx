@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingMap } from '../../lib/adminApi';
 import { toDisplayText, safeArray } from '../../lib/display';
+import { useMachineDrawer } from '../federation/MachineDrawerContext';
 
 // Override default Leaflet popups and container styles for seamless industrial dark theme
 const leafletOverrideStyles = `
@@ -55,6 +56,7 @@ const BoundsFit: React.FC<{ nodes: any[] }> = ({ nodes }) => {
 
 export const FederationLeafletMap: React.FC = () => {
   const { data: mapState, isLoading } = useAdminQuery('routing:map', getRoutingMap, 5000);
+  const { openMachine } = useMachineDrawer();
 
   const nodes = useMemo(() => safeArray(mapState?.nodes), [mapState?.nodes]);
   const routes = useMemo(() => safeArray(mapState?.routes), [mapState?.routes]);
@@ -140,6 +142,9 @@ export const FederationLeafletMap: React.FC = () => {
                 fillColor={color}
                 fillOpacity={node?.status === 'OFFLINE' ? 0.2 : 0.6}
                 weight={2}
+                eventHandlers={{
+                  click: () => node?.id && openMachine(node.id)
+                }}
               >
                 <Popup>
                   <div className="space-y-2 font-mono text-xs min-w-[180px]">

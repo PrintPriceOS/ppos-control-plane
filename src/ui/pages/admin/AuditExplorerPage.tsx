@@ -133,21 +133,21 @@ export const AuditExplorerPage: React.FC = () => {
     };
 
     return (
-        <div className="space-y-6 text-slate-100 ppos-layout-transition">
+        <div className="space-y-6 text-slate-900 dark:text-slate-100 ppos-layout-transition">
             {/* Main Header */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-none flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-4 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center space-x-2">
-                        <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-none uppercase tracking-widest">
+                        <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 rounded-none uppercase tracking-widest">
                             FORENSIC AUDIT ENGINE
                         </span>
-                        <span className="text-xs font-mono text-slate-500">IMMUTABLE TRACEABILITY</span>
+                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500">IMMUTABLE TRACEABILITY</span>
                     </div>
-                    <h1 className="text-xl font-bold font-mono tracking-tight text-white mt-1 flex items-center">
-                        <ShieldCheckIcon className="w-5 h-5 mr-2 text-amber-500" />
+                    <h1 className="text-xl font-black font-sans tracking-tight text-slate-900 dark:text-white mt-1 flex items-center uppercase">
+                        <ShieldCheckIcon className="w-5 h-5 mr-2 text-amber-600 dark:text-amber-500" />
                         Audit Explorer
                     </h1>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Multi-source event correlation spanning API Gateway accesses, industrial MES dispatches, and immutable blockchain ledger logs.
                     </p>
                 </div>
@@ -156,14 +156,14 @@ export const AuditExplorerPage: React.FC = () => {
                     <button
                         onClick={() => { setLookupMode(false); fetchAudits(); }}
                         disabled={loading}
-                        className="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono flex items-center space-x-1.5 rounded-none transition-all"
+                        className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1a1b] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 text-xs font-mono flex items-center space-x-1.5 rounded-none transition-all"
                     >
                         <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-500' : ''}`} />
                         <span>Query Datastore</span>
                     </button>
                     <button
                         onClick={handleResetFilters}
-                        className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-slate-500 hover:text-slate-300 border border-slate-800 text-xs font-mono rounded-none transition-colors"
+                        className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-[#1a1a1b] dark:hover:bg-slate-800 text-slate-500 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-800 text-xs font-mono rounded-none transition-colors"
                         title="Clear all filters and views"
                     >
                         Reset
@@ -172,14 +172,14 @@ export const AuditExplorerPage: React.FC = () => {
             </div>
 
             {/* Filter Controls Workspace */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-none space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                    <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center">
-                        <FunnelIcon className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+            <div className="p-4 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2.5">
+                    <span className="text-xs font-sans font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider flex items-center">
+                        <FunnelIcon className="w-3.5 h-3.5 mr-1.5 text-amber-600 dark:text-amber-500" />
                         Forensic Scope Constraints
                     </span>
                     <div className="flex items-center space-x-3 text-xs font-mono">
-                        <label className="flex items-center space-x-1.5 text-slate-400 cursor-pointer">
+                        <label className="flex items-center space-x-1.5 text-slate-600 dark:text-slate-400 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={lookupMode}
@@ -187,9 +187,9 @@ export const AuditExplorerPage: React.FC = () => {
                                     setLookupMode(e.target.checked);
                                     if (!e.target.checked) fetchAudits();
                                 }}
-                                className="rounded-none bg-slate-950 border-slate-700 text-amber-500 focus:ring-0"
+                                className="rounded-none bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-amber-600 dark:text-amber-500 focus:ring-0"
                             />
-                            <span className={lookupMode ? "text-amber-400 font-bold" : ""}>Target Entity Timeline Mode</span>
+                            <span className={lookupMode ? "text-amber-700 dark:text-amber-400 font-bold" : ""}>Target Entity Timeline Mode</span>
                         </label>
                     </div>
                 </div>
@@ -197,11 +197,11 @@ export const AuditExplorerPage: React.FC = () => {
                 {lookupMode ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Entity Domain Class</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Entity Domain Class</label>
                             <select
                                 value={targetEntityType}
                                 onChange={(e) => setTargetEntityType(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-700 text-xs font-mono text-slate-200 p-2 rounded-none focus:outline-none"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 p-2 rounded-none focus:outline-none"
                             >
                                 <option value="DISPATCH">DISPATCH (Manufacturing Payload)</option>
                                 <option value="JOB">JOB (Global Orchestration Job)</option>
@@ -210,20 +210,20 @@ export const AuditExplorerPage: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Exact Entity/Trace ID</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Exact Entity/Trace ID</label>
                             <input
                                 type="text"
                                 placeholder="e.g. dispatch-uuid or hash..."
                                 value={targetEntityId}
                                 onChange={(e) => setTargetEntityId(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-700 text-xs font-mono text-white p-2 rounded-none focus:outline-none placeholder-slate-600"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white p-2 rounded-none focus:outline-none placeholder-slate-400 dark:placeholder-slate-600"
                             />
                         </div>
                         <div className="flex items-end">
                             <button
                                 onClick={executeEntityLookup}
                                 disabled={!targetEntityId.trim() || loading}
-                                className="w-full py-2 bg-amber-950 hover:bg-amber-900 disabled:bg-slate-950 text-amber-300 disabled:text-slate-600 border border-amber-800 disabled:border-slate-800 text-xs font-mono font-bold uppercase tracking-wider rounded-none transition-all flex items-center justify-center space-x-1"
+                                className="w-full py-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 dark:hover:bg-amber-900 disabled:bg-slate-100 dark:disabled:bg-slate-950 text-amber-800 dark:text-amber-300 disabled:text-slate-400 dark:disabled:text-slate-600 border border-amber-200 dark:border-amber-800 disabled:border-slate-200 dark:disabled:border-slate-800 text-xs font-mono font-bold uppercase tracking-wider rounded-none transition-all flex items-center justify-center space-x-1"
                             >
                                 <DocumentMagnifyingGlassIcon className="w-4 h-4" />
                                 <span>Reconstruct Chain</span>
@@ -233,11 +233,11 @@ export const AuditExplorerPage: React.FC = () => {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Entity Type</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Entity Type</label>
                             <select
                                 value={entityType}
                                 onChange={(e) => setEntityType(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 p-1.5 rounded-none focus:outline-none focus:border-slate-700"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-800 dark:text-slate-300 p-1.5 rounded-none focus:outline-none focus:border-slate-400 dark:focus:border-slate-700"
                             >
                                 <option value="">ALL ENTITIES</option>
                                 <option value="DISPATCH">DISPATCH</option>
@@ -247,60 +247,60 @@ export const AuditExplorerPage: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Event Action</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Event Action</label>
                             <input
                                 type="text"
                                 placeholder="Filter action..."
                                 value={eventType}
                                 onChange={(e) => setEventType(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && fetchAudits()}
-                                className="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-white p-1.5 rounded-none focus:outline-none focus:border-slate-700 placeholder-slate-600"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white p-1.5 rounded-none focus:outline-none focus:border-slate-400 dark:focus:border-slate-700 placeholder-slate-400 dark:placeholder-slate-600"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Actor Identity</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Actor Identity</label>
                             <input
                                 type="text"
                                 placeholder="Filter user/role..."
                                 value={actor}
                                 onChange={(e) => setActor(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && fetchAudits()}
-                                className="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-white p-1.5 rounded-none focus:outline-none focus:border-slate-700 placeholder-slate-600"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white p-1.5 rounded-none focus:outline-none focus:border-slate-400 dark:focus:border-slate-700 placeholder-slate-400 dark:placeholder-slate-600"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Tenant Scoping</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Tenant Scoping</label>
                             <input
                                 type="text"
                                 placeholder="Tenant ID..."
                                 value={tenant}
                                 onChange={(e) => setTenant(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && fetchAudits()}
-                                className="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-white p-1.5 rounded-none focus:outline-none focus:border-slate-700 placeholder-slate-600"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white p-1.5 rounded-none focus:outline-none focus:border-slate-400 dark:focus:border-slate-700 placeholder-slate-400 dark:placeholder-slate-600"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Dispatch/Machine ID</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Dispatch/Machine ID</label>
                             <input
                                 type="text"
                                 placeholder="Exact dispatch..."
                                 value={dispatchId}
                                 onChange={(e) => setDispatchId(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && fetchAudits()}
-                                className="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-white p-1.5 rounded-none focus:outline-none focus:border-slate-700 placeholder-slate-600"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white p-1.5 rounded-none focus:outline-none focus:border-slate-400 dark:focus:border-slate-700 placeholder-slate-400 dark:placeholder-slate-600"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Severity / Limit</label>
+                            <label className="block text-[10px] font-mono text-slate-600 dark:text-slate-500 uppercase mb-1">Severity / Limit</label>
                             <div className="flex gap-1">
                                 <select
                                     value={severity}
                                     onChange={(e) => setSeverity(e.target.value)}
-                                    className="w-2/3 bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 p-1.5 rounded-none focus:outline-none"
+                                    className="w-2/3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-800 dark:text-slate-300 p-1.5 rounded-none focus:outline-none"
                                 >
                                     <option value="">ANY SEV</option>
                                     <option value="INFO">INFO</option>
@@ -310,7 +310,7 @@ export const AuditExplorerPage: React.FC = () => {
                                 <select
                                     value={limit}
                                     onChange={(e) => setLimit(Number(e.target.value))}
-                                    className="w-1/3 bg-slate-950 border border-slate-800 text-xs font-mono text-slate-400 p-1.5 rounded-none focus:outline-none px-1"
+                                    className="w-1/3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-400 p-1.5 rounded-none focus:outline-none px-1"
                                 >
                                     <option value={50}>50</option>
                                     <option value={200}>200</option>
@@ -326,7 +326,7 @@ export const AuditExplorerPage: React.FC = () => {
                     <div className="flex justify-end pt-1">
                         <button
                             onClick={fetchAudits}
-                            className="px-3 py-1 bg-slate-950 hover:bg-slate-800 text-[11px] font-mono text-amber-400 border border-slate-800 rounded-none transition-colors flex items-center space-x-1"
+                            className="px-3 py-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-800 text-[11px] font-mono text-amber-800 dark:text-amber-400 border border-slate-200 dark:border-slate-800 rounded-none transition-colors flex items-center space-x-1"
                         >
                             <MagnifyingGlassIcon className="w-3 h-3" />
                             <span>Apply Parameters</span>
@@ -337,12 +337,12 @@ export const AuditExplorerPage: React.FC = () => {
 
             {/* Scope Feedback Indicators */}
             {lookupFeedback && (
-                <div className="p-2.5 bg-slate-950 border border-slate-800 text-xs font-mono text-slate-400 rounded-none flex items-center justify-between">
-                    <span className="text-amber-400 flex items-center">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-600 dark:text-slate-400 rounded-none flex items-center justify-between">
+                    <span className="text-amber-700 dark:text-amber-400 flex items-center">
                         <InformationCircleIcon className="w-4 h-4 mr-1.5 flex-shrink-0" />
                         {lookupFeedback}
                     </span>
-                    <button onClick={() => setLookupFeedback(null)} className="text-[10px] underline hover:text-white uppercase tracking-wider ml-2">
+                    <button onClick={() => setLookupFeedback(null)} className="text-[10px] underline hover:text-slate-900 dark:hover:text-white uppercase tracking-wider ml-2">
                         Dismiss
                     </button>
                 </div>
@@ -352,30 +352,30 @@ export const AuditExplorerPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Dense Forensic Dataflow Table (Spans 2 Cols) */}
                 <div className="lg:col-span-2 space-y-3">
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-none flex items-center justify-between">
-                        <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center">
-                            <ServerStackIcon className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                    <div className="p-3 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none flex items-center justify-between">
+                        <span className="text-xs font-sans font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider flex items-center">
+                            <ServerStackIcon className="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500" />
                             Aggregated Event Datastream ({events.length} logs)
                         </span>
-                        <span className="text-[10px] font-mono text-slate-500">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
                             Sorted strictly by operational timestamp descending
                         </span>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 rounded-none overflow-x-auto">
+                    <div className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none overflow-x-auto">
                         {loading && events.length === 0 ? (
                             <div className="p-16 text-center text-xs font-mono text-slate-500">
                                 <ArrowPathIcon className="w-6 h-6 mx-auto animate-spin text-amber-500 mb-2" />
                                 Extracting multi-layered forensic traces from database nodes...
                             </div>
                         ) : events.length === 0 ? (
-                            <div className="p-16 text-center text-xs font-mono text-slate-600">
+                            <div className="p-16 text-center text-xs font-mono text-slate-400 dark:text-slate-600">
                                 No operational timeline log events retrieved matching the active cryptographic context bounds.
                             </div>
                         ) : (
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-slate-800 bg-slate-950/80 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/80 text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         <th className="p-2.5 w-32">Timestamp</th>
                                         <th className="p-2.5">Entity / Source</th>
                                         <th className="p-2.5">Event Action / Message</th>
@@ -384,7 +384,7 @@ export const AuditExplorerPage: React.FC = () => {
                                         <th className="p-2.5 w-12 text-center">Inspect</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-800/60 text-xs font-mono">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs font-mono">
                                     {events.map((ev) => {
                                         const isSelected = selectedEvent?.id === ev.id;
                                         // Formatted simplified time string
@@ -397,21 +397,21 @@ export const AuditExplorerPage: React.FC = () => {
                                         return (
                                             <tr
                                                 key={ev.id}
-                                                className={`hover:bg-slate-800/40 transition-colors cursor-pointer ${
-                                                    isSelected ? 'bg-slate-800/90 border-l-2 border-amber-500' : ''
+                                                className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer ${
+                                                    isSelected ? 'bg-slate-50 dark:bg-slate-800/90 border-l-2 border-amber-500' : ''
                                                 }`}
                                                 onClick={() => setSelectedEvent(ev)}
                                             >
-                                                <td className="p-2.5 text-[10px] text-slate-400 whitespace-nowrap">
+                                                <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                                     <span className="flex items-center">
-                                                        <ClockIcon className="w-2.5 h-2.5 mr-1 text-slate-600 flex-shrink-0" />
+                                                        <ClockIcon className="w-2.5 h-2.5 mr-1 text-slate-400 dark:text-slate-600 flex-shrink-0" />
                                                         {timeStr}
                                                     </span>
                                                 </td>
 
                                                 <td className="p-2.5">
                                                     <div className="flex items-center gap-1.5 mb-1">
-                                                        <span className="font-bold text-white text-[11px]">
+                                                        <span className="font-bold text-slate-900 dark:text-white text-[11px]">
                                                             {ev.entity_type}
                                                         </span>
                                                         {renderSourceBadge(ev.source_service)}
@@ -422,17 +422,17 @@ export const AuditExplorerPage: React.FC = () => {
                                                 </td>
 
                                                 <td className="p-2.5">
-                                                    <div className="font-bold text-amber-400/90 text-[11px] truncate max-w-[220px]" title={ev.event_type}>
+                                                    <div className="font-bold text-amber-700 dark:text-amber-400/90 text-[11px] truncate max-w-[220px]" title={ev.event_type}>
                                                         {ev.event_type}
                                                     </div>
-                                                    <div className="text-[10px] text-slate-300 truncate max-w-[250px] mt-0.5" title={ev.message}>
+                                                    <div className="text-[10px] text-slate-600 dark:text-slate-300 truncate max-w-[250px] mt-0.5" title={ev.message}>
                                                         {ev.message}
                                                     </div>
                                                 </td>
 
-                                                <td className="p-2.5 text-[10px] text-slate-400 truncate max-w-[90px]" title={ev.actor}>
+                                                <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[90px]" title={ev.actor}>
                                                     <span className="flex items-center">
-                                                        <UserIcon className="w-2.5 h-2.5 mr-1 text-slate-600 flex-shrink-0" />
+                                                        <UserIcon className="w-2.5 h-2.5 mr-1 text-slate-400 dark:text-slate-600 flex-shrink-0" />
                                                         <span className="truncate">{ev.actor}</span>
                                                     </span>
                                                 </td>
@@ -451,8 +451,8 @@ export const AuditExplorerPage: React.FC = () => {
                                                         }}
                                                         className={`p-1 rounded-none border transition-colors ${
                                                             isSelected
-                                                                ? 'bg-amber-950 text-amber-300 border-amber-800'
-                                                                : 'bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border-slate-800'
+                                                                ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                                                : 'bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-slate-800'
                                                         }`}
                                                     >
                                                         <EyeIcon className="w-3.5 h-3.5" />
@@ -469,46 +469,46 @@ export const AuditExplorerPage: React.FC = () => {
 
                 {/* Metadata Inspection Viewport Sidebar */}
                 <div className="space-y-4">
-                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-none">
-                        <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block border-b border-slate-800 pb-2.5">
+                    <div className="p-4 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none">
+                        <span className="text-xs font-sans font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider block border-b border-slate-200 dark:border-white/10 pb-2.5">
                             Forensic Metadata Drawer
                         </span>
 
                         {selectedEvent ? (
                             <div className="mt-4 space-y-4 font-mono text-xs animate-fade-in">
                                 <div>
-                                    <span className="text-[9px] text-slate-500 block uppercase">Cryptographic Entry Handle</span>
-                                    <span className="font-bold text-white text-[11px] block break-all select-all bg-slate-950 p-1.5 border border-slate-800 mt-0.5">
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase">Cryptographic Entry Handle</span>
+                                    <span className="font-bold text-slate-900 dark:text-white text-[11px] block break-all select-all bg-slate-50 dark:bg-slate-950 p-1.5 border border-slate-200 dark:border-slate-800 mt-0.5">
                                         {selectedEvent.id}
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="bg-slate-950 p-2 border border-slate-800">
-                                        <span className="text-[9px] text-slate-500 block uppercase">Datastore Origin</span>
-                                        <span className="font-bold text-amber-400 block mt-0.5 text-[10px] break-words">
+                                    <div className="bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800">
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase">Datastore Origin</span>
+                                        <span className="font-bold text-amber-700 dark:text-amber-400 block mt-0.5 text-[10px] break-words">
                                             {selectedEvent.source_service}
                                         </span>
                                     </div>
-                                    <div className="bg-slate-950 p-2 border border-slate-800">
-                                        <span className="text-[9px] text-slate-500 block uppercase">Severity Class</span>
+                                    <div className="bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800">
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase">Severity Class</span>
                                         <div className="mt-0.5">{renderSeverityBadge(selectedEvent.severity)}</div>
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-950 p-2.5 border border-slate-800 space-y-2">
-                                    <span className="text-[9px] text-slate-500 block uppercase border-b border-slate-800 pb-1">
+                                <div className="bg-slate-50 dark:bg-slate-950 p-2.5 border border-slate-200 dark:border-slate-800 space-y-2">
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase border-b border-slate-200 dark:border-slate-800 pb-1">
                                         Correlation &amp; Entity Links
                                     </span>
                                     <div>
-                                        <span className="text-[10px] text-slate-400 block">Entity Bound ({selectedEvent.entity_type}):</span>
-                                        <span className="font-bold text-white text-[11px] block break-all select-all">
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Entity Bound ({selectedEvent.entity_type}):</span>
+                                        <span className="font-bold text-slate-900 dark:text-white text-[11px] block break-all select-all">
                                             {selectedEvent.entity_id}
                                         </span>
                                     </div>
-                                    <div className="border-t border-slate-900 pt-1.5">
-                                        <span className="text-[10px] text-slate-400 block">Global Trace ID / Checksum:</span>
-                                        <span className="font-mono text-amber-400 text-[11px] block break-all select-all">
+                                    <div className="border-t border-slate-200 dark:border-slate-900 pt-1.5">
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Global Trace ID / Checksum:</span>
+                                        <span className="font-mono text-amber-700 dark:text-amber-400 text-[11px] block break-all select-all">
                                             {selectedEvent.trace_id}
                                         </span>
                                     </div>
@@ -531,7 +531,7 @@ export const AuditExplorerPage: React.FC = () => {
                                                             }).catch(() => {});
                                                     }, 50);
                                                 }}
-                                                className="text-[10px] text-amber-400 hover:text-white underline uppercase tracking-wider block"
+                                                className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-slate-900 dark:hover:text-white underline uppercase tracking-wider block"
                                             >
                                                 ↳ Pivot view to this Entity Lineage
                                             </button>
@@ -539,17 +539,17 @@ export const AuditExplorerPage: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="bg-slate-950 p-2.5 border border-slate-800">
-                                    <span className="text-[9px] text-slate-500 block uppercase mb-1">Execution Action Profile</span>
-                                    <div className="font-bold text-slate-200 text-[11px]">{selectedEvent.event_type}</div>
-                                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                                <div className="bg-slate-50 dark:bg-slate-950 p-2.5 border border-slate-200 dark:border-slate-800">
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase mb-1">Execution Action Profile</span>
+                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">{selectedEvent.event_type}</div>
+                                    <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                                         {selectedEvent.message}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <span className="text-[10px] text-slate-500 block uppercase mb-1">Immutable Payload / Metadata Context</span>
-                                    <pre className="bg-slate-950 text-[10px] text-slate-400 p-2.5 border border-slate-800 overflow-x-auto max-h-56 rounded-none">
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block uppercase mb-1">Immutable Payload / Metadata Context</span>
+                                    <pre className="bg-slate-50 dark:bg-slate-950 text-[10px] text-slate-600 dark:text-slate-400 p-2.5 border border-slate-200 dark:border-slate-800 overflow-x-auto max-h-56 rounded-none">
                                         {selectedEvent.metadata_json
                                             ? JSON.stringify(selectedEvent.metadata_json, null, 2)
                                             : '// No structured extra properties provided by logging driver layer.'}
@@ -559,21 +559,21 @@ export const AuditExplorerPage: React.FC = () => {
                                 <div className="pt-2">
                                     <button
                                         onClick={() => setSelectedEvent(null)}
-                                        className="w-full py-1.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-[10px] uppercase tracking-wider transition-colors rounded-none"
+                                        className="w-full py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider transition-colors rounded-none"
                                     >
                                         Close Context View
                                     </button>
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-12 text-center text-xs text-slate-600 font-mono italic-text-off">
+                            <div className="p-12 text-center text-xs text-slate-400 dark:text-slate-600 font-mono italic-text-off">
                                 Select any entry row in the datastream pane to expand deep forensic transaction metadata matrices and chain validation proofs.
                             </div>
                         )}
                     </div>
 
-                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-none space-y-2">
-                        <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                    <div className="p-4 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none space-y-2">
+                        <span className="text-xs font-sans font-bold text-slate-700 dark:text-slate-400 uppercase tracking-wider block">
                             Traceability Guarantees
                         </span>
                         <p className="text-[10px] font-mono text-slate-500 leading-relaxed">
