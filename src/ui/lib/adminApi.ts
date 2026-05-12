@@ -1294,7 +1294,11 @@ export async function getEconomicConflicts() {
 }
 
 export async function getRoutingMap() {
-    return adminFetch<{ nodes: any[], routes: any[], summary: any }>('/api/admin/routing/map');
+    return adminFetch<{ nodes: any[], routes: any[], summary: any, counts?: any, source_status?: string }>('/api/admin/routing/map');
+}
+
+export async function getFederationMap() {
+    return adminFetch<{ nodes: any[], routes: any[], summary: any, counts?: any, source_status?: string }>('/api/admin/federation/map');
 }
 
 export async function getRoutingHeatmap() {

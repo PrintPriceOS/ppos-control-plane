@@ -3,15 +3,12 @@ import React, { useState } from "react";
 import { 
     CircleStackIcon, 
     CpuChipIcon, 
-    DocumentDuplicateIcon, 
     ShieldCheckIcon,
     BoltIcon,
     ExclamationTriangleIcon,
     ClockIcon,
     AcademicCapIcon,
-    BanknotesIcon,
-    ShieldCheckIcon,
-    CpuChipIcon
+    BanknotesIcon
 } from "@heroicons/react/24/outline";
 import { ArtifactRegistryTab } from "./ArtifactRegistryTab";
 import { WorkerFleetTab } from "./WorkerFleetTab";
@@ -37,20 +34,20 @@ export const IndustrialOpsPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Operations</h1>
-                    <p className="text-sm text-slate-500 font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
+                    <h1 className="text-2xl font-black text-[var(--ppos-text)] tracking-tight">Industrial Operations</h1>
+                    <p className="text-sm text-[var(--ppos-text-muted)] font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-none">
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-none shrink-0">
                     <div className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">System Operational</span>
+                    <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">System Operational</span>
                 </div>
             </div>
 
-            {/* Categorized Industrial Navigation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-2 rounded-none border border-slate-200 shadow-none">
+            {/* Categorized Industrial Navigation with Canonical Theme Tokens */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[var(--ppos-surface-muted)] p-2 border border-[var(--ppos-border)] shadow-none">
                 {/* Operational Group */}
                 <div className="space-y-2">
-                    <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
                         <BoltIcon className="w-3 h-3" />
                         Operational
                     </h3>
@@ -63,8 +60,8 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
 
                 {/* Intelligence Group */}
-                <div className="space-y-2 border-l border-slate-200 md:pl-4">
-                    <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="space-y-2 border-t md:border-t-0 md:border-l border-[var(--ppos-border)] pt-2 md:pt-0 md:pl-4">
+                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
                         <AcademicCapIcon className="w-3 h-3" />
                         Intelligence
                     </h3>
@@ -78,8 +75,8 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
 
                 {/* Governance Group */}
-                <div className="space-y-2 border-l border-slate-200 md:pl-4">
-                    <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="space-y-2 border-t md:border-t-0 md:border-l border-[var(--ppos-border)] pt-2 md:pt-0 md:pl-4">
+                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
                         <ShieldCheckIcon className="w-3 h-3" />
                         Governance
                     </h3>
@@ -91,7 +88,6 @@ export const IndustrialOpsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-
 
             {/* Tab Content */}
             <div className="min-h-[500px]">
@@ -118,13 +114,13 @@ export const IndustrialOpsPage: React.FC = () => {
 const TabButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-2 rounded-none transition-all ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 transition-all border ${
             active 
-            ? 'bg-white text-slate-900 shadow-none border border-slate-200 font-black' 
-            : 'text-slate-500 hover:text-slate-700 font-bold hover:bg-white/50'
+            ? 'bg-[var(--ppos-surface)] text-[var(--ppos-text)] border-[var(--ppos-border)] font-black shadow-sm' 
+            : 'text-[var(--ppos-text-muted)] border-transparent hover:text-[var(--ppos-text)] font-bold hover:bg-white/5 dark:hover:bg-white/[0.02]'
         }`}
     >
-        <Icon className={`w-4 h-4 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
-        <span className="text-xs uppercase tracking-tight">{label}</span>
+        <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-primary dark:text-red-500' : 'text-[var(--ppos-text-muted)]'}`} />
+        <span className="text-[11px] uppercase tracking-tight">{label}</span>
     </button>
 );

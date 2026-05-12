@@ -12,6 +12,7 @@ const twin = require('../services/federatedDigitalTwinService');
 const recovery = require('../services/federationRecoveryService');
 const orchestration = require('../services/distributedOrchestrationService');
 const globalIntel = require('../services/globalIntelligenceService');
+const topologyService = require('../services/FederationTopologyService');
 
 /**
  * GET /api/admin/federation/health
@@ -95,6 +96,19 @@ router.post('/snapshot', async (req, res) => {
         res.json({ ok: true, data: snapshot });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_SNAPSHOT_ERROR' });
+    }
+});
+
+/**
+ * GET /api/admin/federation/map
+ * Canonical map state endpoint aligning with routing map contracts.
+ */
+router.get('/map', async (req, res) => {
+    try {
+        const state = await topologyService.getMapState();
+        res.json(state);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_MAP_ERROR' });
     }
 });
 
