@@ -108,7 +108,7 @@ export const IndustrialEconomicTab: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-lg font-black italic text-emerald-400">+${h.net_margin.toFixed(2)}</p>
+                                    <p className="text-lg font-black italic text-emerald-400">+${Number(h.net_margin || 0).toFixed(2)}</p>
                                     <p className="text-[10px] text-slate-500 font-black uppercase">NET MARGIN</p>
                                 </div>
                             </div>

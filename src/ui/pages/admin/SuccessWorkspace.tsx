@@ -194,7 +194,7 @@ export const SuccessWorkspace: React.FC = () => {
                                 <div>
                                     <div className="font-bold text-slate-900 text-sm">{t.name}</div>
                                     <div className="text-[10px] text-slate-500 font-medium">
-                                        Consistently hitting {((t.dailyUsage / t.daily_job_limit) * 100).toFixed(0)}% of {t.plan} quota
+                                        Consistently hitting {Number(((t.dailyUsage || 0) / (t.daily_job_limit || 1)) * 100).toFixed(0)}% of {t.plan} quota
                                     </div>
                                 </div>
                                 <button className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-none hover:bg-primary hover:text-white transition-all">

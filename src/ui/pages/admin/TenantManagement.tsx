@@ -91,8 +91,8 @@ const BillingViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () =>
             ) : billingData && billingData.ok ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <BillingStat label="Total Jobs" value={billingData.usage.total_jobs || 0} />
-                    <BillingStat label="Value Generated" value={`€${(billingData.usage.total_value || 0).toFixed(2)}`} />
-                    <BillingStat label="Hours Saved" value={`${(billingData.usage.total_hours || 0).toFixed(1)}h`} />
+                    <BillingStat label="Value Generated" value={`€${Number(billingData.usage.total_value || 0).toFixed(2)}`} />
+                    <BillingStat label="Hours Saved" value={`${Number(billingData.usage.total_hours || 0).toFixed(1)}h`} />
                     <BillingStat label="Peak Day" value={billingData.usage.peak_day ? new Date(billingData.usage.peak_day).toLocaleDateString() : 'N/A'} />
                 </div>
             ) : (

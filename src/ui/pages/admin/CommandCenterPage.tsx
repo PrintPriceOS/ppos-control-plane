@@ -510,10 +510,10 @@ export const CommandCenterPage: React.FC = () => {
         <div className="space-y-6">
           <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
             <div className="space-y-4">
-              <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${routing.data.metrics.avg_margin_pct.toFixed(1)}%` : '---'} status="stable" />
+              <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${Number(routing.data.metrics.avg_margin_pct).toFixed(1)}%` : '---'} status="stable" />
               <div className="flex justify-between border-t border-white/5 pt-2">
                 <span className="text-[9px] font-bold text-slate-500 uppercase">Quality</span>
-                <span className="text-sm font-black text-emerald-500">{(routing.data?.avg_final_score || 0).toFixed(1)}</span>
+                <span className="text-sm font-black text-emerald-500">{Number(routing.data?.avg_final_score || 0).toFixed(1)}</span>
               </div>
             </div>
           </TacticalPanel>
