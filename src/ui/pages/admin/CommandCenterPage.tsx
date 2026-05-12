@@ -246,7 +246,7 @@ const IncidentBridge = () => {
   return (
     <TacticalPanel title="Incident Bridge" icon={ExclamationTriangleIcon} badge="Real-time" color="red" status={incidents.status}>
       <div className="space-y-2">
-        {Array.isArray(incidents.data) && incidents.data.slice(0, 5).map((inc: any) => (
+        {safeArray(incidents.data).slice(0, 5).map((inc: any) => (
           <div key={inc.id} className="p-2 border border-red-500/20 bg-red-500/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-red-500 animate-pulse" />
@@ -255,7 +255,7 @@ const IncidentBridge = () => {
             <span className="text-[8px] font-bold text-red-400 uppercase">{inc.severity}</span>
           </div>
         ))}
-        {(!incidents.data || incidents.data.length === 0) && (
+        {safeArray(incidents.data).length === 0 && (
           <div className="text-center py-6 opacity-20 text-[9px] font-black uppercase">Clear Sector</div>
         )}
       </div>
@@ -268,7 +268,7 @@ const IntelligenceAnomalies = () => {
   return (
     <TacticalPanel title="Intelligence Layer" icon={BoltIcon} badge="Pattern Analysis" color="primary" status={anomalies.status}>
       <div className="space-y-2">
-        {Array.isArray(anomalies.data) && anomalies.data.slice(0, 4).map((anom: any) => (
+        {safeArray(anomalies.data).slice(0, 4).map((anom: any) => (
           <div key={anom.id} className="p-2 border border-primary/20 bg-primary/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-1 h-4 bg-primary" />
@@ -280,7 +280,7 @@ const IntelligenceAnomalies = () => {
             <span className="text-[10px] font-black text-primary">{anom.confidence}%</span>
           </div>
         ))}
-        {(!anomalies.data || anomalies.data.length === 0) && (
+        {safeArray(anomalies.data).length === 0 && (
           <div className="text-center py-6 opacity-20 text-[9px] font-black uppercase">No Anomalies</div>
         )}
       </div>
@@ -552,7 +552,7 @@ export const CommandCenterPage: React.FC = () => {
         <div className="lg:col-span-3">
           <TacticalPanel title="Operational Audit Stream" icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
             <div className="h-[120px] overflow-y-auto font-mono text-[7px] space-y-1">
-              {audit.data?.slice(0, 10).map((log: any) => (
+              {safeArray(audit.data).slice(0, 10).map((log: any) => (
                 <div key={log.id} className="flex gap-2">
                   <span className="text-zinc-600">[{new Date(log.created_at).toLocaleTimeString()}]</span>
                   <span className="text-emerald-500">{log.action}</span>
