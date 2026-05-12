@@ -67,7 +67,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                                         <span className="text-[10px] font-black text-red-600 relative z-10">{Math.round(p.failure_probability * 100)}%</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-tight">Dispatch #{p.dispatch_id.slice(0, 8)}</p>
+                                        <p className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-tight">Dispatch #{String(p.dispatch_id || '').slice(0, 8)}</p>
                                         <p className="text-[10px] text-slate-500 font-bold uppercase">{p.reason_code}</p>
                                     </div>
                                 </div>
@@ -94,7 +94,7 @@ export const IndustrialIntelligenceTab: React.FC = () => {
                             <div key={f.node_id} className="p-4 ppos-surface-muted rounded-none border ppos-border flex items-center justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase">Node #{f.node_id.slice(0, 8)}</span>
+                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase">Node #{String(f.node_id || '').slice(0, 8)}</span>
                                         <span className="text-[10px] font-black text-slate-400">{f.predicted_utilization_pct}% PROJECTED</span>
                                     </div>
                                     <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">

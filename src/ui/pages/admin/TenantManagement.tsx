@@ -28,6 +28,7 @@ import {
     TimelineEvent,
     getBillingData
 } from '../../lib/adminApi';
+import { toDisplayText } from '../../lib/display';
 
 const BillingViewer = ({ tenantId, onClose }: { tenantId: string; onClose: () => void }) => {
     const [billingData, setBillingData] = useState<any>(null);
@@ -323,7 +324,7 @@ export default function TenantManagement() {
             {error && (
                 <div className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center gap-3">
                     <XCircleIcon className="w-5 h-5 shrink-0" />
-                    <p>{error}</p>
+                    <p>{toDisplayText(error)}</p>
                 </div>
             )}
 

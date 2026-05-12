@@ -14,6 +14,7 @@ import {
     CheckCircleIcon
 } from "@heroicons/react/24/outline";
 import { setAuthToken, setAuthUser } from '../lib/authStore';
+import { toDisplayText } from '../lib/display';
 
 export const PrinthouseRegistrationPage: React.FC = () => {
     const [formData, setFormData] = useState({
@@ -149,7 +150,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
                     {error && (
                         <div className="md:col-span-2 p-3 bg-red-50 border border-red-100 rounded-none text-red-600 text-xs font-bold">
-                            {error}
+                            {toDisplayText(error)}
                         </div>
                     )}
 

@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { uploadPreflightFile, createPreflightJob, getGlobalPolicies } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
+import { toDisplayText } from "../../lib/display";
 
 interface PreflightUploadModalProps {
   isOpen: boolean;
@@ -151,7 +152,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                         </p>
                         <div className="px-6 py-4 rounded-none ppos-surface-muted border ppos-border w-full max-w-xs mb-8">
                           <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">Generated Job ID</span>
-                          <span className="font-mono text-primary font-bold text-lg select-all">#{result?.job?.id?.slice(0, 12)}</span>
+                          <span className="font-mono text-primary font-bold text-lg select-all">#{String(result?.job?.id || '').slice(0, 12)}</span>
                         </div>
                         <button 
                           onClick={resetAndClose}
@@ -281,7 +282,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                             <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
                             <div className="flex flex-col gap-0.5">
                               <span className="text-xs font-black uppercase tracking-wider">Initialization Error</span>
-                              <span className="text-xs font-bold opacity-90">{error}</span>
+                              <span className="text-xs font-bold opacity-90">{toDisplayText(error)}</span>
                             </div>
                           </div>
                         )}

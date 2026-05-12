@@ -10,6 +10,7 @@ import {
     CheckCircleIcon,
     SignalIcon
 } from "@heroicons/react/24/outline";
+import { toDisplayText } from "../../lib/display";
 
 export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 5000 }) => {
     const { data, status, error } = useAdminQuery("telemetry-snapshot", () => getTelemetrySnapshot(), refreshMs);
@@ -27,7 +28,7 @@ export const TelemetryTab: React.FC<{ refreshMs?: number }> = ({ refreshMs = 500
         <div className="p-8 rounded-none bg-red-50 border border-red-100 text-center">
             <ExclamationCircleIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
             <div className="text-red-700 font-bold mb-1">Telemetry Interrupted</div>
-            <div className="text-red-500 text-sm">{error}</div>
+            <div className="text-red-500 text-sm">{toDisplayText(error)}</div>
         </div>
     );
 

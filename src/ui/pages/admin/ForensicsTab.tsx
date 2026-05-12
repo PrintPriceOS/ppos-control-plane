@@ -9,6 +9,7 @@ import {
     DocumentMagnifyingGlassIcon,
     ShieldCheckIcon
 } from "@heroicons/react/24/outline";
+import { toDisplayText } from "../../lib/display";
 
 export const ForensicsTab: React.FC = () => {
     const [jobId, setJobId] = useState("");
@@ -63,7 +64,7 @@ export const ForensicsTab: React.FC = () => {
                     <ShieldCheckIcon className="w-8 h-8 text-red-400" />
                     <div>
                         <div className="font-bold">Forensic Link Missing</div>
-                        <div className="text-sm opacity-80">{error}</div>
+                        <div className="text-sm opacity-80">{toDisplayText(error)}</div>
                     </div>
                 </div>
             )}

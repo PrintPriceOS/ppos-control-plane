@@ -7,6 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminFetch } from '../lib/adminApi';
 import { short } from '../lib/formatters';
+import { toDisplayText } from '../lib/display';
 
 
 // ─── Types ────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ export function AnalyticsPortal() {
             <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
                 {error && (
                     <div className="bg-rose-50 border border-rose-200 rounded-none px-5 py-4 text-rose-700 text-sm font-medium">
-                        {error}
+                        {toDisplayText(error)}
                     </div>
                 )}
 
@@ -292,7 +293,7 @@ export function AnalyticsPortal() {
                                     <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
                                         <span className="w-6 h-6 rounded-none bg-rose-50 text-rose-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{e.count}</span>
                                         <div className="min-w-0">
-                                            <p className="text-xs font-mono text-slate-700 truncate">{e.error_message}</p>
+                                            <p className="text-xs font-mono text-slate-700 truncate">{toDisplayText(e.error_message)}</p>
                                             <p className="text-xs text-slate-400">{new Date(e.last_seen).toLocaleDateString()}</p>
                                         </div>
                                     </div>

@@ -2,6 +2,7 @@
 import React from "react";
 import { getWorkerFleet, setWorkerStatus } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
+import { toDisplayText } from "../../lib/display";
 import { 
     CpuChipIcon, 
     SignalIcon,
@@ -14,7 +15,7 @@ export const WorkerFleetTab: React.FC = () => {
     const { data, status, error, refetch } = useAdminQuery("worker-fleet", () => getWorkerFleet());
 
     if (status === "loading") return <div className="p-20 text-center animate-pulse font-bold text-slate-400">Discovering Worker Topology...</div>;
-    if (status === "error") return <div className="p-10 bg-red-500/10 text-red-500 border border-red-500/20">Error: {error}</div>;
+    if (status === "error") return <div className="p-10 bg-red-500/10 text-red-500 border border-red-500/20">Error: {toDisplayText(error)}</div>;
 
     const fleet = data?.fleet || [];
 

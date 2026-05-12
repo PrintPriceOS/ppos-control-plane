@@ -11,6 +11,7 @@ import {
   CogIcon
 } from '@heroicons/react/24/outline';
 import { adminFetch } from '../../lib/adminApi';
+import { toDisplayText } from '../../lib/display';
 
 interface Dispatch {
   id: string;
@@ -134,7 +135,7 @@ export const IncomingJobsPage: React.FC = () => {
           <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
           <div>
             <h3 className="text-red-800 font-bold uppercase tracking-wider text-sm">Pipeline Error</h3>
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">{toDisplayText(error)}</p>
           </div>
         </div>
       </div>

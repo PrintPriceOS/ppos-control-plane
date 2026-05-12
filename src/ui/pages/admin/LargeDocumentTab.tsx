@@ -2,6 +2,7 @@
 import React from "react";
 import { getPreflightJobs } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
+import { toDisplayText } from "../../lib/display";
 import { 
     DocumentDuplicateIcon, 
     ExclamationCircleIcon,
@@ -14,7 +15,7 @@ export const LargeDocumentTab: React.FC = () => {
     const { data, status, error } = useAdminQuery("large-document-jobs", () => getPreflightJobs({ largeOnly: true }));
 
     if (status === "loading") return <div className="p-20 text-center animate-pulse font-bold text-slate-400">Syncing Industrial Pipeline...</div>;
-    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-none">Error: {error}</div>;
+    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-none">Error: {toDisplayText(error)}</div>;
 
     const jobs = data?.jobs || [];
 
@@ -54,7 +55,7 @@ export const LargeDocumentTab: React.FC = () => {
                             <tbody className="divide-y divide-slate-50">
                                 {jobs.map((j: any) => (
                                     <tr key={j.jobId} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-mono text-slate-600">{j.jobId.substring(0, 12)}...</td>
+                                        <td className="px-6 py-4 font-mono text-slate-600">{String(j.jobId || '').substring(0, 12)}...</td>
                                         <td className="px-6 py-4 font-bold text-slate-800">{j.filename || 'anonymous_industrial.pdf'}</td>
                                         <td className="px-6 py-4">
                                             <span className="font-black text-indigo-600">{(j.fileSize / (1024 * 1024)).toFixed(0)} MB</span>

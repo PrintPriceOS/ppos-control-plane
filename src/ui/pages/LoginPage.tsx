@@ -13,6 +13,7 @@ import {
     LockClosedIcon 
 } from "@heroicons/react/24/outline";
 import { setAuthToken, setAuthUser } from '../lib/authStore';
+import { toDisplayText } from '../lib/display';
 
 export const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -125,7 +126,7 @@ export const LoginPage: React.FC = () => {
 
                         {error && (
                             <p className="text-xs font-bold text-red-500 ml-1 mt-2">
-                                {error}
+                                {toDisplayText(error)}
                             </p>
                         )}
 

@@ -2,6 +2,7 @@
 import React from "react";
 import { getArtifacts } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
+import { toDisplayText } from "../../lib/display";
 import { 
     CircleStackIcon, 
     ArrowPathIcon,
@@ -14,7 +15,7 @@ export const ArtifactRegistryTab: React.FC = () => {
     const { data, status, error } = useAdminQuery("artifact-registry", () => getArtifacts());
 
     if (status === "loading") return <div className="p-20 text-center animate-pulse font-bold text-slate-400">Querying Industrial Registry...</div>;
-    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-none">Error: {error}</div>;
+    if (status === "error") return <div className="p-10 bg-red-50 text-red-700 rounded-none">Error: {toDisplayText(error)}</div>;
 
     const artifacts = data?.artifacts || [];
 
@@ -43,13 +44,13 @@ export const ArtifactRegistryTab: React.FC = () => {
                         <tbody className="divide-y divide-slate-50">
                             {artifacts.map((a: any) => (
                                 <tr key={a.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-4 font-mono text-slate-600">{a.id.substring(0, 12)}...</td>
+                                    <td className="px-6 py-4 font-mono text-slate-600">{String(a.id || '').substring(0, 12)}...</td>
                                     <td className="px-6 py-4">
                                         <span className="px-2 py-0.5 rounded-none bg-blue-50 text-blue-600 font-bold uppercase tracking-tighter">
                                             {a.artifact_type}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 font-mono text-slate-400">{a.job_id.substring(0, 8)}...</td>
+                                    <td className="px-6 py-4 font-mono text-slate-400">{String(a.job_id || '').substring(0, 8)}...</td>
                                     <td className="px-6 py-4 font-bold text-slate-700">{(a.size_bytes / (1024 * 1024)).toFixed(2)} MB</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-0.5 rounded-none text-[10px] font-black uppercase ${
