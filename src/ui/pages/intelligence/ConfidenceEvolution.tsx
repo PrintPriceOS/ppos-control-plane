@@ -38,7 +38,7 @@ export const ConfidenceEvolution: React.FC = () => {
                         <div className="mb-2 flex justify-between text-sm">
                             <span className="text-slate-500">System Trust Score</span>
                             <span className={`font-bold ${c.confidenceScore < 0.3 ? 'text-red-600' : 'text-blue-600'}`}>
-                                {(c.confidenceScore * 100).toFixed(0)}%
+                                {Number((c.confidenceScore || 0) * 100).toFixed(0)}%
                             </span>
                         </div>
                         

@@ -62,7 +62,7 @@ export const TenantsPage: React.FC = () => {
                 <div className="w-16 h-1 bg-slate-100 rounded-none overflow-hidden">
                   <div className="h-full bg-emerald-500 rounded-none" style={{ width: `${Math.min(100, t.successRate)}%` }} />
                 </div>
-                <span className="text-[10px] font-black text-slate-400">{t.successRate.toFixed(1)}%</span>
+                <span className="text-[10px] font-black text-slate-400">{Number(t.successRate || 0).toFixed(1)}%</span>
               </div>
             )
           },

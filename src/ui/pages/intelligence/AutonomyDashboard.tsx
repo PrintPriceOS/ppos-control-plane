@@ -45,7 +45,7 @@ export const AutonomyDashboard: React.FC = () => {
                         <div className="flex gap-4 mb-4">
                             <div className="flex-1 bg-slate-50 p-3 rounded-none border border-slate-100">
                                 <span className="block text-xs text-slate-400 uppercase">Confidence</span>
-                                <span className="font-mono text-sm">{(s.metrics.confidenceScore * 100).toFixed(0)}%</span>
+                                <span className="font-mono text-sm">{Number((s.metrics?.confidenceScore || 0) * 100).toFixed(0)}%</span>
                             </div>
                             <div className="flex-1 bg-slate-50 p-3 rounded-none border border-slate-100">
                                 <span className="block text-xs text-slate-400 uppercase">Evaluations</span>

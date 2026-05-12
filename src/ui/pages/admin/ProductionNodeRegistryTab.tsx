@@ -274,7 +274,7 @@ export const ProductionNodeRegistryTab: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-1">
                                         <PerformanceMetric label="Industrial Reliability Score" value={`${Math.round(nodeStats?.reliabilityScore || 0)}%`} />
-                                        <PerformanceMetric label="Avg Production Turnaround" value={`${(nodeStats?.avgTurnaround || 0).toFixed(1)}h`} />
+                                        <PerformanceMetric label="Avg Production Turnaround" value={`${Number(nodeStats?.avgTurnaround || 0).toFixed(1)}h`} />
                                         <PerformanceMetric label="Total Lifecycle Dispatches" value={nodeStats?.totalDispatches} />
                                         <PerformanceMetric label="Rerouted / Diverted Requests" value={nodeStats?.reroutedDispatches} />
                                         <PerformanceMetric label="Active Work-In-Progress" value={nodeStats?.activeJobs} />

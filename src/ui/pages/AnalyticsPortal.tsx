@@ -224,8 +224,8 @@ export function AnalyticsPortal() {
                     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
                         <KpiCard icon={DocumentCheckIcon} label="Total Jobs" value={summary.total_jobs.toLocaleString()} color="indigo" />
                         <KpiCard icon={CalendarIcon} label="Total Batches" value={summary.total_batches.toLocaleString()} color="blue" />
-                        <KpiCard icon={CheckCircleIcon} label="Success Rate" value={`${summary.success_rate.toFixed(1)}%`} color="emerald" />
-                        <KpiCard icon={ClockIcon} label="Hours Saved" value={`${summary.hours_saved_total.toFixed(1)}h`} sub="prepress time" color="amber" />
+                        <KpiCard icon={CheckCircleIcon} label="Success Rate" value={`${Number(summary.success_rate || 0).toFixed(1)}%`} color="emerald" />
+                        <KpiCard icon={ClockIcon} label="Hours Saved" value={`${Number(summary.hours_saved_total || 0).toFixed(1)}h`} sub="prepress time" color="amber" />
                         <KpiCard icon={BanknotesIcon} label="Value Generated" value={`$${Math.round(summary.value_generated_total).toLocaleString()}`} sub="USD ROI" color="emerald" />
                         <KpiCard icon={ShieldCheckIcon} label="Risk Reduction" value={`${summary.avg_risk_reduction} pts`} sub={`${summary.avg_risk_score_before}→${summary.avg_risk_score_after}`} color="violet" />
                     </div>
@@ -249,7 +249,7 @@ export function AnalyticsPortal() {
                                         <MiniBar value={t.value_generated} max={maxValue} color="bg-emerald-400" />
                                         <span className="text-slate-400">${Math.round(t.value_generated)}</span>
                                     </div>
-                                    <span className="text-right text-amber-600 font-semibold">{t.hours_saved.toFixed(1)}h</span>
+                                    <span className="text-right text-amber-600 font-semibold">{Number(t.hours_saved || 0).toFixed(1)}h</span>
                                     <span className="text-right text-violet-600 font-semibold">-{t.avg_risk_reduction}pts</span>
                                 </div>
                             ))}
@@ -270,7 +270,7 @@ export function AnalyticsPortal() {
                                     <div key={p.policy_slug} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
                                         <div>
                                             <p className="font-semibold text-sm text-slate-800">{p.policy_slug}</p>
-                                            <p className="text-xs text-slate-400">{p.jobs} jobs · {p.success_rate.toFixed(1)}% ok</p>
+                                            <p className="text-xs text-slate-400">{p.jobs} jobs · {Number(p.success_rate || 0).toFixed(1)}% ok</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm font-bold text-emerald-600">${Math.round(p.value_generated).toLocaleString()}</p>
@@ -337,7 +337,7 @@ export function AnalyticsPortal() {
                                                 <span className="text-slate-400">/{b.total_jobs}</span>
                                             </td>
                                             <td className="px-4 py-3 text-right font-bold text-emerald-600">${Math.round(b.value_generated_total).toLocaleString()}</td>
-                                            <td className="px-4 py-3 text-right font-semibold text-amber-600">{b.hours_saved_total.toFixed(1)}h</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-amber-600">{Number(b.hours_saved_total || 0).toFixed(1)}h</td>
                                             <td className="px-4 py-3 text-right font-semibold text-violet-600">-{b.risk_reduction}pts</td>
                                             <td className="px-4 py-3 text-right">
                                                 {['SUCCEEDED', 'PARTIAL'].includes(b.status) && (

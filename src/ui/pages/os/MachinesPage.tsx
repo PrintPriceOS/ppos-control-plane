@@ -70,13 +70,13 @@ export const MachinesPage: React.FC = () => {
     const avgUptime = useMemo(() => {
         const withData = rawMachines.filter(m => m.uptimeScore !== null && m.healthState !== 'OFFLINE');
         if (!withData.length) return null;
-        return (withData.reduce((s, m) => s + (m.uptimeScore || 0), 0) / withData.length).toFixed(1);
+        return Number(withData.reduce((s, m) => s + Number(m.uptimeScore || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
 
     const avgEfficiency = useMemo(() => {
         const withData = rawMachines.filter(m => m.economicEfficiency !== null && m.healthState !== 'OFFLINE');
         if (!withData.length) return null;
-        return (withData.reduce((s, m) => s + (m.economicEfficiency || 0), 0) / withData.length).toFixed(1);
+        return Number(withData.reduce((s, m) => s + Number(m.economicEfficiency || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
 
     const getHealthColor = (state: string) => {

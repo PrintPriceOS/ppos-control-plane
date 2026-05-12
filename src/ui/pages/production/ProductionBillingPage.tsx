@@ -165,7 +165,7 @@ export const ProductionBillingPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white text-right">
                       {entry.entry_type === 'DEBIT' ? '-' : '+'}
-                      {parseFloat(entry.amount).toFixed(2)} {entry.currency}
+                      {Number(parseFloat(entry.amount) || 0).toFixed(2)} {entry.currency}
                     </td>
                     <td className="px-6 py-4">
                       <span className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium">

@@ -452,7 +452,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                                         <span className="truncate font-bold text-slate-800" title={m.nodeId || m.id}>
                                                             Node: {String(m.nodeId || m.id || '').substring(0, 8)}
                                                         </span>
-                                                        <span className="text-emerald-700 font-bold">Fit Score: {m.score ? `${(m.score * 100).toFixed(0)}%` : '98%'}</span>
+                                                        <span className="text-emerald-700 font-bold">Fit Score: {m.score ? `${Number(m.score * 100).toFixed(0)}%` : '98%'}</span>
                                                     </div>
                                                 ))
                                             )}

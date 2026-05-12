@@ -115,7 +115,7 @@ export const SuccessWorkspace: React.FC = () => {
                         <CurrencyEuroIcon className="w-6 h-6 text-primary-light" />
                         <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Revenue at Risk</span>
                     </div>
-                    <div className="text-3xl font-black">€{stats.totalValueAtRisk.toFixed(2)}</div>
+                    <div className="text-3xl font-black">€{Number(stats.totalValueAtRisk || 0).toFixed(2)}</div>
                     <div className="text-[10px] text-slate-400 mt-2">Potential Loss (Estimated Daily)</div>
                 </div>
             </div>

@@ -133,7 +133,7 @@ export const OrdersPage: React.FC = () => {
                         header: 'Price',
                         accessor: (o: Order) => (
                             <span className="font-bold text-slate-900 dark:text-slate-100">
-                                €{Number(o.offer_price).toFixed(2)}
+                                €{Number(o.offer_price || 0).toFixed(2)}
                             </span>
                         ),
                     },
@@ -180,7 +180,7 @@ export const OrdersPage: React.FC = () => {
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Price</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300">€{Number(selectedOrder.offer_price).toFixed(2)}</p>
+                                <p className="font-bold text-slate-700 dark:text-slate-300">€{Number(selectedOrder.offer_price || 0).toFixed(2)}</p>
                             </div>
                             <div className="bg-slate-50 rounded-none p-3 col-span-2">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Print House</p>
