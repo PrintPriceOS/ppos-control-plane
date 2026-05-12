@@ -841,7 +841,10 @@ class ManufacturingPersistenceService {
     let sql = 'SELECT * FROM manufacturing_packages WHERE 1=1';
     const params = [];
 
-    if (filters.tenantId) {
+    if (filters.actorTenantId) {
+      sql += ' AND (tenant_id = ? OR assigned_printer_tenant_id = ?)';
+      params.push(filters.actorTenantId, filters.actorTenantId);
+    } else if (filters.tenantId) {
       sql += ' AND tenant_id = ?';
       params.push(filters.tenantId);
     }

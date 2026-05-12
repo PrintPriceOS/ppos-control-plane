@@ -94,7 +94,7 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         route: '/materials',
         status: 'ACTIVE',
         requiredEndpoints: ['/api/admin/materials'],
-        requiredTables: ['materials_inventory'],
+        requiredTables: ['predictive_material_inventory'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN'],
         description: 'Paper and consumable registry.'
     },

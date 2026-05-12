@@ -106,9 +106,7 @@ class ManufacturingPackageService {
 
     // RBAC: If not SuperAdmin, filter by tenantId (as owner or printer)
     if (context.role !== 'SUPER_ADMIN') {
-        // This is a simplification; a more robust listPackages in persistence
-        // should handle (tenant_id = ? OR assigned_printer_tenant_id = ?)
-        finalFilters.tenantId = context.tenantId;
+        finalFilters.actorTenantId = context.tenantId;
     }
 
     return persistence.listPackages(finalFilters);

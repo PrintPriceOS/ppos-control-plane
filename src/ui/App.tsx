@@ -45,6 +45,8 @@ import { AgentConflicts } from './pages/intelligence/AgentConflicts';
 import { TelemetryTab } from './pages/admin/TelemetryTab';
 import { ForensicsTab } from './pages/admin/ForensicsTab';
 import { IndustrialOpsPage } from './pages/admin/IndustrialOpsPage';
+import { MaterialsPage } from './pages/admin/MaterialsPage';
+import { AuditExplorerPage } from './pages/admin/AuditExplorerPage';
 
 import { PreflightJobsPage } from './pages/preflight/PreflightJobsPage';
 import { PreflightJobDetailPage } from './pages/preflight/PreflightJobDetailPage';
@@ -91,7 +93,7 @@ export const App: React.FC = () => {
                 <Route path="/dashboard" element={<CommandCenterPage />} />
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
-                <Route path="/audit" element={<div className="p-10 text-center font-bold text-slate-500 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-white/10">Audit Explorer Logic Deferred to Batch 3</div>} />
+                <Route path="/audit" element={<div className="p-8"><AuditExplorerPage /></div>} />
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
@@ -163,7 +165,7 @@ export const App: React.FC = () => {
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />
-                <Route path="/materials" element={<div className="p-10 text-center font-bold text-slate-500 italic-text-off uppercase tracking-[0.2em] border-2 border-dashed border-white/10">Material & Paper Catalog Deferred to Batch 3</div>} />
+                <Route path="/materials" element={<div className="p-8"><MaterialsPage /></div>} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />

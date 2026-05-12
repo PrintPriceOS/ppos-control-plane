@@ -162,6 +162,9 @@ router.use('/predictive', require('./predictiveAdmin')); // Forecasting Layer
 router.use('/anomaly', require('./anomalyAdmin')); // Anomaly & Drift Layer
 router.use('/economic', require('./economicAdmin')); // Economic Optimization Layer
 router.use('/machines', require('./machinesAdmin')); // Machine Fleet Layer
+router.use('/materials', require('./materialsAdmin')); // Materials & Paper Catalog
+router.use('/audit', require('./auditExplorerAdmin')); // Forensic Audit Explorer
+router.use('/jobs', require('./jobsAdmin')); // Forensic Jobs Observability Layer
 
 
 
@@ -513,67 +516,7 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
   }
 });
 
-// GET /api/admin/jobs?status=FAILED&tenant=...&limit=50&offset=0
-router.get("/jobs", async (req, res) => {
-  const status = req.query.status || null;
-  const limit = Math.min(Number(req.query.limit || 50), 200);
-  const offset = Math.max(Number(req.query.offset || 0), 0);
-  const context = resolveActorContext(req);
-
-  try {
-    const queueOperator = require("../adapters/queueOperator");
-    
-    // For Printhouse users, we MUST filter jobs. 
-    // If BullMQ doesn't support easy filtering, we might rely on DB fallback or filter in memory
-    // for this v1 implementation.
-    
-    // Phase 7.3: Fetch real jobs from BullMQ
-    const realJobs = await queueOperator.getJobs(undefined, limit, offset);
-    
-    let filteredJobs = realJobs;
-    if (context.isPrinthouseUser) {
-        filteredJobs = (realJobs || []).filter(j => j.data?.tenantId === context.tenantId);
-    }
-    
-    if (realJobs && realJobs.length > 0) {
-      const stats = await queueOperator.getAdminStats();
-      const queueStat = stats.queues[0] || {};
-      
-      return res.json({
-        total: queueStat.size || realJobs.length,
-        jobs: realJobs.map(j => ({
-          id: j.id,
-          tenant_id: j.data?.tenantId || 'system',
-          type: j.name,
-          status: j.status,
-          progress: j.progress || 0,
-          error: j.error,
-          created_at: j.created_at,
-          updated_at: j.finished_at || j.created_at
-        }))
-      });
-    }
-
-    // Fallback to mock / DB logic
-    const [countRow] = await db.query(
-      `SELECT COUNT(*) as total FROM jobs;`,
-      []
-    );
-
-    const rows = await db.query(
-      `SELECT id, tenant_id, type, status, progress, error, created_at, updated_at FROM jobs LIMIT ? OFFSET ?;`,
-      [limit, offset]
-    );
-
-    res.json({
-      total: Number(countRow?.total || 0),
-      jobs: rows
-    });
-  } catch (err) {
-    console.error('[ADMIN-API] Error in Jobs API:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// GET /api/admin/jobs implementation delegated to jobsAdmin.js router
 
 // GET /api/admin/errors/top?range=24h
 router.get("/errors/top", async (req, res) => {
@@ -607,68 +550,7 @@ router.get("/errors/top", async (req, res) => {
   }
 });
 
-// GET /api/admin/audit?tenant_id=...&limit=100
-router.get("/audit", async (req, res) => {
-  const tenant = req.query.tenant_id || null;
-  const jobId = req.query.job_id || null;
-  const requestId = req.query.request_id || null;
-  const action = req.query.action || null;
-  const limit = Math.min(Number(req.query.limit || 100), 500);
-  const context = resolveActorContext(req);
-
-  const where = [];
-  const params = [];
-
-  // Scoping: If printhouse user, force their tenant_id
-  if (context.isPrinthouseUser) {
-      where.push("tenant_id = ?");
-      params.push(context.tenantId);
-  } else if (tenant) {
-      where.push("tenant_id = ?");
-      params.push(tenant);
-  }
-
-  if (jobId) { where.push("resource_id = ? AND resource_type = 'JOB'"); params.push(jobId); }
-  if (requestId) { where.push("request_id = ?"); params.push(requestId); }
-  if (action) { where.push("action = ?"); params.push(action); }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")} ` : "";
-
-  try {
-    const rows = await db.query(
-      `
-      SELECT 
-        id, request_id, tenant_id, deployment_id, action, 
-        resource_type, resource_id as job_id, ip_address, 
-        user_role, governance_snapshot, created_at
-      FROM api_audit_log
-      ${whereSql}
-      ORDER BY created_at DESC
-      LIMIT ?;
-    `,
-      [...params, limit]
-    );
-
-    res.json(rows);
-  } catch (err) {
-    console.error('[ADMIN-API] Error fetching audit logs:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// GET /api/admin/audit/:requestId - Detailed trace for a specific correlation key
-router.get("/audit/trace/:requestId", async (req, res) => {
-  const { requestId } = req.params;
-  try {
-    const rows = await db.query(
-      `SELECT * FROM api_audit_log WHERE request_id = ? ORDER BY created_at ASC`,
-      [requestId]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// Delegated to canonical auditExplorerAdmin router mounted at top priority under /audit
 
 // GET /api/admin/queue  (stats BullMQ)
 router.get("/queue", async (_req, res) => {

@@ -240,7 +240,7 @@ router.get('/packages/:packageId/bundle', async (req, res) => {
  * Find compatible print nodes for a package
  */
 router.post('/packages/:packageId/match', async (req, res) => {
-  const context = resolveContext(req);
+  const context = resolveActorContext(req);
   const packageId = req.params.packageId;
 
   try {

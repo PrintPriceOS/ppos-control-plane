@@ -324,6 +324,31 @@ export async function getJobs(params: {
     return res;
 }
 
+export async function getJobDetail(jobId: string) {
+    return adminFetch<{ ok: boolean, job: any, trace_id?: string | null }>(`/api/admin/jobs/${jobId}`);
+}
+
+export async function getJobTimeline(jobId: string) {
+    return adminFetch<{ ok: boolean, timeline: any[], source_status?: string }>(`/api/admin/jobs/${jobId}/timeline`);
+}
+
+export async function getJobLogs(jobId: string) {
+    return adminFetch<{ ok: boolean, logs: any[], source?: string, source_status?: string }>(`/api/admin/jobs/${jobId}/logs`);
+}
+
+export async function getJobArtifacts(jobId: string) {
+    return adminFetch<{ ok: boolean, artifacts: any[], source_status?: string }>(`/api/admin/jobs/${jobId}/artifacts`);
+}
+
+export async function getJobWorkerDetails(jobId: string) {
+    return adminFetch<{ ok: boolean, worker: any, source_status?: string }>(`/api/admin/jobs/${jobId}/worker`);
+}
+
+export async function getJobResult(jobId: string) {
+    return adminFetch<{ ok: boolean, resulting_state: any, source_status?: string }>(`/api/admin/jobs/${jobId}/result`);
+}
+
+
 export async function getTopErrors(range: Range) {
     return adminFetch<TopErrorRow[]>(`/api/admin/errors/top?range=${range}`);
 }
@@ -1292,3 +1317,129 @@ export async function getLiveSLARisks() {
 export async function getDispatchSLAEvidence(dispatchId: string) {
     return adminFetch<{ ok: boolean, snapshot: any, evidence: any[] }>(`/api/admin/dispatch/${dispatchId}/sla-evidence`);
 }
+
+// --- Materials & Paper Catalog API (Phase 34) ---
+export async function getMaterialsCatalog() {
+    return adminFetch<{ ok: boolean, data: any[] }>('/api/admin/materials');
+}
+
+export async function getNodeMaterialsInventory(nodeId: string) {
+    return adminFetch<{ ok: boolean, data: any[] }>(`/api/admin/materials/node/${encodeURIComponent(nodeId)}`);
+}
+
+export async function getMaterialDetail(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}`);
+}
+
+export async function reserveMaterialCapacity(dispatchId: string, nodeId: string, specs: any) {
+    return adminFetch<{ ok: boolean, reserved: boolean, material_id: string, units: number }>('/api/admin/materials/reserve', {
+        method: 'POST',
+        body: JSON.stringify({ dispatch_id: dispatchId, node_id: nodeId, specs })
+    });
+}
+
+export async function releaseMaterialCapacity(dispatchId: string, nodeId: string, specs: any) {
+    return adminFetch<{ ok: boolean, released: boolean, material_id: string, units: number }>('/api/admin/materials/release', {
+        method: 'POST',
+        body: JSON.stringify({ dispatch_id: dispatchId, node_id: nodeId, specs })
+    });
+}
+
+// --- Forensic Audit Explorer API (Phase 34) ---
+export interface AuditExplorerEvent {
+    id: string;
+    timestamp: string;
+    actor: string;
+    event_type: string;
+    entity_type: string;
+    entity_id: string;
+    severity: string;
+    trace_id: string;
+    source_service: string;
+    message: string;
+    metadata_json?: any;
+    tenant_id: string;
+}
+
+export async function getAuditLogs(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, count: number, data: AuditExplorerEvent[] }>(`/api/admin/audit?${qs.toString()}`);
+}
+
+export async function getAuditDetail(id: string) {
+    return adminFetch<{ ok: boolean, data: AuditExplorerEvent, lineage?: AuditExplorerEvent[] }>(`/api/admin/audit/${encodeURIComponent(id)}`);
+}
+
+export async function getAuditEntityTimeline(entityType: string, entityId: string) {
+    return adminFetch<{ ok: boolean, entityType: string, entityId: string, timeline: AuditExplorerEvent[] }>(`/api/admin/audit/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
+}
+
+// --- Manufacturing / Production Packages API (Phase 34) ---
+export interface ProductionPackage {
+    id: string;
+    tenant_id: string;
+    source: string;
+    source_job_id: string;
+    source_artifact_id: string;
+    fixed_pdf_artifact_id?: string | null;
+    certified_pdf_artifact_id?: string | null;
+    book_spec_json?: any;
+    preflight_report_json?: any;
+    policy_id?: string;
+    status: 'DRAFT' | 'READY_FOR_DISPATCH' | 'DISPATCHED' | 'ACCEPTED_BY_PRINTER' | 'REJECTED_BY_PRINTER' | 'IN_PRODUCTION' | 'COMPLETED' | 'CANCELLED';
+    created_by_user_id: string;
+    assigned_printer_tenant_id?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export async function listProductionPackages(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, packages: ProductionPackage[] }>(`/api/admin/production/packages?${qs.toString()}`);
+}
+
+export async function getProductionPackageDetail(packageId: string) {
+    return adminFetch<{ ok: boolean, package: ProductionPackage }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}`);
+}
+
+export async function updateProductionPackageStatus(packageId: string, status: string) {
+    return adminFetch<{ ok: boolean, package: ProductionPackage }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+    });
+}
+
+export async function matchProductionPackageNodes(packageId: string) {
+    return adminFetch<{ ok: boolean, matches?: any[], scores?: any }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/match`, {
+        method: 'POST'
+    });
+}
+
+export async function dispatchProductionPackage(packageId: string, payload: { nodeId: string, message?: string, expiresAt?: string }) {
+    return adminFetch<{ ok: boolean, dispatch?: any }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/dispatch`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function listProductionNodes(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, nodes: any[] }>(`/api/admin/production/nodes?${qs.toString()}`);
+}
+
+
