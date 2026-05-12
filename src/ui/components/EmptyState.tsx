@@ -1,5 +1,5 @@
 import React from 'react';
-import { TYPOGRAPHY } from '../design-system/tokens';
+import { TYPOGRAPHY, COLORS } from '../design-system/tokens';
 
 export interface EmptyStateProps {
   title?: React.ReactNode;
@@ -17,17 +17,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   className = ''
 }) => {
   return (
-    <div className={`flex flex-col items-center justify-center p-12 text-center bg-[#0B0F14] border border-[#1F2430] ${className}`}>
+    <div className={`flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-zinc-950 border ${COLORS.adaptive.borderPrimary} ${className}`}>
       {icon && (
-        <div className="mb-4 text-[#8F96A3] opacity-60">
+        <div className={`mb-4 ${COLORS.adaptive.textMuted}`}>
           {icon}
         </div>
       )}
-      <span className={TYPOGRAPHY.scale.h3.className} style={{ color: '#E6E6EB' }}>
+      <span className={`${TYPOGRAPHY.scale.h3.className} ${COLORS.adaptive.textPrimary}`}>
         {title}
       </span>
       {description && (
-        <p className="mt-2 max-w-md font-inter text-[13px] text-[#8F96A3] leading-relaxed">
+        <p className={`mt-2 max-w-md font-inter text-[13px] ${COLORS.adaptive.textSecondary} leading-relaxed`}>
           {description}
         </p>
       )}

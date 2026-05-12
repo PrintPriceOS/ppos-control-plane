@@ -1,5 +1,5 @@
 import React from 'react';
-import { TYPOGRAPHY } from '../design-system/tokens';
+import { TYPOGRAPHY, COLORS } from '../design-system/tokens';
 
 export interface SectionHeaderProps {
   title: React.ReactNode;
@@ -17,10 +17,10 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   className = ''
 }) => {
   return (
-    <div className={`flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-[#1F2430] pb-4 ${className}`}>
+    <div className={`flex flex-col md:flex-row md:items-start justify-between gap-4 border-b ${COLORS.adaptive.borderPrimary} pb-4 ${className}`}>
       <div className="space-y-1 max-w-3xl">
         <div className="flex items-center gap-3">
-          <h2 className={TYPOGRAPHY.scale.h2.className} style={{ color: '#E6E6EB' }}>
+          <h2 className={`${TYPOGRAPHY.scale.h2.className} ${COLORS.adaptive.textPrimary}`}>
             {title}
           </h2>
           {subtitle && (
@@ -30,7 +30,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
           )}
         </div>
         {description && (
-          <p className="font-inter text-[14px] font-normal leading-relaxed text-[#8F96A3]">
+          <p className={`font-inter text-[14px] font-normal leading-relaxed ${COLORS.adaptive.textSecondary}`}>
             {description}
           </p>
         )}

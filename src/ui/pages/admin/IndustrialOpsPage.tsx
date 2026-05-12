@@ -8,7 +8,8 @@ import {
     ExclamationTriangleIcon,
     ClockIcon,
     AcademicCapIcon,
-    BanknotesIcon
+    BanknotesIcon,
+    MapIcon
 } from "@heroicons/react/24/outline";
 import { ArtifactRegistryTab } from "./ArtifactRegistryTab";
 import { WorkerFleetTab } from "./WorkerFleetTab";
@@ -25,29 +26,29 @@ import { IndustrialGovernanceTab } from "./IndustrialGovernanceTab";
 import { IndustrialTemporalTab } from "./IndustrialTemporalTab";
 import { IndustrialSimulationTab } from "./IndustrialSimulationTab";
 import { IndustrialMapTab } from "./IndustrialMapTab";
-import { MapIcon } from "@heroicons/react/24/outline";
+import { COLORS } from "../../design-system/tokens";
 
 export const IndustrialOpsPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'live' | 'intelligence' | 'economics' | 'governance' | 'temporal' | 'simulation' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle' | 'map'>('map');
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 italic-text-off">
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-[var(--ppos-text)] tracking-tight">Industrial Operations</h1>
-                    <p className="text-sm text-[var(--ppos-text-muted)] font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
+                    <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>Industrial Operations</h1>
+                    <p className={`text-sm ${COLORS.adaptive.textSecondary} font-medium tracking-tight`}>High-fidelity orchestration and governance for distributed infrastructure.</p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-none shrink-0">
-                    <div className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">System Operational</span>
+                <div className="flex items-center gap-2 px-3 py-1 bg-[#10B981]/10 border border-[#10B981]/20 rounded-none shrink-0">
+                    <div className="w-2 h-2 rounded-none bg-[#10B981] animate-pulse" />
+                    <span className="text-[10px] font-black text-[#10B981] uppercase tracking-widest">System Operational</span>
                 </div>
             </div>
 
             {/* Categorized Industrial Navigation with Canonical Theme Tokens */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[var(--ppos-surface-muted)] p-2 border border-[var(--ppos-border)] shadow-none">
+            <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${COLORS.adaptive.surfaceMuted} p-2 border ${COLORS.adaptive.borderPrimary} shadow-none`}>
                 {/* Operational Group */}
                 <div className="space-y-2">
-                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
+                    <h3 className={`px-3 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest flex items-center gap-2`}>
                         <BoltIcon className="w-3 h-3" />
                         Operational
                     </h3>
@@ -60,8 +61,8 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
 
                 {/* Intelligence Group */}
-                <div className="space-y-2 border-t md:border-t-0 md:border-l border-[var(--ppos-border)] pt-2 md:pt-0 md:pl-4">
-                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
+                <div className={`space-y-2 border-t md:border-t-0 md:border-l ${COLORS.adaptive.borderSubtle} pt-2 md:pt-0 md:pl-4`}>
+                    <h3 className={`px-3 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest flex items-center gap-2`}>
                         <AcademicCapIcon className="w-3 h-3" />
                         Intelligence
                     </h3>
@@ -75,8 +76,8 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
 
                 {/* Governance Group */}
-                <div className="space-y-2 border-t md:border-t-0 md:border-l border-[var(--ppos-border)] pt-2 md:pt-0 md:pl-4">
-                    <h3 className="px-3 text-[10px] font-black text-[var(--ppos-text-muted)] uppercase tracking-widest flex items-center gap-2">
+                <div className={`space-y-2 border-t md:border-t-0 md:border-l ${COLORS.adaptive.borderSubtle} pt-2 md:pt-0 md:pl-4`}>
+                    <h3 className={`px-3 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest flex items-center gap-2`}>
                         <ShieldCheckIcon className="w-3 h-3" />
                         Governance
                     </h3>
@@ -114,13 +115,13 @@ export const IndustrialOpsPage: React.FC = () => {
 const TabButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: any, label: string }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-1.5 px-3 py-1.5 transition-all border ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors border rounded-none ${
             active 
-            ? 'bg-[var(--ppos-surface)] text-[var(--ppos-text)] border-[var(--ppos-border)] font-black shadow-sm' 
-            : 'text-[var(--ppos-text-muted)] border-transparent hover:text-[var(--ppos-text)] font-bold hover:bg-white/5 dark:hover:bg-white/[0.02]'
+            ? `${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} ${COLORS.adaptive.borderPrimary} font-black shadow-none` 
+            : `${COLORS.adaptive.textMuted} border-transparent hover:border-zinc-400/20 font-bold ${COLORS.adaptive.hoverSurface}`
         }`}
     >
-        <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-primary dark:text-red-500' : 'text-[var(--ppos-text-muted)]'}`} />
+        <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#dc0000]' : COLORS.adaptive.textMuted}`} />
         <span className="text-[11px] uppercase tracking-tight">{label}</span>
     </button>
 );

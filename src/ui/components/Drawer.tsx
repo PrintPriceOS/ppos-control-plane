@@ -1,15 +1,17 @@
 import React, { Fragment } from 'react';
 import { Dialog, Transition, TransitionChild, DialogPanel, DialogTitle } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { COLORS, TYPOGRAPHY } from '../design-system/tokens';
 
 interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children }) => {
+export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }) => {
   return (
     <Transition show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -22,7 +24,7 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" />
+          <div className={`fixed inset-0 ${COLORS.drawers.overlay} transition-opacity`} />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-hidden">
@@ -37,26 +39,26 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children
                 leaveFrom="translate-x-0"
                 leaveTo="translate-x-full"
               >
-                <DialogPanel className="pointer-events-auto w-screen max-w-xl">
-                  <div className="flex h-full flex-col overflow-y-scroll bg-white shadow-2xl">
-                    <div className="px-6 py-6 sm:px-8 border-b border-slate-100">
+                <DialogPanel className={`pointer-events-auto w-screen ${maxWidth}`}>
+                  <div className={`flex h-full flex-col overflow-y-scroll ${COLORS.drawers.panel}`}>
+                    <div className={COLORS.drawers.header}>
                       <div className="flex items-start justify-between">
-                        <DialogTitle className="text-xl font-black text-slate-900 tracking-tight">
+                        <DialogTitle className={`${TYPOGRAPHY.scale.h2.className} ${COLORS.adaptive.textPrimary}`}>
                           {title}
                         </DialogTitle>
                         <div className="ml-3 flex h-7 items-center">
                           <button
                             type="button"
-                            className="rounded-none bg-slate-50 text-slate-400 hover:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 p-2 transition-all"
+                            className={`rounded-none focus:outline-none ${COLORS.drawers.closeBtn}`}
                             onClick={onClose}
                           >
                             <span className="sr-only">Close panel</span>
-                            <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
                           </button>
                         </div>
                       </div>
                     </div>
-                    <div className="relative flex-1 px-6 py-8 sm:px-8">
+                    <div className={`relative flex-1 ${COLORS.drawers.body}`}>
                       {children}
                     </div>
                   </div>
