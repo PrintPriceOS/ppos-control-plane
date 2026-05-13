@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const FormData = require('form-data');
 const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const gateway = require('../services/preflightContractGateway');
 const db = require('../services/mysqlClient');
@@ -259,103 +260,16 @@ router.post('/jobs', upload.single('file'), async (req, res) => {
 
         res.status(201).json({ ok: true, job: upstreamResponse, source_status: 'LIVE_UPSTREAM' });
     } catch (err) {
-        console.warn(`[ADMIN-PREFLIGHT-ROUTER] Upstream creation failed: ${err.message}. Triggering absolute LOCAL_FALLBACK execution strategy.`);
-        
-        const fallbackJobId = `job_fb_${Date.now()}`;
-        const fallbackStatus = 'COMPLETED';
-        const originalFilename = req.file ? req.file.originalname : 'document.pdf';
-        const fileSize = req.file ? req.file.size : 1024;
-        
-        const fallbackResponse = {
-            id: fallbackJobId,
-            jobId: fallbackJobId,
-            status: fallbackStatus,
-            policy: context.policy,
-            type: context.type,
-            progress: 100,
-            analysisIntegrity: 'DEGRADED_FALLBACK',
-            clientValidation: 'MAGIC_BYTES_VERIFIED',
-            executionStrategy: context.type,
-            artifacts: [
-                {
-                    id: `art_fb_${Date.now()}_fixed`,
-                    artifactId: `art_fb_${Date.now()}_fixed`,
-                    type: 'OUTPUT',
-                    filename: `repaired_${originalFilename}`,
-                    sizeBytes: fileSize,
-                    path: 'local-fallback-storage/fixed.pdf'
-                },
-                {
-                    id: `art_fb_${Date.now()}_report`,
-                    artifactId: `art_fb_${Date.now()}_report`,
-                    type: 'REPORT',
-                    filename: `report_${originalFilename}.json`,
-                    sizeBytes: 512,
-                    path: 'local-fallback-storage/report.json'
-                }
-            ],
-            summary: {
-                totalPages: 1,
-                issues: 0,
-                findings: 1,
-                warnings: 0
-            },
-            issues: [],
-            findings: [
-                {
-                    id: 'FND-FALLBACK-01',
-                    severity: 'INFO',
-                    message: 'Job processed locally in air-gapped fallback mode due to upstream service unavailability.',
-                    category: 'System Configuration'
-                }
-            ],
-            warnings: [],
-            timestamp: new Date().toISOString()
-        };
-
-        try {
-            await db.query(`
-                INSERT INTO preflight_job_registry 
-                (job_id, tenant_id, printhouse_id, operator_id, status, policy, type, progress, file_size_bytes, original_filename, canonical_payload_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                fallbackJobId,
-                context.tenantId,
-                context.printhouseId,
-                context.operatorId,
-                fallbackStatus,
-                context.policy,
-                context.type,
-                100,
-                fileSize,
-                originalFilename,
-                JSON.stringify(fallbackResponse)
-            ]);
-
-            for (const art of fallbackResponse.artifacts) {
-                await db.query(`
-                    INSERT IGNORE INTO preflight_artifact_registry 
-                    (artifact_id, job_id, tenant_id, artifact_type, filename, size_bytes, storage_path)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                `, [
-                    art.id,
-                    fallbackJobId,
-                    context.tenantId,
-                    art.type,
-                    art.filename,
-                    art.sizeBytes,
-                    art.path
-                ]);
+        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_JOB', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        return res.status(err.status || 502).json({
+            ok: false,
+            source_status: 'UPSTREAM_UNAVAILABLE',
+            error: {
+                code: 'PREFLIGHT_UPSTREAM_ERROR',
+                message: err.message,
+                details: err.upstreamResponse || null
             }
-
-            await logAuditEvent({ tenantId: context.tenantId, jobId: fallbackJobId, action: 'CREATE_JOB_FALLBACK', status: 'SUCCESS', message: err.message, traceId: context.traceId });
-            
-            return res.status(201).json({ ok: true, job: fallbackResponse, source_status: 'LOCAL_FALLBACK' });
-        } catch (dbErr) {
-            console.error('[ADMIN-PREFLIGHT-ROUTER] DB insertion also failed during LOCAL_FALLBACK:', dbErr.message);
-            await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_JOB', status: 'FAILURE', message: err.message, traceId: context.traceId });
-            return res.status(err.status || 503).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: err.message, details: err.upstreamResponse } });
-        }
+        });
     }
 });
 
@@ -374,37 +288,30 @@ router.get('/jobs/:jobId', async (req, res) => {
         let livePayload = null;
         let sourceStatus = 'PERSISTENT_REGISTRY';
 
-        if (jobId.startsWith('job_fb_')) {
-            sourceStatus = 'LOCAL_FALLBACK';
+        try {
+            livePayload = await gateway.getJob(jobId, context);
+            if (livePayload) {
+                sourceStatus = 'LIVE_UPSTREAM';
+                const currentStatus = livePayload.status || localRecord?.status || 'COMPLETED';
+                await db.query(`
+                    INSERT INTO preflight_job_registry 
+                    (job_id, tenant_id, status, canonical_payload_json)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                    status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
+                `, [
+                    jobId,
+                    localRecord?.tenant_id || context.tenantId,
+                    currentStatus,
+                    JSON.stringify(livePayload)
+                ]);
+            }
+        } catch (upstreamErr) {
+            console.warn(`[ADMIN-PREFLIGHT-ROUTER] Live hydration failed for ${jobId}, relying on persistent registry:`, upstreamErr.message);
             if (!localRecord) {
-                return res.status(404).json({ ok: false, source_status: 'LOCAL_FALLBACK', error: { message: `Fallback Job ${jobId} not found locally.` } });
+                return res.status(upstreamErr.status || 404).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: `Job ${jobId} not found upstream or locally.` } });
             }
-        } else {
-            try {
-                livePayload = await gateway.getJob(jobId, context);
-                if (livePayload) {
-                    sourceStatus = 'LIVE_UPSTREAM';
-                    const currentStatus = livePayload.status || localRecord?.status || 'COMPLETED';
-                    await db.query(`
-                        INSERT INTO preflight_job_registry 
-                        (job_id, tenant_id, status, canonical_payload_json)
-                        VALUES (?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE 
-                        status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
-                    `, [
-                        jobId,
-                        localRecord?.tenant_id || context.tenantId,
-                        currentStatus,
-                        JSON.stringify(livePayload)
-                    ]);
-                }
-            } catch (upstreamErr) {
-                console.warn(`[ADMIN-PREFLIGHT-ROUTER] Live hydration failed for ${jobId}, relying on persistent registry:`, upstreamErr.message);
-                if (!localRecord) {
-                    return res.status(upstreamErr.status || 404).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: `Job ${jobId} not found upstream or locally.` } });
-                }
-                sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
-            }
+            sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
         }
 
         const rawCanonical = livePayload || (localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null);
@@ -430,29 +337,11 @@ router.get('/jobs/:jobId', async (req, res) => {
 });
 
 // --- 4. POST /api/admin/preflight/jobs/:jobId/actions/fix ---
-router.post('/jobs/:jobId/actions/fix', async (req, res) => {
+router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
+    console.log(`[ADMIN-PREFLIGHT][FIX] Triggering fix operation for job ${jobId}`);
     try {
-        if (jobId.startsWith('job_fb_')) {
-            console.log(`[ADMIN-PREFLIGHT-ROUTER] Intercepting fix action natively for local fallback job ${jobId}`);
-            await db.query('UPDATE preflight_job_registry SET status = ?, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
-            
-            setTimeout(() => {
-                db.query('UPDATE preflight_job_registry SET status = ?, progress = 100, updated_at = NOW() WHERE job_id = ?', ['COMPLETED', jobId]).catch(() => {});
-            }, 600);
-
-            const fbResult = {
-                jobId,
-                status: 'PROCESSING',
-                action: 'FIX',
-                strategy: 'LOCAL_FALLBACK_REPAIR',
-                timestamp: new Date().toISOString()
-            };
-            await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_FIX_FALLBACK', status: 'SUCCESS', traceId: context.traceId });
-            return res.json({ ok: true, result: fbResult, source_status: 'LOCAL_FALLBACK' });
-        }
-
         const options = { ...(req.body || {}) };
         if (options.policy) {
             options.policy = await resolveCanonicalPolicyId(options.policy, context);
@@ -466,45 +355,33 @@ router.post('/jobs/:jobId/actions/fix', async (req, res) => {
         res.json({ ok: true, result: responsePayload, source_status: 'LIVE_UPSTREAM' });
     } catch (err) {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_FIX', status: 'FAILURE', message: err.message, traceId: context.traceId });
-        res.status(err.status || 503).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: err.message, details: err.upstreamResponse } });
+        
+        const status = err.status || 502;
+        if (status === 404 || err.message?.includes('404') || err.message?.includes('NOT_FOUND')) {
+            return res.status(404).json({ ok: false, error: 'JOB_NOT_FOUND', message: 'Requested job could not be found for fix operation.' });
+        }
+        return res.status(502).json({ ok: false, error: 'PREFLIGHT_UPSTREAM_ERROR', message: err.message || 'Preflight upstream service encountered an error during fix.' });
     }
 });
 
 // --- 5. POST /api/admin/preflight/jobs/:jobId/actions/retry ---
-router.post('/jobs/:jobId/actions/retry', async (req, res) => {
+router.post(['/jobs/:jobId/actions/retry', '/jobs/:jobId/retry'], async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
+    console.log(`[ADMIN-PREFLIGHT][RETRY] Triggering retry operation for job ${jobId}`);
     try {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_RETRY', status: 'ATTEMPTING', traceId: context.traceId });
 
-        if (jobId.startsWith('job_fb_')) {
-            await db.query('UPDATE preflight_job_registry SET status = ?, progress = 10, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
-            setTimeout(() => {
-                db.query('UPDATE preflight_job_registry SET status = ?, progress = 100, updated_at = NOW() WHERE job_id = ?', ['COMPLETED', jobId]).catch(() => {});
-            }, 600);
-            return res.json({ ok: true, result: { jobId, status: 'PROCESSING', retryMode: 'LOCAL_FALLBACK' }, source_status: 'LOCAL_FALLBACK' });
-        }
-
-        try {
-            const result = await gateway._execute('POST', `/api/v2/jobs/${encodeURIComponent(jobId)}/actions/retry`, null, context);
-            return res.json({ ok: true, result, source_status: 'LIVE_UPSTREAM' });
-        } catch (upstreamErr) {
-            const status = upstreamErr.status === 404 ? 501 : (upstreamErr.status || 503);
-            const message = upstreamErr.status === 404 ? 'Retry operation is not natively implemented on the upstream V2 engine contract.' : upstreamErr.message;
-            
-            await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_RETRY', status: 'UNSUPPORTED', message, traceId: context.traceId });
-            
-            return res.status(status).json({
-                ok: false,
-                source_status: 'UPSTREAM_UNSUPPORTED',
-                error: {
-                    code: status === 501 ? 'NOT_IMPLEMENTED' : 'UPSTREAM_ERROR',
-                    message
-                }
-            });
-        }
+        // For now re-run analysis only if original input exists, otherwise return controlled 409:
+        // { ok:false, error:"RETRY_NOT_IMPLEMENTED", message:"Retry requires source input requeue support." }
+        // Do not 404.
+        return res.status(409).json({
+            ok: false,
+            error: "RETRY_NOT_IMPLEMENTED",
+            message: "Retry requires source input requeue support."
+        });
     } catch (err) {
-        res.status(500).json({ ok: false, error: { message: err.message } });
+        return res.status(502).json({ ok: false, error: 'PREFLIGHT_UPSTREAM_ERROR', message: err.message });
     }
 });
 
@@ -554,41 +431,20 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
 // --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
 router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     const context = buildGatewayContext(req);
-    const { jobId, artifactId } = req.params;
+    const { jobId } = req.params;
+    let { artifactId } = req.params;
+    
+    console.log(`[ADMIN-PREFLIGHT][ARTIFACT] Fetching artifact ${artifactId} for job ${jobId}`);
+    
+    // Decode artifact IDs only if needed, but pass canonical artifactId safely
+    if (artifactId && artifactId.includes('%')) {
+        try {
+            artifactId = decodeURIComponent(artifactId);
+        } catch (e) {}
+    }
+
     try {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${artifactId}`, traceId: context.traceId });
-
-        if (jobId.startsWith('job_fb_') || artifactId.startsWith('art_fb_')) {
-            console.log(`[ADMIN-PREFLIGHT-ROUTER] Streaming authentic local fallback artifact buffer for ${artifactId}`);
-            if (artifactId.includes('report') || artifactId.endsWith('_report')) {
-                const fallbackReport = {
-                    jobId,
-                    status: 'COMPLETED',
-                    integrityMode: 'LOCAL_FALLBACK',
-                    validation: 'MAGIC_BYTES_VERIFIED',
-                    timestamp: new Date().toISOString(),
-                    summary: { totalPages: 1, issues: 0, findings: 1, warnings: 0 },
-                    findings: [
-                        {
-                            id: 'FND-FALLBACK-01',
-                            severity: 'INFO',
-                            message: 'Job processed locally in air-gapped fallback mode due to upstream service unavailability.',
-                            category: 'System Configuration'
-                        }
-                    ]
-                };
-                res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Content-Disposition', `attachment; filename="report_${jobId}.json"`);
-                await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT_FALLBACK', status: 'SUCCESS', traceId: context.traceId });
-                return res.send(Buffer.from(JSON.stringify(fallbackReport, null, 2)));
-            }
-
-            const minimalPdfBase64 = "JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSPj4Kc3RyZWFtCkJVCnN0cmVhbWVuZAplbmRvYmoKMyAwIG9iagoyCmVuZG9iago0IDAgb2JqCjw8L1R5cGUvUGFnZS9NZWRpYUJveFswIDAgNTk1IDg0Ml0vUGFyZW50IDUgMCBSL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA2IDAgUj4+Pj4vQ29udGVudHMgMiAwIFI+PgplbmRvYmoKNSAwIG9iago8PC9UeXBlL0VnZXMvQ291bnQgMS9LaWRzWzQgMCBSXT4+CmVuZG9iago2IDAgb2JqCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1R5cGUxL0Jhc2VGb250L0hlbHZldGljYT4+CmVuZG9iagoxIDAgb2JqCjw8L1R5cGUvQ2F0YWxvZy9QYWdlcyA1IDAgUj4+CmVuZG9iagp4cmVmCjAgNwowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAyNDMgMDAwMDAgbiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDYxIDAwMDAwIG4gCjAwMDAwMDAwODAgMDAwMDAgbiAKMDAwMDAwMDE4MiAwMDAwMCBuIAowMDAwMDAwMjQzIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA3L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMzk0CiUlRU9GCg==";
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="repaired_${jobId}.pdf"`);
-            await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT_FALLBACK', status: 'SUCCESS', traceId: context.traceId });
-            return res.send(Buffer.from(minimalPdfBase64, 'base64'));
-        }
 
         const streamResponse = await gateway.getArtifact(jobId, artifactId, context);
         
@@ -603,7 +459,12 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         return res.send(Buffer.from(streamResponse.data));
     } catch (err) {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'FAILURE', message: err.message, traceId: context.traceId });
-        res.status(err.status || 503).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: err.message } });
+        
+        const status = err.status || 502;
+        if (status === 404 || err.message?.includes('404') || err.message?.includes('NOT_FOUND')) {
+            return res.status(404).json({ ok: false, error: 'ARTIFACT_NOT_FOUND', message: 'Requested artifact could not be found.' });
+        }
+        return res.status(502).json({ ok: false, error: 'PREFLIGHT_UPSTREAM_ERROR', message: err.message || 'Preflight upstream service encountered an error.' });
     }
 });
 
@@ -790,9 +651,9 @@ router.get('/policies', async (req, res) => {
         return res.json({
             ok: true,
             available: true,
-            source: 'local_contract_fallback',
+            source: 'static_catalog_default',
             policies: canonicalFallbackPolicies,
-            source_status: 'LOCAL_FALLBACK',
+            source_status: 'STATIC_DEFAULT',
             upstream_status: err.status || 503,
             error: { code: 'UPSTREAM_POLICIES_UNAVAILABLE', message: err.message }
         });
@@ -819,29 +680,16 @@ router.post('/batches', upload.any(), async (req, res) => {
 
         res.status(201).json({ ok: true, batch: batchResult, source_status: 'LIVE_UPSTREAM' });
     } catch (err) {
-        console.warn(`[ADMIN-PREFLIGHT-ROUTER] Upstream batch creation failed: ${err.message}. Triggering absolute LOCAL_FALLBACK execution strategy.`);
-        
-        const fallbackBatchId = `batch_fb_${Date.now()}`;
-        const fallbackBatchResponse = {
-            id: fallbackBatchId,
-            batchId: fallbackBatchId,
-            status: 'COMPLETED',
-            policy: context.policy || 'OFFSET_MODERN_COATED_F51',
-            totalJobs: req.files ? req.files.length : 1,
-            completedJobs: req.files ? req.files.length : 1,
-            failedJobs: 0,
-            jobs: (req.files || []).map((f, idx) => ({
-                id: `job_fb_b_${Date.now()}_${idx}`,
-                jobId: `job_fb_b_${Date.now()}_${idx}`,
-                status: 'COMPLETED',
-                filename: f.originalname || `document_${idx}.pdf`,
-                progress: 100
-            })),
-            timestamp: new Date().toISOString()
-        };
-
-        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_BATCH_FALLBACK', status: 'SUCCESS', message: err.message, traceId: context.traceId });
-        return res.status(201).json({ ok: true, batch: fallbackBatchResponse, source_status: 'LOCAL_FALLBACK' });
+        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_BATCH', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        return res.status(err.status || 502).json({
+            ok: false,
+            source_status: 'UPSTREAM_UNAVAILABLE',
+            error: {
+                code: 'PREFLIGHT_UPSTREAM_ERROR',
+                message: err.message,
+                details: err.upstreamResponse || null
+            }
+        });
     }
 });
 

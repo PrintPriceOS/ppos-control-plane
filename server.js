@@ -260,6 +260,11 @@ const start = async () => {
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
 
+            console.log('[ROUTES][ADMIN-PREFLIGHT][REGISTERED] /api/admin/preflight/jobs');
+            console.log('[ROUTES][ADMIN-PREFLIGHT][REGISTERED] /api/admin/preflight/jobs/:jobId/fix');
+            console.log('[ROUTES][ADMIN-PREFLIGHT][REGISTERED] /api/admin/preflight/jobs/:jobId/retry');
+            console.log('[ROUTES][ADMIN-PREFLIGHT][REGISTERED] /api/admin/preflight/jobs/:jobId/artifacts/:artifactId');
+
             // Industrial Observability Hook
             fastify.addHook('onResponse', (request, reply, done) => {
                 try {
