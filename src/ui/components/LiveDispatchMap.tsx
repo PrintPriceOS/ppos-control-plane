@@ -110,8 +110,9 @@ export const LiveDispatchMap: React.FC = () => {
                 {/* Regional Clusters (Heatmap) */}
                 {Array.isArray(heatmap) && heatmap.map((h: any) => {
                     const pos = project(h.center.lat, h.center.lng);
-                    const isSaturated = h.status === 'SATURATED';
-                    const clusterColor = isSaturated ? (isLight ? '#dc0000' : '#ef4444') : (isLight ? '#2563eb' : '#3b82f6');
+                    const isSupplyExhausted = h.status === 'SUPPLY_EXHAUSTED' || h.has_supply_risk;
+                    const isSaturated = h.status === 'SATURATED' || isSupplyExhausted;
+                    const clusterColor = isSupplyExhausted ? (isLight ? '#9333ea' : '#c084fc') : isSaturated ? (isLight ? '#dc0000' : '#ef4444') : (isLight ? '#2563eb' : '#3b82f6');
                     return (
                         <circle 
                             key={h.region}
@@ -125,14 +126,24 @@ export const LiveDispatchMap: React.FC = () => {
                 })}
 
                 {/* Nodes */}
-                {Array.isArray(mapState?.nodes) && mapState.nodes.map((node: MapNode) => {
+                {Array.isArray(mapState?.nodes) && mapState.nodes.map((node: any) => {
                     const pos = project(node.lat, node.lng);
-                    const color = node.status === 'ONLINE' ? (isLight ? '#059669' : '#10b981') : 
+                    const hasShortage = node.has_material_shortage || node.hasMaterialShortage;
+                    const color = hasShortage ? (isLight ? '#9333ea' : '#c084fc') :
+                                  node.status === 'ONLINE' ? (isLight ? '#059669' : '#10b981') : 
                                   node.status === 'DEGRADED' ? (isLight ? '#d97706' : '#f59e0b') : 
                                   node.status === 'OFFLINE' ? (isLight ? '#a1a1aa' : '#4b5563') : (isLight ? '#dc0000' : '#ef4444');
 
                     return (
                         <g key={node.id} className="cursor-pointer group/node" onClick={() => (window as any).openMachine?.(node.id)}>
+                            {hasShortage && (
+                                <circle 
+                                    cx={pos.x} cy={pos.y} r="2.2" 
+                                    fill={isLight ? '#9333ea' : '#c084fc'} 
+                                    fillOpacity="0.3"
+                                    className="animate-ping pointer-events-none"
+                                />
+                            )}
                             <circle 
                                 cx={pos.x} cy={pos.y} r="0.8" 
                                 fill={color} 
@@ -144,7 +155,7 @@ export const LiveDispatchMap: React.FC = () => {
                                 textAnchor="middle" 
                                 className={`text-[1.5px] font-black uppercase tracking-tighter opacity-0 group-hover/node:opacity-100 transition-opacity pointer-events-none ${isLight ? 'fill-zinc-900' : 'fill-white/60'}`}
                             >
-                                {node.name}
+                                {node.name} {hasShortage ? '(EXHAUSTED)' : ''}
                             </text>
                         </g>
                     );
@@ -173,10 +184,10 @@ export const LiveDispatchMap: React.FC = () => {
                         {Array.isArray(heatmap) && heatmap.slice(0, 4).map((h: any) => (
                             <div key={h.region} className="flex items-center gap-3">
                                 <div className={`w-20 h-1 rounded-none overflow-hidden ${isLight ? 'bg-zinc-100' : 'bg-white/5'}`}>
-                                    <div className="h-full bg-[#dc0000]" style={{ width: `${h.pressure}%` }} />
+                                    <div className={`h-full ${h.status === 'SUPPLY_EXHAUSTED' || h.has_supply_risk ? 'bg-purple-500' : 'bg-[#dc0000]'}`} style={{ width: `${h.pressure}%` }} />
                                 </div>
                                 <span className={`text-[7px] font-black uppercase w-12 ${isLight ? 'text-zinc-900' : 'text-white'}`}>{h.region}</span>
-                                <span className={`text-[7px] font-black ${h.status === 'SATURATED' ? 'text-[#dc0000]' : 'text-zinc-500'}`}>{h.pressure}%</span>
+                                <span className={`text-[7px] font-black ${h.status === 'SUPPLY_EXHAUSTED' || h.has_supply_risk ? 'text-purple-400' : h.status === 'SATURATED' ? 'text-[#dc0000]' : 'text-zinc-500'}`}>{h.status === 'SUPPLY_EXHAUSTED' || h.has_supply_risk ? 'RISK' : `${h.pressure}%`}</span>
                             </div>
                         ))}
                     </div>
@@ -196,6 +207,10 @@ export const LiveDispatchMap: React.FC = () => {
                 <div className="flex items-center gap-1.5 sm:gap-2">
                     <div className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-none ${isLight ? 'bg-[#dc0000]' : 'bg-red-500'}`} />
                     <span className="text-[6px] sm:text-[7px] font-black text-zinc-500 uppercase">Saturation</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-none ${isLight ? 'bg-purple-600' : 'bg-purple-500'}`} />
+                    <span className="text-[6px] sm:text-[7px] font-black text-zinc-500 uppercase">Exhausted</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                     <div className={`w-2 sm:w-3 h-[1px] border-t border-dashed ${isLight ? 'border-[#dc0000]' : 'border-red-500/60'}`} />

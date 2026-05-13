@@ -143,7 +143,7 @@ export const AuditExplorerPage: React.FC = () => {
                         </span>
                         <span className="text-xs font-mono text-slate-400 dark:text-slate-500">IMMUTABLE TRACEABILITY</span>
                     </div>
-                    <h1 className="text-xl font-black font-sans tracking-tight text-slate-900 dark:text-white mt-1 flex items-center uppercase">
+                    <h1 className="text-xl font-black font-sans tracking-tight text-slate-900 dark:text-white mt-1 flex items-center">
                         <ShieldCheckIcon className="w-5 h-5 mr-2 text-amber-600 dark:text-amber-500" />
                         Audit Explorer
                     </h1>

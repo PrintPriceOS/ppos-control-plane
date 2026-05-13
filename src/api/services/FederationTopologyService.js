@@ -187,6 +187,22 @@ class FederationTopologyService {
                 });
             }
 
+            const criticalNodesSet = new Set();
+            try {
+                const shortRows = await db.query(`
+                    SELECT node_id 
+                    FROM predictive_material_inventory 
+                    WHERE procurement_risk = 'CRITICAL' OR (current_stock_units - reserved_stock_units) <= 0
+                `);
+                if (shortRows && Array.isArray(shortRows)) {
+                    shortRows.forEach(r => {
+                        if (r && r.node_id) criticalNodesSet.add(r.node_id);
+                    });
+                }
+            } catch (err) {
+                logger.warn({ event: 'predictive_material_map_enrichment_warn', error: err.message });
+            }
+
             const warnings = [];
             let missingCoordinatesCount = 0;
             const validNodes = [];
@@ -237,6 +253,7 @@ class FederationTopologyService {
 
                 const pressure = n.queuePressure !== undefined ? n.queuePressure : (n.utilization || 0);
                 const statusStr = n.status || 'ONLINE';
+                const hasShortage = criticalNodesSet.has(n.id) || criticalNodesSet.has(n.printHouseId);
 
                 validNodes.push({
                     id: n.id,
@@ -257,7 +274,9 @@ class FederationTopologyService {
                     queuePressure: pressure,
                     utilization: pressure,
                     capacity_utilization_pct: pressure,
-                    is_active: statusStr !== 'OFFLINE'
+                    is_active: statusStr !== 'OFFLINE',
+                    has_material_shortage: hasShortage,
+                    hasMaterialShortage: hasShortage
                 });
             });
 
@@ -366,17 +385,46 @@ class FederationTopologyService {
                 { region: 'eu-north', node_count: 2, avg_utilization: 45, total_jobs: 5, total_backlog: 1 }
             ];
 
+            const regionalRiskMap = new Map();
+            try {
+                const matRisks = await db.query(`
+                    SELECT p.region, COUNT(*) as risk_count
+                    FROM predictive_material_inventory m
+                    JOIN print_nodes p ON m.node_id = p.id
+                    WHERE m.procurement_risk = 'CRITICAL' OR (m.current_stock_units - m.reserved_stock_units) <= 0
+                    GROUP BY p.region
+                `);
+                if (matRisks && Array.isArray(matRisks)) {
+                    matRisks.forEach(r => {
+                        if (r && r.region) regionalRiskMap.set(r.region, r.risk_count);
+                    });
+                }
+            } catch (e) {
+                logger.warn({ event: 'regional_material_risk_query_warn', error: e.message });
+            }
+
             return rows.map(r => {
                 const util = parseFloat(r.avg_utilization || 0);
                 const totalBacklog = parseFloat(r.total_backlog || 0);
-                const pressure = (util * 0.7) + (Math.min(100, (totalBacklog / 10)) * 0.3);
+                const regStr = r.region || 'eu-central';
+                const matRiskCount = regionalRiskMap.get(regStr) || 0;
+                
+                // Add pressure weight for critical material shortages in the region
+                const basePressure = (util * 0.7) + (Math.min(100, (totalBacklog / 10)) * 0.3);
+                const pressure = Math.min(100, basePressure + (matRiskCount * 15));
+                
+                let status = pressure > 85 ? 'SATURATED' : pressure > 65 ? 'HIGH_PRESSURE' : 'HEALTHY';
+                if (matRiskCount > 0 && status !== 'SATURATED') {
+                    status = 'SUPPLY_EXHAUSTED';
+                }
                 
                 return {
-                    region: r.region || 'eu-central',
+                    region: regStr,
                     node_count: r.node_count || 1,
                     utilization: util.toFixed(2),
                     pressure: pressure.toFixed(2),
-                    status: pressure > 85 ? 'SATURATED' : pressure > 65 ? 'HIGH_PRESSURE' : 'HEALTHY',
+                    status: status,
+                    has_supply_risk: matRiskCount > 0,
                     center: this._getRegionCenter(r.region)
                 };
             });

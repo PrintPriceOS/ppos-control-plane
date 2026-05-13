@@ -26,7 +26,7 @@ export const JobsPage: React.FC = () => {
       {/* High-Density Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight uppercase">Jobs & Pipeline Visibility Console</h1>
+          <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Jobs & Pipeline Visibility Console</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Real-time status of all preflight and autofix requests across the regional BullMQ stack.</p>
         </div>
         <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 dark:text-zinc-500">

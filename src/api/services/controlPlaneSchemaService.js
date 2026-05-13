@@ -405,9 +405,30 @@ class ControlPlaneSchemaService {
                     shortage_risk VARCHAR(32) DEFAULT 'NONE',
                     depletion_forecast_days INT DEFAULT 30,
                     operational_status VARCHAR(32) DEFAULT 'AVAILABLE',
+                    daily_burn_rate DECIMAL(10,2) DEFAULT 0.00,
+                    forecasted_depletion_date TIMESTAMP NULL,
+                    procurement_risk VARCHAR(32) DEFAULT 'LOW',
+                    supplier_name VARCHAR(128) NULL,
+                    cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_node (node_id)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS material_machine_compatibility (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    material_id VARCHAR(64) NOT NULL,
+                    machine_profile_id VARCHAR(64) NOT NULL,
+                    compatibility_status ENUM('OPTIMAL', 'CERTIFIED', 'SUPPORTED', 'EXPERIMENTAL', 'UNSUPPORTED') DEFAULT 'OPTIMAL',
+                    wear_factor DECIMAL(3,2) DEFAULT 1.00,
+                    max_speed_ppm INT NULL,
+                    notes TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_mat_machine (material_id, machine_profile_id),
+                    INDEX idx_material (material_id),
+                    INDEX idx_machine (machine_profile_id)
                 ) ENGINE=InnoDB;
             `);
 
@@ -422,19 +443,20 @@ class ControlPlaneSchemaService {
                     const defaultNodeId = nodes.length > 0 ? (nodes[0].id || 'node-default') : 'node-alpha-1';
                     
                     const baselineMaterials = [
-                        { id: 'mat-p-100g', name: 'Premium Uncoated Text', type: 'PAPER', gsm: 100, finish: 'UNCOATED', stock: 25000, reserved: 4500, risk: 'NONE', forecast: 45, status: 'AVAILABLE' },
-                        { id: 'mat-p-130g', name: 'Silk Premium Digital', type: 'PAPER', gsm: 130, finish: 'SILK', stock: 12000, reserved: 9500, risk: 'SHORTAGE_RISK', forecast: 6, status: 'SHORTAGE_RISK' },
-                        { id: 'mat-p-300g', name: 'Heavyweight Glossy Cover', type: 'PAPER', gsm: 300, finish: 'GLOSSY', stock: 4500, reserved: 500, risk: 'NONE', forecast: 60, status: 'AVAILABLE' },
-                        { id: 'mat-p-80g', name: 'Standard Bond Recycled', type: 'PAPER', gsm: 80, finish: 'MATTE', stock: 2200, reserved: 2100, risk: 'SHORTAGE_RISK', forecast: 2, status: 'LOW_STOCK' },
-                        { id: 'mat-ink-c', name: 'Industrial Cyan Toner Cartridge', type: 'INK', gsm: null, finish: null, stock: 12, reserved: 2, risk: 'NONE', forecast: 120, status: 'AVAILABLE' }
+                        { id: 'mat-p-100g', name: 'Premium Uncoated Text', type: 'PAPER', gsm: 100, finish: 'UNCOATED', stock: 25000, reserved: 4500, risk: 'NONE', forecast: 45, status: 'AVAILABLE', burn: 450.00, procRisk: 'LOW', supplier: 'Sappi Fine Paper', cost: 0.0450 },
+                        { id: 'mat-p-130g', name: 'Silk Premium Digital', type: 'PAPER', gsm: 130, finish: 'SILK', stock: 12000, reserved: 9500, risk: 'SHORTAGE_RISK', forecast: 6, status: 'SHORTAGE_RISK', burn: 1850.00, procRisk: 'HIGH', supplier: 'Mondi Group PLC', cost: 0.0620 },
+                        { id: 'mat-p-300g', name: 'Heavyweight Glossy Cover', type: 'PAPER', gsm: 300, finish: 'GLOSSY', stock: 4500, reserved: 500, risk: 'NONE', forecast: 60, status: 'AVAILABLE', burn: 65.00, procRisk: 'LOW', supplier: 'Stora Enso Industrial', cost: 0.1850 },
+                        { id: 'mat-p-80g', name: 'Standard Bond Recycled', type: 'PAPER', gsm: 80, finish: 'MATTE', stock: 2200, reserved: 2100, risk: 'SHORTAGE_RISK', forecast: 2, status: 'LOW_STOCK', burn: 950.00, procRisk: 'CRITICAL', supplier: 'UPM-Kymmene Corp', cost: 0.0210 },
+                        { id: 'mat-ink-c', name: 'Industrial Cyan Toner Cartridge', type: 'INK', gsm: null, finish: null, stock: 12, reserved: 2, risk: 'NONE', forecast: 120, status: 'AVAILABLE', burn: 0.08, procRisk: 'MEDIUM', supplier: 'Heidelberger Druckmaschinen AG', cost: 185.0000 }
                     ];
 
                     for (const bm of baselineMaterials) {
+                        const depDate = new Date(Date.now() + bm.forecast * 86400000).toISOString().slice(0, 19).replace('T', ' ');
                         await db.query(`
                             INSERT IGNORE INTO predictive_material_inventory 
-                            (id, node_id, material_name, material_type, paper_gsm, finish, current_stock_units, reserved_stock_units, shortage_risk, depletion_forecast_days, operational_status)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        `, [bm.id, defaultNodeId, bm.name, bm.type, bm.gsm, bm.finish, bm.stock, bm.reserved, bm.risk, bm.forecast, bm.status]);
+                            (id, node_id, material_name, material_type, paper_gsm, finish, current_stock_units, reserved_stock_units, shortage_risk, depletion_forecast_days, operational_status, daily_burn_rate, forecasted_depletion_date, procurement_risk, supplier_name, cost_per_unit)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `, [bm.id, defaultNodeId, bm.name, bm.type, bm.gsm, bm.finish, bm.stock, bm.reserved, bm.risk, bm.forecast, bm.status, bm.burn, depDate, bm.procRisk, bm.supplier, bm.cost]);
                     }
                 }
             } catch (seedErr) {
@@ -545,6 +567,13 @@ class ControlPlaneSchemaService {
             await this.ensureColumn('print_node_machine_profiles', 'status', "ENUM('ACTIVE', 'MAINTENANCE', 'OFFLINE') DEFAULT 'ACTIVE' AFTER profile_type");
             await this.ensureColumn('print_node_machine_profiles', 'manufacturer', 'VARCHAR(128) NULL AFTER profile_name');
             await this.ensureColumn('print_node_machine_profiles', 'model', 'VARCHAR(128) NULL AFTER manufacturer');
+
+            // PHASE 3 - MES Materials Orchestration Hardening
+            await this.ensureColumn('predictive_material_inventory', 'daily_burn_rate', 'DECIMAL(10,2) DEFAULT 0.00');
+            await this.ensureColumn('predictive_material_inventory', 'forecasted_depletion_date', 'TIMESTAMP NULL');
+            await this.ensureColumn('predictive_material_inventory', 'procurement_risk', "VARCHAR(32) DEFAULT 'LOW'");
+            await this.ensureColumn('predictive_material_inventory', 'supplier_name', 'VARCHAR(128) NULL');
+            await this.ensureColumn('predictive_material_inventory', 'cost_per_unit', 'DECIMAL(10,4) DEFAULT 0.0000');
 
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
 

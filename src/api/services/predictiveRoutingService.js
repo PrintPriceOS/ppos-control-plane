@@ -33,16 +33,20 @@ class PredictiveRoutingService {
 
         // 3. Augment with material forecast
         const materialShortages = await materialService.forecastDepletion(base.best_node.id);
-        if (materialShortages.length > 0) {
-            predictiveScore -= 30;
-            warnings.push(`PREDICTIVE_MATERIAL_SHORTAGE: ${materialShortages.map(s => s.material).join(', ')}`);
+        const hasMaterialShortage = materialShortages.length > 0;
+        
+        if (hasMaterialShortage) {
+            predictiveScore -= 50; // Critical penalty threshold
+            warnings.push(`PREDICTIVE_MATERIAL_SHORTAGE: Substrate capacity unconfirmed or depleted for ${materialShortages.map(s => s.material).join(', ')}`);
         }
 
         return {
             ...base,
             predictive_score: Math.max(predictiveScore, 0),
             predictive_warnings: warnings,
-            is_predictive: true
+            is_predictive: true,
+            is_routable: !hasMaterialShortage, // Strict gatekeeping parameter preventing assignment to nodes without stock
+            routing_blocked_by_material_shortage: hasMaterialShortage
         };
     }
 }

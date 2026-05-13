@@ -45,7 +45,7 @@ export const ProductionBillingPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-6 shadow-none">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-zinc-100 tracking-tight flex items-center gap-3 uppercase">
+          <h1 className="text-2xl font-black text-slate-900 dark:text-zinc-100 tracking-tight flex items-center gap-3">
             <BanknotesIcon className="w-8 h-8 text-emerald-600 dark:text-green-400" />
             Financial Settlement
           </h1>

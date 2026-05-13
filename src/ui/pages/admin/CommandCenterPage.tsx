@@ -81,12 +81,11 @@ const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', st
       )}
     </div>
     <div className="flex-1 overflow-auto p-4 custom-scrollbar relative min-h-[100px]">
-      {status === 'loading' && (
-        <div className={`absolute inset-0 ${COLORS.adaptive.surface} bg-opacity-80 backdrop-blur-[1px] flex items-center justify-center z-10`}>
+      {status === 'loading' ? (
+        <div className="flex items-center justify-center h-full min-h-[100px]">
           <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-800 border-t-[#dc0000] rounded-none animate-spin" />
         </div>
-      )}
-      {status === 'error' ? (
+      ) : status === 'error' ? (
         <div className="flex flex-col items-center justify-center h-full text-center p-4">
           <ExclamationTriangleIcon className="w-8 h-8 text-[#dc0000] mb-2 opacity-50" />
           <span className="text-[10px] font-black text-[#dc0000] uppercase">Telemetry Disconnect</span>
@@ -403,7 +402,7 @@ export const CommandCenterPage: React.FC = () => {
       {/* Header */}
       <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-4`}>
         <div>
-          <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} uppercase tracking-tight`}>Control Plane</h1>
+          <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>Control Plane</h1>
           <p className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>Operational Intelligence</p>
         </div>
         <div className="flex gap-4">
@@ -464,13 +463,6 @@ export const CommandCenterPage: React.FC = () => {
 
           <IncidentBridge />
           <IntelligenceAnomalies />
-
-          <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
-            <div className="grid grid-cols-2 gap-2">
-              <CommandButton label="Pause" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
-              <CommandButton label="Resume" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
-            </div>
-          </TacticalPanel>
         </div>
 
         {/* COLUMN 3: ECONOMY & LOGISTICS */}
@@ -536,6 +528,16 @@ export const CommandCenterPage: React.FC = () => {
         </div>
         <div className="lg:col-span-3">
            <RoutingSimulationPanel />
+        </div>
+
+        {/* SYSTEM COMMAND CONSOLE */}
+        <div className="lg:col-span-3">
+          <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <CommandButton label="Pause Queue Orchestration" badge="Emergency Global Stop" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
+              <CommandButton label="Resume Queue Orchestration" badge="Re-engage Worker Hubs" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
+            </div>
+          </TacticalPanel>
         </div>
       </div>
 

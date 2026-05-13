@@ -111,12 +111,22 @@ class MaterialAvailabilityService {
 
             const available = mat.current_stock_units - mat.reserved_stock_units;
             
+            // Derive robust Daily Burn Rate based on active dispatch backlog intensity plus base decay
+            let baseBurn = Number(mat.daily_burn_rate) || (mat.material_type === 'PAPER' ? 250 : 0.05);
+            const actualBurnRate = Math.max(0.01, baseBurn + (projectedUsage / 7)); // Distributed over 7 days rolling execution
+            const forecastDays = Math.min(365, Math.max(1, Math.round(available / actualBurnRate)));
+            const forecastedDate = new Date(Date.now() + forecastDays * 86400000);
+            const formattedDateSql = forecastedDate.toISOString().slice(0, 19).replace('T', ' ');
+
             // Derive/Update Shortage Risk dynamically
             let risk = 'NONE';
             let status = mat.operational_status;
+            let procRisk = mat.procurement_risk || 'LOW';
+
             if (available < projectedUsage) {
                 risk = 'SHORTAGE_RISK';
                 status = 'SHORTAGE_RISK';
+                procRisk = 'CRITICAL';
                 logger.warn({ 
                     event: 'predictive_material_shortage', 
                     nodeId, 
@@ -133,18 +143,24 @@ class MaterialAvailabilityService {
             } else if (available < 1000) {
                 risk = 'LOW_STOCK';
                 status = available <= 0 ? 'UNAVAILABLE' : 'LOW_STOCK';
+                procRisk = available <= 0 ? 'CRITICAL' : 'HIGH';
             } else {
                 risk = 'NONE';
                 status = 'AVAILABLE';
+                procRisk = forecastDays < 14 ? 'MEDIUM' : 'LOW';
             }
 
-            // Save forecast updates back if mutated
-            if (mat.shortage_risk !== risk || mat.operational_status !== status) {
-                await db.query(
+            // Save forecast updates back dynamically
+            await db.query(
+                "UPDATE predictive_material_inventory SET daily_burn_rate = ?, depletion_forecast_days = ?, forecasted_depletion_date = ?, shortage_risk = ?, operational_status = ?, procurement_risk = ? WHERE id = ?",
+                [actualBurnRate.toFixed(2), forecastDays, formattedDateSql, risk, status, procRisk, mat.id]
+            ).catch(() => {
+                // Graceful fallback if new columns are not yet completely applied in isolated runtimes
+                return db.query(
                     "UPDATE predictive_material_inventory SET shortage_risk = ?, operational_status = ? WHERE id = ?",
                     [risk, status, mat.id]
                 );
-            }
+            });
         }
 
         return shortages;
