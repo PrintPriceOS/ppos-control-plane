@@ -366,15 +366,22 @@ class MaterialAvailabilityService {
                 sql = "SELECT * FROM predictive_material_inventory";
             }
 
-            let orderBy = "i.id DESC";
+            let orderBy = isJoinSupported ? "i.id DESC" : "id DESC";
             if (colNames.includes('created_at')) {
-                orderBy = "i.created_at DESC";
+                orderBy = isJoinSupported ? "i.created_at DESC" : "created_at DESC";
             } else if (colNames.includes('material_name')) {
-                orderBy = "i.material_name ASC";
+                orderBy = isJoinSupported ? "i.material_name ASC" : "material_name ASC";
             }
 
             sql += ` ORDER BY ${orderBy}`;
             const allRows = await db.query(sql);
+
+            logger.info({
+                event: 'materials_service_query_result',
+                rowCount: allRows.length,
+                firstRow: allRows[0] || null
+            });
+
             const totalInventoryRows = allRows.length;
 
             // Apply tenant filter

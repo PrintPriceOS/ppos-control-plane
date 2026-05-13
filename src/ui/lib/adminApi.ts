@@ -1492,12 +1492,44 @@ export async function getDispatchSLAEvidence(dispatchId: string) {
 }
 
 // --- Materials & Paper Catalog API (Phase 34) ---
+const normalizeMaterialsResponse = (response: any) => {
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.materials)) return response.materials;
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.inventory)) return response.inventory;
+    if (Array.isArray(response?.items)) return response.items;
+    if (Array.isArray(response?.rows)) return response.rows;
+    return [];
+};
+
 export async function getMaterialsCatalog() {
-    return adminFetch<{ ok: boolean, data: any[] }>('/api/admin/materials');
+    const res = await adminFetch<any>(`/api/admin/materials?_ts=${Date.now()}`);
+    const normalized = normalizeMaterialsResponse(res);
+    console.info('[MATERIALS][API][RAW]', res);
+    console.info('[MATERIALS][API][NORMALIZED_COUNT]', normalized.length);
+    console.info('[MATERIALS][API][FIRST]', normalized[0]);
+    return { 
+        ok: true, 
+        data: normalized,
+        materials: normalized,
+        summary: res?.summary || null,
+        source_status: res?.source_status 
+    };
 }
 
 export async function getNodeMaterialsInventory(nodeId: string) {
-    return adminFetch<{ ok: boolean, data: any[] }>(`/api/admin/materials/node/${encodeURIComponent(nodeId)}`);
+    const res = await adminFetch<any>(`/api/admin/materials/node/${encodeURIComponent(nodeId)}?_ts=${Date.now()}`);
+    const normalized = normalizeMaterialsResponse(res);
+    console.info('[MATERIALS][API][NODE_RAW]', res);
+    console.info('[MATERIALS][API][NODE_NORMALIZED_COUNT]', normalized.length);
+    console.info('[MATERIALS][API][NODE_FIRST]', normalized[0]);
+    return { 
+        ok: true, 
+        data: normalized,
+        materials: normalized,
+        summary: res?.summary || null,
+        source_status: res?.source_status 
+    };
 }
 
 export async function getMaterialDetail(id: string) {

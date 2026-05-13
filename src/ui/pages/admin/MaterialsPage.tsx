@@ -101,7 +101,15 @@ export const MaterialsPage: React.FC = () => {
             } else {
                 res = await adminApi.getMaterialsCatalog();
             }
-            setMaterials(Array.isArray(res?.data) ? res.data : []);
+            const loaded = Array.isArray(res?.materials) ? res.materials : (Array.isArray(res?.data) ? res.data : []);
+            console.info('[MATERIALS][PAGE][LOADED]', {
+                rawCount: res?.materials?.length || res?.data?.length,
+                materialsCount: loaded?.length,
+                filteredCount: loaded?.length,
+                nodeFilter: targetNodeId,
+                first: loaded?.[0]
+            });
+            setMaterials(loaded);
             setLoading(false);
         } catch (err: any) {
             console.error("Failed to fetch materials catalog:", err);

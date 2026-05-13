@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const materialService = require('../services/materialAvailabilityService');
+const logger = require('../services/logger').child('materials-route');
 
 // Helper to extract multi-tenant scope from request context
 function getScopeContext(req) {
@@ -37,10 +38,44 @@ router.get('/', async (req, res) => {
             printhouseId: scope.printhouseId,
             isSuperAdmin: scope.isSuperAdmin
         });
+        
+        const materialsArray = Array.isArray(rows) ? rows : (Array.isArray(rows?.materials) ? rows.materials : []);
+        const registeredStockUnits = materialsArray.reduce((acc, m) => acc + (Number(m.current_stock_units) || 0), 0);
+        const reservedCapacityLocks = materialsArray.reduce((acc, m) => acc + (Number(m.reserved_stock_units) || 0), 0);
+        const netAvailablePool = registeredStockUnits - reservedCapacityLocks;
+        const shortageImpactIndicators = materialsArray.filter(m => m.status === 'CRITICAL' || m.shortage_risk === 'SHORTAGE_RISK').length;
+
+        const payload = {
+            ok: true,
+            materials: materialsArray,
+            summary: {
+                registeredStockUnits,
+                reservedCapacityLocks,
+                netAvailablePool,
+                shortageImpactIndicators
+            }
+        };
         if (rows && rows.source_status) {
-            return res.json(rows);
+            payload.source_status = rows.source_status;
         }
-        res.json({ ok: true, data: rows });
+
+        logger.info({
+            event: 'materials_route_response_shape',
+            isArray: Array.isArray(payload),
+            keys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+            count:
+                Array.isArray(payload) ? payload.length :
+                payload?.materials?.length ??
+                payload?.data?.length ??
+                payload?.inventory?.length ??
+                payload?.items?.length ??
+                0,
+            first: Array.isArray(payload)
+                ? payload[0]
+                : payload?.materials?.[0] ?? payload?.data?.[0] ?? payload?.inventory?.[0] ?? payload?.items?.[0]
+        });
+
+        res.json(payload);
     } catch (err) {
         console.error('[MATERIALS-API] Failed to fetch catalog:', err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIALS_FETCH_ERROR' });
