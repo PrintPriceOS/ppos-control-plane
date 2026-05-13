@@ -11,10 +11,17 @@ const materialService = require('../services/materialAvailabilityService');
 
 // Helper to extract multi-tenant scope from request context
 function getScopeContext(req) {
+    const isSuper = req.headers['x-user-role'] === 'SUPER_ADMIN' || 
+                    req.headers['x-role'] === 'SUPER_ADMIN' || 
+                    req.query.role === 'SUPER_ADMIN' || 
+                    req.query.user_role === 'SUPER_ADMIN' || 
+                    (req.user && req.user.role === 'SUPER_ADMIN') || 
+                    false;
     return {
         tenantId: req.headers['x-tenant-id'] || req.query.tenant_id || 'ppos-production',
         printhouseId: req.headers['x-printhouse-id'] || req.query.printhouse_id || null,
-        operatorId: req.headers['x-operator-id'] || req.body.operator_id || req.query.operator_id || 'operator-dashboard'
+        operatorId: req.headers['x-operator-id'] || req.body.operator_id || req.query.operator_id || 'operator-dashboard',
+        isSuperAdmin: isSuper
     };
 }
 
@@ -27,7 +34,8 @@ router.get('/', async (req, res) => {
     try {
         const rows = await materialService.getAllMaterials({
             tenantId: scope.tenantId,
-            printhouseId: scope.printhouseId
+            printhouseId: scope.printhouseId,
+            isSuperAdmin: scope.isSuperAdmin
         });
         if (rows && rows.source_status) {
             return res.json(rows);

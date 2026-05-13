@@ -344,43 +344,98 @@ class MaterialAvailabilityService {
             }
 
             const colNames = columns.map(c => c.Field);
-            let sql = "SELECT * FROM predictive_material_inventory WHERE 1=1";
-            const params = [];
+            const isJoinSupported = colNames.includes('material_catalog_id');
 
-            if (filters.tenantId && filters.tenantId !== 'ppos-production' && colNames.includes('tenant_id')) {
-                sql += " AND tenant_id = ?";
-                params.push(filters.tenantId);
-            }
-            if (filters.printhouseId && colNames.includes('printhouse_id')) {
-                sql += " AND printhouse_id = ?";
-                params.push(filters.printhouseId);
-            }
-            if (filters.nodeId && colNames.includes('node_id')) {
-                sql += " AND node_id = ?";
-                params.push(filters.nodeId);
+            let sql = "";
+            if (isJoinSupported) {
+                sql = `
+                    SELECT 
+                        i.*, 
+                        c.material_name AS catalog_material_name,
+                        c.material_type AS catalog_material_type,
+                        c.substrate_class AS catalog_substrate_class,
+                        c.gsm AS catalog_gsm,
+                        c.sheet_format AS catalog_sheet_format,
+                        c.finish_type AS catalog_finish_type,
+                        c.supplier_name AS catalog_supplier_name,
+                        c.cost_per_unit AS catalog_cost_per_unit
+                    FROM predictive_material_inventory i
+                    LEFT JOIN materials_catalog c ON i.material_catalog_id = c.id
+                `;
+            } else {
+                sql = "SELECT * FROM predictive_material_inventory";
             }
 
-            let orderBy = "id DESC";
+            let orderBy = "i.id DESC";
             if (colNames.includes('created_at')) {
-                orderBy = "created_at DESC";
+                orderBy = "i.created_at DESC";
             } else if (colNames.includes('material_name')) {
-                orderBy = "material_name ASC";
+                orderBy = "i.material_name ASC";
             }
 
             sql += ` ORDER BY ${orderBy}`;
-            const rows = await db.query(sql, params);
+            const allRows = await db.query(sql);
+            const totalInventoryRows = allRows.length;
 
-            return rows.map(r => {
-                const avail = (r.current_stock_units || 0) - (r.reserved_stock_units || 0);
-                const rop = r.reorder_point || 5000;
+            // Apply tenant filter
+            let afterTenantRows = allRows;
+            if (!filters.isSuperAdmin && filters.tenantId && filters.tenantId !== 'ppos-production') {
+                afterTenantRows = allRows.filter(r => {
+                    const rTenant = r.tenant_id || 'ppos-production';
+                    return rTenant === filters.tenantId;
+                });
+            }
+            const rowsAfterTenantFilter = afterTenantRows.length;
+
+            // Apply node filter
+            let afterNodeRows = afterTenantRows;
+            if (filters.nodeId && filters.nodeId.trim() !== "") {
+                const targetNode = filters.nodeId.trim();
+                afterNodeRows = afterTenantRows.filter(r => r.node_id === targetNode);
+            }
+            const rowsAfterNodeFilter = afterNodeRows.length;
+
+            // Log temporal stats requested by user
+            logger.info({
+                event: 'material_inventory_audit_logging',
+                metrics: {
+                    total_inventory_rows: totalInventoryRows,
+                    rows_after_tenant_filter: rowsAfterTenantFilter,
+                    rows_after_node_filter: rowsAfterNodeFilter,
+                    rows_returned_to_frontend: rowsAfterNodeFilter
+                },
+                filters_applied: filters
+            });
+
+            return afterNodeRows.map(r => {
+                const matName = r.catalog_material_name || r.material_name || 'Unnamed Material';
+                const matType = r.catalog_material_type || r.material_type || 'PAPER';
+                const printhouseId = r.printhouse_id || r.node_id || null;
+                const tenantId = r.tenant_id || 'ppos-production';
+                const gsm = r.catalog_gsm || r.paper_gsm || null;
+                const finish = r.catalog_finish_type || r.finish || 'UNCOATED';
+                const supplier = r.catalog_supplier_name || r.supplier_name || 'Generic Supplier';
+                const cost = r.catalog_cost_per_unit || r.cost_per_unit || 0.05;
+
+                const avail = (Number(r.current_stock_units) || 0) - (Number(r.reserved_stock_units) || 0);
+                const rop = Number(r.reorder_point) || 5000;
                 let computedStatus = r.status || 'STABLE';
                 if (!r.status || r.status === 'UNKNOWN' || r.status === 'AVAILABLE') {
                     if (avail <= 0) computedStatus = 'CRITICAL';
                     else if (avail <= rop) computedStatus = 'AT_RISK';
                     else computedStatus = 'STABLE';
                 }
+
                 return {
                     ...r,
+                    material_name: matName,
+                    material_type: matType,
+                    printhouse_id: printhouseId,
+                    tenant_id: tenantId,
+                    paper_gsm: gsm,
+                    finish: finish,
+                    supplier_name: supplier,
+                    cost_per_unit: cost,
                     available_units: avail,
                     status: computedStatus
                 };
@@ -396,19 +451,66 @@ class MaterialAvailabilityService {
      */
     async getMaterialById(id) {
         try {
-            const rows = await db.query("SELECT * FROM predictive_material_inventory WHERE id = ?", [id]);
+            let columns = [];
+            try {
+                columns = await db.query("SHOW COLUMNS FROM predictive_material_inventory");
+            } catch (err) {}
+            const colNames = (columns || []).map(c => c.Field);
+            const isJoinSupported = colNames.includes('material_catalog_id');
+
+            let sql = "";
+            if (isJoinSupported) {
+                sql = `
+                    SELECT 
+                        i.*, 
+                        c.material_name AS catalog_material_name,
+                        c.material_type AS catalog_material_type,
+                        c.substrate_class AS catalog_substrate_class,
+                        c.gsm AS catalog_gsm,
+                        c.sheet_format AS catalog_sheet_format,
+                        c.finish_type AS catalog_finish_type,
+                        c.supplier_name AS catalog_supplier_name,
+                        c.cost_per_unit AS catalog_cost_per_unit
+                    FROM predictive_material_inventory i
+                    LEFT JOIN materials_catalog c ON i.material_catalog_id = c.id
+                    WHERE i.id = ?
+                `;
+            } else {
+                sql = "SELECT * FROM predictive_material_inventory WHERE id = ?";
+            }
+
+            const rows = await db.query(sql, [id]);
             const r = rows[0];
             if (!r) return null;
-            const avail = (r.current_stock_units || 0) - (r.reserved_stock_units || 0);
-            const rop = r.reorder_point || 5000;
+
+            const matName = r.catalog_material_name || r.material_name || 'Unnamed Material';
+            const matType = r.catalog_material_type || r.material_type || 'PAPER';
+            const printhouseId = r.printhouse_id || r.node_id || null;
+            const tenantId = r.tenant_id || 'ppos-production';
+            const gsm = r.catalog_gsm || r.paper_gsm || null;
+            const finish = r.catalog_finish_type || r.finish || 'UNCOATED';
+            const supplier = r.catalog_supplier_name || r.supplier_name || 'Generic Supplier';
+            const cost = r.catalog_cost_per_unit || r.cost_per_unit || 0.05;
+
+            const avail = (Number(r.current_stock_units) || 0) - (Number(r.reserved_stock_units) || 0);
+            const rop = Number(r.reorder_point) || 5000;
             let computedStatus = r.status || 'STABLE';
             if (!r.status || r.status === 'UNKNOWN' || r.status === 'AVAILABLE') {
                 if (avail <= 0) computedStatus = 'CRITICAL';
                 else if (avail <= rop) computedStatus = 'AT_RISK';
                 else computedStatus = 'STABLE';
             }
+
             return {
                 ...r,
+                material_name: matName,
+                material_type: matType,
+                printhouse_id: printhouseId,
+                tenant_id: tenantId,
+                paper_gsm: gsm,
+                finish: finish,
+                supplier_name: supplier,
+                cost_per_unit: cost,
                 available_units: avail,
                 status: computedStatus
             };
@@ -421,22 +523,8 @@ class MaterialAvailabilityService {
      * Retrieves current inventory for a specific node.
      */
     async getInventory(nodeId) {
-        try {
-            const rows = await db.query("SELECT * FROM predictive_material_inventory WHERE node_id = ?", [nodeId]);
-            return rows.map(r => {
-                const avail = (r.current_stock_units || 0) - (r.reserved_stock_units || 0);
-                const rop = r.reorder_point || 5000;
-                let computedStatus = r.status || 'STABLE';
-                if (!r.status || r.status === 'UNKNOWN' || r.status === 'AVAILABLE') {
-                    if (avail <= 0) computedStatus = 'CRITICAL';
-                    else if (avail <= rop) computedStatus = 'AT_RISK';
-                    else computedStatus = 'STABLE';
-                }
-                return { ...r, available_units: avail, status: computedStatus };
-            });
-        } catch (e) {
-            return [];
-        }
+        const res = await this.getAllMaterials({ nodeId, isSuperAdmin: true });
+        return Array.isArray(res) ? res : [];
     }
 
     /**

@@ -472,7 +472,7 @@ export const MaterialsPage: React.FC = () => {
                     <div className="absolute top-0 left-0 h-full w-1 bg-zinc-700 group-hover:bg-red-500 transition-colors" />
                     <span className="text-[10px] font-manrope text-zinc-500 block uppercase tracking-wider font-bold">Shortage Impact Indicators</span>
                     <span className={`text-2xl font-bold font-manrope block mt-1 ${
-                        criticalCount > 0 ? 'text-red-500 animate-pulse' : (isLight ? 'text-zinc-300' : 'text-zinc-300')
+                        criticalCount > 0 ? 'text-red-500 animate-pulse' : (isLight ? 'text-zinc-700' : 'text-zinc-300')
                     }`}>
                         {criticalCount}
                     </span>
