@@ -13,16 +13,16 @@ const logger = require('../services/logger').child('materials-route');
 
 // Helper to extract multi-tenant scope from request context
 function getScopeContext(req) {
-    const isSuper = req.headers['x-user-role'] === 'SUPER_ADMIN' || 
-                    req.headers['x-role'] === 'SUPER_ADMIN' || 
-                    req.query.role === 'SUPER_ADMIN' || 
-                    req.query.user_role === 'SUPER_ADMIN' || 
-                    (req.user && req.user.role === 'SUPER_ADMIN') || 
+    const isSuper = req.headers?.['x-user-role'] === 'SUPER_ADMIN' || 
+                    req.headers?.['x-role'] === 'SUPER_ADMIN' || 
+                    req.query?.role === 'SUPER_ADMIN' || 
+                    req.query?.user_role === 'SUPER_ADMIN' || 
+                    (req.user && req.user?.role === 'SUPER_ADMIN') || 
                     false;
     return {
-        tenantId: req.headers['x-tenant-id'] || req.query.tenant_id || 'ppos-production',
-        printhouseId: req.headers['x-printhouse-id'] || req.query.printhouse_id || null,
-        operatorId: req.headers['x-operator-id'] || req.body.operator_id || req.query.operator_id || 'operator-dashboard',
+        tenantId: req.headers?.['x-tenant-id'] || req.query?.tenant_id || 'ppos-production',
+        printhouseId: req.headers?.['x-printhouse-id'] || req.query?.printhouse_id || null,
+        operatorId: req.headers?.['x-operator-id'] || req.body?.operator_id || req.query?.operator_id || 'operator-dashboard',
         isSuperAdmin: isSuper
     };
 }
@@ -207,7 +207,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const scope = getScopeContext(req);
     try {
-        const result = await materialService.createMaterial(req.body, scope.tenantId, scope.printhouseId);
+        const result = await materialService.createMaterial(req.body || {}, scope.tenantId, scope.printhouseId);
         res.json({ ok: true, data: result });
     } catch (err) {
         console.error('[MATERIALS-API] Failed to create material:', err);
@@ -251,7 +251,7 @@ router.get('/node/:nodeId', async (req, res) => {
  * Legacy signature: Locks capacity units for active manufacturing dispatches.
  */
 router.post('/reserve', async (req, res) => {
-    const { dispatch_id, node_id, specs } = req.body;
+    const { dispatch_id, node_id, specs } = req.body || {};
     if (!node_id || !specs) {
         return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RESERVATION_PAYLOAD' });
     }
@@ -270,7 +270,7 @@ router.post('/reserve', async (req, res) => {
  * Legacy signature: Frees previously held inventory resources.
  */
 router.post('/release', async (req, res) => {
-    const { dispatch_id, node_id, specs } = req.body;
+    const { dispatch_id, node_id, specs } = req.body || {};
     if (!node_id || !specs) {
         return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RELEASE_PAYLOAD' });
     }
@@ -308,7 +308,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/:id/intake', async (req, res) => {
     const scope = getScopeContext(req);
-    const { quantity, reason, supplier_batch, expected_use } = req.body;
+    const { quantity, reason, supplier_batch, expected_use } = req.body || {};
     try {
         const result = await materialService.intakeStock(req.params.id, quantity, reason, supplier_batch, expected_use, scope.operatorId);
         res.json({ ok: true, data: result });
@@ -323,7 +323,7 @@ router.post('/:id/intake', async (req, res) => {
  */
 router.post('/:id/adjust', async (req, res) => {
     const scope = getScopeContext(req);
-    const { quantity_delta, reason, operator_note } = req.body;
+    const { quantity_delta, reason, operator_note } = req.body || {};
     try {
         const result = await materialService.adjustStock(req.params.id, quantity_delta, reason, operator_note, scope.operatorId);
         res.json({ ok: true, data: result });
@@ -338,7 +338,7 @@ router.post('/:id/adjust', async (req, res) => {
  */
 router.post('/:id/reserve', async (req, res) => {
     const scope = getScopeContext(req);
-    const { job_id, dispatch_id, quantity, expiration } = req.body;
+    const { job_id, dispatch_id, quantity, expiration } = req.body || {};
     try {
         const result = await materialService.reserveStockUnits(req.params.id, job_id, dispatch_id, quantity, expiration, scope.operatorId);
         res.json({ ok: true, data: result });
@@ -352,7 +352,7 @@ router.post('/:id/reserve', async (req, res) => {
  * Operator workflow: Frees explicitly allocated pool units.
  */
 router.post('/:id/release', async (req, res) => {
-    const { quantity } = req.body;
+    const { quantity } = req.body || {};
     try {
         const mat = await materialService.getMaterialById(req.params.id);
         if (!mat) return res.status(404).json({ ok: false, error: 'Material not found' });
@@ -376,7 +376,7 @@ router.post('/:id/release', async (req, res) => {
  */
 router.post('/:id/consume', async (req, res) => {
     const scope = getScopeContext(req);
-    const { job_id, quantity_consumed, waste_units, reason } = req.body;
+    const { job_id, quantity_consumed, waste_units, reason } = req.body || {};
     try {
         const result = await materialService.consumeStockUnits(req.params.id, job_id, quantity_consumed, waste_units, reason, scope.operatorId);
         res.json({ ok: true, data: result });
@@ -390,7 +390,7 @@ router.post('/:id/consume', async (req, res) => {
  * Operator workflow: Triggers a new supplier restock purchase order.
  */
 router.post('/:id/procurements', async (req, res) => {
-    const { supplier_name, ordered_units, expected_delivery_date, risk, notes } = req.body;
+    const { supplier_name, ordered_units, expected_delivery_date, risk, notes } = req.body || {};
     try {
         const result = await materialService.createProcurement(req.params.id, supplier_name, ordered_units, expected_delivery_date, risk, notes);
         res.json({ ok: true, data: result });
