@@ -28,6 +28,15 @@ import {
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
 
+function renderAnalysisIntegrity(value: any): string {
+  if (!value) return '100% Native';
+  if (typeof value === 'string') return value;
+  if (value.fallbackUsed) return 'FALLBACK';
+  if (value.degradedMode) return 'DEGRADED';
+  if (value.realExtraction) return 'REAL_EXTRACTION';
+  return 'OK';
+}
+
 export const PreflightJobDetailPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   
@@ -264,7 +273,7 @@ export const PreflightJobDetailPage: React.FC = () => {
             <MetaItem label="Original Filename" value={payload.filename || registry.filename || 'Untitled.pdf'} icon={DocumentIcon} />
             <MetaItem label="Tenant Context" value={payload.tenantId || registry.tenantId || 'system'} icon={CircleStackIcon} />
             <MetaItem label="Active Policy" value={payload.policy || registry.policy || 'Standard Baseline'} icon={ShieldCheckIcon} />
-            <MetaItem label="Extraction Fidelity" value={payload.analysisIntegrity || '100% Native'} icon={CubeIcon} />
+            <MetaItem label="Extraction Fidelity" value={renderAnalysisIntegrity(payload.analysisIntegrity)} icon={CubeIcon} />
             <MetaItem label="Structural Issues" value={String(payload.issues?.length || payload.analysis?.issues?.length || 0)} icon={ExclamationTriangleIcon} />
             <MetaItem label="Applied Repairs" value={String(payload.fixes?.length || payload.repairs?.length || 0)} icon={ShieldCheckIcon} />
             <MetaItem label="File Storage Size" value={formatSize(payload.fileSize || registry.fileSize)} icon={CommandLineIcon} />
