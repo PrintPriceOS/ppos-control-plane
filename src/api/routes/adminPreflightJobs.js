@@ -428,13 +428,26 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
     }
 });
 
+function resolveArtifactIdForUpstream(jobId, artifactId) {
+    const raw = String(artifactId || '').trim();
+
+    if (!raw) return raw;
+
+    try {
+        const decoded = Buffer.from(raw, 'base64').toString('utf8');
+        if (decoded && decoded.startsWith(`${jobId}:`)) {
+            return decoded.slice(`${jobId}:`.length);
+        }
+    } catch (_) {}
+
+    return raw;
+}
+
 // --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
 router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
     let { artifactId } = req.params;
-    
-    console.log(`[ADMIN-PREFLIGHT][ARTIFACT] Fetching artifact ${artifactId} for job ${jobId}`);
     
     // Decode artifact IDs only if needed, but pass canonical artifactId safely
     if (artifactId && artifactId.includes('%')) {
@@ -443,27 +456,16 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         } catch (e) {}
     }
 
-    let resolvedArtifactId = artifactId;
-    try {
-        const decoded = Buffer.from(artifactId, 'base64').toString('utf8');
-        if (decoded.startsWith(`${jobId}:`)) {
-            resolvedArtifactId = decoded.slice(jobId.length + 1);
-            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
-        } else if (artifactId.startsWith(`${jobId}:`)) {
-            resolvedArtifactId = artifactId.slice(jobId.length + 1);
-            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
-        }
-    } catch (e) {
-        if (artifactId.startsWith(`${jobId}:`)) {
-            resolvedArtifactId = artifactId.slice(jobId.length + 1);
-            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
-        }
-    }
+    const upstreamArtifactId = resolveArtifactIdForUpstream(jobId, artifactId);
+
+    console.log(
+        `[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] job=${jobId} raw=${artifactId} upstream=${upstreamArtifactId}`
+    );
 
     try {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${resolvedArtifactId}`, traceId: context.traceId });
+        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${upstreamArtifactId}`, traceId: context.traceId });
 
-        const streamResponse = await gateway.getArtifact(jobId, resolvedArtifactId, context);
+        const streamResponse = await gateway.getArtifact(jobId, upstreamArtifactId, context);
         
         // Proxy content type and bytes directly
         res.setHeader('Content-Type', streamResponse.headers?.['content-type'] || 'application/pdf');
