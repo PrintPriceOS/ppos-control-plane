@@ -241,7 +241,24 @@ const start = async () => {
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
-            fastify.log.info('Core API routes mounted successfully');
+            
+            // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
+            const apiNotFoundFallback = (request, reply) => {
+                if (!reply.sent) {
+                    reply.status(404).send({ error: 'Endpoint not found', path: request.url });
+                }
+            };
+            fastify.all('/api/auth', apiNotFoundFallback);
+            fastify.all('/api/auth/*', apiNotFoundFallback);
+            fastify.all('/api/admin', apiNotFoundFallback);
+            fastify.all('/api/admin/*', apiNotFoundFallback);
+            fastify.all('/api/v2/analytics', apiNotFoundFallback);
+            fastify.all('/api/v2/analytics/*', apiNotFoundFallback);
+            fastify.all('/api/connectors/factory', apiNotFoundFallback);
+            fastify.all('/api/connectors/factory/*', apiNotFoundFallback);
+
+            fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
+            console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
 
             // Industrial Observability Hook
             fastify.addHook('onResponse', (request, reply, done) => {
@@ -260,6 +277,7 @@ const start = async () => {
             });
         } catch (err) {
             fastify.log.error({ msg: 'FAILED TO MOUNT CORE ROUTES', error: err.message });
+            console.error('[ROUTES][ADMIN][REGISTERED] FAILED TO MOUNT CORE ROUTES:', err);
             // In production, we might want to crash here if core routes are missing,
             // but for stability during transitions, we log and continue if possible.
         }

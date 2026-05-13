@@ -37,6 +37,62 @@ router.get('/verify', (req, res) => {
   });
 });
 
+router.get('/routes/debug', (req, res) => {
+  res.json({
+    ok: true,
+    mountedGroups: [
+      '/machines (Forensic Machine Intelligence)',
+      '/connect',
+      '/network',
+      '/routing/economic',
+      '/routing',
+      '/marketplace/ready',
+      '/marketplace',
+      '/governance',
+      '/civilization',
+      '/interplanetary',
+      '/reality',
+      '/singularity',
+      '/pricing',
+      '/offers',
+      '/commercial',
+      '/autonomous',
+      '/finance',
+      '/control',
+      '/intelligence',
+      '/optimization',
+      '/learning',
+      '/optimization-autonomy',
+      '/agents',
+      '/federation',
+      '/global',
+      '/printhouses',
+      '/orders',
+      '/preflight (Jobs & Policies)',
+      '/production/notifications',
+      '/manufacturing/notifications',
+      '/production',
+      '/manufacturing',
+      '/forensics',
+      '/telemetry',
+      '/artifacts',
+      '/workers',
+      '/orchestration',
+      '/provisioning',
+      '/routing/decision',
+      '/dispatch',
+      '/nodes',
+      '/predictive',
+      '/anomaly',
+      '/economic',
+      '/materials',
+      '/audit',
+      '/jobs'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
 router.use((req, res, next) => {
   const context = resolveActorContext(req);
   const path = req.path;
