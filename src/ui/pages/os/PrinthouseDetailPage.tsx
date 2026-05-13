@@ -6,6 +6,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getPrinthouses, getDispatches, getIndustrialTelemetryOverview } from '../../lib/adminApi';
+import { StatusBadge } from '../../components/StatusBadge';
 import {
     Printhouse, PrinthouseRates, PrinthouseFormModal,
     SIG_KEYS, COLOUR_KEYS, SECTIONS, COUNTRIES, BINDING_CONFIGS, BindingKey,
@@ -13,10 +14,10 @@ import {
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
-const val = "text-sm font-mono text-slate-900 font-semibold";
-const lbl = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5";
-const card = "bg-white/70 border border-slate-100 rounded-none p-5 space-y-4";
-const sectionTitle = "text-sm font-black text-slate-700 mb-3";
+const val = "text-sm font-mono text-zinc-900 dark:text-zinc-100 font-bold";
+const lbl = "text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-0.5";
+const card = "bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-none p-5 space-y-4 shadow-none";
+const sectionTitle = "text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3";
 
 function Cell({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -32,19 +33,19 @@ function RateTable({ headers, rows }: { headers: string[]; rows: { label: string
         <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
                 <thead>
-                    <tr className="border-b border-slate-100">
-                        <th className="text-left py-2 pr-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32"></th>
+                    <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+                        <th className="text-left py-2 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wide w-32"></th>
                         {headers.map(h => (
-                            <th key={h} className="text-right py-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                            <th key={h} className="text-right py-2 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{h}</th>
                         ))}
                     </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                     {rows.map((row, i) => (
-                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
-                            <td className="py-1.5 pr-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">{row.label}</td>
+                        <tr key={i} className="bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900/70 transition-colors">
+                            <td className="py-2 px-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wide">{row.label}</td>
                             {row.values.map((v, j) => (
-                                <td key={j} className="py-1.5 px-2 text-right font-mono text-slate-700 font-semibold">{typeof v === 'number' ? v.toFixed(2) : v}</td>
+                                <td key={j} className="py-2 px-3 text-right font-mono text-zinc-900 dark:text-zinc-100 font-bold">{typeof v === 'number' ? v.toFixed(2) : v}</td>
                             ))}
                         </tr>
                     ))}
@@ -55,16 +56,6 @@ function RateTable({ headers, rows }: { headers: string[]; rows: { label: string
 }
 
 // ── Tab sections ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status?: string }) {
-    const s = status ?? 'Active';
-    const cls = s === 'Active'
-        ? 'bg-emerald-50 text-emerald-700'
-        : s === 'Under Maintenance'
-        ? 'bg-amber-50 text-amber-700'
-        : 'bg-slate-100 text-slate-500';
-    return <span className={`inline-block px-2.5 py-0.5 rounded-none text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
-}
 
 function OperationalTab({ ph }: { ph: Printhouse }) {
     const isEligible = ph.latitude && ph.longitude && ph.region && ph.status === 'Active';
@@ -77,9 +68,6 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
     const telemetry = useAdminQuery('telemetry-overview', getIndustrialTelemetryOverview, 5000);
 
     const activeDispatches = (dispatches.data?.dispatches || []).filter((d: any) => d.printhouse_id === ph.id && d.status === 'ACTIVE').length;
-    
-    // Find node-specific telemetry if available (this is a simplification, ideally node_id is used)
-    const nodeHealth = ph.status === 'Active' ? 'ONLINE' : 'OFFLINE';
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -91,21 +79,21 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
                     <Cell label="Latitude">{ph.latitude || '0'}</Cell>
                     <Cell label="Longitude">{ph.longitude || '0'}</Cell>
                 </div>
-                <div className="pt-2 border-t border-slate-50 mt-2">
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 mt-2">
                     <Cell label="Last Heartbeat">{ph.last_heartbeat_at ? new Date(ph.last_heartbeat_at).toLocaleString() : 'Never Recorded'}</Cell>
                 </div>
             </div>
             <div className={card}>
                 <h3 className={sectionTitle}>Dispatch Eligibility</h3>
                 <div className="space-y-4">
-                    <div className={`p-4 rounded-none border ${isEligible ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                    <div className={`p-4 rounded-none border ${isEligible ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/60' : 'bg-red-50 dark:bg-red-950/40 border-red-100 dark:border-red-900/60'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${isEligible ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isEligible ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#dc0000] dark:text-red-400'}`}>
                           Routing Readiness: {isEligible ? 'VERIFIED' : 'RESTRICTED'}
                         </p>
-                        <div className={`w-2 h-2 rounded-none ${isEligible ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        <div className={`w-2 h-2 rounded-none ${isEligible ? 'bg-emerald-500 animate-pulse' : 'bg-[#dc0000]'}`} />
                       </div>
-                      <p className={`text-xs leading-relaxed font-medium ${isEligible ? 'text-emerald-700' : 'text-red-700'}`}>
+                      <p className={`text-xs leading-relaxed font-bold ${isEligible ? 'text-emerald-900 dark:text-emerald-300' : 'text-red-900 dark:text-red-300'}`}>
                         {isEligible 
                           ? "Deterministic routing identity resolved. Node is eligible for Global Manufacturing Grid orchestration and autonomous dispatch scoring."
                           : `Nodal identity cannot be fully resolved. Missing: ${missingFields.join(', ')}. Autonomous routing is disabled for this candidate.`}
@@ -133,22 +121,22 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
                         {activeDispatches > 0 ? (
                            <div className="space-y-2">
                               {(dispatches.data?.dispatches || []).filter((d: any) => d.printhouse_id === ph.id && d.status === 'ACTIVE').map((d: any) => (
-                                <div key={d.id} className="p-3 bg-slate-50 border border-slate-100 rounded-none flex items-center justify-between">
+                                <div key={d.id} className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-none flex items-center justify-between">
                                    <div>
-                                      <p className="text-[10px] font-black text-slate-400 uppercase">Dispatch ID</p>
-                                      <p className="text-xs font-mono font-bold text-slate-700">#{d.id.slice(0, 8)}</p>
+                                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Dispatch ID</p>
+                                      <p className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">#{d.id.slice(0, 8)}</p>
                                    </div>
                                    <div className="text-right">
-                                      <p className="text-[10px] font-black text-slate-400 uppercase">State</p>
-                                      <p className="text-xs font-bold text-emerald-500">ACTIVE</p>
+                                      <p className="text-[10px] font-bold text-zinc-400 uppercase">State</p>
+                                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">ACTIVE</p>
                                    </div>
                                 </div>
                               ))}
                            </div>
                         ) : (
-                          <div className="p-10 border-2 border-dashed border-slate-100 rounded-none flex flex-col items-center justify-center text-center opacity-30">
-                              <GlobeAltIcon className="w-8 h-8 mb-2 text-slate-300" />
-                              <p className="text-[10px] font-black uppercase text-slate-400">No active orchestration events for this node.</p>
+                          <div className="p-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-none flex flex-col items-center justify-center text-center opacity-40">
+                              <GlobeAltIcon className="w-8 h-8 mb-2 text-zinc-400" />
+                              <p className="text-[10px] font-bold uppercase text-zinc-400">No active orchestration events for this node.</p>
                           </div>
                         )}
                     </div>
@@ -160,9 +148,9 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
 
 function EligibilityCheck({ label, passed }: { label: string, passed: boolean }) {
     return (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-none bg-slate-50 border border-slate-100">
-            <div className={`w-1.5 h-1.5 rounded-none ${passed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-            <span className={`text-[9px] font-black uppercase ${passed ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-none bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <div className={`w-1.5 h-1.5 rounded-none ${passed ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
+            <span className={`text-[9px] font-bold uppercase ${passed ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'}`}>{label}</span>
         </div>
     );
 }
@@ -181,7 +169,7 @@ function BasicTab({ ph }: { ph: Printhouse }) {
                     <Cell label="Production Lead Days">{ph.production_lead_days}d</Cell>
                     <div>
                         <p className={lbl}>Status</p>
-                        <StatusBadge status={ph.status} />
+                        <StatusBadge status={ph.status ?? 'Active'} />
                     </div>
                 </div>
             </div>
@@ -195,7 +183,7 @@ function BasicTab({ ph }: { ph: Printhouse }) {
                     <p className={lbl}>Signatures</p>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                         {(ph.signatures ?? []).map(s => (
-                            <span key={s} className="px-2.5 py-0.5 rounded-none bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">{s}p</span>
+                            <span key={s} className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-transparent dark:border-zinc-700 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
                         ))}
                     </div>
                 </div>
@@ -210,6 +198,7 @@ function InteriorTab({ r }: { r: PrinthouseRates }) {
         { label: '2 Colour', fixedKey: 'interior_two_colour_fixed' as keyof PrinthouseRates, varKey: 'interior_two_colour_var' as keyof PrinthouseRates },
         { label: 'Full Colour', fixedKey: 'interior_full_colour_fixed' as keyof PrinthouseRates, varKey: 'interior_full_colour_var' as keyof PrinthouseRates },
     ];
+
     return (
         <div className="space-y-6">
             {colourSets.map(({ label, fixedKey, varKey }) => (
@@ -300,10 +289,10 @@ function BindingTab({ r }: { r: PrinthouseRates }) {
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-1 border-b border-slate-100 overflow-x-auto">
+            <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
                 {BINDING_CONFIGS.map(bc => (
                     <button key={bc.key} onClick={() => setActiveBinding(bc.key)}
-                        className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-widest border-b-2 whitespace-nowrap transition-colors -mb-px ${activeBinding === bc.key ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest border-b-2 whitespace-nowrap transition-colors -mb-px ${activeBinding === bc.key ? 'border-[#dc0000] text-[#dc0000]' : 'border-transparent text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
                         {bc.label}
                     </button>
                 ))}
@@ -427,7 +416,7 @@ export const PrinthouseDetailPage: React.FC = () => {
 
     if (!ph && q.status === 'loading') {
         return (
-            <div className="flex items-center justify-center h-64 text-slate-400 text-sm font-medium">
+            <div className="flex items-center justify-center h-64 text-zinc-400 text-sm font-medium">
                 Loading…
             </div>
         );
@@ -436,9 +425,9 @@ export const PrinthouseDetailPage: React.FC = () => {
     if (!ph) {
         return (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
-                <p className="text-slate-400 text-sm font-medium">Printhouse not found.</p>
+                <p className="text-zinc-400 text-sm font-medium">Printhouse not found.</p>
                 <button onClick={() => navigate('/printhouses')}
-                    className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">
+                    className="flex items-center gap-2 text-sm font-bold text-zinc-400 hover:text-zinc-100 transition-colors">
                     <ArrowLeftIcon className="w-4 h-4" /> Back to Printhouses
                 </button>
             </div>
@@ -453,19 +442,19 @@ export const PrinthouseDetailPage: React.FC = () => {
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                     <button onClick={() => navigate('/printhouses')}
-                        className="p-2 rounded-none border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors flex-shrink-0">
+                        className="p-2 rounded-none border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex-shrink-0">
                         <ArrowLeftIcon className="w-4 h-4" />
                     </button>
-                    <div className="w-10 h-10 rounded-none bg-slate-100 flex items-center justify-center flex-shrink-0">
-                        <PrinterIcon className="w-5 h-5 text-slate-400" />
+                    <div className="w-10 h-10 rounded-none bg-zinc-100 dark:bg-zinc-800 border border-transparent dark:border-zinc-700 flex items-center justify-center flex-shrink-0">
+                        <PrinterIcon className="w-5 h-5 text-zinc-400 dark:text-zinc-200" />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight truncate">{ph.name}</h1>
-                        <p className="text-sm text-slate-400 font-mono">{ph.id}</p>
+                        <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight truncate">{ph.name}</h1>
+                        <p className="text-sm text-zinc-400 font-mono">{ph.id}</p>
                     </div>
                 </div>
                 <button onClick={() => setEditOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors flex-shrink-0">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-zinc-900 dark:bg-[#dc0000] text-white text-sm font-bold shadow-none hover:bg-zinc-800 dark:hover:bg-red-700 transition-colors flex-shrink-0">
                     <PencilSquareIcon className="w-4 h-4" />
                     Edit
                 </button>
@@ -479,21 +468,21 @@ export const PrinthouseDetailPage: React.FC = () => {
                     { label: 'Min Copies', value: (ph.limits?.min_copies ?? 0).toLocaleString(), icon: DocumentTextIcon },
                     { label: 'Max Pages', value: (ph.limits?.max_pages ?? 0).toLocaleString(), icon: HashtagIcon },
                 ].map((s, i) => (
-                    <div key={i} className="bg-white/70 border border-slate-100 rounded-none p-4 flex items-center gap-3">
-                        <s.icon className="w-5 h-5 text-slate-300 flex-shrink-0" />
+                    <div key={i} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-none p-4 flex items-center gap-3 shadow-none">
+                        <s.icon className="w-5 h-5 text-zinc-400 flex-shrink-0" />
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                            <p className="text-sm font-black text-slate-900">{s.value}</p>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                            <p className="text-sm font-black text-zinc-900 dark:text-zinc-100">{s.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-slate-100 flex gap-0 overflow-x-auto">
+            <div className="border-b border-zinc-200 dark:border-zinc-800 flex gap-0 overflow-x-auto">
                 {DETAIL_TABS.map(t => (
                     <button key={t} onClick={() => setTab(t)}
-                        className={`px-4 py-3 text-[11px] font-black uppercase tracking-widest border-b-2 whitespace-nowrap transition-colors -mb-px ${tab === t ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        className={`px-4 py-3 text-[11px] font-bold uppercase tracking-widest border-b-2 whitespace-nowrap transition-colors -mb-px ${tab === t ? 'border-[#dc0000] text-[#dc0000] dark:bg-zinc-900/60' : 'border-transparent text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
                         {t}
                     </button>
                 ))}
@@ -526,7 +515,7 @@ export const PrinthouseDetailPage: React.FC = () => {
 
 function NoRates() {
     return (
-        <div className="flex items-center justify-center h-40 text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-none">
+        <div className="flex items-center justify-center h-40 text-zinc-400 text-sm font-medium border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-none">
             No rate data configured yet. Use Edit to add rates.
         </div>
     );

@@ -159,7 +159,7 @@ export function DataTable<T>({
       <div className="w-full overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800 border-collapse">
           <thead>
-            <tr className={TABLES.header.className}>
+            <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
               {columns.map((col, i) => {
                 const sortable = !!col.sortKey || typeof col.accessor !== 'function';
                 const activeSort = (col.sortKey || (typeof col.accessor !== 'function' ? col.accessor : null)) === sortConfig.key;
@@ -169,8 +169,7 @@ export function DataTable<T>({
                   <th 
                     key={i} 
                     onClick={() => sortable && requestSort(col)}
-                    className={`font-manrope text-[13px] font-semibold tracking-[0.4px] uppercase text-zinc-600 dark:text-zinc-400 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} border-b border-zinc-200 dark:border-zinc-800 ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group' : ''}`}
-                    style={{ letterSpacing: '0.4px' }}
+                    className={`font-manrope text-[13px] font-semibold tracking-wide uppercase text-zinc-600 dark:text-zinc-400 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} ${col.className || ''} ${sortable ? 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group' : ''}`}
                   >
                     <div className={`flex items-center gap-1.5 ${alignClass}`}>
                       <span>{col.header}</span>
@@ -191,17 +190,17 @@ export function DataTable<T>({
               <tr
                 key={i}
                 onClick={() => onRowClick?.(item)}
-                className={`min-h-[48px] bg-white dark:bg-zinc-950 even:bg-zinc-50 dark:even:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-200 dark:border-zinc-800 ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName ? rowClassName(item) : ''}`}
+                className={`min-h-[48px] bg-white dark:bg-zinc-950 odd:dark:bg-zinc-950 even:bg-zinc-50 dark:even:bg-zinc-900/40 hover:bg-zinc-100 dark:hover:bg-zinc-900/70 transition-colors border-b border-zinc-200 dark:border-zinc-800 ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName ? rowClassName(item) : ''}`}
               >
                 {columns.map((col, j) => {
                   const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
                   return (
-                    <td key={j} className={`font-manrope text-[13px] font-normal leading-[18px] text-zinc-900 dark:text-zinc-100 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} border-b border-zinc-200 dark:border-zinc-800 ${alignClass} ${col.className || ''}`}>
+                    <td key={j} className={`font-manrope text-[13px] font-normal leading-[18px] text-zinc-900 dark:text-zinc-200 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} border-b border-zinc-200 dark:border-zinc-800 ${alignClass} ${col.className || ''}`}>
                       {(() => {
                         if (typeof col.accessor === 'function') {
                           const res = col.accessor(item);
                           if (res !== null && typeof res === 'object' && !React.isValidElement(res)) {
-                            return <span className="font-mono text-[11px] text-zinc-400">{toDisplayText(res, '[OBJECT]')}</span>;
+                            return <span className="font-mono text-[11px] text-zinc-500">{toDisplayText(res, '[OBJECT]')}</span>;
                           }
                           return res;
                         }
@@ -209,7 +208,7 @@ export function DataTable<T>({
                         if (val === null || val === undefined) return '';
                         if (React.isValidElement(val)) return val;
                         if (typeof val === 'object') {
-                          return <span className="font-mono text-[11px] text-zinc-400">{toDisplayText(val, '[OBJECT]')}</span>;
+                          return <span className="font-mono text-[11px] text-zinc-500">{toDisplayText(val, '[OBJECT]')}</span>;
                         }
                         return String(val);
                       })()}
@@ -220,7 +219,7 @@ export function DataTable<T>({
             ))}
             {paginatedData.length === 0 && (
               <tr className="bg-white dark:bg-zinc-950">
-                <td colSpan={columns.length} className="px-4 py-16 text-center text-zinc-400 font-manrope text-[13px] border-b border-zinc-200 dark:border-zinc-800">
+                <td colSpan={columns.length} className="px-4 py-16 text-center text-zinc-500 font-manrope text-[13px] border-b border-zinc-200 dark:border-zinc-800">
                   No data available in this view.
                 </td>
               </tr>

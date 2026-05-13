@@ -42,20 +42,20 @@ export const COLORS = {
     overlay: "bg-zinc-900/40 backdrop-blur-sm",
     panel: "bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl",
     header: "px-6 py-6 sm:px-8 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950",
-    body: "px-6 py-8 sm:px-8 bg-white dark:bg-zinc-900",
+    body: "px-6 py-8 sm:px-8 bg-white dark:bg-zinc-950",
     footer: "px-6 py-4 sm:px-8 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950",
     closeBtn: "p-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors",
   },
 
   cards: {
-    base: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-none transition-all",
-    elevated: "bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-none transition-all",
+    base: "bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-4 rounded-none transition-all",
+    elevated: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-none transition-all",
   },
 
   icons: {
-    containerDark: "bg-zinc-800 text-zinc-100",
+    containerDark: "bg-zinc-800 text-zinc-200",
     containerLight: "bg-zinc-100 text-zinc-900",
-    containerAdaptive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
+    containerAdaptive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200",
   },
 
   tables: {

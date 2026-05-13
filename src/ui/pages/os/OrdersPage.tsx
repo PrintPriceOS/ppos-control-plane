@@ -20,12 +20,12 @@ const STATUS_OPTIONS: { value: OrderStatus | ''; label: string }[] = [
 ];
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
-    pending:       'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700/40',
-    reviewing:     'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700/40',
-    in_production: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-700/40',
-    shipped:       'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-700/40',
-    delivered:     'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700/40',
-    cancelled:     'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700/40',
+    pending:       'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
+    reviewing:     'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/60',
+    in_production: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/60',
+    shipped:       'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/60',
+    delivered:     'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60',
+    cancelled:     'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60',
 };
 
 export const OrdersPage: React.FC = () => {
@@ -54,17 +54,17 @@ export const OrdersPage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Orders</h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Orders</h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
                         All print orders across the platform.
                         {q.data && (
-                            <span className="ml-2 font-bold text-slate-700 dark:text-slate-300">{q.data.total} total</span>
+                            <span className="ml-2 font-bold text-zinc-700 dark:text-zinc-300">{q.data.total} total</span>
                         )}
                     </p>
                 </div>
                 <button
                     onClick={() => q.refetch?.()}
-                    className="p-2 rounded-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
+                    className="p-2 rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400"
                     title="Refresh"
                 >
                     <ArrowPathIcon className={`w-5 h-5 ${q.status === 'loading' ? 'animate-spin' : ''}`} />
@@ -72,23 +72,23 @@ export const OrdersPage: React.FC = () => {
             </div>
 
             {/* Filters */}
-            <div className="glass p-4 rounded-none border border-white dark:border-slate-700/30 flex flex-wrap items-center gap-3">
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-none border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center gap-3">
                 <div className="flex-1 min-w-48 relative">
-                    <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                    <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-zinc-400" />
                     <input
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search by ref, user, or print house..."
-                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20"
+                        className="w-full bg-zinc-50 dark:bg-zinc-900 border-none rounded-none pl-10 pr-4 py-2 text-sm font-bold text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:ring-1 focus:ring-[#dc0000] outline-none"
                     />
                 </div>
                 <div className="flex items-center gap-2">
-                    <FunnelIcon className="w-4 h-4 text-slate-400" />
+                    <FunnelIcon className="w-4 h-4 text-zinc-400" />
                     <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value as OrderStatus | '')}
-                        className="bg-slate-50 dark:bg-slate-800 border-none rounded-none px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide focus:ring-2 focus:ring-primary/20"
+                        className="bg-zinc-50 dark:bg-zinc-900 border-none rounded-none px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide focus:ring-1 focus:ring-[#dc0000] outline-none"
                     >
                         {STATUS_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -106,19 +106,19 @@ export const OrdersPage: React.FC = () => {
                     {
                         header: 'Order Ref',
                         accessor: (o: Order) => (
-                            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{o.order_ref}</span>
+                            <span className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-200">{o.order_ref}</span>
                         ),
                     },
                     {
                         header: 'User',
                         accessor: (o: Order) => (
-                            <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">{o.user_id}</span>
+                            <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">{o.user_id}</span>
                         ),
                     },
                     {
                         header: 'Status',
                         accessor: (o: Order) => (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-none text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[o.status]}`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wide border ${STATUS_STYLES[o.status]}`}>
                                 {o.status.replace('_', ' ')}
                             </span>
                         ),
@@ -126,13 +126,13 @@ export const OrdersPage: React.FC = () => {
                     {
                         header: 'Print House',
                         accessor: (o: Order) => (
-                            <span className="text-sm text-slate-700 dark:text-slate-300">{o.offer_print_house}</span>
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">{o.offer_print_house}</span>
                         ),
                     },
                     {
                         header: 'Price',
                         accessor: (o: Order) => (
-                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                            <span className="font-bold text-zinc-900 dark:text-zinc-100">
                                 €{Number(o.offer_price || 0).toFixed(2)}
                             </span>
                         ),
@@ -140,7 +140,7 @@ export const OrdersPage: React.FC = () => {
                     {
                         header: 'Created',
                         accessor: (o: Order) => (
-                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">
                                 {new Date(o.created_at).toLocaleDateString('es-ES', {
                                     day: '2-digit', month: 'short', year: 'numeric'
                                 })}
@@ -153,52 +153,52 @@ export const OrdersPage: React.FC = () => {
 
             {/* Detail panel */}
             {selectedOrder && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
                     <div
-                        className="bg-white dark:bg-slate-900 rounded-none shadow-2xl border border-transparent dark:border-slate-700 w-full max-w-lg p-6 space-y-4"
+                        className="bg-white dark:bg-zinc-950 rounded-none shadow-none border border-zinc-200 dark:border-zinc-800 w-full max-w-lg p-6 space-y-4"
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-none flex items-center justify-center">
-                                    <ClipboardDocumentListIcon className="w-5 h-5 text-slate-600" />
+                                <div className="w-10 h-10 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-none flex items-center justify-center">
+                                    <ClipboardDocumentListIcon className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                                 </div>
                                 <div>
-                                    <p className="font-black text-slate-900 dark:text-white font-mono">{selectedOrder.order_ref}</p>
-                                    <p className="text-xs text-slate-400 dark:text-slate-500">Order #{selectedOrder.id}</p>
+                                    <p className="font-black text-zinc-900 dark:text-zinc-100 font-mono">{selectedOrder.order_ref}</p>
+                                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Order #{selectedOrder.id}</p>
                                 </div>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-none text-[10px] font-black uppercase tracking-wider border ${STATUS_STYLES[selectedOrder.status]}`}>
+                            <span className={`px-2.5 py-1 rounded-none text-[10px] font-bold uppercase tracking-wide border ${STATUS_STYLES[selectedOrder.status]}`}>
                                 {selectedOrder.status.replace('_', ' ')}
                             </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">User</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300 truncate">{selectedOrder.user_id}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
+                                <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">User</p>
+                                <p className="font-bold text-zinc-700 dark:text-zinc-300 truncate">{selectedOrder.user_id}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Price</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300">€{Number(selectedOrder.offer_price || 0).toFixed(2)}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
+                                <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Price</p>
+                                <p className="font-bold text-zinc-700 dark:text-zinc-300">€{Number(selectedOrder.offer_price || 0).toFixed(2)}</p>
                             </div>
-                            <div className="bg-slate-50 rounded-none p-3 col-span-2">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Print House</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300">{selectedOrder.offer_print_house}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3 col-span-2">
+                                <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Print House</p>
+                                <p className="font-bold text-zinc-700 dark:text-zinc-300">{selectedOrder.offer_print_house}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Created</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300">{new Date(selectedOrder.created_at).toLocaleString('es-ES')}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
+                                <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Created</p>
+                                <p className="font-bold text-zinc-700 dark:text-zinc-300">{new Date(selectedOrder.created_at).toLocaleString('es-ES')}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-none p-3">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Updated</p>
-                                <p className="font-bold text-slate-700 dark:text-slate-300">{new Date(selectedOrder.updated_at).toLocaleString('es-ES')}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
+                                <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Updated</p>
+                                <p className="font-bold text-zinc-700 dark:text-zinc-300">{new Date(selectedOrder.updated_at).toLocaleString('es-ES')}</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 rounded-none p-3">
-                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Specs</p>
-                            <pre className="text-xs text-slate-600 dark:text-slate-400 overflow-auto max-h-40 whitespace-pre-wrap">
+                        <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
+                            <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">Specs</p>
+                            <pre className="text-xs font-mono text-zinc-600 dark:text-zinc-400 overflow-auto max-h-40 whitespace-pre-wrap">
                                 {JSON.stringify(
                                     typeof selectedOrder.specs === 'string'
                                         ? JSON.parse(selectedOrder.specs)
@@ -210,7 +210,7 @@ export const OrdersPage: React.FC = () => {
 
                         <button
                             onClick={() => setSelectedOrder(null)}
-                            className="w-full py-2.5 rounded-none bg-slate-900 text-white text-sm font-black hover:bg-slate-800 transition-colors"
+                            className="w-full py-2.5 rounded-none bg-zinc-900 dark:bg-zinc-800 border border-transparent dark:border-zinc-700 text-white dark:text-zinc-200 text-sm font-bold hover:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors"
                         >
                             Close
                         </button>

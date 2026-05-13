@@ -73,7 +73,7 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
   );
 };
 
-const MetadataItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
+const MetadataItem = ({ label, value, icon: Icon, color = 'zinc' }: any) => (
   <div className={`flex flex-col gap-1 px-4 py-3 rounded-none ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
      <div className={`flex items-center gap-1.5 ${COLORS.adaptive.textMuted}`}>
         {Icon && <Icon className="w-3.5 h-3.5" />}

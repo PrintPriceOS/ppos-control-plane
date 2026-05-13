@@ -6,6 +6,7 @@ import {
     ClockIcon, DocumentTextIcon, HashtagIcon, XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { DataTable } from '../../components/DataTable';
+import { StatusBadge } from '../../components/StatusBadge';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getPrinthouses, createPrinthouse, updatePrinthouse, deletePrinthouse } from '../../lib/adminApi';
 
@@ -131,8 +132,8 @@ const EMPTY_FORM: FormState = {
 };
 
 // ── Styling helpers ────────────────────────────────────────────────────────────
-const inp = "px-3 py-1.5 rounded-none border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400/30 focus:border-slate-400 bg-white w-full";
-const lbl = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1";
+const inp = "px-3 py-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000] bg-white dark:bg-zinc-900 w-full placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors";
+const lbl = "block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1";
 
 const FORM_TABS = ['Basic', 'Operational', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
 type FormTab = typeof FORM_TABS[number];
@@ -196,7 +197,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
 
     const tabBtn = (t: FormTab) => (
         <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-3 text-[11px] font-black uppercase tracking-widest border-b-2 whitespace-nowrap transition-colors ${tab === t ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+            className={`px-4 py-3 text-[11px] font-bold uppercase tracking-widest border-b-2 whitespace-nowrap transition-all ${tab === t ? 'border-[#dc0000] text-[#dc0000] dark:bg-zinc-900/60' : 'border-transparent text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
             {t}
         </button>
     );
@@ -205,27 +206,27 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-50" onClose={onClose}>
                 <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" />
+                    <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm" />
                 </TransitionChild>
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-start justify-center p-4 pt-6">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="w-full max-w-6xl bg-white rounded-none shadow-2xl flex flex-col" style={{ maxHeight: '92vh' }}>
+                            <DialogPanel className="w-full max-w-6xl bg-white dark:bg-zinc-950 rounded-none shadow-none flex flex-col border border-zinc-200 dark:border-zinc-800" style={{ maxHeight: '92vh' }}>
                                 {/* Header */}
-                                <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 flex-shrink-0">
-                                    <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                                <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0 bg-zinc-50 dark:bg-zinc-950">
+                                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                                         {editing ? `Edit: ${editing.name}` : 'Add Printhouse'}
                                     </h2>
-                                    <button onClick={onClose} className="p-2 rounded-none bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
+                                    <button onClick={onClose} className="p-2 rounded-none bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
                                         <XMarkIcon className="w-5 h-5" />
                                     </button>
                                 </div>
                                 {/* Tab bar */}
-                                <div className="flex border-b border-slate-100 px-8 flex-shrink-0 overflow-x-auto">
+                                <div className="flex border-b border-zinc-200 dark:border-zinc-800 px-8 flex-shrink-0 overflow-x-auto bg-zinc-50 dark:bg-zinc-950">
                                     {FORM_TABS.map(tabBtn)}
                                 </div>
                                 {/* Content */}
-                                <div className="flex-1 overflow-y-auto px-8 py-6">
+                                <div className="flex-1 overflow-y-auto px-8 py-6 bg-white dark:bg-zinc-950">
 
                                     {/* ── BASIC ── */}
                                     {tab === 'Basic' && (
@@ -236,7 +237,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     <input type="text" value={form.id} placeholder="e.g. adv-2025"
                                                         disabled={!!editing}
                                                         onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
-                                                        className={`${inp} disabled:bg-slate-50 disabled:text-slate-400`} />
+                                                        className={`${inp} disabled:bg-zinc-50 disabled:dark:bg-zinc-900/50 disabled:text-zinc-400 disabled:dark:text-zinc-600`} />
                                                 </div>
                                                 <div>
                                                     <label className={lbl}>Name</label>
@@ -253,7 +254,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                             return (
                                                                 <button key={sig} type="button"
                                                                     onClick={() => setForm(f => ({ ...f, signatures: [sig] }))}
-                                                                    className={`px-3 py-1.5 rounded-none text-xs font-black uppercase tracking-widest border transition-colors ${active ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+                                                                    className={`px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-widest border transition-colors ${active ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-zinc-100 border-zinc-900 dark:border-zinc-700' : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700'}`}>
                                                                     {sig}p
                                                                 </button>
                                                             );
@@ -286,17 +287,20 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                             <div>
                                                 <label className={lbl}>Status</label>
                                                 <div className="flex gap-2">
-                                                    {(['Active', 'Under Maintenance', 'Inactive'] as const).map(s => (
-                                                        <button key={s} type="button"
-                                                            onClick={() => setForm(f => ({ ...f, status: s }))}
-                                                            className={`px-3 py-1.5 rounded-none text-xs font-black uppercase tracking-widest border transition-colors ${form.status === s
-                                                                ? s === 'Active' ? 'bg-emerald-600 text-white border-emerald-600'
-                                                                    : s === 'Under Maintenance' ? 'bg-amber-500 text-white border-amber-500'
-                                                                    : 'bg-slate-500 text-white border-slate-500'
-                                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
-                                                            {s}
-                                                        </button>
-                                                    ))}
+                                                    {(['Active', 'Under Maintenance', 'Inactive'] as const).map(s => {
+                                                        const active = form.status === s;
+                                                        return (
+                                                            <button key={s} type="button"
+                                                                onClick={() => setForm(f => ({ ...f, status: s }))}
+                                                                className={`px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-widest border transition-colors ${active
+                                                                    ? s === 'Active' ? 'bg-emerald-600 dark:bg-emerald-950/40 text-white dark:text-emerald-400 border-emerald-600 dark:border-emerald-900/60'
+                                                                        : s === 'Under Maintenance' ? 'bg-amber-500 dark:bg-amber-950/40 text-white dark:text-amber-400 border-amber-500 dark:border-amber-900/60'
+                                                                        : 'bg-zinc-600 dark:bg-zinc-800 text-white dark:text-zinc-200 border-zinc-600 dark:border-zinc-700'
+                                                                    : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700'}`}>
+                                                                {s}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -346,9 +350,9 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                         onChange={e => setForm(f => ({ ...f, longitude: parseFloat(e.target.value) || 0 }))} className={inp} />
                                                 </div>
                                             </div>
-                                            <div className="p-4 bg-slate-50 rounded-none border border-slate-100">
-                                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Routing Intelligence Note</p>
-                                              <p className="text-xs text-slate-500 leading-relaxed">
+                                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-none border border-zinc-200 dark:border-zinc-800">
+                                              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Routing Intelligence Note</p>
+                                              <p className="text-xs text-zinc-500 leading-relaxed">
                                                 Providing precise geographic coordinates enables the Global Manufacturing Grid to perform deterministic routing calculations and proximity-based dispatch balancing.
                                               </p>
                                             </div>
@@ -358,20 +362,20 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                     {/* ── INTERIOR ── */}
                                     {tab === 'Interior' && (
                                         <div className="space-y-8">
-                                            <p className="text-xs text-slate-400">Leave 0 for signature sizes not applicable to this printhouse.</p>
+                                            <p className="text-xs text-zinc-400 dark:text-zinc-500">Leave 0 for signature sizes not applicable to this printhouse.</p>
                                             {([
                                                 { label: '1 Colour', fixedKey: 'interior_one_colour_fixed', varKey: 'interior_one_colour_var' },
                                                 { label: '2 Colour', fixedKey: 'interior_two_colour_fixed', varKey: 'interior_two_colour_var' },
                                                 { label: 'Full Colour', fixedKey: 'interior_full_colour_fixed', varKey: 'interior_full_colour_var' },
                                             ] as const).map(({ label, fixedKey, varKey }) => (
                                                 <div key={label}>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-2">{label}</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2">{label}</h3>
                                                     <div className="overflow-x-auto">
                                                         <table className="text-xs border-collapse min-w-full">
                                                             <thead>
                                                                 <tr>
-                                                                    <th className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 w-24" />
-                                                                    {SIG_KEYS.map(k => <th key={k} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 px-1 min-w-[80px]">{k}</th>)}
+                                                                    <th className="text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 w-24" />
+                                                                    {SIG_KEYS.map(k => <th key={k} className="text-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 px-1 min-w-[80px]">{k}</th>)}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -379,7 +383,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                                     const key = ri === 0 ? fixedKey : varKey;
                                                                     return (
                                                                         <tr key={rowLabel}>
-                                                                            <td className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-3 py-1 whitespace-nowrap">{rowLabel}</td>
+                                                                            <td className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pr-3 py-1 whitespace-nowrap">{rowLabel}</td>
                                                                             {SIG_KEYS.map(k => (
                                                                                 <td key={k} className="px-1 py-1">
                                                                                     <input type="number" step="0.01"
@@ -412,13 +416,13 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 { label: 'Endpaper', fixedKey: 'endpaper_fixed_by_colours', varKey: 'endpaper_var_per_1000_by_colours' },
                                             ] as const).map(({ label, fixedKey, varKey }) => (
                                                 <div key={label}>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-1">{label}</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1">{label}</h3>
                                                     <div className="overflow-x-auto">
                                                         <table className="text-xs border-collapse min-w-full">
                                                             <thead>
                                                                 <tr>
-                                                                    <th className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 w-24" />
-                                                                    {COLOUR_KEYS.map(k => <th key={k} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 px-2 min-w-[90px]">{k} colour{k !== '1' ? 's' : ''}</th>)}
+                                                                    <th className="text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 w-24" />
+                                                                    {COLOUR_KEYS.map(k => <th key={k} className="text-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 px-2 min-w-[90px]">{k} colour{k !== '1' ? 's' : ''}</th>)}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -426,7 +430,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                                     const key = ri === 0 ? fixedKey : varKey;
                                                                     return (
                                                                         <tr key={rowLabel}>
-                                                                            <td className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-3 py-1">{rowLabel}</td>
+                                                                            <td className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pr-3 py-1">{rowLabel}</td>
                                                                             {COLOUR_KEYS.map(k => (
                                                                                 <td key={k} className="px-1 py-1">
                                                                                     <input type="number" step="0.01"
@@ -444,7 +448,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 </div>
                                             ))}
                                             <div className="max-w-sm">
-                                                <h3 className="text-sm font-black text-slate-700 mb-3">PMS Cover</h3>
+                                                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">PMS Cover</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className={lbl}>Fixed</label>
@@ -469,7 +473,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 { label: 'Lamination — Variable', key: 'lam_var_per_1000' },
                                             ] as const).map(({ label, key }) => (
                                                 <div key={key}>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">{label}</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">{label}</h3>
                                                     <div className="grid grid-cols-3 gap-4">
                                                         {(['varnish', 'gloss', 'matt'] as const).map(k => (
                                                             <div key={k}>
@@ -482,7 +486,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 </div>
                                             ))}
                                             <div>
-                                                <h3 className="text-sm font-black text-slate-700 mb-3">UV Varnish</h3>
+                                                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">UV Varnish</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className={lbl}>Fixed</label>
@@ -502,11 +506,11 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                     {/* ── BINDING ── */}
                                     {tab === 'Binding' && (
                                         <div className="space-y-4">
-                                            <p className="text-xs text-slate-400">Costs by number of sections (1–24). Enter 0 for unsupported configurations.</p>
+                                            <p className="text-xs text-zinc-400">Costs by number of sections (1–24). Enter 0 for unsupported configurations.</p>
                                             <div className="flex gap-1.5 flex-wrap">
                                                 {BINDING_CONFIGS.map(b => (
                                                     <button key={b.key} onClick={() => setBindingTab(b.key)}
-                                                        className={`px-3 py-1.5 rounded-none text-[11px] font-black uppercase tracking-widest transition-colors ${bindingTab === b.key ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                                        className={`px-3 py-1.5 rounded-none text-[11px] font-bold uppercase tracking-widest transition-colors ${bindingTab === b.key ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-zinc-100 border border-transparent dark:border-zinc-700' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 border border-transparent dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}>
                                                         {b.label}
                                                     </button>
                                                 ))}
@@ -517,17 +521,17 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 return (
                                                     <div key={b.key} className="overflow-x-auto">
                                                         <table className="text-xs border-collapse w-full max-w-md">
-                                                            <thead className="sticky top-0 bg-white z-10">
+                                                            <thead className="sticky top-0 bg-white dark:bg-zinc-900 z-10">
                                                                 <tr>
-                                                                    <th className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 w-20">Sections</th>
-                                                                    <th className="text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 px-2 min-w-[120px]">Fixed</th>
-                                                                    <th className="text-[10px] font-black text-slate-400 uppercase tracking-widest pb-2 px-2 min-w-[120px]">Variable</th>
+                                                                    <th className="text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 w-20">Sections</th>
+                                                                    <th className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 px-2 min-w-[120px]">Fixed</th>
+                                                                    <th className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pb-2 px-2 min-w-[120px]">Variable</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {SECTIONS.map(s => (
-                                                                    <tr key={s} className="border-t border-slate-50">
-                                                                        <td className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-1 pr-3">{s}</td>
+                                                                    <tr key={s} className="border-t border-zinc-100 dark:border-zinc-800">
+                                                                        <td className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest py-1 pr-3">{s}</td>
                                                                         <td className="px-1 py-1">
                                                                             <input type="number" step="0.01"
                                                                                 value={(form.rates[fk] as BySection)[s] ?? 0}
@@ -559,7 +563,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 { label: 'Endpapers', fk: 'paper_endpapers_fixed_by_colours', vk: 'paper_endpapers_var_per_1000_by_colours' },
                                             ] as const).map(({ label, fk, vk }) => (
                                                 <div key={label}>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">Paper — {label}</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">Paper — {label}</h3>
                                                     <div className="grid grid-cols-3 gap-4">
                                                         {(['one', 'two', 'full'] as const).map(c => (
                                                             <div key={c} className="space-y-2">
@@ -579,7 +583,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 </div>
                                             ))}
                                             <div>
-                                                <h3 className="text-sm font-black text-slate-700 mb-3">Paper Waste for Binding</h3>
+                                                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">Paper Waste for Binding</h3>
                                                 <div className="grid grid-cols-6 gap-3">
                                                     {(['pb', 'ss', 'sc', 'hc', 'wo', 'sp'] as const).map(k => (
                                                         <div key={k}>
@@ -592,7 +596,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                             </div>
                                             <div className="grid grid-cols-3 gap-8">
                                                 <div>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">Interior Price / kg</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">Interior Price / kg</h3>
                                                     {(['offset', 'mc', 'lux', 'munken', 'other'] as const).map(k => (
                                                         <div key={k} className="mb-3">
                                                             <label className={lbl}>{k}</label>
@@ -602,7 +606,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     ))}
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">Cover Price / kg</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">Cover Price / kg</h3>
                                                     {(['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).map(k => (
                                                         <div key={k} className="mb-3">
                                                             <label className={lbl}>{k}</label>
@@ -612,7 +616,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                     ))}
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">Endpaper Price / kg</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">Endpaper Price / kg</h3>
                                                     {(['offset', 'mc', 'other'] as const).map(k => (
                                                         <div key={k} className="mb-3">
                                                             <label className={lbl}>{k}</label>
@@ -631,8 +635,8 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input type="checkbox" checked={form.rates.technical_costs_for_transport}
                                                     onChange={e => setRates(r => ({ ...r, technical_costs_for_transport: e.target.checked }))}
-                                                    className="w-4 h-4 rounded-none border-slate-300 text-slate-800 focus:ring-slate-500" />
-                                                <span className="text-sm font-bold text-slate-700">Technical costs for transport</span>
+                                                    className="w-4 h-4 rounded-none border-zinc-300 dark:border-zinc-700 text-[#dc0000] focus:ring-[#dc0000] bg-white dark:bg-zinc-900" />
+                                                <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Technical costs for transport</span>
                                             </label>
                                             <div className="max-w-xs">
                                                 <label className={lbl}>Additional Transport Multiplier</label>
@@ -644,7 +648,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                                 { label: 'Transport Costs by Country', key: 'transport_costs' },
                                             ] as const).map(({ label, key }) => (
                                                 <div key={key}>
-                                                    <h3 className="text-sm font-black text-slate-700 mb-3">{label}</h3>
+                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">{label}</h3>
                                                     <div className="grid grid-cols-5 gap-3">
                                                         {COUNTRIES.map(c => (
                                                             <div key={c}>
@@ -661,13 +665,13 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
 
                                 </div>
                                 {/* Footer */}
-                                <div className="flex items-center gap-3 px-8 py-5 border-t border-slate-100 flex-shrink-0">
+                                <div className="flex items-center gap-3 px-8 py-5 border-t border-zinc-200 dark:border-zinc-800 flex-shrink-0 bg-zinc-50 dark:bg-zinc-950">
                                     <button onClick={handleSave} disabled={saving || !form.id.trim() || !form.name.trim()}
-                                        className="px-6 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        className="px-6 py-2.5 rounded-none bg-zinc-900 dark:bg-[#dc0000] text-white text-sm font-bold hover:bg-zinc-800 dark:hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-none">
                                         {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Printhouse'}
                                     </button>
                                     <button onClick={onClose}
-                                        className="px-6 py-2.5 rounded-none border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        className="px-6 py-2.5 rounded-none border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
                                         Cancel
                                     </button>
                                 </div>
@@ -712,11 +716,11 @@ export const PrinthousesPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Printhouses</h1>
-                    <p className="text-sm text-slate-500 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
+                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Printhouses</h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
                 </div>
                 <button onClick={openAdd}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-slate-800 text-white text-sm font-bold shadow-sm hover:bg-slate-700 transition-colors">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-zinc-900 dark:bg-[#dc0000] text-white text-sm font-bold shadow-none hover:bg-zinc-800 dark:hover:bg-red-700 transition-colors">
                     <PlusIcon className="w-4 h-4" />
                     Add Printhouse
                 </button>
@@ -724,24 +728,24 @@ export const PrinthousesPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
-                    { label: 'Total Printhouses', value: printhouses.length, icon: PrinterIcon, color: 'primary' },
-                    { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon, color: 'blue' },
-                    { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon, color: 'indigo' },
+                    { label: 'Total Printhouses', value: printhouses.length, icon: PrinterIcon },
+                    { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon },
+                    { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-[#131314] p-5 rounded-none border border-slate-100 dark:border-white/5 flex items-center gap-4">
-                        <div className={`p-3 rounded-none bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-zinc-400`}>
-                            <stat.icon className="w-6 h-6" />
+                    <div key={i} className="bg-white dark:bg-zinc-950 p-5 rounded-none border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-none">
+                        <div className="p-3 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-200 border border-transparent dark:border-zinc-800">
+                            <stat.icon className="w-6 h-6 text-zinc-600 dark:text-zinc-200" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                            <p className="text-xl font-black text-slate-900 dark:text-white">{stat.value}</p>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{stat.label}</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">{stat.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
             {q.status === 'error' && (
-                <div className="glass px-5 py-4 rounded-none border border-red-200 bg-red-50 text-sm font-medium text-red-600">
+                <div className="px-5 py-4 rounded-none border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-[#dc0000] dark:text-red-400">
                     Failed to load printhouses: {q.error}
                 </div>
             )}
@@ -754,12 +758,12 @@ export const PrinthousesPage: React.FC = () => {
                         header: 'Printhouse',
                         accessor: (p) => (
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-none bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <PrinterIcon className="w-4 h-4 text-slate-400" />
+                                <div className="w-7 h-7 rounded-none bg-zinc-100 dark:bg-zinc-900 border border-transparent dark:border-zinc-800 flex items-center justify-center flex-shrink-0">
+                                    <PrinterIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-200" />
                                 </div>
                                 <div>
-                                    <p className="font-bold text-slate-900">{p.name}</p>
-                                    <p className="text-[10px] font-mono text-slate-400">{p.id}</p>
+                                    <p className="font-bold text-zinc-900 dark:text-zinc-100">{p.name}</p>
+                                    <p className="text-[10px] font-mono text-zinc-400 font-bold">{p.id}</p>
                                 </div>
                             </div>
                         ),
@@ -769,7 +773,7 @@ export const PrinthousesPage: React.FC = () => {
                         accessor: (p) => (
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 {(p.signatures ?? []).map(s => (
-                                    <span key={s} className="px-2 py-0.5 rounded-none bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">{s}p</span>
+                                    <span key={s} className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-transparent dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
                                 ))}
                             </div>
                         ),
@@ -777,8 +781,8 @@ export const PrinthousesPage: React.FC = () => {
                     {
                         header: 'Delivery',
                         accessor: (p) => (
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                                <ClockIcon className="w-4 h-4 text-slate-300" />
+                            <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 font-medium">
+                                <ClockIcon className="w-4 h-4 text-zinc-400" />
                                 {p.delivery_time}
                             </div>
                         ),
@@ -786,19 +790,19 @@ export const PrinthousesPage: React.FC = () => {
                     {
                         header: 'Lead Days',
                         accessor: (p) => (
-                            <span className="px-2 py-0.5 rounded-none bg-blue-50 text-blue-700 font-bold text-[10px] uppercase tracking-widest">{p.production_lead_days}d</span>
+                            <span className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-transparent dark:border-zinc-800 font-bold text-[10px] uppercase tracking-wide">{p.production_lead_days}d</span>
                         ),
                     },
                     {
                         header: 'Limits',
                         accessor: (p) => (
                             <div className="space-y-0.5">
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                    <DocumentTextIcon className="w-3.5 h-3.5 text-slate-300" />
+                                <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                    <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
                                     <span className="font-medium">min {(p.limits?.min_copies ?? 0).toLocaleString()} copies</span>
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                    <DocumentTextIcon className="w-3.5 h-3.5 text-slate-300" />
+                                <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                    <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
                                     <span className="font-medium">max {(p.limits?.max_pages ?? 0).toLocaleString()} pages</span>
                                 </div>
                             </div>
@@ -806,26 +810,18 @@ export const PrinthousesPage: React.FC = () => {
                     },
                     {
                         header: 'Status',
-                        accessor: (p) => {
-                            const s = p.status ?? 'Active';
-                            const cls = s === 'Active'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : s === 'Under Maintenance'
-                                ? 'bg-amber-50 text-amber-700'
-                                : 'bg-slate-100 text-slate-500';
-                            return <span className={`px-2 py-0.5 rounded-none text-[10px] font-black uppercase tracking-widest ${cls}`}>{s}</span>;
-                        },
+                        accessor: (p) => <StatusBadge status={p.status ?? 'Active'} />,
                     },
                     {
                         header: '',
                         accessor: (p) => (
                             <div className="flex items-center gap-1 justify-end">
                                 <button onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                                    className="p-2 rounded-none text-slate-300 hover:text-slate-600 transition-colors" title="Edit">
+                                    className="p-2 rounded-none text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors" title="Edit">
                                     <PencilSquareIcon className="w-4 h-4" />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
-                                    className="p-2 rounded-none text-slate-300 hover:text-red-500 transition-colors" title="Delete">
+                                    className="p-2 rounded-none text-zinc-400 hover:text-[#dc0000] dark:hover:text-red-400 transition-colors" title="Delete">
                                     <TrashIcon className="w-4 h-4" />
                                 </button>
                             </div>
@@ -841,28 +837,28 @@ export const PrinthousesPage: React.FC = () => {
             <Transition show={!!deleteTarget} as={Fragment}>
                 <Dialog as="div" className="relative z-50" onClose={() => setDeleteTarget(null)}>
                     <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
-                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" />
+                        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm" />
                     </TransitionChild>
                     <div className="fixed inset-0 flex items-center justify-center p-4">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="bg-white rounded-none shadow-2xl p-8 max-w-sm w-full space-y-4">
+                            <DialogPanel className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-none shadow-none p-8 max-w-sm w-full space-y-4">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-3 rounded-none bg-red-50 text-red-500"><TrashIcon className="w-6 h-6" /></div>
+                                    <div className="p-3 rounded-none bg-red-50 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400 border border-red-100 dark:border-red-900/60"><TrashIcon className="w-6 h-6" /></div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-900">Delete Printhouse</p>
-                                        <p className="text-xs text-slate-500 font-medium">This action cannot be undone.</p>
+                                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Delete Printhouse</p>
+                                        <p className="text-xs text-zinc-500 font-medium">This action cannot be undone.</p>
                                     </div>
                                 </div>
-                                <p className="text-sm text-slate-600 font-medium">
-                                    Remove <span className="font-black text-slate-900">{deleteTarget?.name}</span>?
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400 font-medium">
+                                    Remove <span className="font-bold text-zinc-900 dark:text-zinc-100">{deleteTarget?.name}</span>?
                                 </p>
                                 <div className="flex gap-2 pt-2">
                                     <button onClick={confirmDelete} disabled={deleting}
-                                        className="flex-1 py-2.5 rounded-none bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        className="flex-1 py-2.5 rounded-none bg-[#dc0000] text-white text-sm font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-none">
                                         {deleting ? 'Deleting…' : 'Delete'}
                                     </button>
                                     <button onClick={() => setDeleteTarget(null)}
-                                        className="flex-1 py-2.5 rounded-none border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        className="flex-1 py-2.5 rounded-none border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
                                         Cancel
                                     </button>
                                 </div>

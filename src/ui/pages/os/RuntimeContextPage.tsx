@@ -6,8 +6,8 @@ export const RuntimeContextPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Runtime Context</h1>
-                    <p className="text-sm text-slate-500 font-medium tracking-tight">System tiers, isolation modes, and OS telemetry.</p>
+                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Runtime Context</h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">System tiers, isolation modes, and OS telemetry.</p>
                 </div>
             </div>
 
@@ -18,39 +18,39 @@ export const RuntimeContextPage: React.FC = () => {
                     { label: 'Isolation Mode', value: 'Strict Tenant-Bound', icon: ShieldCheckIcon },
                     { label: 'OS Version', value: 'v2.1.0-alpha', icon: CpuChipIcon }
                 ].map((item, i) => (
-                    <div key={i} className="glass p-5 rounded-none border border-white flex flex-col gap-2">
-                        <div className="flex items-center gap-2 text-slate-400">
+                    <div key={i} className="bg-white dark:bg-zinc-950 p-5 rounded-none border border-zinc-200 dark:border-zinc-800 flex flex-col gap-2 shadow-none">
+                        <div className="flex items-center gap-2 text-zinc-400">
                             <item.icon className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{item.label}</span>
                         </div>
-                        <p className="text-sm font-black text-slate-900 break-all">{item.value}</p>
+                        <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 break-all">{item.value}</p>
                     </div>
                 ))}
             </div>
 
-            <div className="glass p-8 rounded-none border border-white italic-text-off">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Active Node Stats</h3>
+            <div className="bg-white dark:bg-zinc-950 p-8 rounded-none border border-zinc-200 dark:border-zinc-800 shadow-none">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-6">Active Node Stats</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                     <div>
-                        <p className="text-xs font-bold text-slate-500 mb-2">CPU Utilization</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
-                            <div className="w-[12%] h-full bg-emerald-500" />
+                        <p className="text-xs font-bold text-zinc-500 mb-2">CPU Utilization</p>
+                        <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
+                            <div className="w-[12%] h-full bg-emerald-600 dark:bg-emerald-500" />
                         </div>
-                        <p className="text-right text-[10px] font-black text-slate-400 mt-1">12.4%</p>
+                        <p className="text-right text-[10px] font-bold text-zinc-400 mt-1">12.4%</p>
                     </div>
                     <div>
-                        <p className="text-xs font-bold text-slate-500 mb-2">Memory (RSS)</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
-                            <div className="w-[45%] h-full bg-blue-500" />
+                        <p className="text-xs font-bold text-zinc-500 mb-2">Memory (RSS)</p>
+                        <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
+                            <div className="w-[45%] h-full bg-[#dc0000] dark:bg-red-500" />
                         </div>
-                        <p className="text-right text-[10px] font-black text-slate-400 mt-1">45.1% (3.2GB / 8GB)</p>
+                        <p className="text-right text-[10px] font-bold text-zinc-400 mt-1">45.1% (3.2GB / 8GB)</p>
                     </div>
                     <div>
-                        <p className="text-xs font-bold text-slate-500 mb-2">Internal Latency</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-none overflow-hidden">
-                            <div className="w-[8%] h-full bg-emerald-500" />
+                        <p className="text-xs font-bold text-zinc-500 mb-2">Internal Latency</p>
+                        <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
+                            <div className="w-[8%] h-full bg-emerald-600 dark:bg-emerald-500" />
                         </div>
-                        <p className="text-right text-[10px] font-black text-slate-400 mt-1">4ms (avg)</p>
+                        <p className="text-right text-[10px] font-bold text-zinc-400 mt-1">4ms (avg)</p>
                     </div>
                 </div>
             </div>

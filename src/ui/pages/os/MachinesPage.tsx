@@ -6,7 +6,6 @@ import {
     BoltIcon,
     ScaleIcon,
     MagnifyingGlassIcon,
-    FunnelIcon,
     ArrowPathIcon,
     ClockIcon,
     MapPinIcon
@@ -14,6 +13,7 @@ import {
 import { DataTable } from '../../components/DataTable';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getMachines } from '../../lib/adminApi';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface Machine {
     id: string;
@@ -79,45 +79,13 @@ export const MachinesPage: React.FC = () => {
         return Number(withData.reduce((s, m) => s + Number(m.economicEfficiency || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
 
-    const getHealthColor = (state: string) => {
-        switch (state) {
-            case 'ONLINE':
-            case 'HEALTHY':
-            case 'PROCESSING':
-                return 'bg-emerald-500';
-            case 'DEGRADED':
-            case 'CAPACITY_BLOCKED':
-                return 'bg-amber-500';
-            case 'OFFLINE':
-                return 'bg-red-500';
-            default:
-                return 'bg-slate-300';
-        }
-    };
-
-    const getHealthPillClass = (state: string) => {
-        switch (state) {
-            case 'ONLINE':
-            case 'HEALTHY':
-            case 'PROCESSING':
-                return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-            case 'DEGRADED':
-            case 'CAPACITY_BLOCKED':
-                return 'bg-amber-50 text-amber-600 border-amber-100';
-            case 'OFFLINE':
-                return 'bg-red-50 text-red-600 border-red-100';
-            default:
-                return 'bg-slate-50 text-slate-500 border-slate-100';
-        }
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Industrial Machines</h1>
+                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Industrial Machines</h1>
                     {q.data?.timestamp && (
-                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-none text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-none text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
                             <ClockIcon className="w-3 h-3" />
                             <span>Sync: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
                         </div>
@@ -126,7 +94,7 @@ export const MachinesPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                    <button 
                      onClick={() => q.refetch()}
-                     className="p-1.5 rounded-none border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-[#1a1a1b]/5 transition-colors text-slate-400"
+                     className="p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400"
                      title="Force Telemetry Refresh"
                    >
                      <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
@@ -136,44 +104,41 @@ export const MachinesPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
-                    { label: 'Total Fleet', value: rawMachines.length, icon: CpuChipIcon, color: 'primary' },
-                    { label: 'Active Nodes', value: activeNodes, icon: SignalIcon, color: 'emerald' },
-                    { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, color: 'blue' },
-                    { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, color: 'indigo' },
+                    { label: 'Total Fleet', value: rawMachines.length, icon: CpuChipIcon, config: { bg: "bg-zinc-50 dark:bg-zinc-900", text: "text-zinc-500 dark:text-zinc-400" } },
+                    { label: 'Active Nodes', value: activeNodes, icon: SignalIcon, config: { bg: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-500 dark:text-emerald-400" } },
+                    { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, config: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-500 dark:text-sky-400" } },
+                    { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, config: { bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-500 dark:text-amber-400" } },
                 ].map((stat, i) => (
-                    <div key={i} className="glass p-3 rounded-none border border-white flex items-center gap-3 shadow-sm">
-                        <div className={`p-2 rounded-none ${stat.color === 'primary' ? 'bg-slate-100 text-slate-600' : 
-                                          stat.color === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
-                                          stat.color === 'blue' ? 'bg-blue-100 text-blue-600' :
-                                          'bg-indigo-100 text-indigo-600'}`}>
+                    <div key={i} className="bg-white dark:bg-zinc-950 p-3 rounded-none border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 shadow-none">
+                        <div className={`p-2 rounded-none ${stat.config.bg} ${stat.config.text}`}>
                             <stat.icon className="w-4 h-4" />
                         </div>
                         <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
-                            <p className="text-lg font-black text-slate-900 tracking-tighter leading-none">{stat.value}</p>
+                            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
+                            <p className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tighter leading-none">{stat.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#131314]/[0.03] p-1.5 rounded-none border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-zinc-950 p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 shadow-none">
                 <div className="relative flex-1 w-full">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input 
                         type="text"
                         placeholder="Search fleet..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-1.5 bg-transparent text-sm focus:ring-0 border-none outline-none font-medium"
+                        className="w-full pl-9 pr-4 py-1.5 bg-transparent text-zinc-900 dark:text-zinc-100 text-sm focus:ring-0 border-none outline-none font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
                     />
                 </div>
-                <div className="h-6 w-[1px] bg-slate-200 dark:bg-[#131314]/10 hidden md:block" />
+                <div className="h-6 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
                 <div className="flex items-center gap-1">
                     {['ALL', 'ONLINE', 'DEGRADED', 'OFFLINE'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-none text-[9px] font-black uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-white dark:bg-[#131314]/10 text-primary shadow-sm ring-1 ring-slate-200 dark:ring-white/20' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-3 py-1.5 rounded-none text-[9px] font-bold uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-zinc-50 dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 ring-1 ring-zinc-200 dark:ring-zinc-800' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                         >
                             {status}
                         </button>
@@ -182,9 +147,9 @@ export const MachinesPage: React.FC = () => {
             </div>
 
             {q.status === 'error' && (
-                <div className="glass px-5 py-4 rounded-none border border-red-200 bg-red-50 text-sm font-medium text-red-600 flex items-center gap-3">
-                    <div className="p-2 bg-red-100 rounded-none">
-                        <SignalIcon className="w-5 h-5" />
+                <div className="p-4 rounded-none border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-3">
+                    <div className="p-2 bg-red-100 dark:bg-red-900/60 rounded-none">
+                        <SignalIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
                     </div>
                     <span>Failed to synchronize grid telemetry: {q.error}</span>
                 </div>
@@ -198,25 +163,25 @@ export const MachinesPage: React.FC = () => {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-none bg-slate-50 dark:bg-[#131314]/5 flex items-center justify-center flex-shrink-0 border border-slate-100 dark:border-white/10 relative">
-                                    <CpuChipIcon className="w-5 h-5 text-slate-400" />
+                                <div className="w-10 h-10 rounded-none bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
+                                    <CpuChipIcon className="w-5 h-5 text-zinc-400" />
                                     {m.profileCompletenessScore < 100 && (
-                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-none" />
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border border-zinc-950 rounded-none" />
                                     )}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <p className="font-bold text-slate-900 dark:text-[#ECECF1] leading-tight">{m.companyName || 'Industrial Node'}</p>
+                                        <p className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{m.companyName || 'Industrial Node'}</p>
                                         {m.profileCompletenessScore < 75 && (
-                                            <span className="px-1.5 py-0.5 rounded-none bg-amber-50 text-[8px] font-black text-amber-600 border border-amber-100 uppercase tracking-tighter">
+                                            <span className="px-1.5 py-0.5 rounded-none bg-amber-50 dark:bg-amber-950/40 text-[8px] font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 uppercase tracking-wide">
                                                 Needs Profile
                                             </span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[10px] font-mono text-slate-400 uppercase">{m.id}</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 uppercase">{m.id}</span>
                                         {m.clusterId && (
-                                            <span className="px-1 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-slate-200/50">
+                                            <span className="px-1 py-0.5 rounded-none bg-zinc-50 dark:bg-zinc-900 text-[9px] font-bold text-zinc-400 uppercase tracking-wide border border-zinc-200 dark:border-zinc-800">
                                                 {m.clusterId}
                                             </span>
                                         )}
@@ -230,21 +195,21 @@ export const MachinesPage: React.FC = () => {
                         header: 'Geolocation',
                         accessor: (m) => (
                             <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                                    <GlobeAltIcon className={`w-3.5 h-3.5 ${m.needsProfile ? 'text-amber-400' : 'text-slate-300'}`} />
-                                    <span className={`text-xs font-bold ${m.needsProfile ? 'text-amber-600 italic' : ''}`}>
+                                <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
+                                    <GlobeAltIcon className={`w-3.5 h-3.5 ${m.needsProfile ? 'text-amber-400' : 'text-zinc-400'}`} />
+                                    <span className={`text-xs font-bold ${m.needsProfile ? 'text-amber-600 dark:text-amber-400 italic' : ''}`}>
                                         {m.locationLabel}
                                     </span>
                                 </div>
                                 {m.needsProfile && (
-                                    <p className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">
+                                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">
                                         Complete print node profile
                                     </p>
                                 )}
                                 {m.region && !m.needsProfile && (
-                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                    <div className="flex items-center gap-1.5 text-zinc-400">
                                         <MapPinIcon className="w-3 h-3" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{m.region}</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">{m.region}</span>
                                     </div>
                                 )}
                             </div>
@@ -255,21 +220,20 @@ export const MachinesPage: React.FC = () => {
                         header: 'Grid Health',
                         accessor: (m) => (
                             <div className="flex flex-col gap-1.5">
-                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-none border text-[10px] font-black uppercase tracking-wider w-fit ${getHealthPillClass(m.healthState)}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-none ${getHealthColor(m.healthState)}`} />
-                                    {m.healthState}
+                                <div className="w-fit">
+                                    <StatusBadge status={m.healthState} />
                                 </div>
                                 {m.healthState === 'OFFLINE' && (
-                                    <div className="px-1.5 py-0.5 rounded-none bg-slate-100 text-[8px] font-black text-slate-500 uppercase tracking-tighter w-fit">
+                                    <div className="px-1.5 py-0.5 rounded-none bg-zinc-50 dark:bg-zinc-900 text-[8px] font-bold text-zinc-500 uppercase tracking-wide w-fit">
                                         No live heartbeat
                                     </div>
                                 )}
                                 <div className="flex items-center gap-1">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Proc:</span>
-                                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400">{m.machineState}</span>
-                                    <span className="text-slate-300 mx-0.5">|</span>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Worker:</span>
-                                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400">{m.workerState}</span>
+                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Proc:</span>
+                                    <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-400">{m.machineState}</span>
+                                    <span className="text-zinc-300 dark:text-zinc-700 mx-0.5">|</span>
+                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">Worker:</span>
+                                    <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-400">{m.workerState}</span>
                                 </div>
                             </div>
                         ),
@@ -280,18 +244,18 @@ export const MachinesPage: React.FC = () => {
                         accessor: (m) => (
                             <div className="space-y-2 w-36">
                                 <div>
-                                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                    <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-1">
                                         <span>Util / Cap</span>
                                         <span className={m.capacityUtilizationPct === null ? 'italic font-medium' : ''}>
                                             {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
                                         </span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-[#131314]/5 rounded-none overflow-hidden">
+                                    <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
                                         {m.capacityUtilizationPct !== null && (
                                             <div 
                                                 className={`h-full rounded-none transition-all duration-1000 ${
                                                     m.capacityUtilizationPct > 90 ? 'bg-red-500' : 
-                                                    m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-primary'
+                                                    m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-red-600'
                                                 }`}
                                                 style={{ width: `${m.capacityUtilizationPct}%` }}
                                             />
@@ -299,15 +263,15 @@ export const MachinesPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[8px] font-black text-slate-400 uppercase">Completeness</span>
+                                    <span className="text-[8px] font-bold text-zinc-400 uppercase">Completeness</span>
                                     <div className="flex items-center gap-1">
-                                        <div className="w-12 h-1 bg-slate-100 rounded-none overflow-hidden">
+                                        <div className="w-12 h-1 bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
                                             <div 
-                                                className={`h-full rounded-none ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                                className={`h-full rounded-none ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-500'}`}
                                                 style={{ width: `${m.telemetryCompletenessScore}%` }}
                                             />
                                         </div>
-                                        <span className="text-[8px] font-bold text-slate-500">{m.telemetryCompletenessScore}%</span>
+                                        <span className="text-[8px] font-bold text-zinc-500">{m.telemetryCompletenessScore}%</span>
                                     </div>
                                 </div>
                             </div>
@@ -319,14 +283,14 @@ export const MachinesPage: React.FC = () => {
                         accessor: (m) => (
                             <div className="flex items-center gap-4">
                                 <div className="text-center">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Uptime</p>
-                                    <p className={`text-xs font-bold ${m.uptimeScore !== null && m.uptimeScore > 95 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    <p className="text-[9px] font-bold text-zinc-400 uppercase mb-0.5">Uptime</p>
+                                    <p className={`text-xs font-bold ${m.uptimeScore !== null && m.uptimeScore > 95 ? 'text-emerald-500' : 'text-zinc-500'}`}>
                                         {m.uptimeScore !== null ? `${m.uptimeScore}%` : 'N/A'}
                                     </p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Efficiency</p>
-                                    <p className="text-xs font-bold text-slate-400">
+                                    <p className="text-[9px] font-bold text-zinc-400 uppercase mb-0.5">Efficiency</p>
+                                    <p className="text-xs font-bold text-zinc-500">
                                         {m.economicEfficiency !== null ? `${m.economicEfficiency}%` : 'N/A'}
                                     </p>
                                 </div>
@@ -339,13 +303,13 @@ export const MachinesPage: React.FC = () => {
                         accessor: (m) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
-                                    <SignalIcon className={`w-4 h-4 ${m.lastHeartbeatAt && (new Date().getTime() - new Date(m.lastHeartbeatAt).getTime() < 900000) ? 'text-emerald-500' : 'text-slate-300'}`} />
-                                    <span className="text-[10px] font-black text-slate-500 font-mono">
+                                    <SignalIcon className={`w-4 h-4 ${m.lastHeartbeatAt && (new Date().getTime() - new Date(m.lastHeartbeatAt).getTime() < 900000) ? 'text-emerald-500' : 'text-zinc-600'}`} />
+                                    <span className="text-[10px] font-bold text-zinc-500 font-mono">
                                         {m.lastHeartbeatAt ? new Date(m.lastHeartbeatAt).toLocaleTimeString() : 'NEVER'}
                                     </span>
                                 </div>
                                 {m.lastHeartbeatAt && (
-                                    <p className="text-[9px] font-medium text-slate-400">
+                                    <p className="text-[9px] font-medium text-zinc-400">
                                         Sync: {Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000)}m ago
                                     </p>
                                 )}
@@ -356,11 +320,11 @@ export const MachinesPage: React.FC = () => {
                 ]}
             />
             
-            <div className="flex items-center justify-between py-4 border-t border-slate-100 dark:border-white/[0.05]">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="flex items-center justify-between py-4 border-t border-zinc-200 dark:border-zinc-800">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                     Showing {filteredMachines.length} of {rawMachines.length} Grid Nodes
                 </p>
-                <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                     <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-none bg-emerald-500" /> ONLINE
                     </div>
