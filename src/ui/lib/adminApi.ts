@@ -358,6 +358,74 @@ export async function getOverview(range: Range) {
     return adminFetch<OverviewResponse>(`/api/admin/metrics/overview?range=${range}`);
 }
 
+export type DashboardOverviewPayload = {
+    ok: boolean;
+    source_status: string;
+    timestamp: string;
+    preflight: {
+        jobsToday: number | null;
+        activeJobs: number | null;
+        completedJobsToday: number | null;
+        failedJobsToday: number | null;
+        realExtractionCount: number | null;
+        failedRuntimeEnvironmentCount: number | null;
+        partialArtifactsCount: number | null;
+        averageRiskScore: number | null;
+        queueDepth: number | null;
+        latestJobStatus: string | null;
+    };
+    governance: {
+        activePolicyCount: number | null;
+        latestPolicyApplied: string | null;
+        jobsBlockedByPolicy: number | null;
+        certificationBlockedCount: number | null;
+        jobsCertifiableCount: number | null;
+        lastGovernanceEvent: {
+            rule: string;
+            result: string;
+            action: string;
+            time: string;
+        } | null;
+        deploymentContractVersion: string;
+        auditStatus: 'clean' | 'warnings' | 'errors' | null;
+    };
+    economy: {
+        estimatedProductionValue: number | null;
+        estimatedAvoidedReprintCost: number | null;
+        averageRiskScore: number | null;
+        averageMargin: number | null;
+        jobsRequiringFix: number | null;
+        fixSuccessCount: number | null;
+        fixFailureCount: number | null;
+        qualityScore: number | null;
+    };
+    storage: {
+        artifactsCount: number | null;
+        totalSizeBytes: number | null;
+        latestArtifact: string | null;
+    };
+    audit: {
+        latestEvents: Array<{
+            event: string;
+            status: string;
+            details: string;
+            timestamp: string;
+        }>;
+    };
+    federation: {
+        operationalNodes: number | null;
+        activeDispatches: number | null;
+        missingCoordinates: number | null;
+        degradedNodes: number | null;
+        averageUtilization: number | null;
+    };
+    warnings?: string[];
+};
+
+export async function getDashboardOverview() {
+    return adminFetch<DashboardOverviewPayload>('/api/admin/dashboard/overview');
+}
+
 export async function getGovernanceBlocks() {
     return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }

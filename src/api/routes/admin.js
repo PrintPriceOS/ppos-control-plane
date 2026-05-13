@@ -223,6 +223,7 @@ router.use('/machines', require('./machinesAdmin')); // Machine Fleet Layer
 router.use('/materials', require('./materialsAdmin')); // Materials & Paper Catalog
 router.use('/audit', require('./auditExplorerAdmin')); // Forensic Audit Explorer
 router.use('/jobs', require('./jobsAdmin')); // Forensic Jobs Observability Layer
+router.use('/dashboard', require('./adminDashboard')); // Production Mission Control Layer
 
 
 
