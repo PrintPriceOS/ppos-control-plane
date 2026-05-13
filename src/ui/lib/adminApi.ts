@@ -1769,18 +1769,21 @@ export async function listAdminPreflightJobs(filters: Record<string, any> = {}) 
     return adminFetch<{ ok: boolean, total: number, jobs: AdminPreflightJob[], source_status?: string }>(qStr ? `/api/admin/preflight/jobs?${qStr}` : `/api/admin/preflight/jobs`);
 }
 
-export async function createAdminPreflightJob(formData: FormData) {
-    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+export async function createAdminPreflightJob(formData: FormData, customHeaders?: Record<string, string>) {
+    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
     const res = await fetch('/api/admin/preflight/jobs', {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...customHeaders
+        },
         body: formData
     });
-    const data = await res.json();
     if (!res.ok) {
-        throw { status: res.status, ...data };
+        const errorData = await res.json().catch(() => ({ message: `Upstream HTTP Error ${res.status}: ${res.statusText || 'Gateway Disconnection'}` }));
+        throw { status: res.status, ...errorData };
     }
-    return data;
+    return res.json();
 }
 
 export async function getAdminPreflightJob(jobId: string) {
@@ -1805,7 +1808,7 @@ export async function listAdminPreflightArtifacts(jobId: string) {
 }
 
 export async function downloadAdminPreflightArtifact(jobId: string, artifactId: string) {
-    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
     const res = await fetch(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
     });
@@ -1829,16 +1832,21 @@ export async function listAdminPreflightBatches(filters: Record<string, any> = {
     return adminFetch<{ ok: boolean, batches: any[], source_status?: string }>(qStr ? `/api/admin/preflight/batches?${qStr}` : `/api/admin/preflight/batches`);
 }
 
-export async function createAdminPreflightBatch(formData: FormData) {
-    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+export async function createAdminPreflightBatch(formData: FormData, customHeaders?: Record<string, string>) {
+    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
     const res = await fetch('/api/admin/preflight/batches', {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...customHeaders
+        },
         body: formData
     });
-    const data = await res.json();
-    if (!res.ok) throw { status: res.status, ...data };
-    return data;
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: `Upstream HTTP Error ${res.status}: ${res.statusText || 'Gateway Disconnection'}` }));
+        throw { status: res.status, ...errorData };
+    }
+    return res.json();
 }
 
 export async function getAdminPreflightAudit(filters: Record<string, any> = {}) {
