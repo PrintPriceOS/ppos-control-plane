@@ -4,6 +4,7 @@ const dispatchService = require('./dispatchService');
 const quoteService = require('./quoteService');
 const economicRoutingService = require('./economicRoutingService');
 const marketplaceService = require('./marketplaceService');
+const materialAvailabilityService = require('./materialAvailabilityService');
 
 class RoutingRecommendationService {
     /**
@@ -129,7 +130,7 @@ class RoutingRecommendationService {
         const docWidthMm = preflightResults.classification?.widthMm || 0;
         const docHeightMm = preflightResults.classification?.heightMm || 0;
 
-        return candidates.map(c => {
+        const evaluated = await Promise.all(candidates.map(async c => {
             let compatibilityReason = 'MATCH';
             let technicalScore = 1.0;
 
@@ -148,13 +149,29 @@ class RoutingRecommendationService {
                 compatibilityReason = `SIZE_INCOMPATIBLE (${Math.round(docWidthMm)}x${Math.round(docHeightMm)} > ${printerMaxWidth}x${printerMaxHeight})`;
             }
 
+            // 3. Material Supply Inventory Orchestration Constraints Verification
+            try {
+                const targetNode = c.printer_id || c.node_id;
+                if (targetNode) {
+                    const shortages = await materialAvailabilityService.forecastDepletion(targetNode);
+                    if (shortages && shortages.length > 0) {
+                        technicalScore *= 0.4; // Industrial penalty threshold for critical inventory depletion state
+                        compatibilityReason += ` | MATERIAL_SHORTAGE_RISK (${shortages.map(s => s.material).join(', ')})`;
+                    }
+                }
+            } catch (err) {
+                // Keep bounding transparent on secondary validation failures
+            }
+
             return {
                 ...c,
                 technical_compatibility: technicalScore,
                 compatibility_reason: compatibilityReason,
                 routing_score: c.routing_score * technicalScore
             };
-        }).filter(c => c.technical_compatibility > 0);
+        }));
+
+        return evaluated.filter(c => c.technical_compatibility > 0);
     }
 
     /**

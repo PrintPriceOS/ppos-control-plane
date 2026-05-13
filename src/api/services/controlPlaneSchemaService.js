@@ -393,18 +393,49 @@ class ControlPlaneSchemaService {
 
             // 18. Predictive Material Inventory (Phase 34 Canonical Materials & Paper Catalog)
             await db.query(`
+                CREATE TABLE IF NOT EXISTS materials_catalog (
+                    id VARCHAR(64) PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+                    printhouse_id VARCHAR(64) NULL,
+                    material_name VARCHAR(128) NOT NULL,
+                    material_type VARCHAR(64) NOT NULL,
+                    substrate_class VARCHAR(64) NULL,
+                    gsm INT NULL,
+                    sheet_format VARCHAR(64) NULL,
+                    finish_type VARCHAR(64) NULL,
+                    supplier_name VARCHAR(128) NULL,
+                    supplier_country VARCHAR(64) NULL,
+                    cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
+                    unit_name VARCHAR(32) DEFAULT 'sheets',
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_tenant (tenant_id),
+                    INDEX idx_printhouse (printhouse_id)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
                 CREATE TABLE IF NOT EXISTS predictive_material_inventory (
                     id VARCHAR(64) PRIMARY KEY,
                     node_id VARCHAR(64) NOT NULL,
+                    material_catalog_id VARCHAR(64) NULL,
                     material_name VARCHAR(128) NOT NULL,
                     material_type VARCHAR(64) NOT NULL,
                     paper_gsm INT NULL,
                     finish VARCHAR(64) NULL,
                     current_stock_units INT DEFAULT 0,
                     reserved_stock_units INT DEFAULT 0,
+                    available_units INT DEFAULT 0,
+                    reorder_point INT DEFAULT 100,
+                    replenishment_lead_days INT DEFAULT 7,
                     shortage_risk VARCHAR(32) DEFAULT 'NONE',
                     depletion_forecast_days INT DEFAULT 30,
                     operational_status VARCHAR(32) DEFAULT 'AVAILABLE',
+                    status VARCHAR(32) DEFAULT 'STABLE',
+                    machine_lock VARCHAR(64) NULL,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+                    printhouse_id VARCHAR(64) NULL,
                     daily_burn_rate DECIMAL(10,2) DEFAULT 0.00,
                     forecasted_depletion_date TIMESTAMP NULL,
                     procurement_risk VARCHAR(32) DEFAULT 'LOW',
@@ -415,6 +446,21 @@ class ControlPlaneSchemaService {
                     INDEX idx_node (node_id)
                 ) ENGINE=InnoDB;
             `);
+
+            // Apply backward-compatible schema modifications gracefully for existing deployed columns
+            const pmiCols = [
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS material_catalog_id VARCHAR(64) NULL",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS available_units INT DEFAULT 0",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS reorder_point INT DEFAULT 100",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS replenishment_lead_days INT DEFAULT 7",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'STABLE'",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS machine_lock VARCHAR(64) NULL",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production'",
+                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL"
+            ];
+            for (const sql of pmiCols) {
+                await db.query(sql).catch(() => {});
+            }
 
             await db.query(`
                 CREATE TABLE IF NOT EXISTS material_machine_compatibility (
@@ -429,6 +475,58 @@ class ControlPlaneSchemaService {
                     UNIQUE KEY uk_mat_machine (material_id, machine_profile_id),
                     INDEX idx_material (material_id),
                     INDEX idx_machine (machine_profile_id)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS material_inventory_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    material_inventory_id VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(32) NOT NULL,
+                    quantity_units INT NOT NULL,
+                    before_stock INT NOT NULL,
+                    after_stock INT NOT NULL,
+                    job_id VARCHAR(64) NULL,
+                    dispatch_id VARCHAR(64) NULL,
+                    operator_id VARCHAR(64) NULL,
+                    reason TEXT NULL,
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_inventory (material_inventory_id),
+                    INDEX idx_event_type (event_type),
+                    INDEX idx_created (created_at)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS manufacturing_material_reservations (
+                    id VARCHAR(64) PRIMARY KEY,
+                    material_inventory_id VARCHAR(64) NOT NULL,
+                    job_id VARCHAR(64) NULL,
+                    dispatch_id VARCHAR(64) NULL,
+                    reserved_units INT NOT NULL,
+                    reservation_status VARCHAR(32) DEFAULT 'ACTIVE',
+                    expires_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_inventory (material_inventory_id),
+                    INDEX idx_dispatch (dispatch_id)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS material_procurements (
+                    id VARCHAR(64) PRIMARY KEY,
+                    material_inventory_id VARCHAR(64) NOT NULL,
+                    supplier_name VARCHAR(128) NULL,
+                    ordered_units INT NOT NULL,
+                    expected_delivery_date TIMESTAMP NULL,
+                    procurement_status VARCHAR(32) DEFAULT 'ORDERED',
+                    procurement_risk VARCHAR(32) DEFAULT 'LOW',
+                    notes TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_inventory (material_inventory_id)
                 ) ENGINE=InnoDB;
             `);
 
@@ -452,11 +550,22 @@ class ControlPlaneSchemaService {
 
                     for (const bm of baselineMaterials) {
                         const depDate = new Date(Date.now() + bm.forecast * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+                        const available = bm.stock - bm.reserved;
+                        let statusStr = 'STABLE';
+                        if (available <= 0) statusStr = 'CRITICAL';
+                        else if (available <= 5000) statusStr = 'AT_RISK';
+
+                        await db.query(`
+                            INSERT IGNORE INTO materials_catalog
+                            (id, tenant_id, material_name, material_type, gsm, finish_type, supplier_name, cost_per_unit)
+                            VALUES (?, 'ppos-production', ?, ?, ?, ?, ?, ?)
+                        `, [bm.id, bm.name, bm.type, bm.gsm, bm.finish, bm.supplier, bm.cost]);
+
                         await db.query(`
                             INSERT IGNORE INTO predictive_material_inventory 
-                            (id, node_id, material_name, material_type, paper_gsm, finish, current_stock_units, reserved_stock_units, shortage_risk, depletion_forecast_days, operational_status, daily_burn_rate, forecasted_depletion_date, procurement_risk, supplier_name, cost_per_unit)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        `, [bm.id, defaultNodeId, bm.name, bm.type, bm.gsm, bm.finish, bm.stock, bm.reserved, bm.risk, bm.forecast, bm.status, bm.burn, depDate, bm.procRisk, bm.supplier, bm.cost]);
+                            (id, node_id, material_catalog_id, material_name, material_type, paper_gsm, finish, current_stock_units, reserved_stock_units, available_units, reorder_point, replenishment_lead_days, shortage_risk, depletion_forecast_days, operational_status, status, daily_burn_rate, forecasted_depletion_date, procurement_risk, supplier_name, cost_per_unit)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 5000, 7, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `, [bm.id, defaultNodeId, bm.id, bm.name, bm.type, bm.gsm, bm.finish, bm.stock, bm.reserved, available, bm.risk, bm.forecast, bm.status, statusStr, bm.burn, depDate, bm.procRisk, bm.supplier, bm.cost]);
                     }
                 }
             } catch (seedErr) {

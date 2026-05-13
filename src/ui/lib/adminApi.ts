@@ -1518,6 +1518,75 @@ export async function releaseMaterialCapacity(dispatchId: string, nodeId: string
     });
 }
 
+// --- Materials MES Operator Workflows API --- //
+
+export async function createCatalogMaterial(payload: any) {
+    return adminFetch<{ ok: boolean, data: any }>('/api/admin/materials', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function intakeMaterialStock(id: string, payload: { quantity: number, reason?: string, supplier_batch?: string, expected_use?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/intake`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function adjustMaterialStock(id: string, payload: { quantity_delta: number, reason: string, operator_note?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/adjust`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function reserveMaterialStockWorkflow(id: string, payload: { quantity: number, job_id?: string, dispatch_id?: string, expiration?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/reserve`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function releaseMaterialStockWorkflow(id: string, quantity?: number) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/release`, {
+        method: 'POST',
+        body: JSON.stringify({ quantity })
+    });
+}
+
+export async function consumeMaterialStock(id: string, payload: { quantity_consumed: number, waste_units?: number, reason?: string, job_id?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/consume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function createMaterialProcurementOrder(id: string, payload: { supplier_name?: string, ordered_units: number, expected_delivery_date?: string, risk?: string, notes?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/procurements`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function receiveMaterialProcurementOrder(procurementId: string) {
+    return adminFetch<{ ok: boolean, received: boolean }>(`/api/admin/materials/procurements/${encodeURIComponent(procurementId)}/receive`, {
+        method: 'POST'
+    });
+}
+
+export async function getMaterialTimelineEvents(id: string) {
+    return adminFetch<{ ok: boolean, events: any[] }>(`/api/admin/materials/${encodeURIComponent(id)}/events`);
+}
+
+export async function getMaterialProcurementList(id: string) {
+    return adminFetch<{ ok: boolean, procurements: any[] }>(`/api/admin/materials/${encodeURIComponent(id)}/procurements`);
+}
+
+export async function getMaterialDepletionForecast(id: string) {
+    return adminFetch<{ ok: boolean, forecast: any }>(`/api/admin/materials/${encodeURIComponent(id)}/forecast`);
+}
+
 // --- Forensic Audit Explorer API (Phase 34) ---
 export interface AuditExplorerEvent {
     id: string;

@@ -293,7 +293,7 @@ Deliver your answer in sections:
             <h2 className="text-xl font-bold flex items-center gap-2">
               {t('aiAuditTitle')}
               {showVisualBadge && (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-none border border-purple-200">
+                <span className="text-xs bg-zinc-950 text-red-400 px-2 py-0.5 rounded-none border border-red-900/60 uppercase tracking-wider font-bold">
                   Vision Analysis
                 </span>
               )}
