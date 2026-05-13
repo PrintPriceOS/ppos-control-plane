@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { clearAdminKey, getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/adminApi';
 import { getAuthUser, getUserRole } from '../lib/authStore';
+import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
 // ─── Notification types ──────────────────────────────────────────────────────
 
@@ -153,9 +154,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
           {/* Corporate Branding */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
-              <ShieldCheckIcon className="w-5 h-5 text-white" />
-            </div>
+            <PrintPriceLogo className="w-8 h-8 shrink-0" />
             <div className="hidden lg:block">
               <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
               <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">Control Plane</p>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { clearAuthToken } from '../lib/authStore';
+import { PrintPriceLogo } from '../components/PrintPriceLogo';
 import {
   ChartBarIcon,
   UsersIcon,
@@ -134,12 +135,10 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose?: () => void }> = ({ i
 
   return (
     <aside className={`${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static z-50 w-64 ppos-bg border-r ppos-border h-full flex flex-col overflow-hidden transition-transform duration-300 ease-in-out shrink-0`}>
-      {/* Brand Header */}
-      <div className="px-5 py-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
+      {/* Brand Header - visible only on mobile to prevent duplicate headers on desktop */}
+      <div className="lg:hidden px-5 py-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#dc0000] flex items-center justify-center">
-            <ShieldCheckIcon className="w-5 h-5 text-white" />
-          </div>
+          <PrintPriceLogo className="w-8 h-8 shrink-0" />
           <div>
             <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight">PrintPrice OS</h1>
             <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
