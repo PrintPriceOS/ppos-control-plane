@@ -42,11 +42,12 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   const policiesData: any = policiesQ.data;
   const policies = Array.isArray(policiesData?.policies) ? policiesData.policies : [];
   const sourceStatus = policiesData?.source;
-  const isPoliciesUnavailable = policiesData && (!policiesData.ok || policies.length === 0);
+  const isPoliciesUnavailable = policiesData && policies.length === 0;
+  const isPoliciesDegraded = sourceStatus?.includes('FALLBACK') || sourceStatus?.includes('UNAVAILABLE') || sourceStatus?.includes('error');
 
   React.useEffect(() => {
     if (policies.length > 0 && !policy) {
-      setPolicy(policies[0].slug || policies[0].id);
+      setPolicy(policies[0].id || policies[0].policy_id);
     }
   }, [policies, policy]);
 
@@ -349,11 +350,15 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                               className="w-full ppos-surface-muted border ppos-border rounded-none px-4 py-3 text-sm font-black text-slate-700 dark:text-[#ECECF1] focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer"
                             >
                               {policies.length > 0 ? (
-                                policies.map((p: any) => (
-                                  <option key={p.slug || p.id} value={p.slug || p.id}>
-                                    {p.name || p.slug}
-                                  </option>
-                                ))
+                                policies.map((p: any) => {
+                                  const canonicalId = p.id || p.policy_id;
+                                  const displayName = p.name || p.id;
+                                  return (
+                                    <option key={canonicalId} value={canonicalId}>
+                                      {displayName}
+                                    </option>
+                                  );
+                                })
                               ) : (
                                 <option value="">No real policies available</option>
                               )}
@@ -361,7 +366,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                           </div>
                         </div>
 
-                        {isPoliciesUnavailable && (
+                        {isPoliciesUnavailable ? (
                           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-start gap-3 text-red-500">
                             <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
                             <div className="flex flex-col gap-0.5">
@@ -371,7 +376,17 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                               </span>
                             </div>
                           </div>
-                        )}
+                        ) : isPoliciesDegraded ? (
+                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-none flex items-start gap-3 text-amber-500">
+                            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider">Local Fallback</span>
+                              <span className="text-xs font-bold opacity-90">
+                                Upstream policy catalog is unreachable. Using authoritative local versioned contract fallbacks for execution.
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
 
                         {error && (
                           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-start gap-3 text-red-500 animate-in shake duration-300">

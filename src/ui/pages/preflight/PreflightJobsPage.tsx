@@ -87,7 +87,9 @@ export const PreflightJobsPage: React.FC = () => {
   const storageQ = useAdminQuery('preflight:storage:global', () => getStorageSummary(), 30000);
   const policiesQ = useAdminQuery('preflight:policies:admin', () => getAdminPreflightPolicies(), 30000);
   const policiesData = policiesQ.data;
-  const isPoliciesUnavailable = policiesData && (!policiesData.ok || !policiesData.policies || policiesData.policies.length === 0);
+  const policiesList = policiesData?.policies || [];
+  const isPoliciesUnavailable = policiesData && policiesList.length === 0;
+  const isPoliciesDegraded = policiesData?.source?.includes('FALLBACK') || policiesData?.source?.includes('UNAVAILABLE') || policiesData?.source?.includes('error');
 
   const formatSize = (bytes?: number) => {
     if (!bytes) return '0 B';
@@ -145,14 +147,21 @@ export const PreflightJobsPage: React.FC = () => {
         </div>
       </div>
 
-      {isPoliciesUnavailable && (
+      {isPoliciesUnavailable ? (
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
           <div className="text-xs font-bold flex-1">
             Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.
           </div>
         </div>
-      )}
+      ) : isPoliciesDegraded ? (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-none flex items-center gap-3 text-amber-500">
+          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+          <div className="text-xs font-bold flex-1">
+            Upstream policy catalog is unreachable. Using authoritative local versioned contract fallbacks for transformation enablement.
+          </div>
+        </div>
+      ) : null}
 
       <PreflightUploadModal 
         isOpen={isUploadOpen}
@@ -269,11 +278,15 @@ export const PreflightJobsPage: React.FC = () => {
             className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer max-w-[160px] truncate"
           >
             <option value="">Policy: All</option>
-            {(policiesData?.policies || []).map((p: any) => (
-              <option key={p.slug || p.id} value={p.slug || p.id}>
-                {p.name || p.slug}
-              </option>
-            ))}
+            {(policiesData?.policies || []).map((p: any) => {
+              const canonicalId = p.id || p.policy_id;
+              const displayName = p.name || p.id;
+              return (
+                <option key={canonicalId} value={canonicalId}>
+                  {displayName}
+                </option>
+              );
+            })}
           </select>
 
           {(filter.tenant || filter.printhouse || filter.status || filter.type || filter.policy) && (

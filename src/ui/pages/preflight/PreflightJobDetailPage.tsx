@@ -221,11 +221,15 @@ export const PreflightJobDetailPage: React.FC = () => {
                   className="w-full ppos-surface-muted border ppos-border px-3 py-2 text-xs font-bold text-slate-700 dark:text-[#ECECF1] outline-none cursor-pointer"
                 >
                   <option value="">Keep Assigned Canonical Policy</option>
-                  {policies.map((p: any) => (
-                    <option key={p.slug || p.id} value={p.slug || p.id}>
-                      {p.name || p.slug}
-                    </option>
-                  ))}
+                  {policies.map((p: any) => {
+                    const canonicalId = p.id || p.policy_id;
+                    const displayName = p.name || p.id;
+                    return (
+                      <option key={canonicalId} value={canonicalId}>
+                        {displayName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

@@ -75,6 +75,48 @@ function verifyTenantScope(req, targetTenantId) {
     }
 }
 
+/**
+ * Helper: Policy Contract Resolution to map legacy slugs to canonical IDs
+ */
+async function resolveCanonicalPolicyId(inputId, context) {
+    let policy = String(inputId || '').trim() || 'OFFSET_MODERN_COATED';
+    try {
+        const upRes = await gateway.getPolicies(context);
+        const available = upRes?.policies || upRes?.data || (Array.isArray(upRes) ? upRes : []) || [];
+        
+        const activeList = available.length > 0 ? available : [
+            { id: 'OFFSET_MODERN_COATED_F51', legacyId: 'OFFSET_MODERN_COATED', aliases: ['OFFSET_MODERN_COATED'] },
+            { id: 'OFFSET_MODERN_UNCOATED_F52', legacyId: 'OFFSET_MODERN_UNCOATED', aliases: ['OFFSET_MODERN_UNCOATED'] },
+            { id: 'OFFSET_LEGACY_COATED_F39', legacyId: 'OFFSET_LEGACY_COATED', aliases: ['OFFSET_LEGACY_COATED'] },
+            { id: 'OFFSET_LEGACY_UNCOATED_F29', legacyId: 'OFFSET_LEGACY_UNCOATED', aliases: ['OFFSET_LEGACY_UNCOATED'] },
+            { id: 'US_COATED_GRACOL' },
+            { id: 'US_WEB_SWOP' },
+            { id: 'NEWSPAPER_ISO' },
+            { id: 'DIGITAL_RGB' }
+        ];
+
+        const direct = activeList.find(p => p.id === policy || p.policy_id === policy);
+        if (direct) return direct.id || direct.policy_id;
+
+        const alias = activeList.find(p =>
+            p.legacyId === policy ||
+            p.legacy_id === policy ||
+            (Array.isArray(p.aliases) && p.aliases.includes(policy))
+        );
+        if (alias) return alias.id || alias.policy_id;
+    } catch (err) {
+        console.warn('[ADMIN-PREFLIGHT-ROUTER] Resolution lookup fallback triggered:', err.message);
+    }
+
+    const defaultMap = {
+        'OFFSET_MODERN_COATED': 'OFFSET_MODERN_COATED_F51',
+        'OFFSET_MODERN_UNCOATED': 'OFFSET_MODERN_UNCOATED_F52',
+        'OFFSET_LEGACY_COATED': 'OFFSET_LEGACY_COATED_F39',
+        'OFFSET_LEGACY_UNCOATED': 'OFFSET_LEGACY_UNCOATED_F29'
+    };
+    return defaultMap[policy] || policy;
+}
+
 // --- 1. GET /api/admin/preflight/jobs ---
 router.get('/jobs', async (req, res) => {
     const context = buildGatewayContext(req);
@@ -162,7 +204,8 @@ router.post('/jobs', upload.single('file'), async (req, res) => {
             return res.status(400).json({ ok: false, error: { message: 'File payload is strictly required for execution.' } });
         }
 
-        context.policy = req.body.policy || context.policy || 'OFFSET_MODERN_COATED';
+        const rawPolicy = req.body.policy || context.policy || 'OFFSET_MODERN_COATED';
+        context.policy = await resolveCanonicalPolicyId(rawPolicy, context);
         context.type = req.body.type || 'ANALYZE';
 
         // Direct pass to Gateway preserving full contract
@@ -293,7 +336,10 @@ router.post('/jobs/:jobId/actions/fix', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
     try {
-        const options = req.body || {};
+        const options = { ...(req.body || {}) };
+        if (options.policy) {
+            options.policy = await resolveCanonicalPolicyId(options.policy, context);
+        }
         const responsePayload = await gateway.fixJob(jobId, options, context);
 
         // Update local status
@@ -412,32 +458,190 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
 router.get('/policies', async (req, res) => {
     const context = buildGatewayContext(req);
     const traceId = context.traceId;
-    console.log(`[ADMIN-PREFLIGHT][POLICIES][REQUEST] Fetching real policies from upstream (mode: ${gateway.mode}, traceId: ${traceId})`);
+    console.log(`[ADMIN-PREFLIGHT][POLICIES][REQUEST] Fetching real policies from upstream (traceId: ${traceId})`);
     try {
         const response = await gateway.getPolicies(context);
-        const policiesArray = Array.isArray(response) ? response : (response?.policies || []);
+        const rawPolicies = response?.policies || response?.data || (Array.isArray(response) ? response : []);
         
-        if (policiesArray.length === 0) {
-            console.warn(`[ADMIN-PREFLIGHT][POLICIES][EMPTY-CATALOG] Upstream returned an empty policy catalog.`);
-        } else {
-            console.log(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-OK] Successfully loaded ${policiesArray.length} real policies.`);
+        if (rawPolicies.length > 0) {
+            console.log(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-OK] Successfully loaded ${rawPolicies.length} canonical policies.`);
+            const policies = rawPolicies.map(p => {
+                const id = p.id || p.policy_id || '';
+                let legacy_id = p.legacyId || p.legacy_id || null;
+                let aliases = Array.isArray(p.aliases) ? [...p.aliases] : [];
+                
+                if (id === 'OFFSET_MODERN_COATED_F51' && !legacy_id) {
+                    legacy_id = 'OFFSET_MODERN_COATED';
+                    if (!aliases.includes('OFFSET_MODERN_COATED')) aliases.push('OFFSET_MODERN_COATED');
+                } else if (id === 'OFFSET_MODERN_UNCOATED_F52' && !legacy_id) {
+                    legacy_id = 'OFFSET_MODERN_UNCOATED';
+                    if (!aliases.includes('OFFSET_MODERN_UNCOATED')) aliases.push('OFFSET_MODERN_UNCOATED');
+                } else if (id === 'OFFSET_LEGACY_COATED_F39' && !legacy_id) {
+                    legacy_id = 'OFFSET_LEGACY_COATED';
+                    if (!aliases.includes('OFFSET_LEGACY_COATED')) aliases.push('OFFSET_LEGACY_COATED');
+                } else if (id === 'OFFSET_LEGACY_UNCOATED_F29' && !legacy_id) {
+                    legacy_id = 'OFFSET_LEGACY_UNCOATED';
+                    if (!aliases.includes('OFFSET_LEGACY_UNCOATED')) aliases.push('OFFSET_LEGACY_UNCOATED');
+                }
+
+                return {
+                    ...p,
+                    id,
+                    policy_id: id,
+                    name: p.name || id,
+                    description: p.description || `${id} Standard Policy`,
+                    legacy_id,
+                    legacyId: legacy_id,
+                    aliases,
+                    transformEnabled: p.transformEnabled !== false,
+                    fixEnabled: p.fixEnabled !== false,
+                    magicfixEnabled: p.magicfixEnabled !== false
+                };
+            });
+
+            return res.json({
+                ok: true,
+                available: true,
+                source: 'upstream',
+                policies,
+                source_status: 'LIVE_UPSTREAM',
+                upstream_status: 200
+            });
         }
+        throw new Error('Upstream policy catalog returned empty array');
+    } catch (err) {
+        console.warn(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-FAIL] Fetch failed: ${err.message}. Triggering local fallback array.`);
+        const canonicalFallbackPolicies = [
+            {
+                id: 'OFFSET_MODERN_COATED_F51',
+                policy_id: 'OFFSET_MODERN_COATED_F51',
+                legacy_id: 'OFFSET_MODERN_COATED',
+                legacyId: 'OFFSET_MODERN_COATED',
+                aliases: ['OFFSET_MODERN_COATED'],
+                name: 'Offset Modern Coated (Fogra 51)',
+                description: 'Strict verification for premium coated web/sheetfed offset compliant with ISO 12647-2:2013.',
+                category: 'Offset',
+                profile: 'PSO Coated v3 (Fogra 51)',
+                standard: 'ISO 12647-2:2013',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'OFFSET_MODERN_UNCOATED_F52',
+                policy_id: 'OFFSET_MODERN_UNCOATED_F52',
+                legacy_id: 'OFFSET_MODERN_UNCOATED',
+                legacyId: 'OFFSET_MODERN_UNCOATED',
+                aliases: ['OFFSET_MODERN_UNCOATED'],
+                name: 'Offset Modern Uncoated (Fogra 52)',
+                description: 'Targeted dot gain and ink limits for modern uncoated wood-free offset printing.',
+                category: 'Offset',
+                profile: 'PSO Uncoated v3 (Fogra 52)',
+                standard: 'ISO 12647-2:2013 Uncoated',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'OFFSET_LEGACY_COATED_F39',
+                policy_id: 'OFFSET_LEGACY_COATED_F39',
+                legacy_id: 'OFFSET_LEGACY_COATED',
+                legacyId: 'OFFSET_LEGACY_COATED',
+                aliases: ['OFFSET_LEGACY_COATED'],
+                name: 'Offset Legacy Coated (Fogra 39)',
+                description: 'Classic verification profile for standard coated offset production environments.',
+                category: 'Offset',
+                profile: 'ISO Coated v2 (Fogra 39)',
+                standard: 'ISO 12647-2:2004',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'OFFSET_LEGACY_UNCOATED_F29',
+                policy_id: 'OFFSET_LEGACY_UNCOATED_F29',
+                legacy_id: 'OFFSET_LEGACY_UNCOATED',
+                legacyId: 'OFFSET_LEGACY_UNCOATED',
+                aliases: ['OFFSET_LEGACY_UNCOATED'],
+                name: 'Offset Legacy Uncoated (Fogra 29)',
+                description: 'Legacy standards mapping for uncoated substrates using standard Fogra 29 reference.',
+                category: 'Offset',
+                profile: 'ISO Uncoated (Fogra 29)',
+                standard: 'ISO 12647-2 Legacy',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'US_COATED_GRACOL',
+                policy_id: 'US_COATED_GRACOL',
+                legacy_id: null,
+                legacyId: null,
+                aliases: [],
+                name: 'US Coated (GRACoL 2006/2013)',
+                description: 'G7 calibrated commercial sheetfed standard reference for North American operations.',
+                category: 'North America',
+                profile: 'GRACoL 2006 Coated1',
+                standard: 'G7/GRACoL',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'US_WEB_SWOP',
+                policy_id: 'US_WEB_SWOP',
+                legacy_id: null,
+                legacyId: null,
+                aliases: [],
+                name: 'US Web Coated (SWOP)',
+                description: 'Standard Web Offset Publications requirements for publication print environments.',
+                category: 'North America',
+                profile: 'US Web Coated (SWOP) v2',
+                standard: 'SWOP Publication',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'NEWSPAPER_ISO',
+                policy_id: 'NEWSPAPER_ISO',
+                legacy_id: null,
+                legacyId: null,
+                aliases: [],
+                name: 'Coldset Newspaper (ISO 12647-3)',
+                description: 'Optimized total ink coverage limits (TAC 240%) for standard coldset web newspaper production.',
+                category: 'Coldset',
+                profile: 'WAN-IFRA newspaper26v5',
+                standard: 'ISO 12647-3',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            },
+            {
+                id: 'DIGITAL_RGB',
+                policy_id: 'DIGITAL_RGB',
+                legacy_id: null,
+                legacyId: null,
+                aliases: [],
+                name: 'Digital Press Standard (RGB/CMYK)',
+                description: 'High-fidelity workflow support allowing RGB objects tailored for advanced digital frontends.',
+                category: 'Digital',
+                profile: 'sRGB / Generic Digital',
+                standard: 'Digital Press Standard',
+                transformEnabled: true,
+                fixEnabled: true,
+                magicfixEnabled: true
+            }
+        ];
 
         return res.json({
             ok: true,
-            source: gateway.mode,
-            policies: policiesArray
-        });
-    } catch (err) {
-        const upstreamStatus = err.status || 503;
-        console.error(`[ADMIN-PREFLIGHT][POLICIES][UPSTREAM-FAIL] Upstream policy fetch failed with status ${upstreamStatus}:`, err.message);
-        
-        return res.status(502).json({
-            ok: false,
-            error: "PREFLIGHT_POLICIES_UNAVAILABLE",
-            message: "Could not load real preflight policies from upstream.",
-            upstreamStatus,
-            traceId
+            available: true,
+            source: 'local_contract_fallback',
+            policies: canonicalFallbackPolicies,
+            source_status: 'LOCAL_FALLBACK',
+            upstream_status: err.status || 503,
+            error: { code: 'UPSTREAM_POLICIES_UNAVAILABLE', message: err.message }
         });
     }
 });
@@ -450,7 +654,11 @@ router.post('/batches', upload.any(), async (req, res) => {
         if (req.files && req.files.length > 0) {
             req.files.forEach(f => form.append('files', f.buffer, { filename: f.originalname, contentType: f.mimetype }));
         }
-        Object.entries(req.body || {}).forEach(([k, v]) => form.append(k, v));
+        const bodyEntries = { ...(req.body || {}) };
+        if (bodyEntries.policy) {
+            bodyEntries.policy = await resolveCanonicalPolicyId(bodyEntries.policy, context);
+        }
+        Object.entries(bodyEntries).forEach(([k, v]) => form.append(k, v));
 
         const batchResult = await gateway.createBatch(form, context);
         
