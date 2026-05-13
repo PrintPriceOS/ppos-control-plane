@@ -1765,7 +1765,8 @@ export async function listAdminPreflightJobs(filters: Record<string, any> = {}) 
             qs.append(k, String(v));
         }
     });
-    return adminFetch<{ ok: boolean, total: number, jobs: AdminPreflightJob[], source_status?: string }>(`/api/admin/preflight/jobs?${qs.toString()}`);
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, jobs: AdminPreflightJob[], source_status?: string }>(qStr ? `/api/admin/preflight/jobs?${qStr}` : `/api/admin/preflight/jobs`);
 }
 
 export async function createAdminPreflightJob(formData: FormData) {
@@ -1824,7 +1825,8 @@ export async function listAdminPreflightBatches(filters: Record<string, any> = {
     Object.entries(filters).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
     });
-    return adminFetch<{ ok: boolean, batches: any[], source_status?: string }>(`/api/admin/preflight/batches?${qs.toString()}`);
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, batches: any[], source_status?: string }>(qStr ? `/api/admin/preflight/batches?${qStr}` : `/api/admin/preflight/batches`);
 }
 
 export async function createAdminPreflightBatch(formData: FormData) {
@@ -1844,7 +1846,8 @@ export async function getAdminPreflightAudit(filters: Record<string, any> = {}) 
     Object.entries(filters).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
     });
-    return adminFetch<{ ok: boolean, total: number, events: any[], source_status?: string }>(`/api/admin/preflight/audit?${qs.toString()}`);
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, events: any[], source_status?: string }>(qStr ? `/api/admin/preflight/audit?${qStr}` : `/api/admin/preflight/audit`);
 }
 
 export async function getAdminPreflightGovernance(filters: Record<string, any> = {}) {
@@ -1852,7 +1855,8 @@ export async function getAdminPreflightGovernance(filters: Record<string, any> =
     Object.entries(filters).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
     });
-    return adminFetch<{ ok: boolean, total: number, governanceEvents: any[], source_status?: string }>(`/api/admin/preflight/governance?${qs.toString()}`);
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, governanceEvents: any[], source_status?: string }>(qStr ? `/api/admin/preflight/governance?${qStr}` : `/api/admin/preflight/governance`);
 }
 
 

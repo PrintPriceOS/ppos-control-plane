@@ -675,10 +675,29 @@ router.post('/batches', upload.any(), async (req, res) => {
 router.get('/batches', async (req, res) => {
     const context = buildGatewayContext(req);
     try {
-        const batches = await gateway.listBatches(context);
-        res.json({ ok: true, batches: Array.isArray(batches) ? batches : (batches?.batches || []), source_status: 'LIVE_UPSTREAM' });
+        const query = req.query || {};
+        const limit = Math.min(Number(query.limit || 50), 200);
+        const offset = Math.max(Number(query.offset || 0), 0);
+        const status = query.status || null;
+        const tenantId = query.tenantId || query.tenant_id || null;
+
+        const batchesRes = await gateway.listBatches({ ...context, limit, offset, status, tenantId });
+        const arr = Array.isArray(batchesRes) ? batchesRes : (batchesRes?.batches || batchesRes?.data || []);
+        
+        return res.json({
+            ok: true,
+            batches: arr,
+            total: arr.length,
+            source_status: arr.length > 0 ? 'ACTIVE' : 'NO_BATCHES'
+        });
     } catch (err) {
-        res.status(err.status || 503).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: err.message } });
+        return res.json({
+            ok: true,
+            batches: [],
+            total: 0,
+            source_status: 'BATCHES_UPSTREAM_UNAVAILABLE',
+            degraded: true
+        });
     }
 });
 
