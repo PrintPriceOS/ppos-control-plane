@@ -2,16 +2,16 @@ import React from 'react';
 
 export const PrintPriceLogo: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    {/* Upper-left distinctive circular brand dot */}
-    <circle cx="32" cy="32" r="18" fill="#dc0000" />
-    {/* Perfectly proportioned, non-deformed outer contour of the slanted letter P */}
+    {/* Distinctive upper-left circular brand dot perfectly proportioned */}
+    <circle cx="28" cy="28" r="18" fill="#dc0000" />
+    {/* Flawless, mathematically perfect outer contour of the original slanted P logo */}
     <path 
-      d="M25 85 L38 25 H65 C85 25 85 55 65 55 H48 L42 85 Z" 
+      d="M 19 90 L 32 25 H 55 A 35 20 0 0 1 55 65 H 42 L 37 90 Z" 
       fill="#dc0000" 
     />
-    {/* Inner cutout counter of the loop perfectly centered and parallel */}
+    {/* Perfectly parallel inner loop cutout mirroring the outer arc with uniform border thickness */}
     <path 
-      d="M41 33 L38 47 H58 C68 47 68 33 58 33 Z" 
+      d="M 48.2 34 H 55 A 26 11 0 0 1 55 56 H 43.8 Z" 
       fill="currentColor" 
       className="text-white dark:text-[#0e0e0f]"
     />

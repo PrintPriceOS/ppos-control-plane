@@ -14,6 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { setAuthToken, setAuthUser } from '../lib/authStore';
 import { toDisplayText } from '../lib/display';
+import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
 export const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -70,9 +71,7 @@ export const LoginPage: React.FC = () => {
             <div className="w-full max-w-md">
                 {/* Branding */}
                 <div className="flex flex-col items-center mb-8 text-center">
-                    <div className="w-16 h-16 bg-red-500/10 rounded-none flex items-center justify-center mb-4">
-                        <ShieldCheckIcon className="w-10 h-10 text-[#dc0000]" />
-                    </div>
+                    <PrintPriceLogo className="w-16 h-16 mb-4 drop-shadow-sm shrink-0" />
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">PrintPrice Control Plane</h1>
                     <p className="text-sm text-slate-500 font-medium mt-1 uppercase tracking-widest">Governance & Operations</p>
                 </div>

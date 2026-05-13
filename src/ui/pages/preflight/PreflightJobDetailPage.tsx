@@ -28,13 +28,33 @@ import {
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
 
-function renderAnalysisIntegrity(value: any): string {
-  if (!value) return '100% Native';
-  if (typeof value === 'string') return value;
-  if (value.fallbackUsed) return 'FALLBACK';
-  if (value.degradedMode) return 'DEGRADED';
-  if (value.realExtraction) return 'REAL_EXTRACTION';
-  return 'OK';
+function renderAnalysisIntegrity(payload: any): string {
+  if (!payload) return '100% Native';
+  
+  // Safely extract missing tools array
+  const missingTools = Array.isArray(payload.missing_tools) ? payload.missing_tools : 
+                       (Array.isArray(payload.missingTools) ? payload.missingTools : 
+                       (Array.isArray(payload.analysis?.missing_tools) ? payload.analysis.missing_tools : []));
+                       
+  const analysisType = payload.analysis_type || payload.analysisType || payload.analysis?.analysis_type;
+  
+  if (missingTools.length > 0) {
+    return 'RUNTIME_ENVIRONMENT_FAILURE';
+  }
+  if (analysisType === 'DEGRADED') {
+    return 'DEGRADED_EXTRACTION';
+  }
+  
+  const integ = payload.analysisIntegrity || {};
+  if (integ.realExtraction === true && integ.degradedMode === false) {
+    return 'REAL_EXTRACTION';
+  }
+  
+  if (typeof payload.analysisIntegrity === 'string') return payload.analysisIntegrity;
+  if (integ.fallbackUsed) return 'FALLBACK';
+  if (integ.degradedMode) return 'DEGRADED';
+  
+  return '100% Native';
 }
 
 export const PreflightJobDetailPage: React.FC = () => {
@@ -86,8 +106,62 @@ export const PreflightJobDetailPage: React.FC = () => {
 
   const policies = Array.isArray(policiesQ.data?.policies) ? policiesQ.data.policies : [];
 
+  // Safely extract missing tools array
+  const missingTools = Array.isArray(payload.missing_tools) ? payload.missing_tools : 
+                       (Array.isArray(payload.missingTools) ? payload.missingTools : 
+                       (Array.isArray(payload.analysis?.missing_tools) ? payload.analysis.missing_tools : []));
+                       
+  const hasEnvFailure = missingTools.length > 0;
+  const isDegradedAnalysis = payload.analysis_type === 'DEGRADED' || payload.forensic_event === 'FORENSIC_DEGRADED_ANALYSIS';
+
+  const isSuccess = status === 'COMPLETED' || status === 'SUCCESS';
+  const isFail = status === 'FAILED' || sourceStatus.includes('UNAVAILABLE') || status.includes('UNAVAILABLE');
+
+  // Change status copy transparently
+  const statusDisplayText = hasEnvFailure 
+    ? 'ENGINE ENVIRONMENT FAILURE' 
+    : (isDegradedAnalysis ? 'DEGRADED ANALYSIS' : (isFail ? 'UPSTREAM DEGRADED / FAILED' : status));
+
+  // Determine certification blockage and action gating
+  const integ = payload.analysisIntegrity || {};
+  const isFixBlocked = hasEnvFailure || integ.certificationAllowed === false || integ.realExtraction === false;
+  
+  let certBlockedReason = payload.certificationBlockedReason || integ.certificationBlockedReason || '';
+  if (!certBlockedReason && isFixBlocked) {
+    if (hasEnvFailure) {
+      certBlockedReason = 'Missing required environment binaries blocks certification invariants.';
+    } else if (integ.certificationAllowed === false) {
+      certBlockedReason = 'Analysis integrity explicit contract blocks certification path.';
+    } else if (integ.realExtraction === false) {
+      certBlockedReason = 'Native real extraction verification failed invariant checks.';
+    }
+  }
+
+  // Deduplicate findings and sanitize structural issue counts to exclude environment failures
+  const rawIssues = Array.isArray(payload.issues) ? payload.issues : (Array.isArray(payload.analysis?.issues) ? payload.analysis.issues : []);
+  const sanitizedIssues = rawIssues.filter((issue: any) => {
+    if (!issue) return false;
+    const textStr = typeof issue === 'string' ? issue : JSON.stringify(issue);
+    const isEnvDefect = textStr.includes('missing_tool') || 
+                        textStr.includes('pdfimages') || 
+                        textStr.includes('pdfinfo') || 
+                        textStr.includes('mutool') || 
+                        textStr.includes('spawn ENOENT') ||
+                        textStr.includes('RUNTIME_ENVIRONMENT');
+    return !isEnvDefect;
+  });
+
+  const uniqueIssuesMap = new Map();
+  sanitizedIssues.forEach((iss: any) => {
+    const key = typeof iss === 'string' ? iss : (iss.id || iss.code || iss.message || JSON.stringify(iss));
+    if (!uniqueIssuesMap.has(key)) {
+      uniqueIssuesMap.set(key, iss);
+    }
+  });
+  const deduplicatedIssuesCount = uniqueIssuesMap.size;
+
   const handleTriggerFix = async () => {
-    if (!jobId) return;
+    if (!jobId || isFixBlocked) return;
     setActionStatus('fixing');
     setActionError(null);
     try {
@@ -113,7 +187,6 @@ export const PreflightJobDetailPage: React.FC = () => {
       setActionStatus('idle');
     } catch (err: any) {
       console.error('[DETAIL-ACTION] Trigger retry error:', err);
-      // Expose explicit unmocked failures (like 501 Not Implemented) perfectly
       setActionError(err.message || 'Retry operation rejected by upstream contract.');
       setActionStatus('error');
     }
@@ -142,9 +215,6 @@ export const PreflightJobDetailPage: React.FC = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat(Number((bytes || 0) / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
-  const isSuccess = status === 'COMPLETED' || status === 'SUCCESS';
-  const isFail = status === 'FAILED' || sourceStatus.includes('UNAVAILABLE') || status.includes('UNAVAILABLE');
 
   // Extract authentic forensic timeline directly from canonical upstream engine response
   const realTimelineArray = Array.isArray(payload.forensics) ? payload.forensics : (Array.isArray(payload.timeline) ? payload.timeline : []);
@@ -177,11 +247,12 @@ export const PreflightJobDetailPage: React.FC = () => {
           </div>
 
           <div className={`px-3 py-1.5 flex items-center gap-2 border font-black text-xs uppercase tracking-widest ${
-            isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' :
-            isFail ? 'bg-red-500/10 border-red-500/30 text-red-600' : 'bg-blue-500/10 border-blue-500/30 text-blue-600'
+            hasEnvFailure || isFail ? 'bg-red-500/10 border-red-500/30 text-red-600' :
+            isDegradedAnalysis ? 'bg-amber-500/10 border-amber-500/30 text-amber-600' :
+            isSuccess ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' : 'bg-blue-500/10 border-blue-500/30 text-blue-600'
           }`}>
-            {isSuccess ? <CheckCircleIcon className="w-4 h-4" /> : isFail ? <XCircleIcon className="w-4 h-4" /> : <ArrowPathIcon className="w-4 h-4 animate-spin" />}
-            <span>{isFail ? 'UPSTREAM DEGRADED / FAILED' : status}</span>
+            {isSuccess && !hasEnvFailure ? <CheckCircleIcon className="w-4 h-4" /> : (hasEnvFailure || isFail) ? <XCircleIcon className="w-4 h-4" /> : <ExclamationTriangleIcon className="w-4 h-4" />}
+            <span>{statusDisplayText}</span>
           </div>
         </div>
       </div>
@@ -244,9 +315,10 @@ export const PreflightJobDetailPage: React.FC = () => {
 
               <div className="flex items-end gap-2 pt-3">
                 <button 
-                  disabled={actionStatus !== 'idle'}
+                  disabled={actionStatus !== 'idle' || isFixBlocked}
                   onClick={handleTriggerFix}
-                  className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-xs font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-40"
+                  className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-xs font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={isFixBlocked ? certBlockedReason : "Trigger native multi-stage repair"}
                 >
                   {actionStatus === 'fixing' ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <WrenchScrewdriverIcon className="w-4 h-4" />}
                   <span>Trigger Fix</span>
@@ -259,10 +331,18 @@ export const PreflightJobDetailPage: React.FC = () => {
                   title="Proxy to upstream retry contract"
                 >
                   {actionStatus === 'retrying' ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <ArrowPathIcon className="w-4 h-4" />}
-                  <span>Trigger Retry</span>
+                  <span>{hasEnvFailure ? 'Retry after environment repair' : 'Trigger Retry'}</span>
                 </button>
               </div>
             </div>
+
+            {isFixBlocked && (
+              <div className="text-[10px] text-red-500 font-bold bg-red-500/5 p-2.5 border border-red-500/10 flex items-center gap-2 mt-2">
+                <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0" />
+                <span>Fix action guarded/disabled: {certBlockedReason}</span>
+              </div>
+            )}
+
             <p className="text-[9px] text-slate-400 font-bold">
               Note: Fix triggers native multi-stage repair wrappers. Retry proxy propagation verifies V2 server compliance fail-loudly.
             </p>
@@ -273,11 +353,79 @@ export const PreflightJobDetailPage: React.FC = () => {
             <MetaItem label="Original Filename" value={payload.filename || registry.filename || 'Untitled.pdf'} icon={DocumentIcon} />
             <MetaItem label="Tenant Context" value={payload.tenantId || registry.tenantId || 'system'} icon={CircleStackIcon} />
             <MetaItem label="Active Policy" value={payload.policy || registry.policy || 'Standard Baseline'} icon={ShieldCheckIcon} />
-            <MetaItem label="Extraction Fidelity" value={renderAnalysisIntegrity(payload.analysisIntegrity)} icon={CubeIcon} />
-            <MetaItem label="Structural Issues" value={String(payload.issues?.length || payload.analysis?.issues?.length || 0)} icon={ExclamationTriangleIcon} />
+            <MetaItem label="Extraction Fidelity" value={renderAnalysisIntegrity(payload)} icon={CubeIcon} />
+            <MetaItem label="Structural Issues" value={String(deduplicatedIssuesCount)} icon={ExclamationTriangleIcon} />
             <MetaItem label="Applied Repairs" value={String(payload.fixes?.length || payload.repairs?.length || 0)} icon={ShieldCheckIcon} />
             <MetaItem label="File Storage Size" value={formatSize(payload.fileSize || registry.fileSize)} icon={CommandLineIcon} />
             <MetaItem label="Execution Stage" value={payload.step || 'TERMINAL'} icon={ClockIcon} />
+          </div>
+
+          {/* Dedicated UI Panel for Environment Integrity */}
+          <div className="glass p-6 rounded-none border ppos-border bg-slate-900/90 dark:bg-[#131314] text-slate-100 space-y-4 font-manrope">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <WrenchScrewdriverIcon className="w-4 h-4 text-amber-500" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Environment Integrity Diagnostics</h3>
+              </div>
+              {hasEnvFailure ? (
+                <span className="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-black uppercase tracking-widest">
+                  DEGRADED RUNTIME
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest">
+                  TOOLS VERIFIED
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Required CLI Tools</span>
+                <div className="flex flex-wrap gap-1">
+                  {['pdfinfo', 'pdfimages', 'mutool', 'gs'].map((tool) => (
+                    <span key={tool} className="px-1.5 py-0.5 bg-white/5 font-mono text-[10px] text-slate-300">
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Missing Tool Diagnostics</span>
+                {hasEnvFailure ? (
+                  <div className="flex flex-wrap gap-1">
+                    {missingTools.map((tool: string) => (
+                      <span key={tool} className="px-1.5 py-0.5 bg-red-500/20 text-red-400 font-mono text-[10px] border border-red-500/30">
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-emerald-400 font-bold text-[11px]">All runtime dependencies present</span>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Extraction & Runtime Errors</span>
+                <span className="font-mono text-[11px] text-amber-400/90 block bg-black/40 p-2.5 border border-white/5">
+                  {payload.extractionErrors || payload.extraction_errors || payload.error?.message || payload.analysis?.error || 'None reported'}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Worker/Engine Fingerprint</span>
+                <span className="font-mono text-[11px] text-slate-300 truncate block">
+                  {payload.workerFingerprint || payload.engineFingerprint || payload.fingerprint || payload.worker_id || 'V2 Preflight Engine (Native/Degraded)'}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Certification Blocked Reason</span>
+                <span className={`text-[11px] font-bold block truncate ${certBlockedReason ? 'text-red-400' : 'text-slate-400'}`} title={certBlockedReason || 'Certification path permitted'}>
+                  {certBlockedReason || 'Certification path permitted'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Forensic Real Timeline */}
@@ -386,15 +534,7 @@ export const PreflightJobDetailPage: React.FC = () => {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-xs font-bold text-slate-400 italic">No artifacts mapped to registry payload.</p>
-                {isSuccess && (
-                  <button 
-                    onClick={() => handleDirectDownload('output', payload.filename || 'certified_output.pdf')}
-                    className="mt-3 w-full py-2 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-colors"
-                  >
-                    Force Stream Standard Output Blob
-                  </button>
-                )}
+                <p className="text-xs font-bold text-slate-400 italic">Artifacts Unavailable: Registry payload has no mapped artifacts.</p>
               </div>
             )}
           </div>

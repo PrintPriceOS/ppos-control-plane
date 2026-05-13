@@ -1791,14 +1791,14 @@ export async function getAdminPreflightJob(jobId: string) {
 }
 
 export async function requestAdminPreflightFix(jobId: string, options: any = {}) {
-    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/actions/fix`, {
+    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
         method: 'POST',
         body: JSON.stringify(options)
     });
 }
 
 export async function retryAdminPreflightJob(jobId: string) {
-    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/actions/retry`, {
+    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/retry`, {
         method: 'POST'
     });
 }
