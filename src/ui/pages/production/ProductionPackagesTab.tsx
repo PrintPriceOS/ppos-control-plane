@@ -146,12 +146,12 @@ export const ProductionPackagesTab: React.FC = () => {
 
     const renderStatusIndicator = (status: string) => {
         const s = (status || 'DRAFT').toUpperCase();
-        let bg = 'bg-slate-950 text-slate-400 border-slate-800';
-        if (s === 'COMPLETED') bg = 'bg-emerald-950 text-emerald-400 border-emerald-800';
-        if (s === 'IN_PRODUCTION') bg = 'bg-indigo-950 text-indigo-400 border-indigo-800';
-        if (s === 'READY_FOR_DISPATCH' || s === 'DISPATCHED') bg = 'bg-cyan-950 text-cyan-400 border-cyan-800';
-        if (s === 'ACCEPTED_BY_PRINTER') bg = 'bg-amber-950 text-amber-400 border-amber-800';
-        if (s === 'REJECTED_BY_PRINTER' || s === 'CANCELLED') bg = 'bg-red-950 text-red-400 border-red-800';
+        let bg = 'bg-slate-950 dark:bg-zinc-800 text-slate-400 dark:text-zinc-300 border-slate-800 dark:border-zinc-700';
+        if (s === 'COMPLETED') bg = 'bg-emerald-950 dark:bg-green-950/40 text-emerald-400 dark:text-green-400 border-emerald-800 dark:border-green-900/60';
+        if (s === 'IN_PRODUCTION') bg = 'bg-red-950 dark:bg-red-950/40 text-red-400 dark:text-red-400 border-red-800 dark:border-red-900/60';
+        if (s === 'READY_FOR_DISPATCH' || s === 'DISPATCHED') bg = 'bg-cyan-950 dark:bg-zinc-800 text-cyan-400 dark:text-zinc-300 border-cyan-800 dark:border-zinc-700';
+        if (s === 'ACCEPTED_BY_PRINTER') bg = 'bg-amber-950 dark:bg-amber-950/40 text-amber-400 dark:text-amber-400 border-amber-800 dark:border-amber-900/60';
+        if (s === 'REJECTED_BY_PRINTER' || s === 'CANCELLED') bg = 'bg-red-950 dark:bg-red-950/40 text-red-400 dark:text-red-400 border-red-800 dark:border-red-900/60';
 
         return (
             <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase border rounded-none block w-max ${bg}`}>
@@ -161,16 +161,16 @@ export const ProductionPackagesTab: React.FC = () => {
     };
 
     return (
-        <div className="p-6 bg-slate-50 min-h-full space-y-6">
+        <div className="p-6 bg-slate-50 dark:bg-zinc-950 min-h-full space-y-6">
             {/* Control Bar */}
-            <div className="bg-white border border-slate-200 p-4 rounded-none flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-4 rounded-none flex flex-col md:flex-row items-center justify-between gap-4 shadow-none">
                 <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-slate-950 text-white rounded-none">
-                        <ArchiveBoxIcon className="w-5 h-5 text-indigo-400" />
+                    <div className="p-2 bg-slate-950 dark:bg-zinc-800 text-white dark:text-zinc-100 rounded-none border border-slate-800 dark:border-zinc-700">
+                        <ArchiveBoxIcon className="w-5 h-5 text-red-600 dark:text-red-500" />
                     </div>
                     <div>
-                        <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">Manufacturing Packages Catalog</h2>
-                        <p className="text-xs font-mono text-slate-500">Secure bridging layer mapping validated preflight documents to physical target production frames.</p>
+                        <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-zinc-100">Manufacturing Packages Catalog</h2>
+                        <p className="text-xs font-mono text-slate-500 dark:text-zinc-400">Secure bridging layer mapping validated preflight documents to physical target production frames.</p>
                     </div>
                 </div>
 
@@ -178,7 +178,7 @@ export const ProductionPackagesTab: React.FC = () => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-white border border-slate-300 text-xs font-mono text-slate-800 p-2 rounded-none focus:outline-none focus:border-slate-600 flex-1 md:w-48"
+                        className="bg-white dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-300 p-2 rounded-none focus:outline-none focus:border-red-600 dark:focus:border-red-500 flex-1 md:w-48"
                     >
                         <option value="">ALL LIFECYCLE STATES</option>
                         <option value="DRAFT">DRAFT</option>
@@ -193,7 +193,7 @@ export const ProductionPackagesTab: React.FC = () => {
                     <button
                         onClick={fetchPackages}
                         disabled={loading}
-                        className="px-3 py-2 bg-slate-950 hover:bg-slate-800 text-white text-xs font-mono tracking-wider rounded-none transition-colors flex items-center space-x-1 flex-shrink-0"
+                        className="px-3 py-2 bg-slate-950 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-100 border border-slate-800 dark:border-zinc-700 text-xs font-mono tracking-wider rounded-none transition-colors flex items-center space-x-1 flex-shrink-0"
                     >
                         <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
                         <span>Sync</span>
@@ -203,19 +203,19 @@ export const ProductionPackagesTab: React.FC = () => {
 
             {/* Notification Feedback Box */}
             {actionFeedback && (
-                <div className="p-3 bg-slate-900 border border-slate-800 text-xs font-mono text-amber-300 rounded-none flex items-center justify-between animate-fade-in">
-                    <span className="flex items-center">
+                <div className="p-3 bg-slate-900 dark:bg-zinc-900 border border-slate-800 dark:border-zinc-800 text-xs font-mono text-amber-300 rounded-none flex items-center justify-between animate-fade-in shadow-none">
+                    <span className="flex items-center text-zinc-300">
                         <InformationCircleIcon className="w-4 h-4 mr-2 text-amber-400 flex-shrink-0" />
                         {actionFeedback}
                     </span>
-                    <button onClick={() => setActionFeedback(null)} className="text-[10px] text-slate-400 hover:text-white uppercase tracking-wider underline ml-2">
+                    <button onClick={() => setActionFeedback(null)} className="text-[10px] text-slate-400 dark:text-zinc-500 hover:text-white dark:hover:text-zinc-200 uppercase tracking-wider underline ml-2">
                         Dismiss
                     </button>
                 </div>
             )}
 
             {error && (
-                <div className="p-4 bg-red-950 text-red-300 border border-red-800 text-xs font-mono rounded-none">
+                <div className="p-4 bg-red-950 dark:bg-red-950/40 text-red-300 dark:text-red-400 border border-red-800 dark:border-red-900/60 text-xs font-mono rounded-none">
                     <span className="font-bold block uppercase">Datastore Error Snapshot</span>
                     {toDisplayText(error)}
                 </div>
@@ -224,28 +224,28 @@ export const ProductionPackagesTab: React.FC = () => {
             {/* Main Operational Split Workspace */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Dense Packages Register Table (Spans 2 columns) */}
-                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-none overflow-hidden">
-                    <div className="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center text-white">
+                <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-none overflow-hidden shadow-none">
+                    <div className="p-3 bg-slate-900 dark:bg-zinc-900 border-b border-slate-800 dark:border-zinc-800 flex justify-between items-center text-white dark:text-zinc-100">
                         <span className="text-xs font-mono font-bold tracking-wider uppercase flex items-center">
-                            <ServerStackIcon className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                            <ServerStackIcon className="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-zinc-500" />
                             Registered Packets ({packages.length})
                         </span>
-                        <span className="text-[10px] font-mono text-slate-400">Select entity to execute matching, routing, or ZIP extraction</span>
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">Select entity to execute matching, routing, or ZIP extraction</span>
                     </div>
 
                     <div className="overflow-x-auto">
                         {loading && packages.length === 0 ? (
-                            <div className="p-16 text-center text-xs font-mono text-slate-400 animate-pulse">
+                            <div className="p-16 text-center text-xs font-mono text-slate-400 dark:text-zinc-500 animate-pulse">
                                 Extracting structured production assembly packages from persistence storage...
                             </div>
                         ) : packages.length === 0 ? (
-                            <div className="p-16 text-center text-xs font-mono text-slate-500 italic-text-off">
+                            <div className="p-16 text-center text-xs font-mono text-slate-500 dark:text-zinc-600 italic-text-off">
                                 No production package matrices allocated within current scope context bounds.
                             </div>
                         ) : (
-                            <table className="w-full text-left border-collapse">
+                            <table className="w-full text-left border-collapse text-slate-700 dark:text-zinc-300">
                                 <thead>
-                                    <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-mono font-bold text-slate-600 uppercase tracking-wider">
+                                    <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-mono font-bold text-slate-600 dark:text-zinc-500 uppercase tracking-wider">
                                         <th className="p-2.5 w-32">Package Handle</th>
                                         <th className="p-2.5">Preflight Base</th>
                                         <th className="p-2.5">Specs Snapshot</th>
@@ -254,7 +254,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                         <th className="p-2.5 w-12 text-center">Inspect</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200 text-xs font-mono">
+                                <tbody className="divide-y divide-slate-200 dark:divide-zinc-800 text-xs font-mono">
                                     {packages.map((pkg) => {
                                         const isSelected = selectedPackage?.id === pkg.id;
                                         const bookSpec = pkg.book_spec_json || {};
@@ -269,42 +269,42 @@ export const ProductionPackagesTab: React.FC = () => {
                                                     setSelectedPackage(pkg);
                                                     setMatchingResults(null);
                                                 }}
-                                                className={`hover:bg-slate-50 transition-colors cursor-pointer ${
-                                                    isSelected ? 'bg-indigo-50/60 border-l-2 border-indigo-600' : ''
+                                                className={`hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer ${
+                                                    isSelected ? 'bg-red-50/60 dark:bg-zinc-800 border-l-2 border-red-600 dark:border-red-500' : ''
                                                 }`}
                                             >
-                                                <td className="p-2.5 font-bold text-[11px] text-slate-900 truncate max-w-[120px]" title={pkg.id}>
+                                                <td className="p-2.5 font-bold text-[11px] text-slate-900 dark:text-zinc-100 truncate max-w-[120px]" title={pkg.id}>
                                                     {pkg.id}
-                                                    <span className="text-[9px] text-slate-400 block font-normal">
+                                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block font-normal">
                                                         {pkg.created_at ? String(pkg.created_at).substring(0, 10) : ''}
                                                     </span>
                                                 </td>
 
-                                                <td className="p-2.5 text-[11px] text-slate-700">
+                                                <td className="p-2.5 text-[11px] text-slate-700 dark:text-zinc-300">
                                                     <span className="block truncate max-w-[140px]" title={pkg.source_job_id}>
                                                         Job: {String(pkg.source_job_id || '').substring(0, 12)}...
                                                     </span>
-                                                    <span className="text-[9px] text-slate-400 block truncate max-w-[140px]" title={pkg.source_artifact_id}>
+                                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block truncate max-w-[140px]" title={pkg.source_artifact_id}>
                                                         Base: {String(pkg.source_artifact_id || '').substring(0, 12)}...
                                                     </span>
                                                 </td>
 
-                                                <td className="p-2.5 text-[11px] text-slate-800">
-                                                    <span className="font-bold text-slate-900 block">{formatStr}</span>
-                                                    <span className="text-[10px] text-slate-500 block">{pagesStr} • {bindingStr}</span>
+                                                <td className="p-2.5 text-[11px] text-slate-800 dark:text-zinc-300">
+                                                    <span className="font-bold text-slate-900 dark:text-zinc-100 block">{formatStr}</span>
+                                                    <span className="text-[10px] text-slate-500 dark:text-zinc-500 block">{pagesStr} • {bindingStr}</span>
                                                 </td>
 
                                                 <td className="p-2.5">
                                                     {renderStatusIndicator(pkg.status)}
                                                 </td>
 
-                                                <td className="p-2.5 text-[10px] text-slate-600 truncate max-w-[100px]">
+                                                <td className="p-2.5 text-[10px] text-slate-600 dark:text-zinc-400 truncate max-w-[100px]">
                                                     {pkg.assigned_printer_tenant_id ? (
-                                                        <span className="text-indigo-900 font-bold" title={pkg.assigned_printer_tenant_id}>
+                                                        <span className="text-red-600 dark:text-red-500 font-bold" title={pkg.assigned_printer_tenant_id}>
                                                             {String(pkg.assigned_printer_tenant_id || '').substring(0, 10)}...
                                                         </span>
                                                     ) : (
-                                                        <span className="text-slate-400 italic-text-off">Unassigned</span>
+                                                        <span className="text-slate-400 dark:text-zinc-500 italic-text-off">Unassigned</span>
                                                     )}
                                                 </td>
 
@@ -317,8 +317,8 @@ export const ProductionPackagesTab: React.FC = () => {
                                                         }}
                                                         className={`p-1 rounded-none border transition-colors ${
                                                             isSelected
-                                                                ? 'bg-slate-900 text-white border-slate-800'
-                                                                : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-300'
+                                                                ? 'bg-slate-900 dark:bg-zinc-800 text-white dark:text-zinc-100 border-slate-800 dark:border-zinc-700'
+                                                                : 'bg-white dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-300 dark:border-zinc-800'
                                                         }`}
                                                     >
                                                         <EyeIcon className="w-3.5 h-3.5" />
@@ -335,84 +335,84 @@ export const ProductionPackagesTab: React.FC = () => {
 
                 {/* Right-Side Package Operational Detail Drawer Panel */}
                 <div className="space-y-4">
-                    <div className="bg-white border border-slate-200 rounded-none overflow-hidden">
-                        <div className="p-3 bg-slate-900 border-b border-slate-800 text-white">
+                    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-none overflow-hidden shadow-none">
+                        <div className="p-3 bg-slate-900 dark:bg-zinc-900 border-b border-slate-800 dark:border-zinc-800 text-white dark:text-zinc-100">
                             <span className="text-xs font-mono font-bold uppercase tracking-wider block">
                                 Inspection &amp; Routing Engine
                             </span>
                         </div>
 
                         {selectedPackage ? (
-                            <div className="p-4 space-y-4 text-xs font-mono">
+                            <div className="p-4 space-y-4 text-xs font-mono text-slate-700 dark:text-zinc-300">
                                 {/* Core Properties */}
-                                <div className="space-y-1 border-b border-slate-200 pb-3">
-                                    <span className="text-[9px] text-slate-400 block uppercase">Package Reference Token</span>
-                                    <span className="font-bold text-sm text-slate-900 block break-all select-all bg-slate-50 p-1.5 border border-slate-200">
+                                <div className="space-y-1 border-b border-slate-200 dark:border-zinc-800 pb-3">
+                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block uppercase">Package Reference Token</span>
+                                    <span className="font-bold text-sm text-slate-900 dark:text-zinc-100 block break-all select-all bg-slate-50 dark:bg-zinc-950 p-1.5 border border-slate-200 dark:border-zinc-800">
                                         {selectedPackage.id}
                                     </span>
                                     <div className="flex justify-between items-center pt-1">
-                                        <span className="text-[10px] text-slate-500">Created: {selectedPackage.created_at || 'N/A'}</span>
+                                        <span className="text-[10px] text-slate-500 dark:text-zinc-500">Created: {selectedPackage.created_at || 'N/A'}</span>
                                         {renderStatusIndicator(selectedPackage.status)}
                                     </div>
                                 </div>
 
                                 {/* Artifact Traceability Maps */}
-                                <div className="space-y-2 border-b border-slate-200 pb-3">
-                                    <span className="text-[9px] text-slate-400 block uppercase font-bold">Artifact Resolution Hashmap</span>
+                                <div className="space-y-2 border-b border-slate-200 dark:border-zinc-800 pb-3">
+                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block uppercase font-bold">Artifact Resolution Hashmap</span>
                                     
                                     <div className="grid grid-cols-1 gap-1 text-[11px]">
-                                        <div className="p-1.5 bg-slate-50 border border-slate-200 flex justify-between">
-                                            <span className="text-slate-500">Source Job:</span>
-                                            <span className="font-bold text-slate-900 truncate max-w-[140px]" title={selectedPackage.source_job_id}>
+                                        <div className="p-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex justify-between">
+                                            <span className="text-slate-500 dark:text-zinc-500">Source Job:</span>
+                                            <span className="font-bold text-slate-900 dark:text-zinc-100 truncate max-w-[140px]" title={selectedPackage.source_job_id}>
                                                 {selectedPackage.source_job_id}
                                             </span>
                                         </div>
-                                        <div className="p-1.5 bg-slate-50 border border-slate-200 flex justify-between">
-                                            <span className="text-slate-500">Source Artifact:</span>
-                                            <span className="font-bold text-slate-900 truncate max-w-[140px]" title={selectedPackage.source_artifact_id}>
+                                        <div className="p-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex justify-between">
+                                            <span className="text-slate-500 dark:text-zinc-500">Source Artifact:</span>
+                                            <span className="font-bold text-slate-900 dark:text-zinc-100 truncate max-w-[140px]" title={selectedPackage.source_artifact_id}>
                                                 {selectedPackage.source_artifact_id}
                                             </span>
                                         </div>
-                                        <div className="p-1.5 bg-slate-50 border border-slate-200 flex justify-between items-center">
-                                            <span className="text-slate-500">Fixed PDF Base:</span>
+                                        <div className="p-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex justify-between items-center">
+                                            <span className="text-slate-500 dark:text-zinc-500">Fixed PDF Base:</span>
                                             {selectedPackage.fixed_pdf_artifact_id ? (
-                                                <span className="font-bold text-emerald-800 truncate max-w-[140px]" title={selectedPackage.fixed_pdf_artifact_id}>
+                                                <span className="font-bold text-emerald-800 dark:text-green-400 truncate max-w-[140px]" title={selectedPackage.fixed_pdf_artifact_id}>
                                                     ✓ {String(selectedPackage.fixed_pdf_artifact_id || '').substring(0, 10)}...
                                                 </span>
                                             ) : (
-                                                <span className="text-red-600 font-bold text-[10px]">Missing Autofix</span>
+                                                <span className="text-red-600 dark:text-red-400 font-bold text-[10px]">Missing Autofix</span>
                                             )}
                                         </div>
-                                        <div className="p-1.5 bg-slate-50 border border-slate-200 flex justify-between items-center">
-                                            <span className="text-slate-500">Certified Profile:</span>
+                                        <div className="p-1.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex justify-between items-center">
+                                            <span className="text-slate-500 dark:text-zinc-500">Certified Profile:</span>
                                             {selectedPackage.certified_pdf_artifact_id ? (
-                                                <span className="font-bold text-indigo-800 truncate max-w-[140px]" title={selectedPackage.certified_pdf_artifact_id}>
+                                                <span className="font-bold text-red-600 dark:text-red-500 truncate max-w-[140px]" title={selectedPackage.certified_pdf_artifact_id}>
                                                     ✓ Certified
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-400 italic-text-off text-[10px]">Standard Base</span>
+                                                <span className="text-slate-400 dark:text-zinc-500 italic-text-off text-[10px]">Standard Base</span>
                                             )}
                                         </div>
                                     </div>
-                                    <span className="text-[9px] text-slate-400 block">Policy Assignment: {selectedPackage.policy_id || 'System Dynamic Policy'}</span>
+                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block">Policy Assignment: {selectedPackage.policy_id || 'System Dynamic Policy'}</span>
                                 </div>
 
                                 {/* Target Assignment Mapping */}
-                                <div className="space-y-1 border-b border-slate-200 pb-3">
-                                    <span className="text-[9px] text-slate-400 block uppercase font-bold">Assigned Topology Node Destination</span>
-                                    <div className="p-2 bg-slate-900 text-slate-100 border border-slate-800 rounded-none">
+                                <div className="space-y-1 border-b border-slate-200 dark:border-zinc-800 pb-3">
+                                    <span className="text-[9px] text-slate-400 dark:text-zinc-500 block uppercase font-bold">Assigned Topology Node Destination</span>
+                                    <div className="p-2 bg-slate-900 dark:bg-zinc-950 text-slate-100 dark:text-zinc-100 border border-slate-800 dark:border-zinc-800 rounded-none">
                                         <div className="flex items-center space-x-1.5">
-                                            <BuildingOfficeIcon className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                                            <BuildingOfficeIcon className="w-4 h-4 text-red-600 dark:text-red-500 flex-shrink-0" />
                                             <span className="text-xs font-bold truncate">
                                                 {selectedPackage.assigned_printer_tenant_id ? `Tenant: ${selectedPackage.assigned_printer_tenant_id}` : 'UNASSIGNED PLATFORM POOL'}
                                             </span>
                                         </div>
-                                        <div className="text-[10px] text-slate-400 mt-1">
-                                            Assigned Machine Target: <span className="text-slate-300 font-bold">Automatic Load Balancer Pool</span>
+                                        <div className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">
+                                            Assigned Machine Target: <span className="text-slate-300 dark:text-zinc-300 font-bold">Automatic Load Balancer Pool</span>
                                         </div>
                                     </div>
-                                    <div className="text-[10px] text-slate-500 pt-0.5">
-                                        Dispatch Readiness: <span className="font-bold text-emerald-700">Fully Assembly Validated</span> • Bundle Available: <span className="font-bold text-indigo-700">Yes</span>
+                                    <div className="text-[10px] text-slate-500 dark:text-zinc-500 pt-0.5">
+                                        Dispatch Readiness: <span className="font-bold text-emerald-700 dark:text-green-400">Fully Assembly Validated</span> • Bundle Available: <span className="font-bold text-red-600 dark:text-red-500">Yes</span>
                                     </div>
                                 </div>
 
@@ -420,21 +420,21 @@ export const ProductionPackagesTab: React.FC = () => {
                                 <div className="pt-1">
                                     <button
                                         onClick={() => downloadProductionBundle(selectedPackage.id)}
-                                        className="w-full py-2 bg-slate-950 hover:bg-slate-800 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center justify-center space-x-2 border border-slate-900"
+                                        className="w-full py-2 bg-slate-950 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-100 font-mono font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center justify-center space-x-2 border border-slate-900 dark:border-zinc-700"
                                     >
-                                        <ArrowDownTrayIcon className="w-4 h-4 text-indigo-400" />
+                                        <ArrowDownTrayIcon className="w-4 h-4 text-red-600 dark:text-red-500" />
                                         <span>Download Assembly Bundle</span>
                                     </button>
                                 </div>
 
                                 {/* Action Matrix: Node Matching Simulation */}
-                                <div className="bg-slate-50 p-2.5 border border-slate-200 space-y-2">
+                                <div className="bg-slate-50 dark:bg-zinc-950 p-2.5 border border-slate-200 dark:border-zinc-800 space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-slate-700 uppercase">Intelligent Node Matcher</span>
+                                        <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 uppercase">Intelligent Node Matcher</span>
                                         <button
                                             onClick={() => handleRunNodeMatching(selectedPackage.id)}
                                             disabled={matchingLoading}
-                                            className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 text-[10px] font-bold uppercase transition-all flex items-center space-x-1"
+                                            className="px-2 py-1 bg-white hover:bg-slate-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-300 dark:border-zinc-700 text-[10px] font-bold uppercase transition-all flex items-center space-x-1"
                                         >
                                             <SparklesIcon className={`w-3 h-3 text-amber-500 ${matchingLoading ? 'animate-spin' : ''}`} />
                                             <span>Run Simulation</span>
@@ -442,17 +442,17 @@ export const ProductionPackagesTab: React.FC = () => {
                                     </div>
 
                                     {matchingResults && (
-                                        <div className="space-y-1 pt-1 border-t border-slate-200 max-h-32 overflow-y-auto">
-                                            <span className="text-[9px] text-slate-500 block uppercase">Calculated Node Fit Matrix:</span>
+                                        <div className="space-y-1 pt-1 border-t border-slate-200 dark:border-zinc-800 max-h-32 overflow-y-auto">
+                                            <span className="text-[9px] text-slate-500 dark:text-zinc-500 block uppercase">Calculated Node Fit Matrix:</span>
                                             {matchingResults.length === 0 ? (
-                                                <span className="text-[10px] text-slate-500 block italic-text-off">No strictly optimized node targets mapped fit criteria.</span>
+                                                <span className="text-[10px] text-slate-500 dark:text-zinc-500 block italic-text-off">No strictly optimized node targets mapped fit criteria.</span>
                                             ) : (
                                                 matchingResults.map((m: any, idx: number) => (
-                                                    <div key={idx} className="p-1 bg-white border border-slate-200 text-[10px] flex justify-between items-center">
-                                                        <span className="truncate font-bold text-slate-800" title={m.nodeId || m.id}>
+                                                    <div key={idx} className="p-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[10px] flex justify-between items-center">
+                                                        <span className="truncate font-bold text-slate-800 dark:text-zinc-200" title={m.nodeId || m.id}>
                                                             Node: {String(m.nodeId || m.id || '').substring(0, 8)}
                                                         </span>
-                                                        <span className="text-emerald-700 font-bold">Fit Score: {m.score ? `${Number(m.score * 100).toFixed(0)}%` : '98%'}</span>
+                                                        <span className="text-emerald-700 dark:text-green-400 font-bold">Fit Score: {m.score ? `${Number(m.score * 100).toFixed(0)}%` : '98%'}</span>
                                                     </div>
                                                 ))
                                             )}
@@ -462,16 +462,16 @@ export const ProductionPackagesTab: React.FC = () => {
 
                                 {/* Action Matrix: Orchestration target dispatch */}
                                 {selectedPackage.status !== 'COMPLETED' && selectedPackage.status !== 'CANCELLED' && (
-                                    <div className="bg-slate-50 p-2.5 border border-slate-200 space-y-2">
-                                        <span className="text-[10px] font-bold text-slate-700 uppercase block">Execute Active Manufacturing Dispatch</span>
+                                    <div className="bg-slate-50 dark:bg-zinc-950 p-2.5 border border-slate-200 dark:border-zinc-800 space-y-2">
+                                        <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 uppercase block">Execute Active Manufacturing Dispatch</span>
                                         
                                         <div className="space-y-1.5">
                                             <div>
-                                                <label className="block text-[9px] text-slate-500 uppercase">Target Printer Destination Node</label>
+                                                <label className="block text-[9px] text-slate-500 dark:text-zinc-500 uppercase">Target Printer Destination Node</label>
                                                 <select
                                                     value={selectedNodeId}
                                                     onChange={(e) => setSelectedNodeId(e.target.value)}
-                                                    className="w-full bg-white border border-slate-300 text-xs p-1 rounded-none font-mono"
+                                                    className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-xs p-1 rounded-none font-mono text-slate-800 dark:text-zinc-300"
                                                 >
                                                     {availableNodes.length === 0 ? (
                                                         <option value="">-- No Online Nodes Mapped --</option>
@@ -491,14 +491,14 @@ export const ProductionPackagesTab: React.FC = () => {
                                                     placeholder="Optional priority tag or routing note..."
                                                     value={dispatchMessage}
                                                     onChange={(e) => setDispatchMessage(e.target.value)}
-                                                    className="w-full bg-white border border-slate-300 text-xs p-1 rounded-none font-mono placeholder-slate-400"
+                                                    className="w-full bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-xs p-1 rounded-none font-mono text-slate-800 dark:text-zinc-300 placeholder-slate-400 dark:placeholder-zinc-600"
                                                 />
                                             </div>
 
                                             <button
                                                 onClick={() => handleDispatchPackage(selectedPackage.id)}
                                                 disabled={dispatchingLoading || !selectedNodeId}
-                                                className="w-full py-1.5 bg-indigo-950 hover:bg-indigo-900 disabled:bg-slate-200 text-indigo-300 disabled:text-slate-400 font-bold text-[11px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 border border-indigo-900 rounded-none"
+                                                className="w-full py-1.5 bg-red-950 hover:bg-red-900 dark:bg-red-950/40 dark:hover:bg-red-900/60 disabled:bg-slate-200 dark:disabled:bg-zinc-800 text-red-300 dark:text-red-400 disabled:text-slate-400 dark:disabled:text-zinc-600 font-bold text-[11px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 border border-red-900 dark:border-red-900/60 rounded-none"
                                             >
                                                 <PaperAirplaneIcon className="w-3 h-3" />
                                                 <span>{dispatchingLoading ? 'Transmitting...' : 'Orchestrate Dispatch Frame'}</span>
@@ -508,14 +508,14 @@ export const ProductionPackagesTab: React.FC = () => {
                                 )}
 
                                 {/* Lifecycle Progression Status Control Matrix */}
-                                <div className="space-y-1.5 pt-2 border-t border-slate-200">
-                                    <span className="text-[9px] text-slate-500 block uppercase font-bold">Lifecycle State Override Engine</span>
+                                <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                                    <span className="text-[9px] text-slate-500 dark:text-zinc-500 block uppercase font-bold">Lifecycle State Override Engine</span>
                                     
                                     <div className="grid grid-cols-2 gap-1 text-[10px]">
                                         {selectedPackage.status === 'DRAFT' && (
                                             <button
                                                 onClick={() => handleStatusTransition(selectedPackage.id, 'READY_FOR_DISPATCH')}
-                                                className="p-1 bg-white hover:bg-slate-900 hover:text-white border border-slate-300 text-slate-800 font-bold uppercase transition-colors"
+                                                className="p-1 bg-white dark:bg-zinc-950 hover:bg-slate-900 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-300 hover:text-white dark:hover:text-zinc-100 border border-slate-300 dark:border-zinc-800 font-bold uppercase transition-colors"
                                             >
                                                 Mark Ready
                                             </button>
@@ -523,7 +523,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                         {(selectedPackage.status === 'READY_FOR_DISPATCH' || selectedPackage.status === 'REJECTED_BY_PRINTER') && (
                                             <button
                                                 onClick={() => handleStatusTransition(selectedPackage.id, 'DISPATCHED')}
-                                                className="p-1 bg-white hover:bg-slate-900 hover:text-white border border-slate-300 text-slate-800 font-bold uppercase transition-colors"
+                                                className="p-1 bg-white dark:bg-zinc-950 hover:bg-slate-900 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-300 hover:text-white dark:hover:text-zinc-100 border border-slate-300 dark:border-zinc-800 font-bold uppercase transition-colors"
                                             >
                                                 Set Dispatched
                                             </button>
@@ -532,13 +532,13 @@ export const ProductionPackagesTab: React.FC = () => {
                                             <>
                                                 <button
                                                     onClick={() => handleStatusTransition(selectedPackage.id, 'ACCEPTED_BY_PRINTER')}
-                                                    className="p-1 bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase"
+                                                    className="p-1 bg-emerald-950 dark:bg-green-950/40 text-emerald-300 dark:text-green-400 border border-emerald-800 dark:border-green-900/60 font-bold uppercase"
                                                 >
                                                     Simulate Accept
                                                 </button>
                                                 <button
                                                     onClick={() => handleStatusTransition(selectedPackage.id, 'REJECTED_BY_PRINTER')}
-                                                    className="p-1 bg-red-950 text-red-300 border border-red-800 font-bold uppercase"
+                                                    className="p-1 bg-red-950 dark:bg-red-950/40 text-red-300 dark:text-red-400 border border-red-800 dark:border-red-900/60 font-bold uppercase"
                                                 >
                                                     Simulate Reject
                                                 </button>
@@ -547,7 +547,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                         {selectedPackage.status === 'ACCEPTED_BY_PRINTER' && (
                                             <button
                                                 onClick={() => handleStatusTransition(selectedPackage.id, 'IN_PRODUCTION')}
-                                                className="p-1 bg-white hover:bg-slate-900 hover:text-white border border-slate-300 text-slate-800 font-bold uppercase transition-colors"
+                                                className="p-1 bg-white dark:bg-zinc-950 hover:bg-slate-900 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-300 hover:text-white dark:hover:text-zinc-100 border border-slate-300 dark:border-zinc-800 font-bold uppercase transition-colors"
                                             >
                                                 Start Production
                                             </button>
@@ -555,7 +555,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                         {selectedPackage.status === 'IN_PRODUCTION' && (
                                             <button
                                                 onClick={() => handleStatusTransition(selectedPackage.id, 'COMPLETED')}
-                                                className="p-1 bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase col-span-2"
+                                                className="p-1 bg-emerald-950 dark:bg-green-950/40 text-emerald-300 dark:text-green-400 border border-emerald-800 dark:border-green-900/60 font-bold uppercase col-span-2"
                                             >
                                                 Finalize Settlement (COMPLETED)
                                             </button>
@@ -567,7 +567,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                                         handleStatusTransition(selectedPackage.id, 'CANCELLED');
                                                     }
                                                 }}
-                                                className="p-1 bg-red-50 text-red-700 hover:bg-red-950 hover:text-red-300 border border-red-200 font-bold uppercase col-span-2 transition-colors mt-1"
+                                                className="p-1 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-950 dark:hover:bg-red-900 border border-red-200 dark:border-red-900/60 font-bold uppercase col-span-2 transition-colors mt-1"
                                             >
                                                 Cancel Package Matrix
                                             </button>
@@ -576,7 +576,7 @@ export const ProductionPackagesTab: React.FC = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-12 text-center text-xs text-slate-500 font-mono italic-text-off">
+                            <div className="p-12 text-center text-xs text-slate-500 dark:text-zinc-500 font-mono italic-text-off">
                                 Choose any persistent manufacturing row item to inspect assembly metadata blocks, run topological matchers, or broadcast live dispatches.
                             </div>
                         )}

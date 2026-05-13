@@ -22,7 +22,7 @@ export const COLORS = {
     surface: "bg-white dark:bg-zinc-900",
     surfaceElevated: "bg-white dark:bg-zinc-800",
     surfaceMuted: "bg-zinc-100 dark:bg-zinc-800/50",
-    
+
     // Text
     textPrimary: "text-zinc-900 dark:text-zinc-100",
     textSecondary: "text-zinc-600 dark:text-zinc-400",
