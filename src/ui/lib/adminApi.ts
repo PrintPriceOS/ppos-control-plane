@@ -107,6 +107,10 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
         ...(options?.headers as any || {}),
     };
 
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`[ADMIN-FETCH][AUTH] tokenPresent=${!!token} path=${cleanPath}`);
+    }
+
     try {
         const res = await fetch(path, {
             ...options,
@@ -116,10 +120,17 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
 
         if (res.status === 401) {
             clearAuthToken();
+            if (process.env.NODE_ENV === 'development') {
+                console.warn(`[ADMIN-FETCH][AUTH] 401 Unauthorized received for ${cleanPath}. Clearing stale token.`);
+            }
             if (typeof window !== 'undefined') {
                 window.location.href = '/login';
             }
-            throw new Error('Unauthorized: Valid Bearer token required');
+            const fallback: any = getFallbackForPath(path);
+            fallback.ok = false;
+            fallback.source_status = "UNAUTHORIZED";
+            fallback.error = "Session expired. Please log in again.";
+            return fallback as unknown as T;
         }
 
         if (!res.ok) {

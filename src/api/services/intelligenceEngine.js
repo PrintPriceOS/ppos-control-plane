@@ -99,17 +99,20 @@ async function getIntelligencePackage() {
                     });
                 }
 
-                // C. Check Partial Artifacts
-                if (aStatus === 'PARTIAL_ARTIFACTS' || artInteg.ready === false || artInteg.ready === 'false') {
+                // C. Check Partial Artifacts & Certified Artifact Missing
+                // Only flag as a failure/anomaly if the document is strictly certifiable;
+                // otherwise, treat as an expected state for non-carrier documents.
+                const hasArtifactIssue = aStatus === 'PARTIAL_ARTIFACTS' || aStatus === 'CERTIFIED_ARTIFACT_MISSING' || artInteg.ready === false || artInteg.ready === 'false';
+                if (hasArtifactIssue && isCert) {
                     anomalies.push({
                         id: `anom_art_${job.job_id || Date.now()}`,
                         type: 'DEGRADED_ARTIFACT_INTEGRITY',
                         severity: 'HIGH',
                         entityType: 'preflight_job',
                         entityId: job.job_id || 'unknown_job',
-                        summary: 'Artifact integrity verification unready or partially generated',
-                        reason: `Job outputs lack signed certified packages or complete raster outputs.`,
-                        evidence: { artifact_ready: artInteg.ready, status: aStatus },
+                        summary: 'Artifact integrity verification unready or certified artifact missing',
+                        reason: `Job outputs lack signed certified packages for a strictly certifiable document.`,
+                        evidence: { artifact_ready: artInteg.ready, status: aStatus, certifiable: isCert },
                         timestamp: job.created_at || new Date().toISOString()
                     });
                 }

@@ -15,6 +15,7 @@ import { toDisplayText } from '../../lib/display';
 
 interface Dispatch {
   id: string;
+  job_id?: string;
   production_package_id: string;
   manufacturing_package_id?: string;
   print_node_id: string;
@@ -25,6 +26,7 @@ interface Dispatch {
   created_at: string;
   accepted_at: string;
   rejected_at: string;
+  isSeed?: boolean;
 }
 
 interface Package {
@@ -56,9 +58,18 @@ export const IncomingJobsPage: React.FC = () => {
       if (dData.ok) {
         setDispatches(dData.dispatches);
         
-        // Fetch linked packages safely
+        // Fetch linked packages safely, skipping validation seeds to prevent 404s
         const rawPackageIds = dData.dispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id);
-        const validPids = [...new Set(rawPackageIds)].filter(id => id && id !== 'undefined') as string[];
+        const validPids = [...new Set(rawPackageIds)].filter(id => {
+          if (!id || id === 'undefined') return false;
+          if (id.startsWith('TEST-JOB-')) return false;
+          // Also skip if any dispatch pointing to this ID is explicitly a seed
+          const isAssociatedSeed = dData.dispatches.some((d: any) => 
+            (d.manufacturing_package_id === id || d.production_package_id === id) &&
+            (d.job_id?.startsWith('TEST-JOB-') || d.isSeed)
+          );
+          return !isAssociatedSeed;
+        }) as string[];
         const pkgMap: Record<string, Package> = {};
         
         for (const pid of validPids) {
@@ -225,7 +236,11 @@ export const IncomingJobsPage: React.FC = () => {
                           <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold italic">POLICY: {pkg.book_spec_json?.policy || 'DEFAULT'}</span>
                         </div>
                       ) : (
-                        <span className="text-xs text-slate-400 dark:text-zinc-500 italic">Syncing package data...</span>
+                        (pkgId?.startsWith('TEST-JOB-') || dispatch.job_id?.startsWith('TEST-JOB-') || dispatch.isSeed) ? (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 font-bold italic">Validation seed — no production package</span>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-zinc-500 italic">Syncing package data...</span>
+                        )
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-tight">

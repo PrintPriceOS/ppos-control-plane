@@ -145,6 +145,10 @@ router.get('/packages', async (req, res) => {
  * GET /api/admin/production/packages/:packageId
  */
 router.get('/packages/:packageId', async (req, res) => {
+  if (req.params.packageId.startsWith('TEST-JOB-')) {
+    return res.status(404).json({ ok: false, error: { code: 'VALIDATION_SEED_NO_PACKAGE', message: 'Validation seed — no production package' } });
+  }
+
   try {
     const context = resolveActorContext(req);
     const pkg = await packageService.getPackage(req.params.packageId, context);
