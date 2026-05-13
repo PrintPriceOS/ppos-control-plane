@@ -443,10 +443,27 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         } catch (e) {}
     }
 
+    let resolvedArtifactId = artifactId;
     try {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${artifactId}`, traceId: context.traceId });
+        const decoded = Buffer.from(artifactId, 'base64').toString('utf8');
+        if (decoded.startsWith(`${jobId}:`)) {
+            resolvedArtifactId = decoded.slice(jobId.length + 1);
+            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
+        } else if (artifactId.startsWith(`${jobId}:`)) {
+            resolvedArtifactId = artifactId.slice(jobId.length + 1);
+            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
+        }
+    } catch (e) {
+        if (artifactId.startsWith(`${jobId}:`)) {
+            resolvedArtifactId = artifactId.slice(jobId.length + 1);
+            console.log(`[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] raw=${artifactId} upstream=${resolvedArtifactId}`);
+        }
+    }
 
-        const streamResponse = await gateway.getArtifact(jobId, artifactId, context);
+    try {
+        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${resolvedArtifactId}`, traceId: context.traceId });
+
+        const streamResponse = await gateway.getArtifact(jobId, resolvedArtifactId, context);
         
         // Proxy content type and bytes directly
         res.setHeader('Content-Type', streamResponse.headers?.['content-type'] || 'application/pdf');
