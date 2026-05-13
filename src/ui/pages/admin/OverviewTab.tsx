@@ -34,9 +34,9 @@ const COLOR_MAP: Record<string, { bg: string; text: string }> = {
     cyan: { bg: "bg-cyan-600/10", text: "text-cyan-600" },
 };
 
-const KpiCard = ({ title, valueRaw, suffix, Icon, color, helpKey }: { title: string; valueRaw: number | string | null; suffix?: string; Icon: any; color: keyof typeof COLOR_MAP; helpKey?: string }) => {
+const KpiCard = ({ title, valueRaw, suffix, Icon, color, helpKey, statusOverride }: { title: string; valueRaw: any; suffix?: string; Icon: any; color: keyof typeof COLOR_MAP; helpKey?: string; statusOverride?: string }) => {
     const theme = COLOR_MAP[color] || COLOR_MAP.blue;
-    const isMissing = valueRaw === null;
+    const isMissing = valueRaw === null || valueRaw === undefined || statusOverride === 'UNAVAILABLE';
     return (
         <div className={`glass rounded-none p-3.5 border ${isMissing ? 'border-amber-400/50 bg-amber-50/10' : 'border-white'} hover-slide flex items-start justify-between gap-2 group relative`}>
             <div className="flex items-center gap-3 min-w-0">
@@ -53,7 +53,7 @@ const KpiCard = ({ title, valueRaw, suffix, Icon, color, helpKey }: { title: str
                             <div className="text-[10px] font-bold text-amber-600 tracking-tight truncate border-b border-dashed border-amber-300">N/A — source unavailable</div>
                         ) : (
                             <>
-                                <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">{valueRaw}</div>
+                                <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">{String(valueRaw)}</div>
                                 {suffix && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{suffix}</span>}
                             </>
                         )}
@@ -72,8 +72,8 @@ const KpiCard = ({ title, valueRaw, suffix, Icon, color, helpKey }: { title: str
     );
 };
 
-const PanelRow = ({ label, valueRaw, suffix, isAlert, isPositive }: { label: string; valueRaw: number | string | null; suffix?: string; isAlert?: boolean; isPositive?: boolean }) => {
-    const isMissing = valueRaw === null;
+const PanelRow = ({ label, valueRaw, suffix, isAlert, isPositive }: { label: string; valueRaw: any; suffix?: string; isAlert?: boolean; isPositive?: boolean }) => {
+    const isMissing = valueRaw === null || valueRaw === undefined;
     return (
         <div className="flex items-center justify-between py-1.5 border-b border-slate-200/60 last:border-none text-xs">
             <span className="text-slate-600 font-medium tracking-tight truncate pr-2">{label}</span>
@@ -81,7 +81,7 @@ const PanelRow = ({ label, valueRaw, suffix, isAlert, isPositive }: { label: str
                 {isMissing ? (
                     <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 border border-amber-200/60">N/A — unavailable</span>
                 ) : (
-                    <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-1 py-0.5' : isPositive ? 'text-emerald-600 font-black' : 'text-slate-900'}`}>{valueRaw} {suffix || ''}</span>
+                    <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-1 py-0.5' : isPositive ? 'text-emerald-600 font-black' : 'text-slate-900'}`}>{String(valueRaw)} {suffix || ''}</span>
                 )}
             </div>
         </div>
@@ -119,8 +119,17 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
     const stor = d.storage || {};
     const fed = d.federation || {};
 
-    // Calculate dynamic percentages safely for top KPI strips
-    const certRatio = gov.jobsCertifiableCount !== null && pref.jobsToday ? Math.round((gov.jobsCertifiableCount / pref.jobsToday) * 100) : null;
+    const getKpi = (k: string) => d.kpis?.find(item => item.key === k) || { value: null, status: 'UNAVAILABLE' };
+
+    // Dynamically retrieve high-density KPI values mapped directly to canonical array items
+    const kJobsToday = getKpi('jobsToday');
+    const kActiveJobs = getKpi('activeJobs');
+    const kRealExtraction = getKpi('realExtraction');
+    const kCertifiable = getKpi('certifiable');
+    const kRuntimeFailures = getKpi('runtimeFailures');
+    const kArtifactStorage = getKpi('artifactStorage');
+    const kOperationalNodes = getKpi('operationalNodes');
+    const kAuditStatus = getKpi('auditStatus');
 
     return (
         <div className="space-y-6 animate-slide-fade">
@@ -140,16 +149,16 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                 </div>
             )}
 
-            {/* HIGH-DENSITY TOP KPI STRIPS (MANDATED 8 CARDS) */}
+            {/* HIGH-DENSITY TOP KPI STRIPS (MANDATED 8 CARDS FROM UNIFIED ARRAY) */}
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-                <KpiCard Icon={Square3Stack3DIcon} color="blue" title="Jobs Today" valueRaw={pref.jobsToday} helpKey="metric-jobs-today" />
-                <KpiCard Icon={QueueListIcon} color="orange" title="Live Queue" valueRaw={pref.queueDepth ?? pref.activeJobs} helpKey="metric-live-queue" />
-                <KpiCard Icon={CheckBadgeIcon} color="emerald" title="Certifiable %" valueRaw={certRatio !== null ? `${certRatio}%` : null} helpKey="metric-certifiable-ratio" />
-                <KpiCard Icon={WrenchScrewdriverIcon} color="amber" title="Failed Runtime" valueRaw={pref.failedRuntimeEnvironmentCount} helpKey="metric-failed-runtime" />
-                <KpiCard Icon={BoltIcon} color="indigo" title="Fixable Issues" valueRaw={econ.jobsRequiringFix} />
-                <KpiCard Icon={ServerStackIcon} color="violet" title="Artifact Storage" valueRaw={stor.artifactsCount} suffix={stor.totalSizeBytes ? `${(stor.totalSizeBytes / 1024 / 1024).toFixed(1)} MB` : undefined} />
-                <KpiCard Icon={GlobeEuropeAfricaIcon} color="cyan" title="Active Nodes" valueRaw={fed.operationalNodes} />
-                <KpiCard Icon={ClockIcon} color="emerald" title="Dispatches Today" valueRaw={fed.activeDispatches} />
+                <KpiCard Icon={Square3Stack3DIcon} color="blue" title="Jobs Today" valueRaw={kJobsToday.value} statusOverride={kJobsToday.status} helpKey="metric-jobs-today" />
+                <KpiCard Icon={QueueListIcon} color="orange" title="Active Jobs" valueRaw={kActiveJobs.value} statusOverride={kActiveJobs.status} helpKey="metric-active-jobs" />
+                <KpiCard Icon={CheckBadgeIcon} color="emerald" title="Real Extraction" valueRaw={kRealExtraction.value} statusOverride={kRealExtraction.status} />
+                <KpiCard Icon={ShieldCheckIcon} color="indigo" title="Certifiable" valueRaw={kCertifiable.value} statusOverride={kCertifiable.status} />
+                <KpiCard Icon={WrenchScrewdriverIcon} color="amber" title="Runtime Failures" valueRaw={kRuntimeFailures.value} statusOverride={kRuntimeFailures.status} />
+                <KpiCard Icon={ServerStackIcon} color="violet" title="Artifact Storage" valueRaw={kArtifactStorage.value} statusOverride={kArtifactStorage.status} suffix={kArtifactStorage.value ? `${(Number(kArtifactStorage.value) / 1024 / 1024).toFixed(1)} MB` : undefined} />
+                <KpiCard Icon={GlobeEuropeAfricaIcon} color="cyan" title="Operational Nodes" valueRaw={kOperationalNodes.value} statusOverride={kOperationalNodes.status} />
+                <KpiCard Icon={DocumentTextIcon} color="emerald" title="Audit Status" valueRaw={kAuditStatus.value ? String(kAuditStatus.value).toUpperCase() : null} statusOverride={kAuditStatus.status} />
             </div>
 
             {/* MISSION CONTROL PANELS (FIRST VIEWPORT OPERATIONAL COVERAGE) */}
@@ -161,7 +170,10 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                             <Square3Stack3DIcon className="w-4 h-4 text-blue-400" />
                             <span className="text-xs font-bold uppercase tracking-wider">Preflight Intelligence</span>
                         </div>
-                        <span className="text-[9px] font-mono px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30">Registry Stream</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${pref.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30">{pref.source_status || 'UNAVAILABLE'}</span>
+                        </div>
                     </div>
                     <div className="p-4 flex-1 space-y-1 bg-white/40">
                         <PanelRow label="Total Analyzed (Today)" valueRaw={pref.jobsToday} />
@@ -184,7 +196,10 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                             <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
                             <span className="text-xs font-bold uppercase tracking-wider">Governance & Economy</span>
                         </div>
-                        <span className="text-[9px] font-mono px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Policy Kernel</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${gov.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">{gov.source_status || 'UNAVAILABLE'}</span>
+                        </div>
                     </div>
                     <div className="p-4 flex-1 space-y-1 bg-white/40">
                         <PanelRow label="Active Swarm Policies" valueRaw={gov.activePolicyCount} />
@@ -196,7 +211,7 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                         <PanelRow label="Audit Trace Registry State" valueRaw={gov.auditStatus ? String(gov.auditStatus).toUpperCase() : null} isAlert={gov.auditStatus === 'errors'} />
                         <PanelRow label="Estimated Value Generated" valueRaw={econ.estimatedProductionValue !== null ? `$${Number(econ.estimatedProductionValue).toLocaleString()}` : null} isPositive />
                         <PanelRow label="Avoided Reprint Waste ROI" valueRaw={econ.estimatedAvoidedReprintCost !== null ? `$${Number(econ.estimatedAvoidedReprintCost).toLocaleString()}` : null} />
-                        <PanelRow label="Mean Ledger Margin" valueRaw={econ.averageMargin !== null ? `${econ.averageMargin}%` : null} />
+                        <PanelRow label="Verified Prepress Hours Saved" valueRaw={econ.hoursSaved !== null ? `${econ.hoursSaved} hrs` : null} />
                         <PanelRow label="AutoFix Success Count" valueRaw={econ.fixSuccessCount} />
                         <PanelRow label="AutoFix Intercept Failures" valueRaw={econ.fixFailureCount} isAlert={econ.fixFailureCount ? econ.fixFailureCount > 0 : false} />
                         <PanelRow label="Derived Quality Benchmark" valueRaw={econ.qualityScore} suffix="/ 10.0" />
@@ -210,7 +225,10 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
                             <GlobeEuropeAfricaIcon className="w-4 h-4 text-indigo-400" />
                             <span className="text-xs font-bold uppercase tracking-wider">Federation Topology</span>
                         </div>
-                        <span className="text-[9px] font-mono px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Live Map Hub</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${fed.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">{fed.source_status || 'UNAVAILABLE'}</span>
+                        </div>
                     </div>
                     <div className="p-4 flex-1 space-y-2 bg-white/40 flex flex-col justify-between">
                         <div className="space-y-1">

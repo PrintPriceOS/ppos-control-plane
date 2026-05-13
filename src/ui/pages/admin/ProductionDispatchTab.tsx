@@ -27,20 +27,28 @@ export const ProductionDispatchTab: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [showJson, setShowJson] = useState(false);
+    const [includeSeeds, setIncludeSeeds] = useState(false);
+    const [counts, setCounts] = useState<any>({});
+    const [sourceStatus, setSourceStatus] = useState<string>("LIVE_MES");
+    const [seedsOnlyMessage, setSeedsOnlyMessage] = useState<string>("");
 
     useEffect(() => {
-        fetchDispatches();
-        const interval = setInterval(fetchDispatches, 15000);
+        fetchDispatches(includeSeeds);
+        const interval = setInterval(() => fetchDispatches(includeSeeds), 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [includeSeeds]);
 
-    const fetchDispatches = async () => {
+    const fetchDispatches = async (seedsFlag = includeSeeds) => {
         try {
-            const data = await adminApi.getDispatches();
-            setDispatches(data.dispatches || []);
+            const data = await adminApi.getManufacturingQueue(seedsFlag);
+            setDispatches(data.jobs || []);
+            setCounts(data.counts || {});
+            setSourceStatus(data.source_status || "LIVE_MES");
+            setSeedsOnlyMessage(data.message || "");
             setLoading(false);
         } catch (err) {
-            console.error('Failed to fetch dispatches:', err);
+            console.error('Failed to fetch manufacturing queue:', err);
+            setSourceStatus("SOURCE_UNAVAILABLE");
         }
     };
 
@@ -482,34 +490,131 @@ export const ProductionDispatchTab: React.FC = () => {
                 {/* Dispatch Ledger */}
                 <div className="lg:col-span-4 space-y-4">
                     <div className={`${COLORS.adaptive.surface} rounded-none border ${COLORS.adaptive.borderPrimary} overflow-hidden`}>
-                        <div className={`p-4 ${COLORS.adaptive.surfaceMuted} border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
-                            <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>Industrial Ledger</span>
-                            <button onClick={fetchDispatches} className={`p-1.5 ${COLORS.adaptive.hoverSurface} rounded-none transition-colors`}>
-                                <ArrowPathIcon className={`w-3.5 h-3.5 ${COLORS.adaptive.textMuted} ${loading ? 'animate-spin' : ''}`} />
-                            </button>
+                        <div className={`p-4 ${COLORS.adaptive.surfaceMuted} border-b ${COLORS.adaptive.borderSubtle} flex flex-col gap-3`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>Industrial Ledger</span>
+                                    {sourceStatus === 'SEEDS_ONLY' && (
+                                        <span className="px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 text-[8px] font-black text-amber-500 uppercase tracking-widest">
+                                            Seeds Only
+                                        </span>
+                                    )}
+                                </div>
+                                <button onClick={() => fetchDispatches()} className={`p-1.5 ${COLORS.adaptive.hoverSurface} rounded-none transition-colors`}>
+                                    <ArrowPathIcon className={`w-3.5 h-3.5 ${COLORS.adaptive.textMuted} ${loading ? 'animate-spin' : ''}`} />
+                                </button>
+                            </div>
+
+                            {/* Audit Seeds Toggle */}
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={includeSeeds}
+                                    onChange={(e) => setIncludeSeeds(e.target.checked)}
+                                    className="rounded-none bg-transparent border border-gray-600 text-indigo-500 focus:ring-0 w-3.5 h-3.5"
+                                />
+                                <span className={`text-[9px] font-bold ${includeSeeds ? 'text-amber-500' : COLORS.adaptive.textMuted} uppercase tracking-widest`}>
+                                    Include Validation Seeds {counts?.seedsFiltered !== undefined && `(${counts.seedsFiltered} filtered)`}
+                                </span>
+                            </label>
+
+                            {/* Queue Summary Counts */}
+                            <div className="grid grid-cols-4 gap-1 pt-1 border-t border-white/5">
+                                <div className="text-center">
+                                    <div className="text-[8px] font-black text-gray-500 uppercase">Pending</div>
+                                    <div className="text-xs font-bold text-gray-300">{counts?.pending || 0}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-[8px] font-black text-blue-500 uppercase">Active</div>
+                                    <div className="text-xs font-bold text-blue-400">{counts?.active || 0}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-[8px] font-black text-amber-500 uppercase">SLA Risk</div>
+                                    <div className="text-xs font-bold text-amber-500">{counts?.slaAtRisk || 0}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-[8px] font-black text-[#dc0000] uppercase">Blocked</div>
+                                    <div className="text-xs font-bold text-[#dc0000]">{counts?.capacityBlocked || 0}</div>
+                                </div>
+                            </div>
                         </div>
                         <div className={`divide-y ${COLORS.adaptive.divideSubtle} max-h-[700px] overflow-y-auto custom-scrollbar`}>
                             {dispatches.map((d) => (
                                 <button
                                     key={d.id}
                                     onClick={() => fetchDetail(d.id)}
-                                    className={`w-full text-left p-4 ${COLORS.adaptive.hoverSurface} transition-all flex items-center justify-between border-l-4 ${selectedDispatch?.id === d.id ? 'bg-indigo-500/5 border-indigo-500' : 'border-transparent'}`}
+                                    className={`w-full text-left p-4 ${COLORS.adaptive.hoverSurface} transition-all flex flex-col gap-2 border-b ${COLORS.adaptive.borderSubtle} border-l-4 ${selectedDispatch?.id === d.id ? 'bg-indigo-500/5 border-indigo-500' : 'border-transparent'}`}
                                 >
-                                    <div>
-                                        <div className={`font-mono text-[10px] ${COLORS.adaptive.textPrimary} mb-1 uppercase tracking-tight`}>#{String(d?.id || '').slice(-8)}</div>
-                                        <div className={`flex items-center gap-2 text-[10px] ${COLORS.adaptive.textMuted} font-bold tracking-tight`}>
-                                            <MapPinIcon className="w-3 h-3" /> {String(d?.node_id || '').slice(0, 8)}
+                                    <div className="w-full flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`font-mono text-[10px] font-black ${COLORS.adaptive.textPrimary} uppercase tracking-tight`}>
+                                                #{String(d?.id || '').slice(-8)}
+                                            </span>
+                                            {d?.isSeed && (
+                                                <span className="px-1 py-0.2 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[7px] font-black uppercase tracking-widest">
+                                                    SEED
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className={`text-[8px] font-black px-2 py-0.5 rounded-none border uppercase tracking-widest ${getStatusColor(d.status)}`}>
+                                            {d.status}
                                         </div>
                                     </div>
-                                    <div className={`text-[8px] font-black px-2 py-0.5 rounded-none border uppercase tracking-widest ${getStatusColor(d.status)}`}>
-                                        {d.status}
+
+                                    {/* Enriched Preflight Telemetry */}
+                                    {d?.job && (
+                                        <div className="w-full bg-black/20 p-2 border border-white/5 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between text-[9px]">
+                                                <span className="font-mono text-gray-300 truncate max-w-[140px]" title={d.job.filename}>
+                                                    {d.job.filename}
+                                                </span>
+                                                <span className={`font-bold ${
+                                                    d.job.riskScore > 70 ? 'text-[#dc0000]' :
+                                                    d.job.riskScore > 40 ? 'text-amber-500' :
+                                                    'text-[#10B981]'
+                                                }`}>
+                                                    Risk: {d.job.riskScore}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[8px] text-gray-400 font-bold uppercase tracking-wider">
+                                                <span>Status: {d.job.preflightStatus}</span>
+                                                {d.job.certifiable ? (
+                                                    <span className="text-[#10B981] flex items-center gap-0.5">
+                                                        <ShieldCheckIcon className="w-2.5 h-2.5" /> Certifiable
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-500">Uncertified</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className={`flex items-center justify-between w-full text-[9px] ${COLORS.adaptive.textMuted} font-bold tracking-tight`}>
+                                        <span className="flex items-center gap-1 font-mono">
+                                            <MapPinIcon className="w-2.5 h-2.5" /> {String(d?.node_id || '').slice(0, 8)}
+                                        </span>
+                                        {d?.slaStatus === 'SLA_AT_RISK' && (
+                                            <span className="text-amber-500 flex items-center gap-0.5 text-[8px] font-black uppercase">
+                                                <ExclamationTriangleIcon className="w-2.5 h-2.5" /> SLA RISK
+                                            </span>
+                                        )}
                                     </div>
                                 </button>
                             ))}
                             {dispatches.length === 0 && !loading && (
-                                <div className="p-12 text-center">
-                                    <ArchiveBoxIcon className={`w-8 h-8 mx-auto opacity-30 mb-2 ${COLORS.adaptive.textMuted}`} />
+                                <div className="p-12 text-center space-y-3">
+                                    <ArchiveBoxIcon className={`w-8 h-8 mx-auto opacity-30 ${COLORS.adaptive.textMuted}`} />
                                     <p className={`text-[10px] font-black uppercase tracking-widest ${COLORS.adaptive.textMuted}`}>No manufacturing records</p>
+                                    {sourceStatus === 'SEEDS_ONLY' && !includeSeeds && (
+                                        <div className="p-3 bg-amber-500/5 border border-amber-500/20 text-left">
+                                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                <ExclamationTriangleIcon className="w-3 h-3 flex-shrink-0" /> Validation Seeds Present
+                                            </p>
+                                            <p className="text-[9px] text-gray-400 leading-relaxed font-bold">
+                                                {seedsOnlyMessage || "Only audit-grade validation seeds are currently present. Toggle 'Include Validation Seeds' above to inspect seed payloads."}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -644,6 +749,51 @@ export const ProductionDispatchTab: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Canonical Preflight Telemetry Context */}
+                                {selectedDispatch.job && (
+                                    <div className="mb-10 p-6 bg-black/30 rounded-none border border-white/10">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
+                                            <DocumentTextIcon className="w-4 h-4 text-indigo-500" /> Canonical Preflight Registry Attachment
+                                        </h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <div className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-1`}>Filename</div>
+                                                <div className="text-xs font-mono font-bold text-gray-200 truncate" title={selectedDispatch.job.filename}>
+                                                    {selectedDispatch.job.filename}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-1`}>Policy Target</div>
+                                                <div className="text-xs font-bold text-indigo-300 uppercase">
+                                                    {selectedDispatch.job.policy || 'STANDARD'}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-1`}>Forensic Risk</div>
+                                                <div className={`text-xs font-bold ${
+                                                    selectedDispatch.job.riskScore > 70 ? 'text-[#dc0000]' :
+                                                    selectedDispatch.job.riskScore > 40 ? 'text-amber-500' :
+                                                    'text-[#10B981]'
+                                                }`}>
+                                                    {selectedDispatch.job.riskScore} / 100
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-1`}>Certification Gate</div>
+                                                <div className="text-xs font-bold">
+                                                    {selectedDispatch.job.certifiable ? (
+                                                        <span className="text-[#10B981] flex items-center gap-1">
+                                                            <ShieldCheckIcon className="w-3 h-3" /> Promoted
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-500">Uncertified</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Predictive Risk Intelligence */}
                                 {selectedDispatch.metadata_json?.predictive_risk && (

@@ -12,11 +12,16 @@ const router = express.Router();
 const db = require('../services/mysqlClient');
 const topologyService = require('../services/FederationTopologyService');
 
+function getCanonicalResult(payload) {
+    return payload?.result || payload || {};
+}
+
 router.get('/overview', async (req, res) => {
     const warnings = [];
     
     // Initial structures with explicit nulls to signal missing/unresolved data instead of fake zeros
     const preflight = {
+        source_status: "UNAVAILABLE",
         jobsToday: null,
         activeJobs: null,
         completedJobsToday: null,
@@ -30,6 +35,7 @@ router.get('/overview', async (req, res) => {
     };
 
     const governance = {
+        source_status: "UNAVAILABLE",
         activePolicyCount: null,
         latestPolicyApplied: null,
         jobsBlockedByPolicy: null,
@@ -41,8 +47,10 @@ router.get('/overview', async (req, res) => {
     };
 
     const economy = {
+        source_status: "UNAVAILABLE",
         estimatedProductionValue: null,
         estimatedAvoidedReprintCost: null,
+        hoursSaved: null,
         averageRiskScore: null,
         averageMargin: null,
         jobsRequiringFix: null,
@@ -52,16 +60,19 @@ router.get('/overview', async (req, res) => {
     };
 
     const storage = {
+        source_status: "UNAVAILABLE",
         artifactsCount: null,
         totalSizeBytes: null,
         latestArtifact: null
     };
 
     const audit = {
+        source_status: "UNAVAILABLE",
         latestEvents: []
     };
 
     const federation = {
+        source_status: "UNAVAILABLE",
         operationalNodes: null,
         activeDispatches: null,
         missingCoordinates: null,
@@ -71,12 +82,16 @@ router.get('/overview', async (req, res) => {
 
     // --- 1. PREFLIGHT REGISTRY & JOBS DATA ---
     try {
-        // Query preflight_job_registry for real extraction stats and payload properties
         const jobsRows = await db.query(`
             SELECT job_id, status, type, policy, canonical_payload_json, created_at 
             FROM preflight_job_registry 
             ORDER BY created_at DESC LIMIT 1000
         `);
+
+        // Table exists, so initialize counts to 0 to avoid fake zero display distinction
+        preflight.source_status = "ACTIVE";
+        governance.source_status = "ACTIVE";
+        economy.source_status = "ACTIVE";
 
         let jobsToday = 0;
         let activeJobs = 0;
@@ -90,18 +105,19 @@ router.get('/overview', async (req, res) => {
         let certifiableCount = 0;
         let certBlockedCount = 0;
         let fixableCount = 0;
+        let analyzedCount = 0;
 
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-        if (jobsRows.length > 0) {
+        if (jobsRows && jobsRows.length > 0) {
             preflight.latestJobStatus = jobsRows[0].status;
             governance.latestPolicyApplied = jobsRows.find(j => j.policy)?.policy || null;
         }
 
         const distinctPolicies = new Set();
 
-        jobsRows.forEach(row => {
+        (jobsRows || []).forEach(row => {
             const jobTime = new Date(row.created_at).getTime();
             const isToday = jobTime >= startOfDay;
 
@@ -112,46 +128,56 @@ router.get('/overview', async (req, res) => {
 
             if (row.policy) distinctPolicies.add(row.policy);
 
-            // Parse canonical payload safely to gather precise internal indicators
+            // Parse canonical payload safely
             if (row.canonical_payload_json) {
                 try {
-                    const payload = typeof row.canonical_payload_json === 'string' ? JSON.parse(row.canonical_payload_json) : row.canonical_payload_json;
+                    const parsedPayload = typeof row.canonical_payload_json === 'string' 
+                        ? JSON.parse(row.canonical_payload_json) 
+                        : row.canonical_payload_json;
                     
-                    if (payload.analysisStatus === 'FAILED_RUNTIME_ENVIRONMENT' || row.status === 'FAILED_RUNTIME_ENVIRONMENT') {
-                        failedRuntime++;
-                    }
-                    if (payload.analysisStatus === 'PARTIAL_ARTIFACTS') {
-                        partialArtifacts++;
-                    }
-                    
-                    const contract = payload.analysisIntegrity || payload.integrityContract || payload.contract || {};
-                    if (contract.realExtraction === true || payload.extractionFidelity === 'REAL_EXTRACTION') {
+                    const result = getCanonicalResult(parsedPayload);
+                    analyzedCount++;
+
+                    // Counter increments based strictly on canonical fields
+                    const integ = result.analysisIntegrity || {};
+
+                    if (integ.realExtraction === true || result.extractionFidelity === "REAL_EXTRACTION") {
                         realExtraction++;
                     }
 
-                    if (payload.certifiable === true || contract.certifiable === true) {
+                    if (result.analysis_status === "FAILED_RUNTIME_ENVIRONMENT") {
+                        failedRuntime++;
+                    }
+
+                    if (result.analysis_status === "PARTIAL_ARTIFACTS") {
+                        partialArtifacts++;
+                    }
+
+                    if (result.certifiable === true || integ.certifiable === true) {
                         certifiableCount++;
-                    } else if (payload.certificationBlocked === true || contract.certifiable === false) {
+                    }
+
+                    if (result.certificationBlockedReason || result.certifiable === false) {
                         certBlockedCount++;
                     }
 
-                    if (typeof payload.riskScore === 'number') {
-                        totalRisk += payload.riskScore;
-                        riskCount++;
-                    } else if (typeof payload.summary?.risk_score === 'number') {
-                        totalRisk += payload.summary.risk_score;
+                    const rScore = result.risk_score !== undefined ? result.risk_score : result.summary?.risk_score;
+                    if (typeof rScore === 'number') {
+                        totalRisk += rScore;
                         riskCount++;
                     }
 
-                    // Check if job requires/has fix recommendations
-                    if (row.type === 'AUTOFIX' || (Array.isArray(payload.findings) && payload.findings.some(f => f.fixable))) {
-                        fixableCount++;
+                    // Fix jobsRequiringFix check
+                    if (Array.isArray(result.findings)) {
+                        const needsFix = result.findings.some(f => f?.fixable === true || f?.fixRequired === true || f?.repairStrategy);
+                        if (needsFix) {
+                            fixableCount++;
+                        }
                     }
                 } catch (e) {}
             }
         });
 
-        // Set evaluated values if real records exist
         preflight.jobsToday = jobsToday;
         preflight.activeJobs = activeJobs;
         preflight.completedJobsToday = completedToday;
@@ -160,23 +186,24 @@ router.get('/overview', async (req, res) => {
         preflight.failedRuntimeEnvironmentCount = failedRuntime;
         preflight.partialArtifactsCount = partialArtifacts;
         preflight.averageRiskScore = riskCount > 0 ? Math.round(totalRisk / riskCount) : null;
-        
+
         governance.jobsCertifiableCount = certifiableCount;
         governance.certificationBlockedCount = certBlockedCount;
-        governance.activePolicyCount = distinctPolicies.size > 0 ? distinctPolicies.size : null;
+        governance.activePolicyCount = distinctPolicies.size;
+        
         economy.jobsRequiringFix = fixableCount;
+        economy.qualityScore = analyzedCount > 0 ? Number(((certifiableCount / analyzedCount) * 10).toFixed(1)) : null;
 
-        // Also query core jobs table to supplement queue depth / active counts safely
+        // Also query core jobs table to supplement queue depth safely
         try {
             const coreJobs = await db.query(`SELECT status, COUNT(*) as cnt FROM jobs GROUP BY status`);
             let coreActive = 0;
             let coreQueued = 0;
-            coreJobs.forEach(cj => {
+            (coreJobs || []).forEach(cj => {
                 if (['RUNNING', 'PROCESSING'].includes(cj.status)) coreActive += cj.cnt;
                 if (['QUEUED', 'PENDING'].includes(cj.status)) coreQueued += cj.cnt;
             });
             preflight.queueDepth = coreQueued;
-            // Elevate active jobs if core metrics reflect broader capacity execution
             if (coreActive > preflight.activeJobs) {
                 preflight.activeJobs = coreActive;
             }
@@ -185,6 +212,9 @@ router.get('/overview', async (req, res) => {
         }
 
     } catch (err) {
+        preflight.source_status = "UNAVAILABLE";
+        governance.source_status = "UNAVAILABLE";
+        economy.source_status = "UNAVAILABLE";
         warnings.push(`preflight_job_registry query failed: ${err.message}`);
     }
 
@@ -194,16 +224,21 @@ router.get('/overview', async (req, res) => {
             SELECT COUNT(*) as total_artifacts, SUM(size_bytes) as total_bytes, MAX(filename) as latest_file 
             FROM preflight_artifact_registry
         `);
-        if (artRows.length > 0 && artRows[0].total_artifacts !== null) {
+        storage.source_status = "ACTIVE";
+        storage.artifactsCount = 0;
+        storage.totalSizeBytes = 0;
+
+        if (artRows && artRows.length > 0 && artRows[0].total_artifacts !== null) {
             storage.artifactsCount = Number(artRows[0].total_artifacts);
             storage.totalSizeBytes = Number(artRows[0].total_bytes || 0);
             storage.latestArtifact = artRows[0].latest_file || null;
         }
     } catch (err) {
+        storage.source_status = "UNAVAILABLE";
         warnings.push(`preflight_artifact_registry query failed: ${err.message}`);
     }
 
-    // --- 3. ECONOMY & METRICS TABLE ---
+    // --- 3. ECONOMY METRICS TABLE & AUDIT TRAIL ---
     try {
         const metRows = await db.query(`
             SELECT 
@@ -212,10 +247,17 @@ router.get('/overview', async (req, res) => {
                 AVG(risk_score_after) as avg_risk
             FROM metrics
         `);
-        if (metRows.length > 0) {
+        economy.source_status = "ACTIVE";
+        
+        // Remove invented monetary proxy. Expose hoursSaved if exists. Keep estimatedAvoidedReprintCost null and push warning.
+        economy.hoursSaved = 0;
+        warnings.push("estimatedAvoidedReprintCost unavailable: no monetary source configured");
+
+        if (metRows && metRows.length > 0) {
             const mr = metRows[0];
             if (mr.val_gen !== null) economy.estimatedProductionValue = Number(mr.val_gen);
-            if (mr.hrs_sav !== null) economy.estimatedAvoidedReprintCost = Number(mr.hrs_sav) * 45.0; // Benchmark proxy cost
+            if (mr.hrs_sav !== null) economy.hoursSaved = Number(mr.hrs_sav);
+            
             if (mr.avg_risk !== null && preflight.averageRiskScore === null) {
                 preflight.averageRiskScore = Math.round(Number(mr.avg_risk));
                 economy.averageRiskScore = Math.round(Number(mr.avg_risk));
@@ -224,37 +266,24 @@ router.get('/overview', async (req, res) => {
             }
         }
 
-        // Fix Success / Failure rates from audit trail
-        const fixAuditRows = await db.query(`
-            SELECT status, COUNT(*) as cnt 
-            FROM preflight_audit_events 
-            WHERE action = 'REQUEST_FIX' 
-            GROUP BY status
-        `);
-        let fSucc = 0;
-        let fFail = 0;
-        fixAuditRows.forEach(fa => {
-            if (['SUCCESS', 'COMPLETED'].includes(fa.status)) fSucc += fa.cnt;
-            else fFail += fa.cnt;
-        });
-        economy.fixSuccessCount = fSucc;
-        economy.fixFailureCount = fFail;
-
-        // Quality score derived from pass/certifiable metrics
-        const totalEvaluated = (governance.jobsCertifiableCount || 0) + (preflight.completedJobsToday || 0);
-        if (totalEvaluated > 0) {
-            const passedScore = ((governance.jobsCertifiableCount || 0) / totalEvaluated) * 10.0;
-            economy.qualityScore = Number(Math.min(10.0, Math.max(1.0, passedScore)).toFixed(1));
-        }
-
-        // Try reading financial ledger entries if present
+        // Fix Success / Failure rates from audit trail safely
         try {
-            const ledgRows = await db.query(`SELECT AVG(amount) as avg_amt FROM financial_ledger_entries WHERE type = 'CREDIT'`);
-            if (ledgRows.length > 0 && ledgRows[0].avg_amt !== null) {
-                economy.averageMargin = Number(Number(ledgRows[0].avg_amt).toFixed(2));
-            }
+            const fixAuditRows = await db.query(`
+                SELECT status, COUNT(*) as cnt 
+                FROM preflight_audit_events 
+                WHERE action = 'REQUEST_FIX' 
+                GROUP BY status
+            `);
+            let fSucc = 0;
+            let fFail = 0;
+            (fixAuditRows || []).forEach(fa => {
+                if (['SUCCESS', 'COMPLETED'].includes(fa.status)) fSucc += fa.cnt;
+                else fFail += fa.cnt;
+            });
+            economy.fixSuccessCount = fSucc;
+            economy.fixFailureCount = fFail;
         } catch (e) {
-            // Silently omit averageMargin to remain null if table missing/empty
+            warnings.push(`preflight_audit_events fix count query failed: ${e.message}`);
         }
 
     } catch (err) {
@@ -268,7 +297,10 @@ router.get('/overview', async (req, res) => {
             FROM preflight_governance_events 
             ORDER BY created_at DESC LIMIT 50
         `);
-        if (govRows.length > 0) {
+        governance.source_status = "ACTIVE";
+        governance.jobsBlockedByPolicy = 0;
+
+        if (govRows && govRows.length > 0) {
             governance.lastGovernanceEvent = {
                 rule: govRows[0].rule_slug,
                 result: govRows[0].evaluation_result,
@@ -285,46 +317,49 @@ router.get('/overview', async (req, res) => {
             governance.jobsBlockedByPolicy = blockedCnt;
         }
 
-        // Set active policy count fallback if distinct collection missed
-        if (governance.activePolicyCount === null) {
-            const polRows = await db.query(`SELECT COUNT(DISTINCT rule_slug) as cnt FROM preflight_governance_events`);
-            if (polRows.length > 0 && polRows[0].cnt > 0) {
-                governance.activePolicyCount = polRows[0].cnt;
-            }
+        // Evaluate audit health status
+        try {
+            const auditStatusRows = await db.query(`
+                SELECT status, COUNT(*) as cnt FROM preflight_audit_events GROUP BY status
+            `);
+            audit.source_status = "ACTIVE";
+            let hasErrors = false;
+            let hasWarnings = false;
+            (auditStatusRows || []).forEach(asr => {
+                if (['FAILURE', 'ERROR', 'CRITICAL'].includes(asr.status)) hasErrors = true;
+                if (['WARNING', 'DEGRADED'].includes(asr.status)) hasWarnings = true;
+            });
+            governance.auditStatus = hasErrors ? "errors" : hasWarnings ? "warnings" : "clean";
+
+            const recentEvents = await db.query(`
+                SELECT action, status, message, created_at 
+                FROM preflight_audit_events 
+                ORDER BY created_at DESC LIMIT 5
+            `);
+            audit.latestEvents = (recentEvents || []).map(re => ({
+                event: re.action,
+                status: re.status,
+                details: re.message || 'Execution trail event logged.',
+                timestamp: re.created_at
+            }));
+        } catch (e) {
+            audit.source_status = "UNAVAILABLE";
+            warnings.push(`preflight_audit_events stream query failed: ${e.message}`);
         }
 
-        // Evaluate audit health status
-        const auditStatusRows = await db.query(`
-            SELECT status, COUNT(*) as cnt FROM preflight_audit_events GROUP BY status
-        `);
-        let hasErrors = false;
-        let hasWarnings = false;
-        auditStatusRows.forEach(asr => {
-            if (['FAILURE', 'ERROR', 'CRITICAL'].includes(asr.status)) hasErrors = true;
-            if (['WARNING', 'DEGRADED'].includes(asr.status)) hasWarnings = true;
-        });
-        governance.auditStatus = hasErrors ? "errors" : hasWarnings ? "warnings" : "clean";
-
-        // Retrieve last 5 pristine operational events
-        const recentEvents = await db.query(`
-            SELECT action, status, message, created_at 
-            FROM preflight_audit_events 
-            ORDER BY created_at DESC LIMIT 5
-        `);
-        audit.latestEvents = recentEvents.map(re => ({
-            event: re.action,
-            status: re.status,
-            details: re.message || 'Execution trail event logged.',
-            timestamp: re.created_at
-        }));
-
     } catch (err) {
-        warnings.push(`governance/audit events query failed: ${err.message}`);
+        warnings.push(`governance events query failed: ${err.message}`);
     }
 
     // --- 5. FEDERATION TOPOLOGY SUMMARY ---
     try {
         const mapData = await topologyService.getMapState();
+        federation.source_status = "ACTIVE";
+        federation.operationalNodes = 0;
+        federation.activeDispatches = 0;
+        federation.missingCoordinates = 0;
+        federation.degradedNodes = 0;
+
         if (mapData && mapData.nodes) {
             const nodes = mapData.nodes;
             federation.operationalNodes = mapData.counts?.operationalNodes ?? nodes.filter(n => n.is_active).length;
@@ -345,14 +380,28 @@ router.get('/overview', async (req, res) => {
             federation.averageUtilization = utilCount > 0 ? Math.round(totalUtil / utilCount) : null;
         }
     } catch (err) {
+        federation.source_status = "UNAVAILABLE";
         warnings.push(`topology service computation failed: ${err.message}`);
     }
+
+    // --- 6. TOP-LEVEL KPIS ARRAY ---
+    const kpis = [
+        { key: "jobsToday", label: "Jobs Today", value: preflight.jobsToday, status: preflight.source_status },
+        { key: "activeJobs", label: "Active Jobs", value: preflight.activeJobs, status: preflight.source_status },
+        { key: "realExtraction", label: "Real Extraction", value: preflight.realExtractionCount, status: preflight.source_status },
+        { key: "certifiable", label: "Certifiable", value: governance.jobsCertifiableCount, status: governance.source_status },
+        { key: "runtimeFailures", label: "Runtime Failures", value: preflight.failedRuntimeEnvironmentCount, status: preflight.source_status },
+        { key: "artifactStorage", label: "Artifact Storage", value: storage.artifactsCount, unit: "bytes", status: storage.source_status },
+        { key: "operationalNodes", label: "Operational Nodes", value: federation.operationalNodes, status: federation.source_status },
+        { key: "auditStatus", label: "Audit Status", value: governance.auditStatus, status: governance.source_status }
+    ];
 
     // Deliver unified real production intelligence payload
     res.json({
         ok: true,
         source_status: "LIVE_AGGREGATED",
         timestamp: new Date().toISOString(),
+        kpis,
         preflight,
         governance,
         economy,

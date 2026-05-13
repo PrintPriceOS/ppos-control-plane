@@ -17,7 +17,17 @@ router.get('/overview', async (req, res) => {
         const pkg = await intelligenceEngine.getIntelligencePackage();
         res.json({
             ok: true,
+            source_status: pkg.source_status || "LIVE_COMPUTED",
+            counts: pkg.counts || {
+                anomalies: pkg.anomalies?.length || 0,
+                insights: pkg.insights?.length || 0,
+                recommendations: pkg.recommendations?.length || 0
+            },
             summary: pkg.summary,
+            anomalies: pkg.anomalies || [],
+            insights: pkg.insights || [],
+            recommendations: pkg.recommendations || [],
+            warnings: pkg.warnings || [],
             cbStatus: pkg.cbStatus,
             guardrailDecisions: pkg.guardrailDecisions,
             timestamp: pkg.timestamp

@@ -53,8 +53,10 @@ function getFallbackForPath(path: string): any {
         base.source_status = "MAP_UNAVAILABLE";
         return base;
     }
-    if (cleanPath.endsWith('/dispatch') || cleanPath.endsWith('/dispatch/active')) {
+    if (cleanPath.endsWith('/dispatch') || cleanPath.endsWith('/dispatch/active') || cleanPath.endsWith('/manufacturing/queue')) {
         base.dispatches = [];
+        base.jobs = [];
+        base.counts = { pending: 0, active: 0, capacityBlocked: 0, slaAtRisk: 0, seedsFiltered: 0 };
         base.source_status = "NO_DISPATCH_DATA";
         return base;
     }
@@ -291,13 +293,14 @@ export type AuditRow = {
 
 export type PreflightJob = {
     jobId: string;
+    id?: string | number;
     tenantId: string;
     userId?: string;
     filename?: string;
     fileSize?: number;
     policy?: string;
-    status: 'CREATED' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'STALLED' | 'RETRYING' | 'CANCELLED';
-    type: 'ANALYZE' | 'AUTOFIX' | 'CERTIFY';
+    status: string;
+    type: string;
     progress: number;
     issueCount?: number;
     fixCount?: number;
@@ -308,6 +311,8 @@ export type PreflightJob = {
     createdAt: string;
     completedAt?: string;
     artifacts?: any[];
+    canonicalData?: any;
+    canonicalPayload?: any;
 };
 
 export type PreflightJobsResponse = {
@@ -362,7 +367,15 @@ export type DashboardOverviewPayload = {
     ok: boolean;
     source_status: string;
     timestamp: string;
+    kpis: Array<{
+        key: string;
+        label: string;
+        value: any;
+        unit?: string;
+        status: string;
+    }>;
     preflight: {
+        source_status: string;
         jobsToday: number | null;
         activeJobs: number | null;
         completedJobsToday: number | null;
@@ -375,6 +388,7 @@ export type DashboardOverviewPayload = {
         latestJobStatus: string | null;
     };
     governance: {
+        source_status: string;
         activePolicyCount: number | null;
         latestPolicyApplied: string | null;
         jobsBlockedByPolicy: number | null;
@@ -390,8 +404,10 @@ export type DashboardOverviewPayload = {
         auditStatus: 'clean' | 'warnings' | 'errors' | null;
     };
     economy: {
+        source_status: string;
         estimatedProductionValue: number | null;
         estimatedAvoidedReprintCost: number | null;
+        hoursSaved: number | null;
         averageRiskScore: number | null;
         averageMargin: number | null;
         jobsRequiringFix: number | null;
@@ -400,11 +416,13 @@ export type DashboardOverviewPayload = {
         qualityScore: number | null;
     };
     storage: {
+        source_status: string;
         artifactsCount: number | null;
         totalSizeBytes: number | null;
         latestArtifact: string | null;
     };
     audit: {
+        source_status: string;
         latestEvents: Array<{
             event: string;
             status: string;
@@ -413,6 +431,7 @@ export type DashboardOverviewPayload = {
         }>;
     };
     federation: {
+        source_status: string;
         operationalNodes: number | null;
         activeDispatches: number | null;
         missingCoordinates: number | null;
@@ -888,6 +907,11 @@ export async function getRoutingHealth() {
 }
 
 // --- Production Dispatch ---
+export async function getManufacturingQueue(includeSeeds?: boolean) {
+    const query = includeSeeds ? '?includeSeeds=true' : '';
+    return adminFetch<{ ok: boolean, source_status?: string, counts?: any, jobs: any[], message?: string }>(`/api/admin/manufacturing/queue${query}`);
+}
+
 export async function getDispatches() {
     return adminFetch<{ ok: boolean, dispatches: any[] }>(`/api/admin/dispatch`);
 }
@@ -1233,11 +1257,29 @@ export async function getPreflightJobs(params: {
         }));
 
         const total = res.total ?? jobs.length;
-        return { total, jobs };
+        const source_status = res.source_status?.includes('UNAVAILABLE') ? res.source_status : (res.source_status || 'PREFLIGHT_REGISTRY');
+        return { total, jobs, source_status };
     } catch (e) {
         console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightJobs failed:`, e);
-        return { total: 0, jobs: [] };
+        return { total: 0, jobs: [], source_status: 'PREFLIGHT_REGISTRY_UNAVAILABLE' };
     }
+}
+
+export async function getIncomingConsoleConsensus(params: { limit?: number }) {
+    const pref = await getPreflightJobs(params);
+    if (pref.source_status && pref.source_status.includes('UNAVAILABLE')) {
+        const leg = await getJobs(params);
+        return {
+            total: leg?.total || 0,
+            jobs: leg?.jobs || [],
+            source_status: 'LEGACY_QUEUE'
+        };
+    }
+    return {
+        total: pref.total,
+        jobs: pref.jobs,
+        source_status: pref.source_status || 'PREFLIGHT_REGISTRY'
+    };
 }
 
 export async function getPreflightJob(jobId: string): Promise<PreflightJob | null> {

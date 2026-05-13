@@ -49,7 +49,9 @@ export const MaterialsPage: React.FC = () => {
         initial_stock: 5000,
         reorder_point: 1000,
         replenishment_lead_days: 7,
-        node_id: 'node-alpha-1'
+        node_id: 'node-alpha-1',
+        ink_system: 'CMYK',
+        consumable_category: 'MAINTENANCE_KIT'
     });
 
     const [intakeForm, setIntakeForm] = useState({
@@ -145,8 +147,47 @@ export const MaterialsPage: React.FC = () => {
     const handleAddMaterialSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setActionFeedback(null);
+
+        const payload: any = {
+            material_name: addMatForm.material_name,
+            material_type: addMatForm.material_type,
+            supplier_name: addMatForm.supplier_name,
+            cost_per_unit: addMatForm.cost_per_unit,
+            initial_stock: addMatForm.initial_stock,
+            reorder_point: addMatForm.reorder_point,
+            replenishment_lead_days: addMatForm.replenishment_lead_days,
+            node_id: addMatForm.node_id,
+            metadata: {}
+        };
+
+        if (addMatForm.material_type === 'PAPER') {
+            payload.gsm = addMatForm.gsm;
+            payload.sheet_format = addMatForm.sheet_format;
+            payload.finish_type = addMatForm.finish_type;
+            payload.metadata = {
+                gsm: addMatForm.gsm,
+                sheet_format: addMatForm.sheet_format,
+                finish_type: addMatForm.finish_type
+            };
+        } else if (addMatForm.material_type === 'INK') {
+            payload.gsm = null;
+            payload.sheet_format = 'N/A';
+            payload.finish_type = 'N/A';
+            payload.metadata = {
+                ink_system: addMatForm.ink_system,
+                color_channel: addMatForm.ink_system
+            };
+        } else if (addMatForm.material_type === 'CONSUMABLE') {
+            payload.gsm = null;
+            payload.sheet_format = 'N/A';
+            payload.finish_type = 'N/A';
+            payload.metadata = {
+                consumable_category: addMatForm.consumable_category
+            };
+        }
+
         try {
-            await adminApi.createCatalogMaterial(addMatForm);
+            await adminApi.createCatalogMaterial(payload);
             setActionFeedback({ type: 'success', message: `Successfully registered new material [${addMatForm.material_name}]` });
             setActiveModal(null);
             await fetchCatalog();
@@ -162,7 +203,9 @@ export const MaterialsPage: React.FC = () => {
                 initial_stock: 5000,
                 reorder_point: 1000,
                 replenishment_lead_days: 7,
-                node_id: 'node-alpha-1'
+                node_id: 'node-alpha-1',
+                ink_system: 'CMYK',
+                consumable_category: 'MAINTENANCE_KIT'
             });
         } catch (err: any) {
             setActionFeedback({ type: 'error', message: err.message || "Failed to create material specification" });
@@ -585,7 +628,19 @@ export const MaterialsPage: React.FC = () => {
                                                         </span>
                                                     </div>
                                                     <div className={`text-[10px] mt-0.5 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                                        {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
+                                                        {m.material_type === 'PAPER' ? (
+                                                            <>
+                                                                {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
+                                                            </>
+                                                        ) : m.material_type === 'INK' ? (
+                                                            <>
+                                                                System: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.ink_system || 'CMYK Dedicated Channel'}</span> • Fluid Datastore
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                Category: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.consumable_category || 'Core Maintenance Part'}</span> • Component SCADA
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className={`p-3 text-[10px] ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -969,7 +1024,7 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 1: ADD MATERIAL */}
             {activeModal === 'ADD_MATERIAL' && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-lg w-full p-6 space-y-4 rounded-none transition-all ${
+                    <div className={`border max-w-lg w-full p-6 space-y-4 rounded-none transition-all max-h-[calc(100vh-64px)] overflow-y-auto ${
                         isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
@@ -1001,7 +1056,7 @@ export const MaterialsPage: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
+                                <div className={addMatForm.material_type !== 'PAPER' ? 'col-span-2' : ''}>
                                     <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Material Type</label>
                                     <select
                                         value={addMatForm.material_type}
@@ -1015,47 +1070,87 @@ export const MaterialsPage: React.FC = () => {
                                         <option value="CONSUMABLE">CONSUMABLE</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Weight (GSM)</label>
-                                    <input
-                                        type="number"
-                                        value={addMatForm.gsm}
-                                        onChange={e => setAddMatForm({...addMatForm, gsm: Number(e.target.value)})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
-                                            isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
-                                        }`}
-                                    />
-                                </div>
+                                {addMatForm.material_type === 'PAPER' && (
+                                    <div>
+                                        <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Weight (GSM)</label>
+                                        <input
+                                            type="number"
+                                            value={addMatForm.gsm}
+                                            onChange={e => setAddMatForm({...addMatForm, gsm: Number(e.target.value)})}
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                                isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
+                                            }`}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Sheet Format</label>
-                                    <input
-                                        type="text"
-                                        value={addMatForm.sheet_format}
-                                        onChange={e => setAddMatForm({...addMatForm, sheet_format: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
-                                            isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
-                                        }`}
-                                    />
+                            {addMatForm.material_type === 'PAPER' && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Sheet Format</label>
+                                        <input
+                                            type="text"
+                                            value={addMatForm.sheet_format}
+                                            onChange={e => setAddMatForm({...addMatForm, sheet_format: e.target.value})}
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                                isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
+                                            }`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Finish Surface</label>
+                                        <select
+                                            value={addMatForm.finish_type}
+                                            onChange={e => setAddMatForm({...addMatForm, finish_type: e.target.value})}
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                                isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
+                                            }`}
+                                        >
+                                            <option value="UNCOATED">UNCOATED</option>
+                                            <option value="SILK">SILK</option>
+                                            <option value="GLOSSY">GLOSSY</option>
+                                            <option value="MATTE">MATTE</option>
+                                        </select>
+                                    </div>
                                 </div>
+                            )}
+
+                            {addMatForm.material_type === 'INK' && (
                                 <div>
-                                    <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Finish Surface</label>
+                                    <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Ink System / Fluid Channel</label>
                                     <select
-                                        value={addMatForm.finish_type}
-                                        onChange={e => setAddMatForm({...addMatForm, finish_type: e.target.value})}
+                                        value={addMatForm.ink_system}
+                                        onChange={e => setAddMatForm({...addMatForm, ink_system: e.target.value})}
                                         className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     >
-                                        <option value="UNCOATED">UNCOATED</option>
-                                        <option value="SILK">SILK</option>
-                                        <option value="GLOSSY">GLOSSY</option>
-                                        <option value="MATTE">MATTE</option>
+                                        <option value="CMYK">CMYK Standard Process</option>
+                                        <option value="K-Only">Monochrome K-Fluid Channel</option>
+                                        <option value="Specialty Spot">Specialty Spot Color Matrix</option>
+                                        <option value="UV Varnish">UV Varnish Coating Channel</option>
                                     </select>
                                 </div>
-                            </div>
+                            )}
+
+                            {addMatForm.material_type === 'CONSUMABLE' && (
+                                <div>
+                                    <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Consumable Industrial Classification</label>
+                                    <select
+                                        value={addMatForm.consumable_category}
+                                        onChange={e => setAddMatForm({...addMatForm, consumable_category: e.target.value})}
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                            isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
+                                        }`}
+                                    >
+                                        <option value="MAINTENANCE_KIT">Core Preventive Maintenance Kit</option>
+                                        <option value="DEVELOPER_ROLLER">Electrostatic Developer Roller</option>
+                                        <option value="TRANSFER_BELT">Intermediate Transfer Belt Assembly</option>
+                                        <option value="FUSER_OIL">High-Temp Silicon Fuser Oil Reagent</option>
+                                    </select>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Primary Certified Supplier</label>

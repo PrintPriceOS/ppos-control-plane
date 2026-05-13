@@ -64,19 +64,24 @@ if (process.env.NODE_ENV !== 'test') {
 
 /**
  * GET /api/admin/dispatch
- * Lists recent production dispatches.
+ * DECOMMISSIONED: Use /api/admin/manufacturing/queue for validated production vs. seed filtered intelligence.
+ * Retained temporarily as a legacy fallback.
  */
 router.get('/', requireAdmin, async (req, res) => {
+    console.warn('[DECOMMISSIONED-ROUTE] GET /api/admin/dispatch accessed. Migrate consumer to /api/admin/manufacturing/queue.');
     try {
         const dispatches = await orchestrationService.getDispatches().catch(() => null);
         res.json({ 
             ok: true, 
+            deprecated: true,
+            canonical_replacement: '/api/admin/manufacturing/queue',
             dispatches: dispatches || [], 
             source_status: dispatches ? "ACTIVE" : "NO_DISPATCH_DATA" 
         });
     } catch (err) {
         return res.json({ 
             ok: true, 
+            deprecated: true,
             dispatches: [], 
             source_status: "NO_DISPATCH_DATA" 
         });

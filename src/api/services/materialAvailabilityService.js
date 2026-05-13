@@ -373,7 +373,8 @@ class MaterialAvailabilityService {
                     hasCatCol('sheet_format') ? 'c.sheet_format AS catalog_sheet_format' : 'NULL AS catalog_sheet_format',
                     hasCatCol('finish_type') ? 'c.finish_type AS catalog_finish_type' : 'NULL AS catalog_finish_type',
                     hasCatCol('supplier_name') ? 'c.supplier_name AS catalog_supplier_name' : 'NULL AS catalog_supplier_name',
-                    hasCatCol('cost_per_unit') ? 'c.cost_per_unit AS catalog_cost_per_unit' : 'NULL AS catalog_cost_per_unit'
+                    hasCatCol('cost_per_unit') ? 'c.cost_per_unit AS catalog_cost_per_unit' : 'NULL AS catalog_cost_per_unit',
+                    hasCatCol('metadata_json') ? 'c.metadata_json AS catalog_metadata_json' : 'NULL AS catalog_metadata_json'
                 ].join(', ');
 
                 const extraInvFields = [];
@@ -473,6 +474,12 @@ class MaterialAvailabilityService {
                     else computedStatus = 'STABLE';
                 }
 
+                let metaObj = {};
+                try {
+                    const rawMeta = r.catalog_metadata_json || r.metadata_json;
+                    metaObj = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : (rawMeta || {});
+                } catch (_) {}
+
                 return {
                     ...r,
                     material_name: matName,
@@ -483,6 +490,7 @@ class MaterialAvailabilityService {
                     finish: finish,
                     supplier_name: supplier,
                     cost_per_unit: cost,
+                    metadata: metaObj,
                     available_units: avail,
                     status: computedStatus
                 };
@@ -518,7 +526,8 @@ class MaterialAvailabilityService {
                         c.sheet_format AS catalog_sheet_format,
                         c.finish_type AS catalog_finish_type,
                         c.supplier_name AS catalog_supplier_name,
-                        c.cost_per_unit AS catalog_cost_per_unit
+                        c.cost_per_unit AS catalog_cost_per_unit,
+                        c.metadata_json AS catalog_metadata_json
                     FROM predictive_material_inventory i
                     LEFT JOIN materials_catalog c ON i.material_catalog_id = c.id
                     WHERE i.id = ?
@@ -549,6 +558,12 @@ class MaterialAvailabilityService {
                 else computedStatus = 'STABLE';
             }
 
+            let metaObj = {};
+            try {
+                const rawMeta = r.catalog_metadata_json || r.metadata_json;
+                metaObj = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : (rawMeta || {});
+            } catch (_) {}
+
             return {
                 ...r,
                 material_name: matName,
@@ -559,6 +574,7 @@ class MaterialAvailabilityService {
                 finish: finish,
                 supplier_name: supplier,
                 cost_per_unit: cost,
+                metadata: metaObj,
                 available_units: avail,
                 status: computedStatus
             };
