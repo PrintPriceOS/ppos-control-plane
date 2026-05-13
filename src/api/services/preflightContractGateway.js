@@ -11,7 +11,7 @@ const FormData = require('form-data');
 
 class PreflightContractGateway {
     constructor() {
-        this.mode = (process.env.PREFLIGHT_CONTRACT_MODE || 'service').toLowerCase();
+        this.mode = process.env.PREFLIGHT_CONTRACT_MODE || 'service';
 
         this.appBffUrl = (
             process.env.PREFLIGHT_APP_BFF_URL ||
