@@ -331,16 +331,17 @@ class MaterialAvailabilityService {
      * Retrieves all materials across the federation with scope controls.
      */
     async getAllMaterials(filters = {}) {
+        const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
         try {
             let columns = [];
             try {
-                columns = await db.query("SHOW COLUMNS FROM predictive_material_inventory");
+                columns = unwrap(await db.query("SHOW COLUMNS FROM predictive_material_inventory"));
             } catch (err) {
-                return { ok: true, materials: [], data: [], source_status: "MATERIAL_INVENTORY_UNAVAILABLE" };
+                return [];
             }
 
             if (!columns || columns.length === 0) {
-                return { ok: true, materials: [], data: [], source_status: "MATERIAL_INVENTORY_UNAVAILABLE" };
+                return [];
             }
 
             const colNames = columns.map(c => c.Field);
@@ -348,10 +349,10 @@ class MaterialAvailabilityService {
             let catalogExists = false;
             let catalogColumns = [];
             try {
-                const tables = await db.query("SHOW TABLES LIKE 'materials_catalog'");
+                const tables = unwrap(await db.query("SHOW TABLES LIKE 'materials_catalog'"));
                 if (tables && tables.length > 0) {
                     catalogExists = true;
-                    catalogColumns = await db.query("SHOW COLUMNS FROM materials_catalog");
+                    catalogColumns = unwrap(await db.query("SHOW COLUMNS FROM materials_catalog"));
                 }
             } catch (err) {
                 catalogExists = false;
@@ -413,7 +414,7 @@ class MaterialAvailabilityService {
             }
 
             sql += ` ORDER BY ${orderBy}`;
-            const allRows = await db.query(sql);
+            const allRows = unwrap(await db.query(sql));
 
             logger.info({
                 event: 'materials_service_query_result',
@@ -488,7 +489,7 @@ class MaterialAvailabilityService {
             });
         } catch (e) {
             logger.warn({ event: 'get_all_materials_schema_drift', error: e.message });
-            return { ok: true, materials: [], data: [], source_status: "MATERIAL_INVENTORY_UNAVAILABLE" };
+            throw e;
         }
     }
 
@@ -496,10 +497,11 @@ class MaterialAvailabilityService {
      * Retrieves a single material by ID.
      */
     async getMaterialById(id) {
+        const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
         try {
             let columns = [];
             try {
-                columns = await db.query("SHOW COLUMNS FROM predictive_material_inventory");
+                columns = unwrap(await db.query("SHOW COLUMNS FROM predictive_material_inventory"));
             } catch (err) {}
             const colNames = (columns || []).map(c => c.Field);
             const isJoinSupported = colNames.includes('material_catalog_id');
@@ -525,7 +527,7 @@ class MaterialAvailabilityService {
                 sql = "SELECT * FROM predictive_material_inventory WHERE id = ?";
             }
 
-            const rows = await db.query(sql, [id]);
+            const rows = unwrap(await db.query(sql, [id]));
             const r = rows[0];
             if (!r) return null;
 
@@ -577,13 +579,15 @@ class MaterialAvailabilityService {
      * Forecasts material depletion based on active dispatches and real package specs.
      */
     async forecastDepletion(nodeId) {
+        const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
         logger.info({ event: 'material_forecast_start', nodeId });
         
         const materials = await this.getInventory(nodeId);
-        const dispatches = await db.query(
+        const dispatchesRaw = await db.query(
             "SELECT * FROM manufacturing_dispatches WHERE node_id = ? AND status IN ('QUEUED', 'ASSIGNED', 'ACCEPTED', 'PREPARING', 'PRINTING')",
             [nodeId]
-        );
+        ).catch(() => []);
+        const dispatches = unwrap(dispatchesRaw);
 
         const shortages = [];
         
@@ -594,14 +598,16 @@ class MaterialAvailabilityService {
                 const specs = metadata.specs || metadata;
                 
                 const requestPaper = specs.paper || specs.material_name;
-                if (mat.material_type === 'PAPER' && requestPaper && requestPaper.toLowerCase() === mat.material_name.toLowerCase()) {
+                if (mat.material_type === 'PAPER' && requestPaper && requestPaper.toLowerCase() === (mat.material_name || '').toLowerCase()) {
                     projectedUsage += (Number(specs.copies || specs.units || 1));
                 } else if (specs.material_id === mat.id) {
                     projectedUsage += (Number(specs.units || 1));
                 }
             }
 
-            const available = mat.current_stock_units - mat.reserved_stock_units;
+            const currentStock = Number(mat.current_stock_units) || 0;
+            const reservedStock = Number(mat.reserved_stock_units) || 0;
+            const available = currentStock - reservedStock;
             
             let baseBurn = Number(mat.daily_burn_rate) || (mat.material_type === 'PAPER' ? 250 : 0.05);
             const actualBurnRate = Math.max(0.01, baseBurn + (projectedUsage / 7));

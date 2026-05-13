@@ -493,17 +493,19 @@ export const MaterialsPage: React.FC = () => {
             {/* Action Feedback Alerts */}
             {actionFeedback && (
                 <div className={`p-3 border text-xs font-manrope flex items-center justify-between rounded-none animate-fade-in ${
-                    actionFeedback.type === 'success' ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300' : 'bg-red-950/80 border-red-800 text-red-300'
+                    actionFeedback.type === 'success' 
+                        ? (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/80 border-emerald-800 text-emerald-300') 
+                        : (isLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-950/80 border-red-800 text-red-300')
                 }`}>
                     <div className="flex items-center space-x-2 font-bold">
                         {actionFeedback.type === 'success' ? (
-                            <CheckBadgeIcon className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            <CheckBadgeIcon className={`w-4 h-4 flex-shrink-0 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                         ) : (
-                            <ExclamationTriangleIcon className="w-4 h-4 text-red-400 flex-shrink-0" />
+                            <ExclamationTriangleIcon className={`w-4 h-4 flex-shrink-0 ${isLight ? 'text-red-600' : 'text-red-400'}`} />
                         )}
                         <span>{toDisplayText(actionFeedback.message)}</span>
                     </div>
-                    <button onClick={() => setActionFeedback(null)} className="text-[10px] underline uppercase tracking-wider hover:text-white ml-2 font-bold">
+                    <button onClick={() => setActionFeedback(null)} className={`text-[10px] underline uppercase tracking-wider ml-2 font-bold ${isLight ? 'hover:text-zinc-900 text-zinc-600' : 'hover:text-white text-zinc-400'}`}>
                         Dismiss
                     </button>
                 </div>

@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const materialService = require('../services/materialAvailabilityService');
+const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
 
 // Helper to extract multi-tenant scope from request context
@@ -27,11 +28,76 @@ function getScopeContext(req) {
 }
 
 /**
+ * GET /api/admin/materials/debug
+ * Direct database introspection endpoint to diagnose driver/plugin/table availability.
+ */
+router.get('/debug', async (req, res) => {
+    try {
+        const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
+
+        const tablesRaw = await db.query(`
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN (
+                'predictive_material_inventory',
+                'materials_catalog',
+                'material_inventory_events',
+                'material_procurements'
+              )
+        `);
+        const tables = unwrap(tablesRaw);
+
+        const inventoryColumnsRaw = await db.query(`
+            SELECT COLUMN_NAME, DATA_TYPE
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'predictive_material_inventory'
+            ORDER BY ORDINAL_POSITION
+        `);
+        const inventoryColumns = unwrap(inventoryColumnsRaw);
+
+        const countRowsRaw = await db.query(`
+            SELECT COUNT(*) AS total
+            FROM predictive_material_inventory
+        `);
+        const countRows = unwrap(countRowsRaw);
+
+        const sampleRowsRaw = await db.query(`
+            SELECT *
+            FROM predictive_material_inventory
+            LIMIT 5
+        `);
+        const sampleRows = unwrap(sampleRowsRaw);
+
+        return res.json({
+            ok: true,
+            tables,
+            inventoryColumns,
+            count: countRows?.[0]?.total ?? 0,
+            sampleRows
+        });
+    } catch (error) {
+        console.error('[MATERIALS][DEBUG_FAILED]', error);
+        return res.status(500).json({
+            ok: false,
+            error: error.message,
+            code: error.code,
+            sqlMessage: error.sqlMessage,
+            stack: error.stack
+        });
+    }
+});
+
+
+/**
  * GET /api/admin/materials
  * Retrieves all catalog materials with predictive availability scoring, scoped to tenant/printhouse.
  */
 router.get('/', async (req, res) => {
     const scope = getScopeContext(req);
+    const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
+
     try {
         const rows = await materialService.getAllMaterials({
             tenantId: scope.tenantId,
@@ -63,28 +129,74 @@ router.get('/', async (req, res) => {
             event: 'materials_route_response_shape',
             isArray: Array.isArray(payload),
             keys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
-            count:
-                Array.isArray(payload) ? payload.length :
-                payload?.materials?.length ??
-                payload?.data?.length ??
-                payload?.inventory?.length ??
-                payload?.items?.length ??
-                0,
-            first: Array.isArray(payload)
-                ? payload[0]
-                : payload?.materials?.[0] ?? payload?.data?.[0] ?? payload?.inventory?.[0] ?? payload?.items?.[0]
+            count: materialsArray.length,
+            first: materialsArray[0]
         });
 
-        res.json(payload);
+        return res.json(payload);
     } catch (error) {
-        console.error('[MATERIALS][500]', error);
+        console.error('[MATERIALS][SERVICE_FAILED_SAFE_FALLBACK]', error);
 
-        return res.status(500).send({
-            error: 'MATERIALS_ENDPOINT_FAILED',
-            message: error.message,
-            code: error.code,
-            sqlMessage: error.sqlMessage
-        });
+        try {
+            const fallbackRowsRaw = await db.query(`
+                SELECT
+                    id,
+                    node_id,
+                    COALESCE(tenant_id, 'ppos-production') AS tenant_id,
+                    COALESCE(printhouse_id, node_id) AS printhouse_id,
+                    material_type,
+                    material_name,
+                    current_stock_units,
+                    reserved_stock_units,
+                    stock_unit_name,
+                    replenishment_lead_days,
+                    reorder_point,
+                    forecasted_depletion_date,
+                    last_updated,
+                    created_at,
+                    (COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) AS available_units,
+                    CASE
+                      WHEN (COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) <= 0 THEN 'CRITICAL'
+                      WHEN (COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) <= COALESCE(reorder_point,100) THEN 'AT_RISK'
+                      ELSE 'STABLE'
+                    END AS status
+                FROM predictive_material_inventory
+                ORDER BY created_at DESC
+                LIMIT 500
+            `);
+            const fallbackRows = unwrap(fallbackRowsRaw);
+
+            return res.json({
+                ok: true,
+                materials: fallbackRows,
+                summary: {
+                    registeredStockUnits: fallbackRows.reduce((s, r) => s + Number(r.current_stock_units || 0), 0),
+                    reservedCapacityLocks: fallbackRows.reduce((s, r) => s + Number(r.reserved_stock_units || 0), 0),
+                    netAvailablePool: fallbackRows.reduce((s, r) => s + Number(r.available_units || 0), 0),
+                    shortageImpactIndicators: fallbackRows.filter(r => ['CRITICAL', 'AT_RISK'].includes(r.status)).length
+                },
+                degraded: true,
+                degradedReason: error.message,
+                sqlMessage: error.sqlMessage,
+                code: error.code
+            });
+        } catch (fallbackError) {
+            console.error('[MATERIALS][FALLBACK_FAILED]', fallbackError);
+            return res.status(500).json({
+                ok: false,
+                error: 'MATERIALS_ENDPOINT_TOTAL_FAILURE',
+                primary: {
+                    message: error.message,
+                    code: error.code,
+                    sqlMessage: error.sqlMessage
+                },
+                fallback: {
+                    message: fallbackError.message,
+                    code: fallbackError.code,
+                    sqlMessage: fallbackError.sqlMessage
+                }
+            });
+        }
     }
 });
 

@@ -1503,17 +1503,40 @@ const normalizeMaterialsResponse = (response: any) => {
 };
 
 export async function getMaterialsCatalog() {
-    const res = await adminFetch<any>(`/api/admin/materials?_ts=${Date.now()}`);
-    const normalized = normalizeMaterialsResponse(res);
-    console.info('[MATERIALS][API][RAW]', res);
+    const token = getAuthToken();
+    const storedTenantId = getUserTenantId();
+    const storedPrinthouseId = getUserPrinthouseId();
+    const headers: Record<string, string> = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(storedTenantId ? { "X-Tenant-Id": storedTenantId } : {}),
+        ...(storedPrinthouseId ? { "X-Printhouse-Id": storedPrinthouseId } : {})
+    };
+
+    const res = await fetch(`/api/admin/materials?_ts=${Date.now()}`, { headers, credentials: "include" });
+    const text = await res.text();
+
+    if (!res.ok) {
+        console.error('[MATERIALS][HTTP_ERROR]', {
+            status: res.status,
+            statusText: res.statusText,
+            body: text,
+        });
+        throw new Error(`Materials API failed: ${res.status} ${text}`);
+    }
+
+    const parsed = JSON.parse(text);
+    const normalized = normalizeMaterialsResponse(parsed);
+    console.info('[MATERIALS][API][RAW]', parsed);
     console.info('[MATERIALS][API][NORMALIZED_COUNT]', normalized.length);
     console.info('[MATERIALS][API][FIRST]', normalized[0]);
     return { 
         ok: true, 
         data: normalized,
         materials: normalized,
-        summary: res?.summary || null,
-        source_status: res?.source_status 
+        summary: parsed?.summary || null,
+        source_status: parsed?.source_status 
     };
 }
 
