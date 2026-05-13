@@ -60,7 +60,8 @@ function buildGatewayContext(req) {
         requestId: req.headers['x-request-id'] || `req_${Date.now()}`,
         printhouseId: context.printhouseId || req.headers['x-printhouse-id'] || '',
         operatorId: context.userId || '',
-        policy: req.headers['x-policy'] || req.query.policy || req.body?.policy || ''
+        policy: req.headers['x-policy'] || req.query.policy || req.body?.policy || '',
+        Authorization: req.headers.authorization || ''
     };
 }
 

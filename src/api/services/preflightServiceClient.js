@@ -67,6 +67,14 @@ class PreflightServiceClient {
       'Authorization': `Bearer ${internalJwt}`
     };
 
+    console.log(
+      `[PREFLIGHT-SERVICE-CLIENT][AUDIT] Dispatching internal call to ${method} ${url}\n` +
+      `  • Tenant Scope: ${tenantId}\n` +
+      `  • Actor: ${actorId} (${role})\n` +
+      `  • Inter-Service Auth JWT Generated: YES (len=${internalJwt.length})\n` +
+      `  • Trace ID: ${traceId}`
+    );
+
     try {
       const response = await axios({
         method,

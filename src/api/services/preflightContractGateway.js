@@ -72,8 +72,9 @@ class PreflightContractGateway {
             ...customHeaders
         };
 
-        if (this.internalToken && this.internalToken !== 'null' && this.internalToken !== 'undefined') {
-            headers.Authorization = `Bearer ${this.internalToken}`;
+        const tokenToUse = this.internalToken || context.token || (context.Authorization || '').replace(/^Bearer\s+/i, '') || '';
+        if (tokenToUse && tokenToUse !== 'null' && tokenToUse !== 'undefined') {
+            headers.Authorization = `Bearer ${tokenToUse}`;
         }
 
         return headers;
@@ -93,9 +94,15 @@ class PreflightContractGateway {
             isFormData ? data.getHeaders() : { 'Content-Type': 'application/json' }
         );
 
+        const safeAuthPrefix = headers.Authorization ? `${headers.Authorization.substr(0, 12)}...[len=${headers.Authorization.length}]` : 'NONE';
         console.log(
-            `[PREFLIGHT-GATEWAY][${method}] ${targetUrl} ` +
-            `(mode=${this.mode}, tenant=${context.tenantId || 'system'})`
+            `[PREFLIGHT-GATEWAY][AUDIT] Outbound Gateway Request Context:\n` +
+            `  • Target: ${method} ${targetUrl}\n` +
+            `  • Mode: ${this.mode}\n` +
+            `  • Auth Header Present: ${!!headers.Authorization} (Masked: ${safeAuthPrefix})\n` +
+            `  • Tenant Scope: ${context.tenantId || 'system'}\n` +
+            `  • Operator Scope: ${context.operatorId || 'N/A'}\n` +
+            `  • Trace Block ID: ${headers['X-Trace-ID']}`
         );
 
         try {

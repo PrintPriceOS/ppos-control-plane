@@ -95,9 +95,10 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
     const storedTenantId = getUserTenantId();
     const storedPrinthouseId = getUserPrinthouseId();
 
+    const isFormData = options?.body instanceof FormData;
     const headers: Record<string, string> = {
         "Accept": "application/json",
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { 
             "Authorization": `Bearer ${token}`
         } : {}),
@@ -106,6 +107,10 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
         ...(options?.headers as any || {}),
     };
+
+    if (isFormData && headers["Content-Type"]) {
+        delete headers["Content-Type"];
+    }
 
     if (process.env.NODE_ENV === 'development') {
         console.log(`[ADMIN-FETCH][AUTH] tokenPresent=${!!token} path=${cleanPath}`);
@@ -1372,24 +1377,27 @@ export async function getGlobalArtifacts(params: { tenant?: string; type?: strin
 }
 
 export async function uploadPreflightFile(file: File, tenantId: string = 'system') {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
     const formData = new FormData();
     formData.append('file', file);
     
-    // Using raw fetch here because adminFetch might not handle FormData correctly without adjustment
-    const token = getAuthToken();
-    const response = await fetch('/api/admin/preflight/upload', {
+    const res = await adminFetch<any>('/api/admin/preflight/upload', {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${token}`,
             'X-Tenant-Id': tenantId,
             'X-Trace-Id': `trace_${Date.now()}`
         },
         body: formData
     });
     
-    const res = await response.json();
-    if (!res.ok) throw new Error(res.error?.message || 'Upload failed');
-    return res.upload;
+    if (res && res.ok === false) throw new Error(res.error?.message || res.error || res.message || 'Upload failed');
+    return res.upload || res;
 }
 
 export async function createPreflightJob(data: { uploadId: string; type: string; policy?: string; tenantId?: string }) {
@@ -1891,20 +1899,22 @@ export async function listAdminPreflightJobs(filters: Record<string, any> = {}) 
 }
 
 export async function createAdminPreflightJob(formData: FormData, customHeaders?: Record<string, string>) {
-    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
-    const res = await fetch('/api/admin/preflight/jobs', {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
+    const res = await adminFetch<any>('/api/admin/preflight/jobs', {
         method: 'POST',
-        headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...customHeaders
-        },
+        headers: customHeaders as any,
         body: formData
     });
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: `Upstream HTTP Error ${res.status}: ${res.statusText || 'Gateway Disconnection'}` }));
-        throw { status: res.status, ...errorData };
+    if (res && res.ok === false) {
+        throw new Error(res.error || res.message || "Upstream HTTP Error: Preflight job creation failed.");
     }
-    return res.json();
+    return res;
 }
 
 export async function getAdminPreflightJob(jobId: string) {
@@ -1954,20 +1964,22 @@ export async function listAdminPreflightBatches(filters: Record<string, any> = {
 }
 
 export async function createAdminPreflightBatch(formData: FormData, customHeaders?: Record<string, string>) {
-    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
-    const res = await fetch('/api/admin/preflight/batches', {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
+    const res = await adminFetch<any>('/api/admin/preflight/batches', {
         method: 'POST',
-        headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...customHeaders
-        },
+        headers: customHeaders as any,
         body: formData
     });
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: `Upstream HTTP Error ${res.status}: ${res.statusText || 'Gateway Disconnection'}` }));
-        throw { status: res.status, ...errorData };
+    if (res && res.ok === false) {
+        throw new Error(res.error || res.message || "Upstream HTTP Error: Preflight batch creation failed.");
     }
-    return res.json();
+    return res;
 }
 
 export async function getAdminPreflightAudit(filters: Record<string, any> = {}) {
