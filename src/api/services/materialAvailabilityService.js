@@ -344,26 +344,65 @@ class MaterialAvailabilityService {
             }
 
             const colNames = columns.map(c => c.Field);
-            const isJoinSupported = colNames.includes('material_catalog_id');
+            
+            let catalogExists = false;
+            let catalogColumns = [];
+            try {
+                const tables = await db.query("SHOW TABLES LIKE 'materials_catalog'");
+                if (tables && tables.length > 0) {
+                    catalogExists = true;
+                    catalogColumns = await db.query("SHOW COLUMNS FROM materials_catalog");
+                }
+            } catch (err) {
+                catalogExists = false;
+            }
+            const catColNames = catalogExists && Array.isArray(catalogColumns) ? catalogColumns.map(c => c.Field) : [];
+
+            const hasCatCol = (name) => catColNames.includes(name);
+            const hasInvCol = (name) => colNames.includes(name);
+            const isJoinSupported = hasInvCol('material_catalog_id') && catalogExists;
 
             let sql = "";
             if (isJoinSupported) {
-                sql = `
-                    SELECT 
-                        i.*, 
-                        c.material_name AS catalog_material_name,
-                        c.material_type AS catalog_material_type,
-                        c.substrate_class AS catalog_substrate_class,
-                        c.gsm AS catalog_gsm,
-                        c.sheet_format AS catalog_sheet_format,
-                        c.finish_type AS catalog_finish_type,
-                        c.supplier_name AS catalog_supplier_name,
-                        c.cost_per_unit AS catalog_cost_per_unit
-                    FROM predictive_material_inventory i
-                    LEFT JOIN materials_catalog c ON i.material_catalog_id = c.id
-                `;
+                const catFields = [
+                    hasCatCol('material_name') ? 'c.material_name AS catalog_material_name' : 'NULL AS catalog_material_name',
+                    hasCatCol('material_type') ? 'c.material_type AS catalog_material_type' : 'NULL AS catalog_material_type',
+                    hasCatCol('substrate_class') ? 'c.substrate_class AS catalog_substrate_class' : 'NULL AS catalog_substrate_class',
+                    hasCatCol('gsm') ? 'c.gsm AS catalog_gsm' : 'NULL AS catalog_gsm',
+                    hasCatCol('sheet_format') ? 'c.sheet_format AS catalog_sheet_format' : 'NULL AS catalog_sheet_format',
+                    hasCatCol('finish_type') ? 'c.finish_type AS catalog_finish_type' : 'NULL AS catalog_finish_type',
+                    hasCatCol('supplier_name') ? 'c.supplier_name AS catalog_supplier_name' : 'NULL AS catalog_supplier_name',
+                    hasCatCol('cost_per_unit') ? 'c.cost_per_unit AS catalog_cost_per_unit' : 'NULL AS catalog_cost_per_unit'
+                ].join(', ');
+
+                const extraInvFields = [];
+                if (!hasInvCol('available_units')) {
+                    extraInvFields.push('(COALESCE(i.current_stock_units,0) - COALESCE(i.reserved_stock_units,0)) AS available_units');
+                }
+                if (!hasInvCol('status')) {
+                    extraInvFields.push(`CASE
+                        WHEN (COALESCE(i.current_stock_units,0) - COALESCE(i.reserved_stock_units,0)) <= 0 THEN 'CRITICAL'
+                        WHEN (COALESCE(i.current_stock_units,0) - COALESCE(i.reserved_stock_units,0)) <= COALESCE(i.reorder_point,100) THEN 'AT_RISK'
+                        ELSE 'STABLE'
+                    END AS status`);
+                }
+                const extraInvStr = extraInvFields.length > 0 ? ', ' + extraInvFields.join(', ') : '';
+
+                sql = `SELECT i.*${extraInvStr}, ${catFields} FROM predictive_material_inventory i LEFT JOIN materials_catalog c ON i.material_catalog_id = c.id`;
             } else {
-                sql = "SELECT * FROM predictive_material_inventory";
+                const extraFlatFields = [];
+                if (!hasInvCol('available_units')) {
+                    extraFlatFields.push('(COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) AS available_units');
+                }
+                if (!hasInvCol('status')) {
+                    extraFlatFields.push(`CASE
+                        WHEN (COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) <= 0 THEN 'CRITICAL'
+                        WHEN (COALESCE(current_stock_units,0) - COALESCE(reserved_stock_units,0)) <= COALESCE(reorder_point,100) THEN 'AT_RISK'
+                        ELSE 'STABLE'
+                    END AS status`);
+                }
+                const extraFlatStr = extraFlatFields.length > 0 ? ', ' + extraFlatFields.join(', ') : '';
+                sql = `SELECT *${extraFlatStr} FROM predictive_material_inventory`;
             }
 
             let orderBy = isJoinSupported ? "i.id DESC" : "id DESC";

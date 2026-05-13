@@ -557,9 +557,11 @@ export const MaterialsPage: React.FC = () => {
                                     isLight ? 'divide-zinc-100' : 'divide-zinc-800/60'
                                 }`}>
                                     {materials.map((m) => {
-                                        const avail = m.current_stock_units - m.reserved_stock_units;
+                                        const currentStock = Number(m.current_stock_units) || 0;
+                                        const reservedStock = Number(m.reserved_stock_units) || 0;
+                                        const avail = currentStock - reservedStock;
                                         const isSelected = selectedMaterial?.id === m.id;
-                                        const percentageUsed = Math.min(100, Math.max(0, (m.reserved_stock_units / (m.current_stock_units || 1)) * 100));
+                                        const percentageUsed = Math.min(100, Math.max(0, (reservedStock / (currentStock || 1)) * 100));
                                         const procRisk = m.procurement_risk || 'LOW';
 
                                         return (

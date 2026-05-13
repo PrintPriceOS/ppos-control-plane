@@ -76,9 +76,15 @@ router.get('/', async (req, res) => {
         });
 
         res.json(payload);
-    } catch (err) {
-        console.error('[MATERIALS-API] Failed to fetch catalog:', err);
-        res.status(500).json({ ok: false, error: err.message, code: 'MATERIALS_FETCH_ERROR' });
+    } catch (error) {
+        console.error('[MATERIALS][500]', error);
+
+        return res.status(500).send({
+            error: 'MATERIALS_ENDPOINT_FAILED',
+            message: error.message,
+            code: error.code,
+            sqlMessage: error.sqlMessage
+        });
     }
 });
 
