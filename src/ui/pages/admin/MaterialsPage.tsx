@@ -1021,11 +1021,17 @@ export const MaterialsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* MODAL 1: ADD MATERIAL */}
+            {/* DRAWER 1: ADD MATERIAL */}
             {activeModal === 'ADD_MATERIAL' && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-lg w-full p-6 space-y-4 rounded-none transition-all max-h-[calc(100vh-64px)] overflow-y-auto ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                <div className="fixed inset-0 z-50 flex justify-end font-manrope">
+                    {/* Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" 
+                        onClick={() => setActiveModal(null)} 
+                    />
+                    {/* Drawer Panel Loading from Right Side */}
+                    <div className={`relative z-10 border-l w-full max-w-lg h-full p-6 space-y-4 rounded-none transition-all overflow-y-auto animate-slide-in-right ${
+                        isLight ? 'bg-white border-zinc-200 shadow-2xl' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
