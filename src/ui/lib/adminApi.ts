@@ -10,6 +10,16 @@ function getFallbackForPath(path: string): any {
     base.ok = true;
     base.source_status = "UNAVAILABLE";
     
+    if (cleanPath.includes('/registry')) {
+        base.registry = [];
+        base.source_status = "REGISTRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/signals')) {
+        base.signals = [];
+        base.source_status = "SIGNALS_UNAVAILABLE";
+        return base;
+    }
     if (cleanPath.includes('/notifications')) {
         base.notifications = [];
         base.source_status = "NOTIFICATIONS_UNAVAILABLE";
