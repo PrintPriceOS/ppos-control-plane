@@ -124,10 +124,10 @@ router.get('/sessions', async (req, res) => {
     try {
         // Support rich filtering query parameters via listSessions contract
         const result = await marketplaceService.listSessions(req.query);
-        return res.json({ 
-            ok: true, 
-            sessions: result.sessions, 
-            total: result.total, 
+        return res.json({
+            ok: true,
+            sessions: result.sessions,
+            total: result.total,
             limit: result.limit,
             offset: result.offset,
             status: "LIVE"
@@ -184,12 +184,12 @@ router.post('/sessions/:sessionId/select', async (req, res) => {
         }
 
         const updatedSessionResult = await marketplaceService.selectOffer(sessionId, targetOfferId, selectionMode);
-        
+
         // Find selected offer object inside the populated session detail
         const selectedOffer = updatedSessionResult?.session?.offers?.find(o => o.id === targetOfferId) || { id: targetOfferId, offerSelected: true };
 
-        const responsePayload = { 
-            ok: true, 
+        const responsePayload = {
+            ok: true,
             session: updatedSessionResult?.session || {},
             selectedOffer
         };
