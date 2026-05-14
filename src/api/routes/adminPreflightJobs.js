@@ -12,6 +12,8 @@ const FormData = require('form-data');
 const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const gateway = require('../services/preflightContractGateway');
 const db = require('../services/mysqlClient');
+const syncService = require('../services/preflightRegistrySyncService');
+
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -334,6 +336,47 @@ router.get('/jobs/:jobId', async (req, res) => {
         });
     } catch (err) {
         res.status(err.status || 500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- 3.5 POST /api/admin/preflight/jobs/:jobId/sync ---
+router.post('/jobs/:jobId/sync', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        // First verify job existence and scope if local record exists
+        const rows = await db.query('SELECT tenant_id FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+        const localRecord = rows[0];
+        if (localRecord) {
+            verifyTenantScope(req, localRecord.tenant_id);
+        }
+
+        const syncedResult = await syncService.syncJob(jobId, {
+            tenantId: context.tenantId,
+            authHeader: context.Authorization
+        });
+
+        await logAuditEvent({
+            tenantId: context.tenantId,
+            jobId,
+            action: 'SYNC_JOB',
+            status: 'SUCCESS',
+            traceId: context.traceId
+        });
+
+        res.json({ ok: true, ...syncedResult, source_status: 'LIVE_UPSTREAM_SYNCED' });
+    } catch (err) {
+        await logAuditEvent({
+            tenantId: context.tenantId,
+            jobId,
+            action: 'SYNC_JOB',
+            status: 'FAILURE',
+            message: err.message,
+            traceId: context.traceId
+        });
+
+        const status = err.status || (err.message?.includes('404') ? 404 : 500);
+        res.status(status).json({ ok: false, error: 'SYNC_FAILED', message: err.message });
     }
 });
 
