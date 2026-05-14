@@ -875,8 +875,8 @@ router.get('/jobs/:jobId/evidence', async (req, res) => {
    */
 router.post('/jobs/:jobId/fix', async (req, res) => {
   try {
-    const { policy } = req.body || {};
-    const result = await operations.triggerJobFix(req.params.jobId, req.headers.authorization, policy);
+    const options = { ...(req.body || {}) };
+    const result = await operations.triggerJobFix(req.params.jobId, req.headers.authorization, options);
     res.json({
       ok: true,
       jobId: result.jobId,

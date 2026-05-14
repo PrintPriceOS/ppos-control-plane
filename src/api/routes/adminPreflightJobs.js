@@ -347,6 +347,72 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
         if (options.policy) {
             options.policy = await resolveCanonicalPolicyId(options.policy, context);
         }
+
+        let jobPayload = null;
+        try {
+            jobPayload = await gateway.getJob(jobId, context);
+        } catch (e) {
+            console.warn(`[ADMIN-PREFLIGHT][FIX] Pre-fetch of live job payload failed for deriving autofix intent: ${e.message}`);
+        }
+
+        let explicitFixes = [];
+        if (Array.isArray(options.fixes)) explicitFixes.push(...options.fixes);
+        if (Array.isArray(options.requested_fixes)) explicitFixes.push(...options.requested_fixes);
+        if (Array.isArray(options.requestedFixes)) explicitFixes.push(...options.requestedFixes);
+        if (typeof options.fixes === 'string') {
+            try { explicitFixes.push(...JSON.parse(options.fixes)); } catch(e) { explicitFixes.push(options.fixes); }
+        }
+        if (typeof options.requested_fixes === 'string') {
+            try { explicitFixes.push(...JSON.parse(options.requested_fixes)); } catch(e) { explicitFixes.push(options.requested_fixes); }
+        }
+
+        const derivedSet = new Set(explicitFixes);
+
+        if (options.forceBleed || options.force_bleed) derivedSet.add('APPLY_BLEED');
+        if (options.convertCmyk || options.convert_cmyk) derivedSet.add('CONVERT_CMYK');
+        if (options.rebuildTrimbox || options.rebuild_trimbox) derivedSet.add('REBUILD_TRIMBOX');
+        if (options.injectOutputIntent || options.inject_output_intent) derivedSet.add('INJECT_OUTPUT_INTENT');
+
+        if (options.forceBleed !== undefined) options.force_bleed = options.forceBleed;
+        if (options.force_bleed !== undefined) options.forceBleed = options.force_bleed;
+
+        if (derivedSet.size === 0) {
+            const findings = Array.isArray(jobPayload?.findings) ? jobPayload.findings :
+                             Array.isArray(jobPayload?.issues) ? jobPayload.issues :
+                             Array.isArray(jobPayload?.analysis?.issues) ? jobPayload.analysis.issues :
+                             Array.isArray(jobPayload?.analysis?.findings) ? jobPayload.analysis.findings : [];
+            
+            findings.forEach(f => {
+                if (!f) return;
+                const fStr = typeof f === 'string' ? f.toUpperCase() : JSON.stringify(f).toUpperCase();
+                if (fStr.includes('TRIMBOX') || fStr.includes('TRIM_BOX')) derivedSet.add('REBUILD_TRIMBOX');
+                if (fStr.includes('BLEED') || fStr.includes('BLEEDBOX')) derivedSet.add('APPLY_BLEED');
+                if (fStr.includes('RGB') || fStr.includes('CMYK') || fStr.includes('COLOR') || fStr.includes('ICC')) derivedSet.add('CONVERT_CMYK');
+                if (fStr.includes('INTENT') || fStr.includes('OUTPUT_INTENT')) derivedSet.add('INJECT_OUTPUT_INTENT');
+            });
+
+            if (derivedSet.size === 0) {
+                ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'CONVERT_CMYK', 'INJECT_OUTPUT_INTENT'].forEach(x => derivedSet.add(x));
+            }
+        }
+
+        const CANONICAL_ORDER = ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'CONVERT_CMYK', 'INJECT_OUTPUT_INTENT'];
+        const finalFixes = CANONICAL_ORDER.filter(fix => derivedSet.has(fix));
+        derivedSet.forEach(fix => {
+            if (!CANONICAL_ORDER.includes(fix)) finalFixes.push(fix);
+        });
+
+        options.fixes = finalFixes;
+        options.requested_fixes = finalFixes;
+        options.requestedFixes = finalFixes;
+
+        console.log(`[CONTROL][PREFLIGHT][AUTOFIX-INTENT] Dispatching fix intent contract: ${JSON.stringify({
+            jobId,
+            fixes: options.fixes,
+            requested_fixes: options.requested_fixes,
+            policy: options.policy
+        })}`);
+
         const responsePayload = await gateway.fixJob(jobId, options, context);
 
         await db.query('UPDATE preflight_job_registry SET status = ?, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
@@ -692,6 +758,52 @@ router.post('/batches', upload.any(), async (req, res) => {
         if (bodyEntries.policy) {
             bodyEntries.policy = await resolveCanonicalPolicyId(bodyEntries.policy, context);
         }
+
+        const isAutofix = bodyEntries.strategy === 'AUTOFIX' || bodyEntries.type === 'AUTOFIX' || bodyEntries.autofix === 'true';
+        if (isAutofix) {
+            let explicitFixes = [];
+            if (bodyEntries.fixes) {
+                try { explicitFixes.push(...JSON.parse(bodyEntries.fixes)); } catch(e) { explicitFixes.push(bodyEntries.fixes); }
+            }
+            if (bodyEntries.requested_fixes) {
+                try { explicitFixes.push(...JSON.parse(bodyEntries.requested_fixes)); } catch(e) { explicitFixes.push(bodyEntries.requested_fixes); }
+            }
+            if (bodyEntries.requestedFixes) {
+                try { explicitFixes.push(...JSON.parse(bodyEntries.requestedFixes)); } catch(e) { explicitFixes.push(bodyEntries.requestedFixes); }
+            }
+            
+            const derivedSet = new Set(explicitFixes);
+            if (bodyEntries.forceBleed || bodyEntries.force_bleed) derivedSet.add('APPLY_BLEED');
+            if (bodyEntries.convertCmyk || bodyEntries.convert_cmyk) derivedSet.add('CONVERT_CMYK');
+            if (bodyEntries.rebuildTrimbox || bodyEntries.rebuild_trimbox) derivedSet.add('REBUILD_TRIMBOX');
+            if (bodyEntries.injectOutputIntent || bodyEntries.inject_output_intent) derivedSet.add('INJECT_OUTPUT_INTENT');
+
+            if (derivedSet.size === 0) {
+                console.warn(`[CONTROL][PREFLIGHT][AUTOFIX-INTENT-EMPTY] Batch autofix submission intercepted with empty requested_fixes payload.`);
+                return res.status(400).json({
+                    ok: false,
+                    error: 'BATCH_AUTOFIX_EMPTY_INTENT',
+                    message: 'Batch autofix requires an explicitly declared non-empty list of requested_fixes to preserve forensic traceability.'
+                });
+            }
+
+            const CANONICAL_ORDER = ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'CONVERT_CMYK', 'INJECT_OUTPUT_INTENT'];
+            const finalFixes = CANONICAL_ORDER.filter(fix => derivedSet.has(fix));
+            derivedSet.forEach(fix => {
+                if (!CANONICAL_ORDER.includes(fix)) finalFixes.push(fix);
+            });
+
+            bodyEntries.fixes = JSON.stringify(finalFixes);
+            bodyEntries.requested_fixes = JSON.stringify(finalFixes);
+            bodyEntries.requestedFixes = JSON.stringify(finalFixes);
+
+            console.log(`[CONTROL][PREFLIGHT][AUTOFIX-INTENT] Dispatching batch fix intent contract: ${JSON.stringify({
+                fixes: finalFixes,
+                requested_fixes: finalFixes,
+                policy: bodyEntries.policy
+            })}`);
+        }
+
         Object.entries(bodyEntries).forEach(([k, v]) => form.append(k, v));
 
         const batchResult = await gateway.createBatch(form, context);

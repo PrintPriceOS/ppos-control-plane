@@ -192,13 +192,13 @@ class PreflightServiceClient {
   /**
    * Trigger a native autofix operation for a job in the upstream service
    */
-  async triggerJobFix(upstreamJobId, authHeader = null, tenantId = null, policy = null) {
+  async triggerJobFix(upstreamJobId, authHeader = null, tenantId = null, policyOrOptions = null) {
     const headers = {};
     if (authHeader) headers['Authorization'] = authHeader;
     if (tenantId) headers['X-Tenant-Id'] = tenantId;
 
-    const payload = policy ? { policy } : {};
-    return this._request('POST', `/api/preflight/jobs/${upstreamJobId}/fix`, payload, headers);
+    const options = typeof policyOrOptions === 'string' ? { policy: policyOrOptions } : (policyOrOptions || {});
+    return this._request('POST', `/api/preflight/jobs/${upstreamJobId}/fix`, options, headers);
   }
 
   /**

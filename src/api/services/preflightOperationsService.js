@@ -748,7 +748,7 @@ class PreflightOperationsService {
   /**
    * Trigger a native autofix operation for a job
    */
-  async triggerJobFix(jobId, authHeader = null, policy = null) {
+  async triggerJobFix(jobId, authHeader = null, optionsOrPolicy = null) {
     const job = await persistence.getJob(jobId);
     if (!job) throw new Error('JOB_NOT_FOUND');
 
@@ -757,8 +757,83 @@ class PreflightOperationsService {
       throw new Error('UPSTREAM_JOB_NOT_FOUND: Cannot trigger fix on a job without upstream context');
     }
 
+    const options = typeof optionsOrPolicy === 'string' ? { policy: optionsOrPolicy } : { ...(optionsOrPolicy || {}) };
+    const policy = options.policy || job.policy;
+
+    // Fetch upstream job status to evaluate findings if explicit requested_fixes are absent
+    let upstreamData = null;
     try {
-      const res = await upstream.triggerJobFix(upstreamJobId, authHeader, job.tenant_id, policy || job.policy);
+      upstreamData = await upstream.getJobStatus(upstreamJobId, authHeader, job.tenant_id);
+    } catch (e) {
+      console.warn(`[PREFLIGHT-OPS] Pre-fetch of upstream job status failed for deriving autofix intent: ${e.message}`);
+    }
+
+    let explicitFixes = [];
+    if (Array.isArray(options.fixes)) explicitFixes.push(...options.fixes);
+    if (Array.isArray(options.requested_fixes)) explicitFixes.push(...options.requested_fixes);
+    if (Array.isArray(options.requestedFixes)) explicitFixes.push(...options.requestedFixes);
+    if (typeof options.fixes === 'string') {
+      try { explicitFixes.push(...JSON.parse(options.fixes)); } catch(e) { explicitFixes.push(options.fixes); }
+    }
+    if (typeof options.requested_fixes === 'string') {
+      try { explicitFixes.push(...JSON.parse(options.requested_fixes)); } catch(e) { explicitFixes.push(options.requested_fixes); }
+    }
+
+    const derivedSet = new Set(explicitFixes);
+
+    if (options.forceBleed || options.force_bleed) derivedSet.add('APPLY_BLEED');
+    if (options.convertCmyk || options.convert_cmyk) derivedSet.add('CONVERT_CMYK');
+    if (options.rebuildTrimbox || options.rebuild_trimbox) derivedSet.add('REBUILD_TRIMBOX');
+    if (options.injectOutputIntent || options.inject_output_intent) derivedSet.add('INJECT_OUTPUT_INTENT');
+
+    if (options.forceBleed !== undefined) options.force_bleed = options.forceBleed;
+    if (options.force_bleed !== undefined) options.forceBleed = options.force_bleed;
+
+    if (derivedSet.size === 0) {
+      let findings = Array.isArray(upstreamData?.findings) ? upstreamData.findings :
+                       Array.isArray(upstreamData?.issues) ? upstreamData.issues : [];
+      if (findings.length === 0) {
+        try {
+          const m = typeof job.metadata_json === 'string' ? JSON.parse(job.metadata_json) : (job.metadata_json || {});
+          findings = m.findings || m.issues || [];
+        } catch(e) {}
+      }
+      
+      findings.forEach(f => {
+        if (!f) return;
+        const fStr = typeof f === 'string' ? f.toUpperCase() : JSON.stringify(f).toUpperCase();
+        if (fStr.includes('TRIMBOX') || fStr.includes('TRIM_BOX')) derivedSet.add('REBUILD_TRIMBOX');
+        if (fStr.includes('BLEED') || fStr.includes('BLEEDBOX')) derivedSet.add('APPLY_BLEED');
+        if (fStr.includes('RGB') || fStr.includes('CMYK') || fStr.includes('COLOR') || fStr.includes('ICC')) derivedSet.add('CONVERT_CMYK');
+        if (fStr.includes('INTENT') || fStr.includes('OUTPUT_INTENT')) derivedSet.add('INJECT_OUTPUT_INTENT');
+      });
+
+      if (derivedSet.size === 0) {
+        ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'CONVERT_CMYK', 'INJECT_OUTPUT_INTENT'].forEach(x => derivedSet.add(x));
+      }
+    }
+
+    const CANONICAL_ORDER = ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'CONVERT_CMYK', 'INJECT_OUTPUT_INTENT'];
+    const finalFixes = CANONICAL_ORDER.filter(fix => derivedSet.has(fix));
+    derivedSet.forEach(fix => {
+      if (!CANONICAL_ORDER.includes(fix)) finalFixes.push(fix);
+    });
+
+    options.fixes = finalFixes;
+    options.requested_fixes = finalFixes;
+    options.requestedFixes = finalFixes;
+    options.policy = policy;
+
+    console.log(`[CONTROL][PREFLIGHT][AUTOFIX-INTENT] Dispatching fix intent contract: ${JSON.stringify({
+      jobId,
+      upstreamJobId,
+      fixes: options.fixes,
+      requested_fixes: options.requested_fixes,
+      policy: options.policy
+    })}`);
+
+    try {
+      const res = await upstream.triggerJobFix(upstreamJobId, authHeader, job.tenant_id, options);
       
       // Update local status to reflect fresh trigger
       await persistence.updateJob(jobId, {
@@ -774,7 +849,7 @@ class PreflightOperationsService {
         tenantId: job.tenant_id,
         userId: 'SYSTEM',
         status: 'SUCCESS',
-        metadata: { jobId, upstreamJobId, policy: policy || job.policy }
+        metadata: { jobId, upstreamJobId, policy: options.policy, requested_fixes: options.requested_fixes }
       });
 
       return {
