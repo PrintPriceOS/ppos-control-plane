@@ -67,61 +67,23 @@ class PreflightRegistrySyncService {
             const risk_level = summaryObj.riskLevel || summaryObj.risk_level || null;
             const issue_count = summaryObj.issueCount !== undefined ? summaryObj.issueCount : (summaryObj.issue_count || (Array.isArray(upstreamJob.findings) ? upstreamJob.findings.length : 0));
 
-            // Normalize JSON arrays
-            const requested_fixes = Array.isArray(upstreamJob.requested_fixes) ? upstreamJob.requested_fixes :
-                                    Array.isArray(upstreamJob.requestedFixes) ? upstreamJob.requestedFixes : null;
-            const requested_fixes_json = requested_fixes ? JSON.stringify(requested_fixes) : null;
+            // Unified canonical extractions following rules 1, 2, 3, 4
+            const extractedRepairs = this._extractRepairs(upstreamJob);
+            const repairs_json = extractedRepairs ? JSON.stringify(extractedRepairs) : null;
 
-            const repairs = Array.isArray(upstreamJob.repairs) ? upstreamJob.repairs : null;
-            const repairs_json = repairs ? JSON.stringify(repairs) : null;
+            const extractedFixes = this._extractFixes(upstreamJob, extractedRepairs);
+            const fixes_json = extractedFixes ? JSON.stringify(extractedFixes) : null;
 
-            const fixes = Array.isArray(upstreamJob.fixes) ? upstreamJob.fixes : null;
-            const fixes_json = fixes ? JSON.stringify(fixes) : null;
+            const extractedRequested = this._extractRequestedFixes(upstreamJob);
+            const requested_fixes_json = extractedRequested ? JSON.stringify(extractedRequested) : null;
 
-            // Derive fix buckets: Applied, Skipped, Failed
-            let applied_fixes = [];
-            let skipped_fixes = [];
-            let failed_fixes = [];
+            const requestedCount = extractedRequested ? extractedRequested.length : 0;
+            const buckets = this._deriveBuckets(extractedRepairs, upstreamJob, jobId, type, requestedCount);
 
-            if (Array.isArray(upstreamJob.repairs)) {
-                upstreamJob.repairs.forEach(r => {
-                    if (!r) return;
-                    if (typeof r === 'string') {
-                        applied_fixes.push(r);
-                        return;
-                    }
-                    const fixName = r.fix || r.type || r.name || r.id || 'UNKNOWN_FIX';
-                    const rStatus = String(r.status || r.state || '').toUpperCase();
-                    
-                    if (rStatus === 'APPLIED' || rStatus === 'SUCCESS' || r.applied === true) {
-                        applied_fixes.push(fixName);
-                    } else if (rStatus === 'SKIPPED') {
-                        skipped_fixes.push(fixName);
-                    } else if (rStatus === 'FAILED' || rStatus === 'ERROR' || r.failed === true || r.error) {
-                        failed_fixes.push(fixName);
-                    } else {
-                        // Deterministic fallback if status is omitted but success indicator is positive or absent
-                        if (r.success !== false) {
-                            applied_fixes.push(fixName);
-                        } else {
-                            failed_fixes.push(fixName);
-                        }
-                    }
-                });
-            } else {
-                if (Array.isArray(upstreamJob.applied_fixes)) applied_fixes = upstreamJob.applied_fixes;
-                else if (Array.isArray(upstreamJob.appliedFixes)) applied_fixes = upstreamJob.appliedFixes;
+            const applied_fixes_json = buckets.applied.length > 0 ? JSON.stringify(buckets.applied) : null;
+            const skipped_fixes_json = buckets.skipped.length > 0 ? JSON.stringify(buckets.skipped) : null;
+            const failed_fixes_json = buckets.failed.length > 0 ? JSON.stringify(buckets.failed) : null;
 
-                if (Array.isArray(upstreamJob.skipped_fixes)) skipped_fixes = upstreamJob.skipped_fixes;
-                else if (Array.isArray(upstreamJob.skippedFixes)) skipped_fixes = upstreamJob.skippedFixes;
-
-                if (Array.isArray(upstreamJob.failed_fixes)) failed_fixes = upstreamJob.failed_fixes;
-                else if (Array.isArray(upstreamJob.failedFixes)) failed_fixes = upstreamJob.failedFixes;
-            }
-
-            const applied_fixes_json = JSON.stringify(applied_fixes);
-            const skipped_fixes_json = JSON.stringify(skipped_fixes);
-            const failed_fixes_json = JSON.stringify(failed_fixes);
 
             // Artifact List Preservation
             const artifacts = Array.isArray(upstreamJob.artifacts) ? upstreamJob.artifacts :
@@ -140,7 +102,7 @@ class PreflightRegistrySyncService {
 
             // Mandatory Structured Logging: Upsert
             console.log(`[CONTROL][PREFLIGHT][SYNC-JOB-UPSERT] Upserting extracted metadata and fix buckets into preflight_job_registry for ${jobId}`);
-            logger.info({ event: 'sync_job_upsert', jobId, type, status, appliedCount: applied_fixes.length });
+            logger.info({ event: 'sync_job_upsert', jobId, type, status, appliedCount: buckets.applied.length });
 
             // Perform highly robust MySQL upsert preserving existing operational data if missing in polls
             await db.query(`
@@ -244,6 +206,16 @@ class PreflightRegistrySyncService {
                 }
             }
 
+            console.log(`[CONTROL][PREFLIGHT][SYNC-UPSERT-SUCCESS] ${JSON.stringify({
+                jobId,
+                type,
+                repairsCount: extractedRepairs ? extractedRepairs.length : 0,
+                appliedCount: buckets.applied.length,
+                skippedCount: buckets.skipped.length,
+                failedCount: buckets.failed.length,
+                requestedCount
+            })}`);
+
             return {
                 ok: true,
                 jobId,
@@ -253,9 +225,9 @@ class PreflightRegistrySyncService {
                 tenantId: resolved_tenant_id,
                 riskScore: risk_score,
                 fixBuckets: {
-                    applied: applied_fixes,
-                    skipped: skipped_fixes,
-                    failed: failed_fixes
+                    applied: buckets.applied,
+                    skipped: buckets.skipped,
+                    failed: buckets.failed
                 },
                 canonicalPayload: upstreamJob
             };
@@ -389,64 +361,22 @@ class PreflightRegistrySyncService {
         const risk_level = summaryObj.riskLevel || summaryObj.risk_level || null;
         const issue_count = summaryObj.issueCount !== undefined ? summaryObj.issueCount : (summaryObj.issue_count || (Array.isArray(payload.findings) ? payload.findings.length : 0));
 
-        // Derive forensic fields
-        const requested_fixes = Array.isArray(payload.requested_fixes) ? payload.requested_fixes :
-                                Array.isArray(payload.requestedFixes) ? payload.requestedFixes : null;
-        const requested_fixes_json = requested_fixes ? JSON.stringify(requested_fixes) : null;
+        // Unified canonical extractions following rules 1, 2, 3, 4
+        const extractedRepairs = this._extractRepairs(payload);
+        const repairs_json = extractedRepairs ? JSON.stringify(extractedRepairs) : null;
 
-        const repairs = Array.isArray(payload.repairs) ? payload.repairs : null;
-        const repairs_json = repairs ? JSON.stringify(repairs) : null;
+        const extractedFixes = this._extractFixes(payload, extractedRepairs);
+        const fixes_json = extractedFixes ? JSON.stringify(extractedFixes) : null;
 
-        const fixes = Array.isArray(payload.fixes) ? payload.fixes : null;
-        const fixes_json = fixes ? JSON.stringify(fixes) : null;
+        const extractedRequested = this._extractRequestedFixes(payload);
+        const requested_fixes_json = extractedRequested ? JSON.stringify(extractedRequested) : null;
 
-        let applied_fixes = [];
-        let skipped_fixes = [];
-        let failed_fixes = [];
+        const requestedCount = extractedRequested ? extractedRequested.length : 0;
+        const buckets = this._deriveBuckets(extractedRepairs, payload, jobId, type, requestedCount);
 
-        if (Array.isArray(payload.repairs)) {
-            payload.repairs.forEach(r => {
-                if (!r) return;
-                if (typeof r === 'string') {
-                    applied_fixes.push(r);
-                    return;
-                }
-                const fixName = r.fix || r.type || r.name || r.id || 'UNKNOWN_FIX';
-                const rStatus = String(r.status || r.state || '').toUpperCase();
-                
-                if (rStatus === 'APPLIED' || rStatus === 'SUCCESS' || r.applied === true) {
-                    applied_fixes.push(fixName);
-                } else if (rStatus === 'SKIPPED') {
-                    skipped_fixes.push(fixName);
-                } else if (rStatus === 'FAILED' || rStatus === 'ERROR' || r.failed === true || r.error) {
-                    failed_fixes.push(fixName);
-                } else {
-                    if (r.success !== false) {
-                        applied_fixes.push(fixName);
-                    } else {
-                        failed_fixes.push(fixName);
-                    }
-                }
-            });
-        } else {
-            if (Array.isArray(payload.applied_fixes)) applied_fixes = payload.applied_fixes;
-            else if (Array.isArray(payload.appliedFixes)) applied_fixes = payload.appliedFixes;
-
-            if (Array.isArray(payload.skipped_fixes)) skipped_fixes = payload.skipped_fixes;
-            else if (Array.isArray(payload.skippedFixes)) skipped_fixes = payload.skippedFixes;
-
-            if (Array.isArray(payload.failed_fixes)) failed_fixes = payload.failed_fixes;
-            else if (Array.isArray(payload.failedFixes)) failed_fixes = payload.failedFixes;
-        }
-
-        const hasAppliedSource = repairs !== null || Array.isArray(payload.applied_fixes) || Array.isArray(payload.appliedFixes);
-        const applied_fixes_json = hasAppliedSource || applied_fixes.length > 0 ? JSON.stringify(applied_fixes) : null;
-
-        const hasSkippedSource = repairs !== null || Array.isArray(payload.skipped_fixes) || Array.isArray(payload.skippedFixes);
-        const skipped_fixes_json = hasSkippedSource || skipped_fixes.length > 0 ? JSON.stringify(skipped_fixes) : null;
-
-        const hasFailedSource = repairs !== null || Array.isArray(payload.failed_fixes) || Array.isArray(payload.failedFixes);
-        const failed_fixes_json = hasFailedSource || failed_fixes.length > 0 ? JSON.stringify(failed_fixes) : null;
+        const applied_fixes_json = buckets.applied.length > 0 ? JSON.stringify(buckets.applied) : null;
+        const skipped_fixes_json = buckets.skipped.length > 0 ? JSON.stringify(buckets.skipped) : null;
+        const failed_fixes_json = buckets.failed.length > 0 ? JSON.stringify(buckets.failed) : null;
 
         const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts :
                           Array.isArray(payload.artifact_list) ? payload.artifact_list : null;
@@ -462,8 +392,8 @@ class PreflightRegistrySyncService {
         const canonical_payload_json = JSON.stringify(payload);
         const sync_error_json_str = syncErrorJson ? JSON.stringify(syncErrorJson) : null;
 
-        const requestedFixesCount = Array.isArray(requested_fixes) ? requested_fixes.length : 0;
-        const repairsCount = Array.isArray(repairs) ? repairs.length : 0;
+        const requestedFixesCount = extractedRequested ? extractedRequested.length : 0;
+        const repairsCount = extractedRepairs ? extractedRepairs.length : 0;
         console.log(`[CONTROL][PREFLIGHT][SYNC-UPSERT-ATTEMPT] ${JSON.stringify({
             jobId,
             tenantId: resolved_tenant_id,
@@ -587,6 +517,136 @@ class PreflightRegistrySyncService {
                 ]);
             }
         }
+
+        console.log(`[CONTROL][PREFLIGHT][SYNC-UPSERT-SUCCESS] ${JSON.stringify({
+            jobId,
+            type,
+            repairsCount,
+            appliedCount: buckets.applied.length,
+            skippedCount: buckets.skipped.length,
+            failedCount: buckets.failed.length,
+            requestedCount
+        })}`);
+    }
+
+    _extractRepairs(payload) {
+        if (!payload) return null;
+
+        const isObjectArray = (arr) => Array.isArray(arr) && arr.length > 0 && arr.some(item => item && typeof item === 'object' && !Array.isArray(item));
+
+        let repairs = null;
+        if (isObjectArray(payload.repairs)) {
+            repairs = payload.repairs;
+        } else if (payload.result && isObjectArray(payload.result.repairs)) {
+            repairs = payload.result.repairs;
+        } else if (isObjectArray(payload.fixes)) {
+            repairs = payload.fixes;
+        } else if (payload.result && isObjectArray(payload.result.fixes)) {
+            repairs = payload.result.fixes;
+        }
+
+        if (repairs) {
+            return repairs.map(r => {
+                if (!r || typeof r !== 'object') return r;
+                const code = r.code || r.fix_method || r.repairStrategy || r.id || r.type || r.fix || r.name;
+                if (!code) {
+                    console.warn(`[CONTROL][PREFLIGHT][SYNC-UNKNOWN-FIX-WARN] Repair record missing resolvable code field: ${JSON.stringify(r)}`);
+                    logger.warn({ event: 'sync_unknown_fix_warn', repair: r });
+                }
+                return {
+                    ...r,
+                    code: code || 'UNKNOWN_FIX'
+                };
+            });
+        }
+        return null;
+    }
+
+    _extractFixes(payload, extractedRepairs) {
+        if (!payload) return null;
+        if (extractedRepairs && extractedRepairs.length > 0) {
+            return extractedRepairs;
+        }
+
+        const getStrings = (arr) => Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : null;
+        const strFixes = getStrings(payload.fixes) || (payload.result ? getStrings(payload.result.fixes) : null);
+        return strFixes && strFixes.length > 0 ? strFixes : null;
+    }
+
+    _extractRequestedFixes(payload) {
+        if (!payload) return null;
+        const getStrings = (arr) => Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : null;
+
+        const req = getStrings(payload.requested_fixes) ||
+                    getStrings(payload.requestedFixes) ||
+                    (payload.result ? (getStrings(payload.result.requested_fixes) || getStrings(payload.result.requestedFixes)) : null) ||
+                    (payload.options ? (getStrings(payload.options.requested_fixes) || getStrings(payload.options.requestedFixes)) : null);
+
+        return req && req.length > 0 ? req : null;
+    }
+
+    _deriveBuckets(repairs, payload, jobId, type, requestedCount = 0) {
+        let applied = [];
+        let skipped = [];
+        let failed = [];
+
+        if (repairs && repairs.length > 0) {
+            repairs.forEach(r => {
+                if (!r || typeof r !== 'object') return;
+                const rStatus = String(r.status || r.state || '').toUpperCase();
+
+                if (rStatus === 'APPLIED' || rStatus === 'SUCCESS' || r.applied === true || r.success === true) {
+                    applied.push(r);
+                } else if (rStatus === 'SKIPPED') {
+                    skipped.push(r);
+                } else if (rStatus === 'FAILED' || rStatus === 'ERROR' || r.failed === true || r.error) {
+                    failed.push(r);
+                } else {
+                    if (r.success !== false) {
+                        applied.push(r);
+                    } else {
+                        failed.push(r);
+                    }
+                }
+            });
+        } else if (payload) {
+            const mapLegacyBucket = (sourceArr, defaultStatus) => {
+                if (!Array.isArray(sourceArr)) return [];
+                return sourceArr.map(item => {
+                    if (item && typeof item === 'object') {
+                        const code = item.code || item.fix_method || item.repairStrategy || item.id || item.type || item.fix || item.name || 'UNKNOWN_FIX';
+                        if (!item.code && !item.fix_method && !item.repairStrategy && !item.id && !item.type && !item.fix && !item.name) {
+                            console.warn(`[CONTROL][PREFLIGHT][SYNC-UNKNOWN-FIX-WARN] Legacy bucket item missing resolvable code field: ${JSON.stringify(item)}`);
+                            logger.warn({ event: 'sync_unknown_fix_warn', legacyItem: item });
+                        }
+                        return { ...item, code, status: item.status || defaultStatus };
+                    }
+                    const strVal = String(item || 'UNKNOWN_FIX');
+                    if (strVal === 'UNKNOWN_FIX') {
+                        console.warn(`[CONTROL][PREFLIGHT][SYNC-UNKNOWN-FIX-WARN] String bucket item defaults to UNKNOWN_FIX`);
+                        logger.warn({ event: 'sync_unknown_fix_warn', item });
+                    }
+                    return { code: strVal, status: defaultStatus };
+                });
+            };
+
+            applied = mapLegacyBucket(payload.applied_fixes || payload.appliedFixes, 'APPLIED');
+            skipped = mapLegacyBucket(payload.skipped_fixes || payload.skippedFixes, 'SKIPPED');
+            failed = mapLegacyBucket(payload.failed_fixes || payload.failedFixes, 'FAILED');
+        }
+
+        const repairsCount = repairs ? repairs.length : 0;
+        console.log(`[CONTROL][PREFLIGHT][SYNC-BUCKET-DERIVE] ${JSON.stringify({
+            jobId,
+            type,
+            repairsCount,
+            appliedCount: applied.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            requestedCount
+        })}`);
+
+        return { applied, skipped, failed };
     }
 }
 

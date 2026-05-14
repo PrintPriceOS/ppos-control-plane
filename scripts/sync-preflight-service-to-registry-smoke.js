@@ -90,8 +90,8 @@ async function runSmokeTests() {
         assert(schemaVerificationInvoked === true, 'Mandatory schema verification ensurePreflightRegistrySchema() executed before sync logic.');
         assert(result.ok === true, 'Service-to-Registry single sync completes successfully.');
         assert(result.sourceJobId === 'src_job_parent', 'Extracts source_job_id field perfectly.');
-        assert(result.fixBuckets.applied.includes('REBUILD_TRIMBOX'), 'Maps APPLIED status accurately to applied bucket.');
-        assert(result.fixBuckets.failed.includes('APPLY_BLEED'), 'Maps FAILED status accurately to failed bucket.');
+        assert(result.fixBuckets.applied.some(r => r.code === 'REBUILD_TRIMBOX'), 'Maps APPLIED status accurately preserving full object in applied bucket.');
+        assert(result.fixBuckets.failed.some(r => r.code === 'APPLY_BLEED'), 'Maps FAILED status accurately preserving full object in failed bucket.');
 
         const upsertQuery = dbQueriesIntercepted.find(q => q.sql.includes('INSERT INTO preflight_job_registry'));
         assert(upsertQuery !== undefined, 'Generated target preflight_job_registry MySQL UPSERT query.');
@@ -166,6 +166,78 @@ async function runSmokeTests() {
                 assert(placeholders === q.params.length, `Query #${idx + 1}: Placeholders count (${placeholders}) exactly matches params array length (${q.params.length}).`);
             }
         });
+
+        console.log('\n--- Test Suite 4: Exhaustive Regression & Auto-Healing Requirements Validation ---');
+        preflightServiceClient.getJob = async (jobId, authHeader, tenantId) => {
+            if (!mockUpstreamJobs[jobId]) throw new Error(`Mock upstream payload not configured for ${jobId}`);
+            return mockUpstreamJobs[jobId];
+        };
+        // Scenario 4A: AUTOFIX payload with repairs full objects and requested_fixes empty
+        const sc4aId = 'job_regress_4a';
+        mockUpstreamJobs[sc4aId] = {
+            id: sc4aId,
+            strategy: 'AUTOFIX',
+            state: 'COMPLETED',
+            tenantId: 'ppos-production-worker',
+            requested_fixes: [],
+            repairs: [
+                { code: 'APPLY_BLEED', status: 'APPLIED', forceBleed: true },
+                { code: 'CONVERT_CMYK', status: 'FAILED', reason: 'Target profile missing' }
+            ]
+        };
+        const res4a = await syncService.syncJob(sc4aId, { tenantId: 'ppos-production-worker' });
+        assert(res4a.fixBuckets.applied.some(r => r.code === 'APPLY_BLEED' && r.forceBleed === true), 'Scenario 4A: applied bucket contains the full APPLY_BLEED object.');
+        assert(res4a.fixBuckets.failed.some(r => r.code === 'CONVERT_CMYK' && r.reason === 'Target profile missing'), 'Scenario 4A: failed bucket contains the full CONVERT_CMYK object.');
+        const noUnknown4a = !res4a.fixBuckets.applied.some(r => r.code === 'UNKNOWN_FIX') && !res4a.fixBuckets.failed.some(r => r.code === 'UNKNOWN_FIX');
+        assert(noUnknown4a, 'Scenario 4A: no bucket contains "UNKNOWN_FIX".');
+
+        // Scenario 4B: AUTOFIX payload with requested_fixes strings and repairs objects
+        const sc4bId = 'job_regress_4b';
+        mockUpstreamJobs[sc4bId] = {
+            id: sc4bId,
+            strategy: 'AUTOFIX',
+            state: 'COMPLETED',
+            tenantId: 'ppos-production-worker',
+            requested_fixes: ['APPLY_BLEED', 'CONVERT_CMYK'],
+            repairs: [
+                { code: 'APPLY_BLEED', status: 'APPLIED' }
+            ]
+        };
+        const res4b = await syncService.syncJob(sc4bId, { tenantId: 'ppos-production-worker' });
+        // Let's inspect intercepted DB query to verify requested_fixes_json is strings and repairs_json is objects
+        const upsert4b = dbQueriesIntercepted.filter(q => q.params && q.params[0] === sc4bId).pop();
+        assert(upsert4b.params[11] === JSON.stringify(['APPLY_BLEED', 'CONVERT_CMYK']), 'Scenario 4B: requested intent remains strings exactly as supplied.');
+        assert(upsert4b.params[12].includes('"code":"APPLY_BLEED"'), 'Scenario 4B: repairs remain objects preserved faithfully.');
+
+        // Scenario 4C: AUTOFIX payload where fixes is string array but repairs is object array
+        const sc4cId = 'job_regress_4c';
+        mockUpstreamJobs[sc4cId] = {
+            id: sc4cId,
+            strategy: 'AUTOFIX',
+            state: 'COMPLETED',
+            tenantId: 'ppos-production-worker',
+            fixes: ['APPLY_BLEED'],
+            repairs: [{ code: 'APPLY_BLEED', status: 'APPLIED', detail: 'rich' }]
+        };
+        const res4c = await syncService.syncJob(sc4cId, { tenantId: 'ppos-production-worker' });
+        const upsert4c = dbQueriesIntercepted.filter(q => q.params && q.params[0] === sc4cId).pop();
+        assert(upsert4c.params[12].includes('"detail":"rich"'), 'Scenario 4C: fixes strings must not overwrite rich repairs objects.');
+
+        // Scenario 4D: Existing records with old ["UNKNOWN_FIX"] healed on next sync by re-deriving buckets from canonical_payload_json
+        const sc4dId = 'job_regress_4d';
+        const legacyPayloadWithUnknownFixes = {
+            id: sc4dId,
+            strategy: 'AUTOFIX',
+            status: 'COMPLETED',
+            tenantId: 'ppos-production-worker',
+            result: {
+                repairs: [{ code: 'REBUILD_TRIMBOX', status: 'APPLIED' }]
+            },
+            applied_fixes: ['UNKNOWN_FIX'] // Old string placeholder
+        };
+        mockUpstreamJobs[sc4dId] = legacyPayloadWithUnknownFixes;
+        const res4d = await syncService.syncJob(sc4dId, { tenantId: 'ppos-production-worker' });
+        assert(res4d.fixBuckets.applied.some(r => r.code === 'REBUILD_TRIMBOX'), 'Scenario 4D: Existing records with old ["UNKNOWN_FIX"] successfully healed by re-deriving buckets from canonical payload.');
 
         console.log('\n==================================================');
         console.log(`RESULTS: ${passed} PASSED, ${failed} FAILED`);

@@ -175,6 +175,13 @@ router.get('/jobs', async (req, res) => {
                 if (typeof str !== 'string') return str;
                 try { return JSON.parse(str); } catch(e) { return null; }
             };
+            const requestedFixes = safeParse(r.requested_fixes_json);
+            const repairs = safeParse(r.repairs_json);
+            const fixes = safeParse(r.fixes_json);
+            const appliedFixes = safeParse(r.applied_fixes_json);
+            const skippedFixes = safeParse(r.skipped_fixes_json);
+            const failedFixes = safeParse(r.failed_fixes_json);
+
             return {
                 jobId: r.job_id,
                 sourceJobId: r.source_job_id,
@@ -192,12 +199,17 @@ router.get('/jobs', async (req, res) => {
                 riskScore: r.risk_score,
                 riskLevel: r.risk_level,
                 issueCount: r.issue_count,
-                requestedFixes: safeParse(r.requested_fixes_json),
-                repairs: safeParse(r.repairs_json),
-                fixes: safeParse(r.fixes_json),
-                appliedFixes: safeParse(r.applied_fixes_json),
-                skippedFixes: safeParse(r.skipped_fixes_json),
-                failedFixes: safeParse(r.failed_fixes_json),
+                requestedFixes,
+                repairs,
+                fixes,
+                appliedFixes,
+                skippedFixes,
+                failedFixes,
+                requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
+                repairsCount: Array.isArray(repairs) ? repairs.length : 0,
+                appliedFixesCount: Array.isArray(appliedFixes) ? appliedFixes.length : 0,
+                skippedFixesCount: Array.isArray(skippedFixes) ? skippedFixes.length : 0,
+                failedFixesCount: Array.isArray(failedFixes) ? failedFixes.length : 0,
                 degraded: !!r.degraded,
                 degradedReasons: safeParse(r.degraded_reasons_json),
                 createdAt: r.created_at,
@@ -343,6 +355,19 @@ router.get('/jobs/:jobId', async (req, res) => {
 
         await logAuditEvent({ tenantId: localRecord?.tenant_id || context.tenantId, jobId, action: 'GET_JOB', status: 'SUCCESS', traceId: context.traceId });
 
+        const safeParseLocal = str => {
+            if (!str) return null;
+            if (typeof str !== 'string') return str;
+            try { return JSON.parse(str); } catch(e) { return null; }
+        };
+
+        const requestedFixes = localRecord ? safeParseLocal(localRecord.requested_fixes_json) : null;
+        const repairs = localRecord ? safeParseLocal(localRecord.repairs_json) : null;
+        const fixes = localRecord ? safeParseLocal(localRecord.fixes_json) : null;
+        const appliedFixes = localRecord ? safeParseLocal(localRecord.applied_fixes_json) : null;
+        const skippedFixes = localRecord ? safeParseLocal(localRecord.skipped_fixes_json) : null;
+        const failedFixes = localRecord ? safeParseLocal(localRecord.failed_fixes_json) : null;
+
         res.json({
             ok: true,
             jobId,
@@ -353,7 +378,18 @@ router.get('/jobs/:jobId', async (req, res) => {
                 createdAt: localRecord.created_at,
                 updatedAt: localRecord.updated_at,
                 fileSize: localRecord.file_size_bytes,
-                filename: localRecord.original_filename
+                filename: localRecord.original_filename,
+                requestedFixes,
+                repairs,
+                fixes,
+                appliedFixes,
+                skippedFixes,
+                failedFixes,
+                requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
+                repairsCount: Array.isArray(repairs) ? repairs.length : 0,
+                appliedFixesCount: Array.isArray(appliedFixes) ? appliedFixes.length : 0,
+                skippedFixesCount: Array.isArray(skippedFixes) ? skippedFixes.length : 0,
+                failedFixesCount: Array.isArray(failedFixes) ? failedFixes.length : 0
             } : null
         });
     } catch (err) {

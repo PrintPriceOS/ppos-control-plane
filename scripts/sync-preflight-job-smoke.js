@@ -71,10 +71,10 @@ async function runSmokeTests() {
         // Assert exact parameters matching in the SQL statement
         const params = upsertQuery.params;
         assert(params[0] === 'job_1778770956950_qtlh7', 'SQL param 0 matches job_id.');
-        assert(params[5] === 'industrial_blueprint.pdf', 'SQL param 5 resolves original_filename.');
-        assert(params[6] === 15485760, 'SQL param 6 resolves file_size_bytes.');
-        assert(params[7] === 25, 'SQL param 7 resolves risk_score.');
-        assert(typeof params[21] === 'string' && params[21].includes('industrial_blueprint.pdf'), 'SQL param 21 correctly formats canonical_payload_json preservation string.');
+        assert(params[6] === 'industrial_blueprint.pdf', 'SQL param 6 resolves original_filename.');
+        assert(params[7] === 15485760, 'SQL param 7 resolves file_size_bytes.');
+        assert(params[8] === 25, 'SQL param 8 resolves risk_score.');
+        assert(typeof params[22] === 'string' && params[22].includes('industrial_blueprint.pdf'), 'SQL param 22 correctly formats canonical_payload_json preservation string.');
 
         console.log('\n--- Test Suite 2: AUTOFIX Job Granular Fix Bucket Derivation ---');
         dbQueriesIntercepted = [];
@@ -102,9 +102,9 @@ async function runSmokeTests() {
         const resAutofix = await syncService.syncJob('fix_1778770957140', { tenantId: 'ppos-production-worker' });
         
         assert(resAutofix.sourceJobId === 'job_1778770956950_qtlh7', 'Successfully binds source_job_id for forensic lineage tracing.');
-        assert(resAutofix.fixBuckets.applied.includes('REBUILD_TRIMBOX') && resAutofix.fixBuckets.applied.includes('INJECT_OUTPUT_INTENT'), 'APPLIED and SUCCESS statuses map to applied bucket.');
-        assert(resAutofix.fixBuckets.skipped.includes('APPLY_BLEED'), 'SKIPPED status maps to skipped bucket.');
-        assert(resAutofix.fixBuckets.failed.includes('CONVERT_CMYK'), 'FAILED status maps to failed bucket.');
+        assert(resAutofix.fixBuckets.applied.some(r => r.code === 'REBUILD_TRIMBOX') && resAutofix.fixBuckets.applied.some(r => r.code === 'INJECT_OUTPUT_INTENT'), 'APPLIED and SUCCESS statuses map to applied bucket preserving full objects.');
+        assert(resAutofix.fixBuckets.skipped.some(r => r.code === 'APPLY_BLEED'), 'SKIPPED status maps to skipped bucket preserving full objects.');
+        assert(resAutofix.fixBuckets.failed.some(r => r.code === 'CONVERT_CMYK'), 'FAILED status maps to failed bucket preserving full objects.');
         
         const artQuery = dbQueriesIntercepted.find(q => q.sql.includes('INSERT IGNORE INTO preflight_artifact_registry'));
         assert(artQuery !== undefined, 'Output artifact records trigger secondary insertion into preflight_artifact_registry.');
@@ -122,8 +122,8 @@ async function runSmokeTests() {
         };
 
         const resAlt = await syncService.syncJob('fix_alt_999');
-        assert(resAlt.fixBuckets.applied[0] === 'APPLY_BLEED', 'Extracts direct applied array fallback gracefully.');
-        assert(resAlt.fixBuckets.skipped[0] === 'REBUILD_TRIMBOX', 'Extracts camelCase skippedFixes property variant gracefully.');
+        assert(resAlt.fixBuckets.applied[0]?.code === 'APPLY_BLEED', 'Extracts direct applied array fallback gracefully.');
+        assert(resAlt.fixBuckets.skipped[0]?.code === 'REBUILD_TRIMBOX', 'Extracts camelCase skippedFixes property variant gracefully.');
 
         console.log('\n==================================================');
         console.log(`RESULTS: ${passed} PASSED, ${failed} FAILED`);
