@@ -19,71 +19,71 @@ const exchange = require('../services/capacityExchangeService');
 router.get('/health', async (req, res) => {
     try {
         const health = await marketplace.getMarketplaceHealth();
-        res.json({ ok: true, health });
+        return res.json({ ok: true, health });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_HEALTH_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_HEALTH_ERROR' });
     }
 });
 
 router.get('/offers', async (req, res) => {
     try {
         const offers = await db.query('SELECT * FROM marketplace_capacity_offers WHERE status = "ACTIVE" ORDER BY created_at DESC LIMIT 50');
-        res.json({ ok: true, data: offers });
+        return res.json({ ok: true, data: offers });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_OFFERS_QUERY_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_OFFERS_QUERY_ERROR' });
     }
 });
 
 router.get('/auctions', async (req, res) => {
     try {
         const auctions = await db.query('SELECT * FROM marketplace_dispatch_auctions ORDER BY created_at DESC LIMIT 50');
-        res.json({ ok: true, data: auctions });
+        return res.json({ ok: true, data: auctions });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_AUCTIONS_QUERY_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_AUCTIONS_QUERY_ERROR' });
     }
 });
 
 router.get('/ledger', async (req, res) => {
     try {
         const history = await ledger.getTradeHistory();
-        res.json({ ok: true, data: history });
+        return res.json({ ok: true, data: history });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_LEDGER_QUERY_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_LEDGER_QUERY_ERROR' });
     }
 });
 
 router.get('/liquidity', async (req, res) => {
     try {
         const liquidity = await twin.computeLiquidityIndex();
-        res.json({ ok: true, liquidity });
+        return res.json({ ok: true, liquidity });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_LIQUIDITY_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_LIQUIDITY_ERROR' });
     }
 });
 
 router.get('/economic-pressure', async (req, res) => {
     try {
         const pressure = await twin.computeEconomicPressure();
-        res.json({ ok: true, pressure });
+        return res.json({ ok: true, pressure });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_PRESSURE_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_PRESSURE_ERROR' });
     }
 });
 
 router.get('/trade-history', async (req, res) => {
     try {
         const history = await ledger.getTradeHistory();
-        res.json({ ok: true, data: history });
+        return res.json({ ok: true, data: history });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_TRADE_HISTORY_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_TRADE_HISTORY_ERROR' });
     }
 });
 
 router.post('/rebalance', async (req, res) => {
     try {
-        res.json({ ok: true, rebalanceExecuted: true });
+        return res.json({ ok: true, rebalanceExecuted: true });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_REBALANCE_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_REBALANCE_ERROR' });
     }
 });
 
@@ -91,9 +91,9 @@ router.post('/auction', async (req, res) => {
     try {
         const { dispatchId, auctionConfig } = req.body;
         const id = await auction.createAuction(dispatchId, auctionConfig || {});
-        res.json({ ok: true, auctionId: id });
+        return res.json({ ok: true, auctionId: id });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_AUCTION_CREATE_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_AUCTION_CREATE_ERROR' });
     }
 });
 
@@ -101,18 +101,18 @@ router.post('/exchange', async (req, res) => {
     try {
         const { sourceId, targetId, capacityDef } = req.body;
         const id = await exchange.createExchangeReservation(sourceId, targetId, capacityDef || {});
-        res.json({ ok: true, exchangeId: id });
+        return res.json({ ok: true, exchangeId: id });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_EXCHANGE_CREATE_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_EXCHANGE_CREATE_ERROR' });
     }
 });
 
 router.post('/snapshot', async (req, res) => {
     try {
         const snapshot = await twin.generateMarketplaceSnapshot();
-        res.json({ ok: true, snapshot });
+        return res.json({ ok: true, snapshot });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_SNAPSHOT_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_SNAPSHOT_ERROR' });
     }
 });
 
@@ -124,7 +124,7 @@ router.get('/sessions', async (req, res) => {
     try {
         // Support rich filtering query parameters via listSessions contract
         const result = await marketplaceService.listSessions(req.query);
-        res.json({ 
+        return res.json({ 
             ok: true, 
             sessions: result.sessions, 
             total: result.total, 
@@ -133,7 +133,7 @@ router.get('/sessions', async (req, res) => {
             status: "LIVE"
         });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 
@@ -147,12 +147,12 @@ router.get('/sessions/:id', async (req, res) => {
         if (!detailResult || !detailResult.ok || !detailResult.session) {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
         }
-        res.json({
+        return res.json({
             ok: true,
             session: detailResult.session
         });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 
@@ -161,32 +161,62 @@ router.get('/sessions/:id', async (req, res) => {
  * Administrative override to explicitly select a winning offer.
  */
 router.post('/sessions/:sessionId/select', async (req, res) => {
-    const { offer_id, selection_mode = 'ADMIN_OVERRIDE' } = req.body;
+    const sessionId = req.params.sessionId;
+    const targetOfferId = req.body.offer_id || req.body.offerId;
+    const selectionMode = req.body.selection_mode || req.body.selectionMode || 'ADMIN_OVERRIDE';
+
+    console.log(`[MARKETPLACE][SELECT-REQUEST] Intercepted offer selection override request`, {
+        sessionId,
+        targetOfferId,
+        selectionMode,
+        bodyStyles: {
+            offer_id: req.body.offer_id,
+            offerId: req.body.offerId,
+            selection_mode: req.body.selection_mode,
+            selectionMode: req.body.selectionMode
+        }
+    });
+
     try {
-        // Extract target offer id supporting both snake_case and camelCase
-        const targetOfferId = offer_id || req.body.offerId;
         if (!targetOfferId) {
+            console.warn(`[MARKETPLACE][SELECT-FAILED] Missing required target offer identifier`, { sessionId });
             return res.status(400).json({ ok: false, error: 'MISSING_OFFER_ID' });
         }
 
-        const updatedSessionResult = await marketplaceService.selectOffer(req.params.sessionId, targetOfferId, selection_mode);
+        const updatedSessionResult = await marketplaceService.selectOffer(sessionId, targetOfferId, selectionMode);
         
         // Find selected offer object inside the populated session detail
         const selectedOffer = updatedSessionResult?.session?.offers?.find(o => o.id === targetOfferId) || { id: targetOfferId, offerSelected: true };
 
-        res.json({ 
+        const responsePayload = { 
             ok: true, 
             session: updatedSessionResult?.session || {},
             selectedOffer
+        };
+
+        console.log(`[MARKETPLACE][SELECT-RESPONSE] Completed selection override successfully`, {
+            sessionId,
+            targetOfferId,
+            selectionMode,
+            sessionStatus: updatedSessionResult?.session?.sessionStatus
         });
+
+        return res.json(responsePayload);
     } catch (err) {
+        console.error(`[MARKETPLACE][SELECT-FAILED] Selection override process failed: ${err.message}`, {
+            sessionId,
+            targetOfferId,
+            selectionMode,
+            stack: err.stack
+        });
+
         if (err.message === 'MARKETPLACE_SESSION_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
         }
         if (err.message === 'MARKETPLACE_OFFER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_OFFER_NOT_FOUND' });
         }
-        res.status(500).json({ ok: false, error: 'MARKETPLACE_SELECT_FAILED', details: err.message });
+        return res.status(500).json({ ok: false, error: 'MARKETPLACE_SELECT_FAILED', details: err.message });
     }
 });
 
