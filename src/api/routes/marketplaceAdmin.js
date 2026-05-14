@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../services/mysqlClient');
 const marketplace = require('../services/manufacturingMarketplaceService');
+const marketplaceService = require('../services/marketplaceService');
 const auction = require('../services/industrialAuctionService');
 const ledger = require('../services/federationTradeLedgerService');
 const twin = require('../services/marketplaceDigitalTwinService');
@@ -117,18 +118,19 @@ router.post('/snapshot', async (req, res) => {
 
 /**
  * GET /api/admin/marketplace/sessions
- * Returns active marketplace sessions.
- * COMPATIBILITY FALLBACK.
+ * Returns real active marketplace sessions.
  */
 router.get('/sessions', async (req, res) => {
     try {
-        // Placeholder until marketplace sessions are fully integrated
+        // Support rich filtering query parameters via listSessions contract
+        const result = await marketplaceService.listSessions(req.query);
         res.json({ 
             ok: true, 
-            sessions: [], 
-            total: 0, 
-            status: "NOT_CONFIGURED",
-            message: "Marketplace session tracking is initializing."
+            sessions: result.sessions, 
+            total: result.total, 
+            limit: result.limit,
+            offset: result.offset,
+            status: "LIVE"
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -137,23 +139,54 @@ router.get('/sessions', async (req, res) => {
 
 /**
  * GET /api/admin/marketplace/sessions/:id
- * Returns detail for a specific marketplace session.
- * COMPATIBILITY FALLBACK.
+ * Returns real detail for a specific marketplace session.
  */
 router.get('/sessions/:id', async (req, res) => {
     try {
+        const detailResult = await marketplaceService.getSessionDetail(req.params.id);
+        if (!detailResult || !detailResult.ok || !detailResult.session) {
+            return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
+        }
         res.json({
             ok: true,
-            session: {
-                id: req.params.id,
-                job_name: "Initial Session",
-                session_status: "NOT_CONFIGURED",
-                offers: [],
-                events: []
-            }
+            session: detailResult.session
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/sessions/:sessionId/select
+ * Administrative override to explicitly select a winning offer.
+ */
+router.post('/sessions/:sessionId/select', async (req, res) => {
+    const { offer_id, selection_mode = 'ADMIN_OVERRIDE' } = req.body;
+    try {
+        // Extract target offer id supporting both snake_case and camelCase
+        const targetOfferId = offer_id || req.body.offerId;
+        if (!targetOfferId) {
+            return res.status(400).json({ ok: false, error: 'MISSING_OFFER_ID' });
+        }
+
+        const updatedSessionResult = await marketplaceService.selectOffer(req.params.sessionId, targetOfferId, selection_mode);
+        
+        // Find selected offer object inside the populated session detail
+        const selectedOffer = updatedSessionResult?.session?.offers?.find(o => o.id === targetOfferId) || { id: targetOfferId, offerSelected: true };
+
+        res.json({ 
+            ok: true, 
+            session: updatedSessionResult?.session || {},
+            selectedOffer
+        });
+    } catch (err) {
+        if (err.message === 'MARKETPLACE_SESSION_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
+        }
+        if (err.message === 'MARKETPLACE_OFFER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'MARKETPLACE_OFFER_NOT_FOUND' });
+        }
+        res.status(500).json({ ok: false, error: 'MARKETPLACE_SELECT_FAILED', details: err.message });
     }
 });
 

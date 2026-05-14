@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const db = require('./db');
 const reservationService = require('./reservationService');
 const dispatchService = require('./dispatchService');
 const quoteService = require('./quoteService');

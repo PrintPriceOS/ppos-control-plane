@@ -85,7 +85,14 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/admin/orders
 router.post('/', async (req, res) => {
-    const { order_ref, user_id, specs, offer_print_house, offer_price, status } = req.body;
+    // Accommodate BPE sync payload by deriving default fallbacks for legacy required fields
+    const isBpe = req.body.source === 'BPE' || req.body.source_ref != null;
+    const order_ref = req.body.order_ref || req.body.source_ref || (isBpe ? `bpe_${Date.now()}` : null);
+    const user_id = req.body.user_id || (isBpe ? 'bpe_system_user' : null);
+    const specs = req.body.specs || (isBpe ? {} : null);
+    const offer_print_house = req.body.offer_print_house || (isBpe ? 'BPE_Engine' : null);
+    const offer_price = req.body.offer_price != null ? req.body.offer_price : (isBpe ? (req.body.pricing?.bpe_price || 0) : null);
+    const status = req.body.status;
 
     if (!order_ref || !user_id || !specs || !offer_print_house || offer_price == null) {
         return res.status(400).json({
@@ -99,9 +106,24 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        const insertId = await createOrder({ order_ref, user_id, specs, offer_print_house, offer_price, status });
+        // Pass full rich body along with resolved legacy arguments to createOrder
+        const insertId = await createOrder({ 
+            ...req.body,
+            order_ref, 
+            user_id, 
+            specs, 
+            offer_print_house, 
+            offer_price, 
+            status 
+        });
         const order = await getOrder(insertId);
-        res.status(201).json({ ok: true, order });
+        
+        // Include marketplace_session_id if returned/injected
+        res.status(201).json({ 
+            ok: true, 
+            order,
+            marketplace_session_id: order?.marketplace_session_id || req.marketplaceSessionId || undefined
+        });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ ok: false, error: `order_ref '${order_ref}' already exists` });

@@ -147,7 +147,7 @@ export const MarketplaceTab: React.FC = () => {
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-lg font-black text-slate-900 leading-none">{o.suggested_price} €</div>
-                                                    <div className="text-[9px] text-emerald-600 font-black mt-1 uppercase tracking-tighter">+{o.margin_pct}% Pargin</div>
+                                                    <div className="text-[9px] text-emerald-600 font-black mt-1 uppercase tracking-tighter">+{o.margin_pct}% Margin</div>
                                                 </div>
                                             </div>
 

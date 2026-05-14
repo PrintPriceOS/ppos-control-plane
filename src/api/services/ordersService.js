@@ -37,7 +37,8 @@ async function getOrderByRef(order_ref) {
     return rows[0] || null;
 }
 
-async function createOrder({ order_ref, user_id, specs, offer_print_house, offer_price, status }) {
+async function createOrder(payload) {
+    const { order_ref, user_id, specs, offer_print_house, offer_price, status } = payload;
     const result = await query(
         `INSERT INTO orders (order_ref, user_id, specs, offer_print_house, offer_price, status)
          VALUES (?, ?, ?, ?, ?, ?)`,
@@ -50,7 +51,71 @@ async function createOrder({ order_ref, user_id, specs, offer_print_house, offer
             status || 'pending'
         ]
     );
-    return result.insertId;
+
+    const insertId = result.insertId;
+
+    // Proactively enrich the newly created order row with extra BPE parameters if available
+    try {
+        const source = payload.source || 'BPE';
+        const source_ref = payload.source_ref || order_ref || null;
+        const tenant_id = payload.tenant_id || 'default';
+        const customerStr = payload.customer ? JSON.stringify(payload.customer) : null;
+        const pricingStr = payload.pricing ? JSON.stringify(payload.pricing) : null;
+        const deliveryStr = payload.delivery ? JSON.stringify(payload.delivery) : null;
+        const currency = payload.currency || payload.pricing?.currency || 'EUR';
+        const metadataStr = payload.metadata_json ? JSON.stringify(payload.metadata_json) : null;
+
+        await query(
+            `UPDATE orders 
+             SET source = ?, source_ref = ?, tenant_id = ?, customer = ?, pricing = ?, delivery = ?, currency = ?, metadata_json = ?
+             WHERE id = ?`,
+            [source, source_ref, tenant_id, customerStr, pricingStr, deliveryStr, currency, metadataStr, insertId]
+        );
+    } catch (enrichErr) {
+        console.error('[MARKETPLACE][ORDER-ENRICH] Non-fatal error enriching order row:', enrichErr.message);
+    }
+
+    // Intake Hook: Instantiate deterministic marketplace session orchestration via BPE client
+    try {
+        const marketplaceService = require('./marketplaceService');
+        // Fetch full updated order object to pass to the session generator
+        const orderRows = await query('SELECT * FROM orders WHERE id = ?', [insertId]);
+        const fullOrder = orderRows[0] || { id: insertId, ...payload };
+
+        // Run non-blocking marketplace session creation
+        marketplaceService.createMarketplaceSessionFromOrder(fullOrder)
+            .then((sessionSummary) => {
+                console.log(`[MARKETPLACE][SESSION-CREATED] Deterministic marketplace session orchestrated successfully`, {
+                    orderId: insertId,
+                    jobId: insertId,
+                    tenantId: fullOrder.tenant_id,
+                    sessionId: sessionSummary?.id
+                });
+            })
+            .catch(err => {
+                const traceId = payload.metadata_json?.trace_id || `trace_${insertId}`;
+                console.error(`[MARKETPLACE][ORCHESTRATION-FAILED] Auto-orchestration failure: ${err.message}`, {
+                    orderId: insertId,
+                    jobId: insertId,
+                    tenantId: fullOrder.tenant_id || payload.tenant_id,
+                    source: fullOrder.source || payload.source,
+                    sourceRef: fullOrder.source_ref || payload.source_ref,
+                    traceId
+                });
+            });
+    } catch (err) {
+        const traceId = payload.metadata_json?.trace_id || `trace_${insertId}`;
+        console.error(`[MARKETPLACE][ORCHESTRATION-FAILED] Failed to invoke marketplace service hook: ${err.message}`, {
+            orderId: insertId,
+            jobId: insertId,
+            tenantId: payload.tenant_id,
+            source: payload.source,
+            sourceRef: payload.source_ref,
+            traceId
+        });
+    }
+
+    return insertId;
 }
 
 async function updateOrder(id, updates) {
