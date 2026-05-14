@@ -360,18 +360,61 @@ export const PreflightJobsPage: React.FC = () => {
               {
                 header: 'Status & Fidelity',
                 align: 'center',
-                accessor: (j) => (
-                  <div className="flex flex-col items-center">
+                accessor: (j: any) => (
+                  <div className="flex flex-col items-center gap-0.5">
                     <StatusBadge status={j.status || 'PENDING'} />
-                    <span className="text-[9px] font-manrope text-[#8F96A3] uppercase tracking-tighter mt-1 block">
-                      {j.canonicalData?.status ? 'Synchronized' : 'Registry Initial'}
+                    <span className="text-[9px] font-manrope text-[#8F96A3] uppercase tracking-tighter mt-0.5 block truncate max-w-[120px]" title={j.sourceSystem || 'Registry'}>
+                      {j.sourceSystem || 'Registry'} • {j.canonicalData?.status ? 'Sync' : 'Init'}
                     </span>
+                    {(j.lastSyncedAt || j.lastSeenAt) && (
+                      <span className="text-[8px] font-mono text-slate-400 block" title={`Freshness: ${j.lastSyncedAt || j.lastSeenAt}`}>
+                        {short(j.lastSyncedAt || j.lastSeenAt || '', 12)}
+                      </span>
+                    )}
                   </div>
                 )
               },
               {
-                header: 'Diagnostics',
-                accessor: (j) => {
+                header: 'Diagnostics / Fix Result',
+                accessor: (j: any) => {
+                  if (j.type === 'AUTOFIX') {
+                    const applied = j.appliedFixesCount ?? 0;
+                    const skipped = j.skippedFixesCount ?? 0;
+                    const failed = j.failedFixesCount ?? 0;
+
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('[CONTROL][PREFLIGHT][UI][AUTOFIX-BUCKETS]', {
+                        jobId: j.jobId,
+                        appliedFixesCount: applied,
+                        skippedFixesCount: skipped,
+                        failedFixesCount: failed
+                      });
+                    }
+
+                    // Preserve Monolith visual language: dark-safe, dense, no rounded/glassmorphism
+                    let badgeColor = 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-white/10';
+                    if (failed > 0) {
+                      badgeColor = 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20';
+                    } else if (skipped > 0) {
+                      badgeColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+                    } else if (applied > 0) {
+                      badgeColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+                    }
+
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-none border text-[9px] font-black uppercase tracking-wider w-fit ${badgeColor}`}>
+                          <span>Fix Result</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 dark:text-zinc-400">
+                          <span title="Applied Fixes">A: <strong className="text-slate-800 dark:text-white">{applied}</strong></span>
+                          <span title="Skipped Fixes">S: <strong className="text-slate-800 dark:text-white">{skipped}</strong></span>
+                          <span title="Failed Fixes">F: <strong className={failed > 0 ? 'text-red-500' : 'text-slate-800 dark:text-white'}>{failed}</strong></span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const info = j.canonicalData;
                   const issues = info?.issues?.length || info?.analysis?.issues?.length || 0;
                   const fixes = info?.fixes?.length || info?.repairs?.length || 0;

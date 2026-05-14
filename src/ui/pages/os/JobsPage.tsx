@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QueueListIcon, FunnelIcon, ClockIcon, ArrowTopRightOnSquareIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { getIncomingConsoleConsensus } from "../../lib/adminApi";
+import { getIncomingConsoleConsensus, syncAdminPreflightRegistry } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { short } from "../../lib/formatters";
@@ -9,8 +9,25 @@ import { safeArray } from "../../lib/display";
 
 export const JobsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
   // Fetch canonical preflight jobs with optional legacy queue operator fallback
   const q = useAdminQuery("jobs:global:consensus", () => getIncomingConsoleConsensus({ limit: 50 }), 10000);
+
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    setSyncStatusMsg("Initiating global reconciliation...");
+    try {
+      const res = await syncAdminPreflightRegistry({ limit: 50 });
+      setSyncStatusMsg(`Reconciled ${res.totalProcessed ?? 0} jobs (${res.successCount ?? 0} updated, ${res.failureCount ?? 0} failed).`);
+      await q.refetch();
+    } catch (err: any) {
+      setSyncStatusMsg(`Sync rejected: ${err.message || 'Upstream Gateway unreachable'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const sStr = (v: any): string => {
     if (!v) return '';
@@ -64,11 +81,24 @@ export const JobsPage: React.FC = () => {
             <button className="px-3 py-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-wide leading-none transition-colors text-[11px]">
                 Status: All
             </button>
-            <button onClick={() => q.refetch()} className="px-3 py-1 bg-zinc-900 dark:bg-zinc-800 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-200 font-bold uppercase tracking-wide leading-none transition-colors text-[11px]">
-                Force Sync
+            <button 
+              disabled={isSyncing}
+              onClick={handleForceSync} 
+              className="flex items-center gap-1 px-3 py-1 bg-zinc-900 dark:bg-zinc-800 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-200 font-bold uppercase tracking-wide leading-none transition-colors text-[11px] disabled:opacity-50"
+              title="Force full upstream Gateway synchronization"
+            >
+                {isSyncing && <ArrowPathIcon className="w-3 h-3 animate-spin" />}
+                <span>{isSyncing ? 'Syncing...' : 'Force Sync'}</span>
             </button>
           </div>
       </div>
+
+      {syncStatusMsg && (
+        <div className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px] font-mono text-zinc-700 dark:text-zinc-300">
+          <span>{syncStatusMsg}</span>
+          <button onClick={() => setSyncStatusMsg(null)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold">×</button>
+        </div>
+      )}
 
       {/* Primary Payload Rendering */}
       {jobs.length === 0 && q.status === 'success' ? (

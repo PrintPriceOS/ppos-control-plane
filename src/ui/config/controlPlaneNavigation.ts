@@ -17,7 +17,7 @@ export interface NavItem {
 export const navigationConfig: NavItem[] = [
     // Global Governance (Super Admin only)
     { id: 'governance', label: 'Global Governance', path: '/governance', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN'] },
-    { id: 'federation', label: 'Federation', path: '/federation', icon: 'CloudIcon', roles: ['SUPER_ADMIN'] },
+    { id: 'federation', label: 'Federation', path: '/federation/overview', icon: 'CloudIcon', roles: ['SUPER_ADMIN'] },
     
     // Core Dashboard (Common)
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'HomeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },

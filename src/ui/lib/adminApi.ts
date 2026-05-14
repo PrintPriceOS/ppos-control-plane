@@ -329,6 +329,20 @@ export type PreflightJob = {
     artifacts?: any[];
     canonicalData?: any;
     canonicalPayload?: any;
+    sourceJobId?: string | null;
+    sourceSystem?: string | null;
+    requestedFixesCount?: number;
+    repairsCount?: number;
+    appliedFixesCount?: number;
+    skippedFixesCount?: number;
+    failedFixesCount?: number;
+    requestedFixes?: any[];
+    repairs?: any[];
+    appliedFixes?: any[];
+    skippedFixes?: any[];
+    failedFixes?: any[];
+    lastSeenAt?: string | null;
+    lastSyncedAt?: string | null;
 };
 
 export type PreflightJobsResponse = {
@@ -1885,6 +1899,20 @@ export interface AdminPreflightJob {
     createdAt: string;
     updatedAt: string;
     canonicalData?: any;
+    sourceJobId?: string | null;
+    sourceSystem?: string | null;
+    requestedFixesCount?: number;
+    repairsCount?: number;
+    appliedFixesCount?: number;
+    skippedFixesCount?: number;
+    failedFixesCount?: number;
+    requestedFixes?: any[];
+    repairs?: any[];
+    appliedFixes?: any[];
+    skippedFixes?: any[];
+    failedFixes?: any[];
+    lastSeenAt?: string | null;
+    lastSyncedAt?: string | null;
 }
 
 export async function listAdminPreflightJobs(filters: Record<string, any> = {}) {
@@ -1998,6 +2026,50 @@ export async function getAdminPreflightGovernance(filters: Record<string, any> =
     });
     const qStr = qs.toString();
     return adminFetch<{ ok: boolean, total: number, governanceEvents: any[], source_status?: string }>(qStr ? `/api/admin/preflight/governance?${qStr}` : `/api/admin/preflight/governance`);
+}
+
+// --- High-Fidelity UI Defensive Helpers for AUTOFIX Buckets ---
+
+export function normalizeFixArray(value: any): any[] {
+    if (!value) return [];
+    let arr: any[] = [];
+    if (Array.isArray(value)) {
+        arr = value;
+    } else if (typeof value === 'object') {
+        arr = [value];
+    } else if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            arr = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {
+            arr = [{ code: value, status: "COMPLETED" }];
+        }
+    }
+    return arr.map(item => {
+        if (typeof item === 'string') {
+            return { code: item, status: "COMPLETED" };
+        }
+        return item || {};
+    });
+}
+
+export function getFixCode(fix: any): string {
+    if (!fix) return "UNKNOWN";
+    if (typeof fix === 'string') return fix;
+    return fix.code || fix.id || fix.repairStrategy || "UNKNOWN";
+}
+
+export function getFixStatus(fix: any): string {
+    if (!fix) return "UNKNOWN";
+    if (typeof fix === 'string') return "COMPLETED";
+    return fix.status || "UNKNOWN";
+}
+
+export async function syncAdminPreflightRegistry(options: { tenantId?: string, limit?: number, status?: string } = {}) {
+    return adminFetch<{ ok: boolean, totalProcessed: number, successCount: number, failureCount: number, results: any[], source_status?: string }>('/api/admin/preflight/sync', {
+        method: 'POST',
+        body: JSON.stringify(options)
+    });
 }
 
 

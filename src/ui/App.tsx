@@ -147,6 +147,7 @@ export const App: React.FC = () => {
                 <Route path="/intelligence/agents/decisions" element={<AgentDecisions />} />
                 <Route path="/intelligence/agents/conflicts" element={<AgentConflicts />} />
 
+                <Route path="/federation" element={<Navigate to="/federation/overview" replace />} />
                 <Route path="/federation/overview" element={<FederationOverview />} />
                 <Route path="/federation/registry" element={<InstanceRegistry />} />
                 <Route path="/federation/signals" element={<FederationSignals />} />
