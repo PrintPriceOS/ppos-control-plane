@@ -754,6 +754,7 @@ class ControlPlaneSchemaService {
     async ensurePreflightRegistrySchema() {
         await this.ensureColumn('preflight_job_registry', 'source_job_id', 'VARCHAR(64) NULL');
         await this.ensureColumn('preflight_job_registry', 'source_system', "VARCHAR(64) NULL DEFAULT 'PREFLIGHT_SERVICE'");
+        await this.ensureColumn('preflight_job_registry', 'source_status', 'VARCHAR(64) NULL');
         await this.ensureColumn('preflight_job_registry', 'risk_score', 'INT NULL');
         await this.ensureColumn('preflight_job_registry', 'risk_level', 'VARCHAR(32) NULL');
         await this.ensureColumn('preflight_job_registry', 'issue_count', 'INT NULL');
@@ -764,6 +765,7 @@ class ControlPlaneSchemaService {
         await this.ensureColumn('preflight_job_registry', 'skipped_fixes_json', 'JSON NULL');
         await this.ensureColumn('preflight_job_registry', 'failed_fixes_json', 'JSON NULL');
         await this.ensureColumn('preflight_job_registry', 'artifact_list_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'sync_error_json', 'JSON NULL');
         await this.ensureColumn('preflight_job_registry', 'degraded', 'TINYINT(1) NULL DEFAULT 0');
         await this.ensureColumn('preflight_job_registry', 'degraded_reasons_json', 'JSON NULL');
         await this.ensureColumn('preflight_job_registry', 'last_seen_at', 'TIMESTAMP NULL');

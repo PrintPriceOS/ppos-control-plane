@@ -430,13 +430,10 @@ router.post('/sync', async (req, res) => {
         let failureCount = 0;
 
         for (const job of items) {
-            const jId = job.id || job.jobId || job.job_id;
+            const jId = job.id || job.jobId || job.job_id || job.targetJobId || job.fixJobId;
             if (!jId) continue;
             try {
-                const res = await syncService.syncJob(jId, {
-                    tenantId: context.tenantId,
-                    authHeader: context.Authorization
-                });
+                const res = await syncService.syncListItem(job, context.tenantId);
                 syncResults.push({ jobId: jId, status: 'SUCCESS', details: res });
                 successCount++;
             } catch (syncErr) {

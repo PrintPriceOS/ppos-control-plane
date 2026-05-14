@@ -104,6 +104,45 @@ async function runSmokeTests() {
         assert(params[3] === 'AUTOFIX', 'SQL Param 3 binds job type/strategy.');
         assert(params[8] === 12, 'SQL Param 8 binds risk_score metric.');
 
+        console.log('\n--- Test Suite 2: List-Payload-First Sync with GET 404 Fallback Verification ---');
+        dbQueriesIntercepted = [];
+        schemaVerificationInvoked = false;
+
+        const fallbackJobId = 'job_smoke_fallback_404';
+        const listItem = {
+            id: fallbackJobId,
+            type: 'AUTOFIX',
+            status: 'COMPLETED',
+            tenantId: 'ppos-production-worker',
+            original_filename: 'listed_only.pdf',
+            sizeBytes: 500000,
+            summaryFlat: { risk_score: 5, risk_level: 'LOW', issue_count: 1 },
+            requested_fixes: ['APPLY_BLEED']
+        };
+
+        // Configure mock getJob to throw 404 to simulate missing upstream enrichment
+        preflightServiceClient.getJob = async (jId) => {
+            console.log(`  [INTERCEPT] preflightServiceClient.getJob returning 404 for ${jId}`);
+            const err = new Error('Request failed with status code 404');
+            err.status = 404;
+            throw err;
+        };
+
+        const fallbackRes = await syncService.syncListItem(listItem, 'ppos-production-worker');
+
+        assert(fallbackRes.ok === true, 'syncListItem returns ok: true even when GET enrichment encounters 404.');
+        assert(fallbackRes.enriched === false, 'Result flags enriched: false correctly.');
+        assert(fallbackRes.source_status === 'LISTED_BUT_NOT_GET_RESOLVABLE', 'Sets source_status to LISTED_BUT_NOT_GET_RESOLVABLE.');
+        assert(fallbackRes.sync_error_json?.status === 404, 'Populates sync_error_json diagnostic payload with status: 404.');
+
+        // Verify that initial upsert query was executed for the minimal row
+        const minimalUpserts = dbQueriesIntercepted.filter(q => q.sql.includes('INSERT INTO preflight_job_registry'));
+        assert(minimalUpserts.length === 1, 'Executes precisely one minimal row upsert before attempting GET enrichment.');
+        
+        // Verify update query sets sync_error_json
+        const updateErrorQuery = dbQueriesIntercepted.find(q => q.sql.includes('UPDATE preflight_job_registry SET source_status = ?'));
+        assert(updateErrorQuery !== undefined, 'Executes UPDATE query to store sync_error_json and fallback status upon 404.');
+
         console.log('\n==================================================');
         console.log(`RESULTS: ${passed} PASSED, ${failed} FAILED`);
         console.log('==================================================\n');
