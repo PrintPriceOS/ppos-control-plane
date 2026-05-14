@@ -136,6 +136,7 @@ class IndustrialProvisioningService {
 
         try {
             await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
+            await require('./controlPlaneSchemaService').ensureMarketplaceRegistrySchema();
         } catch (schemaErr) {
             this._logStepError('ensurePreflightRegistrySchema', schemaErr);
         }

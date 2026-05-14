@@ -88,7 +88,17 @@ router.post('/', async (req, res) => {
     // Accommodate BPE sync payload by deriving default fallbacks for legacy required fields
     const isBpe = req.body.source === 'BPE' || req.body.source_ref != null;
     const order_ref = req.body.order_ref || req.body.source_ref || (isBpe ? `bpe_${Date.now()}` : null);
-    const user_id = req.body.user_id || (isBpe ? 'bpe_system_user' : null);
+    
+    let user_id = req.body.user_id;
+    if (isBpe && !user_id) {
+        if (process.env.PPOS_BPE_SYSTEM_USER_ID) {
+            user_id = process.env.PPOS_BPE_SYSTEM_USER_ID;
+        } else {
+            logger.warn({ event: 'MISSING_BPE_SYSTEM_USER_ID', message: 'PPOS_BPE_SYSTEM_USER_ID env variable is not set. Falling back to system integration user gracefully without failing silently.' });
+            user_id = 'bpe_system_user';
+        }
+    }
+
     const specs = req.body.specs || (isBpe ? {} : null);
     const offer_print_house = req.body.offer_print_house || (isBpe ? 'BPE_Engine' : null);
     const offer_price = req.body.offer_price != null ? req.body.offer_price : (isBpe ? (req.body.pricing?.bpe_price || 0) : null);

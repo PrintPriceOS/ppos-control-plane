@@ -920,6 +920,39 @@ class ControlPlaneSchemaService {
         await this.ensureColumn('preflight_job_registry', 'last_seen_at', 'TIMESTAMP NULL');
         await this.ensureColumn('preflight_job_registry', 'last_synced_at', 'TIMESTAMP NULL');
     }
+
+    /**
+     * Dedicated idempotent method to ensure all enriched columns on marketplace registry tables exist.
+     */
+    async ensureMarketplaceRegistrySchema() {
+        await this.ensureColumn('job_marketplace_sessions', 'order_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'tenant_id', 'VARCHAR(128) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'source', 'VARCHAR(64) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'source_ref', 'VARCHAR(128) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'pricing_engine', 'VARCHAR(64) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'pricing_engine_trace_id', 'VARCHAR(128) NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'metadata_json', 'JSON NULL');
+        await this.ensureColumn('job_marketplace_sessions', 'error_json', 'JSON NULL');
+
+        await this.ensureColumn('manufacturing_offers', 'order_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('manufacturing_offers', 'tenant_id', 'VARCHAR(128) NULL');
+        await this.ensureColumn('manufacturing_offers', 'printer_name', 'VARCHAR(255) NULL');
+        await this.ensureColumn('manufacturing_offers', 'house_id', 'VARCHAR(128) NULL');
+        await this.ensureColumn('manufacturing_offers', 'currency', "VARCHAR(8) DEFAULT 'EUR'");
+        await this.ensureColumn('manufacturing_offers', 'production_lead_days', 'INT NULL');
+        await this.ensureColumn('manufacturing_offers', 'shipping_days', 'INT NULL');
+        await this.ensureColumn('manufacturing_offers', 'delivery_time', 'VARCHAR(128) NULL');
+        await this.ensureColumn('manufacturing_offers', 'raw_estimate_json', 'JSON NULL');
+        await this.ensureColumn('manufacturing_offers', 'metadata_json', 'JSON NULL');
+        await this.ensureColumn('manufacturing_offers', 'error_json', 'JSON NULL');
+
+        await this.ensureColumn('marketplace_events', 'order_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('marketplace_events', 'tenant_id', 'VARCHAR(128) NULL');
+        await this.ensureColumn('marketplace_events', 'source', 'VARCHAR(64) NULL');
+        await this.ensureColumn('marketplace_events', 'source_ref', 'VARCHAR(128) NULL');
+        await this.ensureColumn('marketplace_events', 'event_level', "ENUM('INFO','WARN','ERROR') DEFAULT 'INFO'");
+        await this.ensureColumn('marketplace_events', 'message', 'TEXT NULL');
+    }
 }
 
 const service = new ControlPlaneSchemaService();

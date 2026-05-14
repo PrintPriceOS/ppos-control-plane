@@ -93,3 +93,9 @@ CREATE TABLE IF NOT EXISTS marketplace_events (
     INDEX idx_event_type(event_type),
     INDEX idx_event_created_at(created_at)
 ) ENGINE=InnoDB;
+
+-- Ensure order_id exists idempotently for pre-existing deployments
+ALTER TABLE job_marketplace_sessions ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+ALTER TABLE manufacturing_offers ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+ALTER TABLE marketplace_events ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+

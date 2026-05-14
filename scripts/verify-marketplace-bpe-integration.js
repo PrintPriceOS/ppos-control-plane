@@ -107,8 +107,11 @@ async function runVerification() {
                 console.log(`[4/4] Simulating manual admin override selection on target offer: off_sim_candidate_01...`);
                 console.log(`      ✓ Admin selection override handoff complete`);
                 
-                console.log('\n------------------------------------------------------------------------');
-                console.log('--- VERIFICATION SUCCESSFUL (PURE SIMULATION MODE) ---');
+                console.log('\n========================================================================');
+                console.log('--- VERIFICATION COMPLETED IN SIMULATION MODE (NO REAL DB VALIDATED) ---');
+                console.log('========================================================================');
+                console.log('⚠️ WARNING: Local MySQL service was offline. Verified mapping schemas');
+                console.log('   and orchestration fallback routines using programmatically mocked data.');
                 console.log('✓ Rich BPE incoming order payload schema mapped seamlessly');
                 console.log('✓ Non-blocking deterministic session orchestration invoked correctly');
                 console.log('✓ Diagnostic mapping for pricing_engine string attribute confirmed');
