@@ -134,6 +134,12 @@ class IndustrialProvisioningService {
         let ensured = 0;
         const coreTables = []; // Placeholder for any specific table creation logic if needed
 
+        try {
+            await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
+        } catch (schemaErr) {
+            this._logStepError('ensurePreflightRegistrySchema', schemaErr);
+        }
+
         // Ensure Phase 18 Governance columns exist
         const governanceMigrations = [
             { table: 'print_nodes', column: 'rates_json', type: 'JSON NULL' },

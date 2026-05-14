@@ -685,21 +685,7 @@ class ControlPlaneSchemaService {
             await this.ensureColumn('predictive_material_inventory', 'cost_per_unit', 'DECIMAL(10,4) DEFAULT 0.0000');
 
             // PHASE 10 - Preflight Registry Synchronization Hardening
-            await this.ensureColumn('preflight_job_registry', 'source_job_id', 'VARCHAR(64) NULL');
-            await this.ensureColumn('preflight_job_registry', 'risk_score', 'INT DEFAULT 0');
-            await this.ensureColumn('preflight_job_registry', 'risk_level', 'VARCHAR(32) NULL');
-            await this.ensureColumn('preflight_job_registry', 'issue_count', 'INT DEFAULT 0');
-            await this.ensureColumn('preflight_job_registry', 'requested_fixes_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'repairs_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'fixes_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'applied_fixes_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'skipped_fixes_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'failed_fixes_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'artifact_list_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'degraded', 'BOOLEAN DEFAULT FALSE');
-            await this.ensureColumn('preflight_job_registry', 'degraded_reasons_json', 'JSON NULL');
-            await this.ensureColumn('preflight_job_registry', 'last_seen_at', 'TIMESTAMP NULL');
-            await this.ensureColumn('preflight_job_registry', 'last_synced_at', 'TIMESTAMP NULL');
+            await this.ensurePreflightRegistrySchema();
 
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
 
@@ -760,6 +746,28 @@ class ControlPlaneSchemaService {
         } catch (err) {
             logger.error({ event: 'schema_error', message: `Failed to ensure index ${indexName} on ${table}`, error: err.message });
         }
+    }
+
+    /**
+     * Dedicated idempotent method to ensure all enriched columns on preflight_job_registry exist.
+     */
+    async ensurePreflightRegistrySchema() {
+        await this.ensureColumn('preflight_job_registry', 'source_job_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('preflight_job_registry', 'source_system', "VARCHAR(64) NULL DEFAULT 'PREFLIGHT_SERVICE'");
+        await this.ensureColumn('preflight_job_registry', 'risk_score', 'INT NULL');
+        await this.ensureColumn('preflight_job_registry', 'risk_level', 'VARCHAR(32) NULL');
+        await this.ensureColumn('preflight_job_registry', 'issue_count', 'INT NULL');
+        await this.ensureColumn('preflight_job_registry', 'requested_fixes_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'repairs_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'fixes_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'applied_fixes_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'skipped_fixes_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'failed_fixes_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'artifact_list_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'degraded', 'TINYINT(1) NULL DEFAULT 0');
+        await this.ensureColumn('preflight_job_registry', 'degraded_reasons_json', 'JSON NULL');
+        await this.ensureColumn('preflight_job_registry', 'last_seen_at', 'TIMESTAMP NULL');
+        await this.ensureColumn('preflight_job_registry', 'last_synced_at', 'TIMESTAMP NULL');
     }
 }
 

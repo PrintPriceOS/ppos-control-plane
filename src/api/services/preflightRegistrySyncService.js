@@ -26,6 +26,9 @@ class PreflightRegistrySyncService {
         logger.info({ event: 'sync_job_start', jobId, tenantId: targetTenantId });
 
         try {
+            // Guarantee registry schema compliance before proceeding
+            await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
+
             // Fetch live payload utilizing preflightServiceClient.getJob
             const upstreamJob = await preflightServiceClient.getJob(jobId, authHeader, targetTenantId);
             
@@ -39,6 +42,7 @@ class PreflightRegistrySyncService {
 
             // Data Extraction Logic
             const source_job_id = upstreamJob.sourceJobId || upstreamJob.source_job_id || null;
+            const source_system = upstreamJob.sourceSystem || upstreamJob.source_system || 'PREFLIGHT_SERVICE';
             const type = upstreamJob.type || upstreamJob.strategy || 'ANALYZE';
             const status = upstreamJob.status || upstreamJob.state || 'COMPLETED';
             const resolved_tenant_id = upstreamJob.tenantId || upstreamJob.tenant_id || targetTenantId;
@@ -143,6 +147,7 @@ class PreflightRegistrySyncService {
                 INSERT INTO preflight_job_registry (
                     job_id,
                     source_job_id,
+                    source_system,
                     type,
                     status,
                     tenant_id,
@@ -166,9 +171,10 @@ class PreflightRegistrySyncService {
                     last_seen_at,
                     last_synced_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
                 ) ON DUPLICATE KEY UPDATE
                     source_job_id = VALUES(source_job_id),
+                    source_system = VALUES(source_system),
                     type = VALUES(type),
                     status = VALUES(status),
                     tenant_id = VALUES(tenant_id),
@@ -195,6 +201,7 @@ class PreflightRegistrySyncService {
             `, [
                 jobId,
                 source_job_id,
+                source_system,
                 type,
                 status,
                 resolved_tenant_id,

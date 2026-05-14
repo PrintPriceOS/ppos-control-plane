@@ -13,6 +13,7 @@ const { resolveActorContext, requireApprovedPrinthouse } = require('../middlewar
 const gateway = require('../services/preflightContractGateway');
 const db = require('../services/mysqlClient');
 const syncService = require('../services/preflightRegistrySyncService');
+const preflightServiceClient = require('../services/preflightServiceClient');
 
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
@@ -168,23 +169,44 @@ router.get('/jobs', async (req, res) => {
         const [countRows] = await db.query(countSql, countParams);
         const total = Array.isArray(countRows) ? (countRows[0]?.cnt || 0) : (countRows?.cnt || rows.length);
 
-        const jobs = rows.map(r => ({
-            jobId: r.job_id,
-            tenantId: r.tenant_id,
-            printhouseId: r.printhouse_id,
-            operatorId: r.operator_id,
-            batchId: r.batch_id,
-            status: r.status,
-            policy: r.policy,
-            type: r.type,
-            progress: r.progress,
-            fileSize: r.file_size_bytes,
-            filename: r.original_filename,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-            // Preserve raw canonical diagnostics safely
-            canonicalData: r.canonical_payload_json ? (typeof r.canonical_payload_json === 'string' ? JSON.parse(r.canonical_payload_json) : r.canonical_payload_json) : null
-        }));
+        const jobs = rows.map(r => {
+            const safeParse = str => {
+                if (!str) return null;
+                if (typeof str !== 'string') return str;
+                try { return JSON.parse(str); } catch(e) { return null; }
+            };
+            return {
+                jobId: r.job_id,
+                sourceJobId: r.source_job_id,
+                sourceSystem: r.source_system,
+                tenantId: r.tenant_id,
+                printhouseId: r.printhouse_id,
+                operatorId: r.operator_id,
+                batchId: r.batch_id,
+                status: r.status,
+                policy: r.policy,
+                type: r.type,
+                progress: r.progress,
+                fileSize: r.file_size_bytes,
+                filename: r.original_filename,
+                riskScore: r.risk_score,
+                riskLevel: r.risk_level,
+                issueCount: r.issue_count,
+                requestedFixes: safeParse(r.requested_fixes_json),
+                repairs: safeParse(r.repairs_json),
+                fixes: safeParse(r.fixes_json),
+                appliedFixes: safeParse(r.applied_fixes_json),
+                skippedFixes: safeParse(r.skipped_fixes_json),
+                failedFixes: safeParse(r.failed_fixes_json),
+                degraded: !!r.degraded,
+                degradedReasons: safeParse(r.degraded_reasons_json),
+                createdAt: r.created_at,
+                updatedAt: r.updated_at,
+                lastSeenAt: r.last_seen_at,
+                lastSyncedAt: r.last_synced_at,
+                canonicalData: safeParse(r.canonical_payload_json)
+            };
+        });
 
         await logAuditEvent({
             tenantId: context.tenantId,
@@ -344,6 +366,9 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
     try {
+        // Enforce schema checks before executing sync operations
+        await require('../services/controlPlaneSchemaService').ensurePreflightRegistrySchema();
+
         // First verify job existence and scope if local record exists
         const rows = await db.query('SELECT tenant_id FROM preflight_job_registry WHERE job_id = ?', [jobId]);
         const localRecord = rows[0];
@@ -377,6 +402,77 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
 
         const status = err.status || (err.message?.includes('404') ? 404 : 500);
         res.status(status).json({ ok: false, error: 'SYNC_FAILED', message: err.message });
+    }
+});
+
+// --- 3.6 POST /api/admin/preflight/sync ---
+router.post('/sync', async (req, res) => {
+    const context = buildGatewayContext(req);
+    console.log('[CONTROL][PREFLIGHT][SYNC-START] Initiating global preflight synchronization');
+    try {
+        // Enforce schema checks before executing global sync operations
+        await require('../services/controlPlaneSchemaService').ensurePreflightRegistrySchema();
+
+        const limit = req.body?.limit || req.query?.limit || 100;
+        const statusParam = req.body?.status || req.query?.status;
+
+        // Fetch jobs from upstream service
+        const listRes = await preflightServiceClient.listJobs({
+            tenantId: context.tenantId,
+            limit,
+            status: statusParam,
+            authHeader: context.Authorization
+        });
+
+        const items = Array.isArray(listRes) ? listRes : (listRes?.jobs || listRes?.data || []);
+        const syncResults = [];
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const job of items) {
+            const jId = job.id || job.jobId || job.job_id;
+            if (!jId) continue;
+            try {
+                const res = await syncService.syncJob(jId, {
+                    tenantId: context.tenantId,
+                    authHeader: context.Authorization
+                });
+                syncResults.push({ jobId: jId, status: 'SUCCESS', details: res });
+                successCount++;
+            } catch (syncErr) {
+                syncResults.push({ jobId: jId, status: 'FAILURE', error: syncErr.message });
+                failureCount++;
+            }
+        }
+
+        console.log('[CONTROL][PREFLIGHT][SYNC-SUCCESS] Global preflight synchronization completed successfully');
+        await logAuditEvent({
+            tenantId: context.tenantId,
+            action: 'GLOBAL_SYNC',
+            status: 'SUCCESS',
+            message: `Processed ${items.length} jobs (${successCount} successful, ${failureCount} failed)`,
+            traceId: context.traceId
+        });
+
+        res.json({
+            ok: true,
+            totalProcessed: items.length,
+            successCount,
+            failureCount,
+            results: syncResults,
+            source_status: 'GLOBAL_RECONCILIATION_COMPLETED'
+        });
+    } catch (err) {
+        console.error('[CONTROL][PREFLIGHT][SYNC-ERROR] Global preflight synchronization encountered an error:', err.message);
+        await logAuditEvent({
+            tenantId: context.tenantId,
+            action: 'GLOBAL_SYNC',
+            status: 'FAILURE',
+            message: err.message,
+            traceId: context.traceId
+        });
+
+        res.status(500).json({ ok: false, error: 'GLOBAL_SYNC_FAILED', message: err.message });
     }
 });
 
