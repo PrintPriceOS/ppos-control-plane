@@ -462,15 +462,86 @@ class PreflightRegistrySyncService {
         const canonical_payload_json = JSON.stringify(payload);
         const sync_error_json_str = syncErrorJson ? JSON.stringify(syncErrorJson) : null;
 
-        await db.query(`
-            INSERT INTO preflight_job_registry (
-                job_id,
+        const requestedFixesCount = Array.isArray(requested_fixes) ? requested_fixes.length : 0;
+        const repairsCount = Array.isArray(repairs) ? repairs.length : 0;
+        console.log(`[CONTROL][PREFLIGHT][SYNC-UPSERT-ATTEMPT] ${JSON.stringify({
+            jobId,
+            tenantId: resolved_tenant_id,
+            type,
+            status,
+            sourceJobId: source_job_id,
+            requestedFixesCount,
+            repairsCount
+        })}`);
+
+        try {
+            await db.query(`
+                INSERT INTO preflight_job_registry (
+                    job_id,
+                    source_job_id,
+                    source_system,
+                    source_status,
+                    type,
+                    status,
+                    tenant_id,
+                    original_filename,
+                    file_size_bytes,
+                    risk_score,
+                    risk_level,
+                    issue_count,
+                    requested_fixes_json,
+                    repairs_json,
+                    fixes_json,
+                    applied_fixes_json,
+                    skipped_fixes_json,
+                    failed_fixes_json,
+                    artifact_list_json,
+                    sync_error_json,
+                    degraded,
+                    degraded_reasons_json,
+                    policy,
+                    progress,
+                    canonical_payload_json,
+                    last_seen_at,
+                    last_synced_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+                ) ON DUPLICATE KEY UPDATE
+                    source_job_id = COALESCE(VALUES(source_job_id), source_job_id),
+                    source_system = COALESCE(VALUES(source_system), source_system),
+                    source_status = COALESCE(VALUES(source_status), source_status),
+                    type = VALUES(type),
+                    status = VALUES(status),
+                    tenant_id = VALUES(tenant_id),
+                    original_filename = COALESCE(VALUES(original_filename), original_filename),
+                    file_size_bytes = IF(VALUES(file_size_bytes) > 0, VALUES(file_size_bytes), file_size_bytes),
+                    risk_score = VALUES(risk_score),
+                    risk_level = VALUES(risk_level),
+                    issue_count = VALUES(issue_count),
+                    requested_fixes_json = COALESCE(VALUES(requested_fixes_json), requested_fixes_json),
+                    repairs_json = COALESCE(VALUES(repairs_json), repairs_json),
+                    fixes_json = COALESCE(VALUES(fixes_json), fixes_json),
+                    applied_fixes_json = COALESCE(VALUES(applied_fixes_json), applied_fixes_json),
+                    skipped_fixes_json = COALESCE(VALUES(skipped_fixes_json), skipped_fixes_json),
+                    failed_fixes_json = COALESCE(VALUES(failed_fixes_json), failed_fixes_json),
+                    artifact_list_json = COALESCE(VALUES(artifact_list_json), artifact_list_json),
+                    sync_error_json = VALUES(sync_error_json),
+                    degraded = VALUES(degraded),
+                    degraded_reasons_json = VALUES(degraded_reasons_json),
+                    policy = COALESCE(VALUES(policy), policy),
+                    progress = VALUES(progress),
+                    canonical_payload_json = VALUES(canonical_payload_json),
+                    last_seen_at = NOW(),
+                    last_synced_at = NOW(),
+                    updated_at = NOW()
+            `, [
+                jobId,
                 source_job_id,
                 source_system,
                 source_status,
                 type,
                 status,
-                tenant_id,
+                resolved_tenant_id,
                 original_filename,
                 file_size_bytes,
                 risk_score,
@@ -483,71 +554,20 @@ class PreflightRegistrySyncService {
                 skipped_fixes_json,
                 failed_fixes_json,
                 artifact_list_json,
-                sync_error_json,
+                sync_error_json_str,
                 degraded,
                 degraded_reasons_json,
                 policy,
                 progress,
-                canonical_payload_json,
-                last_seen_at,
-                last_synced_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
-            ) ON DUPLICATE KEY UPDATE
-                source_job_id = COALESCE(VALUES(source_job_id), source_job_id),
-                source_system = COALESCE(VALUES(source_system), source_system),
-                source_status = COALESCE(VALUES(source_status), source_status),
-                type = VALUES(type),
-                status = VALUES(status),
-                tenant_id = VALUES(tenant_id),
-                original_filename = COALESCE(VALUES(original_filename), original_filename),
-                file_size_bytes = IF(VALUES(file_size_bytes) > 0, VALUES(file_size_bytes), file_size_bytes),
-                risk_score = VALUES(risk_score),
-                risk_level = VALUES(risk_level),
-                issue_count = VALUES(issue_count),
-                requested_fixes_json = COALESCE(VALUES(requested_fixes_json), requested_fixes_json),
-                repairs_json = COALESCE(VALUES(repairs_json), repairs_json),
-                fixes_json = COALESCE(VALUES(fixes_json), fixes_json),
-                applied_fixes_json = COALESCE(VALUES(applied_fixes_json), applied_fixes_json),
-                skipped_fixes_json = COALESCE(VALUES(skipped_fixes_json), skipped_fixes_json),
-                failed_fixes_json = COALESCE(VALUES(failed_fixes_json), failed_fixes_json),
-                artifact_list_json = COALESCE(VALUES(artifact_list_json), artifact_list_json),
-                sync_error_json = VALUES(sync_error_json),
-                degraded = VALUES(degraded),
-                degraded_reasons_json = VALUES(degraded_reasons_json),
-                policy = COALESCE(VALUES(policy), policy),
-                progress = VALUES(progress),
-                canonical_payload_json = VALUES(canonical_payload_json),
-                last_seen_at = NOW(),
-                last_synced_at = NOW(),
-                updated_at = NOW()
-        `, [
-            jobId,
-            source_job_id,
-            source_system,
-            source_status,
-            type,
-            status,
-            resolved_tenant_id,
-            original_filename,
-            file_size_bytes,
-            risk_score,
-            risk_level,
-            issue_count,
-            requested_fixes_json,
-            repairs_json,
-            fixes_json,
-            applied_fixes_json,
-            skipped_fixes_json,
-            failed_fixes_json,
-            artifact_list_json,
-            sync_error_json_str,
-            degraded,
-            degraded_reasons_json,
-            policy,
-            progress,
-            canonical_payload_json
-        ]);
+                canonical_payload_json
+            ]);
+        } catch (upsertErr) {
+            console.error(`[CONTROL][PREFLIGHT][SYNC-UPSERT-ERROR] ${JSON.stringify({
+                jobId,
+                error: upsertErr.message
+            })}`);
+            throw upsertErr;
+        }
 
         if (artifacts && Array.isArray(artifacts)) {
             for (const art of artifacts) {

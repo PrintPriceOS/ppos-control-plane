@@ -143,6 +143,30 @@ async function runSmokeTests() {
         const updateErrorQuery = dbQueriesIntercepted.find(q => q.sql.includes('UPDATE preflight_job_registry SET source_status = ?'));
         assert(updateErrorQuery !== undefined, 'Executes UPDATE query to store sync_error_json and fallback status upon 404.');
 
+        console.log('\n--- Test Suite 3: SQL Contract & Placeholder Alignment Validation ---');
+        // Inspect every intercepted query targeting preflight_job_registry INSERT
+        const insertQueries = dbQueriesIntercepted.filter(q => q.sql.includes('INSERT INTO preflight_job_registry'));
+        assert(insertQueries.length > 0, 'Intercepted target preflight_job_registry insertion queries to inspect.');
+
+        insertQueries.forEach((q, idx) => {
+            const colMatch = q.sql.match(/INSERT INTO preflight_job_registry\s*\(([^)]+)\)/i);
+            const valMatch = q.sql.match(/VALUES\s*\((.+?)\)\s*ON\s+DUPLICATE\s+KEY\s+UPDATE/i);
+            
+            assert(colMatch && valMatch, `Query #${idx + 1} matches standard column and values format syntax.`);
+            
+            if (colMatch && valMatch) {
+                const columns = colMatch[1].split(',').map(c => c.trim()).filter(Boolean);
+                const valuesStr = valMatch[1];
+                
+                const placeholders = (valuesStr.match(/\?/g) || []).length;
+                const nows = (valuesStr.match(/NOW\(\)/gi) || []).length;
+                const totalValues = placeholders + nows;
+                
+                assert(columns.length === totalValues, `Query #${idx + 1}: Declared columns (${columns.length}) exactly match total values block items (${totalValues} = ${placeholders} placeholders + ${nows} NOW()).`);
+                assert(placeholders === q.params.length, `Query #${idx + 1}: Placeholders count (${placeholders}) exactly matches params array length (${q.params.length}).`);
+            }
+        });
+
         console.log('\n==================================================');
         console.log(`RESULTS: ${passed} PASSED, ${failed} FAILED`);
         console.log('==================================================\n');

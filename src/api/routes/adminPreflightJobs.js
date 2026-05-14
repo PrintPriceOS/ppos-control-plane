@@ -416,9 +416,11 @@ router.post('/sync', async (req, res) => {
         const limit = req.body?.limit || req.query?.limit || 100;
         const statusParam = req.body?.status || req.query?.status;
 
+        const requestedTenantId = req.actorContext?.isSuperAdmin && req.body?.tenantId ? req.body.tenantId : context.tenantId;
+
         // Fetch jobs from upstream service
         const listRes = await preflightServiceClient.listJobs({
-            tenantId: context.tenantId,
+            tenantId: requestedTenantId,
             limit,
             status: statusParam,
             authHeader: context.Authorization
@@ -433,7 +435,7 @@ router.post('/sync', async (req, res) => {
             const jId = job.id || job.jobId || job.job_id || job.targetJobId || job.fixJobId;
             if (!jId) continue;
             try {
-                const res = await syncService.syncListItem(job, context.tenantId);
+                const res = await syncService.syncListItem(job, requestedTenantId);
                 syncResults.push({ jobId: jId, status: 'SUCCESS', details: res });
                 successCount++;
             } catch (syncErr) {
