@@ -19,6 +19,36 @@ export const MarketplaceTab: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
 
+    // Defensive formatting helpers
+    const safeMoney = (value: any, fallback = '—') => {
+        const n = Number(value);
+        return Number.isFinite(n) ? `${n.toLocaleString('es-ES', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        })} €` : fallback;
+    };
+
+    const safePercent = (value: any, fallback = '—') => {
+        const n = Number(value);
+        return Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n.toLocaleString('es-ES', {
+            maximumFractionDigits: 2
+        })}%` : fallback;
+    };
+
+    const safeScore = (value: any, fallback = '—') => {
+        const n = Number(value);
+        return Number.isFinite(n) ? Math.round(n) : fallback;
+    };
+
+    const safeLeadTime = (value: any, fallback = '—') => {
+        const n = Number(value);
+        return Number.isFinite(n) ? `${Math.ceil(n)} Work Days` : fallback;
+    };
+
+    // Safe array derivations
+    const selectedOffers = Array.isArray(selectedSession?.offers) ? selectedSession.offers : [];
+    const selectedEvents = Array.isArray(selectedSession?.events) ? selectedSession.events : [];
+
     useEffect(() => {
         fetchSessions();
     }, []);
@@ -52,13 +82,19 @@ export const MarketplaceTab: React.FC = () => {
         }
     };
 
-    const handleSelectOffer = async (offerId: string) => {
+    const handleSelectOffer = async (offerId: string, printerName?: string) => {
         if (!selectedSession) return;
+
+        const ok = window.confirm(
+            `Select ${printerName || 'this offer'} for this marketplace session?\n\nThis will mark competing offers as rejected and write OFFER_SELECTED to the event log.`
+        );
+        if (!ok) return;
+
         try {
             const res = await adminApi.selectMarketplaceOffer(selectedSession.id, offerId);
             if (res) {
-                fetchSessionDetail(selectedSession.id);
-                fetchSessions();
+                await fetchSessionDetail(selectedSession.id);
+                await fetchSessions();
             }
         } catch (err) {
             console.error('Selection failed:', err);
@@ -96,7 +132,7 @@ export const MarketplaceTab: React.FC = () => {
                             )}
                             {sessions.map((s, i) => (
                                 <button
-                                    key={i}
+                                    key={s.id || i}
                                     onClick={() => fetchSessionDetail(s.id)}
                                     className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${selectedSession?.id === s.id ? 'bg-blue-50/50' : ''}`}
                                 >
@@ -163,20 +199,23 @@ export const MarketplaceTab: React.FC = () => {
                                 </div>
 
                                 {/* Comparison Grid - Dense Multi-column */}
-                                {selectedSession.offers.length === 0 ? (
+                                {selectedOffers.length === 0 ? (
                                     <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-none">
                                         <ExclamationTriangleIcon className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No offers returned for this session</p>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {selectedSession.offers.map((o: any, i: number) => {
-                                            const isRecommended = o.offerRank === 1;
-                                            const isSelected = o.offerSelected || selectedSession.selectedOfferId === o.id;
+                                        {selectedOffers.map((o: any, i: number) => {
+                                            const rank = Number(o.offerRank);
+                                            const score = Number(o.offerPriorityScore);
+                                            const isRecommended = rank === 1 || (!Number.isFinite(rank) && score === 100);
+                                            const isSelected = Boolean(o.offerSelected || selectedSession.selectedOfferId === o.id);
                                             const isOverride = isSelected && selectedSession.selectionMode === 'ADMIN_OVERRIDE';
+                                            const offerId = (o.id || o.offerId) ? String(o.id || o.offerId) : null;
 
                                             return (
-                                                <div key={i} className={`p-4 rounded-none border transition-all ${isSelected ? 'bg-emerald-50/50 border-emerald-200 ring-2 ring-emerald-500/10' : 
+                                                <div key={o.id || `${o.printerId}-${i}`} className={`p-4 rounded-none border transition-all ${isSelected ? 'bg-emerald-50/50 border-emerald-200 ring-2 ring-emerald-500/10' : 
                                                     isRecommended && selectedSession.sessionStatus === 'OPEN' ? 'bg-blue-50/20 border-blue-100' : 'bg-white border-slate-100 hover:border-slate-300 shadow-none'
                                                     }`}>
                                                     <div className="flex justify-between items-start mb-4">
@@ -187,40 +226,48 @@ export const MarketplaceTab: React.FC = () => {
                                                                 {o.offerRank ? `#${o.offerRank}` : `--`}
                                                             </div>
                                                             <div>
-                                                                <div className="font-black text-slate-900 text-sm tracking-tight">{o.printerName}</div>
+                                                                <div className="font-black text-slate-900 text-sm tracking-tight">{safeText(o.printerName, 'Unknown printer')}</div>
                                                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                                                    {isRecommended && <span className="bg-blue-600 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none"><ShieldCheckIcon className="w-2.5 h-2.5" /> Recommended</span>}
-                                                                    {isSelected && <span className="bg-emerald-600 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none"><BoltIcon className="w-2.5 h-2.5" /> Selected</span>}
+                                                                    {isRecommended && !isSelected && <span className="bg-blue-600 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none"><ShieldCheckIcon className="w-2.5 h-2.5" /> Recommended</span>}
+                                                                    {isRecommended && isSelected && <span className="bg-emerald-600 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none"><ShieldCheckIcon className="w-2.5 h-2.5" /> Recommended + Selected</span>}
+                                                                    {!isRecommended && isSelected && <span className="bg-emerald-600 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none"><BoltIcon className="w-2.5 h-2.5" /> Selected</span>}
                                                                     {isOverride && <span className="bg-amber-500 text-white text-[7px] font-black px-1 py-0.5 rounded-none uppercase tracking-tighter flex items-center gap-0.5 shadow-none">Override</span>}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <div className="text-lg font-black text-slate-900 leading-none">{o.suggestedPrice.toLocaleString()} €</div>
-                                                            <div className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">Cost: {o.productionCost.toLocaleString()} €</div>
+                                                            <div className="text-lg font-black text-slate-900 leading-none">{safeMoney(o.suggestedPrice)}</div>
+                                                            <div className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">Cost: {safeMoney(o.productionCost)}</div>
                                                         </div>
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-3 mb-4">
                                                         <div className="bg-slate-50 p-2 rounded-none border border-slate-100">
                                                             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Margin</div>
-                                                            <div className="font-black text-emerald-600 text-xs">+{o.marginPct}% ({o.estimatedMargin.toLocaleString()}€)</div>
+                                                            <div className="font-black text-emerald-600 text-xs">{safePercent(o.marginPct)} ({safeMoney(o.estimatedMargin)})</div>
                                                         </div>
                                                         <div className="bg-slate-50 p-2 rounded-none border border-slate-100">
                                                             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Lead Time</div>
-                                                            <div className="font-black text-slate-900 text-xs">{safeText(o.leadTimeDays, '—')} Work Days</div>
+                                                            <div className="font-black text-slate-900 text-xs">{safeLeadTime(o.leadTimeDays)}</div>
                                                         </div>
                                                     </div>
 
                                                     <div className="flex items-center justify-between pt-2 border-t border-slate-100/50">
-                                                        <div className="text-[9px] text-slate-400 font-medium">Score: <span className="font-bold text-slate-600">{Math.round(o.offerPriorityScore)}</span></div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <div className="text-[9px] text-slate-400 font-medium">Score: <span className="font-bold text-slate-600">{safeScore(o.offerPriorityScore)}</span></div>
+                                                            {isSelected && !isRecommended && o.offerRank && (
+                                                                <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">BPE Rank: #{o.offerRank}</div>
+                                                            )}
+                                                        </div>
 
-                                                        {!isSelected && selectedSession.sessionStatus === 'OPEN' && (
+                                                        {!isSelected && offerId && (selectedSession.sessionStatus === 'OPEN' || selectedSession.sessionStatus === 'SELECTED') && (
                                                             <button
-                                                                onClick={() => handleSelectOffer(o.id)}
-                                                                className="px-4 py-2 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-none hover:bg-blue-600 transition-all shadow-none active:scale-95"
+                                                                onClick={() => handleSelectOffer(offerId, o.printerName)}
+                                                                className={`px-4 py-2 text-white text-[9px] font-black uppercase tracking-widest rounded-none transition-all shadow-none active:scale-95 ${
+                                                                    selectedSession.sessionStatus === 'OPEN' ? 'bg-slate-900 hover:bg-blue-600' : 'bg-amber-600 hover:bg-amber-700'
+                                                                }`}
                                                             >
-                                                                Override & Select
+                                                                {selectedSession.sessionStatus === 'OPEN' ? 'Select Offer' : 'Override & Select'}
                                                             </button>
                                                         )}
                                                     </div>
@@ -229,27 +276,40 @@ export const MarketplaceTab: React.FC = () => {
                                         })}
                                     </div>
                                 )}
+
+                                {selectedSession.sessionStatus === 'OPEN' && selectedOffers.length > 0 && (
+                                    <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-none flex items-start gap-3">
+                                        <BoltIcon className="w-5 h-5 text-blue-600 mt-0.5" />
+                                        <div>
+                                            <p className="text-[10px] text-blue-900 font-black uppercase tracking-widest mb-1">Transactional Selection</p>
+                                            <p className="text-[9px] text-blue-700 font-bold leading-relaxed uppercase tracking-tight">
+                                                Selecting an offer will finalize this session. All competing offers will be marked as REJECTED, 
+                                                and the chosen offer will be promoted to the primary order record for production routing.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Session Timeline */}
                             <div className="bg-white rounded-none border border-slate-200 p-6 shadow-none">
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Marketplace Event Log</h4>
-                                {selectedSession.events.length === 0 ? (
+                                {selectedEvents.length === 0 ? (
                                     <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest py-4">No events recorded</p>
                                 ) : (
                                     <div className="space-y-4">
-                                        {selectedSession.events.map((e: any, i: number) => {
+                                        {selectedEvents.map((e: any, i: number) => {
                                             const msg = String(e.message || '');
                                             const isNative = msg.includes('/api/marketplace/offers');
                                             const isFallback = msg.includes('/api/estimates');
 
                                             return (
-                                                <div key={i} className="flex gap-4 items-start pl-2 border-l-2 border-slate-100 pb-4 last:pb-0">
+                                                <div key={e.id || i} className="flex gap-4 items-start pl-2 border-l-2 border-slate-100 pb-4 last:pb-0">
                                                     <div className="mt-1 w-2 h-2 rounded-none bg-slate-300 ring-4 ring-white" />
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between">
                                                             <div className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                                                                {safeText(e.event_type || e.eventType).replace(/_/g, ' ')}
+                                                                {String(safeText(e.event_type || e.eventType)).replace(/_/g, ' ')}
                                                             </div>
                                                             <div className="text-[9px] text-slate-400 font-medium">
                                                                 {safeDate(e.created_at || e.createdAt)}
