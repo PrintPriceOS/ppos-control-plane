@@ -21,5 +21,23 @@ After deployment, run the unified verification script to confirm end-to-end func
 node scripts/verify_hardened_intake_full.js
 ```
 
+## Marketplace Orchestration (v10.0)
+The marketplace gateway is now active at `/api/marketplace/offers`.
+
+### Environment Variables
+- `PPOS_PRICING_ENGINE_URL`: Base URL of the BPE (e.g., `https://bpe.printprice.pro`). Defaults to `http://127.0.0.1:8004`.
+- `PPOS_PRICING_ENGINE_MARKETPLACE_PATH`: Path for native marketplace offers. Defaults to `/api/marketplace/offers`.
+- `PPOS_PRICING_ENGINE_ESTIMATES_PATH`: Path for legacy estimates fallback. Defaults to `/api/estimates`.
+- `PPOS_PRICING_ENGINE_TIMEOUT_MS`: Timeout for BPE requests. Defaults to `12000`.
+- `PUBLIC_BPE_API_ENABLED`: Set to `true` to enable the public endpoint.
+- `PPOS_CONTROL_TOKEN`: Mandatory Bearer token for industrial authentication.
+
+### Operational Verification
+To verify the public marketplace pricing flow:
+```bash
+node scripts/verify_marketplace_public_offers.js
+```
+
 ## Monitoring
-Monitor the `marketplace_events` and `production_file_events` tables for any `FAILED` ingestion or validation events. Admin intervention is required for orders stuck in `FILES_PENDING` due to remote fetch failures.
+Monitor the `marketplace_events` and `production_file_events` tables for any `FAILED` ingestion or validation events. 
+Log prefixes for marketplace: `[MARKETPLACE_PUBLIC]`, `[MARKETPLACE][PRICING-REQUEST]`, `[MARKETPLACE][PRICING-FALLBACK-ESTIMATES]`.

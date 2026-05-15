@@ -241,6 +241,7 @@ const start = async () => {
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+            fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
@@ -259,6 +260,8 @@ const start = async () => {
             fastify.all('/api/v2/analytics/*', apiNotFoundFallback);
             fastify.all('/api/connectors/factory', apiNotFoundFallback);
             fastify.all('/api/connectors/factory/*', apiNotFoundFallback);
+            fastify.all('/api/marketplace', apiNotFoundFallback);
+            fastify.all('/api/marketplace/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
