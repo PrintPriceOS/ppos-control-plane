@@ -30,3 +30,36 @@ export function toDisplayText(value: unknown, fallback = 'UNAVAILABLE'): string 
   }
   return fallback;
 }
+
+/**
+ * Safe text helper to ensure string output with fallback.
+ */
+export const safeText = (value: unknown, fallback = '—'): string =>
+  value === null || value === undefined || value === '' ? fallback : String(value);
+
+/**
+ * Safe slug generator to prevent crashes on non-string values.
+ */
+export const safeSlug = (value: unknown, fallback = 'unknown'): string =>
+  safeText(value, fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * Safe date formatter to prevent 'INVALID DATE' display.
+ */
+export const safeDate = (value: unknown, fallback = '—'): string => {
+  if (!value) return fallback;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? fallback : d.toLocaleString();
+};
+
+/**
+ * Safe time-only formatter.
+ */
+export const safeTime = (value: unknown, fallback = '—'): string => {
+  if (!value) return fallback;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? fallback : d.toLocaleTimeString();
+};

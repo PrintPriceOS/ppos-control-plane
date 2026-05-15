@@ -83,20 +83,25 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+/**
+ * Resolve a safe order_ref for legacy orders table (char 16).
+ * Prevents collisions by generating a short unique ID for BPE orders.
+ */
+function makeRouteOrderRef(body, isBpe) {
+    if (body.order_ref) return String(body.order_ref).substring(0, 16);
+    if (isBpe) return `bpe_${Date.now().toString().slice(-12)}`.substring(0, 16);
+    return null;
+}
+
 // POST /api/admin/orders
 router.post('/', async (req, res) => {
     // Accommodate BPE sync payload by deriving default fallbacks for legacy required fields
     const isBpe = req.body.source === 'BPE' || req.body.source_ref != null;
-    const order_ref = req.body.order_ref || req.body.source_ref || (isBpe ? `bpe_${Date.now()}` : null);
+    const order_ref = makeRouteOrderRef(req.body, isBpe);
     
     let user_id = req.body.user_id;
     if (isBpe && !user_id) {
-        if (process.env.PPOS_BPE_SYSTEM_USER_ID) {
-            user_id = process.env.PPOS_BPE_SYSTEM_USER_ID;
-        } else {
-            logger.warn({ event: 'MISSING_BPE_SYSTEM_USER_ID', message: 'PPOS_BPE_SYSTEM_USER_ID env variable is not set. Falling back to system integration user gracefully without failing silently.' });
-            user_id = 'bpe_system_user';
-        }
+        user_id = process.env.PPOS_BPE_SYSTEM_USER_ID || 'bpe-system-user';
     }
 
     const specs = req.body.specs || (isBpe ? {} : null);
@@ -124,7 +129,9 @@ router.post('/', async (req, res) => {
             specs, 
             offer_print_house, 
             offer_price, 
-            status 
+            status,
+            source: req.body.source || (isBpe ? 'BPE' : null),
+            source_ref: req.body.source_ref || null
         });
         const order = await getOrder(insertId);
         
