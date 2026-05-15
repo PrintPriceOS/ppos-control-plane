@@ -95,13 +95,39 @@ class ProductionFileIngestionService {
         try {
             await this.validateUrl(download_url);
 
-            const response = await axios({
-                method: 'get',
-                url: download_url,
-                responseType: 'stream',
-                timeout: this.timeout,
-                maxContentLength: this.maxFileSize
-            });
+            let currentUrl = download_url;
+            let response;
+            let redirectCount = 0;
+            const maxRedirects = 5;
+
+            while (redirectCount < maxRedirects) {
+                response = await axios({
+                    method: 'get',
+                    url: currentUrl,
+                    responseType: 'stream',
+                    timeout: this.timeout,
+                    maxContentLength: this.maxFileSize,
+                    maxRedirects: 0, // Disable automatic redirects
+                    validateStatus: (status) => (status >= 200 && status < 300) || (status >= 301 && status <= 308)
+                });
+
+                if (response.status >= 301 && response.status <= 308) {
+                    const redirectUrl = response.headers.location;
+                    if (!redirectUrl) throw new Error('Redirect without location header');
+                    
+                    // Resolve relative URLs
+                    const resolvedUrl = new URL(redirectUrl, currentUrl).toString();
+                    await this.validateUrl(resolvedUrl);
+                    currentUrl = resolvedUrl;
+                    redirectCount++;
+                    continue;
+                }
+                break;
+            }
+
+            if (redirectCount >= maxRedirects) {
+                throw new Error('Too many redirects');
+            }
 
             // Validate Content-Type
             const contentType = response.headers['content-type'];

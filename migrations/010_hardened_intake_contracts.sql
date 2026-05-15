@@ -3,11 +3,11 @@
 -- Date: 2026-05-15
 
 -- 1. Hardened Order Intake Columns
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS selected_offer_id VARCHAR(64) NULL;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS recommended_offer_id VARCHAR(64) NULL;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS offers_snapshot JSON NULL;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS production_files JSON NULL;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_payment JSON NULL;
+ALTER TABLE orders ADD COLUMN selected_offer_id VARCHAR(64) NULL;
+ALTER TABLE orders ADD COLUMN recommended_offer_id VARCHAR(64) NULL;
+ALTER TABLE orders ADD COLUMN offers_snapshot JSON NULL;
+ALTER TABLE orders ADD COLUMN production_files JSON NULL;
+ALTER TABLE orders ADD COLUMN invoice_payment JSON NULL;
 
 -- 2. Order Status ENUM Widening
 -- Note: status enum widening can be tricky in MySQL if not using native ADD COLUMN IF NOT EXISTS logic

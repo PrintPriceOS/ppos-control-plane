@@ -76,7 +76,17 @@ class MigrationService {
             const statements = content.split(';').map(s => s.trim()).filter(s => s.length > 0);
             
             for (const sql of statements) {
-                await db.query(sql);
+                try {
+                    await db.query(sql);
+                } catch (err) {
+                    // Industrial: Ignore "Duplicate column/key" or "Table exists" errors for idempotency
+                    const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX'];
+                    if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050) {
+                        logger.debug({ event: 'migration_step_skipped', sql: sql.substring(0, 50) + '...', reason: err.code });
+                        continue;
+                    }
+                    throw err;
+                }
             }
 
             await db.query(
