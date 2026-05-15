@@ -135,6 +135,12 @@ router.post('/', async (req, res) => {
             marketplace_session_id: order?.marketplace_session_id || req.marketplaceSessionId || undefined
         });
     } catch (err) {
+        if (err.message === 'BPE_SYSTEM_USER_NOT_FOUND') {
+            return res.status(422).json({ ok: false, error: 'BPE system user not found' });
+        }
+        if (err.message === 'ORDER_USER_NOT_FOUND') {
+            return res.status(422).json({ ok: false, error: `user_id '${user_id}' does not exist` });
+        }
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ ok: false, error: `order_ref '${order_ref}' already exists` });
         }
