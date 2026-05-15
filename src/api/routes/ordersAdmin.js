@@ -135,11 +135,14 @@ router.post('/', async (req, res) => {
             marketplace_session_id: order?.marketplace_session_id || req.marketplaceSessionId || undefined
         });
     } catch (err) {
+        if (err.message === 'ORDER_REQUIRED_FIELDS_MISSING') {
+            return res.status(400).json({ ok: false, error: 'Missing required fields: order_ref, user_id, specs, offer_print_house, offer_price' });
+        }
         if (err.message === 'BPE_SYSTEM_USER_NOT_FOUND') {
             return res.status(422).json({ ok: false, error: 'BPE system user not found' });
         }
         if (err.message === 'ORDER_USER_NOT_FOUND') {
-            return res.status(422).json({ ok: false, error: `user_id '${user_id}' does not exist` });
+            return res.status(422).json({ ok: false, error: `user_id '${user_id || req.body.user_id}' does not exist` });
         }
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ ok: false, error: `order_ref '${order_ref}' already exists` });

@@ -37,8 +37,32 @@ async function getOrderByRef(order_ref) {
     return rows[0] || null;
 }
 
+let ordersTableColumns = null;
+
+/**
+ * Dynamically discover orders table columns for safe backward-compatible inserts.
+ */
+async function getOrdersTableColumns() {
+    if (ordersTableColumns) return ordersTableColumns;
+    try {
+        const rows = await query('DESCRIBE orders');
+        ordersTableColumns = rows.map(r => r.Field);
+        return ordersTableColumns;
+    } catch (err) {
+        console.error('[ORDERS][SCHEMA-CHECK] Failed to describe orders table:', err.message);
+        return ['order_ref', 'user_id', 'specs', 'offer_print_house', 'offer_price', 'status']; // Minimum baseline
+    }
+}
+
+/**
+ * Resolve a safe order_ref for legacy orders table (char 16).
+ */
+function makeOrderRef(payload, isBpe) {
+    const val = payload.order_ref || payload.source_ref || `ord_${Date.now()}`;
+    return String(val).substring(0, 16);
+}
+
 async function createOrder(payload) {
-    const { order_ref, specs, offer_print_house, offer_price, status } = payload;
     const isBpe = payload.source === 'BPE' || payload.source_ref != null;
     
     // Resolve user id
@@ -58,55 +82,67 @@ async function createOrder(payload) {
     }
     resolvedUserId = String(userRows[0].id);
 
+    // Service-level Defaults for BPE
+    const order_ref = makeOrderRef(payload, isBpe);
+    const user_id = resolvedUserId;
+    const specs = payload.specs;
+    const offer_print_house = payload.offer_print_house || (isBpe ? 'BPE_Engine' : null);
+    const offer_price = payload.offer_price != null 
+        ? payload.offer_price 
+        : (isBpe ? (payload.pricing?.bpe_price || payload.pricing?.price || 0) : null);
+
+    // Strict Validation for Required Legacy Fields
+    if (!order_ref || !user_id || !specs || !offer_print_house || offer_price == null) {
+        throw new Error('ORDER_REQUIRED_FIELDS_MISSING');
+    }
+
     // Structured Log
     console.log(`[ORDERS][USER-RESOLVED]`, {
         source: payload.source || (isBpe ? 'BPE' : 'INTERNAL'),
-        sourceRef: payload.source_ref || order_ref,
+        sourceRef: payload.source_ref || payload.order_ref,
         userId: resolvedUserId
     });
 
+    const allColumns = await getOrdersTableColumns();
+    
+    // Prepare Data Map
+    const data = {
+        order_ref, 
+        user_id,
+        specs: typeof specs === 'object' ? JSON.stringify(specs) : specs,
+        offer_print_house,
+        offer_price,
+        status: payload.status || 'pending',
+        
+        // Rich BPE Fields (Preserve full length)
+        source: payload.source || (isBpe ? 'BPE' : null),
+        source_ref: payload.source_ref || payload.order_ref || null,
+        tenant_id: payload.tenant_id || 'default',
+        customer: payload.customer ? JSON.stringify(payload.customer) : null,
+        pricing: payload.pricing ? JSON.stringify(payload.pricing) : null,
+        delivery: payload.delivery ? JSON.stringify(payload.delivery) : null,
+        currency: payload.currency || payload.pricing?.currency || 'EUR',
+        metadata_json: payload.metadata_json ? JSON.stringify(payload.metadata_json) : null
+    };
+
+    // Filter available columns
+    const columnsToInsert = Object.keys(data).filter(col => allColumns.includes(col) && data[col] !== undefined);
+    const placeholders = columnsToInsert.map(() => '?').join(', ');
+    const values = columnsToInsert.map(col => data[col]);
+
     const result = await query(
-        `INSERT INTO orders (order_ref, user_id, specs, offer_print_house, offer_price, status)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-            order_ref,
-            resolvedUserId,
-            typeof specs === 'object' ? JSON.stringify(specs) : specs,
-            offer_print_house,
-            offer_price,
-            status || 'pending'
-        ]
+        `INSERT INTO orders (${columnsToInsert.join(', ')}) VALUES (${placeholders})`,
+        values
     );
 
     const insertId = result.insertId;
 
-    // Proactively enrich the newly created order row with extra BPE parameters if available
-    try {
-        const source = payload.source || 'BPE';
-        const source_ref = payload.source_ref || order_ref || null;
-        const tenant_id = payload.tenant_id || 'default';
-        const customerStr = payload.customer ? JSON.stringify(payload.customer) : null;
-        const pricingStr = payload.pricing ? JSON.stringify(payload.pricing) : null;
-        const deliveryStr = payload.delivery ? JSON.stringify(payload.delivery) : null;
-        const currency = payload.currency || payload.pricing?.currency || 'EUR';
-        const metadataStr = payload.metadata_json ? JSON.stringify(payload.metadata_json) : null;
-
-        await query(
-            `UPDATE orders 
-             SET source = ?, source_ref = ?, tenant_id = ?, customer = ?, pricing = ?, delivery = ?, currency = ?, metadata_json = ?
-             WHERE id = ?`,
-            [source, source_ref, tenant_id, customerStr, pricingStr, deliveryStr, currency, metadataStr, insertId]
-        );
-    } catch (enrichErr) {
-        console.error('[MARKETPLACE][ORDER-ENRICH] Non-fatal error enriching order row:', enrichErr.message);
-    }
-
     // Intake Hook: Instantiate deterministic marketplace session orchestration via BPE client
     try {
         const marketplaceService = require('./marketplaceService');
-        // Fetch full updated order object to pass to the session generator
+        // Fetch full updated order row to pass to the session generator (ensures rich fields are included)
         const orderRows = await query('SELECT * FROM orders WHERE id = ?', [insertId]);
-        const fullOrder = orderRows[0] || { id: insertId, ...payload };
+        const fullOrder = orderRows[0] || { id: insertId, ...data };
 
         // Run non-blocking marketplace session creation
         marketplaceService.createMarketplaceSessionFromOrder(fullOrder)
