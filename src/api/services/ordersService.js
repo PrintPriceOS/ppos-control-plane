@@ -55,11 +55,20 @@ async function getOrdersTableColumns() {
 }
 
 /**
- * Resolve a safe order_ref for legacy orders table (char 16).
+ * Resolve a safe, unique order_ref for legacy orders table (char 16).
+ * Prevents collisions by generating a short unique ID for BPE orders.
  */
 function makeOrderRef(payload, isBpe) {
-    const val = payload.order_ref || payload.source_ref || `ord_${Date.now()}`;
-    return String(val).substring(0, 16);
+    if (payload.order_ref) return String(payload.order_ref).substring(0, 16);
+    
+    // Generate a unique suffix from timestamp (last 12 digits)
+    const suffix = Date.now().toString().slice(-12);
+    
+    // For BPE, we use a dedicated prefix to avoid collisions with source_ref truncation
+    if (isBpe) {
+        return `bpe_${suffix}`.substring(0, 16);
+    }
+    return `ord_${suffix}`.substring(0, 16);
 }
 
 async function createOrder(payload) {
@@ -82,14 +91,12 @@ async function createOrder(payload) {
     }
     resolvedUserId = String(userRows[0].id);
 
-    // Service-level Defaults for BPE
+    // BPE Defaults and Resolvers
     const order_ref = makeOrderRef(payload, isBpe);
     const user_id = resolvedUserId;
     const specs = payload.specs;
-    const offer_print_house = payload.offer_print_house || (isBpe ? 'BPE_Engine' : null);
-    const offer_price = payload.offer_price != null 
-        ? payload.offer_price 
-        : (isBpe ? (payload.pricing?.bpe_price || payload.pricing?.price || 0) : null);
+    const offer_print_house = payload.offer_print_house || 'BPE_Engine';
+    const offer_price = payload.offer_price ?? payload.pricing?.bpe_price ?? payload.pricing?.price ?? 0;
 
     // Strict Validation for Required Legacy Fields
     if (!order_ref || !user_id || !specs || !offer_print_house || offer_price == null) {
@@ -100,16 +107,18 @@ async function createOrder(payload) {
     console.log(`[ORDERS][USER-RESOLVED]`, {
         source: payload.source || (isBpe ? 'BPE' : 'INTERNAL'),
         sourceRef: payload.source_ref || payload.order_ref,
+        orderRef: order_ref,
         userId: resolvedUserId
     });
 
     const allColumns = await getOrdersTableColumns();
+    const stringify = (val) => (val && typeof val === 'object') ? JSON.stringify(val) : val;
     
     // Prepare Data Map
     const data = {
         order_ref, 
         user_id,
-        specs: typeof specs === 'object' ? JSON.stringify(specs) : specs,
+        specs: stringify(specs),
         offer_print_house,
         offer_price,
         status: payload.status || 'pending',
@@ -118,15 +127,19 @@ async function createOrder(payload) {
         source: payload.source || (isBpe ? 'BPE' : null),
         source_ref: payload.source_ref || payload.order_ref || null,
         tenant_id: payload.tenant_id || 'default',
-        customer: payload.customer ? JSON.stringify(payload.customer) : null,
-        pricing: payload.pricing ? JSON.stringify(payload.pricing) : null,
-        delivery: payload.delivery ? JSON.stringify(payload.delivery) : null,
+        customer: stringify(payload.customer),
+        pricing: stringify(payload.pricing),
+        delivery: stringify(payload.delivery),
         currency: payload.currency || payload.pricing?.currency || 'EUR',
-        metadata_json: payload.metadata_json ? JSON.stringify(payload.metadata_json) : null
+        metadata_json: stringify(payload.metadata_json)
     };
 
-    // Filter available columns
-    const columnsToInsert = Object.keys(data).filter(col => allColumns.includes(col) && data[col] !== undefined);
+    // Filter available columns (case-insensitive check for robustness)
+    const columnsToInsert = Object.keys(data).filter(col => 
+        allColumns.some(existing => existing.toLowerCase() === col.toLowerCase()) && 
+        data[col] !== undefined
+    );
+    
     const placeholders = columnsToInsert.map(() => '?').join(', ');
     const values = columnsToInsert.map(col => data[col]);
 
