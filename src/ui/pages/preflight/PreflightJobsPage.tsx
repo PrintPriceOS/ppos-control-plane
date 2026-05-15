@@ -310,21 +310,29 @@ export const PreflightJobsPage: React.FC = () => {
             columns={[
               {
                 header: 'Job Payload',
-                accessor: (j) => (
-                  <div className="flex flex-col py-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-[10px] font-bold text-primary">#{short(j.jobId, 10)}</span>
-                      {j.batchId && (
-                        <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-[8px] font-bold text-slate-400 rounded-none uppercase">
-                          Batch
+                accessor: (j) => {
+                  const fullJobId = j.jobId || j.id || j.sourceJobId || '—';
+                  return (
+                    <div className="flex flex-col py-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          className="font-mono text-[10px] font-bold text-primary break-all whitespace-normal" 
+                          title={fullJobId}
+                        >
+                          #{fullJobId}
                         </span>
-                      )}
+                        {j.batchId && (
+                          <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-[8px] font-bold text-slate-400 rounded-none uppercase flex-shrink-0">
+                            Batch
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-xs truncate max-w-[180px] text-slate-800 dark:text-white mt-0.5" title={j.filename || 'Untitled.pdf'}>
+                        {j.filename || 'Untitled.pdf'}
+                      </span>
                     </div>
-                    <span className="font-bold text-xs truncate max-w-[180px] text-slate-800 dark:text-white mt-0.5" title={j.filename || 'Untitled.pdf'}>
-                      {j.filename || 'Untitled.pdf'}
-                    </span>
-                  </div>
-                )
+                  );
+                }
               },
               {
                 header: 'Tenant Identity',
