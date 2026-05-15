@@ -168,6 +168,7 @@ const industrialProvisioningAdminRouter = require('./industrialProvisioningAdmin
 const industrialRoutingAdminRouter = require('./industrialRoutingAdmin');
 const productionDispatchAdminRouter = require('./productionDispatchAdmin');
 const machineDetailsAdminRouter = require('./machineDetailsAdmin');
+const adminAssetsRouter = require('./adminAssets');
 
 
 /**
@@ -215,6 +216,7 @@ router.use('/orchestration', orchestrationAdminRouter);
 router.use('/provisioning', industrialProvisioningAdminRouter);
 router.use('/routing/decision', industrialRoutingAdminRouter); // Autonomous Routing
 router.use('/dispatch', productionDispatchAdminRouter); // Execution Layer
+router.use('/assets', adminAssetsRouter); // Production Asset Management
 router.use('/nodes', require('./printNodeAgentAdmin')); // Agent Layer
 router.use('/predictive', require('./predictiveAdmin')); // Forecasting Layer
 router.use('/anomaly', require('./anomalyAdmin')); // Anomaly & Drift Layer

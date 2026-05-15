@@ -1,8 +1,16 @@
 // src/api/services/ordersService.js
 const { query } = require('./mysqlClient');
+const crypto = require('crypto');
 
-const VALID_STATUSES = ['pending', 'reviewing', 'in_production', 'shipped', 'delivered', 'cancelled'];
-const UPDATABLE_FIELDS = ['status', 'specs', 'offer_print_house', 'offer_price'];
+const VALID_STATUSES = [
+    'pending', 'reviewing', 'in_production', 'shipped', 'delivered', 'cancelled',
+    'FILES_PENDING', 'FILES_VALIDATED', 'INVOICE_PENDING', 'PAYMENT_PENDING', 'READY_FOR_PRINTHOUSE'
+];
+const UPDATABLE_FIELDS = [
+    'status', 'specs', 'offer_print_house', 'offer_price',
+    'selected_offer_id', 'recommended_offer_id', 'offers_snapshot',
+    'production_files', 'invoice_payment'
+];
 
 async function listOrders({ status, user_id, printhouse_id, limit = 50, offset = 0 }) {
     const where = [];
@@ -131,8 +139,29 @@ async function createOrder(payload) {
         pricing: stringify(payload.pricing),
         delivery: stringify(payload.delivery),
         currency: payload.currency || payload.pricing?.currency || 'EUR',
-        metadata_json: stringify(payload.metadata_json)
+        metadata_json: stringify(payload.metadata_json),
+
+        // Hardened Intake (Phase 10 Intelligence Layer)
+        selected_offer_id: payload.selected_offer_id || null,
+        recommended_offer_id: payload.recommended_offer_id || null,
+        offers_snapshot: stringify(payload.offers_snapshot || payload.metadata_json?.offers_snapshot),
+        production_files: stringify(payload.production_files || payload.metadata_json?.production_files),
+        invoice_payment: stringify(payload.invoice_payment || payload.metadata_json?.invoice_payment)
     };
+
+    // Industrial: Detect v5.3 Hardened Intake contract
+    const isHardenedIntake = payload.metadata_json?.production_files?.required === true;
+    if (isHardenedIntake) {
+        data.status = 'FILES_PENDING';
+        
+        // Handle invoice_payment hardening
+        const invoice_payment = payload.metadata_json.invoice_payment || {};
+        invoice_payment.invoice_status = 'PENDING_FILES';
+        invoice_payment.payment_status = 'PENDING';
+        invoice_payment.invoice_blocked_until = 'FILES_INGESTED_AND_VALIDATED';
+        
+        data.invoice_payment = stringify(invoice_payment);
+    }
 
     // Filter available columns (case-insensitive check for robustness)
     const columnsToInsert = Object.keys(data).filter(col => 
@@ -155,6 +184,20 @@ async function createOrder(payload) {
         const marketplaceService = require('./marketplaceService');
         // Fetch full updated order row to pass to the session generator (ensures rich fields are included)
         const orderRows = await query('SELECT * FROM orders WHERE id = ?', [insertId]);
+        console.log(`[ORDER-INTAKE] Order ${order_ref} created (ID: ${insertId})`);
+
+        // Industrial: Hardened Asset Provisioning (v5.3)
+        if (isHardenedIntake) {
+            try {
+                await provisionHardenedAssets(insertId, payload);
+                await logOrderEvent(insertId, 'ORDER_REQUEST_CREATED', { hardened: true });
+                await logOrderEvent(insertId, 'PRODUCTION_FILES_DECLARED', { files: Object.keys(payload.metadata_json.production_files).filter(k => k !== 'required') });
+                await logOrderEvent(insertId, 'INVOICE_BLOCKED_PENDING_FILES', { reason: 'Hardened Intake' });
+            } catch (err) {
+                console.error('[ORDER-INTAKE][HARDENED] Asset provisioning failed:', err.message);
+            }
+        }
+
         const fullOrder = orderRows[0] || { id: insertId, ...data };
 
         // Run non-blocking marketplace session creation
@@ -193,6 +236,70 @@ async function createOrder(payload) {
     return insertId;
 }
 
+/**
+ * Provision forensic repository and file records for hardened intake.
+ */
+async function provisionHardenedAssets(orderId, payload) {
+    const { rows: [order] } = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (!order) return;
+
+    const repoId = crypto.randomUUID();
+    const order_ref = order.order_ref;
+    const user_id = order.user_id;
+
+    // 1. Create Repository
+    await query(`
+        INSERT INTO production_file_repositories (id, order_id, order_ref, user_id, status)
+        VALUES (?, ?, ?, ?, 'ACTIVE')
+    `, [repoId, orderId, order_ref, user_id]);
+
+    // 2. Create Files
+    const declarations = payload.metadata_json.production_files || {};
+    const assetKinds = ['INTERIOR_PDF', 'COVER_SPINE_BACK_PDF'];
+
+    for (const kind of assetKinds) {
+        const decl = declarations[kind] || {};
+        const fileId = crypto.randomUUID();
+
+        await query(`
+            INSERT INTO production_files (
+                id, order_id, order_ref, repository_id, kind, source_type,
+                original_filename, download_url, ingestion_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DECLARED')
+        `, [
+            fileId, orderId, order_ref, repoId, kind,
+            decl.source_type || 'UPLOAD',
+            decl.filename || null,
+            decl.url || null
+        ]);
+
+        // Log Initial File Event
+        await query(`
+            INSERT INTO production_file_events (production_file_id, order_id, order_ref, event_type, event_payload)
+            VALUES (?, ?, ?, 'FILE_DECLARED', ?)
+        `, [fileId, orderId, order_ref, JSON.stringify({ kind, source_type: decl.source_type })]);
+    }
+}
+
+/**
+ * Log central audit events to marketplace_events.
+ */
+async function logOrderEvent(orderId, type, metadata = {}) {
+    const { rows: [order] } = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (!order) return;
+
+    const eventId = crypto.randomUUID();
+    await query(`
+        INSERT INTO marketplace_events (
+            id, order_id, order_ref, event_type, metadata_json,
+            tenant_id, source, source_ref
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+        eventId, orderId, order.order_ref, type, JSON.stringify(metadata),
+        order.tenant_id, order.source, order.source_ref
+    ]);
+}
+
 async function updateOrder(id, updates) {
     const fields = Object.keys(updates).filter(k => UPDATABLE_FIELDS.includes(k));
     if (fields.length === 0) return false;
@@ -220,4 +327,4 @@ async function deleteOrder(id) {
     return result.affectedRows > 0;
 }
 
-module.exports = { listOrders, getOrder, getOrderByRef, createOrder, updateOrder, deleteOrder, VALID_STATUSES };
+module.exports = { listOrders, getOrder, getOrderByRef, createOrder, updateOrder, deleteOrder, provisionHardenedAssets, VALID_STATUSES };

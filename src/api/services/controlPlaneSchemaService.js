@@ -953,6 +953,171 @@ class ControlPlaneSchemaService {
         await this.ensureColumn('marketplace_events', 'event_level', "ENUM('INFO','WARN','ERROR') DEFAULT 'INFO'");
         await this.ensureColumn('marketplace_events', 'message', 'TEXT NULL');
     }
+
+    /**
+     * Hardens the orders table for PrintPrice Pro v5.3 Hardened Intake contract.
+     */
+    async ensureHardenedOrderIntakeSchema() {
+        console.log('[CONTROL-PLANE-SCHEMA] Hardening order intake schema...');
+        
+        // 1. Add new metadata columns
+        await this.ensureColumn('orders', 'selected_offer_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('orders', 'recommended_offer_id', 'VARCHAR(64) NULL');
+        await this.ensureColumn('orders', 'offers_snapshot', 'JSON NULL');
+        await this.ensureColumn('orders', 'production_files', 'JSON NULL');
+        await this.ensureColumn('orders', 'invoice_payment', 'JSON NULL');
+
+        // 2. Widen status ENUM
+        // Note: We include both legacy lowercase and new industrial uppercase statuses for compatibility
+        const statusEnum = "ENUM('pending', 'reviewing', 'in_production', 'shipped', 'delivered', 'cancelled', 'FILES_PENDING', 'FILES_VALIDATED', 'INVOICE_PENDING', 'PAYMENT_PENDING', 'READY_FOR_PRINTHOUSE') DEFAULT 'pending'";
+        try {
+            await db.query(`ALTER TABLE orders MODIFY COLUMN status ${statusEnum}`);
+            console.log('[CONTROL-PLANE-SCHEMA] Order status ENUM widened successfully.');
+        } catch (err) {
+            console.warn('[CONTROL-PLANE-SCHEMA] Warning: Could not modify order status ENUM:', err.message);
+        }
+    }
+
+    /**
+     * Hardens the schema for PrintPrice Pro App v5.3 Production Asset Intake.
+     */
+    async ensureProductionAssetIntakeSchema() {
+        console.log('[CONTROL-PLANE-SCHEMA] Initializing Production Asset Intake schema...');
+
+        // 1. Production File Repositories (Storage Context)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS production_file_repositories (
+                    id VARCHAR(64) PRIMARY KEY,
+                    order_id VARCHAR(128) NOT NULL,
+                    order_ref VARCHAR(128) NOT NULL,
+                    user_id VARCHAR(128) NOT NULL,
+                    print_house_id VARCHAR(64),
+                    storage_root TEXT,
+                    status VARCHAR(64) DEFAULT 'ACTIVE',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order_ref (order_ref),
+                    INDEX idx_user (user_id),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create production_file_repositories:', err.message);
+        }
+
+        // 2. Production Files (Individual Assets)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS production_files (
+                    id VARCHAR(64) PRIMARY KEY,
+                    order_id VARCHAR(128) NOT NULL,
+                    order_ref VARCHAR(128) NOT NULL,
+                    repository_id VARCHAR(64) NOT NULL,
+                    kind ENUM('INTERIOR_PDF', 'COVER_SPINE_BACK_PDF') NOT NULL,
+                    source_type ENUM('UPLOAD', 'DOWNLOAD_URL') NOT NULL,
+                    original_filename VARCHAR(255),
+                    size_bytes BIGINT DEFAULT 0,
+                    mime_type VARCHAR(128),
+                    checksum VARCHAR(128),
+                    download_url TEXT,
+                    download_url_host VARCHAR(255),
+                    storage_url TEXT,
+                    ingestion_status VARCHAR(64) DEFAULT 'DECLARED',
+                    validation_status VARCHAR(64) DEFAULT 'PENDING',
+                    preflight_job_id VARCHAR(64),
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order_ref (order_ref),
+                    INDEX idx_repository (repository_id),
+                    INDEX idx_kind (kind),
+                    INDEX idx_ingestion_status (ingestion_status)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create production_files:', err.message);
+        }
+
+        // 3. Production File Events (Forensic Ledger)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS production_file_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    production_file_id VARCHAR(64) NOT NULL,
+                    order_id VARCHAR(128) NOT NULL,
+                    order_ref VARCHAR(128) NOT NULL,
+                    event_type VARCHAR(128) NOT NULL,
+                    event_payload JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_file (production_file_id),
+                    INDEX idx_order_ref (order_ref)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create production_file_events:', err.message);
+        }
+
+        console.log('[CONTROL-PLANE-SCHEMA] Production Asset Intake schema ensured successfully.');
+    }
+
+    /**
+     * Hardens the schema for Printhouse Payment Settings and forensic Invoices.
+     */
+    async ensurePaymentInfrastructureSchema() {
+        console.log('[CONTROL-PLANE-SCHEMA] Initializing Payment Infrastructure schema...');
+
+        // 1. Printhouse Payment Settings
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS printhouse_payment_settings (
+                    printhouse_id VARCHAR(64) PRIMARY KEY,
+                    provider ENUM('STRIPE', 'BANK_TRANSFER', 'MANUAL') DEFAULT 'MANUAL',
+                    stripe_account_id VARCHAR(128),
+                    bank_instructions TEXT,
+                    currency VARCHAR(10) DEFAULT 'EUR',
+                    enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_enabled (enabled)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create printhouse_payment_settings:', err.message);
+        }
+
+        // 2. Forensic Invoices (Order-Linked)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS invoices (
+                    id VARCHAR(64) PRIMARY KEY,
+                    order_ref VARCHAR(128) NOT NULL,
+                    customer_id VARCHAR(128),
+                    printhouse_id VARCHAR(64),
+                    invoice_number VARCHAR(64) UNIQUE,
+                    invoice_type ENUM('CUSTOMER', 'PRINTER') DEFAULT 'CUSTOMER',
+                    currency VARCHAR(10) DEFAULT 'EUR',
+                    amount DECIMAL(15, 2) NOT NULL,
+                    status ENUM('DRAFT', 'ISSUED', 'PARTIAL', 'PAID', 'CANCELLED') DEFAULT 'DRAFT',
+                    gateway_provider ENUM('STRIPE', 'BANK_TRANSFER', 'MANUAL'),
+                    gateway_session_id VARCHAR(255),
+                    payment_url TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order_ref (order_ref),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            // Table might exist with different schema, we handle ensuring columns if needed
+            console.warn('[CONTROL-PLANE-SCHEMA] Invoices table check:', err.message);
+            await this.ensureColumn('invoices', 'order_ref', 'VARCHAR(128)');
+            await this.ensureColumn('invoices', 'gateway_provider', "ENUM('STRIPE', 'BANK_TRANSFER', 'MANUAL')");
+            await this.ensureColumn('invoices', 'payment_url', 'TEXT');
+        }
+
+        console.log('[CONTROL-PLANE-SCHEMA] Payment Infrastructure schema ensured successfully.');
+    }
 }
 
 const service = new ControlPlaneSchemaService();

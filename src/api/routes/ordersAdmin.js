@@ -10,6 +10,12 @@ const {
     VALID_STATUSES
 } = require('../services/ordersService');
 const logger = require('../services/logger').child('admin-orders');
+const multer = require('multer');
+const uploadService = require('../services/productionFileUploadService');
+const ingestionService = require('../services/productionFileIngestionService');
+const validationService = require('../services/productionFileValidationService');
+const invoiceService = require('../services/invoiceService');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
 const { resolveActorContext } = require('../middleware/auth');
 
@@ -182,6 +188,113 @@ router.delete('/:id', async (req, res) => {
         const deleted = await deleteOrder(req.params.id);
         if (!deleted) return res.status(404).json({ ok: false, error: 'Order not found' });
         res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * Direct PDF Upload for Production Assets.
+ * POST /api/admin/orders/:orderRef/production-files/upload
+ */
+router.post('/:order_ref/production-files/upload', upload.single('file'), async (req, res) => {
+    const { order_ref } = req.params;
+    const { kind } = req.body;
+    const file = req.file;
+
+    if (!file) return res.status(400).json({ ok: false, error: 'No file uploaded' });
+    if (!kind || !['INTERIOR_PDF', 'COVER_SPINE_BACK_PDF'].includes(kind)) {
+        return res.status(400).json({ ok: false, error: 'Invalid or missing kind. Must be INTERIOR_PDF or COVER_SPINE_BACK_PDF' });
+    }
+
+    try {
+        const result = await uploadService.handleUpload(order_ref, kind, file.buffer, file.originalname);
+        res.status(201).json({ ok: true, ...result });
+    } catch (err) {
+        logger.error({ event: 'FILE_UPLOAD_FAILED', order_ref, kind, error: err.message });
+        res.status(err.message.includes('Not a PDF') ? 400 : 500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * Generate Invoice and Release Payment Path for a Hardened Order.
+ * POST /api/admin/orders/:orderRef/invoice/generate
+ */
+router.post('/:order_ref/invoice/generate', async (req, res) => {
+    const { order_ref } = req.params;
+
+    try {
+        const result = await invoiceService.generateOrderInvoice(order_ref);
+        res.json({ ok: true, ...result });
+    } catch (err) {
+        logger.error({ event: 'INVOICE_GENERATION_FAILED', order_ref, error: err.message });
+        if (err.message.includes('INVOICE_BLOCKED')) {
+            return res.status(422).json({ ok: false, error: err.message });
+        }
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/orders/:orderRef/production-files
+ * Retrieves forensic asset state and repository details.
+ */
+router.get('/:order_ref/production-files', async (req, res) => {
+    const { order_ref } = req.params;
+    try {
+        const repoRows = await require('../services/mysqlClient').query(
+            'SELECT * FROM production_file_repositories WHERE order_ref = ?',
+            [order_ref]
+        );
+        const fileRows = await require('../services/mysqlClient').query(
+            'SELECT * FROM production_files WHERE order_ref = ?',
+            [order_ref]
+        );
+        res.json({
+            ok: true,
+            repository: repoRows[0] || null,
+            files: fileRows
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/orders/:orderRef/production-files/fetch
+ * Manually trigger remote ingestion for DOWNLOAD_URL assets.
+ */
+router.post('/:order_ref/production-files/fetch', async (req, res) => {
+    const { order_ref } = req.params;
+    try {
+        const files = await require('../services/mysqlClient').query(
+            "SELECT * FROM production_files WHERE order_ref = ? AND source_type = 'DOWNLOAD_URL' AND ingestion_status IN ('DECLARED', 'FAILED')",
+            [order_ref]
+        );
+        
+        if (files.length === 0) {
+            return res.status(404).json({ ok: false, error: 'No pending remote assets found for this order' });
+        }
+
+        for (const file of files) {
+            await ingestionService.ingestFile(file);
+        }
+
+        res.json({ ok: true, message: `Ingestion triggered for ${files.length} assets` });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/orders/:orderRef/production-files/validate
+ * Manually trigger forensic certification for order assets.
+ */
+router.post('/:order_ref/production-files/validate', async (req, res) => {
+    const { order_ref } = req.params;
+    try {
+        const result = await validationService.validateOrderAssets(order_ref);
+        res.json(result);
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

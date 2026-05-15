@@ -8,11 +8,16 @@ import {
 import { getOrders, Order, OrderStatus } from '../../lib/adminApi';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { DataTable } from '../../components/DataTable';
+import { MarketplaceIntakeSection } from '../../components/MarketplaceIntakeSection';
 
 const STATUS_OPTIONS: { value: OrderStatus | ''; label: string }[] = [
     { value: '', label: 'All statuses' },
     { value: 'pending', label: 'Pending' },
-    { value: 'reviewing', label: 'Reviewing' },
+    { value: 'FILES_PENDING', label: 'Files Pending' },
+    { value: 'FILES_VALIDATED', label: 'Files Validated' },
+    { value: 'INVOICE_PENDING', label: 'Invoice Pending' },
+    { value: 'PAYMENT_PENDING', label: 'Payment Pending' },
+    { value: 'READY_FOR_PRINTHOUSE', label: 'Ready for Printhouse' },
     { value: 'in_production', label: 'In Production' },
     { value: 'shipped', label: 'Shipped' },
     { value: 'delivered', label: 'Delivered' },
@@ -20,12 +25,17 @@ const STATUS_OPTIONS: { value: OrderStatus | ''; label: string }[] = [
 ];
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
-    pending:       'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
-    reviewing:     'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/60',
-    in_production: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/60',
-    shipped:       'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/60',
-    delivered:     'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60',
-    cancelled:     'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60',
+    pending:              'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
+    reviewing:            'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/60',
+    FILES_PENDING:        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
+    FILES_VALIDATED:      'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/60',
+    INVOICE_PENDING:      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/60',
+    PAYMENT_PENDING:      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/60',
+    READY_FOR_PRINTHOUSE: 'bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-700 dark:text-white dark:border-emerald-800',
+    in_production:        'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/60',
+    shipped:              'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/60',
+    delivered:            'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60',
+    cancelled:            'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60',
 };
 
 export const OrdersPage: React.FC = () => {
@@ -195,6 +205,12 @@ export const OrdersPage: React.FC = () => {
                                 <p className="font-bold text-zinc-700 dark:text-zinc-300">{new Date(selectedOrder.updated_at).toLocaleString('es-ES')}</p>
                             </div>
                         </div>
+
+                        {/* Marketplace Intake Section */}
+                        <MarketplaceIntakeSection 
+                            order={selectedOrder} 
+                            onRefreshOrder={() => q.refetch?.()} 
+                        />
 
                         <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-none p-3">
                             <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">Specs</p>

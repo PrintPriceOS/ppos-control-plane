@@ -239,6 +239,7 @@ const start = async () => {
             
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
+            fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             
@@ -252,6 +253,8 @@ const start = async () => {
             fastify.all('/api/auth/*', apiNotFoundFallback);
             fastify.all('/api/admin', apiNotFoundFallback);
             fastify.all('/api/admin/*', apiNotFoundFallback);
+            fastify.all('/api/printhouse', apiNotFoundFallback);
+            fastify.all('/api/printhouse/*', apiNotFoundFallback);
             fastify.all('/api/v2/analytics', apiNotFoundFallback);
             fastify.all('/api/v2/analytics/*', apiNotFoundFallback);
             fastify.all('/api/connectors/factory', apiNotFoundFallback);

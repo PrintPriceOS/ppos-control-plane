@@ -1232,7 +1232,7 @@ export async function deletePrinthouse(mongoId: string) {
 }
 
 // --- Orders ---
-export type OrderStatus = 'pending' | 'reviewing' | 'in_production' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'reviewing' | 'in_production' | 'shipped' | 'delivered' | 'cancelled' | 'FILES_PENDING' | 'FILES_VALIDATED' | 'INVOICE_PENDING' | 'PAYMENT_PENDING' | 'READY_FOR_PRINTHOUSE';
 
 export type Order = {
     id: number;
@@ -1244,6 +1244,8 @@ export type Order = {
     offer_price: number;
     created_at: string;
     updated_at: string;
+    production_files?: any;
+    invoice_payment?: any;
 };
 
 export type OrdersResponse = {
@@ -1259,6 +1261,28 @@ export async function getOrders(params: { status?: OrderStatus; user_id?: string
     qs.set('limit', String(params.limit ?? 50));
     qs.set('offset', String(params.offset ?? 0));
     return adminFetch<OrdersResponse>(`/api/admin/orders?${qs.toString()}`);
+}
+
+export async function triggerProductionFileFetch(orderRef: string) {
+    return adminFetch<{ ok: boolean, message?: string }>(`/api/admin/orders/${orderRef}/production-files/fetch`, {
+        method: 'POST'
+    });
+}
+
+export async function triggerProductionFileValidation(orderRef: string) {
+    return adminFetch<{ ok: boolean, message?: string, results?: any[] }>(`/api/admin/orders/${orderRef}/production-files/validate`, {
+        method: 'POST'
+    });
+}
+
+export async function generateOrderInvoice(orderRef: string) {
+    return adminFetch<{ ok: boolean, invoice_id?: string }>(`/api/admin/orders/${orderRef}/invoice/generate`, {
+        method: 'POST'
+    });
+}
+
+export async function getProductionFiles(orderRef: string) {
+    return adminFetch<{ ok: boolean, files: any[], repository?: any }>(`/api/admin/orders/${orderRef}/production-files`);
 }
 
 // --- Preflight Operations API --- //
