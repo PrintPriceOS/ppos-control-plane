@@ -135,13 +135,15 @@ class IndustrialProvisioningService {
         const coreTables = []; // Placeholder for any specific table creation logic if needed
 
         try {
-            await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
-            await require('./controlPlaneSchemaService').ensureMarketplaceRegistrySchema();
-            await require('./controlPlaneSchemaService').ensureHardenedOrderIntakeSchema();
-            await require('./controlPlaneSchemaService').ensureProductionAssetIntakeSchema();
-            await require('./controlPlaneSchemaService').ensurePaymentInfrastructureSchema();
+            const schemaService = require('./controlPlaneSchemaService');
+            await schemaService.ensurePreflightRegistrySchema();
+            await schemaService.ensureMarketplaceRegistrySchema();
+            await schemaService.ensureHardenedOrderIntakeSchema();
+            await schemaService.ensureProductionAssetIntakeSchema();
+            await schemaService.ensurePaymentInfrastructureSchema();
+            await schemaService.ensureMarketplaceOrderIntentsSchema();
         } catch (schemaErr) {
-            this._logStepError('ensurePreflightRegistrySchema', schemaErr);
+            this._logStepError('ensureCoreSchemaRegistry', schemaErr);
         }
 
         // Ensure Phase 18 Governance columns exist

@@ -13,6 +13,7 @@ import { AutonomousOpsTab } from "./admin/AutonomousOpsTab";
 import { RoutingDecisionTab } from "./admin/RoutingDecisionTab";
 import { ProductionDispatchTab } from "./admin/ProductionDispatchTab";
 import { IndustrialLiveTab } from "./admin/IndustrialLiveTab";
+import { MarketplaceOrdersTab } from "./admin/MarketplaceOrdersTab";
 
 import { FinancialOpsTab } from "./admin/FinancialOpsTab";
 import TenantManagement from "./admin/TenantManagement";
@@ -46,10 +47,11 @@ import {
     CpuChipIcon,
     ArrowsRightLeftIcon,
     AdjustmentsHorizontalIcon,
-    TruckIcon
+    TruckIcon,
+    InboxStackIcon
 } from "@heroicons/react/24/outline";
 
-type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "intake" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
 
 
 type Range = "24h" | "7d" | "30d";
@@ -87,6 +89,7 @@ const AdminDashboardInner: React.FC = () => {
             ["pricing", "Pricing Intelligence", CurrencyEuroIcon],
             ["offers", "Production Offers", QueueListIcon],
             ["marketplace", "Marketplace", BuildingStorefrontIcon],
+            ["intake", "Order Intake", InboxStackIcon],
             ["negotiations", "Negotiation & Readiness", ArrowsRightLeftIcon],
             ["routing", "Autonomous Routing", ArrowsRightLeftIcon],
             superAdmin && ["dispatch", "Production Dispatch", TruckIcon],
@@ -243,6 +246,7 @@ const AdminDashboardInner: React.FC = () => {
                         {activeTab === "pricing" && <PricingIntelligenceTab key={`pricing-${reloadKey}`} />}
                         {activeTab === "offers" && <OffersTab key={`offers-${reloadKey}`} />}
                         {activeTab === "marketplace" && <MarketplaceTab key={`marketplace-${reloadKey}`} />}
+                        {activeTab === "intake" && <MarketplaceOrdersTab key={`intake-${reloadKey}`} />}
                         {activeTab === "negotiations" && <MarketplaceReadinessTab key={`negotiations-${reloadKey}`} />}
                         {activeTab === "commitments" && <CommercialCommitmentsTab key={`commitments-${reloadKey}`} />}
                         {activeTab === "routing" && <RoutingDecisionTab key={`routing-${reloadKey}`} />}

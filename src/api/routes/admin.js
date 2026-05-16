@@ -169,6 +169,7 @@ const industrialRoutingAdminRouter = require('./industrialRoutingAdmin');
 const productionDispatchAdminRouter = require('./productionDispatchAdmin');
 const machineDetailsAdminRouter = require('./machineDetailsAdmin');
 const adminAssetsRouter = require('./adminAssets');
+const adminMarketplaceOrdersRouter = require('./adminMarketplaceOrders');
 
 
 /**
@@ -181,6 +182,7 @@ router.use('/network', require('./networkOpsAdmin'));
 router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
+router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);

@@ -767,6 +767,36 @@ export async function selectMarketplaceOffer(sessionId: string, offerId: string)
     });
 }
 
+// Marketplace Order Intents (Phase 11 - Public Intake)
+export async function getMarketplaceOrders(params: any = {}) {
+    const qs = new URLSearchParams(params);
+    return adminFetch<any>(`/api/admin/marketplace/orders?${qs.toString()}`);
+}
+
+export async function getMarketplaceOrderDetail(id: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${id}`);
+}
+
+export async function acknowledgeMarketplaceOrder(id: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${id}/acknowledge`, {
+        method: 'POST'
+    });
+}
+
+export async function assignMarketplaceOrderPrinthouse(id: string, printhouseId: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${id}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ printhouseId })
+    });
+}
+
+export async function addMarketplaceOrderNote(id: string, note: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ note })
+    });
+}
+
 export async function getFinanceTransactions() {
     return adminFetch<any[]>(`/api/admin/finance/transactions`);
 }
@@ -2105,5 +2135,38 @@ export async function syncAdminPreflightRegistry(options: { tenantId?: string, l
         body: JSON.stringify(options)
     });
 }
+// --- Marketplace Order Management API --- //
 
+export async function listMarketplaceOrders(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, orders: any[], total: number }>(`/api/admin/marketplace/orders?${qs.toString()}`);
+}
 
+export async function getMarketplaceOrderDetail(id: string) {
+    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}`);
+}
+
+export async function acknowledgeMarketplaceOrder(id: string) {
+    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/acknowledge`, {
+        method: 'POST'
+    });
+}
+
+export async function assignPrinthouseToMarketplaceOrder(id: string, printhouseId: string) {
+    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
+        method: 'POST',
+        body: JSON.stringify({ printhouseId })
+    });
+}
+
+export async function addNoteToMarketplaceOrder(id: string, note: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ note })
+    });
+}

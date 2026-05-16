@@ -836,6 +836,9 @@ class ControlPlaneSchemaService {
             // PHASE 10 - Preflight Registry Synchronization Hardening
             await this.ensurePreflightRegistrySchema();
 
+            // PHASE 11 - Marketplace Order Intents (Public Intake)
+            await this.ensureMarketplaceOrderIntentsSchema();
+
             console.log('[CONTROL-PLANE-SCHEMA] Industrial Tables verified.');
 
         } catch (err) {
@@ -1117,6 +1120,132 @@ class ControlPlaneSchemaService {
         }
 
         console.log('[CONTROL-PLANE-SCHEMA] Payment Infrastructure schema ensured successfully.');
+    }
+
+    /**
+     * Hardens the schema for Marketplace Order Intents (Public Intake / Budget App).
+     */
+    async ensureMarketplaceOrderIntentsSchema() {
+        console.log('[CONTROL-PLANE-SCHEMA] Initializing Marketplace Order Intents schema...');
+
+        // 1. Marketplace Order Intents Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_order_intents (
+                    id VARCHAR(64) PRIMARY KEY,
+                    public_ref VARCHAR(128) UNIQUE NOT NULL,
+                    status VARCHAR(64) DEFAULT 'DECLARED',
+                    lifecycle VARCHAR(64) DEFAULT 'INTAKE',
+                    lifecycle_json JSON NULL,
+                    payload JSON NULL,
+                    offer JSON NULL,
+                    offer_json JSON NULL,
+                    production_files JSON NULL,
+                    production_files_json JSON NULL,
+                    customer JSON NULL,
+                    customer_json JSON NULL,
+                    totals JSON NULL,
+                    totals_json JSON NULL,
+                    preflight JSON NULL,
+                    preflight_json JSON NULL,
+                    invoice JSON NULL,
+                    invoice_json JSON NULL,
+                    payment JSON NULL,
+                    payment_json JSON NULL,
+                    control_plane JSON NULL,
+                    control_plane_json JSON NULL,
+                    printhouse_handoff JSON NULL,
+                    printhouse_handoff_json JSON NULL,
+                    exception JSON NULL,
+                    exception_json JSON NULL,
+                    production_files_history JSON NULL,
+                    production_files_history_json JSON NULL,
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_status (status),
+                    INDEX idx_lifecycle (lifecycle),
+                    INDEX idx_public_ref (public_ref)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_order_intents:', err.message);
+        }
+
+        // 2. Marketplace Production Files Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_production_files (
+                    id VARCHAR(64) PRIMARY KEY,
+                    order_intent_id VARCHAR(64) NOT NULL,
+                    kind ENUM('INTERIOR_PDF', 'COVER_PDF') NOT NULL,
+                    original_filename VARCHAR(255),
+                    size_bytes BIGINT DEFAULT 0,
+                    mime_type VARCHAR(128),
+                    checksum VARCHAR(128),
+                    storage_url TEXT,
+                    status VARCHAR(64) DEFAULT 'UPLOADED',
+                    validation_status VARCHAR(64) DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order_intent (order_intent_id),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_production_files:', err.message);
+        }
+
+        // 3. Marketplace Audit Events Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_audit_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    entity_type VARCHAR(64) NOT NULL,
+                    entity_id VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(128) NOT NULL,
+                    actor_id VARCHAR(64) NULL,
+                    payload JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_entity (entity_type, entity_id),
+                    INDEX idx_event (event_type)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_audit_events:', err.message);
+        }
+
+        // 4. Marketplace Offer Sessions (Compatibility)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_offer_sessions (
+                    id VARCHAR(64) PRIMARY KEY,
+                    order_intent_id VARCHAR(64) NULL,
+                    status VARCHAR(64) DEFAULT 'OPEN',
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_order_intent (order_intent_id)
+                ) ENGINE=InnoDB;
+            `);
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_offer_sessions:', err.message);
+        }
+
+        // Ensure missing JSON columns are added idempotently
+        const cols = [
+            'lifecycle_json', 'payload', 'offer', 'offer_json', 'production_files', 
+            'production_files_json', 'customer', 'customer_json', 'totals', 'totals_json',
+            'preflight', 'preflight_json', 'invoice', 'invoice_json', 'payment', 'payment_json',
+            'control_plane', 'control_plane_json', 'printhouse_handoff', 'printhouse_handoff_json',
+            'exception', 'exception_json', 'production_files_history', 'production_files_history_json',
+            'metadata_json'
+        ];
+
+        for (const col of cols) {
+            await this.ensureColumn('marketplace_order_intents', col, 'JSON NULL');
+        }
+
+        console.log('[CONTROL-PLANE-SCHEMA] Marketplace Order Intents schema ensured successfully.');
     }
 }
 
