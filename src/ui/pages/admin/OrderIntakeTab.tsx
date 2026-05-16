@@ -17,7 +17,8 @@ import {
     XMarkIcon,
     ExclamationTriangleIcon,
     BoltIcon,
-    CreditCardIcon
+    CreditCardIcon,
+    BuildingStorefrontIcon
 } from "@heroicons/react/24/outline";
 import { short, safeText, safeTime, safeDate } from "../../lib/formatters";
 
@@ -388,17 +389,60 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     </div>
                 </section>
 
-                {/* Files, Preflight, Payment */}
-                <div className="grid grid-cols-3 gap-6">
-                    <div className="space-y-4">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Production Files</h4>
-                        <div className={`p-4 border text-center space-y-2 ${order.productionFiles.length > 0 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600'}`}>
-                            <DocumentTextIcon className="w-6 h-6 mx-auto opacity-50" />
-                            <div className="text-[10px] font-black uppercase tracking-widest">
-                                {order.productionFiles.length > 0 ? 'Uploaded' : 'Missing'}
+                <section className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <DocumentTextIcon className="w-3.5 h-3.5" /> Production File Assets
+                    </h4>
+                    <div className="grid grid-cols-1 gap-3">
+                        {order.productionFileMetadata?.length > 0 ? (
+                            order.productionFileMetadata.map((file: any, i: number) => (
+                                <div key={file.id || i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between group">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
+                                            <DocumentTextIcon className="w-4 h-4" />
+                                        </div>
+                                        <div className="truncate">
+                                            <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">{file.filename}</div>
+                                            <div className="flex items-center gap-2 text-[8px] text-slate-400 font-bold uppercase tracking-tight">
+                                                <span>{file.kind}</span>
+                                                {file.sizeBytes > 0 && <span>• {(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</span>}
+                                                {file.checksum && <span className="truncate max-w-[100px]"> • {file.checksum}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-widest">
+                                            {file.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        ) : order.productionFiles?.length > 0 ? (
+                            order.productionFiles.map((file: any, i: number) => (
+                                <div key={i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
+                                            <DocumentTextIcon className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase">{file.filename}</div>
+                                            <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">{file.kind}</div>
+                                        </div>
+                                    </div>
+                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-widest">UPLOADED</span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="bg-red-50 border border-red-100 p-8 text-center space-y-2">
+                                <ExclamationTriangleIcon className="w-6 h-6 mx-auto text-red-400" />
+                                <div className="text-[10px] font-black text-red-700 uppercase tracking-widest">No production files found</div>
+                                <div className="text-[8px] text-red-400 font-bold uppercase tracking-tight">Customer has not uploaded interior/cover yet</div>
                             </div>
-                        </div>
+                        )}
                     </div>
+                </section>
+
+                <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Preflight Readiness</h4>
                         <div className={`p-4 border text-center space-y-2 ${order.preflight.status === 'PASSED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>

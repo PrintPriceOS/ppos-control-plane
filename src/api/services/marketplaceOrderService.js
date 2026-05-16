@@ -45,6 +45,17 @@ class MarketplaceOrderService {
         const totals = snapshot.totals || safeParseJson(row.totals_json, safeParseJson(row.totals, offer.totals || {}));
         const status = row.status || 'DECLARED';
 
+        // Resolve Final Total with robust fallback
+        const resolvedTotal = Number(
+            totals.total ||
+            totals.grand_total ||
+            totals.amount ||
+            offer.total_price ||
+            offer.totalPrice ||
+            offer.amount ||
+            0
+        );
+
         // Normalize Lifecycle into Stage and Data Object
         const lifecycleObject = typeof snapshot.lifecycle === 'object' 
             ? snapshot.lifecycle 
@@ -123,7 +134,7 @@ class MarketplaceOrderService {
         // Payment Blockers
         if (payment.status === 'BLOCKED') {
             blockers.push('PAYMENT_BLOCKED');
-        } else if (!['PAID', 'COMPLETED', 'SUCCESS'].includes(payment.status)) {
+        } else if (!['PAID', 'COMPLETED', 'SUCCESS', 'READY_MANUAL'].includes(payment.status)) {
             blockers.push('PAYMENT_PENDING');
         }
 
@@ -146,20 +157,20 @@ class MarketplaceOrderService {
                 billingAddress: customer.billing_address || customer.address || {}
             },
             offer: {
-                id: offer.id,
-                printerId: offer.printer_id || offer.house_id,
-                printerName: offer.printer_name || offer.print_house || 'Unknown House',
-                totalPrice: offer.total_price || offer.amount || 0,
+                id: offer.offer_id || offer.id,
+                printerId: offer.printer_id || offer.printerId || offer.house_id || offer.print_house_id,
+                printerName: offer.printer_name || offer.printerName || offer.print_house || offer.print_house_name || 'Unknown House',
+                totalPrice: Number(offer.total_price || offer.totalPrice || offer.amount || 0),
                 currency: offer.currency || 'EUR',
                 leadTimeDays: offer.lead_time_days || 0
             },
             specs,
             totals: {
-                subtotal: totals.subtotal || 0,
-                tax: totals.tax || 0,
-                shipping: totals.shipping || 0,
-                total: totals.total || 0,
-                currency: totals.currency || 'EUR'
+                subtotal: Number(totals.subtotal || 0),
+                tax: Number(totals.tax || 0),
+                shipping: Number(totals.shipping || 0),
+                total: resolvedTotal,
+                currency: totals.currency || offer.currency || 'EUR'
             },
             productionFiles: normalizedFiles,
             preflight: {
@@ -212,7 +223,6 @@ class MarketplaceOrderService {
             params.push(status);
         }
         
-        // Use row.lifecycle only if it's a string. Avoid object filters.
         if (lifecycle && typeof lifecycle === 'string') {
             sql += ` AND lifecycle = ?`;
             params.push(lifecycle);
@@ -242,7 +252,7 @@ class MarketplaceOrderService {
                 filesUploaded: orders.filter(o => o.productionFiles.length >= 2).length,
                 preflightRequired: orders.filter(o => o.preflight.status === 'REQUIRED').length,
                 preflightPending: orders.filter(o => o.preflight.status === 'PENDING' || o.preflight.status === 'NOT_STARTED').length,
-                paymentPending: orders.filter(o => !['PAID', 'COMPLETED'].includes(o.payment.status)).length,
+                paymentPending: orders.filter(o => !['PAID', 'COMPLETED', 'READY_MANUAL'].includes(o.payment.status)).length,
                 readyForHandoff: orders.filter(o => o.readiness === 'READY').length,
                 blocked: orders.filter(o => o.readiness === 'BLOCKED').length
             };
@@ -258,7 +268,6 @@ class MarketplaceOrderService {
     async getOrderDetail(id) {
         logger.info({ event: 'MARKETPLACE_ORDER_DETAIL_REQUEST', id });
         try {
-            // Remove 'id' column reference for production safety
             const rows = await mysqlClient.query(`SELECT * FROM marketplace_order_intents WHERE order_intent_id = ? OR public_ref = ?`, [id, id]);
             if (!rows.length) return { ok: false, error: 'ORDER_NOT_FOUND' };
 
@@ -298,8 +307,8 @@ class MarketplaceOrderService {
                 id: f.id || f.file_id,
                 kind: f.kind,
                 filename: f.original_filename || f.filename,
-                sizeBytes: f.size_bytes || f.size,
-                status: f.status,
+                sizeBytes: Number(f.size_bytes || f.size || 0),
+                status: f.status || 'UPLOADED',
                 checksum: f.checksum,
                 createdAt: f.created_at
             }));
@@ -336,7 +345,6 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
-        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
             SET control_plane_json = ?, control_plane = ?, status = 'ACKNOWLEDGED'
@@ -361,7 +369,6 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
-        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
             SET control_plane_json = ?, control_plane = ?
@@ -388,7 +395,6 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
-        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
             SET control_plane_json = ?, control_plane = ?
@@ -458,7 +464,6 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
-        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
             SET control_plane_json = ?, control_plane = ?
@@ -486,7 +491,6 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
-        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
             SET control_plane_json = ?, control_plane = ?
