@@ -673,9 +673,15 @@ class MarketplaceOrderService {
 
         const orderIntentId = order.orderIntentId;
 
-        // Identify interior and cover
-        const interior = order.productionFiles.find(f => f.kind === 'INTERIOR_PDF' || f.kind?.includes('INTERIOR'));
-        const cover = order.productionFiles.find(f => f.kind === 'COVER_PDF' || f.kind?.includes('COVER'));
+        // Identify interior and cover, prioritizing high-fidelity productionFileMetadata
+        const metaInterior = order.productionFileMetadata?.find(f => f.kind === 'INTERIOR_PDF' || f.kind?.includes('INTERIOR'));
+        const metaCover = order.productionFileMetadata?.find(f => f.kind === 'COVER_PDF' || f.kind?.includes('COVER'));
+        
+        const snapInterior = order.productionFiles.find(f => f.kind === 'INTERIOR_PDF' || f.kind?.includes('INTERIOR'));
+        const snapCover = order.productionFiles.find(f => f.kind === 'COVER_PDF' || f.kind?.includes('COVER'));
+
+        const interior = metaInterior || snapInterior;
+        const cover = metaCover || snapCover;
 
         const handoff = {
             status: 'READY',
@@ -688,8 +694,8 @@ class MarketplaceOrderService {
             specs: order.specs,
             totals: order.totals,
             productionFiles: {
-                interior: interior ? { fileId: interior.fileId, filename: interior.filename } : null,
-                cover: cover ? { fileId: cover.fileId, filename: cover.filename } : null
+                interior: interior ? { fileId: interior.fileId || interior.id, filename: interior.filename } : null,
+                cover: cover ? { fileId: cover.fileId || cover.id, filename: cover.filename } : null
             },
             preflight: {
                 status: order.preflight.status,
@@ -739,7 +745,9 @@ class MarketplaceOrderService {
             printerName: order.offer.printerName,
             preparedAt: new Date().toISOString(),
             preparedBy: actorId,
-            productionFiles: order.productionFiles
+            productionFiles: order.productionFileMetadata && order.productionFileMetadata.length > 0 
+                ? order.productionFileMetadata 
+                : order.productionFiles
         };
 
         const handoffJson = JSON.stringify(printhouseHandoff);
