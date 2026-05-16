@@ -16,7 +16,7 @@ import { SystemHealthPage } from './pages/os/SystemHealthPage';
 import { RuntimeContextPage } from './pages/os/RuntimeContextPage';
 import { MachinesPage } from './pages/os/MachinesPage';
 import { AdminDashboard } from './pages/AdminDashboard'; // Legacy Dashboard
-import { MarketplaceTab } from './pages/admin/MarketplaceTab';
+import { MarketplacePage } from './pages/admin/MarketplacePage';
 import { PricingIntelligenceTab } from './pages/admin/PricingIntelligenceTab';
 import { FinancialOpsTab } from './pages/admin/FinancialOpsTab';
 import { SuccessWorkspace } from './pages/admin/SuccessWorkspace';
@@ -162,7 +162,7 @@ export const App: React.FC = () => {
                 <Route path="/global/conflicts" element={<GlobalConflicts />} />
 
                 {/* EXTENDED OPERATIONS (Restored) */}
-                <Route path="/ops/marketplace" element={<MarketplaceTab />} />
+                <Route path="/ops/marketplace" element={<MarketplacePage />} />
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />
