@@ -319,9 +319,75 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
         } catch (err) { console.error(err); }
     };
 
-    const handleMarkPreflight = async () => {
+    const handleRunPreflight = async () => {
+        try {
+            const res = await adminApi.runMarketplaceOrderPreflight(id);
+            if (res.ok) { fetchDetail(); onRefresh(); }
+            else { alert((res as any).error || 'Failed to run preflight'); }
+        } catch (err: any) { console.error(err); alert(err.message || 'Error running preflight'); }
+    };
+
+    const handleMarkPreflightRequired = async () => {
         try {
             const res = await adminApi.markMarketplaceOrderPreflightRequired(id);
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleMarkPreflightPassed = async () => {
+        const issues = prompt("Enter any comments/issues for passing (optional):");
+        if (issues === null) return;
+        try {
+            const res = await adminApi.markMarketplaceOrderPreflightPassed(id, {
+                result: 'MANUAL_PASS',
+                issues: issues ? [issues] : [],
+                riskLevel: 'LOW'
+            });
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleMarkPreflightFailed = async () => {
+        const issue = prompt("Enter failure reasons (optional):", "Manual preflight check failed by operator");
+        if (issue === null) return;
+        try {
+            const res = await adminApi.markMarketplaceOrderPreflightFailed(id, {
+                result: 'WARNINGS_FOUND',
+                issues: [issue],
+                riskLevel: 'HIGH'
+            });
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleMarkPaymentReady = async () => {
+        if (!confirm('Mark this payment as verified and manually approved?')) return;
+        try {
+            const res = await adminApi.markMarketplaceOrderPaymentReady(id);
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleMarkPaymentBlocked = async () => {
+        const reason = prompt("Enter payment blocking reason:", "Payment verification pending");
+        if (reason === null) return;
+        try {
+            const res = await adminApi.markMarketplaceOrderPaymentBlocked(id, reason);
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handlePrepareHandoff = async () => {
+        try {
+            const res = await adminApi.prepareMarketplaceOrderHandoff(id);
+            if (res.ok) { fetchDetail(); onRefresh(); alert('Handoff package compiled successfully!'); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleMarkHandoffReady = async () => {
+        if (!confirm('Mark order as fully ready for printhouse handoff?')) return;
+        try {
+            const res = await adminApi.markMarketplaceOrderHandoffReady(id);
             if (res.ok) { fetchDetail(); onRefresh(); }
         } catch (err) { console.error(err); }
     };
@@ -534,24 +600,86 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                 <button onClick={handleAcknowledge} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">Acknowledge Order</button>
                             )}
 
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 text-[10px] font-bold uppercase outline-none focus:border-primary"
-                                    placeholder="PH-ID-2026..."
-                                    value={printhouseId}
-                                    onChange={(e) => setPrinthouseId(e.target.value)}
-                                />
-                                <button onClick={handleAssign} className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Assign PH</button>
+                            {/* Preflight Management Block */}
+                            <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">1. Preflight Gates</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={handleRunPreflight}
+                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Run Preflight
+                                    </button>
+                                    <button 
+                                        onClick={handleMarkPreflightRequired} 
+                                        className="py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/10 transition-all"
+                                    >
+                                        Require Preflight
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={handleMarkPreflightPassed}
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Force Pass
+                                    </button>
+                                    <button 
+                                        onClick={handleMarkPreflightFailed}
+                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Force Fail
+                                    </button>
+                                </div>
                             </div>
 
-                            <button 
-                                onClick={handleMarkPreflight} 
-                                disabled={order.preflight?.status === 'REQUIRED'}
-                                className="w-full py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-amber-50 hover:text-amber-700 hover:border-amber-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {order.preflight?.status === 'REQUIRED' ? 'Preflight Already Required' : 'Mark Preflight Required'}
-                            </button>
+                            {/* Payment Management Block */}
+                            <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">2. Payment Gates</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={handleMarkPaymentReady}
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Verify & Approve
+                                    </button>
+                                    <button 
+                                        onClick={handleMarkPaymentBlocked}
+                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Block Payment
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Printhouse & Handoff Management Block */}
+                            <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">3. Printhouse Handoff</div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 text-[10px] font-bold uppercase outline-none focus:border-primary"
+                                        placeholder="PH-ID-2026..."
+                                        value={printhouseId}
+                                        onChange={(e) => setPrinthouseId(e.target.value)}
+                                    />
+                                    <button onClick={handleAssign} className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Assign PH</button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={handlePrepareHandoff}
+                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Prepare Package
+                                    </button>
+                                    <button 
+                                        onClick={handleMarkHandoffReady}
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Mark Ready
+                                    </button>
+                                </div>
+                            </div>
 
                             <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
                                 <select

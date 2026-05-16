@@ -149,4 +149,136 @@ router.post('/:id/internal-note', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/run
+ * Initiates or queues native/simulated preflight validation.
+ */
+router.post('/:id/preflight/run', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PREFLIGHT_RUN_REQUESTED]', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.runPreflight(req.params.id, actorId);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to run preflight for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_RUN_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/mark-required
+ * Flag the order as requiring preflight validation.
+ */
+router.post('/:id/preflight/mark-required', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_REQUIRED', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markPreflightRequired(req.params.id, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark preflight required for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_REQUIRED_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/mark-passed
+ * Manually pass the preflight check.
+ */
+router.post('/:id/preflight/mark-passed', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_PASSED', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markPreflightPassed(req.params.id, req.body, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually pass preflight for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_PASSED_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/mark-failed
+ * Manually fail the preflight check.
+ */
+router.post('/:id/preflight/mark-failed', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_FAILED', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markPreflightFailed(req.params.id, req.body, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually fail preflight for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_FAILED_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/payment/mark-ready
+ * Flag payment readiness state.
+ */
+router.post('/:id/payment/mark-ready', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PAYMENT_READY]', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markPaymentReady(req.params.id, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark payment ready for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PAYMENT_READY_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/payment/mark-blocked
+ * Block payment gate state.
+ */
+router.post('/:id/payment/mark-blocked', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_ACTION]', 'PAYMENT_MARK_BLOCKED', req.params.id);
+        const { reason } = req.body;
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markPaymentBlocked(req.params.id, reason, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to block payment gate for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PAYMENT_BLOCKED_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/handoff/prepare
+ * Compile production bundle files.
+ */
+router.post('/:id/handoff/prepare', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_HANDOFF_PREPARED]', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.prepareHandoff(req.params.id, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to prepare handoff for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'HANDOFF_PREPARE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/handoff/mark-ready
+ * Flag handoff state as ready for printhouse.
+ */
+router.post('/:id/handoff/mark-ready', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_ACTION]', 'HANDOFF_MARK_READY', req.params.id);
+        const actorId = req.user?.id || 'ADMIN';
+        const result = await orderService.markHandoffReady(req.params.id, actorId);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark handoff ready for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'HANDOFF_READY_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;

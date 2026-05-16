@@ -2128,27 +2128,72 @@ export async function acknowledgeMarketplaceOrder(id: string) {
 }
 
 export async function assignPrinthouseToMarketplaceOrder(id: string, printhouseId: string) {
-    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
         method: 'POST',
         body: JSON.stringify({ printhouseId })
     });
 }
 
 export async function markMarketplaceOrderPreflightRequired(id: string) {
-    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/mark-preflight-required`, {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-required`, {
+        method: 'POST'
+    });
+}
+
+export async function runMarketplaceOrderPreflight(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/run`, {
+        method: 'POST'
+    });
+}
+
+export async function markMarketplaceOrderPreflightPassed(id: string, result: Record<string, any> = {}) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-passed`, {
+        method: 'POST',
+        body: JSON.stringify(result)
+    });
+}
+
+export async function markMarketplaceOrderPreflightFailed(id: string, result: Record<string, any> = {}) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-failed`, {
+        method: 'POST',
+        body: JSON.stringify(result)
+    });
+}
+
+export async function markMarketplaceOrderPaymentReady(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/payment/mark-ready`, {
+        method: 'POST'
+    });
+}
+
+export async function markMarketplaceOrderPaymentBlocked(id: string, reason: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/payment/mark-blocked`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function prepareMarketplaceOrderHandoff(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/handoff/prepare`, {
+        method: 'POST'
+    });
+}
+
+export async function markMarketplaceOrderHandoffReady(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/handoff/mark-ready`, {
         method: 'POST'
     });
 }
 
 export async function requestMarketplaceOrderCustomerAction(id: string, actionType: string, message: string) {
-    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/request-customer-action`, {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/request-customer-action`, {
         method: 'POST',
         body: JSON.stringify({ actionType, message })
     });
 }
 
 export async function addNoteToMarketplaceOrder(id: string, note: string) {
-    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/internal-note`, {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/internal-note`, {
         method: 'POST',
         body: JSON.stringify({ note })
     });

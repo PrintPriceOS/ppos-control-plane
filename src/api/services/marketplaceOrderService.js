@@ -5,6 +5,7 @@
  */
 const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('marketplace-order-service');
+const marketplacePreflightService = require('./marketplacePreflightService');
 
 /**
  * Robust JSON parsing helper.
@@ -68,10 +69,10 @@ class MarketplaceOrderService {
             ? row.lifecycle
             : (lifecycleObject.marketplace || snapshot.status || status || 'UNKNOWN');
 
-        // Extract operational segments
-        const preflight = snapshot.preflight || safeParseJson(row.preflight_json, safeParseJson(row.preflight, controlPlane.preflight || {}));
-        const payment = snapshot.payment || safeParseJson(row.payment_json, safeParseJson(row.payment, controlPlane.payment || {}));
-        const printhouse = snapshot.printhouse || controlPlane.printhouse || safeParseJson(row.printhouse_handoff_json, safeParseJson(row.printhouse_handoff, {}));
+        // Extract operational segments with dynamic overrides prioritization
+        const preflight = safeParseJson(row.preflight_json, safeParseJson(row.preflight, controlPlane.preflight || snapshot.preflight || {}));
+        const payment = safeParseJson(row.payment_json, safeParseJson(row.payment, controlPlane.payment || snapshot.payment || {}));
+        const handoff = safeParseJson(row.printhouse_handoff_json, safeParseJson(row.printhouse_handoff, controlPlane.printhouse || snapshot.printhouse || {}));
         const customer = snapshot.customer || safeParseJson(row.customer_json, safeParseJson(row.customer, {}));
 
         // Robust Production Files Normalization
@@ -128,17 +129,26 @@ class MarketplaceOrderService {
         }
 
         // Preflight Blockers
-        if (preflight.status === 'REQUIRED') {
-            blockers.push('PREFLIGHT_REQUIRED');
-        } else if (!['PASSED', 'SUCCESS', 'COMPLETED'].includes(preflight.status)) {
+        if (preflight.status === 'FAILED') {
+            blockers.push('PREFLIGHT_FAILED');
+        } else if (!['PASSED', 'WAIVED'].includes(preflight.status)) {
             blockers.push('PREFLIGHT_PENDING');
         }
 
         // Payment Blockers
         if (payment.status === 'BLOCKED') {
             blockers.push('PAYMENT_BLOCKED');
-        } else if (!['PAID', 'COMPLETED', 'SUCCESS', 'READY_MANUAL'].includes(payment.status)) {
+        } else if (!['PAID', 'COMPLETED', 'READY_MANUAL', 'READY'].includes(payment.status)) {
             blockers.push('PAYMENT_PENDING');
+        }
+
+        // Handoff Blockers - handoff not prepared only after preflight & payment are resolved
+        const hasCriticalBlockers = blockers.length > 0;
+        if (!hasCriticalBlockers) {
+            const handoffStatus = handoff.status || handoff.handoffStatus || 'NOT_READY';
+            if (!['READY', 'SENT'].includes(handoffStatus)) {
+                blockers.push('HANDOFF_NOT_PREPARED');
+            }
         }
 
         const readiness = blockers.length === 0 ? 'READY' : 'BLOCKED';
@@ -178,14 +188,23 @@ class MarketplaceOrderService {
             productionFiles: normalizedFiles,
             preflight: {
                 status: preflight.status || 'NOT_STARTED',
-                lastChecked: preflight.updated_at || preflight.last_checked,
-                results: preflight.results || {}
+                lastChecked: preflight.updated_at || preflight.last_checked || preflight.updatedAt,
+                results: preflight.results || preflight.result || {},
+                simulated: Boolean(preflight.simulated),
+                required: Boolean(preflight.required),
+                nativeEnabled: Boolean(preflight.nativeEnabled),
+                interiorJobId: preflight.interiorJobId,
+                coverJobId: preflight.coverJobId,
+                issues: preflight.issues || [],
+                riskLevel: preflight.riskLevel || 'NONE',
+                updatedBy: preflight.updatedBy
             },
             payment: {
                 status: payment.status || 'NOT_STARTED',
                 method: payment.method,
-                transactionId: payment.transaction_id,
-                paidAt: payment.paid_at
+                transactionId: payment.transaction_id || payment.transactionId,
+                paidAt: payment.paid_at || payment.paidAt,
+                blockedReason: payment.blocked_reason || payment.blockedReason
             },
             controlPlane: {
                 acknowledged: Boolean(controlPlane.acknowledged),
@@ -195,9 +214,12 @@ class MarketplaceOrderService {
                 operationalStatus: controlPlane.operationalStatus || controlPlane.operational_status || status
             },
             printhouse: {
-                assignedPrinthouseId: printhouse.id || printhouse.assignedPrinthouseId || printhouse.assigned_printhouse_id,
-                assignedAt: printhouse.assignedAt || printhouse.assigned_at,
-                handoffStatus: printhouse.status || printhouse.handoffStatus || 'PENDING'
+                assignedPrinthouseId: handoff.printerId || handoff.printer_id || handoff.assignedPrinthouseId || handoff.assigned_printhouse_id || controlPlane.printhouse?.assignedPrinthouseId,
+                assignedAt: handoff.preparedAt || handoff.assignedAt || handoff.assigned_at,
+                handoffStatus: handoff.status || handoff.handoffStatus || 'NOT_READY',
+                preparedBy: handoff.preparedBy,
+                preparedAt: handoff.preparedAt,
+                productionFiles: handoff.productionFiles
             },
             audit: [], 
             operationalStatus: controlPlane.operationalStatus || controlPlane.operational_status || status,
@@ -461,6 +483,52 @@ class MarketplaceOrderService {
         }
     }
 
+    async runPreflight(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'RUN_PREFLIGHT', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        // Delegate to marketplacePreflightService
+        const runRes = await marketplacePreflightService.runPreflight(orderIntentId, actorId);
+        if (!runRes.ok) {
+            // Even if it failed or is not configured, we still want to store the preflight object status
+            if (runRes.preflight) {
+                const preflightJson = JSON.stringify(runRes.preflight);
+                await mysqlClient.query(`
+                    UPDATE marketplace_order_intents 
+                    SET preflight_json = ?, preflight = ?
+                    WHERE order_intent_id = ?
+                `, [preflightJson, preflightJson, orderIntentId]);
+            }
+            await this.addAuditEvent(orderIntentId, 'PREFLIGHT_NOT_CONFIGURED', { error: runRes.error, message: runRes.message, actorId }, actorId);
+            return runRes;
+        }
+
+        const preflight = runRes.preflight;
+        const preflightJson = JSON.stringify(preflight);
+
+        // Update preflight_json column
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET preflight_json = ?, preflight = ?
+            WHERE order_intent_id = ?
+        `, [preflightJson, preflightJson, orderIntentId]);
+
+        // Append Audit event
+        const eventType = preflight.simulated ? 'PREFLIGHT_SIMULATED' : 'PREFLIGHT_RUN_REQUESTED';
+        await this.addAuditEvent(orderIntentId, eventType, { preflight, actorId }, actorId);
+
+        // If simulated, also trigger standard pass/fail logging and potential secondary events
+        if (preflight.simulated) {
+            const outcomeEvent = preflight.status === 'PASSED' ? 'PREFLIGHT_PASSED' : 'PREFLIGHT_FAILED';
+            await this.addAuditEvent(orderIntentId, outcomeEvent, { result: preflight.result, actorId }, actorId);
+        }
+
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
     async markPreflightRequired(id, actorId) {
         logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PREFLIGHT_REQUIRED', id });
         const { order } = await this.getOrderDetail(id);
@@ -474,14 +542,216 @@ class MarketplaceOrderService {
         const orderIntentId = order.orderIntentId;
         const cpJson = JSON.stringify(cp);
 
+        // Also update preflight_json directly for robust synchronization
+        const preflight = order.preflight;
+        preflight.status = 'REQUIRED';
+        preflight.updatedAt = new Date().toISOString();
+        preflight.updatedBy = actorId;
+        const preflightJson = JSON.stringify(preflight);
+
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
-            SET control_plane_json = ?, control_plane = ?
+            SET control_plane_json = ?, control_plane = ?, preflight_json = ?, preflight = ?
             WHERE order_intent_id = ?
-        `, [cpJson, cpJson, orderIntentId]);
+        `, [cpJson, cpJson, preflightJson, preflightJson, orderIntentId]);
 
         await this.addAuditEvent(orderIntentId, 'PREFLIGHT_REQUIRED', { actorId }, actorId);
-        return { ok: true };
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async markPreflightPassed(id, result = {}, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PREFLIGHT_PASSED', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        // Build updated preflight status
+        const preflight = order.preflight;
+        preflight.status = 'PASSED';
+        preflight.result = result.result || 'SUCCESS';
+        preflight.issues = result.issues || [];
+        preflight.riskLevel = result.riskLevel || 'LOW';
+        preflight.updatedAt = new Date().toISOString();
+        preflight.updatedBy = actorId;
+
+        const preflightJson = JSON.stringify(preflight);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET preflight_json = ?, preflight = ?
+            WHERE order_intent_id = ?
+        `, [preflightJson, preflightJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'PREFLIGHT_PASSED', { result, actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async markPreflightFailed(id, result = {}, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PREFLIGHT_FAILED', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        // Build updated preflight status
+        const preflight = order.preflight;
+        preflight.status = 'FAILED';
+        preflight.result = result.result || 'WARNINGS_FOUND';
+        preflight.issues = result.issues || ['Manual preflight check failed by operator'];
+        preflight.riskLevel = result.riskLevel || 'MEDIUM';
+        preflight.updatedAt = new Date().toISOString();
+        preflight.updatedBy = actorId;
+
+        const preflightJson = JSON.stringify(preflight);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET preflight_json = ?, preflight = ?
+            WHERE order_intent_id = ?
+        `, [preflightJson, preflightJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'PREFLIGHT_FAILED', { result, actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async markPaymentReady(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PAYMENT_READY', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        const payment = order.payment;
+        payment.status = 'READY_MANUAL';
+        payment.paidAt = new Date().toISOString();
+        payment.method = 'MANUAL';
+        payment.updatedAt = new Date().toISOString();
+        payment.updatedBy = actorId;
+
+        const paymentJson = JSON.stringify(payment);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET payment_json = ?, payment = ?
+            WHERE order_intent_id = ?
+        `, [paymentJson, paymentJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'PAYMENT_READY', { actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async markPaymentBlocked(id, reason = 'Payment verification pending', actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PAYMENT_BLOCKED', id, reason });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        const payment = order.payment;
+        payment.status = 'BLOCKED';
+        payment.blockedReason = reason;
+        payment.updatedAt = new Date().toISOString();
+        payment.updatedBy = actorId;
+
+        const paymentJson = JSON.stringify(payment);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET payment_json = ?, payment = ?
+            WHERE order_intent_id = ?
+        `, [paymentJson, paymentJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'PAYMENT_BLOCKED', { reason, actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async prepareHandoff(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'PREPARE_HANDOFF', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        // Identify interior and cover
+        const interior = order.productionFiles.find(f => f.kind === 'INTERIOR_PDF' || f.kind?.includes('INTERIOR'));
+        const cover = order.productionFiles.find(f => f.kind === 'COVER_PDF' || f.kind?.includes('COVER'));
+
+        const handoff = {
+            status: 'READY',
+            preparedAt: new Date().toISOString(),
+            preparedBy: actorId,
+            orderIntentId: orderIntentId,
+            publicRef: order.publicRef,
+            printerId: order.offer.printerId,
+            printerName: order.offer.printerName,
+            specs: order.specs,
+            totals: order.totals,
+            productionFiles: {
+                interior: interior ? { fileId: interior.fileId, filename: interior.filename } : null,
+                cover: cover ? { fileId: cover.fileId, filename: cover.filename } : null
+            },
+            preflight: {
+                status: order.preflight.status,
+                results: order.preflight.results
+            },
+            payment: {
+                status: order.payment.status,
+                method: order.payment.method
+            },
+            customerSnapshot: {
+                name: order.customer.name,
+                email: order.customer.email
+            },
+            auditRef: `audit_handoff_${Date.now()}`
+        };
+
+        const handoffJson = JSON.stringify(handoff);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET printhouse_handoff_json = ?, printhouse_handoff = ?
+            WHERE order_intent_id = ?
+        `, [handoffJson, handoffJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'HANDOFF_PREPARED', { actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
+    }
+
+    async markHandoffReady(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_HANDOFF_READY', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const orderIntentId = order.orderIntentId;
+
+        // Fetch or create handoff
+        let handoff = safeParseJson(order.printhouse?.handoffStatus === 'NOT_READY' ? null : order.printhouse);
+        if (!handoff || Object.keys(handoff).length <= 4) {
+            // Prepare it inline if not prepared yet
+            const prepRes = await this.prepareHandoff(id, actorId);
+            handoff = prepRes.order.printhouse;
+        }
+
+        const printhouseHandoff = {
+            status: 'READY',
+            printerId: order.offer.printerId,
+            printerName: order.offer.printerName,
+            preparedAt: new Date().toISOString(),
+            preparedBy: actorId,
+            productionFiles: order.productionFiles
+        };
+
+        const handoffJson = JSON.stringify(printhouseHandoff);
+
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET printhouse_handoff_json = ?, printhouse_handoff = ?
+            WHERE order_intent_id = ?
+        `, [handoffJson, handoffJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'HANDOFF_READY', { actorId }, actorId);
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
     }
 
     async requestCustomerAction(id, actionType, message, actorId) {
@@ -508,7 +778,7 @@ class MarketplaceOrderService {
         `, [cpJson, cpJson, orderIntentId]);
 
         await this.addAuditEvent(orderIntentId, 'CUSTOMER_ACTION_REQUESTED', { actionType, message, actorId }, actorId);
-        return { ok: true };
+        return { ok: true, order: (await this.getOrderDetail(id)).order };
     }
 }
 
