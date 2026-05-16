@@ -7,20 +7,95 @@ import {
     MagnifyingGlassIcon,
     ShieldCheckIcon,
     ExclamationCircleIcon,
-    CheckCircleIcon,
     DocumentTextIcon,
     UserIcon,
-    TruckIcon,
-    ChatBubbleLeftRightIcon,
-    EyeIcon,
-    EllipsisVerticalIcon,
     XMarkIcon,
     ExclamationTriangleIcon,
     BoltIcon,
     CreditCardIcon,
     BuildingStorefrontIcon
 } from "@heroicons/react/24/outline";
-import { short, safeText, safeTime, safeDate } from "../../lib/formatters";
+import { safeTime, safeDate } from "../../lib/formatters";
+
+// --- Defensive Helpers ---
+
+const getSpecSummary = (order: any) => {
+    if (!order?.specs) return "—";
+    const s = order.specs;
+    const format = s.format || s.book_size || s.trim_size || "—";
+    const copies = s.copies || s.quantity || "—";
+    const pages = s.interior_pages || s.total_pages || s.page_count || "—";
+    const binding = (s.binding_method || s.binding || "—").toUpperCase();
+    return `${format} / ${copies} copies / ${pages} pages / ${binding}`;
+};
+
+const getFileState = (order: any) => {
+    const files = order?.productionFiles || [];
+    if (files.length === 0) return { label: "Missing", color: "bg-red-100 text-red-700" };
+
+    const hasInterior = files.some((f: any) => f.kind?.includes("INTERIOR"));
+    const hasCover = files.some((f: any) => f.kind?.includes("COVER"));
+
+    if (hasInterior && hasCover) return { label: "Interior + Cover", color: "bg-emerald-100 text-emerald-700" };
+    if (hasInterior) return { label: "Interior Only", color: "bg-amber-100 text-amber-700" };
+    if (hasCover) return { label: "Cover Only", color: "bg-amber-100 text-amber-700" };
+
+    return { label: `${files.length} Files`, color: "bg-blue-100 text-blue-700" };
+};
+
+const getTotalLabel = (order: any) => {
+    const total = Number(order?.totals?.total || order?.offer?.totalPrice || 0);
+    const currency = order?.totals?.currency || order?.offer?.currency || "EUR";
+    return `${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+};
+
+const getPrinterName = (order: any) => {
+    return order?.offer?.printerName || order?.printhouse?.assignedPrinthouseId || "Unassigned";
+};
+
+const isOrderAcknowledged = (order: any) => {
+    return order?.controlPlane?.acknowledged === true || order?.status === "ACKNOWLEDGED";
+};
+
+const getDisplayFiles = (order: any) => {
+    const metadata = order?.productionFileMetadata || [];
+    if (metadata.length > 0) {
+        return metadata.map((m: any) => ({
+            filename: m.filename,
+            sizeBytes: m.sizeBytes,
+            status: m.status,
+            createdAt: m.createdAt,
+            checksum: m.checksum,
+            kind: m.kind
+        }));
+    }
+    const legacy = order?.productionFiles || [];
+    return legacy.map((l: any) => ({
+        filename: l.filename,
+        sizeBytes: 0,
+        status: l.status || "UPLOADED",
+        createdAt: order.createdAt,
+        checksum: null,
+        kind: l.kind
+    }));
+};
+
+const isNewOrder = (order: any) => {
+    // A "New Order" is anything not yet acknowledged by ops
+    return !isOrderAcknowledged(order);
+};
+
+const getStatusStyle = (status: string, order?: any) => {
+    if (order?.controlPlane?.acknowledged) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+    switch (status) {
+        case 'ACKNOWLEDGED': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        case 'FILES_UPLOADED': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+        case 'SIGNED': return 'bg-blue-50 text-blue-700 border-blue-100';
+        case 'READY': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        case 'BLOCKED': return 'bg-red-50 text-red-700 border-red-100';
+        default: return 'bg-slate-50 text-slate-700 border-slate-200';
+    }
+};
 
 export const OrderIntakeTab: React.FC = () => {
     const [orders, setOrders] = useState<any[]>([]);
@@ -46,21 +121,11 @@ export const OrderIntakeTab: React.FC = () => {
         }
     };
 
-    const getStatusStyle = (status: string) => {
-        switch (status) {
-            case 'ACKNOWLEDGED': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-            case 'DECLARED': return 'bg-blue-50 text-blue-700 border-blue-100';
-            case 'READY': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-            case 'BLOCKED': return 'bg-red-50 text-red-700 border-red-100';
-            default: return 'bg-slate-50 text-slate-700 border-slate-200';
-        }
-    };
-
     const kpis = [
-        { label: 'New Orders', value: orders.filter(o => o.status === 'DECLARED').length, icon: InboxStackIcon, color: 'text-blue-600' },
+        { label: 'New Orders', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, color: 'text-blue-600' },
         { label: 'Files Uploaded', value: counts.filesUploaded || 0, icon: DocumentTextIcon, color: 'text-indigo-600' },
-        { label: 'Preflight Required', value: orders.filter(o => o.preflight.status === 'REQUIRED').length, icon: ExclamationTriangleIcon, color: 'text-amber-600' },
-        { label: 'Payment Blocked', value: orders.filter(o => o.payment.status === 'BLOCKED').length, icon: CreditCardIcon, color: 'text-red-600' },
+        { label: 'Preflight Required', value: orders.filter(o => o.preflight?.status === 'REQUIRED').length, icon: ExclamationTriangleIcon, color: 'text-amber-600' },
+        { label: 'Payment Blocked', value: orders.filter(o => o.payment?.status === 'BLOCKED').length, icon: CreditCardIcon, color: 'text-red-600' },
         { label: 'Ready for Handoff', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, color: 'text-emerald-600' },
         { label: 'Blocked Orders', value: orders.filter(o => o.readiness === 'BLOCKED').length, icon: ExclamationCircleIcon, color: 'text-red-500' },
     ];
@@ -84,9 +149,9 @@ export const OrderIntakeTab: React.FC = () => {
             <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
                 <div className="relative flex-1 max-w-md group">
                     <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Filter by Order Ref, Email or ID..." 
+                    <input
+                        type="text"
+                        placeholder="Filter by Order Ref, Email or ID..."
                         className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#0e0e0f] border border-slate-200 dark:border-white/10 rounded-none text-xs font-bold uppercase tracking-widest focus:border-primary outline-none dark:text-white"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -131,7 +196,7 @@ export const OrderIntakeTab: React.FC = () => {
                                 </td>
                             </tr>
                         ) : orders.map((order) => {
-                            const specSummary = `${order.specs.format || 'A5'} / ${order.specs.quantity || order.specs.copies || 0} copies / ${order.specs.page_count || 0} pages / ${order.specs.binding || 'Flexibound'}`;
+                            const fileState = getFileState(order);
                             return (
                                 <tr key={order.orderIntentId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group text-xs">
                                     <td className="px-4 py-5 font-black text-slate-900 dark:text-white tracking-tight">
@@ -141,51 +206,50 @@ export const OrderIntakeTab: React.FC = () => {
                                         {safeDate(order.createdAt)}
                                     </td>
                                     <td className="px-4 py-5">
-                                        <div className="font-bold text-slate-900 dark:text-white">{order.customer.name}</div>
-                                        <div className="text-[10px] text-slate-400 font-medium lowercase truncate max-w-[150px]">{order.customer.email}</div>
+                                        <div className="font-bold text-slate-900 dark:text-white">{order.customer?.name || 'Anonymous'}</div>
+                                        <div className="text-[10px] text-slate-400 font-medium lowercase truncate max-w-[150px]">{order.customer?.email || 'N/A'}</div>
                                     </td>
                                     <td className="px-4 py-5 font-medium text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
-                                        {specSummary}
+                                        {getSpecSummary(order)}
                                     </td>
                                     <td className="px-4 py-5">
-                                        <div className="font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">{order.offer.printerName}</div>
-                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">PRINTER: {order.offer.printerId}</div>
+                                        <div className="font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">{getPrinterName(order)}</div>
+                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">PH-ID: {order.offer?.printerId || 'N/A'}</div>
                                     </td>
                                     <td className="px-4 py-5">
-                                        {order.productionFiles.length > 0 ? (
-                                            <span className="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-black text-[9px] uppercase tracking-widest">Interior + Cover</span>
-                                        ) : (
-                                            <span className="bg-slate-100 dark:bg-white/10 text-slate-400 px-2 py-0.5 font-black text-[9px] uppercase tracking-widest">Missing</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${
-                                            order.preflight.status === 'PASSED' ? 'bg-emerald-100 text-emerald-700' :
-                                            order.preflight.status === 'REQUIRED' ? 'bg-amber-100 text-amber-700' :
-                                            'bg-slate-100 text-slate-400'
-                                        }`}>
-                                            {order.preflight.status.replace(/_/g, ' ')}
+                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${fileState.color}`}>
+                                            {fileState.label}
                                         </span>
                                     </td>
                                     <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${
-                                            order.payment.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                                            order.payment.status === 'BLOCKED' ? 'bg-red-100 text-red-700' :
-                                            'bg-slate-100 text-slate-400'
-                                        }`}>
-                                            {order.payment.status.replace(/_/g, ' ')}
+                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${order.preflight?.status === 'PASSED' ? 'bg-emerald-100 text-emerald-700' :
+                                                order.preflight?.status === 'REQUIRED' ? 'bg-amber-100 text-amber-700' :
+                                                    'bg-slate-100 text-slate-400'
+                                            }`}>
+                                            {order.preflight?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-5">
+                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${order.payment?.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
+                                                order.payment?.status === 'BLOCKED' ? 'bg-red-100 text-red-700' :
+                                                    'bg-slate-100 text-slate-400'
+                                            }`}>
+                                            {order.payment?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-5 font-black text-slate-900 dark:text-white">
-                                        {order.totals.total.toLocaleString()} {order.totals.currency}
+                                        {getTotalLabel(order)}
                                     </td>
-                                    <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider border ${getStatusStyle(order.status)}`}>
+                                    <td className="px-4 py-5 space-y-1">
+                                        <div className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider border inline-block ${getStatusStyle(order.status, order)}`}>
                                             {order.status}
-                                        </span>
+                                        </div>
+                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter block">
+                                            Stage: {order.lifecycle || 'UNKNOWN'}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-5 text-right">
-                                        <button 
+                                        <button
                                             onClick={() => setSelectedOrderId(order.orderIntentId)}
                                             className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-sm"
                                         >
@@ -287,8 +351,6 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
 
     if (!order) return <div className="p-10 text-center">Order not found.</div>;
 
-    const specSummary = `${order.specs.format || 'A5'} / ${order.specs.quantity || order.specs.copies || 0} copies / ${order.specs.page_count || 0} pages / ${order.specs.binding || 'Flexibound'}`;
-
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -296,10 +358,11 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                 <div>
                     <div className="flex items-center gap-3">
                         <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{order.publicRef}</h3>
-                        <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest border ${
-                            order.status === 'ACKNOWLEDGED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100'
-                        }`}>
+                        <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest border ${getStatusStyle(order.status, order)}`}>
                             {order.status}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest border ${order.readiness === 'READY' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                            {order.readiness}
                         </span>
                     </div>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Order Identity: {id}</p>
@@ -310,6 +373,23 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
+                {/* Readiness Blockers */}
+                {order.blockers?.length > 0 && (
+                    <section className="bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/20 p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                            <ExclamationCircleIcon className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Production Blockers Detected</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {order.blockers.map((b: string) => (
+                                <span key={b} className="bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border border-red-200 dark:border-red-500/30">
+                                    {b.replace(/_/g, ' ')}
+                                </span>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 {/* Identity & Session */}
                 <section className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -318,8 +398,8 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     <div className="grid grid-cols-2 gap-6 bg-slate-50 dark:bg-white/5 p-5 border border-slate-200 dark:border-white/10">
                         <div className="space-y-1">
                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Customer Name</div>
-                            <div className="text-sm font-black text-slate-900 dark:text-white">{order.customer.name}</div>
-                            <div className="text-xs font-medium text-slate-500">{order.customer.email}</div>
+                            <div className="text-sm font-black text-slate-900 dark:text-white">{order.customer?.name || 'Anonymous'}</div>
+                            <div className="text-xs font-medium text-slate-500">{order.customer?.email || 'N/A'}</div>
                         </div>
                         <div className="space-y-1">
                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Session Timing</div>
@@ -334,7 +414,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     <section className="space-y-4">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Book Specifications</h4>
                         <div className="space-y-3">
-                            {Object.entries(order.specs).map(([k, v]) => (
+                            {Object.entries(order.specs || {}).map(([k, v]) => (
                                 <div key={k} className="flex justify-between items-center border-b border-slate-100 dark:border-white/5 pb-2">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase">{k.replace(/_/g, ' ')}</span>
                                     <span className="text-xs font-black text-slate-900 dark:text-white">{String(v)}</span>
@@ -347,20 +427,20 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         <div className="bg-slate-900 text-white p-5 space-y-4 shadow-lg">
                             <div className="flex justify-between items-end border-b border-white/10 pb-3">
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Final Amount</div>
-                                <div className="text-2xl font-black">{order.totals.total.toLocaleString()} {order.totals.currency}</div>
+                                <div className="text-2xl font-black">{getTotalLabel(order)}</div>
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-[10px] font-bold">
                                     <span className="text-slate-400 uppercase">Subtotal</span>
-                                    <span>{order.totals.subtotal}</span>
+                                    <span>{order.totals?.subtotal || 0}</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] font-bold">
                                     <span className="text-slate-400 uppercase">Tax</span>
-                                    <span>{order.totals.tax}</span>
+                                    <span>{order.totals?.tax || 0}</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] font-bold">
                                     <span className="text-slate-400 uppercase">Shipping</span>
-                                    <span>{order.totals.shipping}</span>
+                                    <span>{order.totals?.shipping || 0}</span>
                                 </div>
                             </div>
                         </div>
@@ -374,29 +454,30 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     </h4>
                     <div className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 p-5 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-600 flex items-center justify-center text-white font-black text-xl">
-                                {order.offer.printerName[0]}
+                            <div className="w-12 h-12 bg-emerald-600 flex items-center justify-center text-white font-black text-xl uppercase">
+                                {String(getPrinterName(order) || "P").charAt(0)}
                             </div>
                             <div>
-                                <div className="text-sm font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-tight">{order.offer.printerName}</div>
-                                <div className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">Printhouse ID: {order.offer.printerId}</div>
+                                <div className="text-sm font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-tight">{getPrinterName(order)}</div>
+                                <div className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">PH-ID: {order.offer?.printerId || 'N/A'}</div>
                             </div>
                         </div>
                         <div className="text-right">
                             <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Lead Time</div>
-                            <div className="text-sm font-black text-emerald-900 dark:text-emerald-400">{order.offer.leadTimeDays} Work Days</div>
+                            <div className="text-sm font-black text-emerald-900 dark:text-emerald-400">{order.offer?.leadTimeDays || 0} Work Days</div>
                         </div>
                     </div>
                 </section>
 
+                {/* Production File Assets */}
                 <section className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                         <DocumentTextIcon className="w-3.5 h-3.5" /> Production File Assets
                     </h4>
                     <div className="grid grid-cols-1 gap-3">
-                        {order.productionFileMetadata?.length > 0 ? (
-                            order.productionFileMetadata.map((file: any, i: number) => (
-                                <div key={file.id || i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between group">
+                        {getDisplayFiles(order).length > 0 ? (
+                            getDisplayFiles(order).map((file: any, i: number) => (
+                                <div key={i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between group">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
                                             <DocumentTextIcon className="w-4 h-4" />
@@ -417,21 +498,6 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                     </div>
                                 </div>
                             ))
-                        ) : order.productionFiles?.length > 0 ? (
-                            order.productionFiles.map((file: any, i: number) => (
-                                <div key={i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
-                                            <DocumentTextIcon className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase">{file.filename}</div>
-                                            <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">{file.kind}</div>
-                                        </div>
-                                    </div>
-                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-widest">UPLOADED</span>
-                                </div>
-                            ))
                         ) : (
                             <div className="bg-red-50 border border-red-100 p-8 text-center space-y-2">
                                 <ExclamationTriangleIcon className="w-6 h-6 mx-auto text-red-400" />
@@ -445,16 +511,16 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                 <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Preflight Readiness</h4>
-                        <div className={`p-4 border text-center space-y-2 ${order.preflight.status === 'PASSED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
+                        <div className={`p-4 border text-center space-y-2 ${order.preflight?.status === 'PASSED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                             <ShieldCheckIcon className="w-6 h-6 mx-auto opacity-50" />
-                            <div className="text-[10px] font-black uppercase tracking-widest">{order.preflight.status}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest">{order.preflight?.status || 'NOT STARTED'}</div>
                         </div>
                     </div>
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Readiness</h4>
-                        <div className={`p-4 border text-center space-y-2 ${order.payment.status === 'PAID' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
+                        <div className={`p-4 border text-center space-y-2 ${order.payment?.status === 'PAID' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                             <CreditCardIcon className="w-6 h-6 mx-auto opacity-50" />
-                            <div className="text-[10px] font-black uppercase tracking-widest">{order.payment.status}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest">{order.payment?.status || 'NOT STARTED'}</div>
                         </div>
                     </div>
                 </div>
@@ -464,25 +530,31 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     <div className="space-y-6">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Operational Actions</h4>
                         <div className="space-y-3">
-                            {order.status === 'DECLARED' && (
+                            {!isOrderAcknowledged(order) && (
                                 <button onClick={handleAcknowledge} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">Acknowledge Order</button>
                             )}
-                            
+
                             <div className="flex gap-2">
-                                <input 
-                                    type="text" 
-                                    className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 text-[10px] font-bold uppercase outline-none focus:border-primary" 
-                                    placeholder="PH-ID-2026..." 
+                                <input
+                                    type="text"
+                                    className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 text-[10px] font-bold uppercase outline-none focus:border-primary"
+                                    placeholder="PH-ID-2026..."
                                     value={printhouseId}
                                     onChange={(e) => setPrinthouseId(e.target.value)}
                                 />
                                 <button onClick={handleAssign} className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Assign PH</button>
                             </div>
 
-                            <button onClick={handleMarkPreflight} className="w-full py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-amber-50 hover:text-amber-700 hover:border-amber-100 transition-all">Mark Preflight Required</button>
+                            <button 
+                                onClick={handleMarkPreflight} 
+                                disabled={order.preflight?.status === 'REQUIRED'}
+                                className="w-full py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-amber-50 hover:text-amber-700 hover:border-amber-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {order.preflight?.status === 'REQUIRED' ? 'Preflight Already Required' : 'Mark Preflight Required'}
+                            </button>
 
                             <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
-                                <select 
+                                <select
                                     className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2 text-[10px] font-bold uppercase outline-none"
                                     value={actionType}
                                     onChange={(e) => setActionType(e.target.value)}
@@ -491,7 +563,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                     <option value="PAYMENT_VERIFICATION">Request Payment Proof</option>
                                     <option value="SPEC_CLARIFICATION">Request Spec Clarity</option>
                                 </select>
-                                <textarea 
+                                <textarea
                                     className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-medium outline-none focus:border-primary h-20"
                                     placeholder="Message to customer..."
                                     value={actionMessage}
@@ -506,9 +578,9 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Internal Ledger Notes</h4>
                         <div className="space-y-4">
                             <div className="max-h-60 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                                {order.controlPlane.notes?.length === 0 ? (
+                                {order.controlPlane?.notes?.length === 0 ? (
                                     <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest text-center py-8 border-2 border-dashed border-slate-100">No notes found</div>
-                                ) : order.controlPlane.notes.map((n: any, i: number) => (
+                                ) : order.controlPlane?.notes?.map((n: any, i: number) => (
                                     <div key={i} className="bg-slate-50 dark:bg-white/5 p-3 border-l-2 border-primary">
                                         <div className="text-[10px] font-black text-slate-900 dark:text-white mb-1">{n.text}</div>
                                         <div className="flex justify-between text-[8px] text-slate-400 font-bold uppercase tracking-tighter">
@@ -519,7 +591,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                 ))}
                             </div>
                             <div className="pt-2">
-                                <textarea 
+                                <textarea
                                     className="w-full p-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-medium outline-none focus:border-primary h-24 shadow-inner"
                                     placeholder="Add internal operational note..."
                                     value={note}
@@ -537,7 +609,9 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         <BoltIcon className="w-3.5 h-3.5" /> Immutable Audit Timeline
                     </h4>
                     <div className="space-y-6 relative before:absolute before:inset-0 before:left-2 before:w-0.5 before:bg-slate-100 dark:before:bg-white/5">
-                        {order.audit?.map((ev: any, i: number) => (
+                        {(!order.audit || order.audit.length === 0) ? (
+                            <p className="pl-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">No audit events found yet.</p>
+                        ) : order.audit.map((ev: any, i: number) => (
                             <div key={ev.id || i} className="relative pl-8">
                                 <div className="absolute left-0 top-1 w-4 h-4 bg-white dark:bg-[#0e0e0f] border-2 border-slate-200 dark:border-white/10 flex items-center justify-center">
                                     <div className="w-1.5 h-1.5 bg-slate-400" />
@@ -558,3 +632,5 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
         </div>
     );
 };
+
+

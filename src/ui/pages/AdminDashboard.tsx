@@ -45,11 +45,10 @@ import {
     CpuChipIcon,
     ArrowsRightLeftIcon,
     AdjustmentsHorizontalIcon,
-    TruckIcon,
-    InboxStackIcon
+    TruckIcon
 } from "@heroicons/react/24/outline";
 
-type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "intake" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
 
 
 type Range = "24h" | "7d" | "30d";
@@ -125,6 +124,7 @@ const AdminDashboardInner: React.FC = () => {
                                 onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
                             />
                             <button
+                                type="button"
                                 onClick={handleConnect}
                                 className="w-full py-4 bg-primary text-white font-black uppercase hover:bg-primary/90"
                             >
@@ -204,6 +204,7 @@ const AdminDashboardInner: React.FC = () => {
                     </a>
 
                     <button
+                        type="button"
                         onClick={handleDisconnect}
                         className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 ml-2"
                         title="Disconnect"
@@ -213,12 +214,13 @@ const AdminDashboardInner: React.FC = () => {
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto px-6 pb-12">
+            <div className="max-w-[1800px] mx-auto px-6 pb-12">
                 <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
                     <nav className="flex gap-1 bg-slate-50 dark:bg-[#131314]/5 p-1 mb-8 w-fit border border-slate-200 dark:border-white/10 transition-all duration-300 whitespace-nowrap">
                         {tabs.map(([id, label, Icon]) => (
                             <button
                                 key={id}
+                                type="button"
                                 className={[
                                     activeTab === id
                                         ? "btn-tab btn-tab-active"
@@ -233,7 +235,7 @@ const AdminDashboardInner: React.FC = () => {
                     </nav>
                 </div>
 
-                <main className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 p-6 relative overflow-hidden">
+                <main className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 p-6 relative">
                     <div className="relative z-10">
                         {activeTab === "overview" && <OverviewTab key={`overview-${reloadKey}`} range={range} refreshMs={refresh} />}
                         {activeTab === "success" && <SuccessWorkspace key={`success-${reloadKey}`} />}

@@ -14,7 +14,22 @@ import { short, safeText, safeTime, safeDate } from "../../lib/formatters";
 import { normalizeMarketplaceSession } from "../../lib/mappers";
 
 // Feature flag for internal testing
-const MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED = false;
+const MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED =
+    import.meta.env.VITE_MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED === "true";
+
+const getEventMessage = (event: any) => {
+    const value =
+        event?.message ||
+        event?.payload?.message ||
+        event?.payload?.reason ||
+        event?.payload?.status ||
+        event?.payload;
+
+    if (!value) return "—";
+
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    return text.length > 220 ? `${text.slice(0, 220)}…` : text;
+};
 
 export const PricingSessionsTab: React.FC = () => {
     const [sessions, setSessions] = useState<any[]>([]);
@@ -85,7 +100,10 @@ export const PricingSessionsTab: React.FC = () => {
     };
 
     const handleSelectOffer = async (offerId: string, printerName?: string) => {
-        if (!MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED) return;
+        if (!MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED) {
+            console.warn("[MARKETPLACE][SESSIONS] Internal offer selection is disabled.");
+            return;
+        }
         if (!selectedSession) return;
 
         const ok = window.confirm(
@@ -114,7 +132,11 @@ export const PricingSessionsTab: React.FC = () => {
                     </h2>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Forensic visibility into BPE proposals, active sessions and routing events.</p>
                 </div>
-                <button onClick={fetchSessions} className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-none">
+                <button
+                    type="button"
+                    onClick={fetchSessions}
+                    className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-none"
+                >
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
@@ -136,6 +158,7 @@ export const PricingSessionsTab: React.FC = () => {
                             {sessions.map((s, i) => (
                                 <button
                                     key={s.id || i}
+                                    type="button"
                                     onClick={() => fetchSessionDetail(s.id)}
                                     className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedSession?.id === s.id ? 'bg-primary/5 border-l-2 border-primary' : ''}`}
                                 >
@@ -251,6 +274,7 @@ export const PricingSessionsTab: React.FC = () => {
 
                                                     {MARKETPLACE_INTERNAL_OFFER_SELECTION_ENABLED && !isSelected && offerId && selectedSession.sessionStatus === 'OPEN' && (
                                                         <button
+                                                            type="button"
                                                             onClick={() => handleSelectOffer(offerId, o.printerName)}
                                                             className="w-full mt-2 px-4 py-2 bg-slate-900 dark:bg-white/10 text-white text-[9px] font-black uppercase tracking-widest rounded-none hover:bg-primary transition-all shadow-none"
                                                         >
@@ -277,14 +301,14 @@ export const PricingSessionsTab: React.FC = () => {
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between">
                                                         <div className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                                                            {String(safeText(e.event_type || e.eventType)).replace(/_/g, ' ')}
+                                                            {String(safeText(e.event_type || e.eventType, "UNKNOWN_EVENT")).replace(/_/g, ' ')}
                                                         </div>
                                                         <div className="text-[9px] text-slate-400 font-medium">
                                                             {safeDate(e.created_at || e.createdAt)}
                                                         </div>
                                                     </div>
                                                     <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                                                        {e.message || JSON.stringify(e.payload)}
+                                                        {getEventMessage(e)}
                                                     </div>
                                                 </div>
                                             </div>
