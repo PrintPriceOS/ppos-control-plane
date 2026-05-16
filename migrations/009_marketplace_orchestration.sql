@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS marketplace_events (
 ) ENGINE=InnoDB;
 
 -- Ensure order_id exists idempotently for pre-existing deployments
-ALTER TABLE job_marketplace_sessions ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
-ALTER TABLE manufacturing_offers ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
-ALTER TABLE marketplace_events ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+-- ALTER TABLE job_marketplace_sessions ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+-- ALTER TABLE manufacturing_offers ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
+-- ALTER TABLE marketplace_events ADD COLUMN IF NOT EXISTS order_id VARCHAR(64) NULL;
 

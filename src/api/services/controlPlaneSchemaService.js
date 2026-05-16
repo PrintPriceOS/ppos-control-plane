@@ -448,19 +448,14 @@ class ControlPlaneSchemaService {
             `);
 
             // Apply backward-compatible schema modifications gracefully for existing deployed columns
-            const pmiCols = [
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS material_catalog_id VARCHAR(64) NULL",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS available_units INT DEFAULT 0",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS reorder_point INT DEFAULT 100",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS replenishment_lead_days INT DEFAULT 7",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'STABLE'",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS machine_lock VARCHAR(64) NULL",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production'",
-                "ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL"
-            ];
-            for (const sql of pmiCols) {
-                await db.query(sql).catch(() => {});
-            }
+            await this.ensureColumn('predictive_material_inventory', 'material_catalog_id', 'VARCHAR(64) NULL');
+            await this.ensureColumn('predictive_material_inventory', 'available_units', 'INT DEFAULT 0');
+            await this.ensureColumn('predictive_material_inventory', 'reorder_point', 'INT DEFAULT 100');
+            await this.ensureColumn('predictive_material_inventory', 'replenishment_lead_days', 'INT DEFAULT 7');
+            await this.ensureColumn('predictive_material_inventory', 'status', "VARCHAR(32) DEFAULT 'STABLE'");
+            await this.ensureColumn('predictive_material_inventory', 'machine_lock', 'VARCHAR(64) NULL');
+            await this.ensureColumn('predictive_material_inventory', 'tenant_id', "VARCHAR(64) NOT NULL DEFAULT 'ppos-production'");
+            await this.ensureColumn('predictive_material_inventory', 'printhouse_id', 'VARCHAR(64) NULL');
 
             await db.query(`
                 CREATE TABLE IF NOT EXISTS material_machine_compatibility (

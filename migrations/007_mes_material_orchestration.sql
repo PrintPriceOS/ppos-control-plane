@@ -24,20 +24,20 @@ CREATE TABLE IF NOT EXISTS materials_catalog (
 ) ENGINE=InnoDB;
 
 -- Ensure required columns exist on predictive_material_inventory gracefully
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS material_catalog_id VARCHAR(64) NULL;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS available_units INT DEFAULT 0;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS reorder_point INT DEFAULT 100;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS replenishment_lead_days INT DEFAULT 7;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'STABLE';
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS machine_lock VARCHAR(64) NULL;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production';
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS material_catalog_id VARCHAR(64) NULL;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS available_units INT DEFAULT 0;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS reorder_point INT DEFAULT 100;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS replenishment_lead_days INT DEFAULT 7;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'STABLE';
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS machine_lock VARCHAR(64) NULL;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production';
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS printhouse_id VARCHAR(64) NULL;
 
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS daily_burn_rate DECIMAL(10,2) DEFAULT 0.00;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS forecasted_depletion_date TIMESTAMP NULL;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS procurement_risk VARCHAR(32) DEFAULT 'LOW';
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(128) NULL;
-ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS cost_per_unit DECIMAL(10,4) DEFAULT 0.0000;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS daily_burn_rate DECIMAL(10,2) DEFAULT 0.00;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS forecasted_depletion_date TIMESTAMP NULL;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS procurement_risk VARCHAR(32) DEFAULT 'LOW';
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(128) NULL;
+-- ALTER TABLE predictive_material_inventory ADD COLUMN IF NOT EXISTS cost_per_unit DECIMAL(10,4) DEFAULT 0.0000;
 
 CREATE TABLE IF NOT EXISTS material_machine_compatibility (
     id INT AUTO_INCREMENT PRIMARY KEY,

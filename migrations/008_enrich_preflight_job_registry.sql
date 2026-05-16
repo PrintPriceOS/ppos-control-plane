@@ -1,19 +1,19 @@
 -- migrations/008_enrich_preflight_job_registry.sql
 -- Goal: Add enriched schema columns for preflight_job_registry idempotently to support global synchronization.
 
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS source_job_id VARCHAR(64) NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS source_system VARCHAR(64) NULL DEFAULT 'PREFLIGHT_SERVICE';
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS risk_score INT NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS risk_level VARCHAR(32) NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS issue_count INT NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS requested_fixes_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS repairs_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS fixes_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS applied_fixes_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS skipped_fixes_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS failed_fixes_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS artifact_list_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS degraded TINYINT(1) NULL DEFAULT 0;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS degraded_reasons_json JSON NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NULL;
-ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS source_job_id VARCHAR(64) NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS source_system VARCHAR(64) NULL DEFAULT 'PREFLIGHT_SERVICE';
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS risk_score INT NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS risk_level VARCHAR(32) NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS issue_count INT NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS requested_fixes_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS repairs_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS fixes_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS applied_fixes_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS skipped_fixes_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS failed_fixes_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS artifact_list_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS degraded TINYINT(1) NULL DEFAULT 0;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS degraded_reasons_json JSON NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NULL;
+-- ALTER TABLE preflight_job_registry ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP NULL;
