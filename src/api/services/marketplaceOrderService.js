@@ -6,47 +6,135 @@
 const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('marketplace-order-service');
 
+/**
+ * Robust JSON parsing helper.
+ */
+function safeParseJson(value, fallback = null) {
+    if (typeof value === 'object' && value !== null) return value;
+    if (typeof value !== 'string') return fallback;
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return fallback;
+    }
+}
+
+/**
+ * Robust Order Intent ID resolution.
+ */
+function getOrderIntentId(row) {
+    return row.order_intent_id || row.id || row.intent_id;
+}
+
 class MarketplaceOrderService {
     /**
      * Normalizes a marketplace order intent into the canonical Control Plane operational shape.
      */
     normalizeOrder(row) {
-        const safeParse = (val) => {
-            if (typeof val === 'object' && val !== null) return val;
-            if (typeof val === 'string') {
-                try { return JSON.parse(val); } catch (e) { return null; }
+        const payload = safeParseJson(row.payload, {});
+        const snapshot = payload.order_snapshot || payload || {};
+        
+        // Prioritize Budget control_plane from snapshot
+        const rowControlPlane = safeParseJson(row.control_plane_json, safeParseJson(row.control_plane, {}));
+        const controlPlane = snapshot.control_plane || payload.control_plane || rowControlPlane || {};
+
+        // Prioritize Budget canonical snapshot components
+        const offer = snapshot.offer || safeParseJson(row.offer_json, safeParseJson(row.offer, {}));
+        const specs = snapshot.specs || snapshot.book_specs || payload.specs || offer.specs || {};
+        const rawProductionFiles = snapshot.production_files || safeParseJson(row.production_files_json, safeParseJson(row.production_files, []));
+        const totals = snapshot.totals || safeParseJson(row.totals_json, safeParseJson(row.totals, offer.totals || {}));
+        const status = row.status || 'DECLARED';
+
+        // Normalize Lifecycle into Stage and Data Object
+        const lifecycleObject = typeof snapshot.lifecycle === 'object' 
+            ? snapshot.lifecycle 
+            : safeParseJson(snapshot.lifecycle, safeParseJson(row.lifecycle_json, {}));
+
+        const lifecycleStage = typeof row.lifecycle === 'string'
+            ? row.lifecycle
+            : (lifecycleObject.marketplace || snapshot.status || status || 'UNKNOWN');
+
+        // Extract operational segments
+        const preflight = snapshot.preflight || safeParseJson(row.preflight_json, safeParseJson(row.preflight, controlPlane.preflight || {}));
+        const payment = snapshot.payment || safeParseJson(row.payment_json, safeParseJson(row.payment, controlPlane.payment || {}));
+        const printhouse = snapshot.printhouse || controlPlane.printhouse || safeParseJson(row.printhouse_handoff_json, safeParseJson(row.printhouse_handoff, {}));
+        const customer = snapshot.customer || safeParseJson(row.customer_json, safeParseJson(row.customer, {}));
+
+        // Robust Production Files Normalization
+        let normalizedFiles = [];
+        if (Array.isArray(rawProductionFiles)) {
+            normalizedFiles = rawProductionFiles.map(f => ({
+                kind: f.kind || 'DOCUMENT',
+                fileId: f.fileId || f.id || f.uuid,
+                filename: f.filename || f.original_filename || f.name,
+                status: f.status || 'UPLOADED',
+                checksum: f.checksum
+            }));
+        } else if (typeof rawProductionFiles === 'object' && rawProductionFiles !== null) {
+            // Support object mapping (interior/cover keys)
+            const keys = Object.keys(rawProductionFiles);
+            if (rawProductionFiles.interior_pdf_file_id || rawProductionFiles.interior) {
+                normalizedFiles.push({
+                    kind: 'INTERIOR_PDF',
+                    fileId: rawProductionFiles.interior_pdf_file_id || rawProductionFiles.interior?.fileId || rawProductionFiles.interior,
+                    filename: rawProductionFiles.interior?.filename || 'interior.pdf',
+                    status: 'UPLOADED'
+                });
             }
-            return null;
-        };
-
-        const payload = safeParse(row.payload) || {};
-        const orderSnapshot = payload.order_snapshot || payload;
-        const offer = safeParse(row.offer_json) || safeParse(row.offer) || {};
-        const productionFiles = safeParse(row.production_files_json) || safeParse(row.production_files) || [];
-        const totals = safeParse(row.totals_json) || safeParse(row.totals) || {};
-        const lifecycleData = safeParse(row.lifecycle_json) || {};
-        const preflight = safeParse(row.preflight_json) || safeParse(row.preflight) || {};
-        const payment = safeParse(row.payment_json) || safeParse(row.payment) || {};
-        const controlPlane = safeParse(row.control_plane_json) || safeParse(row.control_plane) || {};
-        const printhouse = safeParse(row.printhouse_handoff_json) || safeParse(row.printhouse_handoff) || {};
-        const customer = safeParse(row.customer_json) || safeParse(row.customer) || orderSnapshot.customer || {};
-
-        // Normalization priority logic
-        const specs = orderSnapshot.specs || orderSnapshot.book_specs || payload.specs || offer.specs || {};
+            if (rawProductionFiles.cover_pdf_file_id || rawProductionFiles.cover) {
+                normalizedFiles.push({
+                    kind: 'COVER_PDF',
+                    fileId: rawProductionFiles.cover_pdf_file_id || rawProductionFiles.cover?.fileId || rawProductionFiles.cover,
+                    filename: rawProductionFiles.cover?.filename || 'cover.pdf',
+                    status: 'UPLOADED'
+                });
+            }
+            // Fallback for other keys if not matched
+            if (normalizedFiles.length === 0 && keys.length > 0) {
+                keys.forEach(k => {
+                    const f = rawProductionFiles[k];
+                    normalizedFiles.push({
+                        kind: k.toUpperCase(),
+                        fileId: typeof f === 'string' ? f : (f?.fileId || f?.id),
+                        filename: f?.filename || f?.name || `${k}.pdf`,
+                        status: 'UPLOADED'
+                    });
+                });
+            }
+        }
 
         // Operational readiness & blockers
         const blockers = [];
-        if (productionFiles.length < 2 && !row.production_files_json) blockers.push('MISSING_FILES');
-        if (preflight.status !== 'PASSED' && preflight.status !== 'SUCCESS') blockers.push('PREFLIGHT_PENDING');
-        if (payment.status !== 'PAID' && payment.status !== 'COMPLETED') blockers.push('PAYMENT_PENDING');
+        
+        const hasInterior = normalizedFiles.some(f => f.kind === 'INTERIOR_PDF' || f.kind?.includes('INTERIOR'));
+        const hasCover = normalizedFiles.some(f => f.kind === 'COVER_PDF' || f.kind?.includes('COVER'));
+
+        if (!hasInterior || !hasCover) {
+            blockers.push('MISSING_FILES');
+        }
+
+        // Preflight Blockers
+        if (preflight.status === 'REQUIRED') {
+            blockers.push('PREFLIGHT_REQUIRED');
+        } else if (!['PASSED', 'SUCCESS', 'COMPLETED'].includes(preflight.status)) {
+            blockers.push('PREFLIGHT_PENDING');
+        }
+
+        // Payment Blockers
+        if (payment.status === 'BLOCKED') {
+            blockers.push('PAYMENT_BLOCKED');
+        } else if (!['PAID', 'COMPLETED', 'SUCCESS'].includes(payment.status)) {
+            blockers.push('PAYMENT_PENDING');
+        }
 
         const readiness = blockers.length === 0 ? 'READY' : 'BLOCKED';
 
         return {
-            orderIntentId: row.id,
+            orderIntentId: getOrderIntentId(row),
             publicRef: row.public_ref,
-            status: row.status,
-            lifecycle: row.lifecycle,
+            status,
+            lifecycle: lifecycleStage,
+            lifecycleData: lifecycleObject,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
 
@@ -73,37 +161,32 @@ class MarketplaceOrderService {
                 total: totals.total || 0,
                 currency: totals.currency || 'EUR'
             },
-            productionFiles: productionFiles.map(f => ({
-                kind: f.kind,
-                filename: f.filename || f.original_filename,
-                status: f.status,
-                checksum: f.checksum
-            })),
+            productionFiles: normalizedFiles,
             preflight: {
                 status: preflight.status || 'NOT_STARTED',
                 lastChecked: preflight.updated_at || preflight.last_checked,
                 results: preflight.results || {}
             },
             payment: {
-                status: payment.status || 'PENDING',
+                status: payment.status || 'NOT_STARTED',
                 method: payment.method,
                 transactionId: payment.transaction_id,
                 paidAt: payment.paid_at
             },
             controlPlane: {
                 acknowledged: controlPlane.acknowledged || false,
-                acknowledgedBy: controlPlane.acknowledged_by,
-                acknowledgedAt: controlPlane.acknowledged_at,
+                acknowledgedBy: controlPlane.acknowledgedBy || controlPlane.acknowledged_by,
+                acknowledgedAt: controlPlane.acknowledgedAt || controlPlane.acknowledged_at,
                 notes: controlPlane.notes || [],
-                operationalStatus: controlPlane.operational_status || row.status
+                operationalStatus: controlPlane.operationalStatus || controlPlane.operational_status || status
             },
             printhouse: {
-                assignedPrinthouseId: printhouse.id || printhouse.assigned_printhouse_id,
-                assignedAt: printhouse.assigned_at,
-                handoffStatus: printhouse.status || 'PENDING'
+                assignedPrinthouseId: printhouse.id || printhouse.assignedPrinthouseId || printhouse.assigned_printhouse_id,
+                assignedAt: printhouse.assignedAt || printhouse.assigned_at,
+                handoffStatus: printhouse.status || printhouse.handoffStatus || 'PENDING'
             },
-            audit: [], // Lazy loaded
-            operationalStatus: controlPlane.operational_status || row.status,
+            audit: [], 
+            operationalStatus: controlPlane.operationalStatus || controlPlane.operational_status || status,
             readiness,
             blockers
         };
@@ -119,6 +202,8 @@ class MarketplaceOrderService {
             offset = 0
         } = filters;
 
+        logger.info({ event: 'MARKETPLACE_ORDERS_LIST_REQUEST', filters });
+
         let sql = `SELECT * FROM marketplace_order_intents WHERE 1=1`;
         const params = [];
 
@@ -126,17 +211,20 @@ class MarketplaceOrderService {
             sql += ` AND status = ?`;
             params.push(status);
         }
-        if (lifecycle) {
+        
+        // Use row.lifecycle only if it's a string. Avoid object filters.
+        if (lifecycle && typeof lifecycle === 'string') {
             sql += ` AND lifecycle = ?`;
             params.push(lifecycle);
         }
+
         if (printhouseId) {
             sql += ` AND (JSON_EXTRACT(printhouse_handoff_json, '$.id') = ? OR JSON_EXTRACT(printhouse_handoff_json, '$.assignedPrinthouseId') = ?)`;
             params.push(printhouseId, printhouseId);
         }
 
         if (search) {
-            sql += ` AND (public_ref LIKE ? OR id LIKE ? OR JSON_EXTRACT(customer_json, '$.email') LIKE ?)`;
+            sql += ` AND (public_ref LIKE ? OR order_intent_id LIKE ? OR JSON_EXTRACT(customer_json, '$.email') LIKE ?)`;
             const s = `%${search}%`;
             params.push(s, s, s);
         }
@@ -148,19 +236,18 @@ class MarketplaceOrderService {
             const rows = await mysqlClient.query(sql, params);
             const orders = rows.map(r => this.normalizeOrder(r));
 
-            // Aggregate counts
-            const countSql = `
-                SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN lifecycle = 'FILES_UPLOADED' THEN 1 ELSE 0 END) as filesUploaded,
-                    SUM(CASE WHEN status = 'DECLARED' THEN 1 ELSE 0 END) as declared,
-                    SUM(CASE WHEN JSON_EXTRACT(preflight_json, '$.status') = 'PENDING' THEN 1 ELSE 0 END) as preflightPending,
-                    SUM(CASE WHEN JSON_EXTRACT(payment_json, '$.status') = 'PENDING' THEN 1 ELSE 0 END) as paymentPending
-                FROM marketplace_order_intents
-            `;
-            const countRows = await mysqlClient.query(countSql);
-            const counts = countRows[0] || {};
+            // Compute counts in JS for robustness across schemas
+            const counts = {
+                total: orders.length,
+                filesUploaded: orders.filter(o => o.productionFiles.length >= 2).length,
+                preflightRequired: orders.filter(o => o.preflight.status === 'REQUIRED').length,
+                preflightPending: orders.filter(o => o.preflight.status === 'PENDING' || o.preflight.status === 'NOT_STARTED').length,
+                paymentPending: orders.filter(o => !['PAID', 'COMPLETED'].includes(o.payment.status)).length,
+                readyForHandoff: orders.filter(o => o.readiness === 'READY').length,
+                blocked: orders.filter(o => o.readiness === 'BLOCKED').length
+            };
 
+            logger.info({ event: 'MARKETPLACE_ORDERS_LIST_RESULT', count: orders.length });
             return { ok: true, orders, counts };
         } catch (err) {
             logger.error({ event: 'list_orders_failed', error: err.message });
@@ -169,37 +256,49 @@ class MarketplaceOrderService {
     }
 
     async getOrderDetail(id) {
+        logger.info({ event: 'MARKETPLACE_ORDER_DETAIL_REQUEST', id });
         try {
-            const rows = await mysqlClient.query(`SELECT * FROM marketplace_order_intents WHERE id = ? OR public_ref = ?`, [id, id]);
+            // Remove 'id' column reference for production safety
+            const rows = await mysqlClient.query(`SELECT * FROM marketplace_order_intents WHERE order_intent_id = ? OR public_ref = ?`, [id, id]);
             if (!rows.length) return { ok: false, error: 'ORDER_NOT_FOUND' };
 
             const order = this.normalizeOrder(rows[0]);
+            const orderIntentId = order.orderIntentId;
 
             // Fetch audit timeline
             const auditRows = await mysqlClient.query(`
                 SELECT * FROM marketplace_audit_events 
                 WHERE entity_type = 'MARKETPLACE_ORDER_INTENT' AND entity_id = ?
                 ORDER BY created_at DESC
-            `, [order.orderIntentId]);
+            `, [orderIntentId]);
 
             order.audit = auditRows.map(a => ({
                 id: a.id,
                 eventType: a.event_type,
                 actorId: a.actor_id,
-                payload: typeof a.payload === 'string' ? JSON.parse(a.payload) : a.payload,
+                payload: safeParseJson(a.payload, {}),
                 createdAt: a.created_at
             }));
 
-            // Fetch file metadata
-            const fileRows = await mysqlClient.query(`
+            // Fetch file metadata with fallback
+            let fileRows = await mysqlClient.query(`
                 SELECT * FROM marketplace_production_files WHERE order_intent_id = ?
-            `, [order.orderIntentId]);
+            `, [orderIntentId]);
+            
+            if (fileRows.length === 0 && order.productionFiles.length > 0) {
+                const fileIds = order.productionFiles.map(f => f.fileId).filter(Boolean);
+                if (fileIds.length > 0) {
+                    fileRows = await mysqlClient.query(`
+                        SELECT * FROM marketplace_production_files WHERE id IN (?) OR file_id IN (?)
+                    `, [fileIds, fileIds]);
+                }
+            }
             
             order.productionFileMetadata = fileRows.map(f => ({
-                id: f.id,
+                id: f.id || f.file_id,
                 kind: f.kind,
-                filename: f.original_filename,
-                sizeBytes: f.size_bytes,
+                filename: f.original_filename || f.filename,
+                sizeBytes: f.size_bytes || f.size,
                 status: f.status,
                 checksum: f.checksum,
                 createdAt: f.created_at
@@ -224,6 +323,7 @@ class MarketplaceOrderService {
     }
 
     async acknowledgeOrder(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'ACKNOWLEDGE', id });
         const { order } = await this.getOrderDetail(id);
         if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
 
@@ -233,36 +333,47 @@ class MarketplaceOrderService {
         cp.acknowledgedAt = new Date().toISOString();
         cp.operationalStatus = 'ACKNOWLEDGED';
 
+        const orderIntentId = order.orderIntentId;
+        const cpJson = JSON.stringify(cp);
+
+        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
-            SET control_plane_json = ?, status = 'ACKNOWLEDGED'
-            WHERE id = ?
-        `, [JSON.stringify(cp), order.orderIntentId]);
+            SET control_plane_json = ?, control_plane = ?, status = 'ACKNOWLEDGED'
+            WHERE order_intent_id = ?
+        `, [cpJson, cpJson, orderIntentId]);
 
-        await this.addAuditEvent(order.orderIntentId, 'ORDER_ACKNOWLEDGED', { actorId }, actorId);
+        await this.addAuditEvent(orderIntentId, 'ORDER_ACKNOWLEDGED', { actorId }, actorId);
         return { ok: true };
     }
 
-    async assignPrinthouse(id, printhouseId, actorId) {
+    async assignPrinthouse(id, assignedPrinthouseId, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'ASSIGN_PRINTHOUSE', id, assignedPrinthouseId });
         const { order } = await this.getOrderDetail(id);
         if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
 
-        const ph = order.printhouse;
-        ph.assignedPrinthouseId = printhouseId;
-        ph.assignedAt = new Date().toISOString();
-        ph.handoffStatus = 'ASSIGNED';
+        const cp = order.controlPlane;
+        cp.printhouse = cp.printhouse || {};
+        cp.printhouse.assignedPrinthouseId = assignedPrinthouseId;
+        cp.printhouse.assignedAt = new Date().toISOString();
+        cp.printhouse.assignedBy = actorId;
 
+        const orderIntentId = order.orderIntentId;
+        const cpJson = JSON.stringify(cp);
+
+        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
-            SET printhouse_handoff_json = ?
-            WHERE id = ?
-        `, [JSON.stringify(ph), order.orderIntentId]);
+            SET control_plane_json = ?, control_plane = ?
+            WHERE order_intent_id = ?
+        `, [cpJson, cpJson, orderIntentId]);
 
-        await this.addAuditEvent(order.orderIntentId, 'PRINTHOUSE_ASSIGNED', { printhouseId, actorId }, actorId);
+        await this.addAuditEvent(orderIntentId, 'PRINTHOUSE_ASSIGNED', { assignedPrinthouseId, actorId }, actorId);
         return { ok: true };
     }
 
     async addNote(id, noteText, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'ADD_NOTE', id });
         const { order } = await this.getOrderDetail(id);
         if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
 
@@ -274,13 +385,115 @@ class MarketplaceOrderService {
             createdAt: new Date().toISOString()
         });
 
+        const orderIntentId = order.orderIntentId;
+        const cpJson = JSON.stringify(cp);
+
+        // Remove 'id' reference from UPDATE
         await mysqlClient.query(`
             UPDATE marketplace_order_intents 
-            SET control_plane_json = ?
-            WHERE id = ?
-        `, [JSON.stringify(cp), order.orderIntentId]);
+            SET control_plane_json = ?, control_plane = ?
+            WHERE order_intent_id = ?
+        `, [cpJson, cpJson, orderIntentId]);
 
-        await this.addAuditEvent(order.orderIntentId, 'NOTE_ADDED', { noteText, actorId }, actorId);
+        await this.addAuditEvent(orderIntentId, 'NOTE_ADDED', { noteText, actorId }, actorId);
+        return { ok: true };
+    }
+
+    async listAuditEvents(filters = {}) {
+        const {
+            orderIntentId,
+            publicRef,
+            eventType,
+            limit = 100,
+            offset = 0
+        } = filters;
+
+        let sql = `SELECT * FROM marketplace_audit_events WHERE 1=1`;
+        const params = [];
+
+        if (orderIntentId) {
+            sql += ` AND entity_id = ?`;
+            params.push(orderIntentId);
+        }
+        if (publicRef) {
+            sql += ` AND entity_id IN (SELECT order_intent_id FROM marketplace_order_intents WHERE public_ref = ?)`;
+            params.push(publicRef);
+        }
+        if (eventType) {
+            sql += ` AND event_type = ?`;
+            params.push(eventType);
+        }
+
+        sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        params.push(Number(limit), Number(offset));
+
+        try {
+            const rows = await mysqlClient.query(sql, params);
+            const events = rows.map(r => ({
+                id: r.id,
+                entityType: r.entity_type,
+                entityId: r.entity_id,
+                eventType: r.event_type,
+                actorId: r.actor_id,
+                payload: safeParseJson(r.payload, {}),
+                createdAt: r.created_at
+            }));
+            return { ok: true, events };
+        } catch (err) {
+            logger.error({ event: 'list_audit_events_failed', error: err.message });
+            throw err;
+        }
+    }
+
+    async markPreflightRequired(id, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'MARK_PREFLIGHT_REQUIRED', id });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const cp = order.controlPlane;
+        cp.preflight = cp.preflight || {};
+        cp.preflight.status = 'REQUIRED';
+        cp.preflight.updatedAt = new Date().toISOString();
+
+        const orderIntentId = order.orderIntentId;
+        const cpJson = JSON.stringify(cp);
+
+        // Remove 'id' reference from UPDATE
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET control_plane_json = ?, control_plane = ?
+            WHERE order_intent_id = ?
+        `, [cpJson, cpJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'PREFLIGHT_REQUIRED', { actorId }, actorId);
+        return { ok: true };
+    }
+
+    async requestCustomerAction(id, actionType, message, actorId) {
+        logger.info({ event: 'MARKETPLACE_ORDER_ACTION', action: 'REQUEST_CUSTOMER_ACTION', id, actionType });
+        const { order } = await this.getOrderDetail(id);
+        if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
+
+        const cp = order.controlPlane;
+        cp.customer_action_requested = true;
+        cp.last_requested_action = {
+            type: actionType,
+            message,
+            requestedAt: new Date().toISOString(),
+            requestedBy: actorId
+        };
+
+        const orderIntentId = order.orderIntentId;
+        const cpJson = JSON.stringify(cp);
+
+        // Remove 'id' reference from UPDATE
+        await mysqlClient.query(`
+            UPDATE marketplace_order_intents 
+            SET control_plane_json = ?, control_plane = ?
+            WHERE order_intent_id = ?
+        `, [cpJson, cpJson, orderIntentId]);
+
+        await this.addAuditEvent(orderIntentId, 'CUSTOMER_ACTION_REQUESTED', { actionType, message, actorId }, actorId);
         return { ok: true };
     }
 }

@@ -6,14 +6,12 @@ import { isSuperAdmin } from "../lib/authStore";
 import { OverviewTab } from "./admin/OverviewTab";
 import { PricingIntelligenceTab } from "./admin/PricingIntelligenceTab";
 import { OffersTab } from "./admin/OffersTab";
-import { MarketplaceTab } from "./admin/MarketplaceTab";
-import { MarketplaceReadinessTab } from "./admin/MarketplaceReadinessTab";
+import { MarketplacePage } from "./admin/MarketplacePage";
 import { CommercialCommitmentsTab } from "./admin/CommercialCommitmentsTab";
 import { AutonomousOpsTab } from "./admin/AutonomousOpsTab";
 import { RoutingDecisionTab } from "./admin/RoutingDecisionTab";
 import { ProductionDispatchTab } from "./admin/ProductionDispatchTab";
 import { IndustrialLiveTab } from "./admin/IndustrialLiveTab";
-import { MarketplaceOrdersTab } from "./admin/MarketplaceOrdersTab";
 
 import { FinancialOpsTab } from "./admin/FinancialOpsTab";
 import TenantManagement from "./admin/TenantManagement";
@@ -89,8 +87,6 @@ const AdminDashboardInner: React.FC = () => {
             ["pricing", "Pricing Intelligence", CurrencyEuroIcon],
             ["offers", "Production Offers", QueueListIcon],
             ["marketplace", "Marketplace", BuildingStorefrontIcon],
-            ["intake", "Order Intake", InboxStackIcon],
-            ["negotiations", "Negotiation & Readiness", ArrowsRightLeftIcon],
             ["routing", "Autonomous Routing", ArrowsRightLeftIcon],
             superAdmin && ["dispatch", "Production Dispatch", TruckIcon],
             superAdmin && ["execution", "Execution Loop", BoltIcon],
@@ -245,9 +241,7 @@ const AdminDashboardInner: React.FC = () => {
                         {activeTab === "network" && <NetworkOpsTab key={`network-${reloadKey}`} />}
                         {activeTab === "pricing" && <PricingIntelligenceTab key={`pricing-${reloadKey}`} />}
                         {activeTab === "offers" && <OffersTab key={`offers-${reloadKey}`} />}
-                        {activeTab === "marketplace" && <MarketplaceTab key={`marketplace-${reloadKey}`} />}
-                        {activeTab === "intake" && <MarketplaceOrdersTab key={`intake-${reloadKey}`} />}
-                        {activeTab === "negotiations" && <MarketplaceReadinessTab key={`negotiations-${reloadKey}`} />}
+                        {activeTab === "marketplace" && <MarketplacePage key={`marketplace-${reloadKey}`} />}
                         {activeTab === "commitments" && <CommercialCommitmentsTab key={`commitments-${reloadKey}`} />}
                         {activeTab === "routing" && <RoutingDecisionTab key={`routing-${reloadKey}`} />}
                         {activeTab === "dispatch" && <ProductionDispatchTab key={`dispatch-${reloadKey}`} />}

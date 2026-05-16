@@ -2114,7 +2114,7 @@ export async function listMarketplaceOrders(params: Record<string, any> = {}) {
             qs.append(k, String(v));
         }
     });
-    return adminFetch<{ ok: boolean, orders: any[], total: number }>(`/api/admin/marketplace/orders?${qs.toString()}`);
+    return adminFetch<{ ok: boolean, orders: any[], counts: any, total: number }>(`/api/admin/marketplace/orders?${qs.toString()}`);
 }
 
 export async function getMarketplaceOrderDetail(id: string) {
@@ -2122,21 +2122,45 @@ export async function getMarketplaceOrderDetail(id: string) {
 }
 
 export async function acknowledgeMarketplaceOrder(id: string) {
-    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/acknowledge`, {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/acknowledge`, {
         method: 'POST'
     });
 }
 
 export async function assignPrinthouseToMarketplaceOrder(id: string, printhouseId: string) {
-    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
         method: 'POST',
         body: JSON.stringify({ printhouseId })
     });
 }
 
+export async function markMarketplaceOrderPreflightRequired(id: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/mark-preflight-required`, {
+        method: 'POST'
+    });
+}
+
+export async function requestMarketplaceOrderCustomerAction(id: string, actionType: string, message: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/request-customer-action`, {
+        method: 'POST',
+        body: JSON.stringify({ actionType, message })
+    });
+}
+
 export async function addNoteToMarketplaceOrder(id: string, note: string) {
-    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/notes`, {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/internal-note`, {
         method: 'POST',
         body: JSON.stringify({ note })
     });
 }
+
+export async function listMarketplaceAuditEvents(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, events: any[] }>(`/api/admin/marketplace/orders/audit?${qs.toString()}`);
+}
+
