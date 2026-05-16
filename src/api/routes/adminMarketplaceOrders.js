@@ -61,10 +61,12 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/:id/acknowledge', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'ACKNOWLEDGE', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        console.log('[MARKETPLACE_ORDER_ACKNOWLEDGED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.acknowledgeOrder(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) return res.status(400).json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to acknowledge order ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
@@ -77,14 +79,16 @@ router.post('/:id/acknowledge', async (req, res) => {
  */
 router.post('/:id/assign-printhouse', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'ASSIGN_PRINTHOUSE', req.params.id);
+        console.log('[MARKETPLACE_PRINTHOUSE_ASSIGNED]', req.params.id);
         const { printhouseId } = req.body;
         if (!printhouseId) {
             return res.status(400).json({ ok: false, error: 'PRINTHOUSE_ID_REQUIRED' });
         }
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.assignPrinthouse(req.params.id, printhouseId, actorId);
-        return res.json(result);
+        if (!result.ok) return res.status(400).json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to assign printhouse to order ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
@@ -97,10 +101,12 @@ router.post('/:id/assign-printhouse', async (req, res) => {
  */
 router.post('/:id/mark-preflight-required', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'MARK_PREFLIGHT_REQUIRED', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        console.log('[MARKETPLACE_PREFLIGHT_REQUIRED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.markPreflightRequired(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) return res.status(400).json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark preflight required for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
@@ -113,16 +119,18 @@ router.post('/:id/mark-preflight-required', async (req, res) => {
  */
 router.post('/:id/request-customer-action', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'REQUEST_CUSTOMER_ACTION', req.params.id);
+        console.log('[MARKETPLACE_CUSTOMER_ACTION_REQUESTED]', req.params.id);
         const { actionType, message } = req.body;
         
         if (!actionType || !message) {
             return res.status(400).json({ ok: false, error: 'ACTION_TYPE_AND_MESSAGE_REQUIRED' });
         }
 
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.requestCustomerAction(req.params.id, actionType, message, actorId);
-        return res.json(result);
+        if (!result.ok) return res.status(400).json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request customer action for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
@@ -135,14 +143,16 @@ router.post('/:id/request-customer-action', async (req, res) => {
  */
 router.post('/:id/internal-note', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'INTERNAL_NOTE', req.params.id);
+        console.log('[MARKETPLACE_NOTE_ADDED]', req.params.id);
         const { note } = req.body;
         if (!note) {
             return res.status(400).json({ ok: false, error: 'NOTE_TEXT_REQUIRED' });
         }
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.addNote(req.params.id, note, actorId);
-        return res.json(result);
+        if (!result.ok) return res.status(400).json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to add note to order ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
@@ -156,12 +166,13 @@ router.post('/:id/internal-note', async (req, res) => {
 router.post('/:id/preflight/run', async (req, res) => {
     try {
         console.log('[MARKETPLACE_PREFLIGHT_RUN_REQUESTED]', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.runPreflight(req.params.id, actorId);
         if (!result.ok) {
             return res.status(400).json(result);
         }
-        return res.json(result);
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to run preflight for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_RUN_ERROR', message: err.message });
@@ -174,10 +185,14 @@ router.post('/:id/preflight/run', async (req, res) => {
  */
 router.post('/:id/preflight/mark-required', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_REQUIRED', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        console.log('[MARKETPLACE_PREFLIGHT_REQUIRED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.markPreflightRequired(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark preflight required for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_REQUIRED_ERROR', message: err.message });
@@ -190,10 +205,22 @@ router.post('/:id/preflight/mark-required', async (req, res) => {
  */
 router.post('/:id/preflight/mark-passed', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_PASSED', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
-        const result = await orderService.markPreflightPassed(req.params.id, req.body, actorId);
-        return res.json(result);
+        console.log('[MARKETPLACE_PREFLIGHT_PASSED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
+        
+        // Default manual result if not fully provided
+        const resultPayload = req.body || {};
+        if (!resultPayload.result && !resultPayload.manual) {
+            resultPayload.manual = true;
+            resultPayload.note = 'Operator validation';
+        }
+        
+        const result = await orderService.markPreflightPassed(req.params.id, resultPayload, actorId);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually pass preflight for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_PASSED_ERROR', message: err.message });
@@ -206,10 +233,21 @@ router.post('/:id/preflight/mark-passed', async (req, res) => {
  */
 router.post('/:id/preflight/mark-failed', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'PREFLIGHT_MARK_FAILED', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
-        const result = await orderService.markPreflightFailed(req.params.id, req.body, actorId);
-        return res.json(result);
+        console.log('[MARKETPLACE_PREFLIGHT_FAILED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
+        
+        // Enforce body validation: requires result or reason
+        const { result, reason } = req.body || {};
+        if (!result && !reason) {
+            return res.status(400).json({ ok: false, error: 'RESULT_OR_REASON_REQUIRED', message: 'Preflight failure override requires a result object or specific failure reason.' });
+        }
+        
+        const opResult = await orderService.markPreflightFailed(req.params.id, req.body, actorId);
+        if (!opResult.ok) {
+            return res.status(400).json(opResult);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually fail preflight for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_FAILED_ERROR', message: err.message });
@@ -223,9 +261,13 @@ router.post('/:id/preflight/mark-failed', async (req, res) => {
 router.post('/:id/payment/mark-ready', async (req, res) => {
     try {
         console.log('[MARKETPLACE_PAYMENT_READY]', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.markPaymentReady(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark payment ready for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PAYMENT_READY_ERROR', message: err.message });
@@ -238,11 +280,21 @@ router.post('/:id/payment/mark-ready', async (req, res) => {
  */
 router.post('/:id/payment/mark-blocked', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'PAYMENT_MARK_BLOCKED', req.params.id);
-        const { reason } = req.body;
-        const actorId = req.user?.id || 'ADMIN';
+        console.log('[MARKETPLACE_PAYMENT_BLOCKED]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
+        
+        // Enforce body validation: requires reason
+        const { reason } = req.body || {};
+        if (!reason) {
+            return res.status(400).json({ ok: false, error: 'REASON_REQUIRED', message: 'Payment block override requires a blocking reason.' });
+        }
+        
         const result = await orderService.markPaymentBlocked(req.params.id, reason, actorId);
-        return res.json(result);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to block payment gate for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PAYMENT_BLOCKED_ERROR', message: err.message });
@@ -256,9 +308,13 @@ router.post('/:id/payment/mark-blocked', async (req, res) => {
 router.post('/:id/handoff/prepare', async (req, res) => {
     try {
         console.log('[MARKETPLACE_HANDOFF_PREPARED]', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.prepareHandoff(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to prepare handoff for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'HANDOFF_PREPARE_ERROR', message: err.message });
@@ -271,10 +327,14 @@ router.post('/:id/handoff/prepare', async (req, res) => {
  */
 router.post('/:id/handoff/mark-ready', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDER_ACTION]', 'HANDOFF_MARK_READY', req.params.id);
-        const actorId = req.user?.id || 'ADMIN';
+        console.log('[MARKETPLACE_HANDOFF_READY]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
         const result = await orderService.markHandoffReady(req.params.id, actorId);
-        return res.json(result);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark handoff ready for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'HANDOFF_READY_ERROR', message: err.message });
