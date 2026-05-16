@@ -34,9 +34,12 @@ class MarketplaceOrderService {
         const payload = safeParseJson(row.payload, {});
         const snapshot = payload.order_snapshot || payload || {};
         
-        // Prioritize Budget control_plane from snapshot
+        const snapshotControlPlane = snapshot.control_plane || payload.control_plane || {};
         const rowControlPlane = safeParseJson(row.control_plane_json, safeParseJson(row.control_plane, {}));
-        const controlPlane = snapshot.control_plane || payload.control_plane || rowControlPlane || {};
+        const controlPlane = {
+            ...snapshotControlPlane,
+            ...rowControlPlane
+        };
 
         // Prioritize Budget canonical snapshot components
         const offer = snapshot.offer || safeParseJson(row.offer_json, safeParseJson(row.offer, {}));
@@ -185,7 +188,7 @@ class MarketplaceOrderService {
                 paidAt: payment.paid_at
             },
             controlPlane: {
-                acknowledged: controlPlane.acknowledged || false,
+                acknowledged: Boolean(controlPlane.acknowledged),
                 acknowledgedBy: controlPlane.acknowledgedBy || controlPlane.acknowledged_by,
                 acknowledgedAt: controlPlane.acknowledgedAt || controlPlane.acknowledged_at,
                 notes: controlPlane.notes || [],
@@ -323,8 +326,15 @@ class MarketplaceOrderService {
     async addAuditEvent(orderId, eventType, payload = {}, actorId = 'SYSTEM') {
         try {
             await mysqlClient.query(`
-                INSERT INTO marketplace_audit_events (entity_type, entity_id, event_type, actor_id, payload)
-                VALUES ('MARKETPLACE_ORDER_INTENT', ?, ?, ?, ?)
+                INSERT INTO marketplace_audit_events (
+                    entity_type,
+                    entity_id,
+                    event_type,
+                    actor_id,
+                    payload,
+                    created_at
+                )
+                VALUES ('MARKETPLACE_ORDER_INTENT', ?, ?, ?, ?, NOW())
             `, [orderId, eventType, actorId, JSON.stringify(payload)]);
         } catch (err) {
             logger.error({ event: 'add_audit_event_failed', orderId, error: err.message });
