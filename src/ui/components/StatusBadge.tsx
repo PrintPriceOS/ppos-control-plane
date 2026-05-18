@@ -24,7 +24,15 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
   // Resolve industrial cinematic dark tokens as per specification
   let classes = "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-200 hover:dark:bg-zinc-700";
 
-  if (normStatus.includes('ACTIVE') || normStatus.includes('LIVE') || normStatus.includes('COMPLETED') || normStatus.includes('SUCCESS') || normStatus.includes('SUCCEEDED')) {
+  if (normStatus === 'COMPLETED_WITH_FINDINGS') {
+    classes = "bg-emerald-50/70 dark:bg-emerald-950/30 border-blue-200 dark:border-blue-900/40 text-emerald-700 dark:text-emerald-400";
+  } else if (normStatus === 'DEGRADED') {
+    classes = "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-400";
+  } else if (normStatus === 'PARTIAL' || normStatus === 'PARTIAL_ARTIFACTS') {
+    classes = "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-900/60 text-violet-700 dark:text-violet-400";
+  } else if (normStatus === 'FAILED_RUNTIME_ENVIRONMENT') {
+    classes = "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400";
+  } else if (normStatus.includes('ACTIVE') || normStatus.includes('LIVE') || normStatus.includes('COMPLETED') || normStatus.includes('SUCCESS') || normStatus.includes('SUCCEEDED')) {
     classes = "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-400";
   } else if (normStatus.includes('SUSPENDED') || normStatus.includes('DEGRADED') || normStatus.includes('WARN')) {
     classes = "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-400";

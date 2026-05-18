@@ -10,6 +10,12 @@ const upstream = require('./preflightServiceClient');
 const orchestration = require('./orchestrationService');
 const fs = require('fs');
 const path = require('path');
+const {
+  isTerminalDiagnosticStatus,
+  mapPhase10Status,
+  collectFindings,
+  normalizeArtifacts
+} = require('./preflightStatusHelpers');
 
 class PreflightOperationsService {
   constructor() {
@@ -270,9 +276,10 @@ class PreflightOperationsService {
       if (!upstreamStatus) throw new Error('UPSTREAM_UNAVAILABLE');
 
       const localStatus = this._mapUpstreamStatus(upstreamStatus.status);
+      const progressVal = isTerminalDiagnosticStatus(localStatus) ? 100 : (upstreamStatus.progress || 0);
       const updates = {
         status: localStatus,
-        progress: upstreamStatus.progress || 0,
+        progress: progressVal,
         step: upstreamStatus.step || null,
         last_synced_at: new Date().toISOString()
       };
@@ -285,8 +292,8 @@ class PreflightOperationsService {
       if (upstreamStatus.error) {
         updates.error = upstreamStatus.error;
       } else {
-        // If it's successful or processing, we should ensure no old stale error is shown
-        if (['COMPLETED', 'PROCESSING', 'QUEUED'].includes(localStatus)) {
+        // If it's successful, processing, or terminal diagnostic status, ensure no stale error is shown
+        if (['COMPLETED', 'PROCESSING', 'QUEUED'].includes(localStatus) || isTerminalDiagnosticStatus(localStatus)) {
           updates.error = null;
         }
       }
@@ -306,21 +313,30 @@ class PreflightOperationsService {
           status: 'SUCCESS',
           metadata: { jobId, oldStatus: job.status, newStatus: localStatus, upstreamJobId }
         });
+      }
 
-        // If job just completed, register artifacts if provided by upstream
-        if (localStatus === 'COMPLETED' && upstreamStatus.artifacts && Array.isArray(upstreamStatus.artifacts)) {
-          for (const art of upstreamStatus.artifacts) {
-            await persistence.createArtifact({
-              tenantId: job.tenant_id,
-              jobId,
-              type: art.type || 'OUTPUT',
-              filename: art.filename,
-              storageKey: art.storageKey || art.path,
-              sizeBytes: art.sizeBytes || 0,
-              mimeType: art.mimeType || 'application/pdf',
-              metadata: art.metadata || {}
-            });
+      // If job reached terminal diagnostic state, register artifacts if provided by upstream
+      const artifactsRaw = upstreamStatus.artifacts || upstreamStatus.artifact_list || upstreamStatus.availableArtifacts || upstreamStatus.available_artifacts;
+      if (isTerminalDiagnosticStatus(localStatus) && artifactsRaw) {
+        const normalized = normalizeArtifacts(artifactsRaw);
+        const existing = await persistence.listArtifacts({ jobId });
+        const existingKeys = new Set(existing.map(a => a.storage_key || a.storageKey));
+
+        for (const art of normalized) {
+          const key = art.storageKey || art.path || '';
+          if (key && existingKeys.has(key)) {
+            continue;
           }
+          await persistence.createArtifact({
+            tenantId: job.tenant_id,
+            jobId,
+            type: art.type || 'OUTPUT',
+            filename: art.filename || 'artifact.pdf',
+            storageKey: key,
+            sizeBytes: art.sizeBytes || 0,
+            mimeType: art.mimeType || 'application/pdf',
+            metadata: art.metadata || {}
+          });
         }
       }
 
@@ -345,40 +361,8 @@ class PreflightOperationsService {
     }
   }
 
-  /**
-   * Map upstream status (likely BullMQ/Worker states) to Control Plane canonical lifecycle
-   */
   _mapUpstreamStatus(upstreamStatus) {
-    if (!upstreamStatus) return 'FAILED';
-    
-    const s = upstreamStatus.toUpperCase();
-    
-    // Mapping Logic
-    switch (s) {
-        case 'WAITING':
-        case 'QUEUED':
-        case 'DELAYED':
-            return 'QUEUED';
-        case 'ACTIVE':
-        case 'PROCESSING':
-            return 'PROCESSING';
-        case 'COMPLETED':
-        case 'FINISHED':
-        case 'SUCCESS':
-            return 'COMPLETED';
-        case 'FAILED':
-        case 'ERROR':
-            return 'FAILED';
-        case 'STALLED':
-            return 'STALLED';
-        case 'RETRYING':
-            return 'RETRYING';
-        case 'CANCELLED':
-        case 'REMOVED':
-            return 'CANCELLED';
-        default:
-            return 'PROCESSING'; // Default to active if unknown but present
-    }
+    return mapPhase10Status(upstreamStatus);
   }
 
   /**
@@ -637,6 +621,7 @@ class PreflightOperationsService {
           { slug: 'LARGE_FORMAT_INKJET', name: 'Wide Format UV/Latex', description: 'Optimized raster resolution and ink limits for banners and displays.' }
         ],
         source_status,
+        fallbackMode: true,
         upstream_status: err.status || 500
       };
     }
@@ -671,7 +656,8 @@ class PreflightOperationsService {
         { event: 'STORAGE_ALLOCATED', timestamp: job.created_at, actor: 'STORAGE_ENGINE', metadata: { uploadId: job.upload_id } },
         { event: 'STATUS_UPDATED', timestamp: job.updated_at || job.created_at, actor: 'ORCHESTRATOR', metadata: { status: job.status, progress: job.progress } }
       ],
-      source_status: 'LOCAL_FALLBACK'
+      source_status: 'LOCAL_FALLBACK',
+      fallbackMode: true
     };
   }
 
@@ -699,11 +685,10 @@ class PreflightOperationsService {
 
     // Fallback based on job status
     return {
-      findings: [
-        { category: 'Color', severity: 'WARNING', message: 'RGB Color Spaces detected in Document Profile', count: 1 },
-        { category: 'Geometry', severity: 'INFO', message: 'TrimBox and BleedBox aligned to standard parameters', count: 0 }
-      ],
-      source_status: 'LOCAL_FALLBACK'
+      findings: [],
+      source_status: 'LOCAL_FALLBACK',
+      fallbackMode: true,
+      reason: 'Upstream findings unavailable. No diagnostic findings fabricated.'
     };
   }
 
@@ -735,13 +720,15 @@ class PreflightOperationsService {
 
     return {
       evidence: {
-        repaired: job.fix_count > 0 || job.status === 'COMPLETED',
-        fixCount: job.fix_count || 0,
-        appliedRules: job.policy ? [job.policy] : [],
-        summary: job.noop_fix ? 'Pure Certification without structure modifications.' : 'Standard automated fix instructions applied.'
+        repaired: false,
+        fixCount: 0,
+        appliedRules: [],
+        summary: ''
       },
       artifacts: [],
-      source_status: 'LOCAL_FALLBACK'
+      source_status: 'LOCAL_FALLBACK',
+      fallbackMode: true,
+      reason: 'Upstream evidence unavailable. Local operational summary only.'
     };
   }
 
@@ -947,6 +934,11 @@ class PreflightOperationsService {
 
     const upstreamJobId = upstreamRes?.jobId || upstreamRes?.id || upstreamRes?.upstreamJobId || (sourceStatus === 'SIMULATED_DEV_ONLY' ? `sim-upstream-${localJobId}` : null);
 
+    if (upstreamRes && upstreamRes.status) {
+      initialStatus = mapPhase10Status(upstreamRes.status);
+      progressVal = isTerminalDiagnosticStatus(initialStatus) ? 100 : (upstreamRes.progress || 0);
+    }
+
     // 2. Persist local job record in Control DB
     const metadataJson = {
       source: 'CONTROL_PLANE_PREFLIGHT',
@@ -1082,9 +1074,10 @@ class PreflightOperationsService {
           const statusRes = await upstream.getJobStatus(upstreamId, null, row.tenant_id);
           if (statusRes && statusRes.status) {
             upstreamMeta = statusRes;
-            if (statusRes.status !== row.status && ['PROCESSING', 'COMPLETED', 'FAILED'].includes(statusRes.status)) {
-              await db.query('UPDATE preflight_jobs SET status = ? WHERE id = ?', [statusRes.status, row.id]);
-              row.status = statusRes.status;
+            const mappedStatus = mapPhase10Status(statusRes.status);
+            if (mappedStatus !== row.status) {
+              await db.query('UPDATE preflight_jobs SET status = ? WHERE id = ?', [mappedStatus, row.id]);
+              row.status = mappedStatus;
             }
           }
         }
@@ -1096,6 +1089,9 @@ class PreflightOperationsService {
       const isSimulatedDev = simulationEnabled && (metaObj?.source_status === 'SIMULATED_DEV_ONLY' || metaObj?.simulation);
       const resolvedStatus = isSimulatedDev ? 'COMPLETED' : row.status;
       
+      const findings = collectFindings(upstreamMeta || row.metadata_json || metaObj);
+      const progressVal = isTerminalDiagnosticStatus(resolvedStatus) ? 100 : (row.progress || 0);
+
       return {
         id: row.id,
         jobId: row.id,
@@ -1112,7 +1108,8 @@ class PreflightOperationsService {
         createdAt: row.created_at,
         sourceStatus: metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : 'LIVE_UPSTREAM'),
         source_status: metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : 'LIVE_UPSTREAM'),
-        issueCount: upstreamMeta?.findings?.length ?? metaObj?.issueCount ?? (isSimulatedDev ? 2 : 0),
+        progress: progressVal,
+        issueCount: findings.length,
         fixCount: upstreamMeta?.evidence?.length ?? metaObj?.fixCount ?? (isSimulatedDev ? 1 : 0),
         destructiveFixRisk: upstreamMeta?.destructiveFixRisk || metaObj?.destructiveFixRisk || (isSimulatedDev ? 'LOW' : null),
         upstreamState: upstreamMeta
@@ -1152,8 +1149,9 @@ class PreflightOperationsService {
         upstreamData = await upstream.getJob(upstreamJobId, authHeader, jobRow.tenant_id);
         source_status = 'LIVE_UPSTREAM';
         if (upstreamData?.status && upstreamData.status !== jobRow.status) {
-          await db.query('UPDATE preflight_jobs SET status = ? WHERE id = ?', [upstreamData.status, jobId]);
-          jobRow.status = upstreamData.status;
+          const mappedStatus = mapPhase10Status(upstreamData.status);
+          await db.query('UPDATE preflight_jobs SET status = ? WHERE id = ?', [mappedStatus, jobId]);
+          jobRow.status = mappedStatus;
         }
       } catch (e) {
         console.warn(`[PREFLIGHT-OPS] Upstream job resolution failed for ${upstreamJobId}, using local mapping:`, e.message);
@@ -1172,12 +1170,16 @@ class PreflightOperationsService {
     // Build rich simulated/hydrated upstream object if missing and simulation is enabled
     const hydratedUpstreamData = upstreamData || (isSimulatedDev ? {
         status: resolvedStatus,
-        findings: [{ id: 'f1', type: 'TRIMBOX', risk: 'LOW', message: 'Trimbox missing, auto-generated.' }, { id: 'f2', type: 'FONTS', risk: 'MEDIUM', message: 'Non-embedded fonts normalized.' }],
-        evidence: [{ id: 'e1', action: 'FIXED_TRIMBOX', certified: true }],
-        destructiveFixRisk: 'LOW'
+        findings: [],
+        evidence: [],
+        destructiveFixRisk: null,
+        simulationMode: true,
+        reason: 'Simulation mode active. No diagnostic findings fabricated by design.'
     } : null);
 
     const finalSourceStatus = metaObj?.source_status || (resolvedStatus === 'FAILED' ? 'UPSTREAM_UNAVAILABLE' : source_status);
+    const findings = collectFindings(hydratedUpstreamData || jobRow.metadata_json || metaObj);
+    const progressVal = isTerminalDiagnosticStatus(resolvedStatus) ? 100 : (jobRow.progress ?? 0);
 
     return {
       ok: true,
@@ -1198,9 +1200,9 @@ class PreflightOperationsService {
         createdAt: jobRow.created_at,
         updatedAt: jobRow.updated_at,
         completedAt: jobRow.completed_at || jobRow.created_at,
-        progress: jobRow.progress ?? (resolvedStatus === 'COMPLETED' ? 100 : 0),
-        issueCount: hydratedUpstreamData?.findings?.length || 0,
-        fixCount: hydratedUpstreamData?.evidence?.length || 0,
+        progress: progressVal,
+        issueCount: findings.length,
+        fixCount: hydratedUpstreamData?.evidence?.length || hydratedUpstreamData?.fixes?.length || hydratedUpstreamData?.repairs?.length || 0,
         destructiveFixRisk: hydratedUpstreamData?.destructiveFixRisk || null,
         metadata: metaObj,
         upstreamData: hydratedUpstreamData,

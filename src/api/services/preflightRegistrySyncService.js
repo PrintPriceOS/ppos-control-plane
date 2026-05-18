@@ -8,6 +8,12 @@
 const db = require('./mysqlClient');
 const preflightServiceClient = require('./preflightServiceClient');
 const logger = require('./logger').child('preflight-registry-sync');
+const {
+    isTerminalDiagnosticStatus,
+    mapPhase10Status,
+    collectFindings,
+    normalizeArtifacts
+} = require('./preflightStatusHelpers');
 
 class PreflightRegistrySyncService {
     /**
@@ -44,7 +50,7 @@ class PreflightRegistrySyncService {
             const source_job_id = upstreamJob.sourceJobId || upstreamJob.source_job_id || null;
             const source_system = upstreamJob.sourceSystem || upstreamJob.source_system || 'PREFLIGHT_SERVICE';
             const type = upstreamJob.type || upstreamJob.strategy || 'ANALYZE';
-            const status = upstreamJob.status || upstreamJob.state || 'COMPLETED';
+            const status = mapPhase10Status(upstreamJob.status || upstreamJob.state || 'COMPLETED');
             const resolved_tenant_id = upstreamJob.tenantId || upstreamJob.tenant_id || targetTenantId;
 
             // Extract original filename safely
@@ -65,7 +71,8 @@ class PreflightRegistrySyncService {
             const summaryObj = upstreamJob.summary || upstreamJob.summaryFlat || upstreamJob.analysis?.summary || {};
             const risk_score = summaryObj.riskScore !== undefined ? summaryObj.riskScore : (summaryObj.risk_score || 0);
             const risk_level = summaryObj.riskLevel || summaryObj.risk_level || null;
-            const issue_count = summaryObj.issueCount !== undefined ? summaryObj.issueCount : (summaryObj.issue_count || (Array.isArray(upstreamJob.findings) ? upstreamJob.findings.length : 0));
+            const findings = collectFindings(upstreamJob);
+            const issue_count = findings.length;
 
             // Unified canonical extractions following rules 1, 2, 3, 4
             const extractedRepairs = this._extractRepairs(upstreamJob);
@@ -86,18 +93,18 @@ class PreflightRegistrySyncService {
 
 
             // Artifact List Preservation
-            const artifacts = Array.isArray(upstreamJob.artifacts) ? upstreamJob.artifacts :
-                              Array.isArray(upstreamJob.artifact_list) ? upstreamJob.artifact_list : null;
-            const artifact_list_json = artifacts ? JSON.stringify(artifacts) : null;
+            const artifactsRaw = upstreamJob.artifacts || upstreamJob.artifact_list || upstreamJob.availableArtifacts || upstreamJob.available_artifacts;
+            const artifacts = normalizeArtifacts(artifactsRaw);
+            const artifact_list_json = artifacts.length > 0 ? JSON.stringify(artifacts) : null;
 
             // Degraded path verification
-            const degraded = upstreamJob.degraded === true || upstreamJob.isDegraded === true;
-            const degraded_reasons = Array.isArray(upstreamJob.degradedReasons) ? upstreamJob.degradedReasons :
-                                     Array.isArray(upstreamJob.degraded_reasons) ? upstreamJob.degraded_reasons : null;
-            const degraded_reasons_json = degraded_reasons ? JSON.stringify(degraded_reasons) : null;
+            const derivedDegraded = this._deriveDegraded(upstreamJob, status);
+            const degraded = derivedDegraded.degraded;
+            const degraded_reasons = derivedDegraded.reasons;
+            const degraded_reasons_json = degraded_reasons.length > 0 ? JSON.stringify(degraded_reasons) : null;
 
             const policy = upstreamJob.policy || null;
-            const progress = status === 'COMPLETED' ? 100 : (upstreamJob.progress || 10);
+            const progress = isTerminalDiagnosticStatus(status) ? 100 : (upstreamJob.progress || 10);
             const canonical_payload_json = JSON.stringify(upstreamJob);
 
             // Mandatory Structured Logging: Upsert
@@ -187,7 +194,7 @@ class PreflightRegistrySyncService {
             ]);
 
             // Ensure any output artifacts are correctly advertised in preflight_artifact_registry
-            if (artifacts && Array.isArray(artifacts)) {
+            if (artifacts && artifacts.length > 0) {
                 for (const art of artifacts) {
                     const artId = art.id || art.artifactId || `art_${Date.now()}_${Math.random().toString(36).substr(2,5)}`;
                     await db.query(`
@@ -199,9 +206,9 @@ class PreflightRegistrySyncService {
                         jobId,
                         resolved_tenant_id,
                         art.type || 'OUTPUT',
-                        art.filename || art.name || 'artifact.pdf',
-                        art.sizeBytes || art.size || 0,
-                        art.path || art.storageKey || ''
+                        art.filename || 'artifact.pdf',
+                        art.sizeBytes || 0,
+                        art.path || ''
                     ]);
                 }
             }
@@ -341,7 +348,7 @@ class PreflightRegistrySyncService {
         const source_system = payload.sourceSystem || payload.source_system || 'PREFLIGHT_SERVICE';
         const source_status = payload.source_status || null;
         const type = payload.type || payload.strategy || 'ANALYZE';
-        const status = payload.status || payload.state || 'UNKNOWN';
+        const status = mapPhase10Status(payload.status || payload.state || 'UNKNOWN');
         const resolved_tenant_id = payload.tenantId || payload.tenant_id || tenantId;
 
         const original_filename = payload.document?.name || 
@@ -359,7 +366,8 @@ class PreflightRegistrySyncService {
         const summaryObj = payload.summary || payload.summaryFlat || payload.analysis?.summary || {};
         const risk_score = summaryObj.riskScore !== undefined ? summaryObj.riskScore : (summaryObj.risk_score || 0);
         const risk_level = summaryObj.riskLevel || summaryObj.risk_level || null;
-        const issue_count = summaryObj.issueCount !== undefined ? summaryObj.issueCount : (summaryObj.issue_count || (Array.isArray(payload.findings) ? payload.findings.length : 0));
+        const findings = collectFindings(payload);
+        const issue_count = findings.length;
 
         // Unified canonical extractions following rules 1, 2, 3, 4
         const extractedRepairs = this._extractRepairs(payload);
@@ -378,17 +386,17 @@ class PreflightRegistrySyncService {
         const skipped_fixes_json = buckets.skipped.length > 0 ? JSON.stringify(buckets.skipped) : null;
         const failed_fixes_json = buckets.failed.length > 0 ? JSON.stringify(buckets.failed) : null;
 
-        const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts :
-                          Array.isArray(payload.artifact_list) ? payload.artifact_list : null;
-        const artifact_list_json = artifacts ? JSON.stringify(artifacts) : null;
+        const artifactsRaw = payload.artifacts || payload.artifact_list || payload.availableArtifacts || payload.available_artifacts;
+        const artifacts = normalizeArtifacts(artifactsRaw);
+        const artifact_list_json = artifacts.length > 0 ? JSON.stringify(artifacts) : null;
 
-        const degraded = payload.degraded === true || payload.isDegraded === true;
-        const degraded_reasons = Array.isArray(payload.degradedReasons) ? payload.degradedReasons :
-                                 Array.isArray(payload.degraded_reasons) ? payload.degraded_reasons : null;
-        const degraded_reasons_json = degraded_reasons ? JSON.stringify(degraded_reasons) : null;
+        const derivedDegraded = this._deriveDegraded(payload, status);
+        const degraded = derivedDegraded.degraded;
+        const degraded_reasons = derivedDegraded.reasons;
+        const degraded_reasons_json = degraded_reasons.length > 0 ? JSON.stringify(degraded_reasons) : null;
 
         const policy = payload.policy || null;
-        const progress = status === 'COMPLETED' ? 100 : (payload.progress || 10);
+        const progress = isTerminalDiagnosticStatus(status) ? 100 : (payload.progress || 10);
         const canonical_payload_json = JSON.stringify(payload);
         const sync_error_json_str = syncErrorJson ? JSON.stringify(syncErrorJson) : null;
 
@@ -647,6 +655,51 @@ class PreflightRegistrySyncService {
         })}`);
 
         return { applied, skipped, failed };
+    }
+
+    _deriveDegraded(payload, status) {
+        if (!payload) return { degraded: false, reasons: [] };
+
+        const statusUpper = (status || payload.status || payload.state || '').toUpperCase();
+        const outcomeCategory = (payload.outcomeCategory || payload.outcome_category || '').toUpperCase();
+        const analysisIntegrity = payload.analysisIntegrity || payload.analysis_integrity || {};
+
+        const isDegradedStatus = ['DEGRADED', 'PARTIAL', 'PARTIAL_ARTIFACTS'].includes(statusUpper);
+        const isDegradedOutcome = ['DEGRADED_ANALYSIS', 'PARTIAL_ANALYSIS', 'ARTIFACT_INTEGRITY_FAILURE'].includes(outcomeCategory);
+        const isDegradedIntegrity = analysisIntegrity.degradedMode === true || analysisIntegrity.degraded_mode === true;
+
+        const degraded = payload.degraded === true || 
+                         payload.isDegraded === true || 
+                         isDegradedStatus || 
+                         isDegradedOutcome || 
+                         isDegradedIntegrity;
+
+        let reasons = Array.isArray(payload.degradedReasons) ? payload.degradedReasons :
+                      Array.isArray(payload.degraded_reasons) ? payload.degraded_reasons : [];
+
+        if (degraded && reasons.length === 0) {
+            if (isDegradedStatus) {
+                reasons.push(`STATUS_DEGRADATION:${statusUpper}`);
+            }
+            if (isDegradedOutcome) {
+                reasons.push(`OUTCOME_DEGRADATION:${outcomeCategory}`);
+            }
+            if (isDegradedIntegrity) {
+                reasons.push('ANALYSIS_INTEGRITY_DEGRADED_MODE');
+            }
+            if (payload.degraded === true || payload.isDegraded === true) {
+                reasons.push('UPSTREAM_DEGRADED_INDICATOR');
+            }
+            if (reasons.length === 0) {
+                reasons.push('GENERAL_DEGRADATION_DETECTED');
+            }
+        }
+
+        return { degraded, reasons };
+    }
+
+    normalizeArtifacts(source) {
+        return normalizeArtifacts(source);
     }
 }
 

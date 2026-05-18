@@ -31,6 +31,7 @@ import { DataTable } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { PreflightUploadModal } from "./PreflightUploadModal";
 import { short } from "../../lib/formatters";
+import { collectFindings, mapPhase10Status } from "../../lib/preflightStatusHelpers";
 
 export const PreflightJobsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -256,8 +257,13 @@ export const PreflightJobsPage: React.FC = () => {
           >
             <option value="">Status: All</option>
             <option value="COMPLETED">Completed</option>
+            <option value="COMPLETED_WITH_FINDINGS">Completed with Findings</option>
+            <option value="DEGRADED">Degraded</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="PARTIAL_ARTIFACTS">Partial Artifacts</option>
             <option value="PROCESSING">Processing</option>
             <option value="FAILED">Failed</option>
+            <option value="FAILED_RUNTIME_ENVIRONMENT">Environment Failure</option>
             <option value="PENDING">Pending</option>
           </select>
 
@@ -423,8 +429,9 @@ export const PreflightJobsPage: React.FC = () => {
                     );
                   }
 
-                  const info = j.canonicalData;
-                  const issues = info?.issues?.length || info?.analysis?.issues?.length || 0;
+                  const info = j.canonicalData || j;
+                  const findings = collectFindings(info);
+                  const issues = findings.length;
                   const fixes = info?.fixes?.length || info?.repairs?.length || 0;
                   return (
                     <div className="flex items-center gap-3 text-[10px]">

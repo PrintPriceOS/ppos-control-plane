@@ -27,20 +27,49 @@ import {
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
+import { 
+  isTerminalDiagnosticStatus,
+  isTerminalFailureStatus,
+  isTerminalStatus,
+  isDegradedDiagnosticStatus,
+  mapPhase10Status,
+  collectFindings
+} from "../../lib/preflightStatusHelpers";
 
 function renderAnalysisIntegrity(payload: any): string {
   if (!payload) return '100% Native';
   
-  // Safely extract missing tools array
+  const statusStr = (payload.analysis_status || payload.status || '').toUpperCase();
+  const outcomeCategory = (payload.outcome_category || payload.outcomeCategory || '').toUpperCase();
+  const realExtraction = payload.analysisIntegrity?.realExtraction;
+  const degradedMode = payload.analysisIntegrity?.degradedMode;
+  
+  const findings = collectFindings(payload);
+  const summary = payload.summary || payload.analysis?.summary || payload.result?.summary || '';
+  const hasSummary = typeof summary === 'string' ? !!summary.trim() : !!summary;
+  const coverage = payload.analyzerCoverage || payload.analyzer_coverage || payload.analysis?.analyzerCoverage || payload.result?.analyzerCoverage;
+  const hasCoverage = !!(coverage && (typeof coverage === 'object' ? Object.keys(coverage).length > 0 : true));
+  const hasUsableFindings = findings.length > 0;
+  
+  const isFailedEnvStatus = statusStr === 'FAILED_RUNTIME_ENVIRONMENT' || statusStr === 'ENGINE_ENVIRONMENT_FAILURE';
+  const isFailedEnvCategory = outcomeCategory === 'ENVIRONMENT_FAILURE';
+  const isFailedEnvExtraction = realExtraction === false && !hasUsableFindings && !hasSummary && !hasCoverage;
+  
+  const isFullEnvironmentFailure = isFailedEnvStatus || isFailedEnvCategory || isFailedEnvExtraction;
+  
+  if (isFullEnvironmentFailure) {
+    return 'RUNTIME_ENVIRONMENT_FAILURE';
+  }
+  
   const missingTools = Array.isArray(payload.missing_tools) ? payload.missing_tools : 
                        (Array.isArray(payload.missingTools) ? payload.missingTools : 
                        (Array.isArray(payload.analysis?.missing_tools) ? payload.analysis.missing_tools : []));
                        
-  const analysisType = payload.analysis_type || payload.analysisType || payload.analysis?.analysis_type;
-  
   if (missingTools.length > 0) {
-    return 'RUNTIME_ENVIRONMENT_FAILURE';
+    return 'DEGRADED_EXTRACTION';
   }
+  
+  const analysisType = payload.analysis_type || payload.analysisType || payload.analysis?.analysis_type;
   if (analysisType === 'DEGRADED') {
     return 'DEGRADED_EXTRACTION';
   }
@@ -111,54 +140,60 @@ export const PreflightJobDetailPage: React.FC = () => {
                        (Array.isArray(payload.missingTools) ? payload.missingTools : 
                        (Array.isArray(payload.analysis?.missing_tools) ? payload.analysis.missing_tools : []));
                        
-  const hasEnvFailure = missingTools.length > 0;
-  const isDegradedAnalysis = payload.analysis_type === 'DEGRADED' || payload.forensic_event === 'FORENSIC_DEGRADED_ANALYSIS';
+  const statusStr = (payload.analysis_status || payload.status || status || '').toUpperCase();
+  const outcomeCategory = (payload.outcome_category || payload.outcomeCategory || '').toUpperCase();
+  const realExtraction = payload.analysisIntegrity?.realExtraction;
+  const degradedMode = payload.analysisIntegrity?.degradedMode;
+  
+  // Usable findings, summary, analyzerCoverage
+  const findings = collectFindings(payload);
+  const summary = payload.summary || payload.analysis?.summary || payload.result?.summary || '';
+  const hasSummary = typeof summary === 'string' ? !!summary.trim() : !!summary;
+  const coverage = payload.analyzerCoverage || payload.analyzer_coverage || payload.analysis?.analyzerCoverage || payload.result?.analyzerCoverage;
+  const hasCoverage = !!(coverage && (typeof coverage === 'object' ? Object.keys(coverage).length > 0 : true));
+  const hasUsableFindings = findings.length > 0;
+  
+  const isFailedEnvStatus = statusStr === 'FAILED_RUNTIME_ENVIRONMENT' || statusStr === 'ENGINE_ENVIRONMENT_FAILURE';
+  const isFailedEnvCategory = outcomeCategory === 'ENVIRONMENT_FAILURE';
+  const isFailedEnvExtraction = realExtraction === false && !hasUsableFindings && !hasSummary && !hasCoverage;
+  
+  const isFullEnvironmentFailure = isFailedEnvStatus || isFailedEnvCategory || isFailedEnvExtraction;
+  
+  const hasEnvFailure = isFullEnvironmentFailure;
+  const isDegradedAnalysis = payload.analysis_type === 'DEGRADED' || payload.forensic_event === 'FORENSIC_DEGRADED_ANALYSIS' || (missingTools.length > 0 && !isFullEnvironmentFailure);
 
-  const isSuccess = status === 'COMPLETED' || status === 'SUCCESS';
-  const isFail = status === 'FAILED' || sourceStatus.includes('UNAVAILABLE') || status.includes('UNAVAILABLE');
+  const isSuccess = isTerminalDiagnosticStatus(status);
+  const jobFailure = isTerminalFailureStatus(status);
+  const sourceUnavailable = sourceStatus.includes('UNAVAILABLE');
+  const isFail = jobFailure;
 
   // Change status copy transparently
-  const statusDisplayText = hasEnvFailure 
-    ? 'ENGINE ENVIRONMENT FAILURE' 
-    : (isDegradedAnalysis ? 'DEGRADED ANALYSIS' : (isFail ? 'UPSTREAM DEGRADED / FAILED' : status));
+  let statusDisplayText = status;
+  if (hasEnvFailure) {
+    statusDisplayText = 'ENGINE ENVIRONMENT FAILURE';
+  } else if (isDegradedAnalysis || isDegradedDiagnosticStatus(status)) {
+    statusDisplayText = 'DEGRADED ANALYSIS';
+  } else if (status === 'COMPLETED_WITH_FINDINGS') {
+    statusDisplayText = 'COMPLETED WITH FINDINGS';
+  } else if (isFail) {
+    statusDisplayText = 'FAILED';
+  }
 
   // Determine certification blockage and action gating
-  const integ = payload.analysisIntegrity || {};
-  const isFixBlocked = hasEnvFailure || integ.certificationAllowed === false || integ.realExtraction === false;
+  // "Do not block autofix only because analysis is DEGRADED/PARTIAL."
+  // "If missingTools exist but degradedMode=true or realExtraction=true: do not block autofix."
+  const isFixBlocked = hasEnvFailure;
   
+  const integ = payload.analysisIntegrity || {};
   let certBlockedReason = payload.certificationBlockedReason || integ.certificationBlockedReason || '';
   if (!certBlockedReason && isFixBlocked) {
     if (hasEnvFailure) {
-      certBlockedReason = 'Missing required environment binaries blocks certification invariants.';
-    } else if (integ.certificationAllowed === false) {
-      certBlockedReason = 'Analysis integrity explicit contract blocks certification path.';
-    } else if (integ.realExtraction === false) {
-      certBlockedReason = 'Native real extraction verification failed invariant checks.';
+      certBlockedReason = 'Full environment failure blocks certification and fix invariants.';
     }
   }
 
-  // Deduplicate findings and sanitize structural issue counts to exclude environment failures
-  const rawIssues = Array.isArray(payload.issues) ? payload.issues : (Array.isArray(payload.analysis?.issues) ? payload.analysis.issues : []);
-  const sanitizedIssues = rawIssues.filter((issue: any) => {
-    if (!issue) return false;
-    const textStr = typeof issue === 'string' ? issue : JSON.stringify(issue);
-    const isEnvDefect = textStr.includes('missing_tool') || 
-                        textStr.includes('pdfimages') || 
-                        textStr.includes('pdfinfo') || 
-                        textStr.includes('mutool') || 
-                        textStr.includes('spawn ENOENT') ||
-                        textStr.includes('RUNTIME_ENVIRONMENT');
-    return !isEnvDefect;
-  });
-
-  const uniqueIssuesMap = new Map();
-  sanitizedIssues.forEach((iss: any) => {
-    const key = typeof iss === 'string' ? iss : (iss.id || iss.code || iss.message || JSON.stringify(iss));
-    if (!uniqueIssuesMap.has(key)) {
-      uniqueIssuesMap.set(key, iss);
-    }
-  });
-  const deduplicatedIssuesCount = uniqueIssuesMap.size;
+  // Deduplicate findings and sanitize structural issue counts using collectFindings
+  const deduplicatedIssuesCount = findings.length;
 
   const handleTriggerFix = async () => {
     if (!jobId || isFixBlocked) return;
@@ -273,6 +308,53 @@ export const PreflightJobDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* Phase 10 status banners */}
+      {sourceUnavailable && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-500 rounded-none">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">Upstream Gateway Unavailable</h4>
+            <p className="text-xs font-bold mt-0.5">The upstream preflight engine is currently offline or unreachable. Displaying cached diagnostic records from the local Control Plane evidence vault.</p>
+          </div>
+        </div>
+      )}
+      {status?.toUpperCase() === 'DEGRADED' && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-500 rounded-none">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">DEGRADED ANALYSIS DETECTION</h4>
+            <p className="text-xs font-bold mt-0.5">Preflight completed in degraded extraction mode. Some structural details might be approximated, but the file is certifiable and autofix is available.</p>
+          </div>
+        </div>
+      )}
+      {status?.toUpperCase() === 'PARTIAL' && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-500 rounded-none">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">PARTIAL ANALYSIS WARNING</h4>
+            <p className="text-xs font-bold mt-0.5">Preflight run was partially completed. Operational telemetry is preserved, but some checks were bypassed.</p>
+          </div>
+        </div>
+      )}
+      {status?.toUpperCase() === 'PARTIAL_ARTIFACTS' && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-500 rounded-none">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">PARTIAL ARTIFACTS AVAILABLE</h4>
+            <p className="text-xs font-bold mt-0.5">Analysis completed, but only partial output artifacts were successfully compiled and registered upstream.</p>
+          </div>
+        </div>
+      )}
+      {status?.toUpperCase() === 'COMPLETED_WITH_FINDINGS' && (
+        <div className="p-4 bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 text-blue-500 rounded-none">
+          <CheckCircleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">COMPLETED WITH FINDINGS</h4>
+            <p className="text-xs font-bold mt-0.5">Preflight checks successfully finished. Active issues/findings have been detected in the document layout.</p>
+          </div>
+        </div>
+      )}
+
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -365,7 +447,7 @@ export const PreflightJobDetailPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <WrenchScrewdriverIcon className="w-4 h-4 text-amber-500" />
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Environment Integrity Diagnostics</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Environment & Analysis Integrity</h3>
               </div>
               {hasEnvFailure ? (
                 <span className="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-black uppercase tracking-widest">
@@ -392,7 +474,7 @@ export const PreflightJobDetailPage: React.FC = () => {
 
               <div>
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Missing Tool Diagnostics</span>
-                {hasEnvFailure ? (
+                {hasEnvFailure || missingTools.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {missingTools.map((tool: string) => (
                       <span key={tool} className="px-1.5 py-0.5 bg-red-500/20 text-red-400 font-mono text-[10px] border border-red-500/30">
@@ -424,6 +506,53 @@ export const PreflightJobDetailPage: React.FC = () => {
                 <span className={`text-[11px] font-bold block truncate ${certBlockedReason ? 'text-red-400' : 'text-slate-400'}`} title={certBlockedReason || 'Certification path permitted'}>
                   {certBlockedReason || 'Certification path permitted'}
                 </span>
+              </div>
+            </div>
+
+            {/* Phase 10 Contract Metadata */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-3 border-t border-white/10">
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Analysis Integrity</span>
+                <div className="space-y-1 font-mono text-[10px] text-slate-300">
+                  <div>Real Extraction: <span className={realExtraction ? 'text-emerald-400' : 'text-red-400'}>{String(realExtraction ?? 'N/A')}</span></div>
+                  <div>Degraded Mode: <span className={degradedMode ? 'text-amber-400' : 'text-emerald-400'}>{String(degradedMode ?? 'N/A')}</span></div>
+                  <div>Cert. Allowed: <span className={integ.certificationAllowed ? 'text-emerald-400' : 'text-red-400'}>{String(integ.certificationAllowed ?? 'N/A')}</span></div>
+                </div>
+              </div>
+              
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Analyzer Coverage</span>
+                {coverage ? (
+                  <div className="space-y-1 font-mono text-[10px] text-slate-300 max-h-24 overflow-y-auto">
+                    {Object.entries(coverage).map(([key, val]) => (
+                      <div key={key} className="truncate">
+                        {key}: <span className={val ? 'text-emerald-400' : 'text-slate-400'}>{String(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 font-bold text-[10px] italic">Not Provided</span>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Artifact Integrity</span>
+                {payload.artifactIntegrity || payload.result?.artifactIntegrity ? (
+                  <div className="space-y-1 font-mono text-[10px] text-slate-300">
+                    {(() => {
+                      const art = payload.artifactIntegrity || payload.result?.artifactIntegrity || {};
+                      return (
+                        <>
+                          <div>Ready: <span className={art.ready ? 'text-emerald-400' : 'text-red-400'}>{String(art.ready ?? 'N/A')}</span></div>
+                          <div className="truncate" title={art.checksum}>Checksum: <span className="text-blue-400">{art.checksum || 'N/A'}</span></div>
+                          <div>Integrity: <span className={art.integrityVerified ? 'text-emerald-400' : 'text-slate-400'}>{String(art.integrityVerified ?? 'N/A')}</span></div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 font-bold text-[10px] italic">Not Provided</span>
+                )}
               </div>
             </div>
           </div>

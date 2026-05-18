@@ -41,7 +41,7 @@ class PreflightContractGateway {
     }
 
     resolvePath(v2Path) {
-        if (this.mode === 'service' && process.env.PREFLIGHT_SERVICE_FORCE_LEGACY_PREFIX === 'true') {
+        if (this.mode === 'service' || process.env.PREFLIGHT_SERVICE_FORCE_LEGACY_PREFIX === 'true') {
             return v2Path.replace(/^\/api\/v2/, '/api/preflight');
         }
 
