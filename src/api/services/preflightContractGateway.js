@@ -27,9 +27,10 @@ class PreflightContractGateway {
         ).replace(/\/+$/, '');
 
         this.internalToken = (
-            process.env.PPOS_INTERNAL_SERVICE_TOKEN ||
+            process.env.PREFLIGHT_JWT ||
             process.env.PREFLIGHT_SERVICE_TOKEN ||
-            process.env.PPOS_CONTROL_TOKEN ||
+            process.env.PPOS_INTERNAL_SERVICE_TOKEN ||
+            process.env.PPOS_SERVICE_TOKEN ||
             ''
         );
 
@@ -72,7 +73,7 @@ class PreflightContractGateway {
             ...customHeaders
         };
 
-        const tokenToUse = this.internalToken || context.token || (context.Authorization || '').replace(/^Bearer\s+/i, '') || '';
+        const tokenToUse = this.internalToken || context.token || '';
         if (tokenToUse && tokenToUse !== 'null' && tokenToUse !== 'undefined') {
             headers.Authorization = `Bearer ${tokenToUse}`;
         }

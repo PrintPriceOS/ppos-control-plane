@@ -412,9 +412,13 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
             verifyTenantScope(req, localRecord.tenant_id);
         }
 
+        const upstreamAuthHeader = process.env.PREFLIGHT_JWT
+          ? `Bearer ${process.env.PREFLIGHT_JWT}`
+          : null;
+
         const syncedResult = await syncService.syncJob(jobId, {
             tenantId: context.tenantId,
-            authHeader: context.Authorization
+            authHeader: upstreamAuthHeader
         });
 
         await logAuditEvent({
@@ -454,12 +458,16 @@ router.post('/sync', async (req, res) => {
 
         const requestedTenantId = req.actorContext?.isSuperAdmin && req.body?.tenantId ? req.body.tenantId : context.tenantId;
 
+        const upstreamAuthHeader = process.env.PREFLIGHT_JWT
+            ? `Bearer ${process.env.PREFLIGHT_JWT}`
+            : null;
+
         // Fetch jobs from upstream service
         const listRes = await preflightServiceClient.listJobs({
             tenantId: requestedTenantId,
             limit,
             status: statusParam,
-            authHeader: context.Authorization
+            authHeader: upstreamAuthHeader
         });
 
         const items = Array.isArray(listRes) ? listRes : (listRes?.jobs || listRes?.data || []);
