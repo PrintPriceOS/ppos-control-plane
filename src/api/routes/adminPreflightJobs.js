@@ -14,7 +14,7 @@ const gateway = require('../services/preflightContractGateway');
 const db = require('../services/mysqlClient');
 const syncService = require('../services/preflightRegistrySyncService');
 const preflightServiceClient = require('../services/preflightServiceClient');
-
+const { isTerminalDiagnosticStatus, collectFindings } = require('../services/preflightStatusHelpers');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -368,11 +368,50 @@ router.get('/jobs/:jobId', async (req, res) => {
         const skippedFixes = localRecord ? safeParseLocal(localRecord.skipped_fixes_json) : null;
         const failedFixes = localRecord ? safeParseLocal(localRecord.failed_fixes_json) : null;
 
+        const currentStatus = rawCanonical?.status || localRecord?.status || 'UNKNOWN';
+
+        let progress = null;
+        let issueCount = null;
+        let degraded = null;
+        let degradedReasons = null;
+
+        if (rawCanonical) {
+            progress = isTerminalDiagnosticStatus(currentStatus) ? 100 : (rawCanonical.progress || 10);
+            issueCount = collectFindings(rawCanonical).length;
+            
+            const statusUpper = currentStatus.toUpperCase();
+            const outcomeCategory = (rawCanonical.outcomeCategory || rawCanonical.outcome_category || '').toUpperCase();
+            const isDegradedMode = rawCanonical.analysisIntegrity?.degradedMode === true || rawCanonical.analysisIntegrity?.degraded_mode === true;
+            
+            degraded = ['DEGRADED', 'PARTIAL', 'PARTIAL_ARTIFACTS'].includes(statusUpper) ||
+                       ['DEGRADED_ANALYSIS', 'PARTIAL_ANALYSIS'].includes(outcomeCategory) ||
+                       isDegradedMode ||
+                       rawCanonical.degraded === true || 
+                       rawCanonical.isDegraded === true;
+                       
+            degradedReasons = rawCanonical.degraded_reasons || rawCanonical.degradedReasons || null;
+            if (degraded && (!degradedReasons || degradedReasons.length === 0)) {
+                degradedReasons = [];
+                if (['DEGRADED', 'PARTIAL', 'PARTIAL_ARTIFACTS'].includes(statusUpper)) degradedReasons.push(`STATUS_DEGRADATION:${statusUpper}`);
+                if (['DEGRADED_ANALYSIS', 'PARTIAL_ANALYSIS'].includes(outcomeCategory)) degradedReasons.push(`OUTCOME_DEGRADATION:${outcomeCategory}`);
+                if (isDegradedMode) degradedReasons.push('ANALYSIS_INTEGRITY_DEGRADED_MODE');
+            }
+        } else if (localRecord) {
+            progress = localRecord.progress;
+            issueCount = localRecord.issue_count;
+            degraded = !!localRecord.degraded;
+            degradedReasons = safeParseLocal(localRecord.degraded_reasons_json);
+        }
+
         res.json({
             ok: true,
             jobId,
-            status: rawCanonical?.status || localRecord?.status || 'UNKNOWN',
+            status: currentStatus,
             source_status: sourceStatus,
+            progress,
+            issueCount,
+            degraded,
+            degradedReasons,
             canonicalPayload: rawCanonical,
             registryRecord: localRecord ? {
                 createdAt: localRecord.created_at,
