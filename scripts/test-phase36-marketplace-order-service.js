@@ -46,18 +46,19 @@ function installMockEngine() {
                 const row = {
                     order_id: params[0],
                     pricing_session_id: params[1],
-                    selected_offer_id: params[2],
-                    customer_id: params[3],
-                    tenant_id: params[4],
-                    printhouse_id: params[5],
-                    status: params[6],
-                    currency: params[7],
-                    estimated_price: params[8],
-                    book_spec_json: params[9],
-                    selected_offer_json: params[10],
-                    customer_json: params[11],
-                    readiness_json: params[12],
-                    metadata_json: params[13],
+                    session_id: params[2],
+                    selected_offer_id: params[3],
+                    customer_id: params[4],
+                    tenant_id: params[5],
+                    printhouse_id: params[6],
+                    status: params[7],
+                    currency: params[8],
+                    estimated_price: params[9],
+                    book_spec_json: params[10],
+                    selected_offer_json: params[11],
+                    customer_json: params[12],
+                    readiness_json: params[13],
+                    metadata_json: params[14],
                     created_at: new Date(),
                     updated_at: new Date()
                 };
@@ -222,6 +223,12 @@ async function run() {
     const fetched = await service.getOrder(order.orderId);
     if (fetched && fetched.orderId === order.orderId) {
         console.log('  [PASS] Order successfully fetched matching creation record.');
+        if (typeof fetched.estimatedPrice === 'number' && fetched.estimatedPrice > 0) {
+            console.log(`  [PASS] Verified estimatedPrice normalization: ${fetched.estimatedPrice}`);
+        } else {
+            console.error(`  [FAIL] estimatedPrice normalization failed: ${fetched.estimatedPrice}`);
+            process.exit(1);
+        }
     } else {
         console.error('  [FAIL] Failed to retrieve matching order.');
         process.exit(1);
@@ -266,7 +273,7 @@ async function run() {
     let readiness = await service.computeReadiness(order.orderId);
     console.log(`  [INFO] Initial Readiness State: ${readiness.ready ? 'READY' : 'BLOCKED'}`);
     console.log(`         Blockers found: [${readiness.blockers.join(', ')}]`);
-    if (!readiness.ready && readiness.blockers.includes('FILES_PENDING')) {
+    if (!readiness.ready && (readiness.blockers.includes('INTERIOR_FILE_PENDING') || readiness.blockers.includes('COVER_FILE_PENDING'))) {
         console.log('  [PASS] Blocked status is correct due to files pending.');
     } else {
         console.error('  [FAIL] Mismatch in initial blockers.');
@@ -289,6 +296,7 @@ async function run() {
         console.log('     Simulating preflight outcome status: DEGRADED (acceptable)...');
         memoryDb.marketplace_order_files.forEach(f => {
             f.preflight_status = 'DEGRADED';
+            f.preflight_job_id = 'job_mock_123';
         });
         
         readiness = await service.computeReadiness(order.orderId);
@@ -306,13 +314,14 @@ async function run() {
         console.log('     Simulating preflight outcome status: ENGINE_ENVIRONMENT_FAILURE (blocking)...');
         memoryDb.marketplace_order_files.forEach(f => {
             f.preflight_status = 'ENGINE_ENVIRONMENT_FAILURE';
+            f.preflight_job_id = 'job_mock_123';
         });
 
         readiness = await service.computeReadiness(order.orderId);
         console.log(`  [INFO] Readiness with blocking preflight: ${readiness.ready ? 'READY' : 'BLOCKED'}`);
         console.log(`         Blockers found: [${readiness.blockers.join(', ')}]`);
 
-        if (!readiness.ready && readiness.blockers.some(b => b.includes('PREFLIGHT_BLOCKED'))) {
+        if (!readiness.ready && readiness.blockers.some(b => b.includes('PREFLIGHT_FAILED'))) {
             console.log('  [PASS] ENGINE_ENVIRONMENT_FAILURE correctly blocked order progression.');
         } else {
             console.error('  [FAIL] Blocking preflight status was not correctly intercepted.');

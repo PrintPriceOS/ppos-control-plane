@@ -188,7 +188,7 @@ class MarketplaceOrderService {
             productionFiles: productionFiles
         };
 
-        return {
+        const order = {
             orderIntentId: orderRow.order_id,
             orderId: orderRow.order_id,
             publicRef: orderRow.order_id,
@@ -234,6 +234,10 @@ class MarketplaceOrderService {
             blockers: readinessData.blockers || [],
             readinessFull: readinessData
         };
+
+        order.estimatedPrice = Number(orderRow.estimated_price || order.totals?.total || order.offer?.totalPrice || 0);
+
+        return order;
     }
 
     /**
@@ -908,6 +912,7 @@ class MarketplaceOrderService {
         };
 
         const readinessObj = {
+            ready: readyToInvoice,
             readyToInvoice,
             statusSuggestion,
             blockers,
