@@ -241,6 +241,7 @@ const start = async () => {
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+            fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             

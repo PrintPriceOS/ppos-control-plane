@@ -2209,3 +2209,21 @@ export async function listMarketplaceAuditEvents(params: Record<string, any> = {
     return adminFetch<{ ok: boolean, events: any[] }>(`/api/admin/marketplace/orders/audit?${qs.toString()}`);
 }
 
+export async function getMarketplaceOrder(orderId: string) {
+    return adminFetch<{ ok: boolean, order: any, files: any[], events: any[], preflightBindings: any[], readiness: any }>(`/api/marketplace/orders/${encodeURIComponent(orderId)}`);
+}
+
+export async function createMarketplaceOrder(order: any) {
+    return adminFetch<{ ok: boolean, orderId: string, status: string, requiredFiles: string[], readiness: any }>(`/api/marketplace/orders`, {
+        method: 'POST',
+        body: JSON.stringify(order)
+    });
+}
+
+export async function recomputeMarketplaceOrderReadiness(orderId: string) {
+    return adminFetch<{ ok: boolean, readiness: any }>(`/api/marketplace/orders/${encodeURIComponent(orderId)}/readiness/recompute`, {
+        method: 'POST'
+    });
+}
+
+

@@ -17,6 +17,7 @@ import { RuntimeContextPage } from './pages/os/RuntimeContextPage';
 import { MachinesPage } from './pages/os/MachinesPage';
 import { AdminDashboard } from './pages/AdminDashboard'; // Legacy Dashboard
 import { MarketplacePage } from './pages/admin/MarketplacePage';
+import { MarketplaceOrdersPage } from './pages/MarketplaceOrdersPage';
 import { PricingIntelligenceTab } from './pages/admin/PricingIntelligenceTab';
 import { FinancialOpsTab } from './pages/admin/FinancialOpsTab';
 import { SuccessWorkspace } from './pages/admin/SuccessWorkspace';
@@ -163,6 +164,7 @@ export const App: React.FC = () => {
 
                 {/* EXTENDED OPERATIONS (Restored) */}
                 <Route path="/ops/marketplace" element={<MarketplacePage />} />
+                <Route path="/ops/marketplace-orders" element={<MarketplaceOrdersPage />} />
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />

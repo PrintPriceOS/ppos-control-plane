@@ -201,56 +201,61 @@ router.post('/:id/preflight/mark-required', async (req, res) => {
 
 /**
  * POST /api/admin/marketplace/orders/:id/preflight/mark-passed
- * Manually pass the preflight check.
+ * Map to manual review override.
  */
 router.post('/:id/preflight/mark-passed', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_PREFLIGHT_PASSED]', req.params.id);
+        console.log('[MARKETPLACE_PREFLIGHT_PASSED_MAP_TO_OVERRIDE]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
-        
-        // Default manual result if not fully provided
-        const resultPayload = req.body || {};
-        if (!resultPayload.result && !resultPayload.manual) {
-            resultPayload.manual = true;
-            resultPayload.note = 'Operator validation';
-        }
-        
-        const result = await orderService.markPreflightPassed(req.params.id, resultPayload, actorId);
+        const result = await orderService.manualReviewOverride(req.params.id, actorId);
         if (!result.ok) {
             return res.status(400).json(result);
         }
         const detail = await orderService.getOrderDetail(req.params.id);
         return res.json({ ok: true, order: detail.order });
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually pass preflight for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to pass preflight for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_PASSED_ERROR', message: err.message });
     }
 });
 
 /**
  * POST /api/admin/marketplace/orders/:id/preflight/mark-failed
- * Manually fail the preflight check.
+ * Map to manual review override.
  */
 router.post('/:id/preflight/mark-failed', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_PREFLIGHT_FAILED]', req.params.id);
+        console.log('[MARKETPLACE_PREFLIGHT_FAILED_MAP_TO_OVERRIDE]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
-        
-        // Enforce body validation: requires result or reason
-        const { result, reason } = req.body || {};
-        if (!result && !reason) {
-            return res.status(400).json({ ok: false, error: 'RESULT_OR_REASON_REQUIRED', message: 'Preflight failure override requires a result object or specific failure reason.' });
-        }
-        
-        const opResult = await orderService.markPreflightFailed(req.params.id, req.body, actorId);
-        if (!opResult.ok) {
-            return res.status(400).json(opResult);
+        const result = await orderService.manualReviewOverride(req.params.id, actorId);
+        if (!result.ok) {
+            return res.status(400).json(result);
         }
         const detail = await orderService.getOrderDetail(req.params.id);
         return res.json({ ok: true, order: detail.order });
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to manually fail preflight for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to fail preflight for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: 'PREFLIGHT_MARK_FAILED_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/manual-override
+ * Explicit manual review override.
+ */
+router.post('/:id/preflight/manual-override', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PREFLIGHT_MANUAL_OVERRIDE]', req.params.id);
+        const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
+        const result = await orderService.manualReviewOverride(req.params.id, actorId);
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        const detail = await orderService.getOrderDetail(req.params.id);
+        return res.json({ ok: true, order: detail.order });
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to override preflight for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_MANUAL_OVERRIDE_ERROR', message: err.message });
     }
 });
 
@@ -259,6 +264,13 @@ router.post('/:id/preflight/mark-failed', async (req, res) => {
  * Flag payment readiness state.
  */
 router.post('/:id/payment/mark-ready', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE37_PAYMENT !== 'true') {
+        return res.status(501).json({
+            ok: false,
+            error: 'PHASE_NOT_ENABLED',
+            message: 'Phase 37.1 Marketplace Payment Integration is not enabled.'
+        });
+    }
     try {
         console.log('[MARKETPLACE_PAYMENT_READY]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
@@ -279,6 +291,13 @@ router.post('/:id/payment/mark-ready', async (req, res) => {
  * Block payment gate state.
  */
 router.post('/:id/payment/mark-blocked', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE37_PAYMENT !== 'true') {
+        return res.status(501).json({
+            ok: false,
+            error: 'PHASE_NOT_ENABLED',
+            message: 'Phase 37.1 Marketplace Payment Integration is not enabled.'
+        });
+    }
     try {
         console.log('[MARKETPLACE_PAYMENT_BLOCKED]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
@@ -306,6 +325,13 @@ router.post('/:id/payment/mark-blocked', async (req, res) => {
  * Compile production bundle files.
  */
 router.post('/:id/handoff/prepare', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_HANDOFF !== 'true') {
+        return res.status(501).json({
+            ok: false,
+            error: 'PHASE_NOT_ENABLED',
+            message: 'Phase 38.1 Printhouse Handoff and MES Dispatch Integration is not enabled.'
+        });
+    }
     try {
         console.log('[MARKETPLACE_HANDOFF_PREPARED]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';
@@ -326,6 +352,13 @@ router.post('/:id/handoff/prepare', async (req, res) => {
  * Flag handoff state as ready for printhouse.
  */
 router.post('/:id/handoff/mark-ready', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_HANDOFF !== 'true') {
+        return res.status(501).json({
+            ok: false,
+            error: 'PHASE_NOT_ENABLED',
+            message: 'Phase 38.1 Printhouse Handoff and MES Dispatch Integration is not enabled.'
+        });
+    }
     try {
         console.log('[MARKETPLACE_HANDOFF_READY]', req.params.id);
         const actorId = req.user?.id || req.session?.userId || 'break-glass-session';

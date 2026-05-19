@@ -1242,6 +1242,150 @@ class ControlPlaneSchemaService {
 
         console.log('[CONTROL-PLANE-SCHEMA] Marketplace Order Intents schema ensured successfully.');
     }
+
+    /**
+     * Ensures all Phase 36.1 Marketplace Order & File Governance tables exist.
+     */
+    async ensurePhase36OrderSchema() {
+        console.log('[CONTROL-PLANE-SCHEMA] Initializing Phase 36.1 Marketplace Order & File Governance schema...');
+
+        // 1. Marketplace Orders Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_orders (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    order_id VARCHAR(128) UNIQUE NOT NULL,
+                    pricing_session_id VARCHAR(128) NULL,
+                    session_id VARCHAR(128) NULL,
+                    selected_offer_id VARCHAR(128) NULL,
+                    customer_id VARCHAR(128) NULL,
+                    tenant_id VARCHAR(64) NULL,
+                    printhouse_id VARCHAR(64) NULL,
+                    status VARCHAR(64) NOT NULL,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    estimated_price DECIMAL(15,2) NULL,
+                    book_spec_json JSON NULL,
+                    selected_offer_json JSON NULL,
+                    customer_json JSON NULL,
+                    readiness_json JSON NULL,
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_pricing_session (pricing_session_id),
+                    INDEX idx_session (session_id),
+                    INDEX idx_selected_offer (selected_offer_id),
+                    INDEX idx_customer (customer_id),
+                    INDEX idx_tenant (tenant_id),
+                    INDEX idx_printhouse (printhouse_id),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB;
+            `);
+            console.log('[CONTROL-PLANE-SCHEMA] Table marketplace_orders verified/created.');
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_orders:', err.message);
+        }
+
+        // 2. Marketplace Order Files Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_order_files (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    file_id VARCHAR(128) UNIQUE NOT NULL,
+                    order_id VARCHAR(128) NOT NULL,
+                    role VARCHAR(64) NOT NULL,
+                    version INT DEFAULT 1,
+                    original_name VARCHAR(255) NOT NULL,
+                    mime_type VARCHAR(128) NOT NULL,
+                    size_bytes BIGINT NOT NULL,
+                    checksum_sha256 VARCHAR(64) NULL,
+                    storage_path TEXT NULL,
+                    status VARCHAR(64) NOT NULL,
+                    preflight_job_id VARCHAR(64) NULL,
+                    preflight_status VARCHAR(64) NULL,
+                    preflight_outcome_category VARCHAR(64) NULL,
+                    findings_count INT DEFAULT 0,
+                    artifact_refs_json JSON NULL,
+                    metadata_json JSON NULL,
+                    uploaded_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order (order_id),
+                    INDEX idx_checksum (checksum_sha256),
+                    INDEX idx_status (status),
+                    INDEX idx_preflight_job (preflight_job_id)
+                ) ENGINE=InnoDB;
+            `);
+            console.log('[CONTROL-PLANE-SCHEMA] Table marketplace_order_files verified/created.');
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_order_files:', err.message);
+        }
+
+        // 3. Marketplace Order Events Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_order_events (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    event_id VARCHAR(128) UNIQUE NOT NULL,
+                    order_id VARCHAR(128) NOT NULL,
+                    file_id VARCHAR(128) NULL,
+                    type VARCHAR(64) NOT NULL,
+                    actor_type VARCHAR(64) NULL,
+                    actor_id VARCHAR(128) NULL,
+                    payload_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_order (order_id),
+                    INDEX idx_file (file_id),
+                    INDEX idx_type (type)
+                ) ENGINE=InnoDB;
+            `);
+            console.log('[CONTROL-PLANE-SCHEMA] Table marketplace_order_events verified/created.');
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_order_events:', err.message);
+        }
+
+        // 4. Marketplace Order Preflight Bindings Table
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS marketplace_order_preflight_bindings (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    order_id VARCHAR(128) NOT NULL,
+                    file_id VARCHAR(128) NOT NULL,
+                    preflight_job_id VARCHAR(64) UNIQUE NOT NULL,
+                    role VARCHAR(64) NOT NULL,
+                    status VARCHAR(64) NOT NULL,
+                    outcome_category VARCHAR(64) NULL,
+                    analysis_integrity_json JSON NULL,
+                    analyzer_coverage_json JSON NULL,
+                    artifact_refs_json JSON NULL,
+                    findings_count INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_order (order_id),
+                    INDEX idx_file (file_id),
+                    INDEX idx_preflight_job (preflight_job_id),
+                    INDEX idx_role (role),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB;
+            `);
+            console.log('[CONTROL-PLANE-SCHEMA] Table marketplace_order_preflight_bindings verified/created.');
+        } catch (err) {
+            console.error('[CONTROL-PLANE-SCHEMA] Failed to create marketplace_order_preflight_bindings:', err.message);
+        }
+
+        // Idempotent column and index assurances for Phase 36.1 hardening
+        await this.ensureColumn('marketplace_orders', 'session_id', 'VARCHAR(128) NULL');
+        await this.ensureIndex('marketplace_orders', 'idx_session', 'session_id');
+        await this.ensureColumn('marketplace_orders', 'readiness_json', 'JSON NULL');
+
+        await this.ensureColumn('marketplace_order_files', 'artifact_refs_json', 'JSON NULL');
+        await this.ensureColumn('marketplace_order_files', 'preflight_outcome_category', 'VARCHAR(64) NULL');
+
+        await this.ensureColumn('marketplace_order_preflight_bindings', 'analysis_integrity_json', 'JSON NULL');
+        await this.ensureColumn('marketplace_order_preflight_bindings', 'analyzer_coverage_json', 'JSON NULL');
+        await this.ensureColumn('marketplace_order_preflight_bindings', 'artifact_refs_json', 'JSON NULL');
+
+        console.log('[CONTROL-PLANE-SCHEMA] Phase 36.1 Marketplace Order & File Governance schema ensured successfully.');
+    }
 }
 
 const service = new ControlPlaneSchemaService();

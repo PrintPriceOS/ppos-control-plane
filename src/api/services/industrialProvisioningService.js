@@ -142,6 +142,7 @@ class IndustrialProvisioningService {
             await schemaService.ensureProductionAssetIntakeSchema();
             await schemaService.ensurePaymentInfrastructureSchema();
             await schemaService.ensureMarketplaceOrderIntentsSchema();
+            await schemaService.ensurePhase36OrderSchema();
         } catch (schemaErr) {
             this._logStepError('ensureCoreSchemaRegistry', schemaErr);
         }
