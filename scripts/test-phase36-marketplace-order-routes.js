@@ -21,6 +21,8 @@ const BREAK_GLASS_TOKEN = 'test_break_glass_token_999';
 process.env.PPOS_CONTROL_TOKEN = BREAK_GLASS_TOKEN;
 process.env.ENABLE_BREAK_GLASS_TOKEN = 'true';
 process.env.JWT_SECRET = 'test_jwt_secret_xyz123';
+process.env.PPOS_MARKETPLACE_INTAKE_TOKEN = 'test_marketplace_intake_token_999';
+axios.defaults.headers.common['Authorization'] = `Bearer test_marketplace_intake_token_999`;
 
 const memoryDb = {
     marketplace_orders: [],

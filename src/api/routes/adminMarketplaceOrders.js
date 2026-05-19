@@ -374,4 +374,32 @@ router.post('/:id/handoff/mark-ready', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/marketplace/orders/:id/preflight/bind
+ * Resolves uploaded marketplace files, runs preflight analysis, and binds the jobs.
+ */
+router.post('/:id/preflight/bind', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PREFLIGHT_BIND_REQUESTED]', req.params.id);
+        const bindingService = require('../services/marketplacePreflightBindingService');
+        
+        const options = {
+            policy: req.body?.policy || req.query?.policy || '',
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session',
+            traceId: req.headers['x-trace-id'] || req.body?.traceId || '',
+            requestId: req.headers['x-request-id'] || req.body?.requestId || ''
+        };
+
+        const result = await bindingService.bindPreflightFromMarketplaceFiles(req.params.id, options);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to bind preflight files for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PREFLIGHT_BIND_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
+
