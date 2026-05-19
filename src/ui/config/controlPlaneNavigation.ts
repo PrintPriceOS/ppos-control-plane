@@ -36,7 +36,6 @@ export const navigationConfig: NavItem[] = [
     
     // Operations & Marketplace
     { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
-    { id: 'marketplace-orders', label: 'Marketplace Orders', path: '/ops/marketplace-orders', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     { id: 'financials', label: 'Financial Ops', path: '/ops/financials', icon: 'BanknotesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 

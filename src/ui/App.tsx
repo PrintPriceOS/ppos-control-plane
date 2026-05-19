@@ -165,6 +165,7 @@ export const App: React.FC = () => {
                 {/* EXTENDED OPERATIONS (Restored) */}
                 <Route path="/ops/marketplace" element={<MarketplacePage />} />
                 <Route path="/ops/marketplace-orders" element={<MarketplaceOrdersPage />} />
+                <Route path="/marketplace/orders" element={<Navigate to="/ops/marketplace" replace />} />
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />
