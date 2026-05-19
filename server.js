@@ -49,6 +49,28 @@ fastify.addHook('onRequest', async (request, reply) => {
         !url.startsWith('/api/v2/analytics') &&
         !url.startsWith('/api/connectors/factory')
     ) {
+        // Support X-Marketplace-Token for Phase 36.1 Ingest Bypass
+        const isMarketplaceOrderPath = url === '/api/marketplace/orders' || url.startsWith('/api/marketplace/orders/');
+        if (isMarketplaceOrderPath) {
+            const marketplaceHeaderToken = request.headers['x-marketplace-token'];
+            const configuredMarketplaceToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN;
+
+            if (marketplaceHeaderToken) {
+                if (configuredMarketplaceToken && marketplaceHeaderToken === configuredMarketplaceToken) {
+                    request.log.info({ event: 'MARKETPLACE_INTAKE_TOKEN_ACCEPTED', path: url });
+                    request.user = {
+                        id: 'marketplace-token-actor',
+                        role: 'SUPER_ADMIN',
+                        authMode: 'MARKETPLACE'
+                    };
+                    return;
+                } else {
+                    request.log.warn({ event: 'MARKETPLACE_INTAKE_TOKEN_REJECTED', path: url });
+                    return reply.status(401).send({ error: 'Unauthorized: Invalid Marketplace Intake Token' });
+                }
+            }
+        }
+
         const authHeader = request.headers['authorization'];
         const jwtSecret = process.env.JWT_SECRET;
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
