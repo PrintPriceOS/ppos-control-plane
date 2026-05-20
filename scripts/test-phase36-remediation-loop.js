@@ -115,7 +115,7 @@ function installMockEngine() {
                     return { affectedRows: 1 };
                 }
                 if (cleanSql.includes("status = 'SUPERSEDED'")) {
-                    const fileId = params[0];
+                    const fileId = params.length === 3 ? params[2] : params[0];
                     const file = memoryDb.marketplace_order_files.find(f => f.file_id === fileId);
                     if (file) {
                         file.status = 'SUPERSEDED';

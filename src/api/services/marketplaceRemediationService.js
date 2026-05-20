@@ -184,10 +184,14 @@ async function registerRemediationUpload(orderId, payload = {}, options = {}) {
         const activeFile = activeFiles[0];
         oldFileId = activeFile.file_id;
         previousVersion = activeFile.version || 1;
-        await mysqlClient.query(
-            "UPDATE marketplace_order_files SET status = 'SUPERSEDED', updated_at = NOW() WHERE file_id = ?",
-            [oldFileId]
-        );
+        await mysqlClient.query(`
+            UPDATE marketplace_order_files
+            SET status = 'SUPERSEDED',
+                updated_at = NOW()
+            WHERE order_id = ?
+              AND role = ?
+              AND file_id = ?
+        `, [orderId, role, oldFileId]);
     }
 
     // 4. Compute next version
