@@ -547,5 +547,77 @@ router.post('/:id/remediation/run', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/marketplace/orders/:id/customer-action/create
+ * Creates a customer action for remediation-blocked orders (Phase 36.7).
+ */
+router.post('/:id/customer-action/create', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_CUSTOMER_ACTION_CREATE]', req.params.id);
+        const customerActionService = require('../services/marketplaceCustomerActionService');
+        const payload = req.body || {};
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session',
+            traceId: req.headers['x-trace-id'] || req.headers['trace-id'] || '',
+            requestId: req.headers['x-request-id'] || req.headers['request-id'] || ''
+        };
+        const result = await customerActionService.createCustomerAction(req.params.id, payload, options);
+        if (result.ok === false) {
+            return res.status(422).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to create customer action for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'CUSTOMER_ACTION_CREATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/marketplace/orders/:id/customer-action
+ * Returns the current customer action state for an order (Phase 36.7).
+ */
+router.get('/:id/customer-action', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_CUSTOMER_ACTION_GET]', req.params.id);
+        const customerActionService = require('../services/marketplaceCustomerActionService');
+        const result = await customerActionService.getCustomerAction(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get customer action for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'CUSTOMER_ACTION_GET_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/customer-action/mark-notified
+ * Marks the customer action as notified (Phase 36.7).
+ */
+router.post('/:id/customer-action/mark-notified', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_CUSTOMER_ACTION_MARK_NOTIFIED]', req.params.id);
+        const customerActionService = require('../services/marketplaceCustomerActionService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await customerActionService.markCustomerActionNotified(req.params.id, options);
+        if (result.ok === false) {
+            return res.status(422).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark customer action notified for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'CUSTOMER_ACTION_NOTIFY_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
 

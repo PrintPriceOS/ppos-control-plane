@@ -114,4 +114,65 @@ router.post('/offers', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/marketplace/orders/:orderId/customer-action/:token
+ * Public endpoint — validates the token hash + expiry, returns the customer action payload.
+ * Phase 36.7 — Customer Notification + Reupload UI Handoff.
+ *
+ * No admin auth required: the token IS the auth.
+ * If valid, also marks the action as VIEWED (first access).
+ */
+router.get('/orders/:orderId/customer-action/:token', async (req, res) => {
+    const traceId = req.headers['x-trace-id'] || `trace_${uuidv4()}`;
+
+    try {
+        const { orderId, token } = req.params;
+        console.log(`[MARKETPLACE_PUBLIC][CUSTOMER_ACTION_VALIDATE]`, { orderId, traceId });
+
+        const customerActionService = require('../services/marketplaceCustomerActionService');
+
+        // 1. Validate the token
+        const validation = await customerActionService.validateCustomerToken(orderId, token);
+
+        if (!validation.ok) {
+            const statusCode = validation.error === 'ORDER_NOT_FOUND' ? 404
+                : validation.error === 'TOKEN_EXPIRED' ? 410
+                : 403;
+            return res.status(statusCode).json({
+                success: false,
+                error: validation.error,
+                message: validation.error === 'INVALID_TOKEN' ? 'Access denied: invalid or expired token.'
+                    : validation.error === 'TOKEN_EXPIRED' ? 'This correction link has expired. Please request a new one.'
+                    : 'Unable to process request.',
+                expiredAt: validation.expiredAt || null
+            });
+        }
+
+        // 2. Mark as viewed (idempotent — only updates if not already viewed)
+        try {
+            await customerActionService.markCustomerActionViewed(orderId, token);
+        } catch (viewErr) {
+            // Non-fatal: the customer still gets their action payload
+            console.warn('[MARKETPLACE_PUBLIC][CUSTOMER_ACTION_VIEW_MARK_FAILED]', viewErr.message);
+        }
+
+        // 3. Return the action payload
+        return res.json({
+            success: true,
+            orderId,
+            action: validation.action,
+            currentFiles: validation.currentFiles,
+            trace_id: traceId
+        });
+    } catch (err) {
+        console.error(`[MARKETPLACE_PUBLIC][CUSTOMER_ACTION_FAILED] ${err.message}`, { traceId, stack: err.stack });
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error.',
+            error_code: 'INTERNAL_ERROR',
+            trace_id: traceId
+        });
+    }
+});
+
 module.exports = router;
