@@ -174,7 +174,7 @@ async function registerRemediationUpload(orderId, payload = {}, options = {}) {
 
     // 3. Mark the active file for this slot as SUPERSEDED (preserving all preflight details)
     const activeFiles = await mysqlClient.query(
-        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND role = ? AND status !== 'SUPERSEDED'",
+        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND role = ? AND status <> 'SUPERSEDED'",
         [orderId, role]
     );
 
@@ -260,7 +260,7 @@ async function registerRemediationUpload(orderId, payload = {}, options = {}) {
     const remediationRequestTime = remediation.createdAt ? new Date(remediation.createdAt) : new Date(0);
 
     const freshActiveFiles = await mysqlClient.query(
-        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND status !== 'SUPERSEDED'",
+        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND status <> 'SUPERSEDED'",
         [orderId]
     );
 

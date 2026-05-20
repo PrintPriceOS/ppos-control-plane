@@ -34,6 +34,9 @@ let isMockMode = false;
 function installMockEngine() {
     isMockMode = true;
     db.query = async (sql, params = []) => {
+        if (sql.includes('!==')) {
+            throw new Error('INVALID_SQL_OPERATOR: Use <> or != in SQL, not !==');
+        }
         const cleanSql = sql.replace(/\s+/g, ' ').trim();
         
         // SELECT

@@ -33,6 +33,9 @@ let isMockMode = false;
 function installMockEngine() {
     isMockMode = true;
     db.query = async (sql, params = []) => {
+        if (sql.includes('!==')) {
+            throw new Error('INVALID_SQL_OPERATOR: Use <> or != in SQL, not !==');
+        }
         const cleanSql = sql.replace(/\s+/g, ' ').trim();
         
         // SELECT
@@ -67,10 +70,10 @@ function installMockEngine() {
             if (cleanSql.includes('FROM marketplace_order_preflight_bindings WHERE preflight_job_id = ?')) {
                 return [];
             }
-            if (cleanSql.includes('FROM marketplace_order_files WHERE order_id = ?') && cleanSql.includes('role = ?') && cleanSql.includes("status !== 'SUPERSEDED'")) {
+            if (cleanSql.includes('FROM marketplace_order_files WHERE order_id = ?') && cleanSql.includes('role = ?') && (cleanSql.includes("status <> 'SUPERSEDED'") || cleanSql.includes("status !== 'SUPERSEDED'"))) {
                 return memoryDb.marketplace_order_files.filter(f => f.order_id === params[0] && f.role === params[1] && f.status !== 'SUPERSEDED');
             }
-            if (cleanSql.includes('FROM marketplace_order_files WHERE order_id = ?') && cleanSql.includes("status !== 'SUPERSEDED'")) {
+            if (cleanSql.includes('FROM marketplace_order_files WHERE order_id = ?') && (cleanSql.includes("status <> 'SUPERSEDED'") || cleanSql.includes("status !== 'SUPERSEDED'"))) {
                 return memoryDb.marketplace_order_files.filter(f => f.order_id === params[0] && f.status !== 'SUPERSEDED');
             }
             if (cleanSql.includes('FROM marketplace_order_files WHERE order_id = ?')) {

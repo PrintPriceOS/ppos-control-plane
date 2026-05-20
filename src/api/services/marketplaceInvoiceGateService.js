@@ -49,7 +49,7 @@ async function evaluateMarketplaceInvoiceGate(orderId, options = {}) {
 
     // 3. Load active files for the order
     const files = await mysqlClient.query(
-        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND status !== 'SUPERSEDED'",
+        "SELECT * FROM marketplace_order_files WHERE order_id = ? AND status <> 'SUPERSEDED'",
         [orderId]
     );
 
