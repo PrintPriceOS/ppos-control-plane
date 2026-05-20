@@ -401,5 +401,151 @@ router.post('/:id/preflight/bind', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/marketplace/orders/:id/invoice/evaluate
+ * Evaluates the marketplace invoice gate based on preflight outcome state.
+ */
+router.post('/:id/invoice/evaluate', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_INVOICE_EVALUATE_REQUESTED]', req.params.id);
+        const invoiceGateService = require('../services/marketplaceInvoiceGateService');
+        const options = {
+            evaluatedBy: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await invoiceGateService.evaluateMarketplaceInvoiceGate(req.params.id, options);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to evaluate invoice gate for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'INVOICE_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/invoice/generate
+ * Guarded stub for generating invoices on marketplace orders.
+ */
+router.post('/:id/invoice/generate', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_INVOICE_GENERATE_REQUESTED]', req.params.id);
+        const invoiceGateService = require('../services/marketplaceInvoiceGateService');
+        const options = {
+            evaluatedBy: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await invoiceGateService.evaluateMarketplaceInvoiceGate(req.params.id, options);
+        
+        if (!result.invoiceReady) {
+            return res.status(422).json({
+                ok: false,
+                error: 'INVOICE_BLOCKED',
+                decision: result.decision,
+                blockers: result.blockers,
+                recommendedAction: result.recommendedAction
+            });
+        }
+
+        return res.json({
+            ok: true,
+            message: 'READY_FOR_INVOICE',
+            orderId: req.params.id,
+            decision: result.decision,
+            recommendedAction: result.recommendedAction,
+            phase: '36.5',
+            note: 'Invoice generation logic reserved for Phase 37.'
+        });
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to generate invoice for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'INVOICE_GENERATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/remediation/request
+ * Initiates remediation request for the order intent.
+ */
+router.post('/:id/remediation/request', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_REMEDIATION_REQUESTED]', req.params.id);
+        const remediationService = require('../services/marketplaceRemediationService');
+        const payload = req.body || {};
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session',
+            traceId: req.headers['x-trace-id'] || req.headers['trace-id'] || '',
+            requestId: req.headers['x-request-id'] || req.headers['request-id'] || ''
+        };
+        const result = await remediationService.requestRemediation(req.params.id, payload, options);
+        if (result.ok === false) {
+            if (result.error === 'REMEDIATION_NOT_REQUIRED') {
+                return res.status(422).json(result);
+            }
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request remediation for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'REMEDIATION_REQUEST_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/remediation/reupload
+ * Registers a metadata reupload for remediation.
+ */
+router.post('/:id/remediation/reupload', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_REMEDIATION_REUPLOAD_REGISTERED]', req.params.id);
+        const remediationService = require('../services/marketplaceRemediationService');
+        const payload = req.body || {};
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session',
+            traceId: req.headers['x-trace-id'] || req.headers['trace-id'] || '',
+            requestId: req.headers['x-request-id'] || req.headers['request-id'] || ''
+        };
+        const result = await remediationService.registerRemediationUpload(req.params.id, payload, options);
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to register remediation reupload for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'REMEDIATION_REUPLOAD_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/remediation/run
+ * Runs preflight binding and invoice gate cycle to resolve remediation.
+ */
+router.post('/:id/remediation/run', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_REMEDIATION_CYCLE_RUN]', req.params.id);
+        const remediationService = require('../services/marketplaceRemediationService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session',
+            traceId: req.headers['x-trace-id'] || req.headers['trace-id'] || '',
+            requestId: req.headers['x-request-id'] || req.headers['request-id'] || ''
+        };
+        const result = await remediationService.runRemediationCycle(req.params.id, options);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to run remediation cycle for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'REMEDIATION_CYCLE_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
 

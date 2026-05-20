@@ -174,7 +174,7 @@ async function bindPreflightFromMarketplaceFiles(orderId, options = {}) {
         }
 
         // 3. Resolve file buffer
-        const resolved = await resolveFileBuffer(file);
+        const resolved = await module.exports.resolveFileBuffer(file);
         if (resolved.error) {
             results.push({
                 fileId: file.file_id,
