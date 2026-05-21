@@ -60,4 +60,10 @@ assertContains(routesCode, "'PRINTHOUSE_FILE_DOWNLOAD_DENIED'", "Must log denied
 // 16. fallback to 501
 assertContains(routesCode, "return res.status(501).json({ ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor });", "Must return 501 fallback");
 
+// 17. DB adapter mismatch fix
+if (serviceCode.includes("mysqlClient.getConnection")) {
+    throw new Error("Assertion failed: service must not call mysqlClient.getConnection() directly, use simple queries");
+}
+assertContains(serviceCode, "mysqlClient.query(", "Service must use mysqlClient.query() abstraction");
+
 console.log('✅ All Phase 38.3.1 static tests passed! 🚀');

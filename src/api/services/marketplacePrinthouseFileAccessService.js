@@ -80,15 +80,12 @@ async function createPrinthouseFileAccessToken(orderId, fileId, payload = {}, op
         throw new Error('PHASE38_SECURE_FILE_ACCESS_DISABLED');
     }
 
-    const connection = await mysqlClient.getConnection();
-    await connection.beginTransaction();
-
-    try {
-        const [orders] = await connection.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ? FOR UPDATE', [orderId]);
-        if (!orders || orders.length === 0) throw new Error('ORDER_NOT_FOUND');
-        
-        const metadata = safeParseJson(orders[0].metadata_json, {});
-        const dispatch = checkPackageEligibility(metadata);
+    // Use direct mysqlClient.query instead of transactions to match project pattern
+    const orders = await mysqlClient.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+    if (!orders || orders.length === 0) throw new Error('ORDER_NOT_FOUND');
+    
+    const metadata = safeParseJson(orders[0].metadata_json, {});
+    const dispatch = checkPackageEligibility(metadata);
 
         const file = (dispatch.manifest?.files || []).find(f => f.fileId === fileId);
         if (!file) throw new Error('FILE_NOT_IN_DISPATCH_PACKAGE');
@@ -121,31 +118,23 @@ async function createPrinthouseFileAccessToken(orderId, fileId, payload = {}, op
         }
         metadata.dispatch_package.fileAccessTokens[tokenId] = tokenData;
 
-        await connection.query('UPDATE marketplace_orders SET metadata_json = ? WHERE order_id = ?', [JSON.stringify(metadata), orderId]);
+    await mysqlClient.query('UPDATE marketplace_orders SET metadata_json = ? WHERE order_id = ?', [JSON.stringify(metadata), orderId]);
 
-        await recordPrinthouseFileAccessEvent(orderId, fileId, 'PRINTHOUSE_FILE_ACCESS_TOKEN_CREATED', {
-            packageId: dispatch.packageId,
-            role: file.role,
-            tokenPreview,
-            actor: tokenData.createdBy
-        }, { connection });
+    await recordPrinthouseFileAccessEvent(orderId, fileId, 'PRINTHOUSE_FILE_ACCESS_TOKEN_CREATED', {
+        packageId: dispatch.packageId,
+        role: file.role,
+        tokenPreview,
+        actor: tokenData.createdBy
+    });
 
-        await connection.commit();
-
-        return {
-            ok: true,
-            token: tokenId,
-            tokenPreview,
-            expiresAt: tokenData.expiresAt,
-            maxUses: tokenData.maxUses,
-            downloadUrl: `/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download?token=${tokenId}`
-        };
-    } catch (err) {
-        await connection.rollback();
-        throw err;
-    } finally {
-        connection.release();
-    }
+    return {
+        ok: true,
+        token: tokenId,
+        tokenPreview,
+        expiresAt: tokenData.expiresAt,
+        maxUses: tokenData.maxUses,
+        downloadUrl: `/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download?token=${tokenId}`
+    };
 }
 
 /**
@@ -154,15 +143,10 @@ async function createPrinthouseFileAccessToken(orderId, fileId, payload = {}, op
 async function validatePrinthouseFileAccessToken(token, options = {}) {
     if (!token || !token.startsWith('pfat_')) throw new Error('FILE_ACCESS_TOKEN_INVALID');
 
-    const connection = await mysqlClient.getConnection();
-    if (options.consume) await connection.beginTransaction();
-
-    try {
-        // Find the token across all orders (inefficient but this is for metadata fallback logic as spec'd)
-        // Wait, token payload contains orderId if decoded, but our token is opaque.
-        // For Phase 38, we have to search the metadata_json JSON.
-        const [orders] = await connection.query(`SELECT order_id, metadata_json FROM marketplace_orders WHERE metadata_json LIKE ? ${options.consume ? 'FOR UPDATE' : ''}`, [`%${token}%`]);
-        if (!orders || orders.length === 0) throw new Error('FILE_ACCESS_TOKEN_INVALID');
+    // Use simple query without transactions
+    // Inefficient but matches spec for token fallback lookup
+    const orders = await mysqlClient.query(`SELECT order_id, metadata_json FROM marketplace_orders WHERE metadata_json LIKE ?`, [`%${token}%`]);
+    if (!orders || orders.length === 0) throw new Error('FILE_ACCESS_TOKEN_INVALID');
 
         let targetOrder, targetTokenData, targetMetadata;
         for (const o of orders) {
@@ -189,26 +173,19 @@ async function validatePrinthouseFileAccessToken(token, options = {}) {
         if (!file) throw new Error('FILE_NOT_IN_DISPATCH_PACKAGE');
         if (file.status === 'SUPERSEDED') throw new Error('FILE_SUPERSEDED');
 
-        if (options.consume) {
-            targetTokenData.useCount += 1;
-            targetTokenData.lastUsedAt = Date.now();
-            await connection.query('UPDATE marketplace_orders SET metadata_json = ? WHERE order_id = ?', [JSON.stringify(targetMetadata), targetOrder.order_id]);
-            await connection.commit();
-        }
-
-        return {
-            ok: true,
-            orderId: targetOrder.order_id,
-            file,
-            dispatch,
-            tokenData: targetTokenData
-        };
-    } catch (err) {
-        if (options.consume) await connection.rollback();
-        throw err;
-    } finally {
-        connection.release();
+    if (options.consume) {
+        targetTokenData.useCount += 1;
+        targetTokenData.lastUsedAt = Date.now();
+        await mysqlClient.query('UPDATE marketplace_orders SET metadata_json = ? WHERE order_id = ?', [JSON.stringify(targetMetadata), targetOrder.order_id]);
     }
+
+    return {
+        ok: true,
+        orderId: targetOrder.order_id,
+        file,
+        dispatch,
+        tokenData: targetTokenData
+    };
 }
 
 /**
@@ -253,7 +230,7 @@ async function getPrinthouseFileDownloadDescriptor(orderId, fileId, tokenOrConte
  * Appends audit event.
  */
 async function recordPrinthouseFileAccessEvent(orderId, fileId, eventType, payload = {}, options = {}) {
-    const conn = options.connection || mysqlClient;
+    const conn = mysqlClient;
     const eventId = `evt_${crypto.randomBytes(8).toString('hex')}`;
     
     // Make sure we never log the full token
