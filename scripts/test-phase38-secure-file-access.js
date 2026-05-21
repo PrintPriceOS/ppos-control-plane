@@ -104,4 +104,18 @@ assertContains(routesCode, "'Cache-Control', 'no-store'", "Must set Cache-Contro
 // 7. source preserves FILE_STREAMING_NOT_CONFIGURED fallback.
 assertContains(routesCode, "FILE_STREAMING_NOT_CONFIGURED", "Must preserve streaming not configured fallback");
 
+// 8. new resolver candidates: ${fileId}.pdf and safe originalName
+assertContains(serviceCode, "candidates.push(`${fileId}.pdf`)", "Must try ${fileId}.pdf");
+assertContains(serviceCode, "replace(/[^a-zA-Z0-9.\\-_]/g, '_')", "Must try safe originalName");
+
+// 9. resolver logical path extract
+assertContains(serviceCode, "replace('/api/production-files/download/', '').split('?')[0]", "Must extract ID from logical path");
+
+// 10. magic bytes fallback check
+assertContains(serviceCode, "buffer.toString('utf-8') === '%PDF-'", "Must check PDF magic bytes");
+
+// 11. debug logging
+assertContains(serviceCode, "process.env.PPOS_DEBUG_FILE_RESOLVER === 'true'", "Must have debug toggle");
+assertContains(serviceCode, "logger.info(`[DEBUG]", "Must log candidates in debug");
+
 console.log('✅ All Phase 38.3.3 static tests passed! 🚀');

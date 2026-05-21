@@ -291,22 +291,47 @@ async function resolvePrinthouseFileStorage(orderId, fileId, fileContext, option
         candidates.push(filesRows[0].storage_path);
     }
     
-    // Candidate B: manifest files
-    if (file.storagePath) candidates.push(file.storagePath);
-    if (file.storageRef) candidates.push(file.storageRef);
+    // Candidate B: logical path or explicit storage path
+    let logicalId = null;
+    if (file.storagePath && file.storagePath.startsWith('/api/production-files/download/')) {
+        logicalId = file.storagePath.replace('/api/production-files/download/', '').split('?')[0];
+    } else if (file.storagePath) {
+        candidates.push(file.storagePath);
+    }
+
+    if (logicalId) {
+        candidates.push(`${logicalId}.pdf`);
+        candidates.push(logicalId);
+    }
+
+    candidates.push(`${fileId}.pdf`);
+    candidates.push(fileId);
+
+    if (file.originalName) {
+        const safeName = file.originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        candidates.push(safeName);
+    }
+
+    if (file.storageRef) {
+        candidates.push(`${file.storageRef}.pdf`);
+        candidates.push(file.storageRef);
+    }
+    
+    if (file.storageId) {
+        candidates.push(`${file.storageId}.pdf`);
+        candidates.push(file.storageId);
+    }
 
     let resolvedPath = null;
+
+    if (process.env.PPOS_DEBUG_FILE_RESOLVER === 'true') {
+        logger.info(`[DEBUG] File resolver candidates for ${fileId}:`, candidates);
+    }
 
     for (const candidate of candidates) {
         if (!candidate) continue;
 
         let targetPath = candidate;
-
-        // If candidate is a logical API path, extract id and check against root
-        if (targetPath.startsWith('/api/production-files/download/')) {
-            const logicalId = targetPath.replace('/api/production-files/download/', '').split('?')[0];
-            targetPath = path.join(activeRoot, `${logicalId}.pdf`);
-        }
 
         if (!path.isAbsolute(targetPath)) {
             targetPath = path.join(activeRoot, targetPath);
@@ -317,22 +342,29 @@ async function resolvePrinthouseFileStorage(orderId, fileId, fileContext, option
         if (!targetPath.startsWith(activeRoot + path.sep) && targetPath !== activeRoot) {
             continue; // Escape attempt or outside root
         }
-        
-        // Ensure PDF extension
-        if (!targetPath.toLowerCase().endsWith('.pdf')) {
-            continue;
-        }
 
         if (fs.existsSync(targetPath)) {
             try {
-                // Also verify it's a file
+                // Verify it's a file
                 const stat = await fs.promises.stat(targetPath);
-                if (stat.isFile()) {
+                if (!stat.isFile()) continue;
+
+                if (targetPath.toLowerCase().endsWith('.pdf')) {
                     resolvedPath = targetPath;
                     break;
+                } else {
+                    // allow no-extension candidate if magic bytes start with %PDF-
+                    const fd = await fs.promises.open(targetPath, 'r');
+                    const buffer = Buffer.alloc(5);
+                    await fd.read(buffer, 0, 5, 0);
+                    await fd.close();
+                    if (buffer.toString('utf-8') === '%PDF-') {
+                        resolvedPath = targetPath;
+                        break;
+                    }
                 }
             } catch(e) {
-                // Ignore stat errors
+                // Ignore stat/read errors
             }
         }
     }
