@@ -899,5 +899,123 @@ router.post('/:id/dispatch-package/acknowledge', async (req, res) => {
     }
 });
 
-module.exports = router;
+/**
+ * GET /api/admin/marketplace/orders/:id/printhouse-handoff
+ * Phase 38.1 — Returns full sanitized dispatch package manifest.
+ */
+router.get('/:id/printhouse-handoff', async (req, res) => {
+    try {
+        console.log('[PRINTHOUSE_HANDOFF_GET_REQUESTED]', req.params.id);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
+        const result = await handoffService.getPrinthouseHandoffPackage(req.params.id);
+        if (result.ok === false && result.error === 'HANDOFF_PACKAGE_NOT_FOUND') {
+            return res.status(404).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get handoff package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_HANDOFF_GET_ERROR', message: err.message });
+    }
+});
 
+/**
+ * GET /api/admin/marketplace/orders/:id/printhouse-handoff/timeline
+ * Phase 38.1 — Returns handoff/dispatch related events.
+ */
+router.get('/:id/printhouse-handoff/timeline', async (req, res) => {
+    try {
+        console.log('[PRINTHOUSE_HANDOFF_TIMELINE_REQUESTED]', req.params.id);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
+        const result = await handoffService.getPrinthouseHandoffTimeline(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get handoff timeline for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_HANDOFF_TIMELINE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/printhouse-handoff/accept
+ * Phase 38.1 — Accepts a handoff package.
+ */
+router.post('/:id/printhouse-handoff/accept', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF !== 'true') {
+        return res.status(403).json({ ok: false, error: 'PHASE38_PRINTHOUSE_HANDOFF_DISABLED', message: 'Set PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF=true to enable.' });
+    }
+    try {
+        console.log('[PRINTHOUSE_HANDOFF_ACCEPT_REQUESTED]', req.params.id);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await handoffService.acceptPrinthouseHandoff(req.params.id, req.body || {}, options);
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to accept handoff package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_HANDOFF_ACCEPT_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/printhouse-handoff/reject
+ * Phase 38.1 — Rejects a handoff package (requires reason).
+ */
+router.post('/:id/printhouse-handoff/reject', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF !== 'true') {
+        return res.status(403).json({ ok: false, error: 'PHASE38_PRINTHOUSE_HANDOFF_DISABLED', message: 'Set PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF=true to enable.' });
+    }
+    try {
+        console.log('[PRINTHOUSE_HANDOFF_REJECT_REQUESTED]', req.params.id);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await handoffService.rejectPrinthouseHandoff(req.params.id, req.body || {}, options);
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to reject handoff package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_HANDOFF_REJECT_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/printhouse-handoff/clarification-request
+ * Phase 38.1 — Requests clarification on a handoff package (requires message).
+ */
+router.post('/:id/printhouse-handoff/clarification-request', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF !== 'true') {
+        return res.status(403).json({ ok: false, error: 'PHASE38_PRINTHOUSE_HANDOFF_DISABLED', message: 'Set PPOS_ENABLE_PHASE38_PRINTHOUSE_HANDOFF=true to enable.' });
+    }
+    try {
+        console.log('[PRINTHOUSE_HANDOFF_CLARIFICATION_REQUESTED]', req.params.id);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await handoffService.requestHandoffClarification(req.params.id, req.body || {}, options);
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request clarification for handoff package ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_HANDOFF_CLARIFICATION_ERROR', message: err.message });
+    }
+});
+
+module.exports = router;
