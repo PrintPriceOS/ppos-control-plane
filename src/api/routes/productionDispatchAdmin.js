@@ -67,8 +67,13 @@ if (process.env.NODE_ENV !== 'test') {
  * DECOMMISSIONED: Use /api/admin/manufacturing/queue for validated production vs. seed filtered intelligence.
  * Retained temporarily as a legacy fallback.
  */
+let decommissionedRouteWarned = false;
+
 router.get('/', requireAdmin, async (req, res) => {
-    console.warn('[DECOMMISSIONED-ROUTE] GET /api/admin/dispatch accessed. Migrate consumer to /api/admin/manufacturing/queue.');
+    if (!decommissionedRouteWarned) {
+        console.warn('[DECOMMISSIONED-ROUTE] GET /api/admin/dispatch accessed. Migrate consumer to /api/admin/manufacturing/queue.');
+        decommissionedRouteWarned = true;
+    }
     try {
         const dispatches = await orchestrationService.getDispatches().catch(() => null);
         res.json({ 

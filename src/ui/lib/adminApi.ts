@@ -953,7 +953,12 @@ export async function getManufacturingQueue(includeSeeds?: boolean) {
 }
 
 export async function getDispatches() {
-    return adminFetch<{ ok: boolean, dispatches: any[] }>(`/api/admin/dispatch`);
+    const res = await adminFetch<any>(`/api/admin/manufacturing/queue`);
+    // Map manufacturing/queue jobs to dispatches for backward compatibility with older UI
+    if (res && res.jobs) {
+        return { ok: res.ok, dispatches: res.jobs };
+    }
+    return { ok: res?.ok ?? false, dispatches: [] };
 }
 
 export async function getDispatchDetail(id: string) {

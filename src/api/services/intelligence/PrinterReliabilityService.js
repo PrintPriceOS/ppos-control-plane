@@ -25,7 +25,7 @@ class PrinterReliabilityService {
       logger.info({ event: 'recalibration_complete', nodes_processed: count });
       return count;
     } catch (err) {
-      logger.error({ event: 'recalibration_failed', error: err.message });
+      logger.warn({ event: 'recalibration_failed', error: err.message });
       throw err;
     }
   }

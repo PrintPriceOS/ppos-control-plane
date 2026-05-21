@@ -20,6 +20,11 @@ class IndustrialEventOrchestrationService {
    * Initialize workers for consuming events.
    */
   async init() {
+    if (process.env.PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS !== 'true' && !process.env.REDIS_URL && !process.env.AMQP_URL) {
+      logger.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers skipped: worker connection not configured.');
+      return;
+    }
+
     logger.info('[INDUSTRIAL-ORCHESTRATION] Initializing industrial event consumers...');
 
     // Consume Telemetry Heartbeats

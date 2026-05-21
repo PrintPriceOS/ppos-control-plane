@@ -41,7 +41,7 @@ class AutonomousRerouteService {
           if (ok) results.successfullyRerouted++;
           else results.failedToReroute++;
         } catch (err) {
-          logger.error({ event: 'reroute_dispatch_failed', dispatchId: dispatch.id, error: err.message });
+          logger.warn({ event: 'max_reroutes_exceeded', dispatchId: dispatch.id });
           results.failedToReroute++;
         }
       }
