@@ -16,10 +16,16 @@ const dispatchAdminContent = fs.readFileSync(path.join(__dirname, '../src/api/ro
 assert(dispatchAdminContent.includes('decommissionedRouteWarned = true'), "Decommissioned route warning must be rate-limited");
 console.log('✅ Decommissioned route warning rate-limited');
 
-// 3. Verify worker init guard
+// 3. Verify worker init guard & circular dependency avoidance
 const orchestrationServiceContent = fs.readFileSync(path.join(__dirname, '../src/api/services/IndustrialEventOrchestrationService.js'), 'utf-8');
-assert(orchestrationServiceContent.includes('Consumers skipped: worker connection not configured'), "Worker should skip gracefully when no connection");
-console.log('✅ Industrial Event Orchestration worker guard verified');
+
+assert(orchestrationServiceContent.includes("PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS !== 'true'"), "Must check PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS env var precisely");
+assert(orchestrationServiceContent.includes("return { skipped: true }"), "Must return skipped when not enabled");
+assert(orchestrationServiceContent.includes("throw new Error('Worker requires a connection')"), "Must throw when worker enabled but no connection");
+assert(!orchestrationServiceContent.match(/^const\s+{.*circuitBreakerService.*}\s*=\s*require/m), "Must not destructure circuitBreakerService at top level");
+assert(!orchestrationServiceContent.match(/^const\s+{.*connection.*}\s*=\s*require/m), "Must not destructure connection at top level");
+assert(orchestrationServiceContent.includes("// Lazy load @ppos/shared-infra"), "Must explain lazy load usage");
+console.log('✅ Industrial Event Orchestration worker guard & lazy-require verified');
 
 // 4. Verify autonomous error severities
 const errorFiles = [

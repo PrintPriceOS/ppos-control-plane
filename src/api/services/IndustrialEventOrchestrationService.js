@@ -1,9 +1,4 @@
-const { 
-  publishIndustrialEvent, 
-  INDUSTRIAL_EVENT_TYPES, 
-  createIndustrialEventWorker,
-  INDUSTRIAL_QUEUE_NAMES
-} = require('@ppos/shared-infra');
+// Lazy load @ppos/shared-infra to prevent circular dependency warnings at boot
 const logger = require('./logger');
 
 /**
@@ -20,10 +15,17 @@ class IndustrialEventOrchestrationService {
    * Initialize workers for consuming events.
    */
   async init() {
-    if (process.env.PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS !== 'true' && !process.env.REDIS_URL && !process.env.AMQP_URL) {
-      logger.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers skipped: worker connection not configured.');
-      return;
+    if (process.env.PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS !== 'true') {
+      logger.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers skipped: PPOS_ENABLE_INDUSTRIAL_EVENT_WORKERS is not enabled.');
+      return { skipped: true };
     }
+
+    if (!process.env.REDIS_URL && !process.env.AMQP_URL) {
+      logger.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Async init failed: Worker requires a connection');
+      throw new Error('Worker requires a connection');
+    }
+
+    const { createIndustrialEventWorker, INDUSTRIAL_QUEUE_NAMES } = require('@ppos/shared-infra');
 
     logger.info('[INDUSTRIAL-ORCHESTRATION] Initializing industrial event consumers...');
 
@@ -49,38 +51,47 @@ class IndustrialEventOrchestrationService {
   // --- PUBLISHERS ---
 
   async publishDispatchRequested(dispatchData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_REQUESTED, dispatchData, options);
   }
 
   async publishDispatchAssigned(dispatchData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_ASSIGNED, dispatchData, options);
   }
 
   async publishDispatchStatusChanged(dispatchData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_STATUS_CHANGED, dispatchData, options);
   }
 
   async publishDispatchCompleted(dispatchData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_COMPLETED, dispatchData, options);
   }
 
   async publishDispatchFailed(dispatchData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_FAILED, dispatchData, options);
   }
 
   async publishCapacityReserved(reservationData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_CAPACITY_RESERVED, reservationData, options);
   }
 
   async publishCapacityReleased(reservationData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.MANUFACTURING_CAPACITY_RELEASED, reservationData, options);
   }
 
   async publishPreflightRequired(preflightData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.PREFLIGHT_JOB_REQUESTED, preflightData, options);
   }
 
   async publishTelemetrySnapshot(snapshotData, options = {}) {
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     return this._publish(INDUSTRIAL_EVENT_TYPES.TELEMETRY_HEARTBEAT, snapshotData, options);
   }
 
@@ -89,6 +100,7 @@ class IndustrialEventOrchestrationService {
    */
   async _publish(type, payload, options = {}) {
     try {
+      const { publishIndustrialEvent } = require('@ppos/shared-infra');
       const result = await publishIndustrialEvent(type, payload, {
         trace_id: options.trace_id || options.traceId,
         correlation_id: options.correlation_id || options.correlationId,
@@ -133,6 +145,7 @@ class IndustrialEventOrchestrationService {
 
   async consumeDispatchRequested(event) {
     const { type, payload, trace_id } = event;
+    const { INDUSTRIAL_EVENT_TYPES } = require('@ppos/shared-infra');
     if (type !== INDUSTRIAL_EVENT_TYPES.MANUFACTURING_DISPATCH_REQUESTED) return;
 
     logger.info({ type: 'INDUSTRIAL-EVENT-CONSUMED', eventType: type, trace_id }, `[INDUSTRIAL-EVENT-CONSUMED] ${type}`);
