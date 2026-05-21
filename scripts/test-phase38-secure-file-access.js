@@ -58,7 +58,7 @@ assertContains(serviceCode, "if (payload.token) {\n        delete payload.token;
 assertContains(routesCode, "'PRINTHOUSE_FILE_DOWNLOAD_DENIED'", "Must log denied event");
 
 // 16. fallback to 501
-assertContains(routesCode, "return res.status(501).json({ ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor });", "Must return 501 fallback");
+assertContains(routesCode, "return res.status(501).json({ ok: false, error: storageErr.message, orderId: req.params.id, fileId: req.params.fileId, descriptor });", "Must return 501 fallback");
 
 // 17. DB adapter mismatch fix
 if (serviceCode.includes("mysqlClient.getConnection")) {
@@ -74,4 +74,34 @@ assertContains(serviceCode, "INSERT INTO marketplace_order_events", "Must insert
 assertContains(serviceCode, "payload_json", "Must use payload_json column");
 assertContains(serviceCode, "JSON.stringify(payload)", "Must stringify payload before insertion");
 
-console.log('✅ All Phase 38.3.1 static tests passed! 🚀');
+console.log('✅ All Phase 38.3.1 static tests passed!');
+
+console.log('Running Phase 38.3.3 Secure File Streaming Tests...');
+
+// 1. source includes resolvePrinthouseFileStorage.
+assertContains(serviceCode, "resolvePrinthouseFileStorage", "Must implement resolvePrinthouseFileStorage");
+
+// 2. source uses PPOS_SECURE_FILE_STORAGE_ROOT / PPOS_PRODUCTION_FILES_ROOT.
+assertContains(serviceCode, "PPOS_SECURE_FILE_STORAGE_ROOT", "Must use secure file root env");
+assertContains(serviceCode, "PPOS_PRODUCTION_FILES_ROOT", "Must use fallback production files root env");
+
+// 3. source contains /opt/printprice-os/storage/production-files fallback.
+assertContains(serviceCode, "/opt/printprice-os/storage/production-files", "Must use absolute fallback path");
+
+// 4. source uses path.resolve containment check.
+assertContains(serviceCode, "path.resolve", "Must use path.resolve for normalization");
+assertContains(serviceCode, "startsWith(activeRoot + path.sep)", "Must verify path containment");
+
+// 5. source uses fs.createReadStream in route or service.
+assertContains(routesCode, "fs.createReadStream", "Must stream using fs.createReadStream");
+
+// 6. response headers include strict settings
+assertContains(routesCode, "'Content-Type', 'application/pdf'", "Must set PDF Content-Type");
+assertContains(routesCode, "'Content-Disposition', `attachment; filename=", "Must set Content-Disposition attachment");
+assertContains(routesCode, "'X-PPOS-File-Access', 'governed'", "Must set X-PPOS-File-Access");
+assertContains(routesCode, "'Cache-Control', 'no-store'", "Must set Cache-Control no-store");
+
+// 7. source preserves FILE_STREAMING_NOT_CONFIGURED fallback.
+assertContains(routesCode, "FILE_STREAMING_NOT_CONFIGURED", "Must preserve streaming not configured fallback");
+
+console.log('✅ All Phase 38.3.3 static tests passed! 🚀');

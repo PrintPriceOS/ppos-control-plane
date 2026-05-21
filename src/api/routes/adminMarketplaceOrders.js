@@ -1102,15 +1102,44 @@ router.get('/:id/printhouse-handoff/files/:fileId/download', async (req, res) =>
             return res.status(403).json({ ok: false, error: 'FILE_ACCESS_TOKEN_INVALID' });
         }
 
-        // Get descriptor to return alongside the 501
+        // Get descriptor to return alongside the 501 or for reference
         const descriptor = await fileAccessService.getPrinthouseFileDownloadDescriptor(req.params.id, req.params.fileId, context, { actor: 'download-agent' });
         
         // Log started
         await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_STARTED', { tokenPreview: context.tokenData.tokenPreview });
 
-        // Fallback fail-safe behavior for this phase
-        await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_COMPLETED', { tokenPreview: context.tokenData.tokenPreview, simulated: true });
-        return res.status(501).json({ ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor });
+        const fs = require('fs');
+        
+        try {
+            const resolvedPath = await fileAccessService.resolvePrinthouseFileStorage(req.params.id, req.params.fileId, context);
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${descriptor.originalName.replace(/"/g, '')}"`);
+            res.setHeader('X-PPOS-File-Access', 'governed');
+            res.setHeader('Cache-Control', 'no-store');
+
+            const stream = fs.createReadStream(resolvedPath);
+            stream.pipe(res);
+            
+            stream.on('end', async () => {
+                await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_COMPLETED', { tokenPreview: context.tokenData.tokenPreview });
+            });
+            stream.on('error', async (err) => {
+                await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_DENIED', { reason: 'Stream error', tokenPreview: context.tokenData.tokenPreview });
+                if (!res.headersSent) {
+                    res.status(500).json({ ok: false, error: 'STREAM_ERROR' });
+                }
+            });
+            return; // response handled by stream
+            
+        } catch (storageErr) {
+            await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_COMPLETED', { tokenPreview: context.tokenData.tokenPreview, simulated: true, outcome: storageErr.message });
+            
+            if (storageErr.message === 'FILE_STREAMING_NOT_CONFIGURED' || storageErr.message === 'FILE_NOT_FOUND_IN_STORAGE' || storageErr.message === 'FILE_STORAGE_NOT_RESOLVED') {
+                return res.status(501).json({ ok: false, error: storageErr.message, orderId: req.params.id, fileId: req.params.fileId, descriptor });
+            }
+            throw storageErr;
+        }
 
     } catch (err) {
         if (err.message.includes('INVALID') || err.message.includes('EXPIRED') || err.message.includes('REVOKED') || err.message.includes('EXCEEDED')) {

@@ -7,6 +7,8 @@
 const mysqlClient = require('./mysqlClient');
 const crypto = require('crypto');
 const logger = require('./logger').child('printhouse-file-access');
+const fs = require('fs');
+const path = require('path');
 
 function safeParseJson(str, fallback = {}) {
     if (!str) return fallback;
@@ -260,10 +262,93 @@ async function recordPrinthouseFileAccessEvent(orderId, fileId, eventType, paylo
     await conn.query(query, queryParams);
 }
 
+/**
+ * Resolves a safe absolute physical path for file streaming.
+ */
+async function resolvePrinthouseFileStorage(orderId, fileId, fileContext, options = {}) {
+    // 1. Determine allowed root
+    const allowedRoot = process.env.PPOS_SECURE_FILE_STORAGE_ROOT || process.env.PPOS_PRODUCTION_FILES_ROOT;
+    const defaultRoot = '/opt/printprice-os/storage/production-files';
+    
+    let activeRoot = allowedRoot;
+    if (!activeRoot) {
+        if (fs.existsSync(defaultRoot)) {
+            activeRoot = defaultRoot;
+        } else {
+            throw new Error('FILE_STREAMING_NOT_CONFIGURED');
+        }
+    }
+    
+    // Normalize root to absolute
+    activeRoot = path.resolve(activeRoot);
+
+    const { file, dispatch } = fileContext;
+    let candidates = [];
+
+    // Candidate A: marketplace_order_files.storage_path
+    const filesRows = await mysqlClient.query('SELECT storage_path FROM marketplace_order_files WHERE order_id = ? AND file_id = ?', [orderId, fileId]);
+    if (filesRows && filesRows.length > 0 && filesRows[0].storage_path) {
+        candidates.push(filesRows[0].storage_path);
+    }
+    
+    // Candidate B: manifest files
+    if (file.storagePath) candidates.push(file.storagePath);
+    if (file.storageRef) candidates.push(file.storageRef);
+
+    let resolvedPath = null;
+
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+
+        let targetPath = candidate;
+
+        // If candidate is a logical API path, extract id and check against root
+        if (targetPath.startsWith('/api/production-files/download/')) {
+            const logicalId = targetPath.replace('/api/production-files/download/', '').split('?')[0];
+            targetPath = path.join(activeRoot, `${logicalId}.pdf`);
+        }
+
+        if (!path.isAbsolute(targetPath)) {
+            targetPath = path.join(activeRoot, targetPath);
+        }
+
+        // Normalize and defend against traversal
+        targetPath = path.resolve(targetPath);
+        if (!targetPath.startsWith(activeRoot + path.sep) && targetPath !== activeRoot) {
+            continue; // Escape attempt or outside root
+        }
+        
+        // Ensure PDF extension
+        if (!targetPath.toLowerCase().endsWith('.pdf')) {
+            continue;
+        }
+
+        if (fs.existsSync(targetPath)) {
+            try {
+                // Also verify it's a file
+                const stat = await fs.promises.stat(targetPath);
+                if (stat.isFile()) {
+                    resolvedPath = targetPath;
+                    break;
+                }
+            } catch(e) {
+                // Ignore stat errors
+            }
+        }
+    }
+
+    if (!resolvedPath) {
+        throw new Error('FILE_NOT_FOUND_IN_STORAGE');
+    }
+
+    return resolvedPath;
+}
+
 module.exports = {
     listPackageFiles,
     createPrinthouseFileAccessToken,
     validatePrinthouseFileAccessToken,
     getPrinthouseFileDownloadDescriptor,
-    recordPrinthouseFileAccessEvent
+    recordPrinthouseFileAccessEvent,
+    resolvePrinthouseFileStorage
 };
