@@ -385,7 +385,16 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                                     
                                                                     {fState.descriptor && (
                                                                         <div className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-white/10 p-2 font-mono text-[9px] text-slate-600 dark:text-slate-400 overflow-x-auto">
-                                                                            <pre>{JSON.stringify(fState.descriptor, null, 2)}</pre>
+                                                                            <pre>
+                                                                                {JSON.stringify(
+                                                                                    {
+                                                                                        ...fState.descriptor,
+                                                                                        downloadUrl: fState.descriptor.downloadUrl?.replace(/token=pfat_[a-zA-Z0-9]+/, `token=${fState.tokenPreview}`)
+                                                                                    },
+                                                                                    null,
+                                                                                    2
+                                                                                )}
+                                                                            </pre>
                                                                         </div>
                                                                     )}
                                                                 </div>
