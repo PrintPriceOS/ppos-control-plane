@@ -231,28 +231,33 @@ async function getPrinthouseFileDownloadDescriptor(orderId, fileId, tokenOrConte
  */
 async function recordPrinthouseFileAccessEvent(orderId, fileId, eventType, payload = {}, options = {}) {
     const conn = mysqlClient;
-    const eventId = `evt_${crypto.randomBytes(8).toString('hex')}`;
+    const eventId = `evt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     
     // Make sure we never log the full token
     if (payload.token) {
         delete payload.token;
     }
 
-    const eventObj = {
-        event_id: eventId,
-        event_type: eventType,
-        timestamp: new Date().toISOString(),
-        order_id: orderId,
-        file_id: fileId,
-        payload
-    };
+    const query = `
+        INSERT INTO marketplace_order_events 
+        (event_id, order_id, file_id, type, actor_type, actor_id, payload_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
 
-    const orders = await conn.query('SELECT events_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
-    if (orders && orders.length > 0) {
-        const events = safeParseJson(orders[0].events_json, []);
-        events.push(eventObj);
-        await conn.query('UPDATE marketplace_orders SET events_json = ? WHERE order_id = ?', [JSON.stringify(events), orderId]);
-    }
+    const actorId = payload.actor || 'SYSTEM';
+    const actorType = actorId === 'SYSTEM' || actorId === 'control-plane-admin' || actorId === 'download-agent' ? 'SYSTEM' : 'USER';
+    
+    const queryParams = [
+        eventId,
+        orderId,
+        fileId || null,
+        eventType,
+        actorType,
+        actorId,
+        JSON.stringify(payload)
+    ];
+
+    await conn.query(query, queryParams);
 }
 
 module.exports = {

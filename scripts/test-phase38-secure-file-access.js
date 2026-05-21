@@ -66,4 +66,12 @@ if (serviceCode.includes("mysqlClient.getConnection")) {
 }
 assertContains(serviceCode, "mysqlClient.query(", "Service must use mysqlClient.query() abstraction");
 
+// 18. events_json mismatch fix
+if (serviceCode.includes("events_json")) {
+    throw new Error("Assertion failed: service must not use events_json column");
+}
+assertContains(serviceCode, "INSERT INTO marketplace_order_events", "Must insert into marketplace_order_events directly");
+assertContains(serviceCode, "payload_json", "Must use payload_json column");
+assertContains(serviceCode, "JSON.stringify(payload)", "Must stringify payload before insertion");
+
 console.log('✅ All Phase 38.3.1 static tests passed! 🚀');
