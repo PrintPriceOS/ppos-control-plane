@@ -9,9 +9,10 @@ import {
 import { OrderIntakeTab } from "./OrderIntakeTab";
 import { PricingSessionsTab } from "./PricingSessionsTab";
 import { ProductionReadinessTab } from "./ProductionReadinessTab";
+import { MarketplacePrinthouseHandoffTab } from "./MarketplacePrinthouseHandoffTab";
 import { MarketplaceAuditTab } from "./MarketplaceAuditTab";
 
-type MarketplaceSubTab = "intake" | "sessions" | "readiness" | "audit";
+type MarketplaceSubTab = "intake" | "sessions" | "readiness" | "handoff" | "audit";
 
 export const MarketplacePage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<MarketplaceSubTab>("intake");
@@ -20,6 +21,7 @@ export const MarketplacePage: React.FC = () => {
         { id: "intake", label: "Order Intake", icon: InboxStackIcon },
         { id: "sessions", label: "Pricing Sessions", icon: BuildingStorefrontIcon },
         { id: "readiness", label: "Production Readiness", icon: ClipboardDocumentCheckIcon },
+        { id: "handoff", label: "Printhouse Handoff", icon: ClipboardDocumentCheckIcon },
         { id: "audit", label: "Audit / Events", icon: ShieldCheckIcon },
     ];
 
@@ -60,6 +62,7 @@ export const MarketplacePage: React.FC = () => {
                 {activeTab === "intake" && <OrderIntakeTab />}
                 {activeTab === "sessions" && <PricingSessionsTab />}
                 {activeTab === "readiness" && <ProductionReadinessTab />}
+                {activeTab === "handoff" && <MarketplacePrinthouseHandoffTab />}
                 {activeTab === "audit" && <MarketplaceAuditTab />}
             </div>
         </div>

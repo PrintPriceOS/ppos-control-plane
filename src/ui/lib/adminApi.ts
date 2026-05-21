@@ -2174,8 +2174,45 @@ export async function markMarketplaceOrderPaymentBlocked(id: string, reason: str
 }
 
 export async function prepareMarketplaceOrderHandoff(id: string) {
-    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/handoff/prepare`, {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${id}/handoff/prepare`, {
         method: 'POST'
+    });
+}
+
+// --- Phase 38.1 Printhouse Handoff Packages ---
+export async function listPrinthouseHandoffPackages(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    if (filters.status) qs.set("status", filters.status);
+    if (filters.printhouseId) qs.set("printhouseId", filters.printhouseId);
+    return adminFetch<any>(`/api/admin/marketplace/printhouse-handoff/packages?${qs.toString()}`);
+}
+
+export async function getPrinthouseHandoffPackage(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff`);
+}
+
+export async function getPrinthouseHandoffTimeline(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/timeline`);
+}
+
+export async function acceptPrinthouseHandoff(orderId: string, payload: { operatorId?: string; note?: string } = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/accept`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function rejectPrinthouseHandoff(orderId: string, payload: { reason: string; operatorId?: string }) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/reject`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function requestHandoffClarification(orderId: string, payload: { message: string; operatorId?: string }) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/clarification-request`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
     });
 }
 
