@@ -425,42 +425,126 @@ router.post('/:id/invoice/evaluate', async (req, res) => {
 
 /**
  * POST /api/admin/marketplace/orders/:id/invoice/generate
- * Guarded stub for generating invoices on marketplace orders.
+ * Phase 37.1 — Evaluates invoice gate, issues invoice, and creates bank-transfer
+ * payment instructions in one atomic call.
+ *
+ * Replaces the Phase 36.5 stub.  Requires PPOS_ENABLE_PHASE37_PAYMENT=true.
+ *
+ * Returns HTTP 422 INVOICE_BLOCKED if the order is not ready.
  */
 router.post('/:id/invoice/generate', async (req, res) => {
     try {
         console.log('[MARKETPLACE_INVOICE_GENERATE_REQUESTED]', req.params.id);
-        const invoiceGateService = require('../services/marketplaceInvoiceGateService');
+        const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
         const options = {
-            evaluatedBy: req.user?.id || req.session?.userId || 'break-glass-session'
+            issuedBy: req.user?.id || req.session?.userId || 'break-glass-session',
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
         };
-        const result = await invoiceGateService.evaluateMarketplaceInvoiceGate(req.params.id, options);
-        
-        if (!result.invoiceReady) {
-            return res.status(422).json({
-                ok: false,
-                error: 'INVOICE_BLOCKED',
-                decision: result.decision,
-                blockers: result.blockers,
-                recommendedAction: result.recommendedAction
-            });
-        }
+        // generateMarketplaceInvoice + requestMarketplacePaymentLink chained
+        const result = await invoicePaymentService.requestMarketplacePaymentLink(req.params.id, options);
 
-        return res.json({
-            ok: true,
-            message: 'READY_FOR_INVOICE',
-            orderId: req.params.id,
-            decision: result.decision,
-            recommendedAction: result.recommendedAction,
-            phase: '36.5',
-            note: 'Invoice generation logic reserved for Phase 37.'
-        });
+        if (result.ok === false && result.error === 'INVOICE_BLOCKED') {
+            return res.status(422).json(result);
+        }
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
     } catch (err) {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to generate invoice for ${req.params.id}:`, err);
         if (err.message === 'ORDER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
         }
+        if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
+            return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
+        }
         return res.status(500).json({ ok: false, error: 'INVOICE_GENERATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/marketplace/orders/:id/invoice/status
+ * Phase 37.1 — Returns sanitized invoice + payment state.
+ * Read access; does NOT require PPOS_ENABLE_PHASE37_PAYMENT flag.
+ */
+router.get('/:id/invoice/status', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_INVOICE_STATUS_REQUESTED]', req.params.id);
+        const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+        const result = await invoicePaymentService.getMarketplaceInvoicePaymentStatus(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get invoice status for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'INVOICE_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/payment/request-link
+ * Phase 37.1 — Idempotently creates or returns bank-transfer payment instructions.
+ * Requires PPOS_ENABLE_PHASE37_PAYMENT=true.
+ */
+router.post('/:id/payment/request-link', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PAYMENT_LINK_REQUESTED]', req.params.id);
+        const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+        const options = {
+            requestedBy: req.user?.id || req.session?.userId || 'break-glass-session',
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await invoicePaymentService.requestMarketplacePaymentLink(req.params.id, options);
+        if (result.ok === false && result.error === 'INVOICE_BLOCKED') {
+            return res.status(422).json(result);
+        }
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request payment link for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
+            return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
+        }
+        return res.status(500).json({ ok: false, error: 'PAYMENT_LINK_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/payment/mark-confirmed
+ * Phase 37.1 — Manual/admin confirmation of bank transfer payment.
+ * Requires PPOS_ENABLE_PHASE37_PAYMENT=true.
+ */
+router.post('/:id/payment/mark-confirmed', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_PAYMENT_CONFIRM_REQUESTED]', req.params.id);
+        const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+        const payload = {
+            providerReference: req.body?.providerReference || req.body?.provider_reference || null,
+            confirmedBy: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await invoicePaymentService.markMarketplacePaymentConfirmed(req.params.id, payload, options);
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to confirm payment for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
+            return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
+        }
+        return res.status(500).json({ ok: false, error: 'PAYMENT_CONFIRM_ERROR', message: err.message });
     }
 });
 
