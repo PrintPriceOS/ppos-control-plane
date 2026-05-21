@@ -64,8 +64,17 @@ async function evaluateDispatchPackageReadiness(orderId, options = {}) {
     if (payment.status !== 'PAYMENT_CONFIRMED') blockers.push('PAYMENT_NOT_CONFIRMED');
 
     // 2. Readiness Conditions
-    if (readiness.blockers && readiness.blockers.length > 0) blockers.push('READINESS_BLOCKERS_EXIST');
-    if (readiness.invoiceGateBlockers && readiness.invoiceGateBlockers.length > 0) blockers.push('INVOICE_GATE_BLOCKERS_EXIST');
+    if (Array.isArray(readiness.blockers) && readiness.blockers.length > 0) {
+        blockers.push('READINESS_BLOCKERS_EXIST');
+    }
+    
+    if (Array.isArray(readiness.invoiceGateBlockers) && readiness.invoiceGateBlockers.length > 0) {
+        blockers.push('INVOICE_GATE_BLOCKERS_EXIST');
+    }
+
+    if (readiness.invoiceGateDecision && !['READY_FOR_INVOICE', 'READY_FOR_INVOICE_WITH_OVERRIDE', 'READY_TO_INVOICE'].includes(readiness.invoiceGateDecision)) {
+        blockers.push('INVOICE_GATE_NOT_READY');
+    }
 
     // 3. File Conditions
     const files = await mysqlClient.query(

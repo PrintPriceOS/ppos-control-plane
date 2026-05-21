@@ -238,6 +238,31 @@ async function runTests() {
         assert.equal(res.dispatchPackage.status, 'DISPATCH_PACKAGE_CREATED');
         console.log('✅ Test 15: status route returns sanitized dispatch_package state');
 
+        // Test 16: readiness.ready=false with invoiceGateDecision READY_FOR_INVOICE and empty blockers must pass
+        resetMocks();
+        mockOrderRecord = buildMockOrder(validMetadata, { ready: false, invoiceGateDecision: 'READY_FOR_INVOICE', blockers: [] });
+        mockFiles = buildMockFiles();
+        res = await dispatchService.evaluateDispatchPackageReadiness('ord_mock');
+        assert.equal(res.dispatchReady, true);
+        console.log('✅ Test 16: readiness.ready=false with valid gate and empty blockers passes');
+
+        // Test 17: readiness.statusSuggestion=DRAFT with valid production unlock/payment/files must pass
+        resetMocks();
+        mockOrderRecord = buildMockOrder(validMetadata, { statusSuggestion: 'DRAFT', blockers: [] });
+        mockFiles = buildMockFiles();
+        res = await dispatchService.evaluateDispatchPackageReadiness('ord_mock');
+        assert.equal(res.dispatchReady, true);
+        console.log('✅ Test 17: readiness.statusSuggestion=DRAFT with valid data passes');
+
+        // Test 18: non-empty invoiceGateDecision blocks if not READY_FOR_INVOICE
+        resetMocks();
+        mockOrderRecord = buildMockOrder(validMetadata, { invoiceGateDecision: 'BLOCKED_BY_SOMETHING', blockers: [] });
+        mockFiles = buildMockFiles();
+        res = await dispatchService.evaluateDispatchPackageReadiness('ord_mock');
+        assert.equal(res.dispatchReady, false);
+        assert.ok(res.blockers.includes('INVOICE_GATE_NOT_READY'));
+        console.log('✅ Test 18: non-empty invoiceGateDecision blocks if not valid');
+
         console.log('\nAll mock tests passed successfully.');
     } catch (err) {
         console.error('❌ Test failed:', err);
