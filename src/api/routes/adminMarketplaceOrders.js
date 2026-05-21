@@ -1018,4 +1018,112 @@ router.post('/:id/printhouse-handoff/clarification-request', async (req, res) =>
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/printhouse-handoff/files
+ * Phase 38.3.1 — Read-only list of sanitized manifest files.
+ */
+router.get('/:id/printhouse-handoff/files', async (req, res) => {
+    try {
+        const fileAccessService = require('../services/marketplacePrinthouseFileAccessService');
+        const files = await fileAccessService.listPackageFiles(req.params.id);
+        return res.json({ ok: true, files });
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'HANDOFF_PACKAGE_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRINTHOUSE_FILE_LIST_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/printhouse-handoff/files/:fileId/access-token
+ * Phase 38.3.1 — Generates a short-lived file access token.
+ */
+router.post('/:id/printhouse-handoff/files/:fileId/access-token', async (req, res) => {
+    try {
+        const fileAccessService = require('../services/marketplacePrinthouseFileAccessService');
+        const options = { connection: req.transactionConnection };
+        const payload = { actor: req.user?.id || req.session?.userId || 'control-plane-admin', ...req.body };
+        const result = await fileAccessService.createPrinthouseFileAccessToken(req.params.id, req.params.fileId, payload, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'PHASE38_SECURE_FILE_ACCESS_DISABLED') {
+            return res.status(403).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'PACKAGE_NOT_ELIGIBLE_FOR_FILE_ACCESS' || err.message === 'FILE_NOT_IN_DISPATCH_PACKAGE' || err.message === 'FILE_SUPERSEDED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'ORDER_NOT_FOUND') return res.status(404).json({ ok: false, error: err.message });
+        return res.status(500).json({ ok: false, error: 'TOKEN_CREATION_ERROR', message: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/marketplace/orders/:id/printhouse-handoff/files/:fileId/download-descriptor
+ * Phase 38.3.1 — Returns a sanitized download descriptor.
+ */
+router.get('/:id/printhouse-handoff/files/:fileId/download-descriptor', async (req, res) => {
+    try {
+        const token = req.query.token;
+        if (!token) return res.status(400).json({ ok: false, error: 'MISSING_TOKEN' });
+
+        const fileAccessService = require('../services/marketplacePrinthouseFileAccessService');
+        const actor = req.user?.id || req.session?.userId || 'control-plane-admin';
+        const descriptor = await fileAccessService.getPrinthouseFileDownloadDescriptor(req.params.id, req.params.fileId, token, { actor });
+        return res.json(descriptor);
+    } catch (err) {
+        if (err.message.includes('INVALID') || err.message.includes('EXPIRED') || err.message.includes('REVOKED') || err.message.includes('EXCEEDED')) {
+            return res.status(403).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'PACKAGE_NOT_ELIGIBLE_FOR_FILE_ACCESS' || err.message === 'FILE_NOT_IN_DISPATCH_PACKAGE' || err.message === 'FILE_SUPERSEDED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'DESCRIPTOR_ERROR', message: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/marketplace/orders/:id/printhouse-handoff/files/:fileId/download
+ * Phase 38.3.1 — Consumes token and attempts download.
+ */
+router.get('/:id/printhouse-handoff/files/:fileId/download', async (req, res) => {
+    try {
+        const token = req.query.token;
+        if (!token) return res.status(400).json({ ok: false, error: 'MISSING_TOKEN' });
+
+        const fileAccessService = require('../services/marketplacePrinthouseFileAccessService');
+        
+        // Validate and consume the token
+        const context = await fileAccessService.validatePrinthouseFileAccessToken(token, { consume: true });
+        
+        // Double check it matches the route params
+        if (context.orderId !== req.params.id || context.file.fileId !== req.params.fileId) {
+            await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_DENIED', { reason: 'Order/File mismatch', tokenPreview: context.tokenData.tokenPreview });
+            return res.status(403).json({ ok: false, error: 'FILE_ACCESS_TOKEN_INVALID' });
+        }
+
+        // Get descriptor to return alongside the 501
+        const descriptor = await fileAccessService.getPrinthouseFileDownloadDescriptor(req.params.id, req.params.fileId, context, { actor: 'download-agent' });
+        
+        // Log started
+        await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_STARTED', { tokenPreview: context.tokenData.tokenPreview });
+
+        // Fallback fail-safe behavior for this phase
+        await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_COMPLETED', { tokenPreview: context.tokenData.tokenPreview, simulated: true });
+        return res.status(501).json({ ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor });
+
+    } catch (err) {
+        if (err.message.includes('INVALID') || err.message.includes('EXPIRED') || err.message.includes('REVOKED') || err.message.includes('EXCEEDED')) {
+            const fileAccessService = require('../services/marketplacePrinthouseFileAccessService');
+            // Best effort to log denial, though we might not have order/file fully trusted if token is totally invalid
+            await fileAccessService.recordPrinthouseFileAccessEvent(req.params.id, req.params.fileId, 'PRINTHOUSE_FILE_DOWNLOAD_DENIED', { reason: err.message, tokenPreview: req.query.token ? `pfat_***${req.query.token.slice(-4)}` : 'missing' }).catch(() => {});
+            return res.status(403).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'PACKAGE_NOT_ELIGIBLE_FOR_FILE_ACCESS' || err.message === 'FILE_NOT_IN_DISPATCH_PACKAGE' || err.message === 'FILE_SUPERSEDED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'DOWNLOAD_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
