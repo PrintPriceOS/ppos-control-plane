@@ -21,6 +21,9 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [timeline, setTimeline] = useState<any[]>([]);
     const [detailLoading, setDetailLoading] = useState(false);
 
+    // File Access State: { [fileId]: { token, tokenPreview, expiresAt, maxUses, descriptor, loading, error, fallbackMsg } }
+    const [fileAccessState, setFileAccessState] = useState<Record<string, any>>({});
+
     const [actionState, setActionState] = useState<{ type: 'ACCEPT' | 'REJECT' | 'CLARIFY' | null, reason: string }>({ type: null, reason: '' });
 
     useEffect(() => {
@@ -58,6 +61,101 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             console.error('Failed to fetch package details', err);
         } finally {
             setDetailLoading(false);
+        }
+    };
+
+    const refreshTimeline = async () => {
+        if (!selectedOrderId) return;
+        try {
+            const res = await adminApi.getPrinthouseHandoffTimeline(selectedOrderId);
+            if (res.ok) setTimeline(res.timeline);
+        } catch (e) {
+            console.error('Failed to refresh timeline', e);
+        }
+    };
+
+    const handleGenerateAccess = async (fileId: string) => {
+        if (!selectedOrderId) return;
+        setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: true, error: null } }));
+        try {
+            const res = await adminApi.createPrinthouseFileAccessToken(selectedOrderId, fileId);
+            if (res.ok) {
+                setFileAccessState(prev => ({
+                    ...prev,
+                    [fileId]: {
+                        ...prev[fileId],
+                        loading: false,
+                        token: res.token,
+                        tokenPreview: res.tokenPreview,
+                        expiresAt: res.expiresAt,
+                        maxUses: res.maxUses,
+                        error: null
+                    }
+                }));
+                await refreshTimeline();
+            } else {
+                setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: res.error || 'Failed to generate token' } }));
+            }
+        } catch (err: any) {
+            setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: err.message } }));
+        }
+    };
+
+    const handleViewDescriptor = async (fileId: string) => {
+        if (!selectedOrderId) return;
+        const state = fileAccessState[fileId];
+        if (!state?.token) return;
+        
+        setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: true, error: null } }));
+        try {
+            const res = await adminApi.getPrinthouseFileDownloadDescriptor(selectedOrderId, fileId, state.token);
+            if (res.ok) {
+                setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, descriptor: res } }));
+                await refreshTimeline();
+            } else {
+                setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: res.error || 'Failed to get descriptor' } }));
+            }
+        } catch (err: any) {
+            setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: err.message } }));
+        }
+    };
+
+    const handleDownload = async (fileId: string, originalName: string) => {
+        if (!selectedOrderId) return;
+        const state = fileAccessState[fileId];
+        if (!state?.token) return;
+
+        setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: true, error: null, fallbackMsg: null } }));
+        try {
+            const res = await adminApi.downloadPrinthouseFile(selectedOrderId, fileId, state.token);
+            if (res.ok && res.blob) {
+                // Actual download
+                const url = window.URL.createObjectURL(res.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = originalName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false } }));
+            } else if (res.error === 'FILE_STREAMING_NOT_CONFIGURED') {
+                setFileAccessState(prev => ({ 
+                    ...prev, 
+                    [fileId]: { 
+                        ...prev[fileId], 
+                        loading: false, 
+                        fallbackMsg: "Secure file access validated. Physical streaming is not enabled yet for this environment.",
+                        descriptor: res.descriptor || prev[fileId].descriptor
+                    } 
+                }));
+            } else {
+                setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: res.error || 'Download failed' } }));
+            }
+            await refreshTimeline();
+        } catch (err: any) {
+            setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: err.message } }));
+            await refreshTimeline();
         }
     };
 
@@ -207,27 +305,96 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1">
                                         <DocumentCheckIcon className="w-3.5 h-3.5" /> Production Files
                                     </h4>
+                                    
+                                    {(detail.status === 'PRINTHOUSE_REJECTED' || detail.status === 'CLARIFICATION_REQUESTED' || detail.handoffStatus === 'REJECTED' || detail.handoffStatus === 'CLARIFICATION_REQUESTED') && (
+                                        <div className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-500/10 p-2 font-bold uppercase tracking-widest">
+                                            File access disabled until handoff is accepted or clarification is resolved.
+                                        </div>
+                                    )}
+
                                     <div className="space-y-2">
-                                        {detail.manifest?.files?.map((f: any, i: number) => (
-                                            <div key={i} className="border border-slate-200 dark:border-white/10 p-2 flex flex-col gap-1 text-[11px]">
-                                                <div className="flex justify-between">
-                                                    <span className="font-black text-slate-900 dark:text-white uppercase">{f.role}</span>
-                                                    <span className="text-slate-500 font-mono">{f.checksum?.substring(0,8) || '—'}</span>
-                                                </div>
-                                                <div className="text-slate-600 dark:text-slate-400 truncate">{f.originalName}</div>
-                                                {f.storagePath && (
-                                                    <div className="text-primary font-mono truncate text-[9px] mt-1 bg-primary/5 p-1">
-                                                        {f.storagePath}
+                                        {detail.manifest?.files?.map((f: any, i: number) => {
+                                            const fState = fileAccessState[f.fileId] || {};
+                                            const isEligible = !['PRINTHOUSE_REJECTED', 'CLARIFICATION_REQUESTED'].includes(detail.status) && !['REJECTED', 'CLARIFICATION_REQUESTED'].includes(detail.handoffStatus) && f.status !== 'SUPERSEDED';
+                                            
+                                            return (
+                                                <div key={i} className="border border-slate-200 dark:border-white/10 p-2 flex flex-col gap-1 text-[11px]">
+                                                    <div className="flex justify-between">
+                                                        <span className="font-black text-slate-900 dark:text-white uppercase">{f.role}</span>
+                                                        <span className="text-slate-500 font-mono">{f.checksum?.substring(0,8) || '—'}</span>
                                                     </div>
-                                                )}
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-[9px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 px-1">
-                                                        {f.preflightStatus}
-                                                    </span>
-                                                    {f.findingsCount > 0 && <span className="text-[9px] uppercase font-bold text-amber-600">Findings: {f.findingsCount}</span>}
+                                                    <div className="text-slate-600 dark:text-slate-400 truncate">{f.originalName}</div>
+                                                    {f.storagePath && (
+                                                        <div className="text-primary font-mono truncate text-[9px] mt-1 bg-primary/5 p-1">
+                                                            {f.storagePath}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[9px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 px-1">
+                                                            {f.preflightStatus}
+                                                        </span>
+                                                        {f.findingsCount > 0 && <span className="text-[9px] uppercase font-bold text-amber-600">Findings: {f.findingsCount}</span>}
+                                                    </div>
+                                                    
+                                                    {isEligible && (
+                                                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                                                            {!fState.token && !fState.loading && (
+                                                                <button 
+                                                                    onClick={() => handleGenerateAccess(f.fileId)}
+                                                                    className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 transition-colors"
+                                                                >
+                                                                    Generate Access
+                                                                </button>
+                                                            )}
+                                                            
+                                                            {fState.loading && <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Loading...</div>}
+                                                            
+                                                            {fState.error && <div className="text-[10px] text-red-500 font-bold uppercase tracking-widest">{fState.error}</div>}
+                                                            
+                                                            {fState.token && !fState.loading && (
+                                                                <div className="space-y-2">
+                                                                    <div className="flex flex-wrap gap-2 text-[9px] font-mono text-slate-500">
+                                                                        <span className="bg-slate-100 dark:bg-white/5 px-1">{fState.tokenPreview}</span>
+                                                                        <span>Exp: {formatDate(new Date(fState.expiresAt).toISOString())}</span>
+                                                                        <span>Max Uses: {fState.maxUses}</span>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex gap-2">
+                                                                        {!fState.descriptor && (
+                                                                            <button 
+                                                                                onClick={() => handleViewDescriptor(f.fileId)}
+                                                                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 transition-colors"
+                                                                            >
+                                                                                View Secure Descriptor
+                                                                            </button>
+                                                                        )}
+                                                                        
+                                                                        <button 
+                                                                            onClick={() => handleDownload(f.fileId, f.originalName)}
+                                                                            className="px-3 py-1 bg-primary text-white hover:bg-primary/90 text-[10px] font-black uppercase tracking-widest transition-colors"
+                                                                        >
+                                                                            Verify Governed Download
+                                                                        </button>
+                                                                    </div>
+                                                                    
+                                                                    {fState.fallbackMsg && (
+                                                                        <div className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 p-2 border border-emerald-200 dark:border-emerald-500/20 font-bold">
+                                                                            {fState.fallbackMsg}
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {fState.descriptor && (
+                                                                        <div className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-white/10 p-2 font-mono text-[9px] text-slate-600 dark:text-slate-400 overflow-x-auto">
+                                                                            <pre>{JSON.stringify(fState.descriptor, null, 2)}</pre>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
@@ -245,6 +412,7 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                 {ev.source === 'metadata_fallback' && (
                                                     <div className="text-[9px] text-amber-600 uppercase font-bold mt-0.5">Synthetic Fallback</div>
                                                 )}
+                                                {ev.payload?.tokenPreview && <div className="text-[10px] font-mono text-primary mt-1">{ev.payload.tokenPreview}</div>}
                                                 {ev.payload?.reason && <div className="text-[10px] text-red-500 mt-1">Reason: {ev.payload.reason}</div>}
                                                 {ev.payload?.message && <div className="text-[10px] text-amber-500 mt-1">Msg: {ev.payload.message}</div>}
                                             </div>

@@ -2221,6 +2221,48 @@ export async function requestHandoffClarification(orderId: string, payload: { me
     });
 }
 
+// --- Phase 38.3.2 File Access ---
+
+export async function listPrinthouseHandoffFiles(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files`);
+}
+
+export async function createPrinthouseFileAccessToken(orderId: string, fileId: string, payload?: any) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/access-token`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {})
+    });
+}
+
+export async function getPrinthouseFileDownloadDescriptor(orderId: string, fileId: string, token: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download-descriptor?token=${token}`);
+}
+
+export async function downloadPrinthouseFile(orderId: string, fileId: string, token: string) {
+    // We do NOT use adminFetch here because we need to explicitly handle 501, 403, and blobs without the fallback swallower
+    const currentToken = getAuthToken();
+    const res = await fetch(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download?token=${token}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${currentToken}`
+        }
+    });
+
+    if (res.status === 501) {
+        return await res.json(); // returns the {ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor}
+    }
+    if (res.status === 403) {
+        return await res.json(); // returns {ok: false, error: ...}
+    }
+    if (!res.ok) {
+        return { ok: false, error: 'DOWNLOAD_FAILED', message: await res.text() };
+    }
+
+    // If 200, assume Blob for real download
+    const blob = await res.blob();
+    return { ok: true, blob };
+}
+
 export async function markMarketplaceOrderHandoffReady(id: string) {
     return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/handoff/mark-ready`, {
         method: 'POST'
