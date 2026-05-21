@@ -79,7 +79,10 @@ function sanitizeManifest(manifest) {
         for (const file of sanitized.files) {
             if (file.storagePath) {
                 // Redact local paths
-                if (file.storagePath.includes('/tmp/') || file.storagePath.includes('/var/')) {
+                if (file.storagePath.includes('/tmp/') || 
+                    file.storagePath.includes('/var/') || 
+                    file.storagePath.includes('/opt/') ||
+                    file.storagePath.match(/^[a-zA-Z]:\\/)) {
                     file.storagePath = `/api/production-files/download/${file.fileId}`;
                 }
             }
@@ -119,6 +122,13 @@ async function getPrinthouseHandoffPackage(orderId, options = {}) {
     };
 }
 
+function sanitizeDispatchPackage(dispatchPackage) {
+    if (!dispatchPackage) return null;
+    const sanitized = JSON.parse(JSON.stringify(dispatchPackage));
+    sanitized.manifest = sanitizeManifest(sanitized.manifest);
+    return sanitized;
+}
+
 /**
  * Accepts a handoff package (Printhouse approves it for production).
  */
@@ -136,7 +146,7 @@ async function acceptPrinthouseHandoff(orderId, payload = {}, options = {}) {
     
     const currentStatus = metadata.dispatch_package.status;
     if (currentStatus === 'PRINTHOUSE_ACCEPTED') {
-        return { ok: true, idempotent: true, dispatchPackage: metadata.dispatch_package };
+        return { ok: true, idempotent: true, dispatchPackage: sanitizeDispatchPackage(metadata.dispatch_package) };
     }
 
     if (!['ACKNOWLEDGED', 'PRINTHOUSE_HANDOFF_READY', 'DISPATCH_PACKAGE_CREATED', 'CLARIFICATION_REQUESTED'].includes(currentStatus)) {
@@ -163,7 +173,7 @@ async function acceptPrinthouseHandoff(orderId, payload = {}, options = {}) {
         });
     }
 
-    return { ok: true, dispatchPackage: metadata.dispatch_package };
+    return { ok: true, dispatchPackage: sanitizeDispatchPackage(metadata.dispatch_package) };
 }
 
 /**
@@ -186,7 +196,7 @@ async function rejectPrinthouseHandoff(orderId, payload = {}, options = {}) {
     }
 
     if (metadata.dispatch_package.status === 'PRINTHOUSE_REJECTED' && metadata.dispatch_package.rejectionReason === payload.reason) {
-        return { ok: true, idempotent: true, dispatchPackage: metadata.dispatch_package };
+        return { ok: true, idempotent: true, dispatchPackage: sanitizeDispatchPackage(metadata.dispatch_package) };
     }
 
     const rejectedBy = options.operatorId || 'SYSTEM';
@@ -209,7 +219,7 @@ async function rejectPrinthouseHandoff(orderId, payload = {}, options = {}) {
         });
     }
 
-    return { ok: true, dispatchPackage: metadata.dispatch_package };
+    return { ok: true, dispatchPackage: sanitizeDispatchPackage(metadata.dispatch_package) };
 }
 
 /**
@@ -251,7 +261,7 @@ async function requestHandoffClarification(orderId, payload = {}, options = {}) 
         });
     }
 
-    return { ok: true, dispatchPackage: metadata.dispatch_package };
+    return { ok: true, dispatchPackage: sanitizeDispatchPackage(metadata.dispatch_package) };
 }
 
 /**
@@ -270,7 +280,7 @@ async function getPrinthouseHandoffTimeline(orderId, options = {}) {
     }
 
     // Phase 38 specific events
-    const handoffEvents = events.filter(e => [
+    let handoffEvents = events.filter(e => [
         'DISPATCH_PACKAGE_EVALUATED',
         'DISPATCH_PACKAGE_CREATED',
         'PRINTHOUSE_HANDOFF_READY',
@@ -279,6 +289,66 @@ async function getPrinthouseHandoffTimeline(orderId, options = {}) {
         'PRINTHOUSE_HANDOFF_REJECTED',
         'PRINTHOUSE_HANDOFF_CLARIFICATION_REQUESTED'
     ].includes(e.event_type));
+
+    // Synthetic fallback if no events are found from the audit table
+    if (handoffEvents.length === 0) {
+        const metadata = safeParseJson(orders[0].metadata_json, {});
+        const dispatch = metadata.dispatch_package;
+        
+        if (dispatch) {
+            if (dispatch.createdAt) {
+                handoffEvents.push({
+                    event_type: 'DISPATCH_PACKAGE_CREATED',
+                    created_at: dispatch.createdAt,
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, synthesized: true }
+                });
+            }
+            if (dispatch.status === 'PRINTHOUSE_HANDOFF_READY' || dispatch.handoffStatus === 'HANDOFF_READY') {
+                 handoffEvents.push({
+                    event_type: 'PRINTHOUSE_HANDOFF_READY',
+                    created_at: dispatch.createdAt, // approximation
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, synthesized: true }
+                });
+            }
+            if (dispatch.acknowledgedAt) {
+                handoffEvents.push({
+                    event_type: 'PRINTHOUSE_HANDOFF_ACKNOWLEDGED',
+                    created_at: dispatch.acknowledgedAt,
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, synthesized: true }
+                });
+            }
+            if (dispatch.acceptedAt) {
+                handoffEvents.push({
+                    event_type: 'PRINTHOUSE_HANDOFF_ACCEPTED',
+                    created_at: dispatch.acceptedAt,
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, synthesized: true }
+                });
+            }
+            if (dispatch.rejectedAt) {
+                handoffEvents.push({
+                    event_type: 'PRINTHOUSE_HANDOFF_REJECTED',
+                    created_at: dispatch.rejectedAt,
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, reason: dispatch.rejectionReason, synthesized: true }
+                });
+            }
+            if (dispatch.clarificationRequestedAt) {
+                handoffEvents.push({
+                    event_type: 'PRINTHOUSE_HANDOFF_CLARIFICATION_REQUESTED',
+                    created_at: dispatch.clarificationRequestedAt,
+                    source: 'metadata_fallback',
+                    payload: { packageId: dispatch.packageId, message: dispatch.clarificationMessage, synthesized: true }
+                });
+            }
+            
+            // Sort synthetics by created_at ascending
+            handoffEvents.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        }
+    }
 
     return {
         ok: true,

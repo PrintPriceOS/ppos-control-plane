@@ -175,6 +175,18 @@ async function runTests() {
         assert.equal(res.error, 'HANDOFF_PACKAGE_NOT_FOUND');
         console.log('✅ Test 12: missing package returns HANDOFF_PACKAGE_NOT_FOUND');
 
+        // Test 13: timeline falls back to synthetic events
+        resetMocks();
+        mockOrders.push(buildMockOrder('ord_1', {
+            ...mockDispatchPackage,
+            createdAt: '2026-05-21T10:00:00.000Z',
+            status: 'PRINTHOUSE_HANDOFF_READY'
+        }));
+        res = await handoffService.getPrinthouseHandoffTimeline('ord_1');
+        assert.equal(res.timeline.length, 2); // DISPATCH_PACKAGE_CREATED and PRINTHOUSE_HANDOFF_READY
+        assert.equal(res.timeline[0].source, 'metadata_fallback');
+        console.log('✅ Test 13: timeline falls back to synthetic events');
+
         console.log('\nAll mock tests passed successfully.');
     } catch (err) {
         console.error('❌ Test failed:', err);
