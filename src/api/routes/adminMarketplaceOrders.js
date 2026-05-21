@@ -1155,4 +1155,54 @@ router.get('/:id/printhouse-handoff/files/:fileId/download', async (req, res) =>
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production-decision/status
+ * Phase 38.4 - Read-only production decision status
+ */
+router.get('/:id/production-decision/status', async (req, res) => {
+    try {
+        const productionService = require('../services/marketplacePrinthouseProductionService');
+        const status = await productionService.getProductionDecisionStatus(req.params.id);
+        return res.json(status);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'HANDOFF_PACKAGE_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_DECISION_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-decision
+ * Phase 38.4 - Record a production decision
+ */
+router.post('/:id/production-decision', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_DECISION !== 'true') {
+        return res.status(403).json({ ok: false, error: 'PHASE38_PRODUCTION_DECISION_DISABLED' });
+    }
+
+    try {
+        const { decision, reason, payload } = req.body;
+        if (!decision) {
+            return res.status(400).json({ ok: false, error: 'DECISION_REQUIRED' });
+        }
+
+        const productionService = require('../services/marketplacePrinthouseProductionService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        
+        const fullPayload = { reason, ...(payload || {}) };
+        const result = await productionService.recordProductionDecision(req.params.id, decision, fullPayload, options);
+        
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'HANDOFF_PACKAGE_NOT_FOUND' || err.message === 'DISPATCH_PACKAGE_NOT_ACCEPTED') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_DECISION' || err.message === 'INVALID_ORDER_STATUS_FOR_DECISION' || err.message === 'INVALID_STATE_TRANSITION' || err.message === 'REASON_REQUIRED' || err.message === 'INVOICE_NOT_ISSUED' || err.message === 'PAYMENT_NOT_CONFIRMED' || err.message === 'PRODUCTION_NOT_UNLOCKED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_DECISION_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;

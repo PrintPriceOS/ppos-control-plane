@@ -2311,3 +2311,15 @@ export async function recomputeMarketplaceOrderReadiness(orderId: string) {
 }
 
 
+
+export async function getProductionDecisionStatus(orderId: string) {
+    return adminFetch<any>(/api/admin/marketplace/orders//production-decision/status);
+}
+
+export async function recordProductionDecision(orderId: string, decision: string, reason?: string, payload?: any) {
+    return adminFetch<any>(/api/admin/marketplace/orders//production-decision, {
+        method: 'POST',
+        body: JSON.stringify({ decision, reason, payload })
+    });
+}
+

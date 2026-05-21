@@ -25,6 +25,10 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [fileAccessState, setFileAccessState] = useState<Record<string, any>>({});
 
     const [actionState, setActionState] = useState<{ type: 'ACCEPT' | 'REJECT' | 'CLARIFY' | null, reason: string }>({ type: null, reason: '' });
+    
+    // Phase 38.4 Production Decision State
+    const [productionStatus, setProductionStatus] = useState<any | null>(null);
+    const [productionDecisionState, setProductionDecisionState] = useState<{ decision: string | null, reason: string }>({ decision: null, reason: '' });
 
     useEffect(() => {
         fetchPackages();
@@ -50,13 +54,16 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
         setSelectedOrderId(orderId);
         setDetailLoading(true);
         setActionState({ type: null, reason: '' });
+        setProductionDecisionState({ decision: null, reason: '' });
         try {
-            const [pkgRes, timelineRes] = await Promise.all([
+            const [pkgRes, timelineRes, prodRes] = await Promise.all([
                 adminApi.getPrinthouseHandoffPackage(orderId),
-                adminApi.getPrinthouseHandoffTimeline(orderId)
+                adminApi.getPrinthouseHandoffTimeline(orderId),
+                adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false }))
             ]);
             setDetail(pkgRes.ok ? pkgRes : null);
             setTimeline(timelineRes.ok ? timelineRes.timeline : []);
+            setProductionStatus(prodRes.ok ? prodRes : null);
         } catch (err) {
             console.error('Failed to fetch package details', err);
         } finally {
@@ -180,6 +187,27 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                 await fetchPackages();
             } else {
                 alert(`Action failed: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        }
+    };
+
+    const handleProductionDecision = async () => {
+        if (!selectedOrderId || !productionDecisionState.decision) return;
+        const { decision, reason } = productionDecisionState;
+        if ((decision === 'PRODUCTION_HOLD' || decision === 'PRODUCTION_REJECTED') && !reason) {
+            return alert('Reason is required for Hold or Reject.');
+        }
+
+        try {
+            const res = await adminApi.recordProductionDecision(selectedOrderId, decision, reason);
+            if (res?.ok) {
+                setProductionDecisionState({ decision: null, reason: '' });
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Decision failed: ${res?.error || 'Unknown error'}`);
             }
         } catch (err: any) {
             alert(`Error: ${err.message}`);
@@ -422,6 +450,7 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                     <div className="text-[9px] text-amber-600 uppercase font-bold mt-0.5">Synthetic Fallback</div>
                                                 )}
                                                 {ev.payload?.tokenPreview && <div className="text-[10px] font-mono text-primary mt-1">{ev.payload.tokenPreview}</div>}
+                                                {ev.payload?.decision && <div className="text-[10px] text-indigo-500 mt-1 font-bold">Decision: {ev.payload.decision}</div>}
                                                 {ev.payload?.reason && <div className="text-[10px] text-red-500 mt-1">Reason: {ev.payload.reason}</div>}
                                                 {ev.payload?.message && <div className="text-[10px] text-amber-500 mt-1">Msg: {ev.payload.message}</div>}
                                             </div>
@@ -430,6 +459,91 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                     </div>
                                 </div>
 
+                                {/* Phase 38.4 - Production Decision Gate */}
+                                {detail && ['PRINTHOUSE_ACCEPTED', 'READY_FOR_PRODUCTION', 'PRODUCTION_HOLD', 'PRODUCTION_REJECTED', 'PRODUCTION_ACCEPTED'].includes(detail.status || detail.handoffStatus) && (
+                                    <div className="mt-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 p-4">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5 mb-4">
+                                            <DocumentCheckIcon className="w-4 h-4 text-indigo-500" />
+                                            Production Decision Gate
+                                        </h4>
+                                        
+                                        {productionStatus && productionStatus.warnings?.includes('FILE_ACCESS_NOT_VERIFIED_BY_AUDIT') && (
+                                            <div className="mb-4 p-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
+                                                <QuestionMarkCircleIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                                                <div>
+                                                    <strong>FILE_ACCESS_NOT_VERIFIED_BY_AUDIT</strong><br/>
+                                                    No verified file downloads found in audit logs. Proceed with caution.
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4 mb-4 text-xs">
+                                            <div>
+                                                <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Current Order Status</div>
+                                                <div className="font-mono text-slate-900 dark:text-white">{productionStatus?.orderStatus || '—'}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Production Decision</div>
+                                                <div className="font-mono text-indigo-600 dark:text-indigo-400">{productionStatus?.productionDecision?.decision || 'PENDING'}</div>
+                                            </div>
+                                            {productionStatus?.productionDecision?.decidedAt && (
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Decided At</div>
+                                                    <div className="font-mono text-slate-900 dark:text-white">{formatDate(productionStatus.productionDecision.decidedAt)}</div>
+                                                </div>
+                                            )}
+                                            {productionStatus?.productionDecision?.decidedBy && (
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Decided By</div>
+                                                    <div className="font-mono text-slate-900 dark:text-white">{productionStatus.productionDecision.decidedBy}</div>
+                                                </div>
+                                            )}
+                                            {productionStatus?.productionDecision?.reason && (
+                                                <div className="col-span-2">
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Reason</div>
+                                                    <div className="p-2 bg-white dark:bg-white/5 text-red-600 dark:text-red-400 border border-slate-200 dark:border-white/10 font-mono">
+                                                        {productionStatus.productionDecision.reason}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {productionStatus?.orderStatus !== 'PRODUCTION_ACCEPTED' && (
+                                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-white/10">
+                                                <div className="flex gap-2">
+                                                    <select 
+                                                        className="flex-1 bg-white dark:bg-[#131314] border border-slate-300 dark:border-white/20 text-xs p-2 text-slate-900 dark:text-white"
+                                                        value={productionDecisionState.decision || ''}
+                                                        onChange={(e) => setProductionDecisionState({ ...productionDecisionState, decision: e.target.value })}
+                                                    >
+                                                        <option value="" disabled>Select Decision...</option>
+                                                        <option value="READY_FOR_PRODUCTION">Mark Ready for Production</option>
+                                                        <option value="PRODUCTION_ACCEPTED">Accept into Production Queue</option>
+                                                        <option value="PRODUCTION_HOLD">Put on Hold</option>
+                                                        <option value="PRODUCTION_REJECTED">Reject Production</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                {(productionDecisionState.decision === 'PRODUCTION_HOLD' || productionDecisionState.decision === 'PRODUCTION_REJECTED' || productionDecisionState.decision === 'READY_FOR_PRODUCTION' || productionDecisionState.decision === 'PRODUCTION_ACCEPTED') && (
+                                                    <div className="flex gap-2 items-start animate-slide-fade">
+                                                        <textarea 
+                                                            className="flex-1 h-20 bg-white dark:bg-[#131314] border border-slate-300 dark:border-white/20 p-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400"
+                                                            placeholder={(productionDecisionState.decision === 'PRODUCTION_HOLD' || productionDecisionState.decision === 'PRODUCTION_REJECTED') ? "Reason (Required)..." : "Reason (Optional)..."}
+                                                            value={productionDecisionState.reason}
+                                                            onChange={e => setProductionDecisionState({ ...productionDecisionState, reason: e.target.value })}
+                                                        />
+                                                        <button 
+                                                            onClick={handleProductionDecision}
+                                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors h-20"
+                                                        >
+                                                            Submit
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
