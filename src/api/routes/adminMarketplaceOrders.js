@@ -782,5 +782,122 @@ router.post('/:id/production-unlock/execute', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/dispatch-package/status
+ * Phase 37.5 — Returns dispatch package status. Read-only.
+ */
+router.get('/:id/dispatch-package/status', async (req, res) => {
+    try {
+        console.log('[DISPATCH_PACKAGE_STATUS_REQUESTED]', req.params.id);
+        const dispatchService = require('../services/marketplaceDispatchPackageService');
+        const result = await dispatchService.getDispatchPackageStatus(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get dispatch package status for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'DISPATCH_PACKAGE_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/dispatch-package/evaluate
+ * Phase 37.5 — Evaluates dispatch package readiness. Read-only (no state mutation, just audit logs).
+ */
+router.post('/:id/dispatch-package/evaluate', async (req, res) => {
+    try {
+        console.log('[DISPATCH_PACKAGE_EVALUATE_REQUESTED]', req.params.id);
+        const dispatchService = require('../services/marketplaceDispatchPackageService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await dispatchService.evaluateDispatchPackageReadiness(req.params.id, options);
+        // Exclude the bulky objects from the HTTP response
+        const { files, metadata, currentOrder, selectedOffer, ...sanitizedResult } = result;
+        return res.json(sanitizedResult);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to evaluate dispatch package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'DISPATCH_PACKAGE_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/dispatch-package/create
+ * Phase 37.5 — Creates governed dispatch package and marks PRINTHOUSE_HANDOFF_READY if all conditions are met.
+ * Requires PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE=true
+ */
+router.post('/:id/dispatch-package/create', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE37_DISPATCH_PACKAGE_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE=true to enable Phase 37.5 dispatch package operations.'
+        });
+    }
+
+    try {
+        console.log('[DISPATCH_PACKAGE_CREATE_REQUESTED]', req.params.id);
+        const dispatchService = require('../services/marketplaceDispatchPackageService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await dispatchService.createDispatchPackage(req.params.id, options);
+
+        if (result.ok === false && result.error === 'DISPATCH_PACKAGE_BLOCKED') {
+            return res.status(422).json(result);
+        }
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to create dispatch package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'DISPATCH_PACKAGE_CREATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/dispatch-package/acknowledge
+ * Phase 37.5 — Marks an existing dispatch package as acknowledged.
+ * Requires PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE=true
+ */
+router.post('/:id/dispatch-package/acknowledge', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE37_DISPATCH_PACKAGE_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE37_DISPATCH_PACKAGE=true to enable Phase 37.5 dispatch package operations.'
+        });
+    }
+
+    try {
+        console.log('[DISPATCH_PACKAGE_ACKNOWLEDGE_REQUESTED]', req.params.id);
+        const dispatchService = require('../services/marketplaceDispatchPackageService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const payload = req.body || {};
+        const result = await dispatchService.markDispatchPackageAcknowledged(req.params.id, payload, options);
+
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to acknowledge dispatch package for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'DISPATCH_PACKAGE_ACKNOWLEDGE_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
 
