@@ -703,5 +703,84 @@ router.post('/:id/customer-action/mark-notified', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production-unlock/status
+ * Phase 37.4 — Returns production unlock status. Read-only.
+ */
+router.get('/:id/production-unlock/status', async (req, res) => {
+    try {
+        console.log('[PRODUCTION_UNLOCK_STATUS_REQUESTED]', req.params.id);
+        const unlockService = require('../services/marketplaceProductionUnlockService');
+        const result = await unlockService.getProductionUnlockStatus(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get production unlock status for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_UNLOCK_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-unlock/evaluate
+ * Phase 37.4 — Evaluates production unlock readiness. Read-only (no state mutation, just audit logs).
+ */
+router.post('/:id/production-unlock/evaluate', async (req, res) => {
+    try {
+        console.log('[PRODUCTION_UNLOCK_EVALUATE_REQUESTED]', req.params.id);
+        const unlockService = require('../services/marketplaceProductionUnlockService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await unlockService.evaluateProductionUnlock(req.params.id, options);
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to evaluate production unlock for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_UNLOCK_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-unlock/execute
+ * Phase 37.4 — Unlocks production and marks HANDOFF_READY if all conditions are met.
+ * Requires PPOS_ENABLE_PHASE37_PRODUCTION_UNLOCK=true
+ */
+router.post('/:id/production-unlock/execute', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE37_PRODUCTION_UNLOCK !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE37_PRODUCTION_UNLOCK_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE37_PRODUCTION_UNLOCK=true to enable Phase 37.4 production unlock operations.'
+        });
+    }
+
+    try {
+        console.log('[PRODUCTION_UNLOCK_EXECUTE_REQUESTED]', req.params.id);
+        const unlockService = require('../services/marketplaceProductionUnlockService');
+        const options = {
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await unlockService.unlockProductionAfterPayment(req.params.id, options);
+
+        if (result.ok === false && result.error === 'PRODUCTION_UNLOCK_BLOCKED') {
+            return res.status(422).json(result);
+        }
+        if (result.ok === false) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to execute production unlock for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_UNLOCK_EXECUTE_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
 
