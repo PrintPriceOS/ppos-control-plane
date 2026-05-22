@@ -2316,12 +2316,7 @@ export async function getProductionDecisionStatus(orderId: string) {
     return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-decision/status`);
 }
 
-export async function recordProductionDecision(
-  orderId: string,
-  decision: string,
-  reason?: string,
-  payload: Record<string, any> = {}
-) {
+export async function recordProductionDecision(orderId: string, decision: string, reason?: string, payload: Record<string, any> = {}) {
   return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-decision`, {
     method: 'POST',
     body: JSON.stringify({
