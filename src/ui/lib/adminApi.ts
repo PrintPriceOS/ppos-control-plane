@@ -2362,4 +2362,50 @@ export async function unassignProductionMachine(orderId: string, payload: Record
     });
 }
 
+export async function getProductionWorkOrderStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/status`);
+}
+
+export async function evaluateProductionWorkOrder(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/evaluate`, {
+        method: 'POST'
+    });
+}
+
+export async function createProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/create`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function startProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/start`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function pauseProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/pause`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function resumeProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/resume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function cancelProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/cancel`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+
 

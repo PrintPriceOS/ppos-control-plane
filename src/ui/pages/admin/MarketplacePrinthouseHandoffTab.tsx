@@ -37,6 +37,22 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [unassignReason, setUnassignReason] = useState<string>('');
     const [queueActionLoading, setQueueActionLoading] = useState<boolean>(false);
 
+    // Phase 38.6 Production Work Order Execution State
+    const [workOrderStatus, setWorkOrderStatus] = useState<any | null>(null);
+    const [workOrderEligibility, setWorkOrderEligibility] = useState<any | null>(null);
+    const [workOrderActionLoading, setWorkOrderActionLoading] = useState<boolean>(false);
+
+    // Form inputs for Work Order
+    const [woShiftId, setWoShiftId] = useState<string>('');
+    const [woBatchRef, setWoBatchRef] = useState<string>('');
+    const [woOperatorNote, setWoOperatorNote] = useState<string>('');
+    const [woEstCompletion, setWoEstCompletion] = useState<string>('');
+    const [woPauseReason, setWoPauseReason] = useState<string>('');
+    const [woPauseNote, setWoPauseNote] = useState<string>('');
+    const [woCancelReason, setWoCancelReason] = useState<string>('');
+    const [woCancelNote, setWoCancelNote] = useState<string>('');
+
+
     useEffect(() => {
         fetchPackages();
     }, []);
@@ -64,19 +80,33 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
         setProductionDecisionState({ decision: null, reason: '' });
         setAssignMachineId('');
         setUnassignReason('');
+        
+        setWoShiftId('');
+        setWoBatchRef('');
+        setWoOperatorNote('');
+        setWoEstCompletion('');
+        setWoPauseReason('');
+        setWoPauseNote('');
+        setWoCancelReason('');
+        setWoCancelNote('');
+
         try {
-            const [pkgRes, timelineRes, prodRes, queueRes, evalRes] = await Promise.all([
+            const [pkgRes, timelineRes, prodRes, queueRes, evalRes, woRes, woEvalRes] = await Promise.all([
                 adminApi.getPrinthouseHandoffPackage(orderId),
                 adminApi.getPrinthouseHandoffTimeline(orderId),
                 adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false })),
                 adminApi.getProductionQueueStatus(orderId).catch(() => ({ ok: false })),
-                adminApi.evaluateProductionQueue(orderId).catch(() => ({ ok: false }))
+                adminApi.evaluateProductionQueue(orderId).catch(() => ({ ok: false })),
+                adminApi.getProductionWorkOrderStatus(orderId).catch(() => ({ ok: false })),
+                adminApi.evaluateProductionWorkOrder(orderId).catch(() => ({ ok: false }))
             ]);
             setDetail(pkgRes.ok ? pkgRes : null);
             setTimeline(timelineRes.ok ? timelineRes.timeline : []);
             setProductionStatus(prodRes.ok ? prodRes : null);
             setQueueStatus(queueRes.ok ? queueRes : null);
             setEligibility(evalRes.ok ? evalRes : null);
+            setWorkOrderStatus(woRes.ok ? woRes : null);
+            setWorkOrderEligibility(woEvalRes.ok ? woEvalRes : null);
         } catch (err) {
             console.error('Failed to fetch package details', err);
         } finally {
@@ -284,6 +314,124 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             alert(`Error: ${err.message}`);
         } finally {
             setQueueActionLoading(false);
+        }
+    };
+
+    const handleCreateWorkOrder = async () => {
+        if (!selectedOrderId) return;
+        setWorkOrderActionLoading(true);
+        try {
+            const res = await adminApi.createProductionWorkOrder(selectedOrderId);
+            if (res?.ok) {
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to create work order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setWorkOrderActionLoading(false);
+        }
+    };
+
+    const handleStartWorkOrder = async () => {
+        if (!selectedOrderId) return;
+        setWorkOrderActionLoading(true);
+        try {
+            const res = await adminApi.startProductionWorkOrder(selectedOrderId, {
+                shiftId: woShiftId.trim() || undefined,
+                batchReference: woBatchRef.trim() || undefined,
+                operatorNote: woOperatorNote.trim() || undefined,
+                estimatedCompletionAt: woEstCompletion.trim() || undefined
+            });
+            if (res?.ok) {
+                setWoShiftId('');
+                setWoBatchRef('');
+                setWoOperatorNote('');
+                setWoEstCompletion('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to start work order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setWorkOrderActionLoading(false);
+        }
+    };
+
+    const handlePauseWorkOrder = async () => {
+        if (!selectedOrderId) return;
+        if (!woPauseReason.trim()) {
+            return alert('Pause reason is required');
+        }
+        setWorkOrderActionLoading(true);
+        try {
+            const res = await adminApi.pauseProductionWorkOrder(selectedOrderId, {
+                reason: woPauseReason.trim(),
+                note: woPauseNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setWoPauseReason('');
+                setWoPauseNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to pause work order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setWorkOrderActionLoading(false);
+        }
+    };
+
+    const handleResumeWorkOrder = async () => {
+        if (!selectedOrderId) return;
+        setWorkOrderActionLoading(true);
+        try {
+            const res = await adminApi.resumeProductionWorkOrder(selectedOrderId, {
+                note: woOperatorNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setWoOperatorNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to resume work order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setWorkOrderActionLoading(false);
+        }
+    };
+
+    const handleCancelWorkOrder = async () => {
+        if (!selectedOrderId) return;
+        if (!woCancelReason.trim()) {
+            return alert('Cancel reason is required');
+        }
+        setWorkOrderActionLoading(true);
+        try {
+            const res = await adminApi.cancelProductionWorkOrder(selectedOrderId, {
+                reason: woCancelReason.trim(),
+                note: woCancelNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setWoCancelReason('');
+                setWoCancelNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to cancel work order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setWorkOrderActionLoading(false);
         }
     };
 
@@ -778,6 +926,296 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Phase 38.6 - Production Start / Work Order Execution Gate */}
+                                {detail && ['MACHINE_ASSIGNED', 'WORK_ORDER_CREATED', 'PRODUCTION_STARTED', 'PRODUCTION_PAUSED', 'PRODUCTION_CANCELLED'].includes(detail.status || detail.handoffStatus || (productionStatus && productionStatus.orderStatus) || (workOrderStatus && workOrderStatus.orderStatus)) && (
+                                    <div className="mt-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 p-4 animate-slide-fade">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5 mb-4">
+                                            <ClockIcon className="w-4 h-4 text-indigo-500" />
+                                            Work Order Execution Gate
+                                        </h4>
+
+                                        {/* Blockers & Warnings */}
+                                        {workOrderEligibility && !workOrderStatus?.productionWorkOrder && (
+                                            <div className="space-y-3 mb-4">
+                                                {workOrderEligibility.blockers && workOrderEligibility.blockers.length > 0 && (
+                                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Work Order Blocked</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {workOrderEligibility.blockers.map((b: string) => <li key={b}>{b}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {workOrderEligibility.warnings && workOrderEligibility.warnings.length > 0 && (
+                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Eligibility Warnings</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {workOrderEligibility.warnings.map((w: string) => <li key={w}>{w}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Current Status display */}
+                                        {workOrderStatus?.productionWorkOrder && (
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Work Order Status</div>
+                                                        <span className={`inline-block px-2 py-0.5 border text-[9px] uppercase tracking-wider font-mono ${
+                                                            workOrderStatus.productionWorkOrder.status === 'PRODUCTION_STARTED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' :
+                                                            workOrderStatus.productionWorkOrder.status === 'PRODUCTION_PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20' :
+                                                            workOrderStatus.productionWorkOrder.status === 'PRODUCTION_CANCELLED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20' :
+                                                            'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+                                                        }`}>
+                                                            {workOrderStatus.productionWorkOrder.status}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Work Order ID</div>
+                                                        <div className="font-mono text-xs text-slate-900 dark:text-white truncate font-bold">{workOrderStatus.productionWorkOrder.workOrderId}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Machine ID</div>
+                                                        <div className="font-mono text-xs text-slate-900 dark:text-white font-bold">{workOrderStatus.productionWorkOrder.machineId || '—'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Created At</div>
+                                                        <div className="font-mono text-xs text-slate-900 dark:text-white">{formatDate(workOrderStatus.productionWorkOrder.createdAt)}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Start details if started */}
+                                                {workOrderStatus.productionWorkOrder.start && (
+                                                    <div className="p-3 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 space-y-2">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Execution Parameters</strong>
+                                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                                            <div>
+                                                                <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Started At</span>
+                                                                <span className="font-mono">{formatDate(workOrderStatus.productionWorkOrder.start.startedAt)}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Started By</span>
+                                                                <span className="font-mono truncate block">{workOrderStatus.productionWorkOrder.start.startedBy}</span>
+                                                            </div>
+                                                            {workOrderStatus.productionWorkOrder.start.shiftId && (
+                                                                <div>
+                                                                    <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Shift ID</span>
+                                                                    <span className="font-mono">{workOrderStatus.productionWorkOrder.start.shiftId}</span>
+                                                                </div>
+                                                            )}
+                                                            {workOrderStatus.productionWorkOrder.start.batchReference && (
+                                                                <div>
+                                                                    <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Batch Reference</span>
+                                                                    <span className="font-mono">{workOrderStatus.productionWorkOrder.start.batchReference}</span>
+                                                                </div>
+                                                            )}
+                                                            {workOrderStatus.productionWorkOrder.start.estimatedCompletionAt && (
+                                                                <div className="col-span-2">
+                                                                    <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Est. Completion At</span>
+                                                                    <span className="font-mono">{formatDate(workOrderStatus.productionWorkOrder.start.estimatedCompletionAt)}</span>
+                                                                </div>
+                                                            )}
+                                                            {workOrderStatus.productionWorkOrder.start.operatorNote && (
+                                                                <div className="col-span-2">
+                                                                    <span className="text-slate-400 dark:text-slate-500 text-[9px] block">Operator Note</span>
+                                                                    <div className="bg-slate-50 dark:bg-black/40 p-1.5 border border-slate-100 dark:border-white/5 whitespace-pre-wrap font-sans text-xs">
+                                                                        {workOrderStatus.productionWorkOrder.start.operatorNote}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* History Logs */}
+                                                {((workOrderStatus.productionWorkOrder.pauseHistory && workOrderStatus.productionWorkOrder.pauseHistory.length > 0) ||
+                                                  (workOrderStatus.productionWorkOrder.resumeHistory && workOrderStatus.productionWorkOrder.resumeHistory.length > 0)) && (
+                                                    <div className="p-3 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 space-y-2">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Execution History Log</strong>
+                                                        <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar text-[10px] font-mono">
+                                                            {[
+                                                                ...(workOrderStatus.productionWorkOrder.pauseHistory || []).map((p: any) => ({ ...p, type: 'PAUSE' })),
+                                                                ...(workOrderStatus.productionWorkOrder.resumeHistory || []).map((r: any) => ({ ...r, type: 'RESUME' }))
+                                                            ].sort((a, b) => new Date(a.pausedAt || a.resumedAt).getTime() - new Date(b.pausedAt || b.resumedAt).getTime()).map((item, idx) => (
+                                                                <div key={idx} className="border-l-2 border-indigo-400 pl-2 py-0.5">
+                                                                    <div className="flex justify-between text-slate-400">
+                                                                        <span>{item.type} by {item.pausedBy || item.resumedBy}</span>
+                                                                        <span>{formatDate(item.pausedAt || item.resumedAt)}</span>
+                                                                    </div>
+                                                                    {item.reason && <div className="text-amber-600 dark:text-amber-400">Reason: {item.reason}</div>}
+                                                                    {item.note && <div className="text-slate-600 dark:text-slate-300">Note: {item.note}</div>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Cancellation Context */}
+                                                {workOrderStatus.productionWorkOrder.cancel && (
+                                                    <div className="p-3 bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/10 text-red-900 dark:text-red-400 space-y-2">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px]">Cancellation Details</strong>
+                                                        <div className="text-xs space-y-1">
+                                                            <div><span className="font-bold">Cancelled At:</span> {formatDate(workOrderStatus.productionWorkOrder.cancel.cancelledAt)}</div>
+                                                            <div><span className="font-bold">Operator:</span> {workOrderStatus.productionWorkOrder.cancel.cancelledBy}</div>
+                                                            <div><span className="font-bold">Reason:</span> {workOrderStatus.productionWorkOrder.cancel.reason}</div>
+                                                            {workOrderStatus.productionWorkOrder.cancel.note && <div><span className="font-bold">Note:</span> {workOrderStatus.productionWorkOrder.cancel.note}</div>}
+                                                        </div>
+                                                        <div className="pt-2 border-t border-red-200/50 dark:border-red-500/20 font-mono text-[9px] space-y-0.5 text-slate-500">
+                                                            <div>commercialImpact: {workOrderStatus.productionWorkOrder.cancel.commercialImpact}</div>
+                                                            <div>refundTriggered: {String(workOrderStatus.productionWorkOrder.cancel.refundTriggered)}</div>
+                                                            <div>invoiceCancelled: {String(workOrderStatus.productionWorkOrder.cancel.invoiceCancelled)}</div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Mutation actions */}
+                                        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                                            
+                                            {/* Action 1: Create Work Order */}
+                                            {!workOrderStatus?.productionWorkOrder && (
+                                                <button 
+                                                    onClick={handleCreateWorkOrder}
+                                                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                    disabled={workOrderActionLoading || (workOrderEligibility && !workOrderEligibility.eligible)}
+                                                >
+                                                    {workOrderActionLoading ? 'Creating Work Order...' : 'Create Production Work Order'}
+                                                </button>
+                                            )}
+
+                                            {/* Action 2: Start Work Order Form */}
+                                            {workOrderStatus?.productionWorkOrder?.status === 'WORK_ORDER_CREATED' && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Start Parameters</strong>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Shift ID" 
+                                                            className="bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                            value={woShiftId}
+                                                            onChange={e => setWoShiftId(e.target.value)}
+                                                            disabled={workOrderActionLoading}
+                                                        />
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Batch Reference" 
+                                                            className="bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                            value={woBatchRef}
+                                                            onChange={e => setWoBatchRef(e.target.value)}
+                                                            disabled={workOrderActionLoading}
+                                                        />
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Est. Completion At (ISO)" 
+                                                            className="col-span-2 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white font-mono"
+                                                            value={woEstCompletion}
+                                                            onChange={e => setWoEstCompletion(e.target.value)}
+                                                            disabled={workOrderActionLoading}
+                                                        />
+                                                        <textarea 
+                                                            placeholder="Operator Notes..."
+                                                            className="col-span-2 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                            value={woOperatorNote}
+                                                            onChange={e => setWoOperatorNote(e.target.value)}
+                                                            disabled={workOrderActionLoading}
+                                                        />
+                                                    </div>
+                                                    <button 
+                                                        onClick={handleStartWorkOrder}
+                                                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={workOrderActionLoading}
+                                                    >
+                                                        {workOrderActionLoading ? 'Starting...' : 'Start Execution'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 3: Pause Work Order Form */}
+                                            {workOrderStatus?.productionWorkOrder?.status === 'PRODUCTION_STARTED' && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Pause Details</strong>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Reason for Pause (Required)" 
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                        value={woPauseReason}
+                                                        onChange={e => setWoPauseReason(e.target.value)}
+                                                        disabled={workOrderActionLoading}
+                                                    />
+                                                    <textarea 
+                                                        placeholder="Additional note..."
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                        value={woPauseNote}
+                                                        onChange={e => setWoPauseNote(e.target.value)}
+                                                        disabled={workOrderActionLoading}
+                                                    />
+                                                    <button 
+                                                        onClick={handlePauseWorkOrder}
+                                                        className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={workOrderActionLoading}
+                                                    >
+                                                        {workOrderActionLoading ? 'Pausing...' : 'Pause Execution'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 4: Resume Work Order Form */}
+                                            {workOrderStatus?.productionWorkOrder?.status === 'PRODUCTION_PAUSED' && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Resume Details</strong>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Resume note (Optional)" 
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                        value={woOperatorNote}
+                                                        onChange={e => setWoOperatorNote(e.target.value)}
+                                                        disabled={workOrderActionLoading}
+                                                    />
+                                                    <button 
+                                                        onClick={handleResumeWorkOrder}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={workOrderActionLoading}
+                                                    >
+                                                        {workOrderActionLoading ? 'Resuming...' : 'Resume Execution'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 5: Cancel Work Order Form (Available in any active state) */}
+                                            {workOrderStatus?.productionWorkOrder && ['WORK_ORDER_CREATED', 'PRODUCTION_STARTED', 'PRODUCTION_PAUSED'].includes(workOrderStatus.productionWorkOrder.status) && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-red-200 dark:border-red-500/20">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-red-600 dark:text-red-400">Cancel Work Order</strong>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Reason for Cancellation (Required)" 
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                        value={woCancelReason}
+                                                        onChange={e => setWoCancelReason(e.target.value)}
+                                                        disabled={workOrderActionLoading}
+                                                    />
+                                                    <textarea 
+                                                        placeholder="Additional cancellation note..."
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                        value={woCancelNote}
+                                                        onChange={e => setWoCancelNote(e.target.value)}
+                                                        disabled={workOrderActionLoading}
+                                                    />
+                                                    <button 
+                                                        onClick={handleCancelWorkOrder}
+                                                        className="w-full py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={workOrderActionLoading}
+                                                    >
+                                                        {workOrderActionLoading ? 'Cancelling...' : 'Cancel Work Order'}
+                                                    </button>
+                                                </div>
+                                            )}
+
                                         </div>
                                     </div>
                                 )}

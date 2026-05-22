@@ -1339,4 +1339,188 @@ router.post('/:id/production-queue/unassign-machine', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production-work-order/status
+ * Phase 38.6 — Get status of the work order execution gate.
+ */
+router.get('/:id/production-work-order/status', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const result = await service.getProductionWorkOrderStatus(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/evaluate
+ * Phase 38.6 — Evaluate eligibility for work order execution.
+ */
+router.post('/:id/production-work-order/evaluate', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const result = await service.evaluateWorkOrderEligibility(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/create
+ * Phase 38.6 — Create a work order (transitions status to WORK_ORDER_CREATED).
+ * Guarded by PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION feature flag.
+ */
+router.post('/:id/production-work-order/create', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_WORK_ORDER_EXECUTION_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION=true to enable Phase 38.6 work order operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.createProductionWorkOrder(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'PRODUCTION_WORK_ORDER_CREATION_BLOCKED' || err.message === 'PRODUCTION_WORK_ORDER_CANCELLED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_CREATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/start
+ * Phase 38.6 — Start work order execution.
+ * Guarded by PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION feature flag.
+ */
+router.post('/:id/production-work-order/start', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_WORK_ORDER_EXECUTION_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION=true to enable Phase 38.6 work order operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.startProductionWorkOrder(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_WORK_ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_WORK_ORDER_STATUS' || err.message === 'PRODUCTION_WORK_ORDER_CANCELLED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_START_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/pause
+ * Phase 38.6 — Pause work order execution.
+ * Guarded by PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION feature flag.
+ */
+router.post('/:id/production-work-order/pause', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_WORK_ORDER_EXECUTION_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION=true to enable Phase 38.6 work order operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.pauseProductionWorkOrder(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_WORK_ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_WORK_ORDER_STATUS' || err.message === 'PAUSE_REASON_REQUIRED' || err.message === 'PRODUCTION_WORK_ORDER_CANCELLED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_PAUSE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/resume
+ * Phase 38.6 — Resume paused work order execution.
+ * Guarded by PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION feature flag.
+ */
+router.post('/:id/production-work-order/resume', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_WORK_ORDER_EXECUTION_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION=true to enable Phase 38.6 work order operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.resumeProductionWorkOrder(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_WORK_ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_WORK_ORDER_STATUS' || err.message === 'PRODUCTION_WORK_ORDER_CANCELLED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_RESUME_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-work-order/cancel
+ * Phase 38.6 — Cancel work order execution.
+ * Guarded by PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION feature flag.
+ */
+router.post('/:id/production-work-order/cancel', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_WORK_ORDER_EXECUTION_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_WORK_ORDER_EXECUTION=true to enable Phase 38.6 work order operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionWorkOrderService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.cancelProductionWorkOrder(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_WORK_ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_WORK_ORDER_STATUS' || err.message === 'CANCEL_REASON_REQUIRED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'WORK_ORDER_CANCEL_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
