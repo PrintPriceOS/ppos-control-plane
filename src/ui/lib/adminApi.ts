@@ -2407,5 +2407,44 @@ export async function cancelProductionWorkOrder(orderId: string, payload: Record
     });
 }
 
+export async function getProductionProgressStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/status`);
+}
+
+export async function evaluateProductionProgress(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/evaluate`, {
+        method: 'POST'
+    });
+}
+
+export async function recordProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/record`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function pauseProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/pause`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function resumeProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/resume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function markProductionCompletionReady(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/completion-ready`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+
 
 

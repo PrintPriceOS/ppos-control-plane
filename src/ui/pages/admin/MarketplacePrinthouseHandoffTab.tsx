@@ -52,6 +52,23 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [woCancelReason, setWoCancelReason] = useState<string>('');
     const [woCancelNote, setWoCancelNote] = useState<string>('');
 
+    // Phase 38.7 Production Progress State
+    const [productionProgressStatus, setProductionProgressStatus] = useState<any | null>(null);
+    const [productionProgressEligibility, setProductionProgressEligibility] = useState<any | null>(null);
+    const [progressActionLoading, setProgressActionLoading] = useState<boolean>(false);
+
+    // Form inputs for Production Progress
+    const [progressPercent, setProgressPercent] = useState<string>('');
+    const [progressMilestone, setProgressMilestone] = useState<string>('MATERIALS_STAGED');
+    const [customMilestoneLabel, setCustomMilestoneLabel] = useState<string>('');
+    const [progressNote, setProgressNote] = useState<string>('');
+    const [progressForceRegression, setProgressForceRegression] = useState<boolean>(false);
+    const [progressRegressionReason, setProgressRegressionReason] = useState<string>('');
+    const [progressPauseReason, setProgressPauseReason] = useState<string>('');
+    const [progressPauseNote, setProgressPauseNote] = useState<string>('');
+    const [progressResumeNote, setProgressResumeNote] = useState<string>('');
+    const [progressCompletionReadyNote, setProgressCompletionReadyNote] = useState<string>('');
+
 
     useEffect(() => {
         fetchPackages();
@@ -90,15 +107,28 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
         setWoCancelReason('');
         setWoCancelNote('');
 
+        setProgressPercent('');
+        setProgressMilestone('MATERIALS_STAGED');
+        setCustomMilestoneLabel('');
+        setProgressNote('');
+        setProgressForceRegression(false);
+        setProgressRegressionReason('');
+        setProgressPauseReason('');
+        setProgressPauseNote('');
+        setProgressResumeNote('');
+        setProgressCompletionReadyNote('');
+
         try {
-            const [pkgRes, timelineRes, prodRes, queueRes, evalRes, woRes, woEvalRes] = await Promise.all([
+            const [pkgRes, timelineRes, prodRes, queueRes, evalRes, woRes, woEvalRes, progressRes, progressEvalRes] = await Promise.all([
                 adminApi.getPrinthouseHandoffPackage(orderId),
                 adminApi.getPrinthouseHandoffTimeline(orderId),
                 adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false })),
                 adminApi.getProductionQueueStatus(orderId).catch(() => ({ ok: false })),
                 adminApi.evaluateProductionQueue(orderId).catch(() => ({ ok: false })),
                 adminApi.getProductionWorkOrderStatus(orderId).catch(() => ({ ok: false })),
-                adminApi.evaluateProductionWorkOrder(orderId).catch(() => ({ ok: false }))
+                adminApi.evaluateProductionWorkOrder(orderId).catch(() => ({ ok: false })),
+                adminApi.getProductionProgressStatus(orderId).catch(() => ({ ok: false })),
+                adminApi.evaluateProductionProgress(orderId).catch(() => ({ ok: false }))
             ]);
             setDetail(pkgRes.ok ? pkgRes : null);
             setTimeline(timelineRes.ok ? timelineRes.timeline : []);
@@ -107,6 +137,8 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             setEligibility(evalRes.ok ? evalRes : null);
             setWorkOrderStatus(woRes.ok ? woRes : null);
             setWorkOrderEligibility(woEvalRes.ok ? woEvalRes : null);
+            setProductionProgressStatus(progressRes.ok ? progressRes : null);
+            setProductionProgressEligibility(progressEvalRes.ok ? progressEvalRes : null);
         } catch (err) {
             console.error('Failed to fetch package details', err);
         } finally {
@@ -432,6 +464,123 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             alert(`Error: ${err.message}`);
         } finally {
             setWorkOrderActionLoading(false);
+        }
+    };
+
+    const handleRecordProgress = async () => {
+        if (!selectedOrderId) return;
+        const percent = parseInt(progressPercent, 10);
+        if (isNaN(percent) || percent < 0 || percent > 99) {
+            return alert('Progress percentage must be between 0 and 99');
+        }
+        if (!progressMilestone) {
+            return alert('Milestone is required');
+        }
+        if (progressMilestone === 'CUSTOM' && !customMilestoneLabel.trim()) {
+            return alert('Custom milestone label is required');
+        }
+        if (percent < (productionProgressStatus?.productionProgress?.progressPercent || 0)) {
+            if (!progressForceRegression) {
+                return alert('Progress regression is blocked unless forced with a reason');
+            }
+            if (!progressRegressionReason.trim()) {
+                return alert('Regression reason is required to force a progress regression');
+            }
+        }
+
+        setProgressActionLoading(true);
+        try {
+            const res = await adminApi.recordProductionProgress(selectedOrderId, {
+                progressPercent: percent,
+                milestone: progressMilestone,
+                customMilestoneLabel: progressMilestone === 'CUSTOM' ? customMilestoneLabel.trim() : undefined,
+                note: progressNote.trim() || undefined,
+                forceRegression: progressForceRegression || undefined,
+                reason: progressForceRegression ? progressRegressionReason.trim() : undefined
+            });
+            if (res?.ok) {
+                setProgressPercent('');
+                setCustomMilestoneLabel('');
+                setProgressNote('');
+                setProgressForceRegression(false);
+                setProgressRegressionReason('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to record progress: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setProgressActionLoading(false);
+        }
+    };
+
+    const handlePauseProgress = async () => {
+        if (!selectedOrderId) return;
+        if (!progressPauseReason.trim()) {
+            return alert('Pause reason is required');
+        }
+        setProgressActionLoading(true);
+        try {
+            const res = await adminApi.pauseProductionProgress(selectedOrderId, {
+                reason: progressPauseReason.trim(),
+                note: progressPauseNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setProgressPauseReason('');
+                setProgressPauseNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to pause production: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setProgressActionLoading(false);
+        }
+    };
+
+    const handleResumeProgress = async () => {
+        if (!selectedOrderId) return;
+        setProgressActionLoading(true);
+        try {
+            const res = await adminApi.resumeProductionProgress(selectedOrderId, {
+                note: progressResumeNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setProgressResumeNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to resume production: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setProgressActionLoading(false);
+        }
+    };
+
+    const handleMarkCompletionReady = async () => {
+        if (!selectedOrderId) return;
+        setProgressActionLoading(true);
+        try {
+            const res = await adminApi.markProductionCompletionReady(selectedOrderId, {
+                note: progressCompletionReadyNote.trim() || undefined
+            });
+            if (res?.ok) {
+                setProgressCompletionReadyNote('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to mark completion ready: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setProgressActionLoading(false);
         }
     };
 
@@ -1216,6 +1365,321 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                 </div>
                                             )}
 
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Phase 38.7 — Production Progress Gate */}
+                                {detail && ['PRODUCTION_STARTED', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_PAUSED', 'PRODUCTION_COMPLETION_READY'].includes(detail.status || detail.handoffStatus || (productionStatus && productionStatus.orderStatus) || (workOrderStatus && workOrderStatus.orderStatus) || (productionProgressStatus && productionProgressStatus.orderStatus)) && (
+                                    <div className="mt-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 p-4 animate-slide-fade">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5 mb-4">
+                                            <ArrowPathIcon className="w-4 h-4 text-indigo-500 animate-spin-slow" />
+                                            Production Progress Gate
+                                        </h4>
+
+                                        {/* Blockers & Warnings */}
+                                        {productionProgressEligibility && (
+                                            <div className="space-y-3 mb-4">
+                                                {productionProgressEligibility.blockers && productionProgressEligibility.blockers.length > 0 && (
+                                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Production Progress Blocked</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {productionProgressEligibility.blockers.map((b: string) => <li key={b}>{b}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {productionProgressEligibility.warnings && productionProgressEligibility.warnings.length > 0 && (
+                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Eligibility Warnings</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {productionProgressEligibility.warnings.map((w: string) => <li key={w}>{w}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Current Status Display */}
+                                        <div className="space-y-4 mb-4">
+                                            <div className="grid grid-cols-2 gap-4 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Progress Status</div>
+                                                    <span className={`inline-block px-2 py-0.5 border text-[9px] uppercase tracking-wider font-mono ${
+                                                        (productionProgressStatus?.productionProgress?.status || detail?.status) === 'PRODUCTION_STARTED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' :
+                                                        (productionProgressStatus?.productionProgress?.status || detail?.status) === 'PRODUCTION_IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' :
+                                                        (productionProgressStatus?.productionProgress?.status || detail?.status) === 'PRODUCTION_PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20' :
+                                                        (productionProgressStatus?.productionProgress?.status || detail?.status) === 'PRODUCTION_COMPLETION_READY' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' :
+                                                        'bg-slate-50 text-slate-700 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'
+                                                    }`}>
+                                                        {productionProgressStatus?.productionProgress?.status || detail?.status}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Progress Percentage</div>
+                                                    <div className="font-mono text-xs text-slate-900 dark:text-white font-bold">{productionProgressStatus?.productionProgress?.progressPercent ?? 0}%</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Last Milestone</div>
+                                                    <div className="font-mono text-xs text-slate-900 dark:text-white font-bold">{productionProgressStatus?.productionProgress?.lastMilestone || 'None'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Work Order ID</div>
+                                                    <div className="font-mono text-xs text-slate-900 dark:text-white truncate font-bold">{productionProgressStatus?.productionProgress?.workOrderId || workOrderStatus?.productionWorkOrder?.workOrderId || '—'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Machine ID</div>
+                                                    <div className="font-mono text-xs text-slate-900 dark:text-white font-bold">{productionProgressStatus?.productionProgress?.machineId || workOrderStatus?.productionWorkOrder?.machineId || '—'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Last Updated</div>
+                                                    <div className="font-mono text-xs text-slate-900 dark:text-white">
+                                                        {productionProgressStatus?.productionProgress?.updatedAt ? (
+                                                            `${formatDate(productionProgressStatus.productionProgress.updatedAt)} by ${productionProgressStatus.productionProgress.updatedBy}`
+                                                        ) : (
+                                                            'Not updated yet'
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Milestones Log */}
+                                            {productionProgressStatus?.productionProgress?.milestones && productionProgressStatus.productionProgress.milestones.length > 0 && (
+                                                <div className="p-3 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 space-y-2">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Recorded Milestones Log</strong>
+                                                    <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar text-[10px] font-mono">
+                                                        {productionProgressStatus.productionProgress.milestones.map((m: any, idx: number) => (
+                                                            <div key={idx} className="border-l-2 border-emerald-500 pl-2 py-0.5">
+                                                                <div className="flex justify-between text-slate-400">
+                                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                                        {m.milestone === 'CUSTOM' ? m.customMilestoneLabel : m.milestone} ({m.progressPercent}%)
+                                                                    </span>
+                                                                    <span>{formatDate(m.recordedAt)}</span>
+                                                                </div>
+                                                                <div className="text-slate-500">Recorded By: {m.recordedBy}</div>
+                                                                {m.note && <div className="text-slate-600 dark:text-slate-300">Note: {m.note}</div>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* History Logs */}
+                                            {productionProgressStatus?.productionProgress &&
+                                             ((productionProgressStatus.productionProgress.pauseHistory && productionProgressStatus.productionProgress.pauseHistory.length > 0) ||
+                                              (productionProgressStatus.productionProgress.resumeHistory && productionProgressStatus.productionProgress.resumeHistory.length > 0)) && (
+                                                <div className="p-3 bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 space-y-2">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Progress Governance Log</strong>
+                                                    <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar text-[10px] font-mono">
+                                                        {[
+                                                            ...(productionProgressStatus.productionProgress.pauseHistory || []).map((p: any) => ({ ...p, type: 'PAUSE' })),
+                                                            ...(productionProgressStatus.productionProgress.resumeHistory || []).map((r: any) => ({ ...r, type: 'RESUME' }))
+                                                        ].sort((a, b) => new Date(a.pausedAt || a.resumedAt).getTime() - new Date(b.pausedAt || b.resumedAt).getTime()).map((item, idx) => (
+                                                            <div key={idx} className="border-l-2 border-amber-500 pl-2 py-0.5">
+                                                                <div className="flex justify-between text-slate-400">
+                                                                    <span>{item.type} by {item.pausedBy || item.resumedBy}</span>
+                                                                    <span>{formatDate(item.pausedAt || item.resumedAt)}</span>
+                                                                </div>
+                                                                {item.reason && <div className="text-amber-600 dark:text-amber-400 font-bold">Reason: {item.reason}</div>}
+                                                                {item.note && <div className="text-slate-600 dark:text-slate-300">Note: {item.note}</div>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Completion Ready Context */}
+                                            {productionProgressStatus?.productionProgress?.completionReady && (
+                                                <div className="p-3 bg-indigo-50 dark:bg-indigo-500/5 border border-indigo-200 dark:border-indigo-500/10 text-indigo-900 dark:text-indigo-400 space-y-2">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px]">Completion Readiness Details</strong>
+                                                    <div className="text-xs space-y-1 font-mono">
+                                                        <div><span className="font-bold">Marked At:</span> {formatDate(productionProgressStatus.productionProgress.completionReady.markedAt)}</div>
+                                                        <div><span className="font-bold">Marked By:</span> {productionProgressStatus.productionProgress.completionReady.markedBy}</div>
+                                                        {productionProgressStatus.productionProgress.completionReady.note && <div><span className="font-bold">Note:</span> {productionProgressStatus.productionProgress.completionReady.note}</div>}
+                                                        <div className="pt-2 border-t border-indigo-200/50 dark:border-indigo-500/20 text-[9px] text-slate-500 space-y-0.5">
+                                                            <div>completionTriggered: {String(productionProgressStatus.productionProgress.completionReady.completionTriggered)}</div>
+                                                            <div>shipmentTriggered: {String(productionProgressStatus.productionProgress.completionReady.shipmentTriggered)}</div>
+                                                            <div>qaRequired: {String(productionProgressStatus.productionProgress.completionReady.qaRequired)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                                            {/* Action 1: Record Progress Form */}
+                                            {['PRODUCTION_STARTED', 'PRODUCTION_IN_PROGRESS'].includes(productionProgressStatus?.productionProgress?.status || detail?.status) && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Record Progress Milestone</strong>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="col-span-2">
+                                                            <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1">Milestone</label>
+                                                            <select
+                                                                className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                                value={progressMilestone}
+                                                                onChange={e => setProgressMilestone(e.target.value)}
+                                                                disabled={progressActionLoading}
+                                                            >
+                                                                <option value="MATERIALS_STAGED">MATERIALS_STAGED</option>
+                                                                <option value="PLATES_PREPARED">PLATES_PREPARED</option>
+                                                                <option value="PRESS_SETUP">PRESS_SETUP</option>
+                                                                <option value="PRINTING_STARTED">PRINTING_STARTED</option>
+                                                                <option value="PRINTING_COMPLETED">PRINTING_COMPLETED</option>
+                                                                <option value="BINDING_STARTED">BINDING_STARTED</option>
+                                                                <option value="BINDING_COMPLETED">BINDING_COMPLETED</option>
+                                                                <option value="PACKAGING_STARTED">PACKAGING_STARTED</option>
+                                                                <option value="PACKAGING_COMPLETED">PACKAGING_COMPLETED</option>
+                                                                <option value="CUSTOM">CUSTOM</option>
+                                                            </select>
+                                                        </div>
+
+                                                        {progressMilestone === 'CUSTOM' && (
+                                                            <div className="col-span-2">
+                                                                <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1">Custom Label</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Custom milestone label (Required)"
+                                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white font-semibold"
+                                                                    value={customMilestoneLabel}
+                                                                    onChange={e => setCustomMilestoneLabel(e.target.value)}
+                                                                    disabled={progressActionLoading}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <div>
+                                                            <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1">Progress % (0-99)</label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="99"
+                                                                placeholder="Percent e.g. 50"
+                                                                className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white font-mono font-bold"
+                                                                value={progressPercent}
+                                                                onChange={e => setProgressPercent(e.target.value)}
+                                                                disabled={progressActionLoading}
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 pt-5">
+                                                            <input
+                                                                type="checkbox"
+                                                                id="progressForceRegression"
+                                                                checked={progressForceRegression}
+                                                                onChange={e => setProgressForceRegression(e.target.checked)}
+                                                                disabled={progressActionLoading}
+                                                                className="rounded border-slate-300 dark:border-white/20 text-indigo-600 focus:ring-indigo-500"
+                                                            />
+                                                            <label htmlFor="progressForceRegression" className="text-[10px] uppercase font-bold text-slate-500 select-none">Force Regression</label>
+                                                        </div>
+
+                                                        {progressForceRegression && (
+                                                            <div className="col-span-2">
+                                                                <label className="block text-[9px] uppercase font-bold text-red-500 mb-1">Regression Reason (Required)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Why is progress regressed?"
+                                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-red-200 dark:border-red-500/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                                    value={progressRegressionReason}
+                                                                    onChange={e => setProgressRegressionReason(e.target.value)}
+                                                                    disabled={progressActionLoading}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <div className="col-span-2">
+                                                            <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1">Progress Note</label>
+                                                            <textarea
+                                                                placeholder="Optional notes about this progress milestone..."
+                                                                className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                                value={progressNote}
+                                                                onChange={e => setProgressNote(e.target.value)}
+                                                                disabled={progressActionLoading}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={handleRecordProgress}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={progressActionLoading || (productionProgressEligibility && !productionProgressEligibility.eligible)}
+                                                    >
+                                                        {progressActionLoading ? 'Recording...' : 'Record Progress'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 2: Pause Production Form */}
+                                            {['PRODUCTION_STARTED', 'PRODUCTION_IN_PROGRESS'].includes(productionProgressStatus?.productionProgress?.status || detail?.status) && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Pause Production</strong>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Reason for Pause (Required)"
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                        value={progressPauseReason}
+                                                        onChange={e => setProgressPauseReason(e.target.value)}
+                                                        disabled={progressActionLoading}
+                                                    />
+                                                    <textarea
+                                                        placeholder="Additional pause note (Optional)..."
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                        value={progressPauseNote}
+                                                        onChange={e => setProgressPauseNote(e.target.value)}
+                                                        disabled={progressActionLoading}
+                                                    />
+                                                    <button
+                                                        onClick={handlePauseProgress}
+                                                        className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={progressActionLoading || (productionProgressEligibility && !productionProgressEligibility.eligible)}
+                                                    >
+                                                        {progressActionLoading ? 'Pausing...' : 'Pause Production'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 3: Resume Production Form */}
+                                            {(productionProgressStatus?.productionProgress?.status === 'PRODUCTION_PAUSED' || detail?.status === 'PRODUCTION_PAUSED') && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Resume Production</strong>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Resume note (Optional)"
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                        value={progressResumeNote}
+                                                        onChange={e => setProgressResumeNote(e.target.value)}
+                                                        disabled={progressActionLoading}
+                                                    />
+                                                    <button
+                                                        onClick={handleResumeProgress}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={progressActionLoading || (productionProgressEligibility && !productionProgressEligibility.eligible)}
+                                                    >
+                                                        {progressActionLoading ? 'Resuming...' : 'Resume Production'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Action 4: Mark Completion Ready Form */}
+                                            {(productionProgressStatus?.productionProgress?.status === 'PRODUCTION_IN_PROGRESS' || detail?.status === 'PRODUCTION_IN_PROGRESS') &&
+                                             (productionProgressStatus?.productionProgress?.progressPercent >= 90) && (
+                                                <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-indigo-200 dark:border-indigo-500/20">
+                                                    <strong className="block font-black uppercase tracking-wider text-[9px] text-indigo-600 dark:text-indigo-400">Mark Completion Ready</strong>
+                                                    <textarea
+                                                        placeholder="Ready note (Optional)..."
+                                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                        value={progressCompletionReadyNote}
+                                                        onChange={e => setProgressCompletionReadyNote(e.target.value)}
+                                                        disabled={progressActionLoading}
+                                                    />
+                                                    <button
+                                                        onClick={handleMarkCompletionReady}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                        disabled={progressActionLoading || (productionProgressEligibility && !productionProgressEligibility.eligible)}
+                                                    >
+                                                        {progressActionLoading ? 'Marking...' : 'Mark Completion Ready'}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

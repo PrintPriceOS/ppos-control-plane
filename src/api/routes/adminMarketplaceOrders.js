@@ -1523,4 +1523,248 @@ router.post('/:id/production-work-order/cancel', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production-progress/status
+ * Phase 38.7 — Get production progress status.
+ */
+router.get('/:id/production-progress/status', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const result = await service.getProductionProgressStatus(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-progress/evaluate
+ * Phase 38.7 — Evaluate eligibility for production progress.
+ */
+router.post('/:id/production-progress/evaluate', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const result = await service.evaluateProductionProgressEligibility(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-progress/record
+ * Phase 38.7 — Record production progress.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS feature flag.
+ */
+router.post('/:id/production-progress/record', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_PROGRESS_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS=true to enable Phase 38.7 progress operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.recordProductionProgress(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        const badRequests = [
+            'PRODUCTION_CANCELLED',
+            'PRODUCTION_WORK_ORDER_CANCELLED',
+            'PRODUCTION_PAUSED',
+            'PRODUCTION_COMPLETION_READY',
+            'INVALID_ORDER_STATUS_FOR_PROGRESS',
+            'INVALID_PROGRESS_PERCENT',
+            'MILESTONE_REQUIRED',
+            'INVALID_MILESTONE',
+            'CUSTOM_MILESTONE_LABEL_REQUIRED',
+            'PROGRESS_REGRESSION_BLOCKED',
+            'REGRESSION_REASON_REQUIRED',
+            'PRODUCTION_WORK_ORDER_MISSING',
+            'PRODUCTION_WORK_ORDER_INVALID_PHASE',
+            'PRODUCTION_WORK_ORDER_MISSING_ID',
+            'PRODUCTION_WORK_ORDER_MISSING_MACHINE',
+            'PRODUCTION_WORK_ORDER_INVALID_STATUS',
+            'PRODUCTION_DECISION_NOT_ACCEPTED',
+            'PRODUCTION_QUEUE_MISSING',
+            'PRODUCTION_QUEUE_NOT_ASSIGNED',
+            'INVOICE_MISSING',
+            'INVOICE_NOT_ISSUED',
+            'PAYMENT_MISSING',
+            'PAYMENT_NOT_CONFIRMED',
+            'PRODUCTION_NOT_UNLOCKED',
+            'DISPATCH_PACKAGE_NOT_FOUND',
+            'DISPATCH_PACKAGE_NOT_ACCEPTED'
+        ];
+        if (badRequests.includes(err.message)) {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_RECORD_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-progress/pause
+ * Phase 38.7 — Pause production progress.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS feature flag.
+ */
+router.post('/:id/production-progress/pause', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_PROGRESS_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS=true to enable Phase 38.7 progress operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.pauseProductionProgress(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        const badRequests = [
+            'PRODUCTION_CANCELLED',
+            'PRODUCTION_WORK_ORDER_CANCELLED',
+            'PAUSE_REASON_REQUIRED',
+            'INVALID_ORDER_STATUS_FOR_PAUSE',
+            'PRODUCTION_WORK_ORDER_MISSING',
+            'PRODUCTION_WORK_ORDER_INVALID_PHASE',
+            'PRODUCTION_WORK_ORDER_MISSING_ID',
+            'PRODUCTION_WORK_ORDER_MISSING_MACHINE',
+            'PRODUCTION_WORK_ORDER_INVALID_STATUS',
+            'PRODUCTION_DECISION_NOT_ACCEPTED',
+            'PRODUCTION_QUEUE_MISSING',
+            'PRODUCTION_QUEUE_NOT_ASSIGNED',
+            'INVOICE_MISSING',
+            'INVOICE_NOT_ISSUED',
+            'PAYMENT_MISSING',
+            'PAYMENT_NOT_CONFIRMED',
+            'PRODUCTION_NOT_UNLOCKED',
+            'DISPATCH_PACKAGE_NOT_FOUND',
+            'DISPATCH_PACKAGE_NOT_ACCEPTED'
+        ];
+        if (badRequests.includes(err.message)) {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_PAUSE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-progress/resume
+ * Phase 38.7 — Resume production progress.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS feature flag.
+ */
+router.post('/:id/production-progress/resume', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_PROGRESS_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS=true to enable Phase 38.7 progress operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.resumeProductionProgress(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        const badRequests = [
+            'PRODUCTION_CANCELLED',
+            'PRODUCTION_WORK_ORDER_CANCELLED',
+            'INVALID_ORDER_STATUS_FOR_RESUME',
+            'PRODUCTION_WORK_ORDER_MISSING',
+            'PRODUCTION_WORK_ORDER_INVALID_PHASE',
+            'PRODUCTION_WORK_ORDER_MISSING_ID',
+            'PRODUCTION_WORK_ORDER_MISSING_MACHINE',
+            'PRODUCTION_WORK_ORDER_INVALID_STATUS',
+            'PRODUCTION_DECISION_NOT_ACCEPTED',
+            'PRODUCTION_QUEUE_MISSING',
+            'PRODUCTION_QUEUE_NOT_ASSIGNED',
+            'INVOICE_MISSING',
+            'INVOICE_NOT_ISSUED',
+            'PAYMENT_MISSING',
+            'PAYMENT_NOT_CONFIRMED',
+            'PRODUCTION_NOT_UNLOCKED',
+            'DISPATCH_PACKAGE_NOT_FOUND',
+            'DISPATCH_PACKAGE_NOT_ACCEPTED'
+        ];
+        if (badRequests.includes(err.message)) {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_RESUME_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-progress/completion-ready
+ * Phase 38.7 — Mark production progress completion ready.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS feature flag.
+ */
+router.post('/:id/production-progress/completion-ready', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_PROGRESS_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_PROGRESS=true to enable Phase 38.7 progress operations.'
+        });
+    }
+
+    try {
+        const service = require('../services/marketplaceProductionProgressService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.markProductionCompletionReady(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        const badRequests = [
+            'PRODUCTION_CANCELLED',
+            'PRODUCTION_WORK_ORDER_CANCELLED',
+            'INVALID_STATUS_FOR_COMPLETION_READY',
+            'COMPLETION_READY_PROGRESS_PERCENT_REQUIRED',
+            'PRODUCTION_WORK_ORDER_MISSING',
+            'PRODUCTION_WORK_ORDER_INVALID_PHASE',
+            'PRODUCTION_WORK_ORDER_MISSING_ID',
+            'PRODUCTION_WORK_ORDER_MISSING_MACHINE',
+            'PRODUCTION_WORK_ORDER_INVALID_STATUS',
+            'PRODUCTION_DECISION_NOT_ACCEPTED',
+            'PRODUCTION_QUEUE_MISSING',
+            'PRODUCTION_QUEUE_NOT_ASSIGNED',
+            'INVOICE_MISSING',
+            'INVOICE_NOT_ISSUED',
+            'PAYMENT_MISSING',
+            'PAYMENT_NOT_CONFIRMED',
+            'PRODUCTION_NOT_UNLOCKED',
+            'DISPATCH_PACKAGE_NOT_FOUND',
+            'DISPATCH_PACKAGE_NOT_ACCEPTED'
+        ];
+        if (badRequests.includes(err.message)) {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PROGRESS_COMPLETION_READY_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
