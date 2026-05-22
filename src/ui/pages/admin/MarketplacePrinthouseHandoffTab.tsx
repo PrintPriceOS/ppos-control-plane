@@ -30,6 +30,13 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [productionStatus, setProductionStatus] = useState<any | null>(null);
     const [productionDecisionState, setProductionDecisionState] = useState<{ decision: string | null, reason: string }>({ decision: null, reason: '' });
 
+    // Phase 38.5 Production Queue / Machine Assignment State
+    const [queueStatus, setQueueStatus] = useState<any | null>(null);
+    const [eligibility, setEligibility] = useState<any | null>(null);
+    const [assignMachineId, setAssignMachineId] = useState<string>('');
+    const [unassignReason, setUnassignReason] = useState<string>('');
+    const [queueActionLoading, setQueueActionLoading] = useState<boolean>(false);
+
     useEffect(() => {
         fetchPackages();
     }, []);
@@ -55,15 +62,21 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
         setDetailLoading(true);
         setActionState({ type: null, reason: '' });
         setProductionDecisionState({ decision: null, reason: '' });
+        setAssignMachineId('');
+        setUnassignReason('');
         try {
-            const [pkgRes, timelineRes, prodRes] = await Promise.all([
+            const [pkgRes, timelineRes, prodRes, queueRes, evalRes] = await Promise.all([
                 adminApi.getPrinthouseHandoffPackage(orderId),
                 adminApi.getPrinthouseHandoffTimeline(orderId),
-                adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false }))
+                adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false })),
+                adminApi.getProductionQueueStatus(orderId).catch(() => ({ ok: false })),
+                adminApi.evaluateProductionQueue(orderId).catch(() => ({ ok: false }))
             ]);
             setDetail(pkgRes.ok ? pkgRes : null);
             setTimeline(timelineRes.ok ? timelineRes.timeline : []);
             setProductionStatus(prodRes.ok ? prodRes : null);
+            setQueueStatus(queueRes.ok ? queueRes : null);
+            setEligibility(evalRes.ok ? evalRes : null);
         } catch (err) {
             console.error('Failed to fetch package details', err);
         } finally {
@@ -211,6 +224,66 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             }
         } catch (err: any) {
             alert(`Error: ${err.message}`);
+        }
+    };
+
+    const handleCreateQueueEntry = async (machineIdOption?: string) => {
+        if (!selectedOrderId) return;
+        setQueueActionLoading(true);
+        try {
+            const res = await adminApi.createProductionQueueEntry(selectedOrderId, { machineId: machineIdOption || undefined });
+            if (res?.ok) {
+                setAssignMachineId('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to queue order: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setQueueActionLoading(false);
+        }
+    };
+
+    const handleAssignMachine = async () => {
+        if (!selectedOrderId) return;
+        if (!assignMachineId.trim()) {
+            return alert('Machine ID is required');
+        }
+        setQueueActionLoading(true);
+        try {
+            const res = await adminApi.assignProductionMachine(selectedOrderId, assignMachineId.trim());
+            if (res?.ok) {
+                setAssignMachineId('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to assign machine: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setQueueActionLoading(false);
+        }
+    };
+
+    const handleUnassignMachine = async () => {
+        if (!selectedOrderId) return;
+        setQueueActionLoading(true);
+        try {
+            const res = await adminApi.unassignProductionMachine(selectedOrderId, { reason: unassignReason.trim() });
+            if (res?.ok) {
+                setUnassignReason('');
+                await loadDetail(selectedOrderId);
+                await fetchPackages();
+            } else {
+                alert(`Failed to unassign machine: ${res?.error || 'Unknown error'}`);
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setQueueActionLoading(false);
         }
     };
 
@@ -542,6 +615,170 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Phase 38.5 - Production Queue / Machine Assignment Gate */}
+                                {detail && ['PRODUCTION_ACCEPTED', 'PRODUCTION_QUEUED', 'MACHINE_ASSIGNED'].includes(detail.status || detail.handoffStatus || (productionStatus && productionStatus.orderStatus) || (queueStatus && queueStatus.orderStatus)) && (
+                                    <div className="mt-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 p-4 animate-slide-fade">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5 mb-4">
+                                            <ShieldCheckIcon className="w-4 h-4 text-emerald-500" />
+                                            Production Queue Gate
+                                        </h4>
+
+                                        {/* Warnings & Blockers */}
+                                        {eligibility && !queueStatus?.productionQueue && (
+                                            <div className="mb-4 space-y-2">
+                                                {eligibility.blockers && eligibility.blockers.length > 0 && (
+                                                    <div className="p-2.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Queue Creation Blocked</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {eligibility.blockers.map((b: string) => <li key={b}>{b}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {eligibility.warnings && eligibility.warnings.length > 0 && (
+                                                    <div className="p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Warnings</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {eligibility.warnings.map((w: string) => <li key={w}>{w}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {queueStatus?.productionQueue?.warnings && queueStatus.productionQueue.warnings.length > 0 && (
+                                            <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Queue Entry Warnings</strong>
+                                                <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                    {queueStatus.productionQueue.warnings.map((w: string) => <li key={w}>{w}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Status Info */}
+                                        <div className="grid grid-cols-2 gap-4 mb-4 text-xs">
+                                            <div>
+                                                <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Queue Status</div>
+                                                <span className={`inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border ${
+                                                    queueStatus?.productionQueue?.status === 'MACHINE_ASSIGNED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                                                    queueStatus?.productionQueue?.status === 'PRODUCTION_QUEUED' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400' :
+                                                    'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400'
+                                                }`}>
+                                                    {queueStatus?.productionQueue?.status || 'NOT QUEUED'}
+                                                </span>
+                                            </div>
+
+                                            {queueStatus?.productionQueue?.queuedAt && (
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Queued At</div>
+                                                    <div className="font-mono text-slate-900 dark:text-white">{formatDate(queueStatus.productionQueue.queuedAt)}</div>
+                                                </div>
+                                            )}
+
+                                            {queueStatus?.productionQueue?.queuedBy && (
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Queued By</div>
+                                                    <div className="font-mono text-slate-900 dark:text-white truncate">{queueStatus.productionQueue.queuedBy}</div>
+                                                </div>
+                                            )}
+
+                                            {queueStatus?.productionQueue?.machineAssignment && (
+                                                <div>
+                                                    <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Machine Assignment</div>
+                                                    <span className={`inline-block px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest border ${
+                                                        queueStatus.productionQueue.machineAssignment.assignmentStatus === 'ASSIGNED' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 font-bold' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 font-bold'
+                                                    }`}>
+                                                        {queueStatus.productionQueue.machineAssignment.assignmentStatus}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {queueStatus?.productionQueue?.machineAssignment?.assignmentStatus === 'ASSIGNED' && (
+                                                <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-slate-200 dark:border-white/5 pt-2 mt-2">
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Machine ID</div>
+                                                        <div className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{queueStatus.productionQueue.machineAssignment.machineId}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Assigned At</div>
+                                                        <div className="font-mono text-slate-900 dark:text-white">{formatDate(queueStatus.productionQueue.machineAssignment.assignedAt)}</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                                            {/* Queue Creation Action */}
+                                            {!queueStatus?.productionQueue && (
+                                                <div className="space-y-3">
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            type="text"
+                                                            placeholder="Optional Machine ID..."
+                                                            className="flex-1 bg-white dark:bg-[#131314] border border-slate-300 dark:border-white/20 text-xs p-2 text-slate-900 dark:text-white font-mono"
+                                                            value={assignMachineId}
+                                                            onChange={e => setAssignMachineId(e.target.value)}
+                                                            disabled={queueActionLoading || (eligibility && !eligibility.eligible)}
+                                                        />
+                                                        <button 
+                                                            onClick={() => handleCreateQueueEntry(assignMachineId.trim() || undefined)}
+                                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                            disabled={queueActionLoading || (eligibility && !eligibility.eligible)}
+                                                        >
+                                                            {queueActionLoading ? 'Queueing...' : 'Create Queue Entry'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Machine Assignment / Re-assignment Action */}
+                                            {queueStatus?.productionQueue && (
+                                                <div className="space-y-3">
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            type="text"
+                                                            placeholder="Enter Machine ID..."
+                                                            className="flex-1 bg-white dark:bg-[#131314] border border-slate-300 dark:border-white/20 text-xs p-2 text-slate-900 dark:text-white font-mono"
+                                                            value={assignMachineId}
+                                                            onChange={e => setAssignMachineId(e.target.value)}
+                                                            disabled={queueActionLoading}
+                                                        />
+                                                        <button 
+                                                            onClick={handleAssignMachine}
+                                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                            disabled={queueActionLoading}
+                                                        >
+                                                            {queueActionLoading ? 'Assigning...' : queueStatus.productionQueue.machineAssignment?.assignmentStatus === 'ASSIGNED' ? 'Reassign Machine' : 'Assign Machine'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Machine Unassignment Action */}
+                                            {queueStatus?.productionQueue?.machineAssignment?.assignmentStatus === 'ASSIGNED' && (
+                                                <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/10">
+                                                    <div className="flex gap-2 items-start">
+                                                        <textarea 
+                                                            placeholder="Unassign Reason (Optional)..."
+                                                            className="flex-1 h-16 bg-white dark:bg-[#131314] border border-slate-300 dark:border-white/20 p-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400"
+                                                            value={unassignReason}
+                                                            onChange={e => setUnassignReason(e.target.value)}
+                                                            disabled={queueActionLoading}
+                                                        />
+                                                        <button 
+                                                            onClick={handleUnassignMachine}
+                                                            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest transition-colors h-16 disabled:opacity-50"
+                                                            disabled={queueActionLoading}
+                                                        >
+                                                            {queueActionLoading ? 'Unassigning...' : 'Unassign Machine'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </>

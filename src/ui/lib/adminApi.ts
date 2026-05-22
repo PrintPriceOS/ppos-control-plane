@@ -2327,3 +2327,39 @@ export async function recordProductionDecision(orderId: string, decision: string
   });
 }
 
+export async function getProductionQueueStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/status`);
+}
+
+export async function evaluateProductionQueue(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/evaluate`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function createProductionQueueEntry(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/create`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function assignProductionMachine(orderId: string, machineId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/assign-machine`, {
+        method: 'POST',
+        body: JSON.stringify({
+            machineId,
+            ...payload
+        })
+    });
+}
+
+export async function unassignProductionMachine(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/unassign-machine`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+

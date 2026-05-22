@@ -1205,4 +1205,138 @@ router.post('/:id/production-decision', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production-queue/status
+ * Phase 38.5 — Returns production queue status. Read-only.
+ */
+router.get('/:id/production-queue/status', async (req, res) => {
+    try {
+        const queueService = require('../services/marketplaceProductionQueueService');
+        const status = await queueService.getProductionQueueStatus(req.params.id);
+        return res.json(status);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_QUEUE_STATUS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-queue/evaluate
+ * Phase 38.5 — Evaluates production queue eligibility. Read-only.
+ */
+router.post('/:id/production-queue/evaluate', async (req, res) => {
+    try {
+        const queueService = require('../services/marketplaceProductionQueueService');
+        const options = {
+            machineId: req.body?.machineId || null,
+            operatorId: req.user?.id || req.session?.userId || 'break-glass-session'
+        };
+        const result = await queueService.evaluateProductionQueueEligibility(req.params.id, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'HANDOFF_PACKAGE_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_QUEUE_EVALUATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-queue/create
+ * Phase 38.5 — Creates governed production queue entry.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE feature flag.
+ */
+router.post('/:id/production-queue/create', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_QUEUE_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE=true to enable Phase 38.5 production queue operations.'
+        });
+    }
+
+    try {
+        const queueService = require('../services/marketplaceProductionQueueService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await queueService.createProductionQueueEntry(req.params.id, req.body || {}, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'HANDOFF_PACKAGE_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'PRODUCTION_QUEUE_CREATION_BLOCKED' || err.message === 'INVALID_ORDER_STATUS_FOR_QUEUE' || err.message === 'DISPATCH_PACKAGE_NOT_ACCEPTED' || err.message === 'INVOICE_NOT_ISSUED' || err.message === 'PAYMENT_NOT_CONFIRMED' || err.message === 'PRODUCTION_NOT_UNLOCKED' || err.message === 'PRODUCTION_DECISION_NOT_ACCEPTED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_QUEUE_CREATE_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-queue/assign-machine
+ * Phase 38.5 — Assigns a machine to the production queue entry.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE feature flag.
+ */
+router.post('/:id/production-queue/assign-machine', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_QUEUE_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE=true to enable Phase 38.5 production queue operations.'
+        });
+    }
+
+    try {
+        const { machineId, note } = req.body || {};
+        if (!machineId) {
+            return res.status(400).json({ ok: false, error: 'MACHINE_ID_REQUIRED' });
+        }
+
+        const queueService = require('../services/marketplaceProductionQueueService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await queueService.assignProductionMachine(req.params.id, machineId, { note }, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_QUEUE_ENTRY_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_ORDER_STATUS_FOR_ASSIGNMENT' || err.message === 'MACHINE_ID_REQUIRED') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_MACHINE_ASSIGN_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production-queue/unassign-machine
+ * Phase 38.5 — Unassigns the machine, reverting status to PRODUCTION_QUEUED.
+ * Guarded by PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE feature flag.
+ */
+router.post('/:id/production-queue/unassign-machine', async (req, res) => {
+    if (process.env.PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE !== 'true') {
+        return res.status(403).json({
+            ok: false,
+            error: 'PHASE38_PRODUCTION_QUEUE_DISABLED',
+            message: 'Set PPOS_ENABLE_PHASE38_PRODUCTION_QUEUE=true to enable Phase 38.5 production queue operations.'
+        });
+    }
+
+    try {
+        const { reason } = req.body || {};
+        const queueService = require('../services/marketplaceProductionQueueService');
+        const options = { operatorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await queueService.unassignProductionMachine(req.params.id, { reason }, options);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND' || err.message === 'PRODUCTION_QUEUE_ENTRY_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        if (err.message === 'INVALID_ORDER_STATUS_FOR_UNASSIGNMENT') {
+            return res.status(400).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_MACHINE_UNASSIGN_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;
