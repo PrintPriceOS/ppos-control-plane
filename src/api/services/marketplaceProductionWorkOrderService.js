@@ -517,7 +517,7 @@ async function cancelProductionWorkOrder(orderId, payload = {}, options = {}) {
     const order = orders[0];
     const metadata = safeParseJson(order.metadata_json, {});
 
-    if (order.status === 'PRODUCTION_CANCELLED') {
+    if (order.status === 'PRODUCTION_CANCELLED' || (metadata.production_work_order && metadata.production_work_order.status === 'PRODUCTION_CANCELLED')) {
         return {
             ok: true,
             idempotent: true,
