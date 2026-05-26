@@ -41,3 +41,16 @@ node scripts/verify_marketplace_public_offers.js
 ## Monitoring
 Monitor the `marketplace_events` and `production_file_events` tables for any `FAILED` ingestion or validation events. 
 Log prefixes for marketplace: `[MARKETPLACE_PUBLIC]`, `[MARKETPLACE][PRICING-REQUEST]`, `[MARKETPLACE][PRICING-FALLBACK-ESTIMATES]`.
+
+## Production Completion & Delivery Handoff (Phase 38.8)
+Phase 38.8 implements operational closure from `PRODUCTION_COMPLETION_READY` to `PRODUCTION_COMPLETED` and transition of delivery state to `DELIVERY_HANDOFF_READY` with auditing, idempotency checks, and break-glass overrides.
+
+### Database Migration
+The deployment includes migration `012_phase38_8_production_completion.sql` which adds completion/handoff columns to the canonical `marketplace_orders` table. It runs automatically on app startup.
+
+### Operational Verification
+To run the automated integration/smoke checks:
+```bash
+node scripts/smoke_phase_38_8_production_completion.js
+```
+*Note: To allow mutation of real database rows, set `PHASE_38_8_ALLOW_MUTATION=true` in the environment.*

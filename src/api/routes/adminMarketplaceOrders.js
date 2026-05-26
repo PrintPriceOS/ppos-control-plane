@@ -1767,4 +1767,94 @@ router.post('/:id/production-progress/completion-ready', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:id/production/completion-eligibility
+ * Phase 38.8 — Evaluate production completion eligibility.
+ */
+router.get('/:id/production/completion-eligibility', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionLifecycleService');
+        const result = await service.evaluateProductionCompletionEligibility(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_COMPLETION_ELIGIBILITY_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/production/complete
+ * Phase 38.8 — Execute production completion.
+ */
+router.post('/:id/production/complete', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionLifecycleService');
+        const actorContext = { actorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.completeProductionOrder(req.params.id, actorContext, req.body || {});
+        if (!result.ok) {
+            return res.status(400).json({
+                ok: false,
+                code: result.code,
+                message: result.message,
+                blockers: result.blockers || [],
+                warnings: result.warnings || [],
+                traceId: req.headers['x-trace-id'] || `trace_${Date.now()}`
+            });
+        }
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'PRODUCTION_COMPLETION_ERROR', message: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/marketplace/orders/:id/delivery/handoff-readiness
+ * Phase 38.8 — Evaluate delivery handoff readiness.
+ */
+router.get('/:id/delivery/handoff-readiness', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionLifecycleService');
+        const result = await service.evaluateDeliveryHandoffReadiness(req.params.id);
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'DELIVERY_HANDOFF_READINESS_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/delivery/prepare-handoff
+ * Phase 38.8 — Prepare delivery handoff.
+ */
+router.post('/:id/delivery/prepare-handoff', async (req, res) => {
+    try {
+        const service = require('../services/marketplaceProductionLifecycleService');
+        const actorContext = { actorId: req.user?.id || req.session?.userId || 'break-glass-session' };
+        const result = await service.prepareDeliveryHandoff(req.params.id, actorContext, req.body || {});
+        if (!result.ok) {
+            return res.status(400).json({
+                ok: false,
+                code: result.code,
+                message: result.message,
+                blockers: result.blockers || [],
+                warnings: result.warnings || [],
+                traceId: req.headers['x-trace-id'] || `trace_${Date.now()}`
+            });
+        }
+        return res.json(result);
+    } catch (err) {
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: err.message });
+        }
+        return res.status(500).json({ ok: false, error: 'DELIVERY_HANDOFF_PREPARE_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;

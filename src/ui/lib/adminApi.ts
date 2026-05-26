@@ -2445,6 +2445,30 @@ export async function markProductionCompletionReady(orderId: string, payload: Re
     });
 }
 
+// --- Phase 38.8 Production Completion & Delivery Handoff ---
+
+export async function evaluateProductionCompletionEligibility(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production/completion-eligibility`);
+}
+
+export async function completeProductionOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production/complete`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function evaluateDeliveryHandoffReadiness(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/delivery/handoff-readiness`);
+}
+
+export async function prepareDeliveryHandoff(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/delivery/prepare-handoff`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
 
 
 

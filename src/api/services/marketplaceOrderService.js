@@ -232,7 +232,16 @@ class MarketplaceOrderService {
             printhouse,
             readiness: readinessData.ready ? 'READY' : 'BLOCKED',
             blockers: readinessData.blockers || [],
-            readinessFull: readinessData
+            readinessFull: readinessData,
+
+            // Phase 38.8 additions
+            productionCompletedAt: orderRow.production_completed_at || null,
+            productionCompletedBy: orderRow.production_completed_by || null,
+            productionCompletionStatus: orderRow.production_completion_status || null,
+            deliveryHandoffStatus: orderRow.delivery_handoff_status || null,
+            deliveryHandoffReadyAt: orderRow.delivery_handoff_ready_at || null,
+            deliveryHandoffReadyBy: orderRow.delivery_handoff_ready_by || null,
+            finalProductionAudit: safeParseJson(orderRow.final_production_audit_json, null)
         };
 
         order.estimatedPrice = Number(orderRow.estimated_price || order.totals?.total || order.offer?.totalPrice || 0);

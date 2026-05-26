@@ -69,6 +69,15 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     const [progressResumeNote, setProgressResumeNote] = useState<string>('');
     const [progressCompletionReadyNote, setProgressCompletionReadyNote] = useState<string>('');
 
+    // Phase 38.8 states
+    const [completionEligibility, setCompletionEligibility] = useState<any | null>(null);
+    const [handoffReadiness, setHandoffReadiness] = useState<any | null>(null);
+    const [completionActionLoading, setCompletionActionLoading] = useState<boolean>(false);
+    const [handoffActionLoading, setHandoffActionLoading] = useState<boolean>(false);
+    const [completionOverride, setCompletionOverride] = useState<boolean>(false);
+    const [completionNote, setCompletionNote] = useState<string>('');
+    const [completionOverrideReason, setCompletionOverrideReason] = useState<string>('');
+
 
     useEffect(() => {
         fetchPackages();
@@ -118,8 +127,12 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
         setProgressResumeNote('');
         setProgressCompletionReadyNote('');
 
+        setCompletionOverride(false);
+        setCompletionNote('');
+        setCompletionOverrideReason('');
+
         try {
-            const [pkgRes, timelineRes, prodRes, queueRes, evalRes, woRes, woEvalRes, progressRes, progressEvalRes] = await Promise.all([
+            const [pkgRes, timelineRes, prodRes, queueRes, evalRes, woRes, woEvalRes, progressRes, progressEvalRes, completionEligRes, handoffReadinessRes] = await Promise.all([
                 adminApi.getPrinthouseHandoffPackage(orderId),
                 adminApi.getPrinthouseHandoffTimeline(orderId),
                 adminApi.getProductionDecisionStatus(orderId).catch(() => ({ ok: false })),
@@ -128,7 +141,9 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                 adminApi.getProductionWorkOrderStatus(orderId).catch(() => ({ ok: false })),
                 adminApi.evaluateProductionWorkOrder(orderId).catch(() => ({ ok: false })),
                 adminApi.getProductionProgressStatus(orderId).catch(() => ({ ok: false })),
-                adminApi.evaluateProductionProgress(orderId).catch(() => ({ ok: false }))
+                adminApi.evaluateProductionProgress(orderId).catch(() => ({ ok: false })),
+                adminApi.evaluateProductionCompletionEligibility(orderId).catch(() => ({ ok: false })),
+                adminApi.evaluateDeliveryHandoffReadiness(orderId).catch(() => ({ ok: false }))
             ]);
             setDetail(pkgRes.ok ? pkgRes : null);
             setTimeline(timelineRes.ok ? timelineRes.timeline : []);
@@ -139,6 +154,8 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             setWorkOrderEligibility(woEvalRes.ok ? woEvalRes : null);
             setProductionProgressStatus(progressRes.ok ? progressRes : null);
             setProductionProgressEligibility(progressEvalRes.ok ? progressEvalRes : null);
+            setCompletionEligibility(completionEligRes.ok ? completionEligRes : null);
+            setHandoffReadiness(handoffReadinessRes.ok ? handoffReadinessRes : null);
         } catch (err) {
             console.error('Failed to fetch package details', err);
         } finally {
@@ -180,6 +197,51 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
             }
         } catch (err: any) {
             setFileAccessState(prev => ({ ...prev, [fileId]: { ...prev[fileId], loading: false, error: err.message } }));
+        }
+    };
+
+    const handleCompleteProduction = async () => {
+        if (!selectedOrderId) return;
+        if (completionOverride && !completionOverrideReason.trim()) {
+            alert("Break Glass Override requires a reason.");
+            return;
+        }
+        setCompletionActionLoading(true);
+        try {
+            const res = await adminApi.completeProductionOrder(selectedOrderId, {
+                overrideEligibility: completionOverride,
+                operatorReason: completionOverride ? completionOverrideReason : undefined,
+                note: completionNote
+            });
+            if (res.ok) {
+                setCompletionNote('');
+                setCompletionOverride(false);
+                setCompletionOverrideReason('');
+                await loadDetail(selectedOrderId);
+            } else {
+                alert(`Completion failed: ${res.message || res.error}`);
+            }
+        } catch (err: any) {
+            alert(`Error completing production: ${err.message}`);
+        } finally {
+            setCompletionActionLoading(false);
+        }
+    };
+
+    const handlePrepareDeliveryHandoff = async () => {
+        if (!selectedOrderId) return;
+        setHandoffActionLoading(true);
+        try {
+            const res = await adminApi.prepareDeliveryHandoff(selectedOrderId);
+            if (res.ok) {
+                await loadDetail(selectedOrderId);
+            } else {
+                alert(`Handoff preparation failed: ${res.message || res.error}`);
+            }
+        } catch (err: any) {
+            alert(`Error preparing delivery handoff: ${err.message}`);
+        } finally {
+            setHandoffActionLoading(false);
         }
     };
 
@@ -1681,6 +1743,158 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Phase 38.8 — Production Completion & Delivery Handoff Gate */}
+                                {detail && ['PRODUCTION_COMPLETION_READY', 'PRODUCTION_COMPLETED', 'DELIVERY_HANDOFF_READY'].includes(detail.status || detail.handoffStatus || (productionProgressStatus?.productionProgress?.status) || (completionEligibility?.currentStatus)) && (
+                                    <div className="mt-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 p-4 animate-slide-fade">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5 mb-4">
+                                            <DocumentCheckIcon className="w-4 h-4 text-emerald-500 animate-pulse" />
+                                            Phase 38.8 — Completion & Delivery Handoff
+                                        </h4>
+
+                                        {/* Completion Eligibility Panel */}
+                                        {completionEligibility && (
+                                            <div className="space-y-3 mb-4">
+                                                {/* Blockers */}
+                                                {completionEligibility.blockers && completionEligibility.blockers.length > 0 && (
+                                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Completion Blockers</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {completionEligibility.blockers.map((b: string) => <li key={b}>{b.replace(/_/g, ' ')}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Warnings */}
+                                                {completionEligibility.warnings && completionEligibility.warnings.length > 0 && (
+                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Completion Warnings</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {completionEligibility.warnings.map((w: string) => <li key={w}>{w.replace(/_/g, ' ')}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Details */}
+                                                <div className="grid grid-cols-2 gap-4 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10 text-xs font-mono">
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Completion Eligibility</div>
+                                                        <span className={`inline-block px-2 py-0.5 border text-[9px] uppercase tracking-wider font-bold ${
+                                                            completionEligibility.eligible ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                                        }`}>
+                                                            {completionEligibility.eligible ? 'ELIGIBLE' : 'BLOCKED'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Current Status</div>
+                                                        <span className="font-bold text-slate-900 dark:text-white">{completionEligibility.currentStatus || detail?.status}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Completion Action Panel */}
+                                        {completionEligibility && (completionEligibility.currentStatus || detail?.status) !== 'PRODUCTION_COMPLETED' && (completionEligibility.currentStatus || detail?.status) !== 'DELIVERY_HANDOFF_READY' && (
+                                            <div className="space-y-3 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10 mb-4">
+                                                <strong className="block font-black uppercase tracking-wider text-[9px] text-slate-500">Complete Production Action</strong>
+                                                <textarea
+                                                    placeholder="Optional operator notes about completion..."
+                                                    className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/20 text-xs p-1.5 text-slate-900 dark:text-white h-12"
+                                                    value={completionNote}
+                                                    onChange={e => setCompletionNote(e.target.value)}
+                                                    disabled={completionActionLoading}
+                                                />
+                                                {!completionEligibility.eligible && (
+                                                    <div className="space-y-2 p-2.5 bg-red-50/50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/20">
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                id="completionOverride"
+                                                                checked={completionOverride}
+                                                                onChange={e => setCompletionOverride(e.target.checked)}
+                                                                disabled={completionActionLoading}
+                                                                className="rounded border-slate-300 dark:border-white/20 text-indigo-600 focus:ring-indigo-500"
+                                                            />
+                                                            <label htmlFor="completionOverride" className="text-[10px] uppercase font-black text-red-600 select-none">Force Eligibility Override (Break Glass)</label>
+                                                        </div>
+                                                        {completionOverride && (
+                                                            <div>
+                                                                <label className="block text-[9px] uppercase font-black text-red-500 mb-1">Override Justification Reason (Required)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Justification for bypassing blockers..."
+                                                                    className="w-full bg-white dark:bg-[#131314] border border-red-300 dark:border-red-500/30 text-xs p-1.5 text-slate-900 dark:text-white"
+                                                                    value={completionOverrideReason}
+                                                                    onChange={e => setCompletionOverrideReason(e.target.value)}
+                                                                    disabled={completionActionLoading}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <button
+                                                    onClick={handleCompleteProduction}
+                                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                    disabled={completionActionLoading || (!completionEligibility.eligible && !completionOverride)}
+                                                >
+                                                    {completionActionLoading ? 'Executing...' : 'Complete Production'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Handoff Eligibility Panel */}
+                                        {((completionEligibility?.currentStatus || detail?.status) === 'PRODUCTION_COMPLETED' || (completionEligibility?.currentStatus || detail?.status) === 'DELIVERY_HANDOFF_READY') && handoffReadiness && (
+                                            <div className="space-y-3 mb-4">
+                                                {/* Handoff Blockers */}
+                                                {handoffReadiness.blockers && handoffReadiness.blockers.length > 0 && (
+                                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Handoff Blockers</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {handoffReadiness.blockers.map((b: string) => <li key={b}>{b.replace(/_/g, ' ')}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Handoff Warnings */}
+                                                {handoffReadiness.warnings && handoffReadiness.warnings.length > 0 && (
+                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                                        <strong className="block font-black uppercase tracking-wider text-[9px] mb-1">Handoff Warnings</strong>
+                                                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[10px]">
+                                                            {handoffReadiness.warnings.map((w: string) => <li key={w}>{w.replace(/_/g, ' ')}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Details */}
+                                                <div className="grid grid-cols-2 gap-4 bg-white dark:bg-[#131314] p-3 border border-slate-200 dark:border-white/10 text-xs font-mono">
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Handoff Readiness</div>
+                                                        <span className={`inline-block px-2 py-0.5 border text-[9px] uppercase tracking-wider font-bold ${
+                                                            handoffReadiness.eligible ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                                        }`}>
+                                                            {handoffReadiness.eligible ? 'READY' : 'NOT READY'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold mb-1">Handoff Status</div>
+                                                        <span className="font-bold text-slate-900 dark:text-white">{handoffReadiness.deliveryHandoffStatus || 'PENDING'}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Prepare Handoff Action */}
+                                                {handoffReadiness.deliveryHandoffStatus !== 'DELIVERY_HANDOFF_READY' && (
+                                                    <button
+                                                        onClick={handlePrepareDeliveryHandoff}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50 mt-2"
+                                                        disabled={handoffActionLoading || !handoffReadiness.eligible}
+                                                    >
+                                                        {handoffActionLoading ? 'Preparing...' : 'Prepare Delivery Handoff'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </>
