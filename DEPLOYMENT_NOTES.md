@@ -54,3 +54,15 @@ To run the automated integration/smoke checks:
 node scripts/smoke_phase_38_8_production_completion.js
 ```
 *Note: To allow mutation of real database rows, set `PHASE_38_8_ALLOW_MUTATION=true` in the environment.*
+
+## Tenant Plan Governance & Grace Period Management (Phase 39.0)
+Phase 39.0 implements a unified commercial status, grace period tracking, file/job limit enforcement, module access control, and Founding Printhouse access management.
+
+### Database Migration
+The deployment includes migration `013_phase39_0_tenant_plan_governance.sql` which adds plan governance, commercial status, access level, grace timestamps, and limits JSON columns to the `tenants` table. It also creates the `tenant_governance_events` audit table.
+
+### Operational Verification
+To run the automated integration and smoke checks:
+```bash
+node scripts/smoke_phase_39_0_tenant_plan_governance.js
+```

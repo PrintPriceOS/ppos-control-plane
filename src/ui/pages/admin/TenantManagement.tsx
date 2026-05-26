@@ -26,7 +26,10 @@ import {
     TenantUsageHistory,
     getTenantTimeline,
     TimelineEvent,
-    getBillingData
+    getBillingData,
+    assignTenantPlan,
+    extendTenantGrace,
+    freezeTenantGraceIfExpired
 } from '../../lib/adminApi';
 import { toDisplayText } from '../../lib/display';
 
@@ -202,6 +205,20 @@ export default function TenantManagement() {
         try {
             setIsSaving(true);
             await updateTenant(editingTenant.id, editingTenant);
+
+            // Plan Governance assignment updates
+            const originalTenant = tenants.find(t => t.id === editingTenant.id);
+            if (originalTenant && (
+                editingTenant.plan_code !== originalTenant.plan_code ||
+                editingTenant.commercial_status !== originalTenant.commercial_status
+            )) {
+                await assignTenantPlan(editingTenant.id, {
+                    planCode: editingTenant.plan_code || editingTenant.plan,
+                    commercialStatus: editingTenant.commercial_status || 'ACTIVE',
+                    reason: 'Admin modified plan or status in Dashboard'
+                });
+            }
+
             await loadTenants();
             setEditingTenant(null);
         } catch (err: any) {
@@ -220,10 +237,26 @@ export default function TenantManagement() {
         }
     };
 
+    const getCommercialStatusColor = (status: string) => {
+        switch (status) {
+            case 'ACTIVE': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+            case 'GRACE': return 'bg-amber-100 text-amber-800 border-amber-200';
+            case 'GRACE_EXPIRED': return 'bg-rose-100 text-rose-800 border-rose-200';
+            case 'SUSPENDED': return 'bg-red-100 text-red-800 border-red-200';
+            case 'CONVERTED': return 'bg-teal-100 text-teal-800 border-teal-200';
+            case 'CANCELLED': return 'bg-slate-100 text-slate-800 border-slate-200';
+            case 'MANUAL_REVIEW': return 'bg-orange-100 text-orange-800 border-orange-200';
+            default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        }
+    };
+
     const getPlanColor = (plan: string) => {
         switch (plan) {
+            case 'SYSTEM': return 'bg-purple-100 text-purple-800 border-purple-200';
+            case 'FOUNDING_PRINTHOUSE': return 'bg-amber-100 text-amber-800 border-amber-200';
             case 'ENTERPRISE': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
             case 'PRO': return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'CUSTOM': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
             default: return 'bg-slate-100 text-slate-800 border-slate-200';
         }
     };
@@ -356,9 +389,14 @@ export default function TenantManagement() {
                                             <span className={`px-2 py-0.5 text-xs font-semibold border ${getStatusColor(tenant.status)}`}>
                                                 {tenant.status}
                                             </span>
-                                            <span className={`px-2 py-0.5 text-[10px] font-bold border ${getPlanColor(tenant.plan)}`}>
-                                                {tenant.plan}
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold border ${getPlanColor(tenant.plan_code || tenant.plan)}`}>
+                                                {tenant.plan_code || tenant.plan}
                                             </span>
+                                            {tenant.commercial_status && (
+                                                <span className={`px-2 py-0.5 text-[10px] font-bold border ${getCommercialStatusColor(tenant.commercial_status)}`}>
+                                                    {tenant.commercial_status}
+                                                </span>
+                                            )}
                                             {isChurnRisk && (
                                                 <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 animate-pulse">
                                                     CHURN RISK
@@ -548,30 +586,108 @@ export default function TenantManagement() {
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <label className="block">
-                                            <span className="text-sm font-bold text-slate-700">Plan</span>
+                                            <span className="text-sm font-bold text-slate-700">Plan Code (Phase 39)</span>
                                             <select
-                                                value={editingTenant.plan}
-                                                onChange={e => setEditingTenant({ ...editingTenant, plan: e.target.value as any })}
+                                                value={editingTenant.plan_code || editingTenant.plan}
+                                                onChange={e => setEditingTenant({ ...editingTenant, plan_code: e.target.value, plan: (e.target.value === 'FOUNDING_PRINTHOUSE' || e.target.value === 'CUSTOM' || e.target.value === 'SYSTEM') ? 'ENTERPRISE' : e.target.value as any })}
                                                 className="mt-1 block w-full px-4 py-3 bg-white/5 border border-white/10 focus:border-primary transition-all font-medium text-white outline-none"
                                             >
                                                 <option value="FREE">FREE</option>
                                                 <option value="PRO">PRO</option>
                                                 <option value="ENTERPRISE">ENTERPRISE</option>
+                                                <option value="FOUNDING_PRINTHOUSE">FOUNDING_PRINTHOUSE</option>
+                                                <option value="CUSTOM">CUSTOM</option>
+                                                <option value="SYSTEM">SYSTEM</option>
                                             </select>
                                         </label>
                                         <label className="block">
-                                            <span className="text-sm font-bold text-slate-700">Status</span>
+                                            <span className="text-sm font-bold text-slate-700">Commercial Status</span>
                                             <select
-                                                value={editingTenant.status}
-                                                onChange={e => setEditingTenant({ ...editingTenant, status: e.target.value as any })}
+                                                value={editingTenant.commercial_status || (editingTenant.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE')}
+                                                onChange={e => setEditingTenant({ ...editingTenant, commercial_status: e.target.value, status: e.target.value === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE' })}
                                                 className="mt-1 block w-full px-4 py-3 bg-white/5 border border-white/10 focus:border-primary transition-all font-medium text-white outline-none"
                                             >
                                                 <option value="ACTIVE">ACTIVE</option>
+                                                <option value="GRACE">GRACE</option>
+                                                <option value="GRACE_EXPIRED">GRACE_EXPIRED</option>
                                                 <option value="SUSPENDED">SUSPENDED</option>
-                                                <option value="QUARANTINED">QUARANTINED</option>
+                                                <option value="CONVERTED">CONVERTED</option>
+                                                <option value="CANCELLED">CANCELLED</option>
+                                                <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
                                             </select>
                                         </label>
                                     </div>
+
+                                    {(editingTenant.plan_code === 'FOUNDING_PRINTHOUSE' || editingTenant.plan === 'FOUNDING_PRINTHOUSE') && (
+                                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 space-y-3 col-span-2">
+                                            <span className="text-xs font-bold text-amber-700 block uppercase tracking-wider">Founding Printhouse Grace Extension</span>
+                                            <div className="flex gap-4">
+                                                <div className="flex-1">
+                                                    <span className="text-xs text-slate-400 font-bold block mb-1">Extension Days</span>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="7"
+                                                        id="graceExtensionDays"
+                                                        className="mt-1 block w-full px-4 py-2 bg-white/5 border border-white/10 text-white outline-none"
+                                                        defaultValue="7"
+                                                    />
+                                                </div>
+                                                <div className="flex-[2]">
+                                                    <span className="text-xs text-slate-400 font-bold block mb-1">Reason</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Manually approved extension"
+                                                        id="graceExtensionReason"
+                                                        className="mt-1 block w-full px-4 py-2 bg-white/5 border border-white/10 text-white outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 pt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        const daysInput = document.getElementById('graceExtensionDays') as HTMLInputElement;
+                                                        const reasonInput = document.getElementById('graceExtensionReason') as HTMLInputElement;
+                                                        const days = parseInt(daysInput?.value || '7');
+                                                        const reason = reasonInput?.value || '';
+                                                        
+                                                        if (!reason) {
+                                                            alert('A reason is required to extend the grace period.');
+                                                            return;
+                                                        }
+                                                        
+                                                        try {
+                                                            await extendTenantGrace(editingTenant.id, { graceDays: days, reason });
+                                                            alert('Grace period extended successfully.');
+                                                            await loadTenants();
+                                                            setEditingTenant(null);
+                                                        } catch (err: any) {
+                                                            alert('Failed to extend grace: ' + err.message);
+                                                        }
+                                                    }}
+                                                    className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-slate-900 font-bold text-xs transition-all"
+                                                >
+                                                    Apply Grace Extension
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        try {
+                                                            await freezeTenantGraceIfExpired(editingTenant.id);
+                                                            alert('Freeze checks complete.');
+                                                            await loadTenants();
+                                                            setEditingTenant(null);
+                                                        } catch (err: any) {
+                                                            alert('Failed to check freeze: ' + err.message);
+                                                        }
+                                                    }}
+                                                    className="py-2 px-4 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 border border-rose-500/20 font-bold text-xs transition-all"
+                                                >
+                                                    Enforce Freeze
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <label className="block">

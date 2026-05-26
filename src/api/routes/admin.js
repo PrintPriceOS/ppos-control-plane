@@ -171,6 +171,7 @@ const machineDetailsAdminRouter = require('./machineDetailsAdmin');
 const adminAssetsRouter = require('./adminAssets');
 const adminMarketplaceOrdersRouter = require('./adminMarketplaceOrders');
 const adminMarketplacePrinthouseHandoffRouter = require('./adminMarketplacePrinthouseHandoff');
+const adminTenantGovernanceRouter = require('./adminTenantGovernance');
 
 
 /**
@@ -185,6 +186,7 @@ router.use('/routing', routingAdminRouter);
 router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
 router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
 router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
+router.use('/tenant-governance', adminTenantGovernanceRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);
@@ -366,7 +368,10 @@ router.get("/tenants", async (req, res) => {
       SELECT 
         id, name, status, plan, rate_limit_rpm, 
         plan_expires_at, last_active_at, daily_job_limit, 
-        max_batch_size, created_at, metadata_json
+        max_batch_size, created_at, metadata_json,
+        plan_code, commercial_status, access_level,
+        grace_started_at, grace_ends_at, grace_extended_until,
+        limits_json, entitlements_json, module_access_json, governance_notes_json
       FROM tenants
       ORDER BY last_active_at DESC, created_at DESC;
     `);

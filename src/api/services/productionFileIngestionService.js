@@ -15,7 +15,6 @@ const logger = require('./logger').child('ingestion-service');
 class ProductionFileIngestionService {
     constructor() {
         this.storageRoot = path.join(__dirname, '../../../storage/production_files');
-        this.maxFileSize = 500 * 1024 * 1024; // 500MB
         this.timeout = 30000; // 30s
     }
 
@@ -92,6 +91,34 @@ class ProductionFileIngestionService {
         logger.info({ event: 'ingestion_started', file_id: id, url: download_url });
         await this.logEvent(id, order_ref, 'FILE_FETCH_STARTED', { url: download_url });
 
+        // Resolve tenant ID
+        let tenantId = null;
+        try {
+            const orderRows = await db.query(
+                'SELECT tenant_id FROM marketplace_orders WHERE order_id = ? OR order_id = (SELECT order_id FROM production_files WHERE id = ?)',
+                [file.order_id || order_ref, file.id]
+            );
+            if (orderRows && orderRows.length > 0) {
+                tenantId = orderRows[0].tenant_id;
+            }
+        } catch (dbErr) {
+            logger.warn({ event: 'ingest_resolve_tenant_error', file_id: id, error: dbErr.message });
+        }
+
+        let maxFileSize = parseInt(process.env.PPOS_PRODUCTION_FILE_INFRA_MAX_MB || '5120') * 1024 * 1024;
+        if (tenantId) {
+            try {
+                const governanceService = require('./tenantPlanGovernanceService');
+                const entitlements = await governanceService.getTenantEntitlements(tenantId);
+                const limitMb = entitlements.limits?.maxFileSizeMb || 500;
+                maxFileSize = limitMb * 1024 * 1024;
+            } catch (govErr) {
+                logger.warn({ event: 'ingest_get_limits_error', tenantId, error: govErr.message });
+            }
+        } else {
+            logger.warn({ event: 'ingest_tenant_missing', file_id: id, message: 'Tenant context missing for file ingestion, falling back to infra safety ceiling' });
+        }
+
         try {
             await this.validateUrl(download_url);
 
@@ -106,7 +133,7 @@ class ProductionFileIngestionService {
                     url: currentUrl,
                     responseType: 'stream',
                     timeout: this.timeout,
-                    maxContentLength: this.maxFileSize,
+                    maxContentLength: maxFileSize,
                     maxRedirects: 0, // Disable automatic redirects
                     validateStatus: (status) => (status >= 200 && status < 300) || (status >= 301 && status <= 308)
                 });
@@ -135,6 +162,12 @@ class ProductionFileIngestionService {
                 throw new Error(`Invalid content type: ${contentType}`);
             }
 
+            // Check Content-Length if available
+            const contentLength = parseInt(response.headers['content-length'] || '0');
+            if (contentLength && contentLength > maxFileSize) {
+                throw new Error(`File size (${(contentLength / 1024 / 1024).toFixed(2)} MB) exceeds allowed limit of ${(maxFileSize / 1024 / 1024).toFixed(2)} MB`);
+            }
+
             // Prepare Storage Path
             const urlPath = new URL(download_url).pathname;
             const fileName = path.basename(urlPath) || `${kind.toLowerCase()}.pdf`;
@@ -151,7 +184,7 @@ class ProductionFileIngestionService {
             return new Promise((resolve, reject) => {
                 response.data.on('data', (chunk) => {
                     size += chunk.length;
-                    if (size > this.maxFileSize) {
+                    if (size > maxFileSize) {
                         writer.destroy();
                         reject(new Error('File size limit exceeded during stream'));
                     }

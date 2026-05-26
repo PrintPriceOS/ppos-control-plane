@@ -122,6 +122,23 @@ router.post('/jobs', upload.single('pdf'), async (req, res) => {
   try {
     // 1. Native Direct Pipeline check (file attached as 'pdf')
     if (req.file) {
+      // Check Tenant Plan File Limits
+      const tenantPlanGovernanceService = require('../services/tenantPlanGovernanceService');
+      const limitCheck = await tenantPlanGovernanceService.checkFileLimit(tenantId, req.file.size, context);
+      if (!limitCheck.ok) {
+        try {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        } catch (e) {}
+        return res.status(403).json({
+          ok: false,
+          error: {
+            code: 'TENANT_FILE_LIMIT_EXCEEDED',
+            message: limitCheck.blockers[0]?.message || 'File size limit exceeded for plan',
+            blockers: limitCheck.blockers
+          }
+        });
+      }
+
       const fileBuffer = fs.readFileSync(req.file.path);
       const fileObj = {
         originalname: req.file.originalname,
@@ -517,6 +534,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, error: { code: 'NO_FILE_UPLOADED', message: 'No file part found in request' } });
+    }
+
+    // Check Tenant Plan File Limits
+    const tenantPlanGovernanceService = require('../services/tenantPlanGovernanceService');
+    const context = resolveActorContext(req);
+    const limitCheck = await tenantPlanGovernanceService.checkFileLimit(tenantId, req.file.size, context);
+    if (!limitCheck.ok) {
+      try {
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      } catch (e) {}
+      return res.status(403).json({
+        ok: false,
+        error: {
+          code: 'TENANT_FILE_LIMIT_EXCEEDED',
+          message: limitCheck.blockers[0]?.message || 'File size limit exceeded for plan',
+          blockers: limitCheck.blockers
+        }
+      });
     }
 
     // 1. Security: Magic Byte Check for PDF

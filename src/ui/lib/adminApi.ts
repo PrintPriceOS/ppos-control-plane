@@ -279,6 +279,16 @@ export type TenantDetail = {
         fired?: string[];
     };
     notification_settings_json?: NotificationSettings;
+    plan_code?: string;
+    commercial_status?: string;
+    access_level?: string;
+    grace_started_at?: string | null;
+    grace_ends_at?: string | null;
+    grace_extended_until?: string | null;
+    limits_json?: any;
+    entitlements_json?: any;
+    module_access_json?: any;
+    governance_notes_json?: any;
 };
 
 export type JobsResponse = {
@@ -2466,6 +2476,53 @@ export async function prepareDeliveryHandoff(orderId: string, payload: Record<st
     return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/delivery/prepare-handoff`, {
         method: 'POST',
         body: JSON.stringify(payload)
+    });
+}
+
+// --- Phase 39.0 Tenant Plan Governance ---
+
+export async function getTenantEntitlements(tenantId: string) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/entitlements`);
+}
+
+export async function assignTenantPlan(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/plan`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function extendTenantGrace(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/grace/extend`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function evaluateTenantAction(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/evaluate-action`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function checkTenantFileLimit(tenantId: string, fileSizeBytes: number) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/check-file-limit`, {
+        method: 'POST',
+        body: JSON.stringify({ fileSizeBytes })
+    });
+}
+
+export async function checkTenantJobLimit(tenantId: string, totalJobSizeBytes: number) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/check-job-limit`, {
+        method: 'POST',
+        body: JSON.stringify({ totalJobSizeBytes })
+    });
+}
+
+export async function freezeTenantGraceIfExpired(tenantId: string) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/grace/freeze-if-expired`, {
+        method: 'POST'
     });
 }
 
