@@ -2481,6 +2481,10 @@ export async function prepareDeliveryHandoff(orderId: string, payload: Record<st
 
 // --- Phase 39.0 Tenant Plan Governance ---
 
+export async function listTenantGovernance() {
+    return adminFetch<any>(`/api/admin/tenant-governance`);
+}
+
 export async function getTenantEntitlements(tenantId: string) {
     return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/entitlements`);
 }
