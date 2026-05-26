@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './layout/Layout';
 import { DashboardPage } from './pages/os/DashboardPage';
 import { CommandCenterPage } from './pages/admin/CommandCenterPage';
-import { TenantsPage } from './pages/os/TenantsPage';
+import TenantManagement from './pages/admin/TenantManagement';
 import { JobsPage } from './pages/os/JobsPage';
 import { QueuesWorkersPage } from './pages/os/QueuesWorkersPage';
 import { GovernancePage } from './pages/os/GovernancePage';
@@ -104,7 +104,7 @@ export const App: React.FC = () => {
                 <Route path="/runtime" element={<RuntimeContextPage />} />
                 <Route path="/jobs" element={<JobsPage />} />
                 <Route path="/queues-workers" element={<QueuesWorkersPage />} />
-                <Route path="/tenants" element={<TenantsPage />} />
+                <Route path="/tenants" element={<TenantManagement />} />
 
                 {/* PREFLIGHT OPERATIONS */}
                 <Route path="/preflight/jobs" element={<PreflightJobsPage />} />
