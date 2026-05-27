@@ -12,11 +12,13 @@ const auction = require('../services/industrialAuctionService');
 const ledger = require('../services/federationTradeLedgerService');
 const twin = require('../services/marketplaceDigitalTwinService');
 const exchange = require('../services/capacityExchangeService');
+const { requireRole, resolveActorContext } = require('../middleware/auth');
+const requireGlobalAdmin = requireRole('TENANT_ADMIN');
 
 /**
  * GET /api/admin/marketplace/health
  */
-router.get('/health', async (req, res) => {
+router.get('/health', requireGlobalAdmin, async (req, res) => {
     try {
         const health = await marketplace.getMarketplaceHealth();
         return res.json({ ok: true, health });
@@ -27,14 +29,23 @@ router.get('/health', async (req, res) => {
 
 router.get('/offers', async (req, res) => {
     try {
-        const offers = await db.query('SELECT * FROM marketplace_capacity_offers WHERE status = "ACTIVE" ORDER BY created_at DESC LIMIT 50');
+        const context = resolveActorContext(req);
+        let query = 'SELECT * FROM marketplace_capacity_offers WHERE status = "ACTIVE"';
+        const params = [];
+        if (context.isPrinthouseUser) {
+            query += ' AND printhouse_id = ?';
+            params.push(context.printhouseId);
+        }
+        query += ' ORDER BY created_at DESC LIMIT 50';
+        
+        const offers = await db.query(query, params);
         return res.json({ ok: true, data: offers });
     } catch (err) {
         return res.status(500).json({ ok: false, error: err.message, code: 'MARKETPLACE_OFFERS_QUERY_ERROR' });
     }
 });
 
-router.get('/auctions', async (req, res) => {
+router.get('/auctions', requireGlobalAdmin, async (req, res) => {
     try {
         const auctions = await db.query('SELECT * FROM marketplace_dispatch_auctions ORDER BY created_at DESC LIMIT 50');
         return res.json({ ok: true, data: auctions });
@@ -43,7 +54,7 @@ router.get('/auctions', async (req, res) => {
     }
 });
 
-router.get('/ledger', async (req, res) => {
+router.get('/ledger', requireGlobalAdmin, async (req, res) => {
     try {
         const history = await ledger.getTradeHistory();
         return res.json({ ok: true, data: history });
@@ -52,7 +63,7 @@ router.get('/ledger', async (req, res) => {
     }
 });
 
-router.get('/liquidity', async (req, res) => {
+router.get('/liquidity', requireGlobalAdmin, async (req, res) => {
     try {
         const liquidity = await twin.computeLiquidityIndex();
         return res.json({ ok: true, liquidity });
@@ -61,7 +72,7 @@ router.get('/liquidity', async (req, res) => {
     }
 });
 
-router.get('/economic-pressure', async (req, res) => {
+router.get('/economic-pressure', requireGlobalAdmin, async (req, res) => {
     try {
         const pressure = await twin.computeEconomicPressure();
         return res.json({ ok: true, pressure });
@@ -70,7 +81,7 @@ router.get('/economic-pressure', async (req, res) => {
     }
 });
 
-router.get('/trade-history', async (req, res) => {
+router.get('/trade-history', requireGlobalAdmin, async (req, res) => {
     try {
         const history = await ledger.getTradeHistory();
         return res.json({ ok: true, data: history });
@@ -79,7 +90,7 @@ router.get('/trade-history', async (req, res) => {
     }
 });
 
-router.post('/rebalance', async (req, res) => {
+router.post('/rebalance', requireGlobalAdmin, async (req, res) => {
     try {
         return res.json({ ok: true, rebalanceExecuted: true });
     } catch (err) {
@@ -87,7 +98,7 @@ router.post('/rebalance', async (req, res) => {
     }
 });
 
-router.post('/auction', async (req, res) => {
+router.post('/auction', requireGlobalAdmin, async (req, res) => {
     try {
         const { dispatchId, auctionConfig } = req.body;
         const id = await auction.createAuction(dispatchId, auctionConfig || {});
@@ -97,7 +108,7 @@ router.post('/auction', async (req, res) => {
     }
 });
 
-router.post('/exchange', async (req, res) => {
+router.post('/exchange', requireGlobalAdmin, async (req, res) => {
     try {
         const { sourceId, targetId, capacityDef } = req.body;
         const id = await exchange.createExchangeReservation(sourceId, targetId, capacityDef || {});
@@ -107,7 +118,7 @@ router.post('/exchange', async (req, res) => {
     }
 });
 
-router.post('/snapshot', async (req, res) => {
+router.post('/snapshot', requireGlobalAdmin, async (req, res) => {
     try {
         const snapshot = await twin.generateMarketplaceSnapshot();
         return res.json({ ok: true, snapshot });
@@ -122,6 +133,10 @@ router.post('/snapshot', async (req, res) => {
  */
 router.get('/sessions', async (req, res) => {
     try {
+        const context = resolveActorContext(req);
+        if (context.isPrinthouseUser) {
+            req.query.printhouseId = context.printhouseId;
+        }
         // Support rich filtering query parameters via listSessions contract
         const result = await marketplaceService.listSessions(req.query);
         return res.json({
@@ -147,6 +162,16 @@ router.get('/sessions/:id', async (req, res) => {
         if (!detailResult || !detailResult.ok || !detailResult.session) {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
         }
+        
+        const context = resolveActorContext(req);
+        if (context.isPrinthouseUser) {
+            const offers = detailResult.session.offers || [];
+            const isParticipant = offers.some(o => o.printerId === context.printhouseId || o.printhouseId === context.printhouseId);
+            if (!isParticipant) {
+                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this session.' });
+            }
+        }
+
         return res.json({
             ok: true,
             session: detailResult.session
@@ -165,51 +190,34 @@ router.post('/sessions/:sessionId/select', async (req, res) => {
     const targetOfferId = req.body.offer_id || req.body.offerId;
     const selectionMode = req.body.selection_mode || req.body.selectionMode || 'ADMIN_OVERRIDE';
 
-    console.log(`[MARKETPLACE][SELECT-REQUEST] Intercepted offer selection override request`, {
-        sessionId,
-        targetOfferId,
-        selectionMode,
-        bodyStyles: {
-            offer_id: req.body.offer_id,
-            offerId: req.body.offerId,
-            selection_mode: req.body.selection_mode,
-            selectionMode: req.body.selectionMode
-        }
-    });
-
     try {
+        const context = resolveActorContext(req);
+        if (context.isPrinthouseUser) {
+            // Check if the Printhouse is trying to select their own offer
+            const detailResult = await marketplaceService.getSessionDetail(sessionId);
+            if (!detailResult || !detailResult.ok || !detailResult.session) {
+                return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
+            }
+            const offers = detailResult.session.offers || [];
+            const targetOffer = offers.find(o => o.id === targetOfferId);
+            if (!targetOffer || (targetOffer.printerId !== context.printhouseId && targetOffer.printhouseId !== context.printhouseId)) {
+                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You cannot select an offer that does not belong to your printhouse.' });
+            }
+        }
+
         if (!targetOfferId) {
-            console.warn(`[MARKETPLACE][SELECT-FAILED] Missing required target offer identifier`, { sessionId });
             return res.status(400).json({ ok: false, error: 'MISSING_OFFER_ID' });
         }
 
         const updatedSessionResult = await marketplaceService.selectOffer(sessionId, targetOfferId, selectionMode);
-
-        // Find selected offer object inside the populated session detail
         const selectedOffer = updatedSessionResult?.session?.offers?.find(o => o.id === targetOfferId) || { id: targetOfferId, offerSelected: true };
 
-        const responsePayload = {
+        return res.json({
             ok: true,
             session: updatedSessionResult?.session || {},
             selectedOffer
-        };
-
-        console.log(`[MARKETPLACE][SELECT-RESPONSE] Completed selection override successfully`, {
-            sessionId,
-            targetOfferId,
-            selectionMode,
-            sessionStatus: updatedSessionResult?.session?.sessionStatus
         });
-
-        return res.json(responsePayload);
     } catch (err) {
-        console.error(`[MARKETPLACE][SELECT-FAILED] Selection override process failed: ${err.message}`, {
-            sessionId,
-            targetOfferId,
-            selectionMode,
-            stack: err.stack
-        });
-
         if (err.message === 'MARKETPLACE_SESSION_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
         }

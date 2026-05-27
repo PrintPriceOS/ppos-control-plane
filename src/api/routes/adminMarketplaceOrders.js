@@ -6,7 +6,37 @@
 const express = require('express');
 const router = express.Router();
 const orderService = require('../services/marketplaceOrderService');
+const { resolveActorContext } = require('../middleware/auth');
 
+// Phase 39: Enforce Printhouse Scoping for Marketplace Orders
+router.use((req, res, next) => {
+    const context = resolveActorContext(req);
+    if (context.isPrinthouseUser) {
+        req.query.printhouseId = context.printhouseId;
+        req.actorContext = context;
+    }
+    next();
+});
+
+// Enforce ownership for specific order access
+router.param('id', async (req, res, next, id) => {
+    const context = resolveActorContext(req);
+    if (context.isPrinthouseUser) {
+        try {
+            const order = await orderService.getOrder(id);
+            if (!order) {
+                return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
+            }
+            if (order.printhouse?.assignedPrinthouseId !== context.printhouseId && order.printhouseId !== context.printhouseId) {
+                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
+            }
+            req.marketplaceOrder = order;
+        } catch (err) {
+            return res.status(500).json({ ok: false, error: err.message });
+        }
+    }
+    next();
+});
 /**
  * GET /api/admin/marketplace/orders
  * Returns a list of normalized marketplace order intents.

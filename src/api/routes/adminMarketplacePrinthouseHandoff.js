@@ -13,10 +13,18 @@ const router = express.Router();
 router.get('/packages', async (req, res) => {
     try {
         console.log('[PRINTHOUSE_HANDOFF_PACKAGES_LIST_REQUEST]', req.query);
+        const { resolveActorContext } = require('../middleware/auth');
+        const context = resolveActorContext(req);
+        
+        let targetPrinthouseId = req.query.printhouseId;
+        if (context.isPrinthouseUser) {
+            targetPrinthouseId = context.printhouseId;
+        }
+
         const handoffService = require('../services/marketplacePrinthouseHandoffService');
         const filters = {
             status: req.query.status,
-            printhouseId: req.query.printhouseId
+            printhouseId: targetPrinthouseId
         };
         const result = await handoffService.listPrinthouseHandoffPackages(filters);
         return res.json(result);
