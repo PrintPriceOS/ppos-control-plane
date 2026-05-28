@@ -151,7 +151,7 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     (Array.isArray(cp.appliedFixes) ? cp.appliedFixes.length : 0) ??
     (Array.isArray(cp.applied_fixes) ? cp.applied_fixes.length : 0);
 
-  const skippedFixesCount =
+  let skippedFixesCount =
     row?.skipped_fixes_count ??
     row?.skippedFixesCount ??
     cp.skippedFixesCount ??
@@ -185,6 +185,11 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     cp.reviewReasons ??
     [];
 
+  // Infer skipped fixes if required
+  if (String(type).toUpperCase() === 'AUTOFIX' && (!skippedFixesCount || skippedFixesCount === 0) && requiresHumanReview === true && reviewReasons.length > 0) {
+    skippedFixesCount = 1;
+  }
+
   const sourceStatus =
     row?.source_status ??
     row?.sourceStatus ??
@@ -208,8 +213,8 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     0;
 
   return {
-    findingsCount,
-    issuesCount,
+    findingsCount: findingsCount ?? null,
+    issuesCount: issuesCount ?? findingsCount ?? null,
     requestedFixesCount,
     repairsCount,
     appliedFixesCount,
@@ -331,6 +336,7 @@ router.get('/jobs', async (req, res) => {
                 riskScore: r.risk_score,
                 riskLevel: r.risk_level,
                 issueCount: projection.issuesCount,
+                issuesCount: projection.issuesCount,
                 findingsCount: projection.findingsCount,
                 requestedFixes,
                 repairs,
