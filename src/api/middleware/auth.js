@@ -15,6 +15,19 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+function extractBearerToken(req) {
+    return String(req.headers.authorization || '')
+        .replace(/^Bearer\s+/i, '')
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
+}
+
+function isInternalControlToken(req) {
+    const token = extractBearerToken(req);
+    const expected = String(process.env.PPOS_CONTROL_TOKEN || '').trim().replace(/^Bearer\s+/i, '');
+    return Boolean(token && expected && token === expected);
+}
+
 /**
  * Primary Authentication Middleware.
  * Enforces JWT validation and populates req.user.
@@ -46,6 +59,38 @@ function requireAdmin(req, res, next) {
             tenantId: 'ppos-production',
             authMode: 'BREAK_GLASS'
         };
+        return next();
+    }
+
+    if (isInternalControlToken(req)) {
+        req.auth = {
+            type: 'system',
+            actor: 'preflight-worker',
+            role: 'SYSTEM',
+            scopes: [
+                'preflight:read',
+                'preflight:write',
+                'jobs:read',
+                'jobs:write',
+                'artifacts:write'
+            ]
+        };
+
+        req.user = {
+            id: 'preflight-worker',
+            email: 'preflight-worker@system.local',
+            role: 'SYSTEM',
+            appRole: 'SYSTEM',
+            tenantId: 'ppos-production-worker'
+        };
+
+        console.log('[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED]', {
+            route: req.originalUrl,
+            actor: 'preflight-worker',
+            tokenLength: extractBearerToken(req).length,
+            authMode: 'PPOS_CONTROL_TOKEN'
+        });
+
         return next();
     }
 
