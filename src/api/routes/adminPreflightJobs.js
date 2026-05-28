@@ -173,15 +173,21 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     Array.isArray(cp.applied_fixes) ? cp.applied_fixes.length : 0
   );
 
-  const skippedFixesCount = Math.max(
+  const rawSkippedMax = Math.max(
     Number(row?.skipped_fixes_count ?? row?.skippedFixesCount ?? 0),
-    Number(cp.skippedFixesCount ?? cp.skipped_fixes_count ?? 0),
-    Array.isArray(row?.skippedFixes) ? row.skippedFixes.length : 0,
-    Array.isArray(row?.skipped_fixes) ? row.skipped_fixes.length : 0,
-    Array.isArray(cp.skippedFixes) ? cp.skippedFixes.length : 0,
-    Array.isArray(cp.skipped_fixes) ? cp.skipped_fixes.length : 0,
-    reviewReasons.length > 0 && requiresHumanReview ? 1 : 0
+    Number(cp.skippedFixesCount ?? cp.skipped_fixes_count ?? 0)
   );
+
+  let skippedFixesCount = rawSkippedMax;
+  if (Array.isArray(cp.skippedFixes)) {
+    skippedFixesCount = cp.skippedFixes.length;
+  } else if (Array.isArray(cp.skipped_fixes)) {
+    skippedFixesCount = cp.skipped_fixes.length;
+  } else if (Array.isArray(row?.skippedFixes)) {
+    skippedFixesCount = row.skippedFixes.length;
+  } else if (Array.isArray(row?.skipped_fixes)) {
+    skippedFixesCount = row.skipped_fixes.length;
+  }
 
   const failedFixesCount = Math.max(
     Number(row?.failed_fixes_count ?? row?.failedFixesCount ?? 0),
