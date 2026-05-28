@@ -122,6 +122,117 @@ async function resolveCanonicalPolicyId(inputId, context) {
     return defaultMap[policy] || policy;
 }
 
+/**
+ * Helper: Project Preflight Registry Record from row and canonical payload
+ */
+function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
+  const cp = canonicalPayload || {};
+  const type = row?.type || cp.type;
+
+  const findingsCount =
+    row?.findings_count ??
+    row?.findingsCount ??
+    cp.findingsCount ??
+    cp.issuesCount ??
+    (Array.isArray(cp.findings) ? cp.findings.length : null) ??
+    (Array.isArray(cp.issues) ? cp.issues.length : null);
+
+  const issuesCount =
+    row?.issue_count ??
+    row?.issues_count ??
+    row?.issuesCount ??
+    cp.issuesCount ??
+    findingsCount;
+
+  const appliedFixesCount =
+    row?.applied_fixes_count ??
+    row?.appliedFixesCount ??
+    cp.appliedFixesCount ??
+    (Array.isArray(cp.appliedFixes) ? cp.appliedFixes.length : 0) ??
+    (Array.isArray(cp.applied_fixes) ? cp.applied_fixes.length : 0);
+
+  const skippedFixesCount =
+    row?.skipped_fixes_count ??
+    row?.skippedFixesCount ??
+    cp.skippedFixesCount ??
+    (Array.isArray(cp.skippedFixes) ? cp.skippedFixes.length : 0) ??
+    (Array.isArray(cp.skipped_fixes) ? cp.skipped_fixes.length : 0);
+
+  const failedFixesCount =
+    row?.failed_fixes_count ??
+    row?.failedFixesCount ??
+    cp.failedFixesCount ??
+    (Array.isArray(cp.failedFixes) ? cp.failedFixes.length : 0) ??
+    (Array.isArray(cp.failed_fixes) ? cp.failed_fixes.length : 0);
+
+  const requiresHumanReview =
+    row?.requires_human_review ??
+    row?.requiresHumanReview ??
+    cp.requiresHumanReview ??
+    cp.requires_human_review ??
+    false;
+
+  const productionCertified =
+    row?.production_certified ??
+    row?.productionCertified ??
+    cp.productionCertified ??
+    cp.production_certified ??
+    null;
+
+  const reviewReasons =
+    row?.review_reasons_json ??
+    row?.reviewReasons ??
+    cp.reviewReasons ??
+    [];
+
+  const sourceStatus =
+    row?.source_status ??
+    row?.sourceStatus ??
+    cp.source_status ??
+    cp.final_status ??
+    cp.status ??
+    null;
+
+  return {
+    findingsCount,
+    issuesCount,
+    appliedFixesCount,
+    skippedFixesCount,
+    failedFixesCount,
+    requiresHumanReview,
+    productionCertified,
+    reviewReasons,
+    source_status: sourceStatus
+  };
+}
+
+/**
+ * Helper: Map Preflight Status prioritizing review requirements
+ */
+function mapPreflightStatus(type, sourceStatus, projection) {
+  const statusText = String(sourceStatus || '').toUpperCase();
+
+  const reviewRequired =
+    projection.requiresHumanReview === true ||
+    statusText.includes('REVIEW_REQUIRED') ||
+    (
+      String(type).toUpperCase() === 'AUTOFIX' &&
+      Number(projection.skippedFixesCount || 0) > 0 &&
+      (
+        projection.productionCertified === false ||
+        projection.reviewReasons?.length > 0
+      )
+    );
+
+  if (reviewRequired) return 'REVIEW_REQUIRED';
+
+  if (String(type).toUpperCase() === 'AUTOFIX' && Number(projection.appliedFixesCount || 0) > 0) {
+    return 'COMPLETED_WITH_FIXES';
+  }
+
+  return sourceStatus;
+}
+
 // --- 1. GET /api/admin/preflight/jobs ---
 router.get('/jobs', async (req, res) => {
     const context = buildGatewayContext(req);
@@ -181,6 +292,10 @@ router.get('/jobs', async (req, res) => {
             const appliedFixes = safeParse(r.applied_fixes_json);
             const skippedFixes = safeParse(r.skipped_fixes_json);
             const failedFixes = safeParse(r.failed_fixes_json);
+            const canonicalData = safeParse(r.canonical_payload_json);
+
+            const projection = projectPreflightRegistryRecord(r, canonicalData);
+            const mappedStatus = mapPreflightStatus(r.type, r.status, projection);
 
             return {
                 jobId: r.job_id,
@@ -190,7 +305,8 @@ router.get('/jobs', async (req, res) => {
                 printhouseId: r.printhouse_id,
                 operatorId: r.operator_id,
                 batchId: r.batch_id,
-                status: r.status,
+                status: mappedStatus,
+                source_status: projection.source_status || r.status,
                 policy: r.policy,
                 type: r.type,
                 progress: r.progress,
@@ -198,7 +314,8 @@ router.get('/jobs', async (req, res) => {
                 filename: r.original_filename,
                 riskScore: r.risk_score,
                 riskLevel: r.risk_level,
-                issueCount: r.issue_count,
+                issueCount: projection.issuesCount,
+                findingsCount: projection.findingsCount,
                 requestedFixes,
                 repairs,
                 fixes,
@@ -207,16 +324,19 @@ router.get('/jobs', async (req, res) => {
                 failedFixes,
                 requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
                 repairsCount: Array.isArray(repairs) ? repairs.length : 0,
-                appliedFixesCount: Array.isArray(appliedFixes) ? appliedFixes.length : 0,
-                skippedFixesCount: Array.isArray(skippedFixes) ? skippedFixes.length : 0,
-                failedFixesCount: Array.isArray(failedFixes) ? failedFixes.length : 0,
+                appliedFixesCount: projection.appliedFixesCount,
+                skippedFixesCount: projection.skippedFixesCount,
+                failedFixesCount: projection.failedFixesCount,
+                requiresHumanReview: projection.requiresHumanReview,
+                productionCertified: projection.productionCertified,
+                reviewReasons: projection.reviewReasons,
                 degraded: !!r.degraded,
                 degradedReasons: safeParse(r.degraded_reasons_json),
                 createdAt: r.created_at,
                 updatedAt: r.updated_at,
                 lastSeenAt: r.last_seen_at,
                 lastSyncedAt: r.last_synced_at,
-                canonicalData: safeParse(r.canonical_payload_json)
+                canonicalData
             };
         });
 
@@ -403,15 +523,22 @@ router.get('/jobs/:jobId', async (req, res) => {
             degradedReasons = safeParseLocal(localRecord.degraded_reasons_json);
         }
 
+        const projection = projectPreflightRegistryRecord(localRecord || {}, rawCanonical);
+        const mappedStatus = mapPreflightStatus(localRecord?.type || rawCanonical?.type, currentStatus, projection);
+
         res.json({
             ok: true,
             jobId,
-            status: currentStatus,
-            source_status: sourceStatus,
+            status: mappedStatus,
+            source_status: projection.source_status || currentStatus,
             progress,
-            issueCount,
+            issueCount: projection.issuesCount,
+            findingsCount: projection.findingsCount,
             degraded,
             degradedReasons,
+            requiresHumanReview: projection.requiresHumanReview,
+            productionCertified: projection.productionCertified,
+            reviewReasons: projection.reviewReasons,
             canonicalPayload: rawCanonical,
             registryRecord: localRecord ? {
                 createdAt: localRecord.created_at,
@@ -426,9 +553,9 @@ router.get('/jobs/:jobId', async (req, res) => {
                 failedFixes,
                 requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
                 repairsCount: Array.isArray(repairs) ? repairs.length : 0,
-                appliedFixesCount: Array.isArray(appliedFixes) ? appliedFixes.length : 0,
-                skippedFixesCount: Array.isArray(skippedFixes) ? skippedFixes.length : 0,
-                failedFixesCount: Array.isArray(failedFixes) ? failedFixes.length : 0
+                appliedFixesCount: projection.appliedFixesCount,
+                skippedFixesCount: projection.skippedFixesCount,
+                failedFixesCount: projection.failedFixesCount
             } : null
         });
     } catch (err) {
@@ -529,6 +656,11 @@ router.post('/jobs/sync', async (req, res) => {
         if (mappedStatus === 'QUEUED') {
              mappedStatus = 'COMPLETED';
         }
+
+        // Apply robust projection mapping
+        const dummyRow = { type, status: mappedStatus, source_status };
+        const projection = projectPreflightRegistryRecord(dummyRow, payload);
+        mappedStatus = mapPreflightStatus(type, mappedStatus, projection);
 
         console.log('[CONTROL][PREFLIGHT-JOB-SYNC][RECEIVED]', {
             jobId,
