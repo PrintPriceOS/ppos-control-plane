@@ -193,9 +193,25 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     cp.status ??
     null;
 
+  const requestedFixesCount =
+    row?.requested_fixes_count ??
+    row?.requestedFixesCount ??
+    cp.requestedFixesCount ??
+    (Array.isArray(cp.requestedFixes) ? cp.requestedFixes.length : 0) ??
+    (Array.isArray(cp.requested_fixes) ? cp.requested_fixes.length : 0);
+
+  const repairsCount =
+    row?.repairs_count ??
+    row?.repairsCount ??
+    cp.repairsCount ??
+    (Array.isArray(cp.repairs) ? cp.repairs.length : 0) ??
+    0;
+
   return {
     findingsCount,
     issuesCount,
+    requestedFixesCount,
+    repairsCount,
     appliedFixesCount,
     skippedFixesCount,
     failedFixesCount,
@@ -322,8 +338,8 @@ router.get('/jobs', async (req, res) => {
                 appliedFixes,
                 skippedFixes,
                 failedFixes,
-                requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
-                repairsCount: Array.isArray(repairs) ? repairs.length : 0,
+                requestedFixesCount: projection.requestedFixesCount,
+                repairsCount: projection.repairsCount,
                 appliedFixesCount: projection.appliedFixesCount,
                 skippedFixesCount: projection.skippedFixesCount,
                 failedFixesCount: projection.failedFixesCount,
@@ -551,11 +567,17 @@ router.get('/jobs/:jobId', async (req, res) => {
                 appliedFixes,
                 skippedFixes,
                 failedFixes,
-                requestedFixesCount: Array.isArray(requestedFixes) ? requestedFixes.length : 0,
-                repairsCount: Array.isArray(repairs) ? repairs.length : 0,
+                source_status: projection.source_status || currentStatus,
+                issuesCount: projection.issuesCount,
+                findingsCount: projection.findingsCount,
+                requestedFixesCount: projection.requestedFixesCount,
+                repairsCount: projection.repairsCount,
                 appliedFixesCount: projection.appliedFixesCount,
                 skippedFixesCount: projection.skippedFixesCount,
-                failedFixesCount: projection.failedFixesCount
+                failedFixesCount: projection.failedFixesCount,
+                productionCertified: projection.productionCertified,
+                requiresHumanReview: projection.requiresHumanReview,
+                reviewReasons: projection.reviewReasons
             } : null
         });
     } catch (err) {
