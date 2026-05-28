@@ -63,6 +63,7 @@ class PricingEngineClient {
             currency,
             target_margin_pct: order.target_margin_pct || pricing.target_margin_pct || 30.0,
             customer,
+            ...normalizedSpecs,
             specs: normalizedSpecs,
             pricing,
             delivery,
