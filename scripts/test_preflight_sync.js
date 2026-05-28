@@ -63,6 +63,31 @@ async function runSmokeTests() {
 
     data = await res.json();
     console.log("AUTOFIX sync result (COMPLETED_WITH_FIXES):", data);
+    // Test 4: Array counter regression
+    const regressionPayload = {
+        jobId: 'smoke-autofix-3-regression',
+        type: 'AUTOFIX',
+        status: 'COMPLETED',
+        source_status: 'COMPLETED',
+        findingsCount: 0,
+        requestedFixesCount: 0,
+        appliedFixesCount: 0,
+        skippedFixesCount: 0,
+        failedFixesCount: 0,
+        requestedFixes: ["APPLY_BLEED", "CONVERT_CMYK"],
+        appliedFixes: [{ code: "APPLY_BLEED" }],
+        skippedFixes: [{ code: "CONVERT_CMYK" }],
+        failedFixes: []
+    };
+
+    res = await fetch('http://127.0.0.1:8001/api/admin/preflight/jobs/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(regressionPayload)
+    });
+
+    data = await res.json();
+    console.log("AUTOFIX sync result (Array counter regression):", data);
 }
 
 runSmokeTests().catch(console.error);

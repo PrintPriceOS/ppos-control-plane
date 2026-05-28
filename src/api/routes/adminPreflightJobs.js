@@ -322,6 +322,34 @@ router.get('/jobs', async (req, res) => {
             const projection = projectPreflightRegistryRecord(r, canonicalData);
             const mappedStatus = mapPreflightStatus(r.type, r.status, projection);
 
+            const projectedRequestedFixesCount = Math.max(
+                Number(projection.requestedFixesCount || 0),
+                Array.isArray(requestedFixes) ? requestedFixes.length : 0,
+                Array.isArray(canonicalData?.requestedFixes) ? canonicalData.requestedFixes.length : 0,
+                Array.isArray(canonicalData?.requested_fixes) ? canonicalData.requested_fixes.length : 0
+            );
+
+            const projectedAppliedFixesCount = Math.max(
+                Number(projection.appliedFixesCount || 0),
+                Array.isArray(appliedFixes) ? appliedFixes.length : 0,
+                Array.isArray(canonicalData?.appliedFixes) ? canonicalData.appliedFixes.length : 0,
+                Array.isArray(canonicalData?.applied_fixes) ? canonicalData.applied_fixes.length : 0
+            );
+
+            const projectedSkippedFixesCount = Math.max(
+                Number(projection.skippedFixesCount || 0),
+                Array.isArray(skippedFixes) ? skippedFixes.length : 0,
+                Array.isArray(canonicalData?.skippedFixes) ? canonicalData.skippedFixes.length : 0,
+                Array.isArray(canonicalData?.skipped_fixes) ? canonicalData.skipped_fixes.length : 0
+            );
+
+            const projectedFailedFixesCount = Math.max(
+                Number(projection.failedFixesCount || 0),
+                Array.isArray(failedFixes) ? failedFixes.length : 0,
+                Array.isArray(canonicalData?.failedFixes) ? canonicalData.failedFixes.length : 0,
+                Array.isArray(canonicalData?.failed_fixes) ? canonicalData.failed_fixes.length : 0
+            );
+
             return {
                 jobId: r.job_id,
                 sourceJobId: r.source_job_id,
@@ -348,11 +376,11 @@ router.get('/jobs', async (req, res) => {
                 appliedFixes,
                 skippedFixes,
                 failedFixes,
-                requestedFixesCount: projection.requestedFixesCount,
+                requestedFixesCount: projectedRequestedFixesCount,
                 repairsCount: projection.repairsCount,
-                appliedFixesCount: projection.appliedFixesCount,
-                skippedFixesCount: projection.skippedFixesCount,
-                failedFixesCount: projection.failedFixesCount,
+                appliedFixesCount: projectedAppliedFixesCount,
+                skippedFixesCount: projectedSkippedFixesCount,
+                failedFixesCount: projectedFailedFixesCount,
                 requiresHumanReview: projection.requiresHumanReview,
                 productionCertified: projection.productionCertified,
                 reviewReasons: projection.reviewReasons,
@@ -552,6 +580,34 @@ router.get('/jobs/:jobId', async (req, res) => {
         const projection = projectPreflightRegistryRecord(localRecord || {}, rawCanonical);
         const mappedStatus = mapPreflightStatus(localRecord?.type || rawCanonical?.type, currentStatus, projection);
 
+        const projectedRequestedFixesCount = Math.max(
+            Number(projection.requestedFixesCount || 0),
+            Array.isArray(requestedFixes) ? requestedFixes.length : 0,
+            Array.isArray(rawCanonical?.requestedFixes) ? rawCanonical.requestedFixes.length : 0,
+            Array.isArray(rawCanonical?.requested_fixes) ? rawCanonical.requested_fixes.length : 0
+        );
+
+        const projectedAppliedFixesCount = Math.max(
+            Number(projection.appliedFixesCount || 0),
+            Array.isArray(appliedFixes) ? appliedFixes.length : 0,
+            Array.isArray(rawCanonical?.appliedFixes) ? rawCanonical.appliedFixes.length : 0,
+            Array.isArray(rawCanonical?.applied_fixes) ? rawCanonical.applied_fixes.length : 0
+        );
+
+        const projectedSkippedFixesCount = Math.max(
+            Number(projection.skippedFixesCount || 0),
+            Array.isArray(skippedFixes) ? skippedFixes.length : 0,
+            Array.isArray(rawCanonical?.skippedFixes) ? rawCanonical.skippedFixes.length : 0,
+            Array.isArray(rawCanonical?.skipped_fixes) ? rawCanonical.skipped_fixes.length : 0
+        );
+
+        const projectedFailedFixesCount = Math.max(
+            Number(projection.failedFixesCount || 0),
+            Array.isArray(failedFixes) ? failedFixes.length : 0,
+            Array.isArray(rawCanonical?.failedFixes) ? rawCanonical.failedFixes.length : 0,
+            Array.isArray(rawCanonical?.failed_fixes) ? rawCanonical.failed_fixes.length : 0
+        );
+
         res.json({
             ok: true,
             jobId,
@@ -580,11 +636,11 @@ router.get('/jobs/:jobId', async (req, res) => {
                 source_status: projection.source_status || currentStatus,
                 issuesCount: projection.issuesCount,
                 findingsCount: projection.findingsCount,
-                requestedFixesCount: projection.requestedFixesCount,
+                requestedFixesCount: projectedRequestedFixesCount,
                 repairsCount: projection.repairsCount,
-                appliedFixesCount: projection.appliedFixesCount,
-                skippedFixesCount: projection.skippedFixesCount,
-                failedFixesCount: projection.failedFixesCount,
+                appliedFixesCount: projectedAppliedFixesCount,
+                skippedFixesCount: projectedSkippedFixesCount,
+                failedFixesCount: projectedFailedFixesCount,
                 productionCertified: projection.productionCertified,
                 requiresHumanReview: projection.requiresHumanReview,
                 reviewReasons: projection.reviewReasons
