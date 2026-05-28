@@ -10,9 +10,14 @@ class WorkerRegistryService {
     /**
      * Heartbeat from a worker node.
      */
-    async heartbeat(workerId, metadata) {
+    async heartbeat(workerId, metadata = {}) {
+        const hostname =
+            metadata.hostname ||
+            metadata.host ||
+            workerId ||
+            'unknown-worker-host';
+
         const {
-            hostname,
             status = 'HEALTHY',
             queueBindings = [],
             capabilities = {},
