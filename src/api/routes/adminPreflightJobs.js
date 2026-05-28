@@ -484,6 +484,123 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
     }
 });
 
+// --- 3.5b POST /api/admin/preflight/jobs/sync (Worker Push) ---
+router.post('/jobs/sync', async (req, res) => {
+    // This endpoint handles the payload pushed from the worker after it finishes a job.
+    try {
+        const payload = req.body;
+        const { jobId, sourceJobId, tenantId, type, status, source_status, final_status } = payload;
+        
+        if (!jobId) {
+            return res.status(400).json({ ok: false, error: 'MISSING_JOB_ID' });
+        }
+
+        // Map status based on prompt rules
+        let mappedStatus = final_status || status || 'COMPLETED';
+        const isAnalyze = type === 'ANALYZE' || type === 'preflight_job';
+        const isAutofix = type === 'AUTOFIX';
+
+        if (isAnalyze && mappedStatus === 'COMPLETED') {
+            if (payload.findingsCount > 0) {
+                mappedStatus = 'COMPLETED_WITH_FINDINGS';
+            }
+        }
+
+        if (isAutofix) {
+            const rawSourceStatus = source_status || '';
+            if (rawSourceStatus === 'AUTOFIX_PARTIAL_REVIEW_REQUIRED' || rawSourceStatus === 'AUTOFIX_REVIEW_REQUIRED') {
+                mappedStatus = 'REVIEW_REQUIRED';
+            } else if (rawSourceStatus === 'AUTOFIX_PARTIAL' && payload.requiresHumanReview) {
+                mappedStatus = 'REVIEW_REQUIRED';
+            } else if (rawSourceStatus === 'AUTOFIX_PARTIAL' && payload.productionCertified) {
+                mappedStatus = 'COMPLETED_WITH_FIXES';
+            } else if (rawSourceStatus === 'AUTOFIX_FAILED' || mappedStatus === 'FAILED') {
+                mappedStatus = 'FAILED';
+            } else if (mappedStatus === 'COMPLETED') {
+                 if (payload.appliedFixesCount > 0) mappedStatus = 'COMPLETED_WITH_FIXES';
+            }
+        }
+        
+        // Never keep QUEUED if source_status is terminal (already handled since we overwrite with mappedStatus)
+        if (mappedStatus === 'QUEUED') {
+             mappedStatus = 'COMPLETED';
+        }
+
+        console.log('[CONTROL][PREFLIGHT-JOB-SYNC][RECEIVED]', {
+            jobId,
+            type,
+            source_status,
+            mappedStatus,
+            findingsCount: payload.findingsCount,
+            appliedFixesCount: payload.appliedFixesCount,
+            skippedFixesCount: payload.skippedFixesCount,
+            requiresHumanReview: payload.requiresHumanReview
+        });
+
+        // Use preflightRegistrySyncService to upsert? Or DB directly
+        const dbStatus = mappedStatus;
+        const dbType = type === 'preflight_job' ? 'ANALYZE' : (type || 'ANALYZE');
+
+        // Prepare canonical payload
+        const canonical = {
+             jobId,
+             status: dbStatus,
+             type: dbType,
+             progress: 100,
+             issuesCount: payload.issuesCount,
+             findingsCount: payload.findingsCount,
+             artifacts: payload.artifacts,
+             analysisIntegrity: payload.analysisIntegrity,
+             requiresHumanReview: payload.requiresHumanReview,
+             productionCertified: payload.productionCertified,
+             reviewReasons: payload.reviewReasons
+        };
+
+        const jsonStr = JSON.stringify(canonical);
+
+        // UPSERT
+        await db.query(`
+            INSERT INTO preflight_job_registry 
+            (job_id, source_job_id, tenant_id, status, type, progress, issue_count, 
+             applied_fixes_json, skipped_fixes_json, failed_fixes_json, requested_fixes_json, canonical_payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+            source_job_id = COALESCE(VALUES(source_job_id), source_job_id),
+            status = VALUES(status), 
+            type = VALUES(type),
+            progress = VALUES(progress),
+            issue_count = VALUES(issue_count),
+            applied_fixes_json = COALESCE(VALUES(applied_fixes_json), applied_fixes_json),
+            skipped_fixes_json = COALESCE(VALUES(skipped_fixes_json), skipped_fixes_json),
+            failed_fixes_json = COALESCE(VALUES(failed_fixes_json), failed_fixes_json),
+            requested_fixes_json = COALESCE(VALUES(requested_fixes_json), requested_fixes_json),
+            canonical_payload_json = VALUES(canonical_payload_json), 
+            updated_at = NOW()
+        `, [
+            jobId,
+            sourceJobId || null,
+            tenantId || 'system',
+            dbStatus,
+            dbType,
+            100,
+            payload.issuesCount || payload.findingsCount || 0,
+            payload.appliedFixes ? JSON.stringify(payload.appliedFixes) : null,
+            payload.skippedFixes ? JSON.stringify(payload.skippedFixes) : null,
+            payload.failedFixes ? JSON.stringify(payload.failedFixes) : null,
+            payload.requestedFixes ? JSON.stringify(payload.requestedFixes) : null,
+            jsonStr
+        ]);
+
+        console.log('[CONTROL][PREFLIGHT-JOB-SYNC][UPSERTED]', { jobId, mappedStatus });
+
+        res.json({ ok: true, jobId, mappedStatus });
+
+    } catch (err) {
+        console.error('[CONTROL][PREFLIGHT-JOB-SYNC][ERROR]', err.message);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // --- 3.6 POST /api/admin/preflight/sync ---
 router.post('/sync', async (req, res) => {
     const context = buildGatewayContext(req);
