@@ -144,27 +144,6 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     cp.issuesCount ??
     findingsCount;
 
-  const appliedFixesCount =
-    row?.applied_fixes_count ??
-    row?.appliedFixesCount ??
-    cp.appliedFixesCount ??
-    (Array.isArray(cp.appliedFixes) ? cp.appliedFixes.length : 0) ??
-    (Array.isArray(cp.applied_fixes) ? cp.applied_fixes.length : 0);
-
-  let skippedFixesCount =
-    row?.skipped_fixes_count ??
-    row?.skippedFixesCount ??
-    cp.skippedFixesCount ??
-    (Array.isArray(cp.skippedFixes) ? cp.skippedFixes.length : 0) ??
-    (Array.isArray(cp.skipped_fixes) ? cp.skipped_fixes.length : 0);
-
-  const failedFixesCount =
-    row?.failed_fixes_count ??
-    row?.failedFixesCount ??
-    cp.failedFixesCount ??
-    (Array.isArray(cp.failedFixes) ? cp.failedFixes.length : 0) ??
-    (Array.isArray(cp.failed_fixes) ? cp.failed_fixes.length : 0);
-
   const requiresHumanReview =
     row?.requires_human_review ??
     row?.requiresHumanReview ??
@@ -185,10 +164,33 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     cp.reviewReasons ??
     [];
 
-  // Infer skipped fixes if required
-  if (String(type).toUpperCase() === 'AUTOFIX' && (!skippedFixesCount || skippedFixesCount === 0) && requiresHumanReview === true && reviewReasons.length > 0) {
-    skippedFixesCount = 1;
-  }
+  const appliedFixesCount = Math.max(
+    Number(row?.applied_fixes_count ?? row?.appliedFixesCount ?? 0),
+    Number(cp.appliedFixesCount ?? cp.applied_fixes_count ?? 0),
+    Array.isArray(row?.appliedFixes) ? row.appliedFixes.length : 0,
+    Array.isArray(row?.applied_fixes) ? row.applied_fixes.length : 0,
+    Array.isArray(cp.appliedFixes) ? cp.appliedFixes.length : 0,
+    Array.isArray(cp.applied_fixes) ? cp.applied_fixes.length : 0
+  );
+
+  const skippedFixesCount = Math.max(
+    Number(row?.skipped_fixes_count ?? row?.skippedFixesCount ?? 0),
+    Number(cp.skippedFixesCount ?? cp.skipped_fixes_count ?? 0),
+    Array.isArray(row?.skippedFixes) ? row.skippedFixes.length : 0,
+    Array.isArray(row?.skipped_fixes) ? row.skipped_fixes.length : 0,
+    Array.isArray(cp.skippedFixes) ? cp.skippedFixes.length : 0,
+    Array.isArray(cp.skipped_fixes) ? cp.skipped_fixes.length : 0,
+    reviewReasons.length > 0 && requiresHumanReview ? 1 : 0
+  );
+
+  const failedFixesCount = Math.max(
+    Number(row?.failed_fixes_count ?? row?.failedFixesCount ?? 0),
+    Number(cp.failedFixesCount ?? cp.failed_fixes_count ?? 0),
+    Array.isArray(row?.failedFixes) ? row.failedFixes.length : 0,
+    Array.isArray(row?.failed_fixes) ? row.failed_fixes.length : 0,
+    Array.isArray(cp.failedFixes) ? cp.failedFixes.length : 0,
+    Array.isArray(cp.failed_fixes) ? cp.failed_fixes.length : 0
+  );
 
   const sourceStatus =
     row?.source_status ??
@@ -198,12 +200,14 @@ function projectPreflightRegistryRecord(row, canonicalPayload = {}) {
     cp.status ??
     null;
 
-  const requestedFixesCount =
-    row?.requested_fixes_count ??
-    row?.requestedFixesCount ??
-    cp.requestedFixesCount ??
-    (Array.isArray(cp.requestedFixes) ? cp.requestedFixes.length : 0) ??
-    (Array.isArray(cp.requested_fixes) ? cp.requested_fixes.length : 0);
+  const requestedFixesCount = Math.max(
+    Number(row?.requested_fixes_count ?? row?.requestedFixesCount ?? 0),
+    Number(cp.requestedFixesCount ?? cp.requested_fixes_count ?? 0),
+    Array.isArray(row?.requestedFixes) ? row.requestedFixes.length : 0,
+    Array.isArray(row?.requested_fixes) ? row.requested_fixes.length : 0,
+    Array.isArray(cp.requestedFixes) ? cp.requestedFixes.length : 0,
+    Array.isArray(cp.requested_fixes) ? cp.requested_fixes.length : 0
+  );
 
   const repairsCount =
     row?.repairs_count ??
