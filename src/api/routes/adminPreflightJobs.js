@@ -508,16 +508,20 @@ router.post('/jobs/sync', async (req, res) => {
 
         if (isAutofix) {
             const rawSourceStatus = source_status || '';
-            if (rawSourceStatus === 'AUTOFIX_PARTIAL_REVIEW_REQUIRED' || rawSourceStatus === 'AUTOFIX_REVIEW_REQUIRED') {
+            const reviewRequired =
+              payload.requiresHumanReview === true ||
+              payload.requires_human_review === true ||
+              (Number(payload.skippedFixesCount || payload.skipped_fixes_count || 0) > 0 && payload.reviewReasons?.length > 0) ||
+              String(rawSourceStatus || mappedStatus || '').includes('REVIEW_REQUIRED');
+
+            if (reviewRequired) {
                 mappedStatus = 'REVIEW_REQUIRED';
-            } else if (rawSourceStatus === 'AUTOFIX_PARTIAL' && payload.requiresHumanReview) {
-                mappedStatus = 'REVIEW_REQUIRED';
-            } else if (rawSourceStatus === 'AUTOFIX_PARTIAL' && payload.productionCertified) {
-                mappedStatus = 'COMPLETED_WITH_FIXES';
             } else if (rawSourceStatus === 'AUTOFIX_FAILED' || mappedStatus === 'FAILED') {
                 mappedStatus = 'FAILED';
             } else if (mappedStatus === 'COMPLETED') {
                  if (payload.appliedFixesCount > 0) mappedStatus = 'COMPLETED_WITH_FIXES';
+            } else if (rawSourceStatus === 'AUTOFIX_PARTIAL' && payload.productionCertified) {
+                mappedStatus = 'COMPLETED_WITH_FIXES';
             }
         }
         
