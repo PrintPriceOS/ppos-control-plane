@@ -547,6 +547,7 @@ router.get('/jobs/:jobId', async (req, res) => {
         const appliedFixes = localRecord ? safeParseLocal(localRecord.applied_fixes_json) : null;
         const skippedFixes = localRecord ? safeParseLocal(localRecord.skipped_fixes_json) : null;
         const failedFixes = localRecord ? safeParseLocal(localRecord.failed_fixes_json) : null;
+        const fixCoverage = rawCanonical?.fix_coverage || rawCanonical?.result?.fix_coverage || null;
 
         const currentStatus = rawCanonical?.status || localRecord?.status || 'UNKNOWN';
 
@@ -649,7 +650,8 @@ router.get('/jobs/:jobId', async (req, res) => {
                 failedFixesCount: projectedFailedFixesCount,
                 productionCertified: projection.productionCertified,
                 requiresHumanReview: projection.requiresHumanReview,
-                reviewReasons: projection.reviewReasons
+                reviewReasons: projection.reviewReasons,
+                fixCoverage
             } : null
         });
     } catch (err) {

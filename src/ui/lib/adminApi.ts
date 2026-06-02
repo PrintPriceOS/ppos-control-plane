@@ -327,6 +327,28 @@ export type AuditRow = {
     governance_snapshot?: any;
 };
 
+export interface FixCoverageItem {
+    issue_code: string | null;
+    severity: string | null;
+    message: string | null;
+    fix_method: string | null;
+    repair_code?: string;
+    repair_status?: string;
+    repair_reason?: string | null;
+}
+
+export interface FixCoverage {
+    total_issues: number;
+    fixed_count: number;
+    skipped_count: number;
+    failed_count: number;
+    not_attempted_count: number;
+    fixed: FixCoverageItem[];
+    skipped: FixCoverageItem[];
+    failed: FixCoverageItem[];
+    not_attempted: FixCoverageItem[];
+}
+
 export type PreflightJob = {
     jobId: string;
     id?: string | number;
@@ -361,6 +383,7 @@ export type PreflightJob = {
     appliedFixes?: any[];
     skippedFixes?: any[];
     failedFixes?: any[];
+    fixCoverage?: FixCoverage;
     lastSeenAt?: string | null;
     lastSyncedAt?: string | null;
 };
@@ -1960,6 +1983,7 @@ export interface AdminPreflightJob {
     appliedFixes?: any[];
     skippedFixes?: any[];
     failedFixes?: any[];
+    fixCoverage?: FixCoverage;
     lastSeenAt?: string | null;
     lastSyncedAt?: string | null;
 }
