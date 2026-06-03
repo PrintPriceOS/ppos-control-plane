@@ -18,6 +18,10 @@ class AutonomousTemporalLoop {
   }
 
   start(intervalMs = 1200000) { // Default 20 mins
+    if (process.env.PPOS_ENABLE_AUTONOMOUS_TEMPORAL !== 'true') {
+        logger.info('[AUTONOMOUS-GATING] temporal-intelligence disabled by PPOS_ENABLE_AUTONOMOUS_TEMPORAL=false');
+        return;
+    }
     if (this.isRunning) return;
     this.isRunning = true;
     this.intervalId = setInterval(() => this.runCycle(), intervalMs);

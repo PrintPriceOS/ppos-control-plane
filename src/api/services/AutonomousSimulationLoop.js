@@ -18,6 +18,10 @@ class AutonomousSimulationLoop {
   }
 
   start(intervalMs = 300000) { // Default 5 mins
+    if (process.env.PPOS_ENABLE_AUTONOMOUS_SIMULATION !== 'true') {
+        logger.info('[AUTONOMOUS-GATING] reality-simulation disabled by PPOS_ENABLE_AUTONOMOUS_SIMULATION=false');
+        return;
+    }
     if (this.isRunning) return;
     this.isRunning = true;
     this.intervalId = setInterval(() => this.runCycle(), intervalMs);

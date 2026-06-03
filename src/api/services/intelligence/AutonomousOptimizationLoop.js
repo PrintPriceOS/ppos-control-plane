@@ -22,6 +22,10 @@ class AutonomousOptimizationLoop {
    * Starts the optimization loop.
    */
   start(intervalMs = 300000) { // Default 5 mins
+    if (process.env.PPOS_ENABLE_AUTONOMOUS_OPT !== 'true') {
+        logger.info('[AUTONOMOUS-GATING] autonomous-opt disabled by PPOS_ENABLE_AUTONOMOUS_OPT=false');
+        return;
+    }
     if (this.isRunning) return;
     
     this.isRunning = true;

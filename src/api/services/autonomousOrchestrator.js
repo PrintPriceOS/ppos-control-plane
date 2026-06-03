@@ -35,13 +35,21 @@ class AutonomousOrchestrator {
         setInterval(() => this.executeLoop('sla', () => slaMonitor.scanActiveDispatches()), this.loops.sla.interval);
 
         // 3. Autonomous Reroute Loop
-        setInterval(() => this.executeLoop('reroute', () => autoReroute.evaluateReroutes()), this.loops.reroute.interval);
+        if (process.env.PPOS_ENABLE_AUTO_REROUTE === 'true') {
+            setInterval(() => this.executeLoop('reroute', () => autoReroute.evaluateReroutes()), this.loops.reroute.interval);
+        } else {
+            logger.info('[AUTONOMOUS-GATING] auto-reroute disabled by PPOS_ENABLE_AUTO_REROUTE=false');
+        }
 
         // 4. Capacity Conflict Loop
         setInterval(() => this.executeLoop('conflict', () => capacityConflict.detectConflicts()), this.loops.conflict.interval);
 
         // 5. Learning Feedback Loop
-        setInterval(() => this.executeLoop('learning', () => learningLoop.recomputeIntelligence()), this.loops.learning.interval);
+        if (process.env.PPOS_ENABLE_LEARNING_LOOP === 'true') {
+            setInterval(() => this.executeLoop('learning', () => learningLoop.recomputeIntelligence()), this.loops.learning.interval);
+        } else {
+            logger.info('[AUTONOMOUS-GATING] learning-loop disabled by PPOS_ENABLE_LEARNING_LOOP=false');
+        }
     }
 
     /**

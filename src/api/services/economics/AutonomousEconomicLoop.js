@@ -21,6 +21,10 @@ class AutonomousEconomicLoop {
    * Starts the economic optimization loop.
    */
   start(intervalMs = 600000) { // Default 10 mins
+    if (process.env.PPOS_ENABLE_AUTONOMOUS_ECONOMICS !== 'true') {
+        logger.info('[AUTONOMOUS-GATING] autonomous-economics disabled by PPOS_ENABLE_AUTONOMOUS_ECONOMICS=false');
+        return;
+    }
     if (this.isRunning) return;
     
     this.isRunning = true;
