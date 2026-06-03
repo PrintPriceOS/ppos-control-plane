@@ -550,10 +550,10 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
 
     // Enhanced metrics: Policy distribution (as object)
     const policies = await db.query(`
-      SELECT policy_slug, COUNT(*) as count
-      FROM audit_logs
+      SELECT JSON_EXTRACT(metadata_json, '$.policy_slug') as policy_slug, COUNT(*) as count
+      FROM api_audit_logs
       WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
-        AND policy_slug IS NOT NULL
+        AND JSON_EXTRACT(metadata_json, '$.policy_slug') IS NOT NULL
       GROUP BY policy_slug
       ORDER BY count DESC
     `, [id, startTs, endTsLimit]);

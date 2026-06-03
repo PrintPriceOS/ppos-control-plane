@@ -6,7 +6,7 @@ class AuditService {
         const { jobId, policySlug, ipAddress, details } = params;
         try {
             await db.query(`
-                INSERT INTO audit_logs (id, tenant_id, action, job_id, policy_slug, ip_address, details)
+                INSERT INTO api_audit_logs (id, tenant_id, action, job_id, policy_slug, ip_address, details)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `, [
                 crypto.randomUUID(),

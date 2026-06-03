@@ -125,7 +125,7 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         route: '/audit',
         status: 'ACTIVE',
         requiredEndpoints: ['/api/admin/audit'],
-        requiredTables: ['api_audit_log'],
+        requiredTables: ['api_api_audit_logs'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
         description: 'Security and operation logs.'
     }

@@ -56,7 +56,7 @@ class AuditLogger {
         // 1. Persist to DB asynchronously to avoid blocking
         try {
             await db.execute(
-                `INSERT INTO api_audit_log 
+                `INSERT INTO api_audit_logs 
                  (tenant_id, deployment_id, user_id, user_role, request_id, action, resource_type, resource_id, ip_address, user_agent, governance_snapshot) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [

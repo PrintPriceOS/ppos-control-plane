@@ -242,22 +242,23 @@ router.get("/:id/timeline", async (req, res) => {
 
         const events = [];
 
-        // 1. Query real api_audit_log entries mapped to this request/resource
+        // 1. Query real api_audit_logs entries mapped to this request/resource
         try {
             const auditRows = await db.query(
-                "SELECT id, created_at, action, resource_type, tenant_id FROM api_audit_log WHERE resource_id = ? OR request_id = ? ORDER BY created_at ASC",
+                "SELECT id, created_at, event_type, tenant_id, metadata_json FROM api_audit_logs WHERE JSON_EXTRACT(metadata_json, '$.resource_id') = ? OR JSON_EXTRACT(metadata_json, '$.request_id') = ? ORDER BY created_at ASC",
                 [jobEntity.id, jobEntity.id]
             );
             if (auditRows && auditRows.length > 0) {
                 auditRows.forEach((row, i) => {
+                    const metadata = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : (row.metadata_json || {});
                     events.push({
                         id: String(row.id || `aud_${i}`),
                         stage: "AUDIT_EVENT",
-                        title: String(row.action || "API Access Logged"),
+                        title: String(row.event_type || "API Access Logged"),
                         status: "SUCCESS",
                         timestamp: row.created_at || jobEntity.created_at,
-                        details: `Action invoked on resource [${row.resource_type || 'JOB'}]. Actor: ${row.tenant_id || 'System'}`,
-                        telemetry: { source: "api_audit_log" }
+                        details: `Action invoked on resource [${metadata.resource_type || metadata.entity_type || 'JOB'}]. Actor: ${row.tenant_id || 'System'}`,
+                        telemetry: { source: "api_audit_logs" }
                     });
                 });
             }
@@ -265,28 +266,9 @@ router.get("/:id/timeline", async (req, res) => {
             // Unindexed table fallback
         }
 
-        // 2. Query real manufacturing_dispatch_events if present
-        try {
-            const mesRows = await db.query(
-                "SELECT id, created_at, event_type, message, actor_id FROM manufacturing_dispatch_events WHERE dispatch_id = ? OR manufacturing_package_id = ? ORDER BY created_at ASC",
-                [jobEntity.id, jobEntity.id]
-            );
-            if (mesRows && mesRows.length > 0) {
-                mesRows.forEach((row, i) => {
-                    events.push({
-                        id: String(row.id || `mes_${i}`),
-                        stage: "ORCHESTRATION",
-                        title: String(row.event_type || "Dispatch Transition"),
-                        status: row.event_type?.includes('FAIL') ? "FAILURE" : "SUCCESS",
-                        timestamp: row.created_at || jobEntity.updated_at,
-                        details: row.message || "Manufacturing ledger event tracked.",
-                        telemetry: { actor: row.actor_id || "MES_Orchestrator", source: "manufacturing_dispatch_events" }
-                    });
-                });
-            }
-        } catch (e) {
-            // Unindexed table fallback
-        }
+        // TODO [PHASE 11/12 MES Integration]: 
+        // Query manufacturing_dispatch_events and manufacturing_evidence_ledger here.
+        // DO NOT enable until migrations and schemas exist to avoid silent query failures.
 
         // 3. Fallback to truthfulness: Map canonical base record timestamps if NO external events exist
         if (events.length === 0) {
@@ -394,10 +376,10 @@ router.get("/:id/logs", async (req, res) => {
             }
         }
 
-        // 3. Look up specific api_audit_log messages if logs still unmapped
+        // 3. Look up specific api_audit_logs messages if logs still unmapped
         if (logs.length === 0) {
             try {
-                const audRows = await db.query("SELECT id, created_at, action FROM api_audit_log WHERE resource_id = ? ORDER BY created_at ASC", [jobEntity.id]);
+                const audRows = await db.query("SELECT id, created_at, event_type FROM api_audit_logs WHERE JSON_EXTRACT(metadata_json, '$.resource_id') = ? ORDER BY created_at ASC", [jobEntity.id]);
                 if (audRows && audRows.length > 0) {
                     sourceStatus = "API_AUDIT_LOG_LEDGER";
                     audRows.forEach((row, i) => {
@@ -405,7 +387,7 @@ router.get("/:id/logs", async (req, res) => {
                             index: i,
                             timestamp: row.created_at || new Date().toISOString(),
                             severity: "INFO",
-                            message: `[AUDIT-ACTION] ${row.action}`
+                            message: `[AUDIT-ACTION] ${row.event_type}`
                         });
                     });
                 }
@@ -466,28 +448,9 @@ router.get("/:id/artifacts", async (req, res) => {
             // Unindexed table fallback
         }
 
-        // 2. Query manufacturing_evidence_ledger for output attachments
-        try {
-            const evRows = await db.query(
-                "SELECT id, evidence_type, hash, created_at FROM manufacturing_evidence_ledger WHERE dispatch_id = ? OR hash = ?",
-                [jobEntity.id, jobEntity.id]
-            );
-            if (evRows && evRows.length > 0) {
-                evRows.forEach(ev => {
-                    realArtifacts.push({
-                        artifact_id: String(ev.id),
-                        filename: `evidence_ledger_${ev.evidence_type || 'block'}.dat`,
-                        size_bytes: 1024,
-                        mime_type: 'application/octet-stream',
-                        checksum_sha256: ev.hash || null,
-                        created_at: ev.created_at,
-                        download_url: null, // No streaming payload link exists natively
-                        available: false,
-                        reason: "LEDGER_METADATA_ONLY"
-                    });
-                });
-            }
-        } catch (e) {}
+        // TODO [PHASE 11/12 MES Integration]: 
+        // Query manufacturing_evidence_ledger for output attachments here.
+        // DO NOT enable until migrations and schemas exist to avoid silent query failures.
 
         if (realArtifacts.length === 0) {
             return res.json({

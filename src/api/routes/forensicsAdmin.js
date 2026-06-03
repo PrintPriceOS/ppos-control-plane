@@ -23,7 +23,7 @@ router.get('/timeline/:jobId', async (req, res) => {
         // 2. Fetch Audit Logs for this Job and its Request ID
         const requestId = job.metadata_json?.traceId || job.metadata_json?.requestId;
         const { rows: auditLogs } = await db.query(`
-            SELECT * FROM api_audit_log 
+            SELECT * FROM api_audit_logs 
             WHERE resource_id = ? OR request_id = ?
             ORDER BY created_at ASC
         `, [jobId, requestId]);

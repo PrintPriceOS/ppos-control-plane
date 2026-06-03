@@ -33,11 +33,12 @@ class AuditLoggerService {
         // 2. Persistent Logging (MySQL)
         try {
             await db.query(
-                `INSERT INTO audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
+                `INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
                  VALUES (?, ?, ?, ?, ?, NOW())`,
                 [event.type, event.tenantId, event.userId, event.status, JSON.stringify(event.metadata || {})]
             );
         } catch (err) {
+            console.error('[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs:', err.message, event);
             logger.error({
                 event: 'audit_persistence_failed',
                 message: 'Failed to persist audit log to MySQL',

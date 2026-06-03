@@ -56,7 +56,7 @@ async function calculateTenantRisk(tenantId, options = {}) {
         // 4. Quota Pressure (Last 1h)
         const { rows: [quotaStats] } = await db.query(`
             SELECT COUNT(*) as count 
-            FROM api_audit_log 
+            FROM api_audit_logs 
             WHERE tenant_id = ? AND action = 'QUOTA_EXCEEDED'
             AND created_at >= NOW() - INTERVAL 1 HOUR
         `, [tenantId]);

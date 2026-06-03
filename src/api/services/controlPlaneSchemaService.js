@@ -147,7 +147,7 @@ class ControlPlaneSchemaService {
 
             // 7. API Audit Log
             await db.query(`
-                CREATE TABLE IF NOT EXISTS api_audit_log (
+                CREATE TABLE IF NOT EXISTS api_api_audit_logs (
                     id VARCHAR(64) PRIMARY KEY,
                     request_id VARCHAR(64) NOT NULL,
                     tenant_id VARCHAR(64) NOT NULL,

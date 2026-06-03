@@ -34,7 +34,7 @@ async function calculateDeploymentRisk(deploymentId) {
         // 2. Worker Health (Heartbeat gaps)
         // In this implementation, we simulate worker health check
         const { rows: deadWorkers } = await db.query(`
-            SELECT id FROM api_audit_log 
+            SELECT id FROM api_audit_logs 
             WHERE action = 'WORKER_OFFLINE' AND created_at >= NOW() - INTERVAL 10 MINUTE
         `);
         signals.worker_health = Math.min(1, (deadWorkers?.length || 0) / 3);

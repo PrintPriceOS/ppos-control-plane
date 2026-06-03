@@ -95,7 +95,7 @@ class ManufacturingBundleService {
 
     // 8. Add Audit Log Snapshot
     // Note: In a real system, we'd fetch actual events from a manufacturing_dispatch_events table.
-    // For now, we'll provide a placeholder or fetch from audit_logs if available.
+    // For now, we'll provide a placeholder or fetch from api_audit_logs if available.
     archive.append(JSON.stringify({ note: 'Operational audit log snapshot included in manufacturing package.' }, null, 2), { name: 'audit-log.json' });
 
     // 9. Add Checksums File
