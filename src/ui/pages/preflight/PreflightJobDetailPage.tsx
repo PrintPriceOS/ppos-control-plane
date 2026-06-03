@@ -616,56 +616,74 @@ export const PreflightJobDetailPage: React.FC = () => {
               <div className="h-10 flex items-center justify-center">
                 <ArrowPathIcon className="w-4 h-4 text-primary animate-spin" />
               </div>
-            ) : (artifactsQ.data?.artifacts && artifactsQ.data.artifacts.length > 0) ? (
-              <div className="space-y-2">
-                {artifactsQ.data.artifacts.map((a: any, i: number) => (
-                  <div key={i} className="ppos-surface-muted p-2.5 border ppos-border flex flex-col gap-1.5 group">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <DocumentArrowDownIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                        <span className="text-xs font-bold text-slate-800 dark:text-white truncate" title={a.filename || a.name}>
-                          {a.filename || a.name || 'document.pdf'}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono text-slate-400 flex-shrink-0 uppercase bg-white/5 px-1.5 py-0.5">
-                        {a.type || 'OUTPUT'}
-                      </span>
+            ) : (() => {
+              // The API returns normalized artifacts.
+              const items = artifactsQ.data?.artifacts || [];
+              const hasUpstreamArtifacts = payload.artifacts || payload.artifact_list || payload.availableArtifacts || (payload.result?.artifacts);
+              
+              if (items.length === 0) {
+                if (hasUpstreamArtifacts) {
+                  return (
+                    <div className="text-center py-4 space-y-2">
+                      <p className="text-xs font-bold text-amber-500 italic">Artifacts detected upstream but not yet persisted.</p>
+                      <button onClick={() => { jobQ.refetch(); artifactsQ.refetch(); }} className="text-xs text-primary hover:underline font-black uppercase tracking-widest">
+                        Refresh Artifacts
+                      </button>
                     </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t ppos-border">
-                      <span className="text-[9px] font-mono text-slate-400">
-                        {formatSize(a.sizeBytes || a.size)}
-                      </span>
-                      
-                      <div className="flex items-center gap-2">
-                        {/* If upstream yields native static storagePath/S3 url, expose it transparently */}
-                        {(a.storagePath || a.path || '').startsWith('http') && (
-                          <a 
-                            href={a.storagePath || a.path} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-[9px] font-bold text-slate-400 hover:text-primary underline"
-                          >
-                            Direct S3 URI
-                          </a>
-                        )}
-
-                        <button 
-                          onClick={() => handleDirectDownload(a.artifactId || a.id, a.filename || a.name)}
-                          className="text-[10px] font-black uppercase text-primary hover:underline flex items-center gap-0.5"
-                        >
-                          <span>Stream Proxied</span>
-                        </button>
-                      </div>
+                  );
+                }
+                if (isTerminalStatus(status) && (payload.type === 'AUTOFIX' || payload.type === 'REPAIR')) {
+                   return (
+                    <div className="text-center py-4">
+                      <p className="text-xs font-bold text-slate-400 italic">No corrected PDF was produced for this job.</p>
                     </div>
+                   );
+                }
+                return (
+                  <div className="text-center py-4">
+                    <p className="text-xs font-bold text-slate-400 italic">No downloadable artifacts are mapped for this job yet.</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-xs font-bold text-slate-400 italic">Artifacts Unavailable: Registry payload has no mapped artifacts.</p>
-              </div>
-            )}
+                );
+              }
+
+              const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
+              const primaryItem = items.find((a: any) => primaryAliasCandidates.includes(a.alias));
+              const secondaryItems = items.filter((a: any) => a !== primaryItem);
+
+              return (
+                <div className="space-y-4">
+                  {primaryItem && (
+                    <button 
+                      onClick={() => handleDirectDownload(primaryItem.alias || primaryItem.id, primaryItem.filename)}
+                      className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
+                      title={primaryItem.label}
+                    >
+                      <DocumentArrowDownIcon className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>Download Fixed PDF</span>
+                    </button>
+                  )}
+
+                  {secondaryItems.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {secondaryItems.map((a: any, i: number) => (
+                        <button 
+                          key={i}
+                          onClick={() => handleDirectDownload(a.alias || a.id, a.filename)}
+                          className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
+                          title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <DocumentIcon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
+                            <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.label || a.alias || a.type}</span>
+                          </div>
+                          <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Upstream Worker Telemetry Verification */}

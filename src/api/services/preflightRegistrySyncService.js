@@ -12,7 +12,8 @@ const {
     isTerminalDiagnosticStatus,
     mapPhase10Status,
     collectFindings,
-    normalizeArtifacts
+    normalizeArtifacts,
+    normalizePreflightArtifacts
 } = require('./preflightStatusHelpers');
 
 class PreflightRegistrySyncService {
@@ -93,8 +94,8 @@ class PreflightRegistrySyncService {
 
 
             // Artifact List Preservation
-            const artifactsRaw = upstreamJob.artifacts || upstreamJob.artifact_list || upstreamJob.availableArtifacts || upstreamJob.available_artifacts;
-            const artifacts = normalizeArtifacts(artifactsRaw);
+            const artifactsRaw = upstreamJob.artifacts || upstreamJob.artifact_list || upstreamJob.availableArtifacts || upstreamJob.available_artifacts || (upstreamJob.result ? upstreamJob.result.artifacts : null);
+            const artifacts = normalizePreflightArtifacts(upstreamJob, null, upstreamJob, jobId);
             const artifact_list_json = artifacts.length > 0 ? JSON.stringify(artifacts) : null;
 
             // Degraded path verification
@@ -386,8 +387,8 @@ class PreflightRegistrySyncService {
         const skipped_fixes_json = buckets.skipped.length > 0 ? JSON.stringify(buckets.skipped) : null;
         const failed_fixes_json = buckets.failed.length > 0 ? JSON.stringify(buckets.failed) : null;
 
-        const artifactsRaw = payload.artifacts || payload.artifact_list || payload.availableArtifacts || payload.available_artifacts;
-        const artifacts = normalizeArtifacts(artifactsRaw);
+        const artifactsRaw = payload.artifacts || payload.artifact_list || payload.availableArtifacts || payload.available_artifacts || (payload.result ? payload.result.artifacts : null);
+        const artifacts = normalizePreflightArtifacts(payload, null, payload, jobId);
         const artifact_list_json = artifacts.length > 0 ? JSON.stringify(artifacts) : null;
 
         const derivedDegraded = this._deriveDegraded(payload, status);

@@ -14,7 +14,7 @@ const gateway = require('../services/preflightContractGateway');
 const db = require('../services/mysqlClient');
 const syncService = require('../services/preflightRegistrySyncService');
 const preflightServiceClient = require('../services/preflightServiceClient');
-const { isTerminalDiagnosticStatus, collectFindings } = require('../services/preflightStatusHelpers');
+const { isTerminalDiagnosticStatus, collectFindings, normalizePreflightArtifacts } = require('../services/preflightStatusHelpers');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -615,6 +615,8 @@ router.get('/jobs/:jobId', async (req, res) => {
             Array.isArray(rawCanonical?.failed_fixes) ? rawCanonical.failed_fixes.length : 0
         );
 
+        const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
+
         res.json({
             ok: true,
             jobId,
@@ -629,6 +631,7 @@ router.get('/jobs/:jobId', async (req, res) => {
             productionCertified: projection.productionCertified,
             reviewReasons: projection.reviewReasons,
             canonicalPayload: rawCanonical,
+            artifacts,
             registryRecord: localRecord ? {
                 createdAt: localRecord.created_at,
                 updatedAt: localRecord.updated_at,
@@ -1026,40 +1029,13 @@ router.post(['/jobs/:jobId/actions/retry', '/jobs/:jobId/retry'], async (req, re
 router.get('/jobs/:jobId/artifacts', async (req, res) => {
     const { jobId } = req.params;
     try {
-        // Fetch from Artifact Registry
-        const artifacts = await db.query('SELECT * FROM preflight_artifact_registry WHERE job_id = ?', [jobId]);
-        
-        // Also consult job record's canonical payload
-        const rows = await db.query('SELECT canonical_payload_json FROM preflight_job_registry WHERE job_id = ?', [jobId]);
-        const canonicalObj = rows[0]?.canonical_payload_json ? (typeof rows[0].canonical_payload_json === 'string' ? JSON.parse(rows[0].canonical_payload_json) : rows[0].canonical_payload_json) : null;
+        const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+        const localRecord = rows[0];
+        const canonicalObj = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
 
-        const combinedMap = new Map();
-        artifacts.forEach(a => combinedMap.set(a.artifact_id, {
-            id: a.artifact_id,
-            artifactId: a.artifact_id,
-            type: a.artifact_type,
-            filename: a.filename,
-            sizeBytes: a.size_bytes,
-            createdAt: a.created_at
-        }));
+        const normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
 
-        if (canonicalObj?.artifacts && Array.isArray(canonicalObj.artifacts)) {
-            canonicalObj.artifacts.forEach(art => {
-                const aid = art.id || art.artifactId;
-                if (aid && !combinedMap.has(aid)) {
-                    combinedMap.set(aid, {
-                        id: aid,
-                        artifactId: aid,
-                        type: art.type || 'OUTPUT',
-                        filename: art.filename || art.name || 'artifact.pdf',
-                        sizeBytes: art.sizeBytes || art.size || 0,
-                        createdAt: new Date().toISOString()
-                    });
-                }
-            });
-        }
-
-        res.json({ ok: true, artifacts: Array.from(combinedMap.values()), source_status: 'PERSISTENT_REGISTRY' });
+        res.json({ ok: true, artifacts: normalized, source_status: 'PERSISTENT_REGISTRY' });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
     }
@@ -1080,6 +1056,7 @@ function resolveArtifactIdForUpstream(jobId, artifactId) {
     return raw;
 }
 
+// --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
 // --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
 router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     const context = buildGatewayContext(req);
@@ -1102,17 +1079,41 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     try {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${upstreamArtifactId}`, traceId: context.traceId });
 
-        const streamResponse = await gateway.getArtifact(jobId, upstreamArtifactId, context);
+        // Resolve alias via normalized artifact list
+        let resolvedArtifactId = upstreamArtifactId;
+        try {
+            const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+            const localRecord = rows[0];
+            const rawCanonical = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
+            const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
+            
+            const matched = artifacts.find(a => a.alias === upstreamArtifactId || a.id === upstreamArtifactId);
+            if (matched && matched.id) {
+                resolvedArtifactId = resolveArtifactIdForUpstream(jobId, matched.id);
+            }
+        } catch (resolveErr) {
+            console.warn(`[ADMIN-PREFLIGHT][ARTIFACT] Alias resolution fallback triggered for ${upstreamArtifactId}`, resolveErr.message);
+        }
+
+        // Use preflightServiceClient.downloadArtifact to get the stream
+        const streamResponse = await preflightServiceClient.downloadArtifact(jobId, resolvedArtifactId, context.Authorization, context.tenantId);
         
-        // Proxy content type and bytes directly
-        res.setHeader('Content-Type', streamResponse.headers?.['content-type'] || 'application/pdf');
+        // Proxy content type and headers directly
+        const contentType = streamResponse.headers?.['content-type'] || 'application/pdf';
+        res.setHeader('Content-Type', contentType);
+        
         if (streamResponse.headers?.['content-disposition']) {
             res.setHeader('Content-Disposition', streamResponse.headers['content-disposition']);
+        } else {
+            // Default content disposition
+            const defaultFilename = contentType.includes('json') ? 'artifact.json' : 'artifact.pdf';
+            res.setHeader('Content-Disposition', `attachment; filename="${defaultFilename}"`);
         }
         
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'SUCCESS', traceId: context.traceId });
 
-        return res.send(Buffer.from(streamResponse.data));
+        // Stream the bytes from upstream to the client
+        streamResponse.stream.pipe(res);
     } catch (err) {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'FAILURE', message: err.message, traceId: context.traceId });
         

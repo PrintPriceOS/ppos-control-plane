@@ -278,6 +278,46 @@ class PreflightServiceClient {
 
     return this._request('GET', `/api/preflight/jobs/${jobId}`, null, headers);
   }
+
+  /**
+   * Download artifact bytes as a stream from upstream service
+   */
+  async downloadArtifact(jobId, artifactId, authHeader = null, tenantId = null) {
+    const headers = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (tenantId) headers['X-Tenant-Id'] = tenantId;
+
+    const url = `${this.baseUrl}/api/preflight/jobs/${jobId}/artifacts/${artifactId}`;
+    const actorContext = { actorId: 'control-plane', tenantId: tenantId || 'system', role: 'SUPER_ADMIN' };
+    const internalJwt = this.getInternalPreflightJwt(actorContext);
+
+    const secureHeaders = {
+      'X-Admin-Api-Key': this.systemToken,
+      'X-Tenant-Id': tenantId || 'system',
+      'X-Trace-Id': `trace_${Date.now()}`,
+      'X-Actor-Id': 'control-plane',
+      'X-Actor-Role': 'SUPER_ADMIN',
+      'X-Origin-Service': 'ppos-control-plane',
+      ...headers,
+      'Authorization': `Bearer ${internalJwt}`
+    };
+
+    try {
+      const response = await axios({
+        method: 'GET',
+        url,
+        headers: secureHeaders,
+        responseType: 'stream',
+        timeout: 60000 // downloading large PDFs might take some time
+      });
+      return { stream: response.data, headers: response.headers };
+    } catch (error) {
+      const status = error.response?.status || 500;
+      const enhancedError = new Error(`UPSTREAM_ARTIFACT_DOWNLOAD_ERROR_${status}`);
+      enhancedError.status = status;
+      throw enhancedError;
+    }
+  }
 }
 
 module.exports = new PreflightServiceClient();

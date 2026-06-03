@@ -214,56 +214,129 @@ function collectFindings(payload) {
   return uniqueFindings;
 }
 
-function normalizeArtifacts(source) {
-  if (!source) return [];
+function normalizePreflightArtifacts(jobPayload, registryRow, upstreamPayload, jobId) {
+  let sourceArtifacts = [];
   
-  if (Array.isArray(source)) {
-    return source.map(item => {
-      if (typeof item === 'string') {
-        return { type: 'OUTPUT', filename: item, path: item, storageKey: item };
-      }
-      const name = item.filename || item.name || 'artifact.pdf';
-      const storagePath = item.path || item.storageKey || item.storage_key || '';
-      return {
-        id: item.id || item.artifactId || undefined,
-        type: item.type || item.artifactType || 'OUTPUT',
-        filename: name,
-        sizeBytes: item.sizeBytes || item.size || 0,
-        path: storagePath,
-        storageKey: storagePath
-      };
-    });
-  }
-
-  if (typeof source === 'object') {
-    const list = [];
-    for (const [key, val] of Object.entries(source)) {
-      if (!val) continue;
-      if (typeof val === 'string') {
-        list.push({
-          type: key,
-          filename: val,
-          path: val,
-          storageKey: val,
-          sizeBytes: 0
-        });
-      } else if (typeof val === 'object') {
-        const name = val.filename || val.name || val.path || 'artifact.pdf';
-        const storagePath = val.path || val.storageKey || val.storage_key || '';
-        list.push({
-          id: val.id || val.artifactId || undefined,
-          type: val.type || val.artifactType || key,
-          filename: name,
-          sizeBytes: val.sizeBytes || val.size || 0,
-          path: storagePath,
-          storageKey: storagePath
-        });
-      }
+  if (registryRow && registryRow.artifact_list_json) {
+    let parsed = registryRow.artifact_list_json;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
     }
-    return list;
+    if (Array.isArray(parsed)) sourceArtifacts = sourceArtifacts.concat(parsed);
   }
 
-  return [];
+  if (jobPayload) {
+    const raw = jobPayload.artifacts || jobPayload.artifact_list || jobPayload.availableArtifacts || jobPayload.available_artifacts || [];
+    if (Array.isArray(raw)) sourceArtifacts = sourceArtifacts.concat(raw);
+    else if (typeof raw === 'object') {
+       for (const [k, v] of Object.entries(raw)) {
+         if (typeof v === 'string') sourceArtifacts.push({ type: k, path: v, filename: v });
+         else if (typeof v === 'object') sourceArtifacts.push({ type: k, ...v });
+       }
+    }
+  }
+
+  if (upstreamPayload) {
+    const raw = upstreamPayload.artifacts || upstreamPayload.artifact_list || upstreamPayload.availableArtifacts || upstreamPayload.available_artifacts || [];
+    if (Array.isArray(raw)) sourceArtifacts = sourceArtifacts.concat(raw);
+    else if (typeof raw === 'object') {
+       for (const [k, v] of Object.entries(raw)) {
+         if (typeof v === 'string') sourceArtifacts.push({ type: k, path: v, filename: v });
+         else if (typeof v === 'object') sourceArtifacts.push({ type: k, ...v });
+       }
+    }
+  }
+
+  const seen = new Set();
+  const normalized = [];
+
+  const ALIAS_PRIORITY = [
+    'final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf',
+    'production_pdf', 'printable_pdf', 'certified_pdf', 'review_pdf', 'normalized_pdf',
+    'final_fixed', 'fixed', 'corrected', 'certified'
+  ];
+
+  const inferAlias = (item) => {
+    const id = item.id || item.artifactId || item.artifact_id || '';
+    const type = item.type || item.artifactType || '';
+    const name = item.name || item.filename || item.fileName || '';
+    const searchStr = `${id}:${type}:${name}`.toLowerCase();
+
+    // Check compound patterns first
+    if (searchStr.includes('final_fixed_pdf')) return 'final_fixed_pdf';
+    if (searchStr.includes('fixed_pdf')) return 'fixed_pdf';
+    if (searchStr.includes('corrected_pdf')) return 'corrected_pdf';
+    if (searchStr.includes('repaired_pdf')) return 'repaired_pdf';
+    if (searchStr.includes('repair_pdf')) return 'repair_pdf';
+    if (searchStr.includes('production_pdf')) return 'production_pdf';
+    if (searchStr.includes('printable_pdf')) return 'printable_pdf';
+    if (searchStr.includes('certified_pdf')) return 'certified_pdf';
+    if (searchStr.includes('review_pdf')) return 'review_pdf';
+    if (searchStr.includes('normalized_pdf')) return 'normalized_pdf';
+    
+    // Exact or legacy matches
+    if (searchStr.includes('final_fixed')) return 'final_fixed_pdf';
+    if (searchStr.includes('fixed')) return 'fixed_pdf';
+    if (searchStr.includes('corrected')) return 'corrected_pdf';
+    if (searchStr.includes('certified') || searchStr.includes('certification_pdf')) return 'certified_pdf';
+    
+    // JSON / Audit reports
+    if (searchStr.includes('analysis_report')) return 'analysis_report';
+    if (searchStr.includes('report_json') || searchStr.includes('preflight_report') || searchStr.includes('report.json')) return 'report_json';
+    if (searchStr.includes('fix_audit') || searchStr.includes('audit_json') || searchStr.includes('repair_audit') || searchStr.includes('audit.json')) return 'fix_audit';
+    
+    // Summaries
+    if (searchStr.includes('client_change_summary') || searchStr.includes('human_summary') || searchStr.includes('change_summary')) return 'change_summary';
+    
+    return type.toLowerCase() || 'unknown';
+  };
+
+  const getLabel = (alias) => {
+    if (['fixed_pdf', 'final_fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'].includes(alias)) return 'Fixed PDF';
+    if (alias === 'review_pdf') return 'Review PDF';
+    if (alias === 'certified_pdf') return 'Certified PDF';
+    if (alias === 'fix_audit') return 'Fix Audit JSON';
+    if (['analysis_report', 'report_json'].includes(alias)) return 'Analysis Report';
+    if (alias === 'change_summary') return 'Change Summary';
+    return alias.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  for (const item of sourceArtifacts) {
+    if (!item) continue;
+    if (typeof item === 'string') continue; // We already expanded strings previously, but if any sneak in, skip
+    
+    const id = item.id || item.artifactId || item.artifact_id || `art_${Math.random().toString(36).substr(2,9)}`;
+    const alias = inferAlias(item);
+    const key = `${id}-${alias}`;
+    
+    if (!seen.has(key)) {
+      seen.add(key);
+      const isPdf = alias.includes('pdf') || String(item.filename || '').toLowerCase().endsWith('.pdf') || String(item.type || '').toLowerCase().includes('pdf') || String(item.mime_type || '').includes('pdf');
+      
+      normalized.push({
+        id,
+        alias,
+        type: item.type || item.artifactType || 'OUTPUT',
+        label: getLabel(alias),
+        filename: item.filename || item.name || item.fileName || (isPdf ? 'artifact.pdf' : 'artifact.json'),
+        mime_type: item.mime_type || item.mimeType || (isPdf ? 'application/pdf' : 'application/json'),
+        size_bytes: item.sizeBytes || item.size_bytes || item.size || 0,
+        downloadable: true,
+        download_url: jobId ? `/api/admin/preflight/jobs/${jobId}/artifacts/${alias || id}` : null,
+        source: item.storagePath || item.path || item.storageKey || 'upstream',
+        priority: ALIAS_PRIORITY.indexOf(alias) !== -1 ? ALIAS_PRIORITY.indexOf(alias) : 999
+      });
+    }
+  }
+
+  normalized.sort((a, b) => a.priority - b.priority);
+
+  return normalized;
+}
+
+function normalizeArtifacts(source) {
+  // Legacy backward compatible wrapper
+  return normalizePreflightArtifacts({ artifacts: source }, null, null, null);
 }
 
 module.exports = {
@@ -275,5 +348,6 @@ module.exports = {
   isDegradedDiagnosticStatus,
   mapPhase10Status,
   collectFindings,
-  normalizeArtifacts
+  normalizeArtifacts,
+  normalizePreflightArtifacts
 };
