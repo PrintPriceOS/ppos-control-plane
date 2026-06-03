@@ -271,7 +271,7 @@ router.get('/overview', async (req, res) => {
             const fixAuditRows = await db.query(`
                 SELECT status, COUNT(*) as cnt 
                 FROM preflight_audit_events 
-                WHERE action = 'REQUEST_FIX' 
+                WHERE event_type = 'REQUEST_FIX' 
                 GROUP BY status
             `);
             let fSucc = 0;

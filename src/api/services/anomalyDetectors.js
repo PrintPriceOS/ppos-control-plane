@@ -108,7 +108,7 @@ async function detectGovernanceAnomalies() {
                 tenant_id, 
                 COUNT(*) as count
             FROM api_audit_logs
-            WHERE action = 'QUOTA_EXCEEDED'
+            WHERE event_type = 'QUOTA_EXCEEDED'
             AND created_at >= NOW() - INTERVAL 1 HOUR
             GROUP BY tenant_id
         `);

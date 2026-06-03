@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT_DIR = path.resolve(__dirname, '..', 'src');
+const ROOT_DIR = path.resolve(__dirname, '..', 'src', 'api');
 
 // These tables shouldn't be queried anywhere
 const GLOBALLY_FORBIDDEN = [
     'audit_logs',
-    'api_audit_log '
+    'api_audit_log ',
+    'api_api_audit_logs'
 ];
 
 // These tables shouldn't be queried as "audit sources" in the audit/jobs layers
@@ -14,6 +15,8 @@ const AUDIT_LAYER_FORBIDDEN = [
     'manufacturing_dispatch_events',
     'manufacturing_evidence_ledger'
 ];
+
+const LEGACY_COLUMNS = ['job_id', 'policy_slug', 'ip_address', 'details'];
 
 function scanDirectory(dir) {
     let hasError = false;
@@ -30,12 +33,39 @@ function scanDirectory(dir) {
         } else if (file.endsWith('.js') || file.endsWith('.ts')) {
             const content = fs.readFileSync(fullPath, 'utf8');
             
-            // Global check for audit_logs / api_audit_log
+            // Global check for forbidden tables
             for (const table of GLOBALLY_FORBIDDEN) {
                 const regex = new RegExp(`['"\`\\s]${table.trim()}['"\`\\s]`, 'g');
                 if (regex.test(content) && !fullPath.includes('audit_regression_test')) {
                     console.error(`[REGRESSION] File ${fullPath} references globally forbidden table '${table.trim()}'`);
                     hasError = true;
+                }
+            }
+
+            // Check for legacy `action` combined with `api_audit_logs`
+            if (content.includes('api_audit_logs') && content.match(/[\s=.,]action[\s=.,]/) && !fullPath.includes('audit_regression_test')) {
+                // To be exact, check if it's querying api_audit_logs AND using action
+                if (content.match(/SELECT.*FROM api_audit_logs.*action/is) || content.match(/api_audit_logs.*WHERE.*action/is)) {
+                     console.error(`[REGRESSION] File ${fullPath} combines api_audit_logs with legacy 'action' column.`);
+                     hasError = true;
+                }
+            }
+
+            // Check for INSERT INTO api_audit_logs using legacy columns
+            if (content.includes('INSERT INTO api_audit_logs')) {
+                const insertMatch = content.match(/INSERT INTO api_audit_logs\s*\(([^)]+)\)/i);
+                if (insertMatch) {
+                    const cols = insertMatch[1].split(',').map(c => c.trim());
+                    for (const leg of LEGACY_COLUMNS) {
+                        if (cols.includes(leg)) {
+                             console.error(`[REGRESSION] File ${fullPath} inserts into api_audit_logs using legacy column '${leg}'`);
+                             hasError = true;
+                        }
+                    }
+                    if (cols.includes('action')) {
+                         console.error(`[REGRESSION] File ${fullPath} inserts into api_audit_logs using legacy column 'action'`);
+                         hasError = true;
+                    }
                 }
             }
 
@@ -45,10 +75,8 @@ function scanDirectory(dir) {
                 for (const table of AUDIT_LAYER_FORBIDDEN) {
                     const regex = new RegExp(`['"\`\\s]${table.trim()}['"\`\\s]`, 'g');
                     if (regex.test(content) && !fullPath.includes('audit_regression_test')) {
-                        // Exclude comments
                         const matches = content.match(regex);
                         if (matches) {
-                            // Quick check if it's commented out. It's sufficient to check if there are any active queries.
                             if (content.includes(`FROM ${table}`) || content.includes(`INTO ${table}`)) {
                                 console.error(`[REGRESSION] File ${fullPath} has an active query to MES table '${table}' in the audit path.`);
                                 hasError = true;

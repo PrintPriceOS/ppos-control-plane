@@ -57,20 +57,22 @@ class AuditLogger {
         try {
             await db.execute(
                 `INSERT INTO api_audit_logs 
-                 (tenant_id, deployment_id, user_id, user_role, request_id, action, resource_type, resource_id, ip_address, user_agent, governance_snapshot) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (event_type, tenant_id, user_id, status, metadata_json, created_at) 
+                 VALUES (?, ?, ?, 'SUCCESS', ?, NOW())`,
                 [
-                    tenantId,
-                    deploymentId,
-                    userId,
-                    userRole,
-                    safeRequestId,
                     action,
-                    resourceType,
-                    resourceId,
-                    ip,
-                    userAgent,
-                    governanceSnapshot ? JSON.stringify(governanceSnapshot) : null
+                    tenantId,
+                    userId,
+                    JSON.stringify({
+                        deployment_id: deploymentId,
+                        user_role: userRole,
+                        request_id: safeRequestId,
+                        resource_type: resourceType,
+                        resource_id: resourceId,
+                        ip_address: ip,
+                        user_agent: userAgent,
+                        governance_snapshot: governanceSnapshot
+                    })
                 ],
                 { tenantId, requestId: safeRequestId }
             );

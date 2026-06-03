@@ -24,7 +24,7 @@ router.get('/timeline/:jobId', async (req, res) => {
         const requestId = job.metadata_json?.traceId || job.metadata_json?.requestId;
         const { rows: auditLogs } = await db.query(`
             SELECT * FROM api_audit_logs 
-            WHERE resource_id = ? OR request_id = ?
+            WHERE JSON_EXTRACT(metadata_json, '$.resource_id') = ? OR JSON_EXTRACT(metadata_json, '$.request_id') = ?
             ORDER BY created_at ASC
         `, [jobId, requestId]);
 
@@ -48,11 +48,12 @@ router.get('/timeline/:jobId', async (req, res) => {
 
         // Map Audit Logs
         auditLogs.forEach(log => {
+            const metadata = typeof log.metadata_json === 'string' ? JSON.parse(log.metadata_json) : (log.metadata_json || {});
             timeline.push({
-                event: log.action,
+                event: log.event_type,
                 timestamp: log.created_at,
-                actor: log.user_role || 'System',
-                metadata: { requestId: log.request_id, ip: log.ip_address }
+                actor: metadata.user_role || log.user_id || 'System',
+                metadata: { requestId: metadata.request_id, ip: metadata.ip_address }
             });
         });
 
