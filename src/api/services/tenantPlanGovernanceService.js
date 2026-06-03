@@ -7,6 +7,7 @@
 
 const db = require('./mysqlClient');
 const logger = require('./logger').child('tenant-governance');
+const auditLogger = require('./auditLoggerService');
 const matrix = require('./tenantEntitlementMatrix');
 
 class TenantPlanGovernanceService {
@@ -16,10 +17,15 @@ class TenantPlanGovernanceService {
     async getTenantState(tenantId) {
         try {
             const rows = await db.query(
-                `SELECT plan, plan_code, status, commercial_status, access_level,
-                        grace_started_at, grace_ends_at, grace_extended_until,
-                        limits_json, entitlements_json, module_access_json, governance_notes_json
-                 FROM tenants WHERE id = ?`,
+                `SELECT t.plan, t.plan_code, t.status, t.commercial_status, t.access_level, t.service_tier,
+                        t.grace_started_at, t.grace_ends_at, t.grace_extended_until,
+                        t.limits_json, t.entitlements_json, t.module_access_json, t.governance_notes_json,
+                        r.max_concurrent_jobs, r.max_jobs_per_minute, r.max_jobs_per_hour, r.max_queue_depth, r.burst_multiplier, r.is_enabled as resource_enabled, r.priority_class, r.plan_tier as resource_plan_tier,
+                        q.monthly_job_limit as quota_monthly, q.storage_limit_bytes, q.current_month_jobs, q.current_storage_bytes
+                 FROM tenants t
+                 LEFT JOIN tenant_resource_limits r ON t.id = r.tenant_id
+                 LEFT JOIN preflight_tenant_quotas q ON t.id = q.tenant_id
+                 WHERE t.id = ?`,
                 [tenantId]
             );
 
@@ -54,10 +60,34 @@ class TenantPlanGovernanceService {
             } catch (e) {}
             modules = { ...matrix.DEFAULT_MODULES[planCode], ...modules };
 
+            let resourceLimits = null;
+            if (row.max_concurrent_jobs !== null) {
+                resourceLimits = {
+                    max_concurrent_jobs: row.max_concurrent_jobs,
+                    max_jobs_per_minute: row.max_jobs_per_minute,
+                    max_jobs_per_hour: row.max_jobs_per_hour,
+                    max_queue_depth: row.max_queue_depth,
+                    burst_multiplier: row.burst_multiplier,
+                    priority_class: row.priority_class,
+                    plan_tier: row.resource_plan_tier
+                };
+            }
+
+            let preflightQuotas = null;
+            if (row.quota_monthly !== null) {
+                preflightQuotas = {
+                    monthly_job_limit: row.quota_monthly,
+                    storage_limit_bytes: row.storage_limit_bytes,
+                    current_month_jobs: row.current_month_jobs,
+                    current_storage_bytes: row.current_storage_bytes
+                };
+            }
+
             return {
                 id: tenantId,
                 plan_code: planCode,
                 plan: row.plan || 'FREE',
+                service_tier: row.service_tier || 'standard',
                 commercial_status: commercialStatus,
                 status: row.status || 'ACTIVE',
                 access_level: accessLevel,
@@ -65,6 +95,8 @@ class TenantPlanGovernanceService {
                 grace_ends_at: row.grace_ends_at,
                 grace_extended_until: row.grace_extended_until,
                 limits,
+                resource_limits: resourceLimits,
+                preflight_quotas: preflightQuotas,
                 modules,
                 governance_notes: row.governance_notes_json
             };
@@ -150,6 +182,7 @@ class TenantPlanGovernanceService {
             ok: true,
             tenantId,
             planCode: tenant.plan_code,
+            serviceTier: tenant.service_tier,
             commercialStatus: tenant.commercial_status,
             accessLevel: tenant.access_level,
             grace: {
@@ -161,6 +194,8 @@ class TenantPlanGovernanceService {
                 daysRemaining
             },
             limits: tenant.limits,
+            resourceLimits: tenant.resource_limits,
+            preflightQuotas: tenant.preflight_quotas,
             modules: tenant.modules,
             actions,
             blockers,
@@ -600,6 +635,119 @@ class TenantPlanGovernanceService {
         } catch (err) {
             logger.warn({ event: 'log_governance_event_failed', tenantId, error: err.message });
         }
+    }
+    /**
+     * Updates tenant governance settings safely.
+     */
+    async updateTenantGovernance(tenantId, payload, actorContext) {
+        if (!actorContext || !actorContext.userId) {
+            throw new Error('Actor identity is required to update tenant governance');
+        }
+
+        const tenant = await this.getTenantState(tenantId);
+        
+        let {
+            plan_code,
+            service_tier,
+            commercial_status,
+            access_level,
+            limits_json,
+            resource_limits,
+            preflight_quotas
+        } = payload;
+
+        plan_code = matrix.normalizePlan(plan_code || tenant.plan_code);
+        service_tier = service_tier || tenant.service_tier || 'standard';
+        commercial_status = matrix.normalizeStatus(commercial_status || tenant.commercial_status);
+        access_level = access_level || tenant.access_level;
+        
+        // Critical Validations
+        if (plan_code === matrix.PLANS.SYSTEM && access_level !== matrix.ACCESS_LEVELS.SYSTEM) {
+            throw new Error('SYSTEM plan tenants must have SYSTEM access level');
+        }
+        
+        if (tenant.plan_code === matrix.PLANS.SYSTEM && plan_code !== matrix.PLANS.SYSTEM) {
+            throw new Error('SYSTEM tenants cannot be downgraded via normal governance update. Require direct DB intervention.');
+        }
+
+        // Validate limits
+        let mergedLimits = { ...tenant.limits, ...(limits_json || {}) };
+        if (mergedLimits.maxJobSizeMb && mergedLimits.maxFileSizeMb) {
+            if (Number(mergedLimits.maxJobSizeMb) < Number(mergedLimits.maxFileSizeMb)) {
+                throw new Error('maxJobSizeMb cannot be less than maxFileSizeMb');
+            }
+        }
+        if (mergedLimits.maxFileSizeMb > 150) {
+            mergedLimits.allowLargeUploads = true;
+        }
+
+        const newLimitsJsonStr = JSON.stringify(mergedLimits);
+        
+        // 1. Update Tenants table
+        await db.query(
+            `UPDATE tenants 
+             SET plan_code = ?, service_tier = ?, commercial_status = ?, access_level = ?, limits_json = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [plan_code, service_tier, commercial_status, access_level, newLimitsJsonStr, tenantId]
+        );
+
+        // Track Plan changes
+        if (tenant.plan_code !== plan_code) {
+            await db.query(
+                `INSERT INTO tenant_plan_history (tenant_id, old_plan, new_plan, reason) VALUES (?, ?, ?, ?)`,
+                [tenantId, tenant.plan_code, plan_code, 'Tenant Governance Console Update']
+            );
+        }
+
+        // 2. Update Resource Limits
+        if (resource_limits) {
+            const r = resource_limits;
+            await db.query(
+                `INSERT INTO tenant_resource_limits 
+                 (tenant_id, max_concurrent_jobs, max_jobs_per_minute, max_jobs_per_hour, max_queue_depth, burst_multiplier, priority_class, plan_tier)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                 max_concurrent_jobs=VALUES(max_concurrent_jobs), max_jobs_per_minute=VALUES(max_jobs_per_minute),
+                 max_jobs_per_hour=VALUES(max_jobs_per_hour), max_queue_depth=VALUES(max_queue_depth),
+                 burst_multiplier=VALUES(burst_multiplier), priority_class=VALUES(priority_class), plan_tier=VALUES(plan_tier)`,
+                [tenantId, r.max_concurrent_jobs, r.max_jobs_per_minute, r.max_jobs_per_hour, r.max_queue_depth, r.burst_multiplier, r.priority_class, r.plan_tier]
+            );
+        }
+
+        // 3. Update Preflight Quotas
+        if (preflight_quotas) {
+            const q = preflight_quotas;
+            await db.query(
+                `INSERT INTO preflight_tenant_quotas 
+                 (tenant_id, monthly_job_limit, storage_limit_bytes)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                 monthly_job_limit=VALUES(monthly_job_limit), storage_limit_bytes=VALUES(storage_limit_bytes)`,
+                [tenantId, q.monthly_job_limit, q.storage_limit_bytes]
+            );
+        }
+
+        // 4. Governance Events and Audit
+        await this.logGovernanceEvent(tenantId, 'TENANT_GOVERNANCE_UPDATED', {
+            actorId: actorContext.userId,
+            planCode: plan_code,
+            commercialStatus: commercial_status,
+            reason: 'Manual update from Tenant Governance Console',
+            metadata: payload
+        });
+
+        await auditLogger.log({
+            event_type: 'TENANT_GOVERNANCE_UPDATED',
+            tenant_id: tenantId,
+            user_id: actorContext.userId,
+            status: 'SUCCESS',
+            metadata: {
+                target_tenant: tenantId,
+                payload
+            }
+        });
+
+        return { ok: true, updated: true };
     }
 }
 

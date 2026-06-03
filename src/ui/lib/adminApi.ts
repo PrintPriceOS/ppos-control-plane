@@ -2553,7 +2553,10 @@ export async function freezeTenantGraceIfExpired(tenantId: string) {
         method: 'POST'
     });
 }
-
-
-
+export async function updateTenantGovernance(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+    });
+}
 

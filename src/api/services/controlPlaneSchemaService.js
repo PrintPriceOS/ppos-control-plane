@@ -1385,6 +1385,58 @@ class ControlPlaneSchemaService {
         await this.ensureColumn('marketplace_order_preflight_bindings', 'artifact_refs_json', 'JSON NULL');
 
         console.log('[CONTROL-PLANE-SCHEMA] Phase 36.1 Marketplace Order & File Governance schema ensured successfully.');
+
+        // --- PHASE 39.2.3 Tenant Governance Console Hardening ---
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS tenant_resource_limits (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id VARCHAR(64) UNIQUE NOT NULL,
+                max_concurrent_jobs INT DEFAULT 10,
+                max_jobs_per_minute INT DEFAULT 30,
+                max_jobs_per_hour INT DEFAULT 1000,
+                max_queue_depth INT DEFAULT 100,
+                burst_multiplier DECIMAL(6,2) DEFAULT 1.50,
+                is_enabled TINYINT(1) DEFAULT 1,
+                priority_class VARCHAR(32) DEFAULT 'STANDARD',
+                plan_tier VARCHAR(32) DEFAULT 'standard',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_tenant (tenant_id)
+            ) ENGINE=InnoDB;
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS preflight_tenant_quotas (
+                tenant_id VARCHAR(64) PRIMARY KEY,
+                monthly_job_limit INT DEFAULT 1000,
+                storage_limit_bytes BIGINT DEFAULT 10737418240,
+                current_month_jobs INT DEFAULT 0,
+                current_storage_bytes BIGINT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB;
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS tenant_governance_events (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id VARCHAR(64) NOT NULL,
+                event_type VARCHAR(128) NOT NULL,
+                actor_id VARCHAR(64) NULL,
+                plan_code VARCHAR(64) NULL,
+                commercial_status VARCHAR(64) NULL,
+                action_code VARCHAR(128) NULL,
+                blockers_json JSON NULL,
+                warnings_json JSON NULL,
+                reason TEXT NULL,
+                metadata_json JSON NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_tenant (tenant_id),
+                INDEX idx_event (event_type)
+            ) ENGINE=InnoDB;
+        `);
+
+        console.log('[CONTROL-PLANE-SCHEMA] Phase 39.2.3 Tenant Governance schemas ensured successfully.');
     }
 }
 

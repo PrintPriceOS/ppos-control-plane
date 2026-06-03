@@ -34,7 +34,7 @@ function asyncHandler(fn) {
 router.get('/', asyncHandler(async (req, res) => {
     const actor = resolveActorContext(req);
     const tenants = await db.query(
-        `SELECT id, name, status, plan, plan_code, commercial_status, access_level,
+        `SELECT id, name, status, plan, plan_code, service_tier, commercial_status, access_level,
                 grace_started_at, grace_ends_at, grace_extended_until,
                 limits_json, entitlements_json, module_access_json, governance_notes_json,
                 last_active_at, metadata_json
@@ -64,10 +64,13 @@ router.get('/', asyncHandler(async (req, res) => {
                 status: t.status,
                 plan: t.plan,
                 planCode: ent.planCode,
+                serviceTier: ent.serviceTier || t.service_tier,
                 commercialStatus: ent.commercialStatus,
                 accessLevel: ent.accessLevel,
                 grace: ent.grace,
                 limits: ent.limits,
+                resourceLimits: ent.resourceLimits,
+                preflightQuotas: ent.preflightQuotas,
                 modulesSummary,
                 lastActiveAt: t.last_active_at,
                 blockers: ent.blockers || [],
@@ -81,10 +84,13 @@ router.get('/', asyncHandler(async (req, res) => {
                 status: t.status,
                 plan: t.plan,
                 planCode: t.plan_code || t.plan || 'FREE',
+                serviceTier: t.service_tier || 'standard',
                 commercialStatus: t.commercial_status || 'ACTIVE',
                 accessLevel: t.access_level || 'BASIC',
                 grace: { active: false, expired: false, daysRemaining: 0 },
                 limits: {},
+                resourceLimits: null,
+                preflightQuotas: null,
                 modulesSummary: 'Inconsistent',
                 lastActiveAt: t.last_active_at,
                 blockers: [{ code: 'DATA_INCONSISTENCY', message: err.message }],
@@ -225,6 +231,18 @@ router.post('/:tenantId/grace/freeze-if-expired', asyncHandler(async (req, res) 
     const actor = resolveActorContext(req);
 
     const result = await governanceService.freezeExpiredGraceTenant(tenantId, actor);
+    res.json(result);
+}));
+
+/**
+ * PATCH /api/admin/tenant-governance/:tenantId
+ */
+router.patch('/:tenantId', asyncHandler(async (req, res) => {
+    const { tenantId } = req.params;
+    const payload = req.body;
+    const actor = resolveActorContext(req);
+
+    const result = await governanceService.updateTenantGovernance(tenantId, payload, actor);
     res.json(result);
 }));
 
