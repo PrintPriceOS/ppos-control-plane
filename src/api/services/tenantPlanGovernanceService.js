@@ -17,7 +17,7 @@ class TenantPlanGovernanceService {
     async getTenantState(tenantId) {
         try {
             const rows = await db.query(
-                `SELECT t.plan, t.plan_code, t.status, t.commercial_status, t.access_level, t.service_tier,
+                `SELECT t.type, t.metadata_json, t.plan, t.plan_code, t.status, t.commercial_status, t.access_level, t.service_tier,
                         t.grace_started_at, t.grace_ends_at, t.grace_extended_until,
                         t.limits_json, t.entitlements_json, t.module_access_json, t.governance_notes_json,
                         r.max_concurrent_jobs, r.max_jobs_per_minute, r.max_jobs_per_hour, r.max_queue_depth, r.burst_multiplier, r.is_enabled as resource_enabled, r.priority_class, r.plan_tier as resource_plan_tier,
@@ -83,8 +83,48 @@ class TenantPlanGovernanceService {
                 };
             }
 
+            const effective_limits = {
+                maxFileSizeMb: limits.maxFileSizeMb,
+                maxJobSizeMb: limits.maxJobSizeMb,
+                allowLargeUploads: !!limits.allowLargeUploads,
+                dailyJobsLimit: limits.dailyJobsLimit,
+                monthlyJobsLimit: preflightQuotas ? preflightQuotas.monthly_job_limit : limits.maxJobsPerMonth,
+                retentionDays: limits.retentionDays,
+                storageLimitBytes: preflightQuotas ? preflightQuotas.storage_limit_bytes : null,
+                maxConcurrentJobs: resourceLimits ? resourceLimits.max_concurrent_jobs : null,
+                maxJobsPerMinute: resourceLimits ? resourceLimits.max_jobs_per_minute : null,
+                maxJobsPerHour: resourceLimits ? resourceLimits.max_jobs_per_hour : null,
+                maxQueueDepth: resourceLimits ? resourceLimits.max_queue_depth : null,
+                priorityClass: resourceLimits ? resourceLimits.priority_class : null,
+                isUnlimited: planCode === 'SYSTEM',
+                sources: {
+                    maxFileSizeMb: 'tenants.limits_json',
+                    maxJobSizeMb: 'tenants.limits_json',
+                    allowLargeUploads: 'tenants.limits_json',
+                    dailyJobsLimit: 'tenants.limits_json',
+                    monthlyJobsLimit: preflightQuotas ? 'preflight_tenant_quotas' : 'tenants.limits_json',
+                    retentionDays: 'tenants.limits_json',
+                    storageLimitBytes: preflightQuotas ? 'preflight_tenant_quotas' : 'default',
+                    maxConcurrentJobs: resourceLimits ? 'tenant_resource_limits' : 'default',
+                    maxJobsPerMinute: resourceLimits ? 'tenant_resource_limits' : 'default',
+                    maxJobsPerHour: resourceLimits ? 'tenant_resource_limits' : 'default',
+                    maxQueueDepth: resourceLimits ? 'tenant_resource_limits' : 'default',
+                    priorityClass: resourceLimits ? 'tenant_resource_limits' : 'default'
+                }
+            };
+
+            let type = row.type;
+            if (!type) {
+                let metadata = {};
+                try {
+                    metadata = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : (row.metadata_json || {});
+                } catch (e) {}
+                type = metadata.type || 'PRINTHOUSE';
+            }
+
             return {
                 id: tenantId,
+                type,
                 plan_code: planCode,
                 plan: row.plan || 'FREE',
                 service_tier: row.service_tier || 'standard',
@@ -97,6 +137,7 @@ class TenantPlanGovernanceService {
                 limits,
                 resource_limits: resourceLimits,
                 preflight_quotas: preflightQuotas,
+                effective_limits,
                 modules,
                 governance_notes: row.governance_notes_json
             };
@@ -196,6 +237,7 @@ class TenantPlanGovernanceService {
             limits: tenant.limits,
             resourceLimits: tenant.resource_limits,
             preflightQuotas: tenant.preflight_quotas,
+            effective_limits: tenant.effective_limits,
             modules: tenant.modules,
             actions,
             blockers,

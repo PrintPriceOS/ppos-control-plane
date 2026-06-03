@@ -71,6 +71,7 @@ router.get('/', asyncHandler(async (req, res) => {
                 limits: ent.limits,
                 resourceLimits: ent.resourceLimits,
                 preflightQuotas: ent.preflightQuotas,
+                effective_limits: ent.effective_limits,
                 modulesSummary,
                 lastActiveAt: t.last_active_at,
                 blockers: ent.blockers || [],

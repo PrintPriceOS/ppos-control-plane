@@ -1,32 +1,32 @@
 require('dotenv').config();
 const db = require('../src/api/services/mysqlClient');
+const governanceService = require('../src/api/services/tenantPlanGovernanceService');
 
 async function checkTenant(tenantId, expected) {
     console.log(`\nChecking tenant: ${tenantId}`);
     
-    // Check main tenant details
-    const rows = await db.query(`SELECT type, plan_code, service_tier, access_level, limits_json FROM tenants WHERE id = ?`, [tenantId]);
-    if (!rows || rows.length === 0) {
-        console.error(`❌ Tenant ${tenantId} not found.`);
+    // Call the newly hardened method
+    const tenant = await governanceService.getTenantState(tenantId);
+    if (!tenant || tenant.plan_code === 'FREE' && expected.plan_code !== 'FREE') {
+        console.error(`❌ Tenant ${tenantId} not found or defaulted to FREE incorrectly.`);
+        // Note: getTenantState falls back to FREE if not found in DB
         return false;
     }
     
-    const t = rows[0];
-    let limits = {};
-    try { limits = JSON.parse(t.limits_json); } catch(e) {}
+    const limits = tenant.effective_limits || {};
     
     let pass = true;
     for (const [key, val] of Object.entries(expected)) {
         if (key === 'maxFileSizeMb' || key === 'maxJobSizeMb' || key === 'allowLargeUploads') {
             if (limits[key] !== val) {
-                console.error(`❌ Mismatch for ${key}: Expected ${val}, got ${limits[key]}`);
+                console.error(`❌ Mismatch for effective_limits.${key}: Expected ${val}, got ${limits[key]}`);
                 pass = false;
             } else {
-                console.log(`✅ ${key} matches (${val})`);
+                console.log(`✅ effective_limits.${key} matches (${val})`);
             }
         } else {
-            if (t[key] !== val) {
-                console.error(`❌ Mismatch for ${key}: Expected ${val}, got ${t[key]}`);
+            if (tenant[key] !== val) {
+                console.error(`❌ Mismatch for ${key}: Expected ${val}, got ${tenant[key]}`);
                 pass = false;
             } else {
                 console.log(`✅ ${key} matches (${val})`);
