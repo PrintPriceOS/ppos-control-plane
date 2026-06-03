@@ -145,24 +145,7 @@ class ControlPlaneSchemaService {
                 ) ENGINE=InnoDB;
             `);
 
-            // 7. API Audit Log
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS api_audit_logs (
-                    id VARCHAR(64) PRIMARY KEY,
-                    request_id VARCHAR(64) NOT NULL,
-                    tenant_id VARCHAR(64) NOT NULL,
-                    deployment_id VARCHAR(64) NULL,
-                    action VARCHAR(128) NOT NULL,
-                    resource_type VARCHAR(64) NULL,
-                    resource_id VARCHAR(64) NULL,
-                    ip_address VARCHAR(45) NULL,
-                    user_role VARCHAR(32) NULL,
-                    governance_snapshot JSON NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_request (request_id),
-                    INDEX idx_tenant_action (tenant_id, action)
-                ) ENGINE=InnoDB;
-            `);
+            // 7. API Audit Log (managed by migrations/002_resolve_schema_drift.sql)
 
             // 8. Notifications System (Core)
             await db.query(`

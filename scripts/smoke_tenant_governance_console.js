@@ -1,16 +1,17 @@
-const mysql = require('mysql2/promise');
+require('dotenv').config();
+const db = require('../src/api/services/mysqlClient');
 
-async function checkTenant(connection, tenantId, expected) {
+async function checkTenant(tenantId, expected) {
     console.log(`\nChecking tenant: ${tenantId}`);
     
     // Check main tenant details
-    const [tRows] = await connection.query(`SELECT type, plan_code, service_tier, access_level, limits_json FROM tenants WHERE id = ?`, [tenantId]);
-    if (tRows.length === 0) {
+    const rows = await db.query(`SELECT type, plan_code, service_tier, access_level, limits_json FROM tenants WHERE id = ?`, [tenantId]);
+    if (!rows || rows.length === 0) {
         console.error(`❌ Tenant ${tenantId} not found.`);
         return false;
     }
     
-    const t = tRows[0];
+    const t = rows[0];
     let limits = {};
     try { limits = JSON.parse(t.limits_json); } catch(e) {}
     
@@ -39,17 +40,9 @@ async function checkTenant(connection, tenantId, expected) {
 async function runSmokeTest() {
     console.log('--- RUNNING TENANT GOVERNANCE SMOKE TEST ---');
     
-    const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || '127.0.0.1',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD || 'secret',
-        database: process.env.DB_NAME || 'printpriceos',
-        port: process.env.DB_PORT || 3306
-    });
-    
     let allPassed = true;
     
-    const adminPassed = await checkTenant(connection, 'ppos-customer-1', {
+    const adminPassed = await checkTenant('ppos-customer-1', {
         type: 'INTERNAL',
         plan_code: 'SYSTEM',
         service_tier: 'system',
@@ -59,7 +52,7 @@ async function runSmokeTest() {
         allowLargeUploads: true
     });
     
-    const demoPassed = await checkTenant(connection, 'ph-demo-123', {
+    const demoPassed = await checkTenant('ph-demo-123', {
         type: 'PRINTHOUSE',
         plan_code: 'FOUNDING_PRINTHOUSE',
         service_tier: 'enterprise',
@@ -68,8 +61,6 @@ async function runSmokeTest() {
         maxJobSizeMb: 2048,
         allowLargeUploads: true
     });
-    
-    await connection.end();
     
     if (adminPassed && demoPassed) {
         console.log('\n✅ TENANT GOVERNANCE SMOKE TEST PASSED');
