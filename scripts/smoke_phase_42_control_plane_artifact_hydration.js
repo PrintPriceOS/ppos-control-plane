@@ -8,6 +8,47 @@ async function runSmokeTests() {
     const jobId = 'fix_1780577270244'; // Update to the job with final_fixed_pdf
     
     try {
+        console.log(`\n[TEST 0] Testing resolveRequestedArtifact logic directly`);
+        function resolveRequestedArtifact(artifacts, requestedArtifactId) {
+            return artifacts.find(a => {
+                 const target = requestedArtifactId.toLowerCase();
+                 const idMatch = a.id === target || a.artifact_id === target || a.download_id === target;
+                 const typeMatch = (a.type || '').toLowerCase() === target || (a.alias || '').toLowerCase() === target;
+                 const aliasesMatch = Array.isArray(a.aliases) && a.aliases.some(al => al.toLowerCase() === target);
+                 
+                 const fixedGroup = ['fixed_pdf', 'final_fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
+                 const certifiedGroup = ['certified_pdf', 'certified', 'certified_output'];
+                 const reviewGroup = ['review_pdf', 'review_copy', 'human_review_pdf'];
+                 const fixAuditGroup = ['fix_audit', 'fix_audit_json'];
+                 const analysisGroup = ['analysis_report', 'report_json', 'preflight_report'];
+                 
+                 let groupMatch = false;
+                 if (fixedGroup.includes(target) && (fixedGroup.includes((a.type || '').toLowerCase()) || fixedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (certifiedGroup.includes(target) && (certifiedGroup.includes((a.type || '').toLowerCase()) || certifiedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => certifiedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (reviewGroup.includes(target) && (reviewGroup.includes((a.type || '').toLowerCase()) || reviewGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => reviewGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (fixAuditGroup.includes(target) && (fixAuditGroup.includes((a.type || '').toLowerCase()) || fixAuditGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixAuditGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (analysisGroup.includes(target) && (analysisGroup.includes((a.type || '').toLowerCase()) || analysisGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => analysisGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 
+                 return idMatch || typeMatch || aliasesMatch || groupMatch || a.filename === target || a.name === target;
+            });
+        }
+        const mockArtifacts = [{
+          id: "base64-fixed-id",
+          type: "fixed_pdf",
+          alias: "fixed_pdf",
+          download_id: "fixed_pdf",
+          filename: "fixed.pdf",
+          aliases: ["base64-fixed-id", "base64-final-id", "fixed_pdf", "final_fixed_pdf"],
+          downloadable: true,
+          size_bytes: 6368921
+        }];
+        if (!resolveRequestedArtifact(mockArtifacts, "fixed_pdf")) console.error("❌ Failed fixed_pdf resolution");
+        else console.log("✅ resolveRequestedArtifact for fixed_pdf passed");
+        if (!resolveRequestedArtifact(mockArtifacts, "final_fixed_pdf")) console.error("❌ Failed final_fixed_pdf resolution");
+        else console.log("✅ resolveRequestedArtifact for final_fixed_pdf passed");
+        if (!resolveRequestedArtifact(mockArtifacts, "base64-fixed-id")) console.error("❌ Failed base64-fixed-id resolution");
+        else console.log("✅ resolveRequestedArtifact for base64-fixed-id passed");
+
         console.log(`\n[TEST 1] Fetching live artifacts for ${jobId} via Control Plane`);
         const res = await fetch(`${baseUrl}/api/admin/preflight/jobs/${jobId}/artifacts`, {
             headers: {

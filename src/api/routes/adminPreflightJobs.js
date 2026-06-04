@@ -23,6 +23,199 @@ const upload = multer({
     limits: { fileSize: parseInt(process.env.PPOS_MAX_FILE_SIZE_BYTES || '2147483648', 10) }
 });
 
+
+async function hydratePreflightArtifacts(jobId, context, localRecordOverride = null) {
+    let localRecord = localRecordOverride;
+    if (!localRecord) {
+        const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+        localRecord = rows[0];
+    }
+    const canonicalObj = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
+    const syncError = localRecord?.sync_error_json ? (typeof localRecord.sync_error_json === 'string' ? JSON.parse(localRecord.sync_error_json) : localRecord.sync_error_json) : {};
+
+    let liveArtifactsResponse = null;
+    try {
+        liveArtifactsResponse = await preflightServiceClient.getJobArtifacts(jobId, context.Authorization, context.tenantId);
+        
+        // clear stale error
+        if (syncError.live_hydration_disabled) {
+            syncError.live_hydration_disabled = false;
+            await db.query('UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?', [JSON.stringify(syncError), jobId]);
+        }
+    } catch (upstreamErr) {
+        console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-REGISTRY-FALLBACK] ${JSON.stringify({ jobId, reason: upstreamErr.message })}`);
+    }
+
+    let normalized = [];
+    let sourceStatus = 'PERSISTENT_REGISTRY';
+    let downloadable_artifact_count = 0;
+    let zero_byte_artifact_count = 0;
+    
+    if (liveArtifactsResponse && liveArtifactsResponse.physical_artifacts_ready && Array.isArray(liveArtifactsResponse.artifacts) && liveArtifactsResponse.artifacts.length > 0) {
+        const uniqueByHashOrName = new Map();
+        liveArtifactsResponse.artifacts.forEach(a => {
+             const storageRef = a.storage_key || a.path || a.storagePath || '';
+             const key = storageRef ? storageRef : `${a.filename}_${a.size_bytes}`;
+             if (!uniqueByHashOrName.has(key)) {
+                 uniqueByHashOrName.set(key, { ...a, aliases: [a.alias || a.id] });
+             } else {
+                 const existing = uniqueByHashOrName.get(key);
+                 if (a.alias && a.id && !existing.aliases.includes(a.alias)) existing.aliases.push(a.alias);
+                 if (a.id && !existing.aliases.includes(a.id)) existing.aliases.push(a.id);
+                 if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') {
+                     existing.alias = a.alias;
+                 }
+             }
+        });
+        normalized = Array.from(uniqueByHashOrName.values()).map(a => {
+            if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+            if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
+            if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
+
+            if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
+                a.type = 'fixed_pdf';
+                a.alias = 'fixed_pdf';
+                a.download_id = 'fixed_pdf';
+                a.label = 'Fixed PDF';
+                if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
+                if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
+            } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
+                a.type = 'certified_pdf';
+                a.alias = 'certified_pdf';
+                a.download_id = 'certified_pdf';
+                a.label = 'Certified PDF';
+                if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
+            } else if (a.type === 'fix_audit') {
+                a.type = 'fix_audit';
+                a.alias = 'fix_audit';
+                a.download_id = 'fix_audit';
+                a.label = 'Fix Audit JSON';
+                if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
+                if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
+            } else if (a.type === 'output_file') {
+                a.alias = 'output_file';
+                a.download_id = a.id || a.download_id || 'output_file';
+                a.label = 'Output PDF';
+            } else {
+                a.download_id = a.download_id || a.alias || a.id;
+            }
+
+            a.download_url = `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
+            return a;
+        });
+        
+        sourceStatus = 'LIVE_UPSTREAM';
+        
+        const newCanonical = canonicalObj || {};
+        newCanonical.artifacts = normalized;
+        newCanonical.artifact_summary = {
+            downloadable_artifact_count: liveArtifactsResponse.downloadable_artifact_count,
+            zero_byte_artifact_count: liveArtifactsResponse.zero_byte_artifact_count,
+            physical_artifacts_ready: liveArtifactsResponse.physical_artifacts_ready
+        };
+        if (localRecord) {
+            await db.query('UPDATE preflight_job_registry SET artifact_list_json = ?, canonical_payload_json = ? WHERE job_id = ?', [
+                JSON.stringify(normalized),
+                JSON.stringify(newCanonical),
+                jobId
+            ]);
+        }
+        
+        downloadable_artifact_count = liveArtifactsResponse.downloadable_artifact_count;
+        zero_byte_artifact_count = liveArtifactsResponse.zero_byte_artifact_count;
+    } else {
+         normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
+         normalized.forEach(a => {
+            if (a.downloadable && a.size_bytes > 0) downloadable_artifact_count++;
+            if (!a.downloadable || a.size_bytes === 0) zero_byte_artifact_count++;
+         });
+         
+         if (normalized.length > 0) {
+             sourceStatus = 'PERSISTENT_REGISTRY_HYDRATED';
+         }
+    }
+    
+    const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
+    let primary_fixed_pdf_selected = false;
+
+    normalized.forEach(a => {
+        if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+        if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
+        if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
+
+        if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
+            a.type = 'fixed_pdf';
+            a.alias = 'fixed_pdf';
+            a.download_id = 'fixed_pdf';
+            a.label = 'Fixed PDF';
+            if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
+            if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
+        } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
+            a.type = 'certified_pdf';
+            a.alias = 'certified_pdf';
+            a.download_id = 'certified_pdf';
+            a.label = 'Certified PDF';
+            if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
+        } else if (a.type === 'fix_audit') {
+            a.type = 'fix_audit';
+            a.alias = 'fix_audit';
+            a.download_id = 'fix_audit';
+            a.label = 'Fix Audit JSON';
+            if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
+            if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
+        } else if (a.type === 'output_file') {
+            a.alias = 'output_file';
+            a.download_id = a.id || a.download_id || 'output_file';
+            a.label = 'Output PDF';
+        } else {
+            a.download_id = a.download_id || a.alias || a.id;
+        }
+
+        a.download_url = a.download_url || `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
+
+        if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
+            primary_fixed_pdf_selected = true;
+            a.primary = true;
+        }
+    });
+
+    const physical_artifacts_ready = downloadable_artifact_count > 0;
+
+    return {
+        artifacts: normalized,
+        source_status: sourceStatus,
+        physical_artifacts_ready,
+        downloadable_artifact_count,
+        zero_byte_artifact_count,
+        primary_fixed_pdf_selected
+    };
+}
+
+function resolveRequestedArtifact(artifacts, requestedArtifactId) {
+    return artifacts.find(a => {
+         const target = requestedArtifactId.toLowerCase();
+         const idMatch = a.id === target || a.artifact_id === target || a.download_id === target;
+         const typeMatch = (a.type || '').toLowerCase() === target || (a.alias || '').toLowerCase() === target;
+         const aliasesMatch = Array.isArray(a.aliases) && a.aliases.some(al => al.toLowerCase() === target);
+         
+         const fixedGroup = ['fixed_pdf', 'final_fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
+         const certifiedGroup = ['certified_pdf', 'certified', 'certified_output'];
+         const reviewGroup = ['review_pdf', 'review_copy', 'human_review_pdf'];
+         const fixAuditGroup = ['fix_audit', 'fix_audit_json'];
+         const analysisGroup = ['analysis_report', 'report_json', 'preflight_report'];
+         
+         let groupMatch = false;
+         if (fixedGroup.includes(target) && (fixedGroup.includes((a.type || '').toLowerCase()) || fixedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+         if (certifiedGroup.includes(target) && (certifiedGroup.includes((a.type || '').toLowerCase()) || certifiedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => certifiedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+         if (reviewGroup.includes(target) && (reviewGroup.includes((a.type || '').toLowerCase()) || reviewGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => reviewGroup.includes(al.toLowerCase()))))) groupMatch = true;
+         if (fixAuditGroup.includes(target) && (fixAuditGroup.includes((a.type || '').toLowerCase()) || fixAuditGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixAuditGroup.includes(al.toLowerCase()))))) groupMatch = true;
+         if (analysisGroup.includes(target) && (analysisGroup.includes((a.type || '').toLowerCase()) || analysisGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => analysisGroup.includes(al.toLowerCase()))))) groupMatch = true;
+         
+         return idMatch || typeMatch || aliasesMatch || groupMatch || a.filename === target || a.name === target;
+    });
+}
+
+
 // Helper: Log operational audit trails persistently
 async function logPreflightAdminEvent({ tenantId, userId, jobId, eventType, status, message, metadata, traceId }) {
     try {
@@ -1194,198 +1387,37 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
     const { jobId } = req.params;
     console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-LIVE-HYDRATION-START] ${JSON.stringify({ jobId })}`);
     try {
-        const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
-        const localRecord = rows[0];
-        const canonicalObj = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
-        const syncError = localRecord?.sync_error_json ? (typeof localRecord.sync_error_json === 'string' ? JSON.parse(localRecord.sync_error_json) : localRecord.sync_error_json) : {};
 
-        let liveArtifactsResponse = null;
-        try {
-            liveArtifactsResponse = await preflightServiceClient.getJobArtifacts(jobId, context.Authorization, context.tenantId);
-            
-            // clear stale error
-            if (syncError.live_hydration_disabled) {
-                syncError.live_hydration_disabled = false;
-                await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
-            }
-        } catch (upstreamErr) {
-            console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-REGISTRY-FALLBACK] ${JSON.stringify({ jobId, reason: upstreamErr.message })}`);
-        }
-
-        let normalized = [];
-        let sourceStatus = 'PERSISTENT_REGISTRY';
-        let downloadable_artifact_count = 0;
-        let zero_byte_artifact_count = 0;
-        
-        if (liveArtifactsResponse && liveArtifactsResponse.physical_artifacts_ready && Array.isArray(liveArtifactsResponse.artifacts) && liveArtifactsResponse.artifacts.length > 0) {
-            // Deduplicate logic
-            const uniqueByHashOrName = new Map();
-            liveArtifactsResponse.artifacts.forEach(a => {
-                 const storageRef = a.storage_key || a.path || a.storagePath || '';
-                 const key = storageRef ? storageRef : `${a.filename}_${a.size_bytes}`;
-                 if (!uniqueByHashOrName.has(key)) {
-                     uniqueByHashOrName.set(key, { ...a, aliases: [a.alias || a.id] });
-                 } else {
-                     const existing = uniqueByHashOrName.get(key);
-                     if (a.alias && a.id && !existing.aliases.includes(a.alias)) existing.aliases.push(a.alias);
-                     if (a.id && !existing.aliases.includes(a.id)) existing.aliases.push(a.id);
-                     // if current is preferred alias (final_fixed_pdf or fixed_pdf)
-                     if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') {
-                         existing.alias = a.alias;
-                     }
-                 }
-            });
-            normalized = Array.from(uniqueByHashOrName.values()).map(a => {
-                if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
-                if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
-                if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
-
-                if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
-                    a.type = 'fixed_pdf';
-                    a.alias = 'fixed_pdf';
-                    a.download_id = 'fixed_pdf';
-                    a.label = 'Fixed PDF';
-                    if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
-                    if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
-                } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
-                    a.type = 'certified_pdf';
-                    a.alias = 'certified_pdf';
-                    a.download_id = 'certified_pdf';
-                    a.label = 'Certified PDF';
-                    if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
-                } else if (a.type === 'fix_audit') {
-                    a.type = 'fix_audit';
-                    a.alias = 'fix_audit';
-                    a.download_id = 'fix_audit';
-                    a.label = 'Fix Audit JSON';
-                    if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
-                    if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
-                } else if (a.type === 'output_file') {
-                    a.alias = 'output_file';
-                    a.download_id = a.id || a.download_id || 'output_file';
-                    a.label = 'Output PDF';
-                } else {
-                    a.download_id = a.download_id || a.alias || a.id;
-                }
-
-                a.download_url = `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
-                return a;
-            });
-            
-            sourceStatus = 'LIVE_UPSTREAM';
-            
-            // persist
-            const newCanonical = canonicalObj || {};
-            newCanonical.artifacts = normalized;
-            newCanonical.artifact_summary = {
-                downloadable_artifact_count: liveArtifactsResponse.downloadable_artifact_count,
-                zero_byte_artifact_count: liveArtifactsResponse.zero_byte_artifact_count,
-                physical_artifacts_ready: liveArtifactsResponse.physical_artifacts_ready
-            };
-            if (localRecord) {
-                await db.query(`UPDATE preflight_job_registry SET artifact_list_json = ?, canonical_payload_json = ? WHERE job_id = ?`, [
-                    JSON.stringify(normalized),
-                    JSON.stringify(newCanonical),
-                    jobId
-                ]);
-            }
-            
-            downloadable_artifact_count = liveArtifactsResponse.downloadable_artifact_count;
-            zero_byte_artifact_count = liveArtifactsResponse.zero_byte_artifact_count;
-            
-            console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-UPSTREAM-HYDRATED] ${JSON.stringify({ 
-                jobId, 
-                upstreamArtifactCount: liveArtifactsResponse.artifacts.length, 
-                normalizedArtifactCount: normalized.length,
-                downloadableArtifactCount: downloadable_artifact_count,
-                zeroByteArtifactCount: zero_byte_artifact_count,
-                physicalArtifactsReady: liveArtifactsResponse.physical_artifacts_ready
-            })}`);
-        } else {
-             normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
-             normalized.forEach(a => {
-                if (a.downloadable && a.size_bytes > 0) downloadable_artifact_count++;
-                if (!a.downloadable || a.size_bytes === 0) zero_byte_artifact_count++;
-             });
-             
-             if (normalized.length > 0) {
-                 sourceStatus = 'PERSISTENT_REGISTRY_HYDRATED';
-             }
-        }
-        
-        let primary_fixed_pdf_selected = false;
-        const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
-
-        normalized.forEach(a => {
-            if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
-            if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
-            if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
-
-            if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
-                a.type = 'fixed_pdf';
-                a.alias = 'fixed_pdf';
-                a.download_id = 'fixed_pdf';
-                a.label = 'Fixed PDF';
-                if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
-                if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
-            } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
-                a.type = 'certified_pdf';
-                a.alias = 'certified_pdf';
-                a.download_id = 'certified_pdf';
-                a.label = 'Certified PDF';
-                if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
-            } else if (a.type === 'fix_audit') {
-                a.type = 'fix_audit';
-                a.alias = 'fix_audit';
-                a.download_id = 'fix_audit';
-                a.label = 'Fix Audit JSON';
-                if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
-                if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
-            } else if (a.type === 'output_file') {
-                a.alias = 'output_file';
-                a.download_id = a.id || a.download_id || 'output_file';
-                a.label = 'Output PDF';
-            } else {
-                a.download_id = a.download_id || a.alias || a.id;
-            }
-
-            a.download_url = a.download_url || `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
-
-            if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
-                primary_fixed_pdf_selected = true;
-                a.primary = true;
-            }
-        });
-
-        const physical_artifacts_ready = downloadable_artifact_count > 0;
+        const hydrated = await hydratePreflightArtifacts(jobId, context);
         let message = undefined;
-        if (!physical_artifacts_ready && normalized.length > 0) {
+        if (!hydrated.physical_artifacts_ready && hydrated.artifacts.length > 0) {
             message = "Artifacts are registered but no downloadable bytes are available yet.";
         }
 
         console.log(`[PRELIGHT-ARTIFACTS][NORMALIZED] ${JSON.stringify({
             jobId,
-            artifact_count: normalized.length,
-            downloadable_artifact_count,
-            zero_byte_artifact_count,
-            physical_artifacts_ready,
-            primary_fixed_pdf_selected,
-            aliases: normalized.map(a => a.alias)
+            artifact_count: hydrated.artifacts.length,
+            downloadable_artifact_count: hydrated.downloadable_artifact_count,
+            zero_byte_artifact_count: hydrated.zero_byte_artifact_count,
+            physical_artifacts_ready: hydrated.physical_artifacts_ready,
+            primary_fixed_pdf_selected: hydrated.primary_fixed_pdf_selected,
+            aliases: hydrated.artifacts.map(a => a.alias)
         })}`);
 
         res.json({ 
             ok: true, 
-            artifacts: normalized, 
-            downloadable_artifact_count,
-            zero_byte_artifact_count,
-            physical_artifacts_ready,
+            artifacts: hydrated.artifacts, 
+            downloadable_artifact_count: hydrated.downloadable_artifact_count,
+            zero_byte_artifact_count: hydrated.zero_byte_artifact_count,
+            physical_artifacts_ready: hydrated.physical_artifacts_ready,
             message,
-            source_status: sourceStatus 
+            source_status: hydrated.source_status 
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
     }
 });
+
 
 function resolveArtifactIdForUpstream(jobId, artifactId) {
     const raw = String(artifactId || '').trim();
@@ -1416,70 +1448,50 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         } catch (e) {}
     }
 
-    const upstreamArtifactId = resolveArtifactIdForUpstream(jobId, artifactId);
-
-    console.log(
-        `[ADMIN-PREFLIGHT][ARTIFACT][RESOLVED] job=${jobId} raw=${artifactId} upstream=${upstreamArtifactId}`
-    );
+    console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD-RESOLVE-START] ${JSON.stringify({ jobId, requestedArtifactId: artifactId })}`);
 
     try {
         await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_DOWNLOAD_REQUESTED', 'SUCCESS', context.tenantId, context.operatorId, {
             job_id: jobId,
             parent_job_id: jobId,
             child_job_id: jobId,
-            artifact_id: upstreamArtifactId,
+            artifact_id: artifactId,
             actor: context.operatorId,
             actor_role: req.actorContext?.role || 'operator',
             trace_id: context.traceId,
             source: 'CONTROL_PLANE_PREFLIGHT_UI'
         });
-        // Resolve alias via normalized artifact list
-        let resolvedArtifactId = upstreamArtifactId;
-        let artifactRecord = null;
-        try {
-            const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
-            const localRecord = rows[0];
-            const rawCanonical = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
-            const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
-            
-            const matched = artifacts.find(a => {
-                 const target = upstreamArtifactId.toLowerCase();
-                 const idMatch = a.id === target || a.artifact_id === target || a.download_id === target;
-                 const typeMatch = (a.type || '').toLowerCase() === target || (a.alias || '').toLowerCase() === target;
-                 const aliasesMatch = Array.isArray(a.aliases) && a.aliases.some(al => al.toLowerCase() === target);
-                 
-                 const fixedGroup = ['fixed_pdf', 'final_fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
-                 const certifiedGroup = ['certified_pdf', 'certified', 'certified_output'];
-                 const reviewGroup = ['review_pdf', 'review_copy', 'human_review_pdf'];
-                 const fixAuditGroup = ['fix_audit', 'fix_audit_json'];
-                 const analysisGroup = ['analysis_report', 'report_json', 'preflight_report'];
-                 
-                 let groupMatch = false;
-                 if (fixedGroup.includes(target) && (fixedGroup.includes((a.type || '').toLowerCase()) || fixedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixedGroup.includes(al.toLowerCase()))))) groupMatch = true;
-                 if (certifiedGroup.includes(target) && (certifiedGroup.includes((a.type || '').toLowerCase()) || certifiedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => certifiedGroup.includes(al.toLowerCase()))))) groupMatch = true;
-                 if (reviewGroup.includes(target) && (reviewGroup.includes((a.type || '').toLowerCase()) || reviewGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => reviewGroup.includes(al.toLowerCase()))))) groupMatch = true;
-                 if (fixAuditGroup.includes(target) && (fixAuditGroup.includes((a.type || '').toLowerCase()) || fixAuditGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixAuditGroup.includes(al.toLowerCase()))))) groupMatch = true;
-                 if (analysisGroup.includes(target) && (analysisGroup.includes((a.type || '').toLowerCase()) || analysisGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => analysisGroup.includes(al.toLowerCase()))))) groupMatch = true;
-                 
-                 return idMatch || typeMatch || aliasesMatch || groupMatch || a.filename === target;
-            });
-            if (matched) {
-                artifactRecord = matched;
-                if (matched.id) {
-                    resolvedArtifactId = resolveArtifactIdForUpstream(jobId, matched.id);
-                }
-            }
-        } catch (resolveErr) {
-            console.warn(`[ADMIN-PREFLIGHT][ARTIFACT] Alias resolution fallback triggered for ${upstreamArtifactId}`, resolveErr.message);
+
+        // 1. Live hydrate first!
+        const hydrated = await hydratePreflightArtifacts(jobId, context);
+        console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD-HYDRATED] ${JSON.stringify({ jobId, artifactCount: hydrated.artifacts.length, sourceStatus: hydrated.source_status })}`);
+
+        // 2. Resolve requested ID against normalized aliases
+        const artifactRecord = resolveRequestedArtifact(hydrated.artifacts, artifactId);
+
+        if (!artifactRecord) {
+            console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD-NOT-FOUND] ${JSON.stringify({
+                jobId,
+                requestedArtifactId: artifactId,
+                known: hydrated.artifacts.map(a => ({
+                    id: a.id,
+                    alias: a.alias,
+                    download_id: a.download_id,
+                    type: a.type,
+                    filename: a.filename,
+                    aliases: a.aliases
+                }))
+            })}`);
+            return res.status(404).json({ ok: false, error: 'ARTIFACT_NOT_FOUND' });
         }
 
         // Phase 41.2 Byte validation enforcement
-        if (artifactRecord && (!artifactRecord.downloadable || artifactRecord.size_bytes === 0)) {
+        if (!artifactRecord.downloadable || artifactRecord.size_bytes <= 0) {
             await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_DOWNLOAD_FAILED', 'WARNING', context.tenantId, context.operatorId, {
                 job_id: jobId,
                 parent_job_id: jobId,
                 child_job_id: jobId,
-                artifact_id: upstreamArtifactId,
+                artifact_id: artifactId,
                 actor: context.operatorId,
                 actor_role: req.actorContext?.role || 'operator',
                 message: 'Rejected 0 B artifact download attempt',
@@ -1493,22 +1505,47 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
             });
         }
 
-        // Use preflightServiceClient.downloadArtifact to get the stream
+        // 3. Determine best upstream identifier
+        // 1. resolvedArtifact.id
+        // 2. resolvedArtifact.artifact_id
+        // 3. first base64-looking alias in resolvedArtifact.aliases
+        // 4. resolvedArtifact.download_id, only if upstream accepts canonical aliases
+        // 5. requestedArtifactId as final fallback
+        let resolvedArtifactId = artifactRecord.id || artifactRecord.artifact_id;
+        if (!resolvedArtifactId && Array.isArray(artifactRecord.aliases)) {
+             resolvedArtifactId = artifactRecord.aliases.find(al => al.startsWith('Zml4Xz'));
+        }
+        if (!resolvedArtifactId) {
+             resolvedArtifactId = artifactRecord.download_id;
+        }
+        if (!resolvedArtifactId) {
+             resolvedArtifactId = resolveArtifactIdForUpstream(jobId, artifactId);
+        }
+
+        console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD-RESOLVED] ${JSON.stringify({
+            jobId,
+            requestedArtifactId: artifactId,
+            resolvedArtifactId,
+            resolvedDownloadId: artifactRecord.download_id,
+            resolvedType: artifactRecord.type,
+            filename: artifactRecord.filename,
+            sizeBytes: artifactRecord.size_bytes
+        })}`);
+
+        // Ask service client to stream
         const streamResponse = await preflightServiceClient.downloadArtifact(jobId, resolvedArtifactId, context.Authorization, context.tenantId);
-        
-        // Proxy content type and headers directly
-        const contentType = streamResponse.headers?.['content-type'] || 'application/pdf';
-        res.setHeader('Content-Type', contentType);
-        
+
+        if (!streamResponse.stream) {
+            return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'Physical artifact could not be downloaded from upstream' });
+        }
+
+        res.setHeader('Content-Type', streamResponse.headers?.['content-type'] || 'application/pdf');
         if (streamResponse.headers?.['content-disposition']) {
             res.setHeader('Content-Disposition', streamResponse.headers['content-disposition']);
-        } else {
-            // Default content disposition
-            const defaultFilename = contentType.includes('json') ? 'artifact.json' : 'artifact.pdf';
-            res.setHeader('Content-Disposition', `attachment; filename="${defaultFilename}"`);
         }
-        
-        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId, eventType: 'PREFLIGHT_ARTIFACT_DOWNLOAD_REQUESTED', status: 'SUCCESS', traceId: context.traceId });
+        else {
+            res.setHeader('Content-Disposition', `attachment; filename="${artifactRecord.filename || artifactId}"`);
+        }
 
         // Stream the bytes from upstream to the client
         streamResponse.stream.pipe(res);
