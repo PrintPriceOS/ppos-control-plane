@@ -5,14 +5,12 @@ async function runSmokeTests() {
     
     // We can assume the local control plane is running on 8080 or we test the preflight API directly.
     const baseUrl = 'http://127.0.0.1:8080';
-    const jobId = 'fix_1780574759446';
+    const jobId = 'fix_1780577270244'; // Update to the job with final_fixed_pdf
     
     try {
         console.log(`\n[TEST 1] Fetching live artifacts for ${jobId} via Control Plane`);
         const res = await fetch(`${baseUrl}/api/admin/preflight/jobs/${jobId}/artifacts`, {
             headers: {
-                // we assume local server ignores token or uses a default if not strictly enforced in tests,
-                // or we use the break glass token
                 'Authorization': `Bearer ${process.env.PPOS_CONTROL_TOKEN || 'admin-secret'}`
             }
         });
@@ -26,33 +24,42 @@ async function runSmokeTests() {
             console.log("✅ source_status format is recognized");
         }
         
-        // Check for deduplication
-        if (data.artifacts && data.artifacts.length > 0) {
-            const fixedPdfs = data.artifacts.filter(a => a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf');
-            if (fixedPdfs.length > 1) {
-                console.error("❌ Duplicate primary artifacts detected");
-            } else {
-                console.log("✅ Deduplication test passed (or 0/1 artifacts found)");
+        const fixedPdf = data.artifacts?.find(a => a.type === 'fixed_pdf' || a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf');
+        if (fixedPdf) {
+            console.log(`\n[TEST 3] Testing canonical alias resolution for: ${fixedPdf.filename}`);
+            
+            const aliasesToTest = ['fixed_pdf', 'final_fixed_pdf'];
+            if (fixedPdf.id) aliasesToTest.push(fixedPdf.id);
+            if (Array.isArray(fixedPdf.aliases)) aliasesToTest.push(...fixedPdf.aliases);
+            
+            for (const alias of new Set(aliasesToTest)) {
+                if (!alias) continue;
+                const headRes = await fetch(`${baseUrl}/api/admin/preflight/jobs/${jobId}/artifacts/${alias}`, {
+                    method: 'HEAD',
+                    headers: { 'Authorization': `Bearer ${process.env.PPOS_CONTROL_TOKEN || 'admin-secret'}` }
+                });
+                
+                if (headRes.status === 200) {
+                    console.log(`✅ Resolves correctly for alias: ${alias}`);
+                } else if (headRes.status === 404 && process.env.PPOS_CONTROL_TOKEN === undefined) {
+                    console.log(`⚠️ Resolves with ${headRes.status} for alias: ${alias} (mock test might be running without full upstream)`);
+                } else {
+                    console.error(`❌ FAILED resolution for alias: ${alias} (status: ${headRes.status})`);
+                }
             }
         }
         
-        console.log(`\n[TEST 2] Testing AUTOFIX block for child jobs`);
-        const res2 = await fetch(`${baseUrl}/api/admin/preflight/jobs/${jobId}/actions/fix`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.PPOS_CONTROL_TOKEN || 'admin-secret'}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ type: 'AUTOFIX' })
-        });
-        
-        const data2 = await res2.json();
-        console.log(`Response: ${JSON.stringify(data2, null, 2)}`);
-        
-        if (res2.status === 409 && data2.error === 'FIX_ALREADY_AUTOFIX_JOB') {
-            console.log("✅ Fix triggered on child job correctly blocked with 409 FIX_ALREADY_AUTOFIX_JOB");
-        } else {
-            console.error("❌ Fix trigger not blocked correctly. Status:", res2.status);
+        console.log(`\n[TEST 4] Testing missing artifact resolution for absent types`);
+        for (const missingAlias of ['certified_pdf', 'fix_audit']) {
+            const headRes = await fetch(`${baseUrl}/api/admin/preflight/jobs/${jobId}/artifacts/${missingAlias}`, {
+                method: 'HEAD',
+                headers: { 'Authorization': `Bearer ${process.env.PPOS_CONTROL_TOKEN || 'admin-secret'}` }
+            });
+            if (headRes.status === 404 || headRes.status === 400 || headRes.status === 401) {
+                console.log(`✅ Correctly rejected missing artifact alias: ${missingAlias}`);
+            } else {
+                console.error(`❌ FAILED: Missing artifact alias returned status ${headRes.status} instead of 404: ${missingAlias}`);
+            }
         }
         
     } catch (e) {

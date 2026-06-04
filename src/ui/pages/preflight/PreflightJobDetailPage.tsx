@@ -751,7 +751,7 @@ export const PreflightJobDetailPage: React.FC = () => {
 
                   {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (
                     <button 
-                      onClick={() => handleDirectDownload(primaryItem.alias || primaryItem.id, primaryItem.filename)}
+                      onClick={() => handleDirectDownload(primaryItem.download_id || primaryItem.alias || primaryItem.id, primaryItem.filename)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
                       title={primaryItem.label}
                     >
@@ -774,7 +774,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                         a.downloadable ? (
                           <button 
                             key={i}
-                            onClick={() => handleDirectDownload(a.alias || a.id, a.filename)}
+                            onClick={() => handleDirectDownload(a.download_id || a.alias || a.id, a.filename)}
                             className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
                             title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
                           >

@@ -1234,7 +1234,18 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
                      }
                  }
             });
-            normalized = Array.from(uniqueByHashOrName.values());
+            normalized = Array.from(uniqueByHashOrName.values()).map(a => {
+                a.download_id = a.alias || a.id;
+                if (!a.label) {
+                    if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') a.label = 'Fixed PDF';
+                    else if (a.alias === 'certified_pdf') a.label = 'Certified PDF';
+                    else if (a.alias === 'fix_audit') a.label = 'Fix Audit JSON';
+                    else if (a.type === 'output_file') a.label = 'Output PDF';
+                }
+                a.download_url = `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
+                if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+                return a;
+            });
             
             sourceStatus = 'LIVE_UPSTREAM';
             
@@ -1281,6 +1292,16 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
         const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
 
         normalized.forEach(a => {
+            a.download_id = a.download_id || a.alias || a.id;
+            if (!a.label) {
+                if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') a.label = 'Fixed PDF';
+                else if (a.alias === 'certified_pdf') a.label = 'Certified PDF';
+                else if (a.alias === 'fix_audit') a.label = 'Fix Audit JSON';
+                else if (a.type === 'output_file') a.label = 'Output PDF';
+            }
+            a.download_url = a.download_url || `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
+            if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+
             if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
                 primary_fixed_pdf_selected = true;
                 a.primary = true;
@@ -1372,7 +1393,27 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
             const rawCanonical = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
             const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
             
-            const matched = artifacts.find(a => a.alias === upstreamArtifactId || a.id === upstreamArtifactId);
+            const matched = artifacts.find(a => {
+                 const target = upstreamArtifactId.toLowerCase();
+                 const idMatch = a.id === target || a.artifact_id === target || a.download_id === target;
+                 const typeMatch = (a.type || '').toLowerCase() === target || (a.alias || '').toLowerCase() === target;
+                 const aliasesMatch = Array.isArray(a.aliases) && a.aliases.some(al => al.toLowerCase() === target);
+                 
+                 const fixedGroup = ['fixed_pdf', 'final_fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
+                 const certifiedGroup = ['certified_pdf', 'certified', 'certified_output'];
+                 const reviewGroup = ['review_pdf', 'review_copy', 'human_review_pdf'];
+                 const fixAuditGroup = ['fix_audit', 'fix_audit_json'];
+                 const analysisGroup = ['analysis_report', 'report_json', 'preflight_report'];
+                 
+                 let groupMatch = false;
+                 if (fixedGroup.includes(target) && (fixedGroup.includes((a.type || '').toLowerCase()) || fixedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (certifiedGroup.includes(target) && (certifiedGroup.includes((a.type || '').toLowerCase()) || certifiedGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => certifiedGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (reviewGroup.includes(target) && (reviewGroup.includes((a.type || '').toLowerCase()) || reviewGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => reviewGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (fixAuditGroup.includes(target) && (fixAuditGroup.includes((a.type || '').toLowerCase()) || fixAuditGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => fixAuditGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 if (analysisGroup.includes(target) && (analysisGroup.includes((a.type || '').toLowerCase()) || analysisGroup.includes((a.alias || '').toLowerCase()) || (Array.isArray(a.aliases) && a.aliases.some(al => analysisGroup.includes(al.toLowerCase()))))) groupMatch = true;
+                 
+                 return idMatch || typeMatch || aliasesMatch || groupMatch || a.filename === target;
+            });
             if (matched) {
                 artifactRecord = matched;
                 if (matched.id) {
