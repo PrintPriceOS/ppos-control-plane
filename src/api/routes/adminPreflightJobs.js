@@ -859,9 +859,21 @@ router.get('/jobs/:jobId', async (req, res) => {
         const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
 
         
+        const resolvedJobId =
+          jobPayload?.id ||
+          jobPayload?.jobId ||
+          rawCanonical?.job?.id ||
+          rawCanonical?.job?.jobId ||
+          localRecord?.job_id ||
+          req.params.jobId;
+
+        const resolvedSourceStatus =
+          sourceStatus ||
+          'PERSISTENT_REGISTRY';
+
         if (sourceStatus === 'LIVE_UPSTREAM') {
             console.log('[CONTROL][PREFLIGHT][STATUS-HYDRATED]', {
-                jobId,
+                jobId: resolvedJobId,
                 registryStatus: localRecord?.status || 'UNKNOWN',
                 upstreamStatus: currentStatus,
                 displayStatus: mappedStatus,
@@ -870,13 +882,16 @@ router.get('/jobs/:jobId', async (req, res) => {
         }
         res.json({
             ok: true,
-            jobId,
+            id: resolvedJobId,
+            jobId: resolvedJobId,
+            job_id: resolvedJobId,
             status: mappedStatus,
             display_status: mappedStatus,
             upstream_status: currentStatus,
             registry_status: localRecord?.status || 'UNKNOWN',
-            status_source: sourceStatus,
-            source_status: sourceStatus,
+            status_source: resolvedSourceStatus,
+            sourceStatus: resolvedSourceStatus,
+            source_status: resolvedSourceStatus,
             live_hydration_disabled: !!syncError?.live_hydration_disabled,
             progress,
             issueCount: projection.issuesCount,
