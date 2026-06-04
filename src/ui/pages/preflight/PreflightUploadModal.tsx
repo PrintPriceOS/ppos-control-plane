@@ -21,11 +21,11 @@ import {
 import { 
   createAdminPreflightJob, 
   createAdminPreflightBatch, 
-  getAdminPreflightPolicies, 
-  getAdminPreflightJob 
+  getAdminPreflightPolicies
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
+import { addBackgroundJob } from "../../components/BackgroundJobMonitor";
 
 interface PreflightUploadModalProps {
   isOpen: boolean;
@@ -66,8 +66,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   
   // High-fidelity Status Polling States
   const [polledData, setPolledData] = useState<any>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const [pollAttempts, setPollAttempts] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -134,8 +132,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
     setError(null);
     setResult(null);
     setPolledData(null);
-    setIsPolling(false);
-    setPollAttempts(0);
     regenerateTraceId();
     onClose();
   };
@@ -146,8 +142,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
     setStatus('executing');
     setError(null);
     setPolledData(null);
-    setIsPolling(false);
-    setPollAttempts(0);
     
     try {
       const currentTraceId = traceId || `trace_cp_${Date.now()}`;
@@ -203,14 +197,15 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
       setStatus('success');
       onSuccess();
 
-      // Trigger resilient Background Polling Monitor for Single Jobs to verify completion status
+      // Trigger global Background Polling Monitor for Single Jobs
       if (mode === 'SINGLE' && submittedJobId) {
-        setIsPolling(true);
-        setPolledData({
+        addBackgroundJob({
           jobId: submittedJobId,
+          filename: files[0]?.name,
+          type: jobType,
+          tenantId: tenantId || 'system',
           status: resPayload?.job?.status || resPayload?.status || 'PROCESSING',
-          progress: resPayload?.job?.progress || resPayload?.progress || 15,
-          canonicalPayload: resPayload?.job || resPayload
+          progress: resPayload?.job?.progress || resPayload?.progress || 15
         });
       }
     } catch (err: any) {
@@ -219,46 +214,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
       setStatus('error');
     }
   };
-
-  // High-fidelity Polling Engine Loop
-  useEffect(() => {
-    let timerId: any;
-    const isTerminalStatus = (st?: string) => {
-      if (!st) return false;
-      return ['COMPLETED', 'SUCCESS', 'SUCCEEDED', 'FAILED', 'CANCELLED'].includes(st.toUpperCase());
-    };
-
-    if (status === 'success' && mode === 'SINGLE' && isPolling && polledData?.jobId) {
-      if (isTerminalStatus(polledData?.status) || pollAttempts > 25) {
-        setIsPolling(false);
-        return;
-      }
-
-      timerId = setTimeout(async () => {
-        try {
-          const fresh = await getAdminPreflightJob(polledData.jobId);
-          if (fresh && fresh.ok) {
-            const nextStatus = fresh.status || fresh.canonicalPayload?.status || polledData.status;
-            const terminal = isTerminalStatus(nextStatus);
-            setPolledData({
-              jobId: fresh.jobId,
-              status: nextStatus,
-              progress: fresh.canonicalPayload?.progress || (terminal ? 100 : Math.min(92, (polledData?.progress || 15) + 18)),
-              canonicalPayload: fresh.canonicalPayload || fresh.registryRecord || polledData?.canonicalPayload
-            });
-            if (terminal) {
-              setIsPolling(false);
-            }
-          }
-        } catch (pollErr) {
-          console.warn('[POLLING-MONITOR] Transient polling glitch toleration logic active:', pollErr);
-        } finally {
-          setPollAttempts(prev => prev + 1);
-        }
-      }, 2000);
-    }
-    return () => clearTimeout(timerId);
-  }, [status, mode, isPolling, polledData, pollAttempts]);
 
   return (
     <Transition show={isOpen} as={Fragment}>

@@ -210,6 +210,7 @@ router.use('/printhouses', printhousesAdminRouter);
 router.use('/orders', ordersAdminRouter);
 router.use('/preflight', adminPreflightJobsRouter);
 router.use('/preflight', preflightAdminRouter);
+router.use('/notifications', require('./adminNotifications'));
 router.use('/production/notifications', notificationsRouter);
 router.use('/manufacturing/notifications', notificationsRouter);
 router.use('/production', productionAdminRouter);

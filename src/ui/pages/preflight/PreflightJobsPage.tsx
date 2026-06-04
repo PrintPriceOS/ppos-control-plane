@@ -29,14 +29,13 @@ import {
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
-import { PreflightUploadModal } from "./PreflightUploadModal";
 import { PreflightUploadPanel } from "../../components/PreflightUploadPanel";
+import { BackgroundJobProgress } from "../../components/BackgroundJobProgress";
 import { short } from "../../lib/formatters";
 import { collectFindings, mapPhase10Status } from "../../lib/preflightStatusHelpers";
 
 export const PreflightJobsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'JOBS' | 'BATCHES' | 'AUDIT' | 'GOVERNANCE'>('JOBS');
   
   // High-Density Filters supporting full operational scoping
@@ -137,15 +136,6 @@ export const PreflightJobsPage: React.FC = () => {
               <span className="text-[9px] font-bold text-slate-400">allocated</span>
             </div>
           </div>
-
-          <button 
-            disabled={!!isPoliciesUnavailable}
-            onClick={() => setIsUploadOpen(true)}
-            className="flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-none font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-          >
-            <CloudArrowUpIcon className="w-4 h-4" />
-            <span>Trigger Payload</span>
-          </button>
         </div>
       </div>
 
@@ -177,17 +167,9 @@ export const PreflightJobsPage: React.FC = () => {
         />
       </div>
 
-      <PreflightUploadModal 
-        isOpen={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
-        onSuccess={() => {
-          jobsQ.refetch();
-          batchesQ.refetch();
-          auditQ.refetch();
-          governanceQ.refetch();
-          storageQ.refetch();
-        }}
-      />
+      <div className="mt-4 mb-2">
+        <BackgroundJobProgress />
+      </div>
 
       {/* Tabs Layout */}
       <div className="flex items-center justify-between border-b ppos-border flex-wrap gap-4 bg-slate-50/50 dark:bg-[#131314]/20 p-1">
@@ -387,9 +369,16 @@ export const PreflightJobsPage: React.FC = () => {
               {
                 header: 'Status & Fidelity',
                 align: 'center',
-                accessor: (j: any) => (
-                  <div className="flex flex-col items-center gap-0.5">
+                accessor: (j: any) => {
+                  const p = j.progress || (['COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(j.status) ? 100 : (['FAILED', 'DEGRADED', 'CANCELLED'].includes(j.status) ? 100 : (j.status === 'QUEUED' ? 5 : 20)));
+                  return (
+                  <div className="flex flex-col items-center gap-0.5 min-w-[120px]">
                     <StatusBadge status={j.status || 'PENDING'} />
+                    {p > 0 && p < 100 && (
+                      <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 mt-1 overflow-hidden">
+                        <div className="bg-primary h-full transition-all duration-500 ease-out" style={{ width: `${p}%` }} />
+                      </div>
+                    )}
                     <span className="text-[9px] font-manrope text-[#8F96A3] uppercase tracking-tighter mt-0.5 block truncate max-w-[120px]" title={j.sourceSystem || 'Registry'}>
                       {j.sourceSystem || 'Registry'} • {j.canonicalData?.status ? 'Sync' : 'Init'}
                     </span>
@@ -399,7 +388,8 @@ export const PreflightJobsPage: React.FC = () => {
                       </span>
                     )}
                   </div>
-                )
+                  );
+                }
               },
               {
                 header: 'Diagnostics / Fix Result',

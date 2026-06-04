@@ -167,6 +167,28 @@ class ControlPlaneSchemaService {
             `);
 
             await db.query(`
+                CREATE TABLE IF NOT EXISTS control_plane_notifications (
+                    id VARCHAR(64) PRIMARY KEY,
+                    tenant_id VARCHAR(128) NOT NULL,
+                    user_id VARCHAR(128) NULL,
+                    scope VARCHAR(64) DEFAULT 'USER',
+                    type VARCHAR(128) NOT NULL,
+                    severity VARCHAR(32) DEFAULT 'info',
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NULL,
+                    entity_type VARCHAR(64) NULL,
+                    entity_id VARCHAR(128) NULL,
+                    action_url TEXT NULL,
+                    metadata_json JSON NULL,
+                    read_at DATETIME NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    expires_at DATETIME NULL,
+                    INDEX idx_tenant_user (tenant_id, user_id),
+                    INDEX idx_scope_read (scope, read_at)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
                 CREATE TABLE IF NOT EXISTS notification_events (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     notification_id VARCHAR(64) NOT NULL,

@@ -1606,16 +1606,21 @@ export async function triggerJobFix(jobId: string, policy?: string) {
 // --- Production Notifications ---
 
 export async function getNotifications(limit = 20) {
-  const res = await adminFetch<any>(`/api/admin/manufacturing/notifications?limit=${limit}`);
+  const res = await adminFetch<any>(`/api/admin/notifications?limit=${limit}`);
   return res.notifications || [];
 }
 
+export async function getUnreadNotificationsCount() {
+  const res = await adminFetch<any>('/api/admin/notifications/unread-count');
+  return res.count || 0;
+}
+
 export async function markNotificationRead(id: string) {
-  return adminFetch<any>(`/api/admin/manufacturing/notifications/${id}/read`, { method: 'POST' });
+  return adminFetch<any>(`/api/admin/notifications/${id}/read`, { method: 'PATCH' });
 }
 
 export async function markAllNotificationsRead() {
-  return adminFetch<any>(`/api/admin/manufacturing/notifications/read-all`, { method: 'POST' });
+  return adminFetch<any>(`/api/admin/notifications/mark-all-read`, { method: 'POST' });
 }
 
 // --- Production Financials ---

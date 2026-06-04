@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { initTheme } from '../lib/themeStore';
+import { BackgroundJobMonitor } from '../components/BackgroundJobMonitor';
 
 export const Layout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -13,6 +14,7 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full ppos-bg overflow-hidden">
+      <BackgroundJobMonitor />
       {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div 

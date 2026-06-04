@@ -15,6 +15,7 @@ const {
     normalizeArtifacts,
     normalizePreflightArtifacts
 } = require('./preflightStatusHelpers');
+const controlPlaneNotificationService = require('./controlPlaneNotificationService');
 
 class PreflightRegistrySyncService {
     /**
@@ -560,6 +561,41 @@ class PreflightRegistrySyncService {
                     art.sizeBytes || art.size || 0,
                     art.path || art.storageKey || ''
                 ]);
+            }
+        }
+
+        // Emit Idempotent Notification for Terminal Statuses
+        const terminalStatuses = [
+            'COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW',
+            'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED',
+            'FAILED', 'DEGRADED', 'CANCELLED'
+        ];
+        if (terminalStatuses.includes(status)) {
+            let severity = 'info';
+            let title = `Preflight Analysis Completed`;
+            if (['FAILED', 'DEGRADED', 'CANCELLED'].includes(status)) {
+                severity = 'error';
+                title = `Preflight Analysis Failed`;
+            } else if (['COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(status)) {
+                severity = 'warning';
+                title = `Preflight Analysis Completed (Review Required)`;
+            }
+
+            try {
+                await controlPlaneNotificationService.createNotification({
+                    id: `notif_preflight_term_${status}_${jobId}`,
+                    tenant_id: resolved_tenant_id,
+                    scope: 'TENANT',
+                    type: 'PREFLIGHT_JOB_COMPLETED',
+                    severity,
+                    title,
+                    message: `Job ${original_filename || jobId} finished with status ${status}.`,
+                    entity_type: 'PREFLIGHT_JOB',
+                    entity_id: jobId,
+                    action_url: `/preflight/jobs/${jobId}`
+                });
+            } catch (err) {
+                logger.warn({ event: 'notification_emit_failed', jobId, error: err.message });
             }
         }
 

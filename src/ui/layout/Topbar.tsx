@@ -31,6 +31,7 @@ interface Notification {
   date: string; // ISO 8601
   read: boolean;
   severity: NotifSeverity;
+  action_url?: string;
 }
 
 // --- Helpers ---
@@ -38,6 +39,7 @@ interface Notification {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRelative(iso: string): string {
+  if (!iso) return 'Unknown';
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return 'Just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -68,10 +70,11 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
       : []
   );
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
   const hasUnread = unreadCount > 0;
 
   // Close dropdowns when clicking outside
@@ -86,16 +89,21 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
   const fetchNotifications = async () => {
     try {
-      const data = await getNotifications(10);
+      const [data, count] = await Promise.all([
+        getNotifications(10),
+        getUnreadNotificationsCount()
+      ]);
       setNotifications(data.map((n: any) => ({
         id: n.id,
         userId: n.user_id,
         title: n.title,
         description: n.message,
         date: n.created_at,
-        read: !!n.is_read,
-        severity: n.severity as NotifSeverity
+        read: !!n.read_at,
+        severity: (n.severity || 'info') as NotifSeverity,
+        action_url: n.action_url
       })));
+      setUnreadCount(count);
     } catch (err) {
       console.warn('[TOPBAR] Failed to fetch notifications:', err);
     }
@@ -104,13 +112,25 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000); // Polling every 30s
-    return () => clearInterval(interval);
+    
+    const handleRefresh = () => fetchNotifications();
+    window.addEventListener('ppos:notifications:refresh', handleRefresh);
+    
+    return () => {
+        clearInterval(interval);
+        window.removeEventListener('ppos:notifications:refresh', handleRefresh);
+    };
   }, []);
 
-  const handleMarkAsRead = async (id: string) => {
+  const handleMarkAsRead = async (id: string, action_url?: string) => {
     try {
       await markNotificationRead(id);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      if (action_url) {
+        setNotifOpen(false);
+        navigate(action_url);
+      }
     } catch (err) {
       console.error('[TOPBAR] Failed to mark as read:', err);
     }
@@ -120,6 +140,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
     try {
       await markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
     } catch (err) {
       console.error('[TOPBAR] Failed to mark all as read:', err);
     }
@@ -226,7 +247,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
                     return (
                       <button
                         key={n.id}
-                        onClick={() => handleMarkAsRead(n.id)}
+                        onClick={() => handleMarkAsRead(n.id, n.action_url)}
                         className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
                           n.read ? 'hover:bg-slate-50 dark:hover:bg-white/5' : 'bg-slate-50/50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/5'
                         }`}
