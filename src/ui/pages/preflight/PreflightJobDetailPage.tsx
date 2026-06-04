@@ -768,9 +768,9 @@ export const PreflightJobDetailPage: React.FC = () => {
                     </div>
                   ) : null}
 
-                  {secondaryItems.length > 0 && (
+                  {secondaryItems.filter((a: any) => a.type !== 'output_file').length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {secondaryItems.map((a: any, i: number) => (
+                      {secondaryItems.filter((a: any) => a.type !== 'output_file').map((a: any, i: number) => (
                         a.downloadable ? (
                           <button 
                             key={i}
@@ -799,6 +799,45 @@ export const PreflightJobDetailPage: React.FC = () => {
                         )
                       ))}
                     </div>
+                  )}
+
+                  {secondaryItems.filter((a: any) => a.type === 'output_file').length > 0 && (
+                    <details className="group border ppos-border ppos-surface-muted rounded overflow-hidden">
+                      <summary className="cursor-pointer text-[10px] font-black text-slate-400 uppercase tracking-widest p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <span>Advanced / Intermediate Outputs</span>
+                        <ChevronDownIcon className="w-4 h-4 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="p-3 border-t ppos-border bg-white dark:bg-[#1E1E2D] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {secondaryItems.filter((a: any) => a.type === 'output_file').map((a: any, i: number) => (
+                          a.downloadable ? (
+                            <button 
+                              key={i}
+                              onClick={() => handleDirectDownload(a.download_id || a.alias || a.id, a.filename)}
+                              className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
+                              title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
+                            >
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <DocumentIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.filename}</span>
+                              </div>
+                              <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
+                            </button>
+                          ) : (
+                            <div 
+                              key={i}
+                              className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border opacity-50 cursor-not-allowed"
+                              title="Artifact registered but 0 bytes"
+                            >
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <DocumentIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                <span className="text-[10px] font-bold text-slate-500 truncate">{a.filename}</span>
+                              </div>
+                              <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">0 B</span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </details>
                   )}
                 </div>
               );
