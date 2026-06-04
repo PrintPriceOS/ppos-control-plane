@@ -7,6 +7,7 @@
 const mysqlClient = require('./mysqlClient');
 const marketplaceOrderService = require('./marketplaceOrderService');
 const logger = require('./logger').child('marketplace-production-lifecycle');
+const lifecycleAudit = require('./marketplaceLifecycleAuditService');
 
 function safeParseJson(str, fallback = {}) {
     if (!str) return fallback;
@@ -331,6 +332,15 @@ async function completeProductionOrder(orderId, actorContext = {}, payload = {})
         }
     });
 
+    await lifecycleAudit.auditProductionExecutionTransition('PRODUCTION_COMPLETED', 'SUCCESS', {
+        order_id: orderId,
+        previous_status: order.status,
+        next_status: 'PRODUCTION_COMPLETED',
+        warnings: evalResult.warnings,
+        actor: actorId,
+        metadata: finalAuditSnapshot
+    });
+
     return {
         ok: true,
         orderId,
@@ -539,6 +549,13 @@ async function prepareDeliveryHandoff(orderId, actorContext = {}, payload = {}) 
             readyAt: handoffAt,
             readyBy: actorId
         }
+    });
+
+    await lifecycleAudit.auditDeliveryHandoffTransition('DELIVERY_HANDOFF_READY', 'SUCCESS', {
+        order_id: orderId,
+        previous_status: order.status,
+        next_status: 'DELIVERY_HANDOFF_READY',
+        actor: actorId
     });
 
     return {

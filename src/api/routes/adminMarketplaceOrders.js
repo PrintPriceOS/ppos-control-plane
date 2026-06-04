@@ -68,6 +68,57 @@ router.get('/audit', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/marketplace/orders/:id/audit-timeline
+ * Returns chronological lifecycle events from api_audit_logs for this order.
+ */
+router.get('/:id/audit-timeline', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_ORDER_AUDIT_TIMELINE_REQUEST]', req.params.id);
+        const orderId = req.params.id;
+        
+        // Query api_audit_logs where order_id or marketplace_order_id matches
+        const db = require('../services/db');
+        const rows = await db.query(`
+            SELECT id, event_type, status, user_id as actor, created_at, metadata_json
+            FROM api_audit_logs
+            WHERE JSON_EXTRACT(metadata_json, '$.order_id') = ? 
+               OR JSON_EXTRACT(metadata_json, '$.marketplace_order_id') = ?
+            ORDER BY created_at ASC
+        `, [orderId, orderId]);
+
+        const timeline = rows.map(row => {
+            let metadata = {};
+            try {
+                metadata = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : row.metadata_json;
+            } catch (e) {
+                // ignore
+            }
+            return {
+                id: row.id,
+                event_type: row.event_type,
+                status: row.status,
+                severity: row.status === 'FAILURE' ? 'ERROR' : row.status === 'WARNING' ? 'WARN' : 'INFO',
+                actor: row.actor,
+                actor_role: metadata.actor_role || 'SYSTEM',
+                source: metadata.source || 'CONTROL_PLANE',
+                previous_status: metadata.previous_status,
+                next_status: metadata.next_status,
+                message: metadata.reason || '',
+                blockers: metadata.blockers || [],
+                warnings: metadata.warnings || [],
+                created_at: row.created_at,
+                metadata
+            };
+        });
+
+        return res.json({ ok: true, orderId, timeline });
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get audit timeline for ${req.params.id}:`, err);
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
  * GET /api/admin/marketplace/orders/:id
  * Returns full details for a specific order intent, including audit timeline.
  */

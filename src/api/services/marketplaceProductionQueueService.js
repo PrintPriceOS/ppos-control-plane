@@ -7,6 +7,7 @@
 const mysqlClient = require('./mysqlClient');
 const marketplaceOrderService = require('./marketplaceOrderService');
 const logger = require('./logger').child('marketplace-production-queue');
+const lifecycleAudit = require('./marketplaceLifecycleAuditService');
 
 function safeParseJson(str, fallback = {}) {
     if (!str) return fallback;
@@ -93,10 +94,31 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
         }
     }
 
+    const eligible = blockers.length === 0;
+
+    if (!eligible) {
+        await lifecycleAudit.auditProductionQueueTransition('PRODUCTION_QUEUE_BLOCKED', 'FAILURE', {
+            order_id: orderId,
+            previous_status: order.status,
+            next_status: order.status,
+            blockers,
+            warnings,
+            actor: options.operatorId || 'SYSTEM'
+        });
+    } else {
+        await lifecycleAudit.auditProductionQueueTransition('PRODUCTION_QUEUE_ELIGIBILITY_CHECKED', 'SUCCESS', {
+            order_id: orderId,
+            previous_status: order.status,
+            next_status: order.status,
+            warnings,
+            actor: options.operatorId || 'SYSTEM'
+        });
+    }
+
     return {
         ok: true,
         orderId,
-        eligible: blockers.length === 0,
+        eligible,
         blockers,
         warnings,
         orderStatus: order.status,
@@ -207,6 +229,14 @@ async function createProductionQueueEntry(orderId, payload = {}, options = {}) {
             }
         });
 
+        await lifecycleAudit.auditProductionQueueTransition('PRODUCTION_QUEUED', 'SUCCESS', {
+            order_id: orderId,
+            previous_status: order.status,
+            next_status: newStatus,
+            warnings,
+            actor: queuedBy
+        });
+
         if (hasMachineId) {
             await marketplaceOrderService.appendOrderEvent(orderId, {
                 type: 'PRODUCTION_MACHINE_ASSIGNED',
@@ -219,6 +249,16 @@ async function createProductionQueueEntry(orderId, payload = {}, options = {}) {
                     note: payload.note || '',
                     warnings
                 }
+            });
+
+            await lifecycleAudit.auditMachineAssignmentTransition('MACHINE_ASSIGNED', 'SUCCESS', {
+                order_id: orderId,
+                previous_status: 'PRODUCTION_QUEUED',
+                next_status: newStatus,
+                machine_id: payload.machineId,
+                warnings,
+                actor: assignedBy,
+                reason: payload.note || ''
             });
         }
     }
@@ -336,6 +376,16 @@ async function assignProductionMachine(orderId, machineId, payload = {}, options
                 note,
                 warnings
             }
+        });
+
+        await lifecycleAudit.auditMachineAssignmentTransition('MACHINE_ASSIGNED', 'SUCCESS', {
+            order_id: orderId,
+            previous_status: order.status,
+            next_status: 'MACHINE_ASSIGNED',
+            machine_id: machineId,
+            warnings,
+            actor: assignedBy,
+            reason: note
         });
     }
 

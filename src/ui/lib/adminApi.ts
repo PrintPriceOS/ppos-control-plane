@@ -2160,6 +2160,10 @@ export async function getMarketplaceOrderDetail(id: string) {
     return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}`);
 }
 
+export async function getMarketplaceOrderAuditTimeline(id: string) {
+    return adminFetch<{ ok: boolean, orderId: string, timeline: any[] }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/audit-timeline`);
+}
+
 export async function acknowledgeMarketplaceOrder(id: string) {
     return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/acknowledge`, {
         method: 'POST'

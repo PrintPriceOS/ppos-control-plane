@@ -456,7 +456,23 @@ class MarketplaceOrderService {
             const orders = [];
             for (const row of rows) {
                 const order = await this.getOrder(row.order_id);
-                if (order) orders.push(order);
+                if (order) {
+                    try {
+                        const auditRows = await mysqlClient.query(`
+                            SELECT event_type, status, created_at, metadata_json
+                            FROM api_audit_logs
+                            WHERE JSON_EXTRACT(metadata_json, '$.order_id') = ?
+                               OR JSON_EXTRACT(metadata_json, '$.marketplace_order_id') = ?
+                            ORDER BY created_at DESC LIMIT 1
+                        `, [row.order_id, row.order_id]);
+                        if (auditRows && auditRows.length > 0) {
+                            order.lastAuditEvent = auditRows[0];
+                        }
+                    } catch (e) {
+                        // ignore audit fetch errors
+                    }
+                    orders.push(order);
+                }
             }
 
             const counts = {

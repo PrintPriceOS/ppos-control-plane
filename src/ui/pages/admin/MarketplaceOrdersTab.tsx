@@ -104,6 +104,7 @@ export const MarketplaceOrdersTab: React.FC = () => {
                             <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
                             <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                             <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Readiness</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit</th>
                             <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</th>
                             <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Created</th>
                             <th className="px-4 py-3 w-10"></th>
@@ -148,6 +149,18 @@ export const MarketplaceOrdersTab: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="px-4 py-4">
+                                    <div className="text-[10px] font-bold text-slate-900 truncate max-w-[120px] uppercase">
+                                        {order.lastAuditEvent?.event_type?.replace(/_/g, ' ') || 'NO EVENTS'}
+                                    </div>
+                                    <div className="flex items-center gap-1 mt-1">
+                                        {order.lastAuditEvent?.status === 'FAILURE' && <ExclamationCircleIcon className="w-3 h-3 text-red-500" />}
+                                        {order.lastAuditEvent?.status === 'WARNING' && <ExclamationCircleIcon className="w-3 h-3 text-amber-500" />}
+                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
+                                            {order.lastAuditEvent ? safeTime(order.lastAuditEvent.created_at) : '---'}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-4">
                                     <div className="font-black text-slate-900 text-xs">{order.totals.total.toLocaleString()} {order.totals.currency}</div>
                                     <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{order.offer.printerName}</div>
                                 </td>
@@ -184,6 +197,8 @@ export const MarketplaceOrdersTab: React.FC = () => {
 
 const OrderDetailView: React.FC<{ id: string, onClose: () => void, onRefresh: () => void }> = ({ id, onClose, onRefresh }) => {
     const [order, setOrder] = useState<any>(null);
+    const [timeline, setTimeline] = useState<any[]>([]);
+    const [timelineExpanded, setTimelineExpanded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [note, setNote] = useState("");
     const [activeTab, setActiveTab] = useState<'DETAILS' | 'FILES' | 'AUDIT'>('DETAILS');
@@ -195,8 +210,12 @@ const OrderDetailView: React.FC<{ id: string, onClose: () => void, onRefresh: ()
     const fetchDetail = async () => {
         setLoading(true);
         try {
-            const res = await adminApi.getMarketplaceOrderDetail(id);
+            const [res, tRes] = await Promise.all([
+                adminApi.getMarketplaceOrderDetail(id),
+                adminApi.getMarketplaceOrderAuditTimeline(id)
+            ]);
             if (res.ok) setOrder(res.order);
+            if (tRes.ok) setTimeline(tRes.timeline || []);
         } catch (err) {
             console.error('Failed to fetch order detail:', err);
         } finally {
@@ -343,6 +362,70 @@ const OrderDetailView: React.FC<{ id: string, onClose: () => void, onRefresh: ()
                                     <div className="font-black text-xs uppercase tracking-widest">{order.payment.status}</div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Audit Timeline Panel */}
+                        <div className="space-y-4 pt-6 border-t border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Audit Timeline &mdash; {timeline.length} events {timeline.length > 0 ? `— latest: ${timeline[timeline.length - 1].event_type.replace(/_/g, ' ')}` : ''}
+                                </h4>
+                                <div className="flex items-center gap-3">
+                                    <a href={`/admin/audit?search=${id}`} target="_blank" className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline">
+                                        Open in global Audit Logs
+                                    </a>
+                                    <button 
+                                        onClick={() => setTimelineExpanded(!timelineExpanded)} 
+                                        className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2 py-1 border border-slate-200 hover:bg-slate-50"
+                                    >
+                                        {timelineExpanded ? 'Collapse' : 'Expand'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {timelineExpanded && (
+                                <div className="bg-slate-50 border border-slate-200 p-4 space-y-4">
+                                    {timeline.length === 0 ? (
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center py-4">No audit events found</div>
+                                    ) : (
+                                        <div className="relative pl-4 space-y-6 before:absolute before:inset-y-0 before:left-[11px] before:w-px before:bg-slate-200">
+                                            {timeline.map((ev, i) => (
+                                                <div key={ev.id || i} className="relative">
+                                                    <div className={`absolute -left-[20px] top-1 w-3 h-3 rounded-full ring-4 ring-slate-50 ${
+                                                        ev.severity === 'ERROR' ? 'bg-red-500' :
+                                                        ev.severity === 'WARN' ? 'bg-amber-500' : 'bg-emerald-500'
+                                                    }`} />
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <div className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{ev.event_type.replace(/_/g, ' ')}</div>
+                                                        <div className="text-[9px] text-slate-500 font-bold tracking-tighter">{safeDate(ev.created_at)} {safeTime(ev.created_at)}</div>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                        <span className="text-[8px] bg-slate-200 text-slate-600 px-1 py-0.5 font-bold uppercase tracking-widest rounded-none">Actor: {ev.actor} ({ev.actor_role})</span>
+                                                        {ev.previous_status && ev.next_status && (
+                                                            <span className="text-[8px] bg-slate-800 text-slate-200 px-1 py-0.5 font-bold uppercase tracking-widest rounded-none">{ev.previous_status} &rarr; {ev.next_status}</span>
+                                                        )}
+                                                        {ev.metadata?.machine_id && (
+                                                            <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 py-0.5 font-bold uppercase tracking-widest rounded-none">Machine: {ev.metadata.machine_id}</span>
+                                                        )}
+                                                    </div>
+                                                    {ev.message && <p className="text-[10px] text-slate-600 font-bold mb-1">{ev.message}</p>}
+                                                    {ev.blockers?.length > 0 && (
+                                                        <div className="bg-red-50 text-red-700 p-2 text-[9px] font-bold uppercase tracking-widest mt-1 border border-red-100">
+                                                            Blockers: {ev.blockers.join(', ')}
+                                                        </div>
+                                                    )}
+                                                    {ev.warnings?.length > 0 && (
+                                                        <div className="bg-amber-50 text-amber-700 p-2 text-[9px] font-bold uppercase tracking-widest mt-1 border border-amber-100">
+                                                            Warnings: {ev.warnings.join(', ')}
+                                                        </div>
+                                                    )}
+                                                    <div className="text-[8px] text-slate-400 font-mono mt-2">Trace: {ev.metadata?.trace_id || '---'}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
