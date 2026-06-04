@@ -240,21 +240,53 @@ export const PreflightJobDetailPage: React.FC = () => {
     }
   };
 
-  const handleDirectDownload = async (artifactId: string, filename?: string) => {
-    try {
-      const blob = await downloadAdminPreflightArtifact(jobId!, artifactId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename || `${artifactId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(`Direct download error: ${err.message || 'File stream unavailable'}`);
+  async function handleDownloadArtifact(artifact: any) {
+  const artifactId = getArtifactDownloadId(artifact);
+
+  if (!artifactId) {
+    alert('Artifact has no valid download identifier.');
+    return;
+  }
+
+  console.debug('[PREFLIGHT-UI][DOWNLOAD_ARTIFACT]', {
+    jobId,
+    artifactId,
+    artifactType: artifact?.type,
+    filename: artifact?.filename
+  });
+
+  try {
+    const url = `/api/admin/preflight/jobs/${encodeURIComponent(jobId!)}/artifacts/${encodeURIComponent(artifactId)}`;
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const response = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+    
+    if (!response.ok) {
+      let message = 'Requested artifact could not be found.';
+      try {
+        const payload = await response.json();
+        message = payload.message || payload.error || message;
+      } catch {}
+      throw new Error(message);
     }
-  };
+
+    const blob = await response.blob();
+    if (!blob || blob.size === 0) {
+      throw new Error('Downloaded artifact is empty.');
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = artifact?.filename || 'artifact.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (err: any) {
+      alert(`Direct download error: ${err.message || 'File stream unavailable'}`);
+  }
+}
+
 
   const formatSize = (bytes?: number) => {
     if (!bytes) return '0 B';
@@ -752,7 +784,7 @@ export const PreflightJobDetailPage: React.FC = () => {
 
                   {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (
                     <button 
-                      onClick={() => handleDirectDownload(primaryItem)}
+                      onClick={() => handleDownloadArtifact(primaryItem)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
                       title={primaryItem.label}
                     >
@@ -775,7 +807,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                         a.downloadable ? (
                           <button 
                             key={i}
-                            onClick={() => handleDirectDownload(a)}
+                            onClick={() => handleDownloadArtifact(a)}
                             className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
                             title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
                           >
@@ -813,7 +845,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                           a.downloadable ? (
                             <button 
                               key={i}
-                              onClick={() => handleDirectDownload(a)}
+                              onClick={() => handleDownloadArtifact(a)}
                               className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
                               title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
                             >
