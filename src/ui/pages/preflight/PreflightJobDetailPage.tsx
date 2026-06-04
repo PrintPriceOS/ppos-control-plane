@@ -728,12 +728,25 @@ export const PreflightJobDetailPage: React.FC = () => {
               }
 
               const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
-              const primaryItem = items.find((a: any) => primaryAliasCandidates.includes(a.alias));
+              const primaryItem = items.find((a: any) => primaryAliasCandidates.includes(a.alias) && a.downloadable === true);
               const secondaryItems = items.filter((a: any) => a !== primaryItem);
+
+              const zeroBytesOnly = artifactsQ.data?.zero_byte_artifact_count > 0 && artifactsQ.data?.downloadable_artifact_count === 0;
 
               return (
                 <div className="space-y-4">
-                  {primaryItem && primaryItem.downloadable ? (
+                  {zeroBytesOnly && (
+                    <div className="w-full flex flex-col items-center justify-center p-4 border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-500">
+                      <DocumentIcon className="w-6 h-6 mb-2 opacity-50" />
+                      <span className="text-xs font-bold text-center">No fixed PDF bytes were produced by the upstream engine for this job.</span>
+                      <span className="text-[10px] mt-1 opacity-75">{artifactsQ.data?.message || "Artifacts are registered but contain no downloadable bytes yet."}</span>
+                      <button onClick={() => { jobQ.refetch(); artifactsQ.refetch(); }} className="mt-2 text-[10px] text-primary hover:underline font-black uppercase tracking-widest">
+                        Refresh Artifacts
+                      </button>
+                    </div>
+                  )}
+
+                  {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (
                     <button 
                       onClick={() => handleDirectDownload(primaryItem.alias || primaryItem.id, primaryItem.filename)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
@@ -742,7 +755,7 @@ export const PreflightJobDetailPage: React.FC = () => {
                       <DocumentArrowDownIcon className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
                       <span>Download Fixed PDF</span>
                     </button>
-                  ) : primaryItem && !primaryItem.downloadable ? (
+                  ) : (!zeroBytesOnly && primaryItem && !primaryItem.downloadable) ? (
                     <div className="w-full flex flex-col items-center justify-center p-4 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-500">
                       <DocumentIcon className="w-6 h-6 mb-2 text-slate-400" />
                       <span className="text-xs font-bold text-center">Artifact registered but contains no downloadable bytes yet.</span>

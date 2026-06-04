@@ -317,7 +317,16 @@ function normalizePreflightArtifacts(jobPayload, registryRow, upstreamPayload, j
       seen.add(key);
       const isPdf = alias.includes('pdf') || String(item.filename || '').toLowerCase().endsWith('.pdf') || String(item.type || '').toLowerCase().includes('pdf') || String(item.mime_type || '').includes('pdf');
       
-      const size_bytes = item.sizeBytes || item.size_bytes || item.size || 0;
+      const size_bytes = Number(item.sizeBytes || item.size_bytes || item.size || 0);
+      const isFiniteSize = Number.isFinite(size_bytes) && size_bytes > 0;
+      
+      const sourceRef = item.storagePath || item.path || item.storageKey || item.upstream_artifact_id || item.download_url || id;
+      // downloadable must be false if size_bytes is 0, null, undefined, or not finite.
+      // downloadable must be false if no physical storage ref exists (though 'id' acts as a fallback above).
+      // We explicitly check if item has any real upstream ID.
+      const hasRealUpstreamId = !!(item.storagePath || item.path || item.storageKey || item.upstream_artifact_id || item.download_url || item.id || item.artifactId || item.artifact_id);
+      
+      const downloadable = isFiniteSize && hasRealUpstreamId;
       
       normalized.push({
         id,
@@ -327,9 +336,9 @@ function normalizePreflightArtifacts(jobPayload, registryRow, upstreamPayload, j
         filename: item.filename || item.name || item.fileName || (isPdf ? 'artifact.pdf' : 'artifact.json'),
         mime_type: item.mime_type || item.mimeType || (isPdf ? 'application/pdf' : 'application/json'),
         size_bytes,
-        downloadable: size_bytes > 0,
-        download_url: jobId ? `/api/admin/preflight/jobs/${jobId}/artifacts/${alias || id}` : null,
-        source: item.storagePath || item.path || item.storageKey || 'upstream',
+        downloadable,
+        download_url: (jobId && downloadable) ? `/api/admin/preflight/jobs/${jobId}/artifacts/${alias || id}` : null,
+        source: sourceRef || 'upstream',
         priority: ALIAS_PRIORITY.indexOf(alias) !== -1 ? ALIAS_PRIORITY.indexOf(alias) : 999
       });
     }

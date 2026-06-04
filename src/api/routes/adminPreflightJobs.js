@@ -1089,13 +1089,41 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
                 }
             });
 
+            // Check if downstream synchronously returned artifacts
+            let artifacts_pending = true;
+            if (responsePayload?.artifacts || responsePayload?.artifact_list) {
+                const immediateArtifacts = normalizePreflightArtifacts(responsePayload, null, responsePayload, childJobId);
+                let hasDownloadable = false;
+                immediateArtifacts.forEach(a => {
+                    if (a.downloadable && a.size_bytes > 0) hasDownloadable = true;
+                });
+                if (!hasDownloadable && immediateArtifacts.length > 0) {
+                    await auditLoggerService.log({
+                        tenantId: context.tenantId,
+                        userId: context.operatorId,
+                        eventType: 'PREFLIGHT_ARTIFACTS_EMPTY_OR_UNAVAILABLE',
+                        status: 'WARNING',
+                        metadata: { job_id: childJobId, parent_job_id: jobId, trace_id: context.traceId }
+                    });
+                } else if (hasDownloadable) {
+                    artifacts_pending = false;
+                    await auditLoggerService.log({
+                        tenantId: context.tenantId,
+                        userId: context.operatorId,
+                        eventType: 'PREFLIGHT_FIXED_PDF_READY',
+                        status: 'SUCCESS',
+                        metadata: { job_id: childJobId, parent_job_id: jobId, trace_id: context.traceId }
+                    });
+                }
+            }
+
             res.json({ 
                 ok: true, 
                 child_job_id: childJobId,
                 fix_job_id: childJobId,
                 parent_job_id: jobId,
                 status: responsePayload?.status || 'CREATED',
-                artifacts_pending: true,
+                artifacts_pending,
                 result: responsePayload, 
                 source_status: 'LIVE_UPSTREAM' 
             });
@@ -1164,7 +1192,48 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
 
         const normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
 
-        res.json({ ok: true, artifacts: normalized, source_status: 'PERSISTENT_REGISTRY' });
+        let downloadable_artifact_count = 0;
+        let zero_byte_artifact_count = 0;
+        let primary_fixed_pdf_selected = false;
+        const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
+
+        normalized.forEach(a => {
+            if (a.downloadable && a.size_bytes > 0) {
+                downloadable_artifact_count++;
+            }
+            if (!a.downloadable || a.size_bytes === 0) {
+                zero_byte_artifact_count++;
+            }
+            if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
+                primary_fixed_pdf_selected = true;
+            }
+        });
+
+        const physical_artifacts_ready = downloadable_artifact_count > 0;
+        let message = undefined;
+        if (!physical_artifacts_ready && normalized.length > 0) {
+            message = "Artifacts are registered but no downloadable bytes are available yet.";
+        }
+
+        console.log(`[PRELIGHT-ARTIFACTS][NORMALIZED] ${JSON.stringify({
+            jobId,
+            artifact_count: normalized.length,
+            downloadable_artifact_count,
+            zero_byte_artifact_count,
+            physical_artifacts_ready,
+            primary_fixed_pdf_selected,
+            aliases: normalized.map(a => a.alias)
+        })}`);
+
+        res.json({ 
+            ok: true, 
+            artifacts: normalized, 
+            downloadable_artifact_count,
+            zero_byte_artifact_count,
+            physical_artifacts_ready,
+            message,
+            source_status: 'PERSISTENT_REGISTRY' 
+        });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
     }
@@ -1210,6 +1279,7 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
 
         // Resolve alias via normalized artifact list
         let resolvedArtifactId = upstreamArtifactId;
+        let artifactRecord = null;
         try {
             const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
             const localRecord = rows[0];
@@ -1217,11 +1287,24 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
             const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
             
             const matched = artifacts.find(a => a.alias === upstreamArtifactId || a.id === upstreamArtifactId);
-            if (matched && matched.id) {
-                resolvedArtifactId = resolveArtifactIdForUpstream(jobId, matched.id);
+            if (matched) {
+                artifactRecord = matched;
+                if (matched.id) {
+                    resolvedArtifactId = resolveArtifactIdForUpstream(jobId, matched.id);
+                }
             }
         } catch (resolveErr) {
             console.warn(`[ADMIN-PREFLIGHT][ARTIFACT] Alias resolution fallback triggered for ${upstreamArtifactId}`, resolveErr.message);
+        }
+
+        // Phase 41.2 Byte validation enforcement
+        if (artifactRecord && (!artifactRecord.downloadable || artifactRecord.size_bytes === 0)) {
+            await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'FAILURE', message: 'Rejected 0 B artifact download attempt', traceId: context.traceId });
+            return res.status(409).json({
+                ok: false,
+                error: "ARTIFACT_NOT_DOWNLOADABLE",
+                reason: "ZERO_BYTE_ARTIFACT_OR_MISSING_STORAGE_REF"
+            });
         }
 
         // Use preflightServiceClient.downloadArtifact to get the stream
@@ -1736,17 +1819,29 @@ router.post('/ui-audit', async (req, res) => {
 
         Object.keys(metadata).forEach(k => metadata[k] === undefined && delete metadata[k]);
 
-        await auditLoggerService.log({
-            tenantId: context.tenantId,
-            userId: context.operatorId,
-            eventType: event_type,
-            status: 'SUCCESS',
-            metadata
-        });
+        try {
+            await auditLoggerService.log({
+                tenantId: context.tenantId,
+                userId: context.operatorId,
+                eventType: event_type,
+                status: 'SUCCESS',
+                metadata
+            });
+        } catch (auditErr) {
+            console.error(`[CONTROL][PREFLIGHT][UI-AUDIT] Failed to persist UI audit event: ${auditErr.message}`, auditErr);
+            // Do not fail the frontend request if audit logger fails
+            return res.status(200).json({ 
+                ok: true, 
+                warning: 'Audit persistence failed', 
+                event_type 
+            });
+        }
 
-        res.json({ ok: true });
+        res.json({ ok: true, event_type });
     } catch (err) {
-        res.status(500).json({ ok: false, error: { message: err.message } });
+        console.error(`[CONTROL][PREFLIGHT][UI-AUDIT] Internal error processing payload: ${err.message}`, err);
+        // Return 200 with an error object rather than crashing the client with 500
+        res.status(200).json({ ok: false, error: 'UI_AUDIT_INTERNAL_ERROR', message: err.message });
     }
 });
 
@@ -1757,14 +1852,16 @@ router.get('/jobs/:jobId/audit-timeline', async (req, res) => {
         const sql = `
             SELECT id, event_type, status, user_id, created_at, metadata_json
             FROM api_audit_logs
-            WHERE JSON_EXTRACT(metadata_json, '$.job_id') = ?
-               OR JSON_EXTRACT(metadata_json, '$.parent_job_id') = ?
-               OR JSON_EXTRACT(metadata_json, '$.fix_job_id') = ?
-               OR JSON_EXTRACT(metadata_json, '$.source_analyze_job_id') = ?
+            WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.job_id')) = ?
+               OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.parent_job_id')) = ?
+               OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.fix_job_id')) = ?
+               OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.child_job_id')) = ?
+               OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.source_analyze_job_id')) = ?
+               OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.latest_fix_job_id')) = ?
             ORDER BY created_at ASC
         `;
         
-        const rows = await db.query(sql, [jobId, jobId, jobId, jobId]);
+        const rows = await db.query(sql, [jobId, jobId, jobId, jobId, jobId, jobId]);
         res.json({ ok: true, events: rows });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
