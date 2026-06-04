@@ -500,7 +500,7 @@ class PreflightRegistrySyncService {
                     skipped_fixes_json = COALESCE(VALUES(skipped_fixes_json), skipped_fixes_json),
                     failed_fixes_json = COALESCE(VALUES(failed_fixes_json), failed_fixes_json),
                     artifact_list_json = COALESCE(VALUES(artifact_list_json), artifact_list_json),
-                    sync_error_json = VALUES(sync_error_json),
+                    sync_error_json = COALESCE(VALUES(sync_error_json), sync_error_json),
                     degraded = VALUES(degraded),
                     degraded_reasons_json = VALUES(degraded_reasons_json),
                     policy = COALESCE(VALUES(policy), policy),

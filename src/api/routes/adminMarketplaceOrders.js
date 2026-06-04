@@ -213,7 +213,7 @@ router.post('/:id/request-customer-action', async (req, res) => {
         const detail = await orderService.getOrderDetail(req.params.id);
         return res.json({ ok: true, order: detail.order });
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request customer action for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to request customer intervention for ${req.params.id}:`, err);
         return res.status(500).json({ ok: false, error: err.message });
     }
 });
@@ -714,7 +714,7 @@ router.post('/:id/remediation/run', async (req, res) => {
 
 /**
  * POST /api/admin/marketplace/orders/:id/customer-action/create
- * Creates a customer action for remediation-blocked orders (Phase 36.7).
+ * Creates a customer intervention for remediation-blocked orders (Phase 36.7).
  */
 router.post('/:id/customer-action/create', async (req, res) => {
     try {
@@ -732,7 +732,7 @@ router.post('/:id/customer-action/create', async (req, res) => {
         }
         return res.json(result);
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to create customer action for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to create customer intervention for ${req.params.id}:`, err);
         if (err.message === 'ORDER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
         }
@@ -742,7 +742,7 @@ router.post('/:id/customer-action/create', async (req, res) => {
 
 /**
  * GET /api/admin/marketplace/orders/:id/customer-action
- * Returns the current customer action state for an order (Phase 36.7).
+ * Returns the current customer intervention state for an order (Phase 36.7).
  */
 router.get('/:id/customer-action', async (req, res) => {
     try {
@@ -751,7 +751,7 @@ router.get('/:id/customer-action', async (req, res) => {
         const result = await customerActionService.getCustomerAction(req.params.id);
         return res.json(result);
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get customer action for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to get customer intervention for ${req.params.id}:`, err);
         if (err.message === 'ORDER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
         }
@@ -761,7 +761,7 @@ router.get('/:id/customer-action', async (req, res) => {
 
 /**
  * POST /api/admin/marketplace/orders/:id/customer-action/mark-notified
- * Marks the customer action as notified (Phase 36.7).
+ * Marks the customer intervention as notified (Phase 36.7).
  */
 router.post('/:id/customer-action/mark-notified', async (req, res) => {
     try {
@@ -776,7 +776,7 @@ router.post('/:id/customer-action/mark-notified', async (req, res) => {
         }
         return res.json(result);
     } catch (err) {
-        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark customer action notified for ${req.params.id}:`, err);
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to mark customer intervention notified for ${req.params.id}:`, err);
         if (err.message === 'ORDER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
         }
