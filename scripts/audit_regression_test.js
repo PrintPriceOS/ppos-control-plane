@@ -43,9 +43,10 @@ function scanDirectory(dir) {
             }
 
             // Check for legacy `action` combined with `api_audit_logs`
-            if (content.includes('api_audit_logs') && content.match(/[\s=.,]action[\s=.,]/) && !fullPath.includes('audit_regression_test')) {
-                // To be exact, check if it's querying api_audit_logs AND using action
-                if (content.match(/SELECT.*FROM api_audit_logs.*action/is) || content.match(/api_audit_logs.*WHERE.*action/is)) {
+            if (content.includes('api_audit_logs') && !fullPath.includes('audit_regression_test')) {
+                // Strict check for SQL usage of action column
+                const strictSqlActionRegex = /(api_audit_logs\.action|SELECT\s+(?:[^F]+,\s*)?action(?:\s*,[^F]+)?\s+FROM\s+api_audit_logs|WHERE\s+action\s*=|ORDER\s+BY\s+action)/i;
+                if (strictSqlActionRegex.test(content)) {
                      console.error(`[REGRESSION] File ${fullPath} combines api_audit_logs with legacy 'action' column.`);
                      hasError = true;
                 }

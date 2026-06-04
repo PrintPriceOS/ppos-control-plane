@@ -24,23 +24,24 @@ const upload = multer({
 });
 
 // Helper: Log operational audit trails persistently
-async function logAuditEvent({ tenantId, jobId, action, status, message, metadata, traceId }) {
+async function logPreflightAdminEvent({ tenantId, userId, jobId, eventType, status, message, metadata, traceId }) {
     try {
-        await db.query(`
-            INSERT INTO preflight_audit_events 
-            (tenant_id, job_id, action, status, message, metadata_json, trace_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [
-            tenantId || 'system',
-            jobId || null,
-            action,
-            status,
-            message || null,
-            metadata ? JSON.stringify(metadata) : null,
-            traceId || `trace_${Date.now()}`
-        ]);
+        const finalMetadata = {
+            job_id: jobId,
+            trace_id: traceId,
+            message: message,
+            ...metadata
+        };
+
+        await auditLoggerService.log({
+            type: eventType,
+            tenantId: tenantId || 'system',
+            userId: userId || 'system',
+            status: status || 'SUCCESS',
+            metadata: finalMetadata
+        });
     } catch (err) {
-        console.error('[ADMIN-PREFLIGHT-ROUTER] Failed to log audit event:', err.message);
+        console.error('[ADMIN-PREFLIGHT-ROUTER] Failed to log canonical audit event:', err.message);
     }
 }
 
@@ -419,9 +420,9 @@ router.get('/jobs', async (req, res) => {
             };
         });
 
-        await logAuditEvent({
+        await logPreflightAdminEvent({
             tenantId: context.tenantId,
-            action: 'LIST_JOBS',
+            eventType: 'PREFLIGHT_JOBS_LISTED',
             status: 'SUCCESS',
             traceId: context.traceId
         });
@@ -492,11 +493,11 @@ router.post('/jobs', upload.single('file'), async (req, res) => {
             }
         }
 
-        await logAuditEvent({ tenantId: context.tenantId, jobId: canonicalJobId, action: 'CREATE_JOB', status: 'SUCCESS', traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId: canonicalJobId, eventType: 'PREFLIGHT_JOB_CREATED', status: 'SUCCESS', traceId: context.traceId });
 
         res.status(201).json({ ok: true, job: upstreamResponse, source_status: 'LIVE_UPSTREAM' });
     } catch (err) {
-        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_JOB', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, eventType: 'PREFLIGHT_JOB_CREATED', status: 'FAILURE', message: err.message, traceId: context.traceId });
         return res.status(err.status || 502).json({
             ok: false,
             source_status: 'UPSTREAM_UNAVAILABLE',
@@ -578,7 +579,7 @@ router.get('/jobs/:jobId', async (req, res) => {
 
         const rawCanonical = livePayload || (localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null);
 
-        await logAuditEvent({ tenantId: localRecord?.tenant_id || context.tenantId, jobId, action: 'GET_JOB', status: 'SUCCESS', traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: localRecord?.tenant_id || context.tenantId, jobId, eventType: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', traceId: context.traceId });
 
         const safeParseLocal = str => {
             if (!str) return null;
@@ -732,20 +733,20 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
             authHeader: upstreamAuthHeader
         });
 
-        await logAuditEvent({
+        await logPreflightAdminEvent({
             tenantId: context.tenantId,
             jobId,
-            action: 'SYNC_JOB',
+            eventType: 'PREFLIGHT_JOB_SYNCED',
             status: 'SUCCESS',
             traceId: context.traceId
         });
 
         res.json({ ok: true, ...syncedResult, source_status: 'LIVE_UPSTREAM_SYNCED' });
     } catch (err) {
-        await logAuditEvent({
+        await logPreflightAdminEvent({
             tenantId: context.tenantId,
             jobId,
-            action: 'SYNC_JOB',
+            eventType: 'PREFLIGHT_JOB_SYNCED',
             status: 'FAILURE',
             message: err.message,
             traceId: context.traceId
@@ -944,9 +945,9 @@ router.post('/sync', async (req, res) => {
         });
     } catch (err) {
         console.error('[CONTROL][PREFLIGHT][SYNC-ERROR] Global preflight synchronization encountered an error:', err.message);
-        await logAuditEvent({
+        await logPreflightAdminEvent({
             tenantId: context.tenantId,
-            action: 'GLOBAL_SYNC',
+            eventType: 'PREFLIGHT_GLOBAL_SYNC_REQUESTED',
             status: 'FAILURE',
             message: err.message,
             traceId: context.traceId
@@ -1156,7 +1157,7 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
             });
         }
     } catch (err) {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_FIX', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId, eventType: 'PREFLIGHT_FIX_REQUEST_FAILED', status: 'FAILURE', message: err.message, traceId: context.traceId });
         
         const status = err.status || 502;
         if (status === 404 || err.message?.includes('404') || err.message?.includes('NOT_FOUND')) {
@@ -1172,7 +1173,7 @@ router.post(['/jobs/:jobId/actions/retry', '/jobs/:jobId/retry'], async (req, re
     const { jobId } = req.params;
     console.log(`[ADMIN-PREFLIGHT][RETRY] Triggering retry operation for job ${jobId}`);
     try {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_RETRY', status: 'ATTEMPTING', traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId, eventType: 'PREFLIGHT_RETRY_REQUESTED', status: 'ATTEMPTING', traceId: context.traceId });
 
         // For now re-run analysis only if original input exists, otherwise return controlled 409:
         // { ok:false, error:"RETRY_NOT_IMPLEMENTED", message:"Retry requires source input requeue support." }
@@ -1507,7 +1508,7 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
             res.setHeader('Content-Disposition', `attachment; filename="${defaultFilename}"`);
         }
         
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'SUCCESS', traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId, eventType: 'PREFLIGHT_ARTIFACT_DOWNLOAD_REQUESTED', status: 'SUCCESS', traceId: context.traceId });
 
         // Stream the bytes from upstream to the client
         streamResponse.stream.pipe(res);
@@ -1786,11 +1787,11 @@ router.post('/batches', upload.any(), async (req, res) => {
 
         const batchResult = await gateway.createBatch(form, context);
         
-        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_BATCH', status: 'SUCCESS', traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, eventType: 'PREFLIGHT_BATCH_CREATED', status: 'SUCCESS', traceId: context.traceId });
 
         res.status(201).json({ ok: true, batch: batchResult, source_status: 'LIVE_UPSTREAM' });
     } catch (err) {
-        await logAuditEvent({ tenantId: context.tenantId, action: 'CREATE_BATCH', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        await logPreflightAdminEvent({ tenantId: context.tenantId, eventType: 'PREFLIGHT_BATCH_CREATED', status: 'FAILURE', message: err.message, traceId: context.traceId });
         return res.status(err.status || 502).json({
             ok: false,
             source_status: 'UPSTREAM_UNAVAILABLE',
@@ -1875,7 +1876,8 @@ router.get('/audit', async (req, res) => {
     const context = buildGatewayContext(req);
     try {
         const { tenant, action, status, limit = 50, offset = 0 } = req.query;
-        let sql = 'SELECT * FROM preflight_audit_events WHERE 1=1';
+        const event_type = action;
+        let sql = 'SELECT * FROM api_audit_logs WHERE 1=1';
         const params = [];
 
         if (!req.actorContext?.isSuperAdmin) {
@@ -1886,7 +1888,7 @@ router.get('/audit', async (req, res) => {
             params.push(tenant);
         }
 
-        if (action) { sql += ' AND action = ?'; params.push(action); }
+        if (event_type) { sql += ' AND event_type = ?'; params.push(event_type); }
         if (status) { sql += ' AND status = ?'; params.push(status); }
 
         sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -1894,14 +1896,14 @@ router.get('/audit', async (req, res) => {
 
         const rows = await db.query(sql, params);
 
-        let countSql = 'SELECT COUNT(*) as cnt FROM preflight_audit_events WHERE 1=1';
+        let countSql = 'SELECT COUNT(*) as cnt FROM api_audit_logs WHERE 1=1';
         const countParams = [];
         if (!req.actorContext?.isSuperAdmin) {
             countSql += ' AND tenant_id = ?'; countParams.push(context.tenantId);
         } else if (tenant) {
             countSql += ' AND tenant_id = ?'; countParams.push(tenant);
         }
-        if (action) { countSql += ' AND action = ?'; countParams.push(action); }
+        if (event_type) { countSql += ' AND event_type = ?'; countParams.push(event_type); }
         if (status) { countSql += ' AND status = ?'; countParams.push(status); }
 
         const [countRows] = await db.query(countSql, countParams);
