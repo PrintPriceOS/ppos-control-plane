@@ -42,7 +42,7 @@ class ControlPlaneNotificationService {
                 expires_at
             ]);
 
-            const isDuplicate = result && result.affectedRows === 0;
+            const isDuplicate = result && result.affectedRows !== 1;
 
             if (isDuplicate) {
                 logger.info({

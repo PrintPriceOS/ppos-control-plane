@@ -40,7 +40,7 @@ async function run() {
             action_url: `/preflight/jobs/${jobId}`
         });
         
-        const [rows] = await db.query('SELECT * FROM control_plane_notifications WHERE id = ?', [notifId]);
+        const rows = await db.query('SELECT * FROM control_plane_notifications WHERE id = ?', [notifId]);
         if (rows.length === 1 && rows[0].title === 'Preflight Analysis Completed') {
             console.log("   ✅ Idempotency verified: duplicate ignored, state preserved.");
         } else {
