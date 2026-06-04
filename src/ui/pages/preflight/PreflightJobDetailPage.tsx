@@ -255,7 +255,7 @@ export const PreflightJobDetailPage: React.FC = () => {
     : null;
 }
 
-async function handleDownloadArtifact(artifact: any) {
+function triggerArtifactDownload(artifact: any) {
   const artifactId = getArtifactDownloadId(artifact);
 
   if (!artifactId) {
@@ -263,43 +263,17 @@ async function handleDownloadArtifact(artifact: any) {
     return;
   }
 
-  console.debug('[PREFLIGHT-UI][DOWNLOAD_ARTIFACT]', {
-    jobId,
-    artifactId,
-    artifactType: artifact?.type,
-    filename: artifact?.filename
-  });
+  const url =
+    artifact.download_url ||
+    `/api/admin/preflight/jobs/${encodeURIComponent(jobId!)}/artifacts/${encodeURIComponent(artifactId)}`;
 
-  try {
-    const url = `/api/admin/preflight/jobs/${encodeURIComponent(jobId!)}/artifacts/${encodeURIComponent(artifactId)}`;
-    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
-    const response = await fetch(url, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
-    
-    if (!response.ok) {
-      let message = 'Requested artifact could not be found.';
-      try {
-        const payload = await response.json();
-        message = payload.message || payload.error || message;
-      } catch {}
-      throw new Error(message);
-    }
-
-    const blob = await response.blob();
-    if (!blob || blob.size === 0) {
-      throw new Error('Downloaded artifact is empty.');
-    }
-
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = artifact?.filename || 'artifact.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch (err: any) {
-      alert(`Direct download error: ${err.message || 'File stream unavailable'}`);
-  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = artifact.filename || 'artifact.pdf';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 
@@ -799,7 +773,7 @@ async function handleDownloadArtifact(artifact: any) {
 
                   {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (
                     <button 
-                      onClick={() => handleDownloadArtifact(primaryItem)}
+                      onClick={() => triggerArtifactDownload(primaryItem)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
                       title={primaryItem.label}
                     >
@@ -822,7 +796,7 @@ async function handleDownloadArtifact(artifact: any) {
                         a.downloadable ? (
                           <button 
                             key={i}
-                            onClick={() => handleDownloadArtifact(a)}
+                            onClick={() => triggerArtifactDownload(a)}
                             className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
                             title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
                           >
@@ -860,7 +834,7 @@ async function handleDownloadArtifact(artifact: any) {
                           a.downloadable ? (
                             <button 
                               key={i}
-                              onClick={() => handleDownloadArtifact(a)}
+                              onClick={() => triggerArtifactDownload(a)}
                               className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
                               title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
                             >
