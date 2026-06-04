@@ -1220,7 +1220,8 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
             // Deduplicate logic
             const uniqueByHashOrName = new Map();
             liveArtifactsResponse.artifacts.forEach(a => {
-                 const key = a.checksum_sha256 || `${a.filename}_${a.size_bytes}`;
+                 const storageRef = a.storage_key || a.path || a.storagePath || '';
+                 const key = storageRef ? storageRef : `${a.filename}_${a.size_bytes}`;
                  if (!uniqueByHashOrName.has(key)) {
                      uniqueByHashOrName.set(key, { ...a, aliases: [a.alias || a.id] });
                  } else {
