@@ -185,13 +185,16 @@ export const PreflightJobDetailPage: React.FC = () => {
   // Determine certification blockage and action gating
   // "Do not block autofix only because analysis is DEGRADED/PARTIAL."
   // "If missingTools exist but degradedMode=true or realExtraction=true: do not block autofix."
-  const isFixBlocked = hasEnvFailure;
+  const isAutofix = payload.type === 'AUTOFIX' || registry.type === 'AUTOFIX' || (jobId || '').startsWith('fix_');
+  const isFixBlocked = hasEnvFailure || isAutofix;
   
   const integ = payload.analysisIntegrity || {};
   let certBlockedReason = payload.certificationBlockedReason || integ.certificationBlockedReason || '';
   if (!certBlockedReason && isFixBlocked) {
     if (hasEnvFailure) {
       certBlockedReason = 'Full environment failure blocks certification and fix invariants.';
+    } else if (isAutofix) {
+      certBlockedReason = 'This is already an AUTOFIX result. Open the parent ANALYZE job to trigger a new fix.';
     }
   }
 

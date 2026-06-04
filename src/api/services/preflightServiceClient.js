@@ -190,6 +190,17 @@ class PreflightServiceClient {
   }
 
   /**
+   * Fetch job artifacts from upstream service
+   */
+  async getJobArtifacts(upstreamJobId, authHeader = null, tenantId = null) {
+    const headers = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (tenantId) headers['X-Tenant-Id'] = tenantId;
+
+    return this._request('GET', `/api/preflight/jobs/${upstreamJobId}/artifacts`, null, headers);
+  }
+
+  /**
    * Trigger a native autofix operation for a job in the upstream service
    */
   async triggerJobFix(upstreamJobId, authHeader = null, tenantId = null, policyOrOptions = null) {

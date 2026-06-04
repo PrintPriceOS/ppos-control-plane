@@ -963,6 +963,11 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
     console.log(`[ADMIN-PREFLIGHT][FIX] Triggering fix operation for job ${jobId}`);
     try {
         const options = { ...(req.body || {}) };
+        
+        if (jobId.startsWith('fix_') || options.type === 'AUTOFIX') {
+            return res.status(409).json({ ok: false, error: 'FIX_ALREADY_AUTOFIX_JOB', message: 'This is already an AUTOFIX result. Open the parent ANALYZE job to trigger a new fix.' });
+        }
+
         if (options.policy) {
             options.policy = await resolveCanonicalPolicyId(options.policy, context);
         }
@@ -970,6 +975,9 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
         let jobPayload = null;
         try {
             jobPayload = await gateway.getJob(jobId, context);
+            if (jobPayload?.type === 'AUTOFIX') {
+                 return res.status(409).json({ ok: false, error: 'FIX_ALREADY_AUTOFIX_JOB', message: 'This is already an AUTOFIX result. Open the parent ANALYZE job to trigger a new fix.' });
+            }
         } catch (e) {
             console.warn(`[ADMIN-PREFLIGHT][FIX] Pre-fetch of live job payload failed for deriving autofix intent: ${e.message}`);
         }
@@ -1181,28 +1189,100 @@ router.post(['/jobs/:jobId/actions/retry', '/jobs/:jobId/retry'], async (req, re
 
 // --- 6. GET /api/admin/preflight/jobs/:jobId/artifacts ---
 router.get('/jobs/:jobId/artifacts', async (req, res) => {
+    const context = buildGatewayContext(req);
     const { jobId } = req.params;
+    console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-LIVE-HYDRATION-START] ${JSON.stringify({ jobId })}`);
     try {
         const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
         const localRecord = rows[0];
         const canonicalObj = localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null;
+        const syncError = localRecord?.sync_error_json ? (typeof localRecord.sync_error_json === 'string' ? JSON.parse(localRecord.sync_error_json) : localRecord.sync_error_json) : {};
 
-        const normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
+        let liveArtifactsResponse = null;
+        try {
+            liveArtifactsResponse = await preflightServiceClient.getJobArtifacts(jobId, context.Authorization, context.tenantId);
+            
+            // clear stale error
+            if (syncError.live_hydration_disabled) {
+                syncError.live_hydration_disabled = false;
+                await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
+            }
+        } catch (upstreamErr) {
+            console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-REGISTRY-FALLBACK] ${JSON.stringify({ jobId, reason: upstreamErr.message })}`);
+        }
 
+        let normalized = [];
+        let sourceStatus = 'PERSISTENT_REGISTRY';
         let downloadable_artifact_count = 0;
         let zero_byte_artifact_count = 0;
+        
+        if (liveArtifactsResponse && liveArtifactsResponse.physical_artifacts_ready && Array.isArray(liveArtifactsResponse.artifacts) && liveArtifactsResponse.artifacts.length > 0) {
+            // Deduplicate logic
+            const uniqueByHashOrName = new Map();
+            liveArtifactsResponse.artifacts.forEach(a => {
+                 const key = a.checksum_sha256 || `${a.filename}_${a.size_bytes}`;
+                 if (!uniqueByHashOrName.has(key)) {
+                     uniqueByHashOrName.set(key, { ...a, aliases: [a.alias || a.id] });
+                 } else {
+                     const existing = uniqueByHashOrName.get(key);
+                     if (a.alias && a.id && !existing.aliases.includes(a.alias)) existing.aliases.push(a.alias);
+                     if (a.id && !existing.aliases.includes(a.id)) existing.aliases.push(a.id);
+                     // if current is preferred alias (final_fixed_pdf or fixed_pdf)
+                     if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') {
+                         existing.alias = a.alias;
+                     }
+                 }
+            });
+            normalized = Array.from(uniqueByHashOrName.values());
+            
+            sourceStatus = 'LIVE_UPSTREAM';
+            
+            // persist
+            const newCanonical = canonicalObj || {};
+            newCanonical.artifacts = normalized;
+            newCanonical.artifact_summary = {
+                downloadable_artifact_count: liveArtifactsResponse.downloadable_artifact_count,
+                zero_byte_artifact_count: liveArtifactsResponse.zero_byte_artifact_count,
+                physical_artifacts_ready: liveArtifactsResponse.physical_artifacts_ready
+            };
+            if (localRecord) {
+                await db.query(`UPDATE preflight_job_registry SET artifact_list_json = ?, canonical_payload_json = ? WHERE job_id = ?`, [
+                    JSON.stringify(normalized),
+                    JSON.stringify(newCanonical),
+                    jobId
+                ]);
+            }
+            
+            downloadable_artifact_count = liveArtifactsResponse.downloadable_artifact_count;
+            zero_byte_artifact_count = liveArtifactsResponse.zero_byte_artifact_count;
+            
+            console.log(`[CONTROL][PREFLIGHT][ARTIFACTS-UPSTREAM-HYDRATED] ${JSON.stringify({ 
+                jobId, 
+                upstreamArtifactCount: liveArtifactsResponse.artifacts.length, 
+                normalizedArtifactCount: normalized.length,
+                downloadableArtifactCount: downloadable_artifact_count,
+                zeroByteArtifactCount: zero_byte_artifact_count,
+                physicalArtifactsReady: liveArtifactsResponse.physical_artifacts_ready
+            })}`);
+        } else {
+             normalized = normalizePreflightArtifacts(canonicalObj, localRecord, canonicalObj, jobId);
+             normalized.forEach(a => {
+                if (a.downloadable && a.size_bytes > 0) downloadable_artifact_count++;
+                if (!a.downloadable || a.size_bytes === 0) zero_byte_artifact_count++;
+             });
+             
+             if (normalized.length > 0) {
+                 sourceStatus = 'PERSISTENT_REGISTRY_HYDRATED';
+             }
+        }
+        
         let primary_fixed_pdf_selected = false;
         const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
 
         normalized.forEach(a => {
-            if (a.downloadable && a.size_bytes > 0) {
-                downloadable_artifact_count++;
-            }
-            if (!a.downloadable || a.size_bytes === 0) {
-                zero_byte_artifact_count++;
-            }
             if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
                 primary_fixed_pdf_selected = true;
+                a.primary = true;
             }
         });
 
@@ -1229,7 +1309,7 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
             zero_byte_artifact_count,
             physical_artifacts_ready,
             message,
-            source_status: 'PERSISTENT_REGISTRY' 
+            source_status: sourceStatus 
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
