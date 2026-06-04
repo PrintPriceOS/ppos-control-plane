@@ -22,27 +22,64 @@ class ControlPlaneNotificationService {
         expires_at = null
     }) {
         try {
-            await db.query(`
+            logger.info({
+                event: 'control_plane_notification_create_attempt',
+                message: '[CONTROL][NOTIFICATIONS][CREATE_ATTEMPT]',
+                notificationId: id,
+                tenantId: tenant_id,
+                userId: user_id
+            });
+
+            const [result] = await db.query(`
                 INSERT INTO control_plane_notifications 
                 (id, tenant_id, user_id, scope, type, severity, title, message, entity_type, entity_id, action_url, metadata_json, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    id = VALUES(id)
+                    id = id
             `, [
                 id, tenant_id, user_id, scope, type, severity, title, message, entity_type, entity_id, action_url,
-                metadata_json ? JSON.stringify(metadata_json) : null,
+                metadata_json ? (typeof metadata_json === 'string' ? metadata_json : JSON.stringify(metadata_json)) : null,
                 expires_at
             ]);
 
-            logger.info({
-                event: 'control_plane_notification_created',
-                notificationId: id,
-                tenantId: tenant_id,
-                userId: user_id,
-                type
-            });
+            const isDuplicate = result && result.affectedRows === 0;
 
-            return { id };
+            if (isDuplicate) {
+                logger.info({
+                    event: 'control_plane_notification_duplicate_reused',
+                    message: '[CONTROL][NOTIFICATIONS][CREATE_DUPLICATE_REUSED]',
+                    notificationId: id,
+                    tenantId: tenant_id,
+                    userId: user_id,
+                    type
+                });
+            } else {
+                logger.info({
+                    event: 'control_plane_notification_created',
+                    message: '[CONTROL][NOTIFICATIONS][CREATE_OK]',
+                    notificationId: id,
+                    tenantId: tenant_id,
+                    userId: user_id,
+                    type
+                });
+            }
+
+            const [rows] = await db.query(
+                `SELECT * FROM control_plane_notifications WHERE id = ? LIMIT 1`,
+                [id]
+            );
+
+            let row = Array.isArray(rows) ? rows[0] : rows;
+            
+            if (row && row.metadata_json && typeof row.metadata_json === 'string') {
+                try {
+                    row.metadata_json = JSON.parse(row.metadata_json);
+                } catch (e) {
+                    // Ignore parse error
+                }
+            }
+
+            return row;
         } catch (err) {
             logger.error({
                 event: 'control_plane_notification_creation_failed',
