@@ -41,6 +41,28 @@ function requireAdmin(req, res, next) {
     }
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (req.query.ticket) {
+            try {
+                const decoded = jwt.verify(req.query.ticket, JWT_SECRET, {
+                    audience: JWT_AUDIENCE,
+                    issuer: JWT_ISSUER
+                });
+                req.user = {
+                    id: decoded.sub,
+                    email: decoded.email,
+                    role: (decoded.role || 'VIEWER').toUpperCase(),
+                    tenantId: decoded.tenant_id,
+                    printhouseId: decoded.printhouse_id,
+                    scopes: decoded.scopes || [],
+                    authMode: 'JWT_TICKET',
+                    issuedAt: decoded.iat,
+                    expiresAt: decoded.exp
+                };
+                return next();
+            } catch (err) {
+                return fail(req, res, 'Invalid or expired download ticket');
+            }
+        }
         return fail(req, res, 'Bearer token required');
     }
 

@@ -856,10 +856,24 @@ router.get('/jobs/:jobId', async (req, res) => {
 
         const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
 
+        
+        if (sourceStatus === 'LIVE_UPSTREAM') {
+            console.log('[CONTROL][PREFLIGHT][STATUS-HYDRATED]', {
+                jobId,
+                registryStatus: localRecord?.status || 'UNKNOWN',
+                upstreamStatus: currentStatus,
+                displayStatus: mappedStatus,
+                source: 'LIVE_UPSTREAM'
+            });
+        }
         res.json({
             ok: true,
             jobId,
             status: mappedStatus,
+            display_status: mappedStatus,
+            upstream_status: currentStatus,
+            registry_status: localRecord?.status || 'UNKNOWN',
+            status_source: sourceStatus,
             source_status: sourceStatus,
             live_hydration_disabled: !!syncError?.live_hydration_disabled,
             progress,
@@ -1436,6 +1450,40 @@ function resolveArtifactIdForUpstream(jobId, artifactId) {
 
 // --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
 // --- 7. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
+
+// --- 7a. POST /api/admin/preflight/jobs/:jobId/artifacts/:artifactId/download-ticket ---
+router.post('/jobs/:jobId/artifacts/:artifactId/download-ticket', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId, artifactId } = req.params;
+
+    try {
+        const expiresInSec = 60;
+        const payload = {
+            sub: req.user.id,
+            email: req.user.email,
+            role: req.user.role,
+            tenant_id: req.user.tenantId,
+            printhouse_id: req.user.printhouseId,
+            scopes: req.user.scopes
+        };
+
+        const ticket = require('jsonwebtoken').sign(payload, process.env.JWT_SECRET, {
+            audience: process.env.JWT_AUDIENCE || 'ppos:control',
+            issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro',
+            expiresIn: expiresInSec
+        });
+
+        console.log('[CONTROL][PREFLIGHT][DOWNLOAD-TICKET-CREATED]', { jobId, artifactId, expiresInSec });
+
+        return res.json({
+            ok: true,
+            download_url: `/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}?ticket=${encodeURIComponent(ticket)}`
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'Failed to generate ticket' });
+    }
+});
+
 router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
@@ -1448,6 +1496,9 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         } catch (e) {}
     }
 
+    if (req.query.ticket) {
+        console.log('[CONTROL][PREFLIGHT][DOWNLOAD-TICKET-USED]', { jobId, artifactId });
+    }
     console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD-RESOLVE-START] ${JSON.stringify({ jobId, requestedArtifactId: artifactId })}`);
 
     try {

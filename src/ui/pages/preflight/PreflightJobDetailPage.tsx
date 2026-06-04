@@ -255,7 +255,7 @@ export const PreflightJobDetailPage: React.FC = () => {
     : null;
 }
 
-function triggerArtifactDownload(artifact: any) {
+async function triggerArtifactDownload(artifact: any) {
   const artifactId = getArtifactDownloadId(artifact);
 
   if (!artifactId) {
@@ -263,17 +263,30 @@ function triggerArtifactDownload(artifact: any) {
     return;
   }
 
-  const url =
-    artifact.download_url ||
-    `/api/admin/preflight/jobs/${encodeURIComponent(jobId!)}/artifacts/${encodeURIComponent(artifactId)}`;
+  try {
+    const ticketUrl = `/api/admin/preflight/jobs/${encodeURIComponent(jobId!)}/artifacts/${encodeURIComponent(artifactId)}/download-ticket`;
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const res = await fetch(ticketUrl, { 
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {} 
+    });
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = artifact.filename || 'artifact.pdf';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+    if (!res.ok) {
+        throw new Error('Could not request secure download ticket');
+    }
+
+    const { download_url } = await res.json();
+
+    const a = document.createElement('a');
+    a.href = download_url;
+    a.download = artifact.filename || 'artifact.pdf';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err: any) {
+    alert(`Download failed: ${err.message}`);
+  }
 }
 
 
