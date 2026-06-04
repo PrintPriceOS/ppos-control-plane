@@ -2054,7 +2054,10 @@ export async function listAdminPreflightArtifacts(jobId: string) {
     return adminFetch<{ ok: boolean, artifacts: any[], source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
 }
 
-export async function downloadAdminPreflightArtifact(jobId: string, artifactId: string) {
+export async function downloadAdminPreflightArtifact(jobId: string, artifactId: string, filename?: string) {
+    if (typeof artifactId !== 'string') {
+        throw new Error('artifactId must be a string');
+    }
     const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
     const res = await fetch(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
