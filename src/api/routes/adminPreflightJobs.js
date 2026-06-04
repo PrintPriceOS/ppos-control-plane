@@ -44,6 +44,24 @@ async function logAuditEvent({ tenantId, jobId, action, status, message, metadat
     }
 }
 
+// Helper: Canonical Phase 41 Audit Logging to api_audit_logs
+async function writePreflightAuditLog(eventType, status, tenantId, userId, metadata = {}) {
+    console.log(`[PREFLIGHT-AUDIT][WRITE_ATTEMPT] ${JSON.stringify({ event_type: eventType, job_id: metadata.job_id, fix_job_id: metadata.fix_job_id, parent_job_id: metadata.parent_job_id })}`);
+    try {
+        await auditLoggerService.log({
+            type: eventType,
+            tenantId: tenantId || 'system',
+            userId: userId || 'system',
+            status: status || 'SUCCESS',
+            metadata
+        });
+        console.log(`[PREFLIGHT-AUDIT][WRITE_OK] ${JSON.stringify({ event_type: eventType, job_id: metadata.job_id })}`);
+    } catch (err) {
+        console.error(`[PREFLIGHT-AUDIT][WRITE_FAILED] ${JSON.stringify({ event_type: eventType, job_id: metadata.job_id, error_message: err.message, error_code: err.code })}`);
+        throw err;
+    }
+}
+
 // Ensure all endpoints are authenticated and contextualized
 router.use((req, res, next) => {
     req.actorContext = resolveActorContext(req);
@@ -1039,54 +1057,41 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
                 WHERE job_id = ? AND JSON_TYPE(JSON_EXTRACT(canonical_payload_json, '$.fix_job_ids')) = 'ARRAY'
             `, [childJobId, jobId]);
 
-            await auditLoggerService.log({
-                tenantId: context.tenantId,
-                userId: context.operatorId,
-                eventType: 'PREFLIGHT_FIX_TRIGGERED',
-                status: 'SUCCESS',
-                metadata: {
-                    job_id: jobId,
-                    parent_job_id: jobId,
-                    fix_job_id: childJobId,
-                    actor: context.operatorId,
-                    actor_role: req.actorContext?.role || 'operator',
-                    policy_id: options.policy,
-                    requested_fixes: options.fixes,
-                    trace_id: context.traceId,
-                    source: "CONTROL_PLANE_PREFLIGHT_UI"
-                }
+            await writePreflightAuditLog('PREFLIGHT_FIX_TRIGGERED', 'SUCCESS', context.tenantId, context.operatorId, {
+                job_id: jobId,
+                parent_job_id: jobId,
+                fix_job_id: childJobId,
+                child_job_id: childJobId,
+                actor: context.operatorId,
+                actor_role: req.actorContext?.role || 'operator',
+                policy_id: options.policy,
+                requested_fixes: options.fixes,
+                trace_id: context.traceId,
+                source: "CONTROL_PLANE_PREFLIGHT_UI"
             });
 
-            await auditLoggerService.log({
-                tenantId: context.tenantId,
-                userId: context.operatorId,
-                eventType: 'PREFLIGHT_FIX_JOB_CREATED',
-                status: 'SUCCESS',
-                metadata: {
-                    job_id: childJobId,
-                    parent_job_id: jobId,
-                    fix_job_id: childJobId,
-                    actor: context.operatorId,
-                    actor_role: req.actorContext?.role || 'operator',
-                    trace_id: context.traceId,
-                    source: "CONTROL_PLANE_PREFLIGHT_UI"
-                }
+            await writePreflightAuditLog('PREFLIGHT_FIX_JOB_CREATED', 'SUCCESS', context.tenantId, context.operatorId, {
+                job_id: childJobId,
+                parent_job_id: jobId,
+                fix_job_id: childJobId,
+                child_job_id: childJobId,
+                source_analyze_job_id: jobId,
+                actor: context.operatorId,
+                actor_role: req.actorContext?.role || 'operator',
+                trace_id: context.traceId,
+                source: "CONTROL_PLANE_PREFLIGHT_UI"
             });
 
-            await auditLoggerService.log({
-                tenantId: context.tenantId,
-                userId: context.operatorId,
-                eventType: 'PREFLIGHT_FIX_JOB_LINKED_TO_PARENT',
-                status: 'SUCCESS',
-                metadata: {
-                    job_id: jobId,
-                    parent_job_id: jobId,
-                    fix_job_id: childJobId,
-                    actor: context.operatorId,
-                    actor_role: req.actorContext?.role || 'operator',
-                    trace_id: context.traceId,
-                    source: "CONTROL_PLANE_PREFLIGHT_UI"
-                }
+            await writePreflightAuditLog('PREFLIGHT_FIX_JOB_LINKED_TO_PARENT', 'SUCCESS', context.tenantId, context.operatorId, {
+                job_id: jobId,
+                parent_job_id: jobId,
+                fix_job_id: childJobId,
+                child_job_id: childJobId,
+                latest_fix_job_id: childJobId,
+                actor: context.operatorId,
+                actor_role: req.actorContext?.role || 'operator',
+                trace_id: context.traceId,
+                source: "CONTROL_PLANE_PREFLIGHT_UI"
             });
 
             // Check if downstream synchronously returned artifacts
@@ -1098,21 +1103,19 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
                     if (a.downloadable && a.size_bytes > 0) hasDownloadable = true;
                 });
                 if (!hasDownloadable && immediateArtifacts.length > 0) {
-                    await auditLoggerService.log({
-                        tenantId: context.tenantId,
-                        userId: context.operatorId,
-                        eventType: 'PREFLIGHT_ARTIFACTS_EMPTY_OR_UNAVAILABLE',
-                        status: 'WARNING',
-                        metadata: { job_id: childJobId, parent_job_id: jobId, trace_id: context.traceId }
+                    await writePreflightAuditLog('PREFLIGHT_ARTIFACTS_EMPTY_OR_UNAVAILABLE', 'WARNING', context.tenantId, context.operatorId, { 
+                        job_id: childJobId, 
+                        parent_job_id: jobId, 
+                        child_job_id: childJobId,
+                        trace_id: context.traceId 
                     });
                 } else if (hasDownloadable) {
                     artifacts_pending = false;
-                    await auditLoggerService.log({
-                        tenantId: context.tenantId,
-                        userId: context.operatorId,
-                        eventType: 'PREFLIGHT_FIXED_PDF_READY',
-                        status: 'SUCCESS',
-                        metadata: { job_id: childJobId, parent_job_id: jobId, trace_id: context.traceId }
+                    await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_READY', 'SUCCESS', context.tenantId, context.operatorId, { 
+                        job_id: childJobId, 
+                        parent_job_id: jobId, 
+                        child_job_id: childJobId,
+                        trace_id: context.traceId 
                     });
                 }
             }
@@ -1128,19 +1131,13 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
                 source_status: 'LIVE_UPSTREAM' 
             });
         } else {
-            await auditLoggerService.log({
-                tenantId: context.tenantId,
-                userId: context.operatorId,
-                eventType: 'PREFLIGHT_FIX_TRIGGERED',
-                status: 'WARNING',
-                metadata: {
-                    job_id: jobId,
-                    message: 'Fix triggered but no child job ID was returned upstream',
-                    actor: context.operatorId,
-                    actor_role: req.actorContext?.role || 'operator',
-                    trace_id: context.traceId,
-                    source: "CONTROL_PLANE_PREFLIGHT_UI"
-                }
+            await writePreflightAuditLog('PREFLIGHT_FIX_TRIGGERED', 'WARNING', context.tenantId, context.operatorId, {
+                job_id: jobId,
+                message: 'Fix triggered but no child job ID was returned upstream',
+                actor: context.operatorId,
+                actor_role: req.actorContext?.role || 'operator',
+                trace_id: context.traceId,
+                source: "CONTROL_PLANE_PREFLIGHT_UI"
             });
             await db.query('UPDATE preflight_job_registry SET status = ?, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
             res.json({ 
@@ -1275,8 +1272,16 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
     );
 
     try {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'ATTEMPTING', message: `Artifact: ${upstreamArtifactId}`, traceId: context.traceId });
-
+        await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_DOWNLOAD_REQUESTED', 'SUCCESS', context.tenantId, context.operatorId, {
+            job_id: jobId,
+            parent_job_id: jobId,
+            child_job_id: jobId,
+            artifact_id: upstreamArtifactId,
+            actor: context.operatorId,
+            actor_role: req.actorContext?.role || 'operator',
+            trace_id: context.traceId,
+            source: 'CONTROL_PLANE_PREFLIGHT_UI'
+        });
         // Resolve alias via normalized artifact list
         let resolvedArtifactId = upstreamArtifactId;
         let artifactRecord = null;
@@ -1299,7 +1304,17 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
 
         // Phase 41.2 Byte validation enforcement
         if (artifactRecord && (!artifactRecord.downloadable || artifactRecord.size_bytes === 0)) {
-            await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'FAILURE', message: 'Rejected 0 B artifact download attempt', traceId: context.traceId });
+            await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_DOWNLOAD_FAILED', 'WARNING', context.tenantId, context.operatorId, {
+                job_id: jobId,
+                parent_job_id: jobId,
+                child_job_id: jobId,
+                artifact_id: upstreamArtifactId,
+                actor: context.operatorId,
+                actor_role: req.actorContext?.role || 'operator',
+                message: 'Rejected 0 B artifact download attempt',
+                trace_id: context.traceId,
+                source: 'CONTROL_PLANE_PREFLIGHT_UI'
+            });
             return res.status(409).json({
                 ok: false,
                 error: "ARTIFACT_NOT_DOWNLOADABLE",
@@ -1327,7 +1342,17 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         // Stream the bytes from upstream to the client
         streamResponse.stream.pipe(res);
     } catch (err) {
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'DOWNLOAD_ARTIFACT', status: 'FAILURE', message: err.message, traceId: context.traceId });
+        await writePreflightAuditLog('PREFLIGHT_FIXED_PDF_DOWNLOAD_FAILED', 'FAILURE', context.tenantId, context.operatorId, {
+            job_id: jobId,
+            parent_job_id: jobId,
+            child_job_id: jobId,
+            artifact_id: upstreamArtifactId,
+            actor: context.operatorId,
+            actor_role: req.actorContext?.role || 'operator',
+            message: err.message,
+            trace_id: context.traceId,
+            source: 'CONTROL_PLANE_PREFLIGHT_UI'
+        });
         
         const status = err.status || 502;
         if (status === 404 || err.message?.includes('404') || err.message?.includes('NOT_FOUND')) {
@@ -1820,15 +1845,8 @@ router.post('/ui-audit', async (req, res) => {
         Object.keys(metadata).forEach(k => metadata[k] === undefined && delete metadata[k]);
 
         try {
-            await auditLoggerService.log({
-                tenantId: context.tenantId,
-                userId: context.operatorId,
-                eventType: event_type,
-                status: 'SUCCESS',
-                metadata
-            });
+            await writePreflightAuditLog(event_type, 'SUCCESS', context.tenantId, context.operatorId, metadata);
         } catch (auditErr) {
-            console.error(`[CONTROL][PREFLIGHT][UI-AUDIT] Failed to persist UI audit event: ${auditErr.message}`, auditErr);
             // Do not fail the frontend request if audit logger fails
             return res.status(200).json({ 
                 ok: true, 

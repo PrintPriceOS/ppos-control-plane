@@ -14,14 +14,24 @@ async function main() {
   try {
     console.log('[1/4] Testing Preflight UI Audit Logging mechanism...');
     
+    // Simulating POST /api/admin/preflight/ui-audit payload logic
+    const testUiEventId = `ui_${Date.now()}`;
     await auditLogger.log({
       type: 'PREFLIGHT_UPLOAD_PANEL_OPENED',
       tenantId: 'system',
       userId: 'smoke-tester@printprice.pro',
       status: 'SUCCESS',
-      metadata: { test_source: 'smoke_phase_41' }
+      metadata: { test_source: 'smoke_phase_41', job_id: testUiEventId }
     });
-    console.log('✅ Simulated PREFLIGHT_UPLOAD_PANEL_OPENED audit event successfully.');
+
+    const uiCheck = await db.query(`SELECT * FROM api_audit_logs WHERE event_type = 'PREFLIGHT_UPLOAD_PANEL_OPENED' AND JSON_EXTRACT(metadata_json, '$.job_id') = ?`, [testUiEventId]);
+    if (uiCheck.length === 0) {
+      console.error('❌ Failed to persist PREFLIGHT_UPLOAD_PANEL_OPENED to api_audit_logs.');
+      failed = true;
+    } else {
+      console.log('✅ Simulated PREFLIGHT_UPLOAD_PANEL_OPENED audit event successfully persisted to DB.');
+    }
+
 
     console.log('[2/4] Testing Audit Timeline Database Integration...');
     await db.query(`
@@ -51,6 +61,29 @@ async function main() {
     console.log('✅ GET /artifacts explicitly exports downloadable_artifact_count and zero_byte_artifact_count.');
     console.log('✅ GET /artifacts/:id intercepts 0 B artifacts returning 409 ARTIFACT_NOT_DOWNLOADABLE.');
 
+    console.log('[4/4] Phase 41.3: Assert Backend Fix Audit Write...');
+    await auditLogger.log({
+        type: 'PREFLIGHT_FIX_TRIGGERED',
+        tenantId: 'system',
+        userId: 'smoke-tester',
+        status: 'SUCCESS',
+        metadata: { job_id: testJobId, test_source: 'smoke_phase_41' }
+    });
+    const fixCheck = await db.query(`SELECT * FROM api_audit_logs WHERE event_type = 'PREFLIGHT_FIX_TRIGGERED' AND JSON_EXTRACT(metadata_json, '$.job_id') = ?`, [testJobId]);
+    if (fixCheck.length === 0) {
+        console.error('❌ Failed to persist PREFLIGHT_FIX_TRIGGERED to api_audit_logs.');
+        failed = true;
+    } else {
+        console.log('✅ Simulated PREFLIGHT_FIX_TRIGGERED audit event successfully persisted to DB.');
+    }
+
+    const allPreflightRows = await db.query(`SELECT COUNT(*) as cnt FROM api_audit_logs WHERE event_type LIKE 'PREFLIGHT%'`);
+    if (!allPreflightRows[0] || allPreflightRows[0].cnt === 0) {
+        console.error('❌ Expected at least one PREFLIGHT_* row in api_audit_logs, found 0.');
+        failed = true;
+    } else {
+        console.log(`✅ Verified ${allPreflightRows[0].cnt} PREFLIGHT_* rows exist in api_audit_logs.`);
+    }
 
   } catch (error) {
     console.error('❌ Unexpected Error during Phase 41 Smoke Test:', error);
