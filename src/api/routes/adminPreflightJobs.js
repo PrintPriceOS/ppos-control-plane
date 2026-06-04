@@ -769,201 +769,6 @@ router.get('/jobs/:jobId', async (req, res) => {
                 sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
             }
         }
-                printhouseId: r.printhouse_id,
-                operatorId: r.operator_id,
-                batchId: r.batch_id,
-                status: mappedStatus,
-                source_status: projection.source_status || r.status,
-                policy: r.policy,
-                type: r.type,
-                progress: r.progress,
-                fileSize: r.file_size_bytes,
-                filename: r.original_filename,
-                riskScore: r.risk_score,
-                riskLevel: r.risk_level,
-                issueCount: projection.issuesCount,
-                issuesCount: projection.issuesCount,
-                findingsCount: projection.findingsCount,
-                requestedFixes,
-                repairs,
-                fixes,
-                appliedFixes,
-                skippedFixes,
-                failedFixes,
-                requestedFixesCount: projectedRequestedFixesCount,
-                repairsCount: projection.repairsCount,
-                appliedFixesCount: projectedAppliedFixesCount,
-                skippedFixesCount: projectedSkippedFixesCount,
-                failedFixesCount: projectedFailedFixesCount,
-                requiresHumanReview: projection.requiresHumanReview,
-                productionCertified: projection.productionCertified,
-                reviewReasons: projection.reviewReasons,
-                degraded: !!r.degraded,
-                degradedReasons: safeParse(r.degraded_reasons_json),
-                createdAt: r.created_at,
-                updatedAt: r.updated_at,
-                lastSeenAt: r.last_seen_at,
-                lastSyncedAt: r.last_synced_at,
-                canonicalData
-            };
-        });
-
-        await logPreflightAdminEvent({
-            tenantId: context.tenantId,
-            eventType: 'PREFLIGHT_JOBS_LISTED',
-            status: 'SUCCESS',
-            traceId: context.traceId
-        });
-
-        res.json({ ok: true, total, jobs, source_status: 'PERSISTENT_REGISTRY' });
-    } catch (err) {
-        console.error('[ADMIN-PREFLIGHT-ROUTER] GET /jobs error:', err.message);
-        res.status(err.status || 500).json({ ok: false, error: { message: err.message } });
-    }
-});
-
-// --- 2. POST /api/admin/preflight/jobs ---
-router.post('/jobs', upload.single('file'), async (req, res) => {
-    const context = buildGatewayContext(req);
-    try {
-        if (!req.file) {
-            return res.status(400).json({ ok: false, error: { message: 'File payload is strictly required for execution.' } });
-        }
-
-        const rawPolicy = req.body.policy || context.policy || 'OFFSET_MODERN_COATED';
-        context.policy = await resolveCanonicalPolicyId(rawPolicy, context);
-        context.type = req.body.type || 'ANALYZE';
-
-        // Direct pass to Gateway preserving full contract
-        const upstreamResponse = await gateway.createJob(req.file.buffer, req.file.originalname, context);
-
-        const canonicalJobId = upstreamResponse.jobId || upstreamResponse.id || `job_${Date.now()}`;
-        const canonicalStatus = upstreamResponse.status || 'COMPLETED';
-
-        // Persist record honestly
-        await db.query(`
-            INSERT INTO preflight_job_registry 
-            (job_id, tenant_id, printhouse_id, operator_id, status, policy, type, progress, file_size_bytes, original_filename, canonical_payload_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-            status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
-        `, [
-            canonicalJobId,
-            context.tenantId,
-            context.printhouseId,
-            context.operatorId,
-            canonicalStatus,
-            context.policy,
-            context.type,
-            canonicalStatus === 'COMPLETED' ? 100 : 10,
-            req.file.size,
-            req.file.originalname,
-            JSON.stringify(upstreamResponse)
-        ]);
-
-        // Register output artifacts if available in canonical payload
-        if (upstreamResponse.artifacts && Array.isArray(upstreamResponse.artifacts)) {
-            for (const art of upstreamResponse.artifacts) {
-                const artId = art.id || art.artifactId || `art_${Date.now()}_${Math.random().toString(36).substr(2,5)}`;
-                await db.query(`
-                    INSERT IGNORE INTO preflight_artifact_registry 
-                    (artifact_id, job_id, tenant_id, artifact_type, filename, size_bytes, storage_path)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                `, [
-                    artId,
-                    canonicalJobId,
-                    context.tenantId,
-                    art.type || 'OUTPUT',
-                    art.filename || art.name || 'artifact.pdf',
-                    art.sizeBytes || art.size || 0,
-                    art.path || art.storageKey || ''
-                ]);
-            }
-        }
-
-        await logPreflightAdminEvent({ tenantId: context.tenantId, jobId: canonicalJobId, eventType: 'PREFLIGHT_JOB_CREATED', status: 'SUCCESS', traceId: context.traceId });
-
-        res.status(201).json({ ok: true, job: upstreamResponse, source_status: 'LIVE_UPSTREAM' });
-    } catch (err) {
-        await logPreflightAdminEvent({ tenantId: context.tenantId, eventType: 'PREFLIGHT_JOB_CREATED', status: 'FAILURE', message: err.message, traceId: context.traceId });
-        return res.status(err.status || 502).json({
-            ok: false,
-            source_status: 'UPSTREAM_UNAVAILABLE',
-            error: {
-                code: 'PREFLIGHT_UPSTREAM_ERROR',
-                message: err.message,
-                details: err.upstreamResponse || null
-            }
-        });
-    }
-});
-
-// --- 3. GET /api/admin/preflight/jobs/:jobId ---
-router.get('/jobs/:jobId', async (req, res) => {
-    const context = buildGatewayContext(req);
-    const { jobId } = req.params;
-    try {
-        const rows = await db.query('SELECT * FROM preflight_job_registry WHERE job_id = ?', [jobId]);
-        const localRecord = rows[0];
-
-        if (localRecord) {
-            verifyTenantScope(req, localRecord.tenant_id);
-        }
-
-        let syncError = localRecord?.sync_error_json ? (typeof localRecord.sync_error_json === 'string' ? JSON.parse(localRecord.sync_error_json) : localRecord.sync_error_json) : {};
-        let livePayload = null;
-        let sourceStatus = 'PERSISTENT_REGISTRY';
-
-        if (syncError.live_hydration_disabled) {
-            sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
-        } else {
-            try {
-                livePayload = await gateway.getJob(jobId, context);
-                
-                // On success, reset 404 count if it was incremented
-                if (syncError['404_count']) {
-                    delete syncError['404_count'];
-                    await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
-                }
-
-                if (livePayload) {
-                    sourceStatus = 'LIVE_UPSTREAM';
-                    const currentStatus = livePayload.status || localRecord?.status || 'COMPLETED';
-                    await db.query(`
-                        INSERT INTO preflight_job_registry 
-                        (job_id, tenant_id, status, canonical_payload_json)
-                        VALUES (?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE 
-                        status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
-                    `, [
-                        jobId,
-                        localRecord?.tenant_id || context.tenantId,
-                        currentStatus,
-                        JSON.stringify(livePayload)
-                    ]);
-                }
-            } catch (upstreamErr) {
-                const is404 = upstreamErr.status === 404 || upstreamErr.message?.includes('404') || upstreamErr.message?.includes('Job not found');
-                
-                if (is404 && localRecord) {
-                    syncError['404_count'] = (syncError['404_count'] || 0) + 1;
-                    if (syncError['404_count'] >= 3) {
-                        syncError.live_hydration_disabled = true;
-                        syncError.live_hydration_disabled_reason = 'UPSTREAM_404_REPEATED';
-                    }
-                    await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
-                }
-
-                if (!syncError.live_hydration_disabled) {
-                    console.warn(`[ADMIN-PREFLIGHT-ROUTER] Live hydration failed for ${jobId}, relying on persistent registry:`, upstreamErr.message);
-                }
-
-                if (!localRecord) {
-                    return res.status(upstreamErr.status || 404).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: `Job ${jobId} not found upstream or locally.` } });
-                }
-                sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
-            }
-        }
 
         const rawCanonical = livePayload || (localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null);
 
@@ -975,38 +780,36 @@ router.get('/jobs/:jobId', async (req, res) => {
             try { return JSON.parse(str); } catch(e) { return null; }
         };
 
-        const jobPayload = rawCanonical?.job || rawCanonical;
-
         const requestedFixes = localRecord ? safeParseLocal(localRecord.requested_fixes_json) : null;
         const repairs = localRecord ? safeParseLocal(localRecord.repairs_json) : null;
         const fixes = localRecord ? safeParseLocal(localRecord.fixes_json) : null;
         const appliedFixes = localRecord ? safeParseLocal(localRecord.applied_fixes_json) : null;
         const skippedFixes = localRecord ? safeParseLocal(localRecord.skipped_fixes_json) : null;
         const failedFixes = localRecord ? safeParseLocal(localRecord.failed_fixes_json) : null;
-        const fixCoverage = jobPayload?.fix_coverage || jobPayload?.result?.fix_coverage || null;
+        const fixCoverage = rawCanonical?.fix_coverage || rawCanonical?.result?.fix_coverage || null;
 
-        const currentStatus = jobPayload?.status || localRecord?.status || 'UNKNOWN';
+        const currentStatus = rawCanonical?.status || localRecord?.status || 'UNKNOWN';
 
         let progress = null;
         let issueCount = null;
         let degraded = null;
         let degradedReasons = null;
 
-        if (jobPayload) {
-            progress = isTerminalDiagnosticStatus(currentStatus) ? 100 : (jobPayload.progress || 10);
-            issueCount = collectFindings(jobPayload).length;
+        if (rawCanonical) {
+            progress = isTerminalDiagnosticStatus(currentStatus) ? 100 : (rawCanonical.progress || 10);
+            issueCount = collectFindings(rawCanonical).length;
             
             const statusUpper = currentStatus.toUpperCase();
-            const outcomeCategory = (jobPayload.outcomeCategory || jobPayload.outcome_category || '').toUpperCase();
-            const isDegradedMode = jobPayload.analysisIntegrity?.degradedMode === true || jobPayload.analysisIntegrity?.degraded_mode === true;
+            const outcomeCategory = (rawCanonical.outcomeCategory || rawCanonical.outcome_category || '').toUpperCase();
+            const isDegradedMode = rawCanonical.analysisIntegrity?.degradedMode === true || rawCanonical.analysisIntegrity?.degraded_mode === true;
             
             degraded = ['DEGRADED', 'PARTIAL', 'PARTIAL_ARTIFACTS'].includes(statusUpper) ||
                        ['DEGRADED_ANALYSIS', 'PARTIAL_ANALYSIS'].includes(outcomeCategory) ||
                        isDegradedMode ||
-                       jobPayload.degraded === true || 
-                       jobPayload.isDegraded === true;
+                       rawCanonical.degraded === true || 
+                       rawCanonical.isDegraded === true;
                        
-            degradedReasons = jobPayload.degraded_reasons || jobPayload.degradedReasons || null;
+            degradedReasons = rawCanonical.degraded_reasons || rawCanonical.degradedReasons || null;
             if (degraded && (!degradedReasons || degradedReasons.length === 0)) {
                 degradedReasons = [];
                 if (['DEGRADED', 'PARTIAL', 'PARTIAL_ARTIFACTS'].includes(statusUpper)) degradedReasons.push(`STATUS_DEGRADATION:${statusUpper}`);
@@ -1020,35 +823,35 @@ router.get('/jobs/:jobId', async (req, res) => {
             degradedReasons = safeParseLocal(localRecord.degraded_reasons_json);
         }
 
-        const projection = projectPreflightRegistryRecord(localRecord || {}, jobPayload);
-        const mappedStatus = mapPreflightStatus(localRecord?.type || jobPayload?.type, currentStatus, projection);
+        const projection = projectPreflightRegistryRecord(localRecord || {}, rawCanonical);
+        const mappedStatus = mapPreflightStatus(localRecord?.type || rawCanonical?.type, currentStatus, projection);
 
         const projectedRequestedFixesCount = Math.max(
             Number(projection.requestedFixesCount || 0),
             Array.isArray(requestedFixes) ? requestedFixes.length : 0,
-            Array.isArray(jobPayload?.requestedFixes) ? jobPayload.requestedFixes.length : 0,
-            Array.isArray(jobPayload?.requested_fixes) ? jobPayload.requested_fixes.length : 0
+            Array.isArray(rawCanonical?.requestedFixes) ? rawCanonical.requestedFixes.length : 0,
+            Array.isArray(rawCanonical?.requested_fixes) ? rawCanonical.requested_fixes.length : 0
         );
 
         const projectedAppliedFixesCount = Math.max(
             Number(projection.appliedFixesCount || 0),
             Array.isArray(appliedFixes) ? appliedFixes.length : 0,
-            Array.isArray(jobPayload?.appliedFixes) ? jobPayload.appliedFixes.length : 0,
-            Array.isArray(jobPayload?.applied_fixes) ? jobPayload.applied_fixes.length : 0
+            Array.isArray(rawCanonical?.appliedFixes) ? rawCanonical.appliedFixes.length : 0,
+            Array.isArray(rawCanonical?.applied_fixes) ? rawCanonical.applied_fixes.length : 0
         );
 
         const projectedSkippedFixesCount = Math.max(
             Number(projection.skippedFixesCount || 0),
             Array.isArray(skippedFixes) ? skippedFixes.length : 0,
-            Array.isArray(jobPayload?.skippedFixes) ? jobPayload.skippedFixes.length : 0,
-            Array.isArray(jobPayload?.skipped_fixes) ? jobPayload.skipped_fixes.length : 0
+            Array.isArray(rawCanonical?.skippedFixes) ? rawCanonical.skippedFixes.length : 0,
+            Array.isArray(rawCanonical?.skipped_fixes) ? rawCanonical.skipped_fixes.length : 0
         );
 
         const projectedFailedFixesCount = Math.max(
             Number(projection.failedFixesCount || 0),
             Array.isArray(failedFixes) ? failedFixes.length : 0,
-            Array.isArray(jobPayload?.failedFixes) ? jobPayload.failedFixes.length : 0,
-            Array.isArray(jobPayload?.failed_fixes) ? jobPayload.failed_fixes.length : 0
+            Array.isArray(rawCanonical?.failedFixes) ? rawCanonical.failedFixes.length : 0,
+            Array.isArray(rawCanonical?.failed_fixes) ? rawCanonical.failed_fixes.length : 0
         );
 
         const artifacts = normalizePreflightArtifacts(rawCanonical, localRecord, rawCanonical, jobId);
