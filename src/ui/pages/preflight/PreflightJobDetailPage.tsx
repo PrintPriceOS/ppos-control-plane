@@ -25,9 +25,11 @@ import {
   retryAdminPreflightJob, 
   downloadAdminPreflightArtifact,
   listAdminPreflightPolicies,
-  getAdminPreflightJobAuditTimeline
+  getAdminPreflightJobAuditTimeline,
+  getAdminPreflightGovernanceLedger
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
+import { GovernanceLedgerPanel } from "./GovernanceLedgerPanel";
 import { toDisplayText } from "../../lib/display";
 import { 
   isTerminalDiagnosticStatus,
@@ -101,6 +103,7 @@ export const PreflightJobDetailPage: React.FC = () => {
   const artifactsQ = useAdminQuery(`admin:preflight:artifacts:${jobId}`, () => listAdminPreflightArtifacts(jobId!), 10000);
   const policiesQ = useAdminQuery('admin:preflight:policies', () => listAdminPreflightPolicies(), 60000);
   const auditTimelineQ = useAdminQuery(`admin:preflight:job:${jobId}:audit-timeline`, () => getAdminPreflightJobAuditTimeline(jobId!), 15000);
+  const ledgerQ = useAdminQuery(`admin:preflight:job:${jobId}:governance-ledger`, () => getAdminPreflightGovernanceLedger(jobId!), 15000);
 
   if (jobQ.status === 'loading') {
     return (
@@ -667,6 +670,12 @@ async function triggerArtifactDownload(artifact: any) {
               </div>
             )}
           </div>
+
+          {/* Canonical Governance Ledger */}
+          <GovernanceLedgerPanel 
+             ledgerPayload={ledgerQ.data} 
+             onRefresh={() => ledgerQ.refetch()} 
+          />
 
           {/* Canonical Audit Ledger Timeline */}
           <div className="space-y-4">

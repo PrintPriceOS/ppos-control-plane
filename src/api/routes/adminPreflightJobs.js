@@ -16,6 +16,7 @@ const syncService = require('../services/preflightRegistrySyncService');
 const preflightServiceClient = require('../services/preflightServiceClient');
 const { isTerminalDiagnosticStatus, collectFindings, normalizePreflightArtifacts } = require('../services/preflightStatusHelpers');
 const auditLoggerService = require('../services/auditLoggerService');
+const governanceLedgerService = require('../services/preflightGovernanceLedgerService');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -2137,6 +2138,28 @@ router.post('/ui-audit', async (req, res) => {
         console.error(`[CONTROL][PREFLIGHT][UI-AUDIT] Internal error processing payload: ${err.message}`, err);
         // Return 200 with an error object rather than crashing the client with 500
         res.status(200).json({ ok: false, error: 'UI_AUDIT_INTERNAL_ERROR', message: err.message });
+    }
+});
+
+// --- 16.5 GET /api/admin/preflight/jobs/:jobId/governance-ledger ---
+router.get('/jobs/:jobId/governance-ledger', async (req, res) => {
+    const context = buildGatewayContext(req);
+    try {
+        const jobId = req.params.jobId;
+        const ledgerPayload = await governanceLedgerService.getGovernanceLedger(jobId, context);
+        
+        await logPreflightAdminEvent({ 
+            tenantId: context.tenantId, 
+            jobId, 
+            eventType: 'PREFLIGHT_GOVERNANCE_LEDGER_VIEWED', 
+            status: 'SUCCESS', 
+            traceId: context.traceId 
+        });
+
+        res.status(200).json(ledgerPayload);
+    } catch (err) {
+        console.error('[ADMIN-PREFLIGHT-ROUTER] GET /jobs/:jobId/governance-ledger error:', err.message);
+        res.status(500).json({ ok: false, error: 'GOVERNANCE_LEDGER_ERROR', message: err.message });
     }
 });
 
