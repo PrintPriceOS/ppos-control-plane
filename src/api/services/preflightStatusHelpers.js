@@ -303,15 +303,21 @@ function normalizePreflightArtifacts(jobPayload, registryRow, upstreamPayload, j
 
   for (const item of sourceArtifacts) {
     if (!item) continue;
-    if (typeof item === 'string') continue; // We already expanded strings previously, but if any sneak in, skip
+    if (typeof item === 'string') continue;
     
     const id = item.id || item.artifactId || item.artifact_id || `art_${Math.random().toString(36).substr(2,9)}`;
     const alias = inferAlias(item);
-    const key = `${id}-${alias}`;
+    
+    // Deduplicate by alias for known PDF types to avoid duplicate buttons
+    // For other types, deduplicate by alias + id
+    const isPrimaryPdf = ['fixed_pdf', 'final_fixed_pdf', 'certified_pdf', 'review_pdf', 'corrected_pdf', 'production_pdf', 'printable_pdf', 'repaired_pdf'].includes(alias);
+    const key = isPrimaryPdf ? `alias:${getLabel(alias)}` : `${id}-${alias}`;
     
     if (!seen.has(key)) {
       seen.add(key);
       const isPdf = alias.includes('pdf') || String(item.filename || '').toLowerCase().endsWith('.pdf') || String(item.type || '').toLowerCase().includes('pdf') || String(item.mime_type || '').includes('pdf');
+      
+      const size_bytes = item.sizeBytes || item.size_bytes || item.size || 0;
       
       normalized.push({
         id,
@@ -320,8 +326,8 @@ function normalizePreflightArtifacts(jobPayload, registryRow, upstreamPayload, j
         label: getLabel(alias),
         filename: item.filename || item.name || item.fileName || (isPdf ? 'artifact.pdf' : 'artifact.json'),
         mime_type: item.mime_type || item.mimeType || (isPdf ? 'application/pdf' : 'application/json'),
-        size_bytes: item.sizeBytes || item.size_bytes || item.size || 0,
-        downloadable: true,
+        size_bytes,
+        downloadable: size_bytes > 0,
         download_url: jobId ? `/api/admin/preflight/jobs/${jobId}/artifacts/${alias || id}` : null,
         source: item.storagePath || item.path || item.storageKey || 'upstream',
         priority: ALIAS_PRIORITY.indexOf(alias) !== -1 ? ALIAS_PRIORITY.indexOf(alias) : 999

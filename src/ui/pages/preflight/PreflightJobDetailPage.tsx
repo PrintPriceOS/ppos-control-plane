@@ -91,8 +91,9 @@ export const PreflightJobDetailPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   
   const [selectedPolicy, setSelectedPolicy] = useState('');
-  const [actionStatus, setActionStatus] = useState<'idle' | 'fixing' | 'retrying' | 'error'>('idle');
+  const [actionStatus, setActionStatus] = useState<'idle' | 'fixing' | 'retrying' | 'error' | 'success'>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [childFixJobId, setChildFixJobId] = useState<string | null>(null);
 
   // High-Fidelity unmocked queries
   const jobQ = useAdminQuery(`admin:preflight:job:${jobId}`, () => getAdminPreflightJob(jobId!), 5000);
@@ -201,11 +202,17 @@ export const PreflightJobDetailPage: React.FC = () => {
     if (!jobId || isFixBlocked) return;
     setActionStatus('fixing');
     setActionError(null);
+    setChildFixJobId(null);
     try {
-      await requestAdminPreflightFix(jobId, selectedPolicy ? { policy: selectedPolicy } : {});
+      const res = await requestAdminPreflightFix(jobId, selectedPolicy ? { policy: selectedPolicy } : {});
+      if (res && res.child_job_id) {
+        setChildFixJobId(res.child_job_id);
+      } else if (res && res.fix_job_id) {
+        setChildFixJobId(res.fix_job_id);
+      }
       await jobQ.refetch();
       await artifactsQ.refetch();
-      setActionStatus('idle');
+      setActionStatus('success');
     } catch (err: any) {
       console.error('[DETAIL-ACTION] Trigger fix error:', err);
       setActionError(err.message || 'Fix execution failed upstream.');
@@ -381,6 +388,27 @@ export const PreflightJobDetailPage: React.FC = () => {
             {actionError && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold">
                 Action Rejection: {actionError}
+              </div>
+            )}
+
+            {childFixJobId && (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                    <CheckCircleIcon className="w-4 h-4" />
+                    Fix job created: {childFixJobId}
+                  </h4>
+                  <p className="text-[10px] font-bold mt-1 text-emerald-700 dark:text-emerald-500">
+                    Fixed artifacts are ready in the Fix Result job.
+                  </p>
+                </div>
+                <Link 
+                  to={`/preflight/jobs/${childFixJobId}`} 
+                  className="px-4 py-2 bg-emerald-500 text-white text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  <span>Open Fix Result</span>
+                  <ArrowLeftIcon className="w-3 h-3 rotate-180" />
+                </Link>
               </div>
             )}
 
@@ -705,7 +733,7 @@ export const PreflightJobDetailPage: React.FC = () => {
 
               return (
                 <div className="space-y-4">
-                  {primaryItem && (
+                  {primaryItem && primaryItem.downloadable ? (
                     <button 
                       onClick={() => handleDirectDownload(primaryItem.alias || primaryItem.id, primaryItem.filename)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
@@ -714,23 +742,45 @@ export const PreflightJobDetailPage: React.FC = () => {
                       <DocumentArrowDownIcon className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
                       <span>Download Fixed PDF</span>
                     </button>
-                  )}
+                  ) : primaryItem && !primaryItem.downloadable ? (
+                    <div className="w-full flex flex-col items-center justify-center p-4 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-500">
+                      <DocumentIcon className="w-6 h-6 mb-2 text-slate-400" />
+                      <span className="text-xs font-bold text-center">Artifact registered but contains no downloadable bytes yet.</span>
+                      <button onClick={() => { jobQ.refetch(); artifactsQ.refetch(); }} className="mt-2 text-[10px] text-primary hover:underline font-black uppercase tracking-widest">
+                        Refresh Artifacts
+                      </button>
+                    </div>
+                  ) : null}
 
                   {secondaryItems.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {secondaryItems.map((a: any, i: number) => (
-                        <button 
-                          key={i}
-                          onClick={() => handleDirectDownload(a.alias || a.id, a.filename)}
-                          className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
-                          title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
-                        >
-                          <div className="flex items-center gap-2 truncate pr-2">
-                            <DocumentIcon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
-                            <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.label || a.alias || a.type}</span>
+                        a.downloadable ? (
+                          <button 
+                            key={i}
+                            onClick={() => handleDirectDownload(a.alias || a.id, a.filename)}
+                            className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
+                            title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
+                          >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <DocumentIcon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
+                              <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.label || a.alias || a.type}</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
+                          </button>
+                        ) : (
+                          <div 
+                            key={i}
+                            className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border opacity-50 cursor-not-allowed"
+                            title="Artifact registered but 0 bytes"
+                          >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <DocumentIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                              <span className="text-xs font-bold text-slate-500 truncate">{a.label || a.alias || a.type}</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">0 B</span>
                           </div>
-                          <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
-                        </button>
+                        )
                       ))}
                     </div>
                   )}

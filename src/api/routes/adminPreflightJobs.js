@@ -1016,11 +1016,112 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
 
         const responsePayload = await gateway.fixJob(jobId, options, context);
 
-        await db.query('UPDATE preflight_job_registry SET status = ?, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
+        const childJobId = responsePayload?.id || responsePayload?.jobId || responsePayload?.fix_job_id || responsePayload?.job_id;
 
-        await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_FIX', status: 'SUCCESS', traceId: context.traceId });
+        if (childJobId) {
+            await db.query(`
+                UPDATE preflight_job_registry 
+                SET status = 'PROCESSING', 
+                    updated_at = NOW(),
+                    canonical_payload_json = JSON_SET(COALESCE(canonical_payload_json, '{}'), '$.child_fix_job_id', ?)
+                WHERE job_id = ?
+            `, [childJobId, jobId]);
 
-        res.json({ ok: true, result: responsePayload, source_status: 'LIVE_UPSTREAM' });
+            await db.query(`
+                UPDATE preflight_job_registry 
+                SET canonical_payload_json = JSON_SET(COALESCE(canonical_payload_json, '{}'), '$.fix_job_ids', JSON_ARRAY(?))
+                WHERE job_id = ? AND JSON_EXTRACT(canonical_payload_json, '$.fix_job_ids') IS NULL
+            `, [childJobId, jobId]);
+
+            await db.query(`
+                UPDATE preflight_job_registry 
+                SET canonical_payload_json = JSON_ARRAY_APPEND(canonical_payload_json, '$.fix_job_ids', ?)
+                WHERE job_id = ? AND JSON_TYPE(JSON_EXTRACT(canonical_payload_json, '$.fix_job_ids')) = 'ARRAY'
+            `, [childJobId, jobId]);
+
+            await auditLoggerService.log({
+                tenantId: context.tenantId,
+                userId: context.operatorId,
+                eventType: 'PREFLIGHT_FIX_TRIGGERED',
+                status: 'SUCCESS',
+                metadata: {
+                    job_id: jobId,
+                    parent_job_id: jobId,
+                    fix_job_id: childJobId,
+                    actor: context.operatorId,
+                    actor_role: req.actorContext?.role || 'operator',
+                    policy_id: options.policy,
+                    requested_fixes: options.fixes,
+                    trace_id: context.traceId,
+                    source: "CONTROL_PLANE_PREFLIGHT_UI"
+                }
+            });
+
+            await auditLoggerService.log({
+                tenantId: context.tenantId,
+                userId: context.operatorId,
+                eventType: 'PREFLIGHT_FIX_JOB_CREATED',
+                status: 'SUCCESS',
+                metadata: {
+                    job_id: childJobId,
+                    parent_job_id: jobId,
+                    fix_job_id: childJobId,
+                    actor: context.operatorId,
+                    actor_role: req.actorContext?.role || 'operator',
+                    trace_id: context.traceId,
+                    source: "CONTROL_PLANE_PREFLIGHT_UI"
+                }
+            });
+
+            await auditLoggerService.log({
+                tenantId: context.tenantId,
+                userId: context.operatorId,
+                eventType: 'PREFLIGHT_FIX_JOB_LINKED_TO_PARENT',
+                status: 'SUCCESS',
+                metadata: {
+                    job_id: jobId,
+                    parent_job_id: jobId,
+                    fix_job_id: childJobId,
+                    actor: context.operatorId,
+                    actor_role: req.actorContext?.role || 'operator',
+                    trace_id: context.traceId,
+                    source: "CONTROL_PLANE_PREFLIGHT_UI"
+                }
+            });
+
+            res.json({ 
+                ok: true, 
+                child_job_id: childJobId,
+                fix_job_id: childJobId,
+                parent_job_id: jobId,
+                status: responsePayload?.status || 'CREATED',
+                artifacts_pending: true,
+                result: responsePayload, 
+                source_status: 'LIVE_UPSTREAM' 
+            });
+        } else {
+            await auditLoggerService.log({
+                tenantId: context.tenantId,
+                userId: context.operatorId,
+                eventType: 'PREFLIGHT_FIX_TRIGGERED',
+                status: 'WARNING',
+                metadata: {
+                    job_id: jobId,
+                    message: 'Fix triggered but no child job ID was returned upstream',
+                    actor: context.operatorId,
+                    actor_role: req.actorContext?.role || 'operator',
+                    trace_id: context.traceId,
+                    source: "CONTROL_PLANE_PREFLIGHT_UI"
+                }
+            });
+            await db.query('UPDATE preflight_job_registry SET status = ?, updated_at = NOW() WHERE job_id = ?', ['PROCESSING', jobId]);
+            res.json({ 
+                ok: true, 
+                warning: 'No child job identity returned from upstream',
+                result: responsePayload, 
+                source_status: 'LIVE_UPSTREAM' 
+            });
+        }
     } catch (err) {
         await logAuditEvent({ tenantId: context.tenantId, jobId, action: 'REQUEST_FIX', status: 'FAILURE', message: err.message, traceId: context.traceId });
         
@@ -1581,8 +1682,13 @@ router.get('/governance', async (req, res) => {
 router.post('/ui-audit', async (req, res) => {
     const context = buildGatewayContext(req);
     try {
-        const { event_type, jobId, filename, file_size, execution_mode, policy_id, artifact_alias, artifact_id } = req.body || {};
-        
+        const payload = req.body || {};
+        const { event_type, metadata: payloadMetadata } = payload;
+
+        if (!event_type) {
+            return res.status(400).json({ ok: false, error: 'INVALID_PAYLOAD', message: 'Missing event_type' });
+        }
+
         const ALLOWED_EVENTS = [
             'PREFLIGHT_UPLOAD_PANEL_OPENED',
             'PREFLIGHT_FILE_SELECTED',
@@ -1590,15 +1696,29 @@ router.post('/ui-audit', async (req, res) => {
             'PREFLIGHT_JOB_SUBMITTED',
             'PREFLIGHT_ARTIFACT_REFRESH_REQUESTED',
             'PREFLIGHT_ARTIFACT_DOWNLOAD_REQUESTED',
-            'PREFLIGHT_RETRY_TRIGGERED'
+            'PREFLIGHT_RETRY_TRIGGERED',
+            'PREFLIGHT_FIXED_PDF_DOWNLOAD_REQUESTED',
+            'PREFLIGHT_FIXED_PDF_DOWNLOAD_FAILED'
         ];
 
         if (!ALLOWED_EVENTS.includes(event_type)) {
-            return res.status(400).json({ ok: false, error: 'INVALID_EVENT_TYPE', message: `Event ${event_type} is not allowlisted for UI telemetry` });
+            console.warn(`[CONTROL][PREFLIGHT][UI-AUDIT] Rejected unauthorized event type: ${event_type}`);
+            return res.status(400).json({ ok: false, error: 'INVALID_EVENT_TYPE', message: 'Event type not allowed' });
         }
 
+        const pm = payloadMetadata || {};
+        const {
+            job_id,
+            filename,
+            file_size,
+            execution_mode,
+            policy_id,
+            artifact_alias,
+            artifact_id
+        } = pm;
+
         const metadata = {
-            job_id: jobId,
+            job_id: job_id ? String(job_id) : undefined,
             tenant_id: context.tenantId,
             user_id: context.operatorId,
             actor: context.operatorId,
@@ -1638,10 +1758,13 @@ router.get('/jobs/:jobId/audit-timeline', async (req, res) => {
             SELECT id, event_type, status, user_id, created_at, metadata_json
             FROM api_audit_logs
             WHERE JSON_EXTRACT(metadata_json, '$.job_id') = ?
+               OR JSON_EXTRACT(metadata_json, '$.parent_job_id') = ?
+               OR JSON_EXTRACT(metadata_json, '$.fix_job_id') = ?
+               OR JSON_EXTRACT(metadata_json, '$.source_analyze_job_id') = ?
             ORDER BY created_at ASC
         `;
         
-        const rows = await db.query(sql, [jobId]);
+        const rows = await db.query(sql, [jobId, jobId, jobId, jobId]);
         res.json({ ok: true, events: rows });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
