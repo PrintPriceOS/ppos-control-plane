@@ -15,6 +15,7 @@ const db = require('../services/mysqlClient');
 const syncService = require('../services/preflightRegistrySyncService');
 const preflightServiceClient = require('../services/preflightServiceClient');
 const { isTerminalDiagnosticStatus, collectFindings, normalizePreflightArtifacts } = require('../services/preflightStatusHelpers');
+const auditLoggerService = require('../services/auditLoggerService');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -1573,6 +1574,132 @@ router.get('/governance', async (req, res) => {
         res.json({ ok: true, total, governanceEvents: rows, source_status: 'PERSISTENT_REGISTRY' });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- 16. POST /api/admin/preflight/ui-audit ---
+router.post('/ui-audit', async (req, res) => {
+    const context = buildGatewayContext(req);
+    try {
+        const { event_type, jobId, filename, file_size, execution_mode, policy_id, artifact_alias, artifact_id } = req.body || {};
+        
+        const ALLOWED_EVENTS = [
+            'PREFLIGHT_UPLOAD_PANEL_OPENED',
+            'PREFLIGHT_FILE_SELECTED',
+            'PREFLIGHT_UPLOAD_REJECTED',
+            'PREFLIGHT_JOB_SUBMITTED',
+            'PREFLIGHT_ARTIFACT_REFRESH_REQUESTED',
+            'PREFLIGHT_ARTIFACT_DOWNLOAD_REQUESTED',
+            'PREFLIGHT_RETRY_TRIGGERED'
+        ];
+
+        if (!ALLOWED_EVENTS.includes(event_type)) {
+            return res.status(400).json({ ok: false, error: 'INVALID_EVENT_TYPE', message: `Event ${event_type} is not allowlisted for UI telemetry` });
+        }
+
+        const metadata = {
+            job_id: jobId,
+            tenant_id: context.tenantId,
+            user_id: context.operatorId,
+            actor: context.operatorId,
+            actor_role: req.actorContext?.role || 'operator',
+            filename: filename ? String(filename).substring(0, 255) : undefined,
+            file_size: file_size ? Number(file_size) : undefined,
+            execution_mode: execution_mode ? String(execution_mode).substring(0, 100) : undefined,
+            policy_id: policy_id ? String(policy_id).substring(0, 100) : undefined,
+            artifact_alias: artifact_alias ? String(artifact_alias).substring(0, 100) : undefined,
+            artifact_id: artifact_id ? String(artifact_id).substring(0, 100) : undefined,
+            trace_id: context.traceId,
+            request_id: context.requestId,
+            source: 'CONTROL_PLANE_PREFLIGHT_UI'
+        };
+
+        Object.keys(metadata).forEach(k => metadata[k] === undefined && delete metadata[k]);
+
+        await auditLoggerService.log({
+            tenantId: context.tenantId,
+            userId: context.operatorId,
+            eventType: event_type,
+            status: 'SUCCESS',
+            metadata
+        });
+
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- 17. GET /api/admin/preflight/jobs/:jobId/audit-timeline ---
+router.get('/jobs/:jobId/audit-timeline', async (req, res) => {
+    try {
+        const jobId = req.params.jobId;
+        const sql = `
+            SELECT id, event_type, status, user_id, created_at, metadata_json
+            FROM api_audit_logs
+            WHERE JSON_EXTRACT(metadata_json, '$.job_id') = ?
+            ORDER BY created_at ASC
+        `;
+        
+        const rows = await db.query(sql, [jobId]);
+        res.json({ ok: true, events: rows });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- 18. GET /api/admin/preflight/jobs/:jobId/artifacts/:artifactId ---
+router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
+    const context = buildGatewayContext(req);
+    try {
+        const { jobId, artifactId } = req.params;
+        
+        let registryRow = null;
+        try {
+            const rows = await db.query('SELECT artifact_list_json, sync_error_json FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+            if (rows.length > 0) registryRow = rows[0];
+        } catch (e) {}
+        
+        const syncError = registryRow && registryRow.sync_error_json ? (typeof registryRow.sync_error_json === 'string' ? JSON.parse(registryRow.sync_error_json) : registryRow.sync_error_json) : {};
+        const isStale = !!syncError.live_hydration_disabled;
+        
+        const normalized = normalizePreflightArtifacts(null, registryRow, null, jobId);
+        const target = normalized.find(a => a.alias === artifactId || a.id === artifactId);
+        
+        const actualArtifactId = target ? target.id : artifactId;
+        
+        if (isStale) {
+            return res.status(404).json({
+                ok: false,
+                error: 'STALE_REGISTRY_ONLY',
+                message: 'This job is served from persistent registry. Upstream live hydration is unavailable and the artifact is not physically available locally.'
+            });
+        }
+        
+        const streamResponse = await preflightServiceClient.downloadArtifact(jobId, actualArtifactId, null, context.tenantId);
+        
+        res.setHeader('Content-Type', streamResponse.headers?.['content-type'] || target?.mime_type || 'application/octet-stream');
+        if (streamResponse.headers?.['content-disposition']) {
+            res.setHeader('Content-Disposition', streamResponse.headers['content-disposition']);
+        } else {
+            const filename = target?.filename || `artifact-${actualArtifactId}`;
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        }
+        
+        if (streamResponse.stream && typeof streamResponse.stream.pipe === 'function') {
+            streamResponse.stream.pipe(res);
+        } else {
+            return res.send(Buffer.from(streamResponse.stream || streamResponse.data || []));
+        }
+    } catch (err) {
+        if (err.status === 404 || err.message?.includes('404') || err.message?.includes('not found')) {
+             return res.status(404).json({
+                ok: false,
+                error: 'ARTIFACT_NOT_FOUND',
+                message: err.message
+             });
+        }
+        res.status(err.status || 500).json({ ok: false, error: { message: err.message } });
     }
 });
 

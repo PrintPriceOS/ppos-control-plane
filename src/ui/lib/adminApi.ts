@@ -1431,6 +1431,21 @@ export async function getLargeDocumentJobs(params: { limit?: number; offset?: nu
     return getPreflightJobs({ ...params, largeOnly: true });
 }
 
+export async function logAdminPreflightUiAudit(payload: any): Promise<any> {
+  const res = await adminFetch<any>('/api/admin/preflight/ui-audit', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(res.error?.message || 'Failed to log UI audit event');
+  return res;
+}
+
+export async function getAdminPreflightJobAuditTimeline(jobId: string): Promise<any> {
+  const res = await adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/audit-timeline`);
+  if (!res.ok) throw new Error(res.error?.message || 'Failed to fetch job audit timeline');
+  return res;
+}
+
 export async function getAdminPreflightPolicies(): Promise<{ ok: boolean; source?: string; policies: any[] }> {
     try {
         const res = await adminFetch<any>('/api/admin/preflight/policies');

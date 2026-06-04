@@ -23,7 +23,8 @@ import {
   requestAdminPreflightFix, 
   retryAdminPreflightJob, 
   downloadAdminPreflightArtifact,
-  listAdminPreflightPolicies
+  listAdminPreflightPolicies,
+  getAdminPreflightJobAuditTimeline
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { toDisplayText } from "../../lib/display";
@@ -97,6 +98,7 @@ export const PreflightJobDetailPage: React.FC = () => {
   const jobQ = useAdminQuery(`admin:preflight:job:${jobId}`, () => getAdminPreflightJob(jobId!), 5000);
   const artifactsQ = useAdminQuery(`admin:preflight:artifacts:${jobId}`, () => listAdminPreflightArtifacts(jobId!), 10000);
   const policiesQ = useAdminQuery('admin:preflight:policies', () => listAdminPreflightPolicies(), 60000);
+  const auditTimelineQ = useAdminQuery(`admin:preflight:job:${jobId}:audit-timeline`, () => getAdminPreflightJobAuditTimeline(jobId!), 15000);
 
   if (jobQ.status === 'loading') {
     return (
@@ -596,6 +598,48 @@ export const PreflightJobDetailPage: React.FC = () => {
                   <span>Created: {new Date(payload.createdAt || registry.createdAt || Date.now()).toLocaleString()}</span>
                   <span>Updated: {new Date(payload.updatedAt || registry.updatedAt || Date.now()).toLocaleString()}</span>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Canonical Audit Ledger Timeline */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                Canonical Preflight Audit Ledger
+              </span>
+              <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 text-[9px] font-black uppercase tracking-widest">api_audit_logs</span>
+            </div>
+            
+            {auditTimelineQ.status === 'loading' ? (
+              <div className="h-10 flex items-center justify-center border ppos-border ppos-surface-muted">
+                <ArrowPathIcon className="w-4 h-4 text-primary animate-spin" />
+              </div>
+            ) : auditTimelineQ.data?.events?.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                {auditTimelineQ.data.events.map((e: any, index: number) => (
+                  <div key={index} className="ppos-surface-muted p-3 border ppos-border flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{e.event_type}</span>
+                      <span className="font-mono text-[9px] text-slate-400">{new Date(e.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-black text-slate-500">Actor:</span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{e.user_id || e.actor || 'System'}</span>
+                      <span className="text-[10px] font-black text-slate-500 ml-2">Status:</span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{e.status}</span>
+                    </div>
+                    {e.metadata_json && (
+                      <pre className="text-[9px] text-slate-500 bg-white/5 p-1 mt-1 font-mono overflow-x-auto">
+                        {JSON.stringify(e.metadata_json, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center border ppos-border ppos-surface-muted">
+                <p className="text-xs font-bold text-slate-400 italic">No global audit records found for this Job ID.</p>
               </div>
             )}
           </div>

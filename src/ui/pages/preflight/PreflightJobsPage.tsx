@@ -30,6 +30,7 @@ import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { PreflightUploadModal } from "./PreflightUploadModal";
+import { PreflightUploadPanel } from "../../components/PreflightUploadPanel";
 import { short } from "../../lib/formatters";
 import { collectFindings, mapPhase10Status } from "../../lib/preflightStatusHelpers";
 
@@ -163,6 +164,18 @@ export const PreflightJobsPage: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      <div className="mt-4">
+        <PreflightUploadPanel 
+          onSuccess={() => {
+            jobsQ.refetch();
+            batchesQ.refetch();
+            auditQ.refetch();
+            governanceQ.refetch();
+            storageQ.refetch();
+          }}
+        />
+      </div>
 
       <PreflightUploadModal 
         isOpen={isUploadOpen}
