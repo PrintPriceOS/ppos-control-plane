@@ -1235,15 +1235,39 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
                  }
             });
             normalized = Array.from(uniqueByHashOrName.values()).map(a => {
-                a.download_id = a.alias || a.id;
-                if (!a.label) {
-                    if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') a.label = 'Fixed PDF';
-                    else if (a.alias === 'certified_pdf') a.label = 'Certified PDF';
-                    else if (a.alias === 'fix_audit') a.label = 'Fix Audit JSON';
-                    else if (a.type === 'output_file') a.label = 'Output PDF';
-                }
-                a.download_url = `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
                 if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+                if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
+                if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
+
+                if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
+                    a.type = 'fixed_pdf';
+                    a.alias = 'fixed_pdf';
+                    a.download_id = 'fixed_pdf';
+                    a.label = 'Fixed PDF';
+                    if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
+                    if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
+                } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
+                    a.type = 'certified_pdf';
+                    a.alias = 'certified_pdf';
+                    a.download_id = 'certified_pdf';
+                    a.label = 'Certified PDF';
+                    if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
+                } else if (a.type === 'fix_audit') {
+                    a.type = 'fix_audit';
+                    a.alias = 'fix_audit';
+                    a.download_id = 'fix_audit';
+                    a.label = 'Fix Audit JSON';
+                    if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
+                    if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
+                } else if (a.type === 'output_file') {
+                    a.alias = 'output_file';
+                    a.download_id = a.id || a.download_id || 'output_file';
+                    a.label = 'Output PDF';
+                } else {
+                    a.download_id = a.download_id || a.alias || a.id;
+                }
+
+                a.download_url = `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
                 return a;
             });
             
@@ -1292,15 +1316,39 @@ router.get('/jobs/:jobId/artifacts', async (req, res) => {
         const primaryAliasCandidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'production_pdf', 'printable_pdf'];
 
         normalized.forEach(a => {
-            a.download_id = a.download_id || a.alias || a.id;
-            if (!a.label) {
-                if (a.alias === 'fixed_pdf' || a.alias === 'final_fixed_pdf') a.label = 'Fixed PDF';
-                else if (a.alias === 'certified_pdf') a.label = 'Certified PDF';
-                else if (a.alias === 'fix_audit') a.label = 'Fix Audit JSON';
-                else if (a.type === 'output_file') a.label = 'Output PDF';
-            }
-            a.download_url = a.download_url || `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
             if (!Array.isArray(a.aliases)) a.aliases = a.alias ? [a.alias] : [];
+            if (a.id && !a.aliases.includes(a.id)) a.aliases.push(a.id);
+            if (a.download_id && !a.aliases.includes(a.download_id)) a.aliases.push(a.download_id);
+
+            if (a.type === 'fixed_pdf' || a.type === 'final_fixed_pdf' || a.filename === 'fixed.pdf') {
+                a.type = 'fixed_pdf';
+                a.alias = 'fixed_pdf';
+                a.download_id = 'fixed_pdf';
+                a.label = 'Fixed PDF';
+                if (!a.aliases.includes('fixed_pdf')) a.aliases.push('fixed_pdf');
+                if (!a.aliases.includes('final_fixed_pdf')) a.aliases.push('final_fixed_pdf');
+            } else if (a.type === 'certified_pdf' || a.filename === 'certified.pdf') {
+                a.type = 'certified_pdf';
+                a.alias = 'certified_pdf';
+                a.download_id = 'certified_pdf';
+                a.label = 'Certified PDF';
+                if (!a.aliases.includes('certified_pdf')) a.aliases.push('certified_pdf');
+            } else if (a.type === 'fix_audit') {
+                a.type = 'fix_audit';
+                a.alias = 'fix_audit';
+                a.download_id = 'fix_audit';
+                a.label = 'Fix Audit JSON';
+                if (!a.aliases.includes('fix_audit')) a.aliases.push('fix_audit');
+                if (!a.aliases.includes('fix_audit_json')) a.aliases.push('fix_audit_json');
+            } else if (a.type === 'output_file') {
+                a.alias = 'output_file';
+                a.download_id = a.id || a.download_id || 'output_file';
+                a.label = 'Output PDF';
+            } else {
+                a.download_id = a.download_id || a.alias || a.id;
+            }
+
+            a.download_url = a.download_url || `/api/admin/preflight/jobs/${jobId}/artifacts/${a.download_id}`;
 
             if (a.downloadable && a.size_bytes > 0 && primaryAliasCandidates.includes(a.alias)) {
                 primary_fixed_pdf_selected = true;
