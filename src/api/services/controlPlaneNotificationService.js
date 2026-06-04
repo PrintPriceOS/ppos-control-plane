@@ -30,7 +30,7 @@ class ControlPlaneNotificationService {
                 userId: user_id
             });
 
-            const [result] = await db.query(`
+            const result = await db.query(`
                 INSERT INTO control_plane_notifications 
                 (id, tenant_id, user_id, scope, type, severity, title, message, entity_type, entity_id, action_url, metadata_json, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -64,7 +64,7 @@ class ControlPlaneNotificationService {
                 });
             }
 
-            const [rows] = await db.query(
+            const rows = await db.query(
                 `SELECT * FROM control_plane_notifications WHERE id = ? LIMIT 1`,
                 [id]
             );
@@ -92,7 +92,7 @@ class ControlPlaneNotificationService {
 
     async getMyNotifications(tenantId, userId, limit = 20) {
         try {
-            const [rows] = await db.query(`
+            const rows = await db.query(`
                 SELECT * FROM control_plane_notifications
                 WHERE tenant_id = ? AND (scope = 'TENANT' OR (scope = 'USER' AND user_id = ?))
                 ORDER BY created_at DESC
@@ -107,7 +107,7 @@ class ControlPlaneNotificationService {
 
     async getUnreadCount(tenantId, userId) {
         try {
-            const [rows] = await db.query(`
+            const rows = await db.query(`
                 SELECT COUNT(*) as unreadCount FROM control_plane_notifications
                 WHERE tenant_id = ? AND (scope = 'TENANT' OR (scope = 'USER' AND user_id = ?))
                 AND read_at IS NULL
