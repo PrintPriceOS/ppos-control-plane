@@ -268,8 +268,31 @@ class PreflightRegistrySyncService {
         // Guarantee registry schema compliance before proceeding
         await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
 
+        // 2.5 Check existing sync error state before fetching
+        let existingSyncError = {};
+        try {
+            const rows = await db.query('SELECT sync_error_json FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+            if (rows.length > 0 && rows[0].sync_error_json) {
+                existingSyncError = typeof rows[0].sync_error_json === 'string' ? JSON.parse(rows[0].sync_error_json) : rows[0].sync_error_json;
+            }
+        } catch (e) {
+            // Ignore select error
+        }
+
         // 3. Always upsert a minimal preflight_job_registry row from the list item before attempting enrichment.
         await this._upsertJobRow(jobId, item, tenantId, null);
+
+        if (existingSyncError.live_hydration_disabled) {
+            console.log(`[CONTROL][PREFLIGHT][SYNC-JOB-FETCH-SUPPRESSED] ${JSON.stringify({ jobId, tenantId, reason: existingSyncError.live_hydration_disabled_reason })}`);
+            return {
+                ok: true,
+                jobId,
+                enriched: false,
+                source_status: 'LISTED_BUT_NOT_GET_RESOLVABLE',
+                sync_error_json: existingSyncError,
+                status
+            };
+        }
 
         // 4. Then attempt enrichment:
         try {
@@ -277,6 +300,11 @@ class PreflightRegistrySyncService {
             const enrichedJob = await preflightServiceClient.getJob(jobId, null, tenantId);
             
             if (enrichedJob) {
+                if (existingSyncError['404_count']) {
+                    delete existingSyncError['404_count'];
+                    await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(existingSyncError), jobId]);
+                }
+                
                 // 5. If enrichment succeeds, merge enriched payload over the list item and update the same registry row.
                 const mergedPayload = { ...item, ...enrichedJob, source_status: 'ENRICHED' };
                 await this._upsertJobRow(jobId, mergedPayload, tenantId, null);
@@ -293,8 +321,16 @@ class PreflightRegistrySyncService {
             const is404 = enrichErr.status === 404 || enrichErr.message?.includes('404');
             if (is404) {
                 // 6. If enrichment returns 404, do NOT mark the whole item as failure. Keep the minimal row from list payload and set:
-                console.log(`[CONTROL][PREFLIGHT][SYNC-JOB-GET-404-FALLBACK] ${JSON.stringify({ jobId, tenantId })}`);
-                const syncErrorJson = { status: 404, message: 'UPSTREAM_GET_404', jobId, tenantId };
+                existingSyncError['404_count'] = (existingSyncError['404_count'] || 0) + 1;
+                if (existingSyncError['404_count'] >= 3) {
+                    existingSyncError.live_hydration_disabled = true;
+                    existingSyncError.live_hydration_disabled_reason = 'UPSTREAM_404_REPEATED';
+                }
+                const syncErrorJson = { ...existingSyncError, status: 404, message: 'UPSTREAM_GET_404', jobId, tenantId };
+                
+                if (!existingSyncError.live_hydration_disabled) {
+                    console.log(`[CONTROL][PREFLIGHT][SYNC-JOB-GET-404-FALLBACK] ${JSON.stringify({ jobId, tenantId })}`);
+                }
                 
                 await db.query(`
                     UPDATE preflight_job_registry 

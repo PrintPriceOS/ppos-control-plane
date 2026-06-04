@@ -309,6 +309,15 @@ export const PreflightJobDetailPage: React.FC = () => {
       )}
 
       {/* Phase 10 status banners */}
+      {jobQ.data?.live_hydration_disabled && (
+        <div className="p-4 bg-slate-500/10 border border-slate-500/20 flex items-start gap-3 text-slate-500 rounded-none">
+          <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest">Live Hydration Suppressed</h4>
+            <p className="text-xs font-bold mt-0.5">This job is served from persistent registry. Upstream live hydration is unavailable.</p>
+          </div>
+        </div>
+      )}
       {sourceUnavailable && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-500 rounded-none">
           <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />

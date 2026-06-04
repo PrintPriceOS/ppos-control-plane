@@ -502,33 +502,59 @@ router.get('/jobs/:jobId', async (req, res) => {
             verifyTenantScope(req, localRecord.tenant_id);
         }
 
+        let syncError = localRecord?.sync_error_json ? (typeof localRecord.sync_error_json === 'string' ? JSON.parse(localRecord.sync_error_json) : localRecord.sync_error_json) : {};
         let livePayload = null;
         let sourceStatus = 'PERSISTENT_REGISTRY';
 
-        try {
-            livePayload = await gateway.getJob(jobId, context);
-            if (livePayload) {
-                sourceStatus = 'LIVE_UPSTREAM';
-                const currentStatus = livePayload.status || localRecord?.status || 'COMPLETED';
-                await db.query(`
-                    INSERT INTO preflight_job_registry 
-                    (job_id, tenant_id, status, canonical_payload_json)
-                    VALUES (?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE 
-                    status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
-                `, [
-                    jobId,
-                    localRecord?.tenant_id || context.tenantId,
-                    currentStatus,
-                    JSON.stringify(livePayload)
-                ]);
-            }
-        } catch (upstreamErr) {
-            console.warn(`[ADMIN-PREFLIGHT-ROUTER] Live hydration failed for ${jobId}, relying on persistent registry:`, upstreamErr.message);
-            if (!localRecord) {
-                return res.status(upstreamErr.status || 404).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: `Job ${jobId} not found upstream or locally.` } });
-            }
+        if (syncError.live_hydration_disabled) {
             sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
+        } else {
+            try {
+                livePayload = await gateway.getJob(jobId, context);
+                
+                // On success, reset 404 count if it was incremented
+                if (syncError['404_count']) {
+                    delete syncError['404_count'];
+                    await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
+                }
+
+                if (livePayload) {
+                    sourceStatus = 'LIVE_UPSTREAM';
+                    const currentStatus = livePayload.status || localRecord?.status || 'COMPLETED';
+                    await db.query(`
+                        INSERT INTO preflight_job_registry 
+                        (job_id, tenant_id, status, canonical_payload_json)
+                        VALUES (?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE 
+                        status = VALUES(status), canonical_payload_json = VALUES(canonical_payload_json), updated_at = NOW()
+                    `, [
+                        jobId,
+                        localRecord?.tenant_id || context.tenantId,
+                        currentStatus,
+                        JSON.stringify(livePayload)
+                    ]);
+                }
+            } catch (upstreamErr) {
+                const is404 = upstreamErr.status === 404 || upstreamErr.message?.includes('404') || upstreamErr.message?.includes('Job not found');
+                
+                if (is404 && localRecord) {
+                    syncError['404_count'] = (syncError['404_count'] || 0) + 1;
+                    if (syncError['404_count'] >= 3) {
+                        syncError.live_hydration_disabled = true;
+                        syncError.live_hydration_disabled_reason = 'UPSTREAM_404_REPEATED';
+                    }
+                    await db.query(`UPDATE preflight_job_registry SET sync_error_json = ? WHERE job_id = ?`, [JSON.stringify(syncError), jobId]);
+                }
+
+                if (!syncError.live_hydration_disabled) {
+                    console.warn(`[ADMIN-PREFLIGHT-ROUTER] Live hydration failed for ${jobId}, relying on persistent registry:`, upstreamErr.message);
+                }
+
+                if (!localRecord) {
+                    return res.status(upstreamErr.status || 404).json({ ok: false, source_status: 'UPSTREAM_UNAVAILABLE', error: { message: `Job ${jobId} not found upstream or locally.` } });
+                }
+                sourceStatus = 'PERSISTENT_REGISTRY_FALLBACK';
+            }
         }
 
         const rawCanonical = livePayload || (localRecord?.canonical_payload_json ? (typeof localRecord.canonical_payload_json === 'string' ? JSON.parse(localRecord.canonical_payload_json) : localRecord.canonical_payload_json) : null);
@@ -621,7 +647,8 @@ router.get('/jobs/:jobId', async (req, res) => {
             ok: true,
             jobId,
             status: mappedStatus,
-            source_status: projection.source_status || currentStatus,
+            source_status: sourceStatus,
+            live_hydration_disabled: !!syncError?.live_hydration_disabled,
             progress,
             issueCount: projection.issuesCount,
             findingsCount: projection.findingsCount,

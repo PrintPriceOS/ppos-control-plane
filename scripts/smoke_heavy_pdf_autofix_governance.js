@@ -92,6 +92,45 @@ async function run() {
         
         console.log('✔ Audit events HEAVY_PDF_AUTOFIX_ACCEPTED, PREFLIGHT_ARTIFACTS_NORMALIZED written.');
 
+        console.log('\n5. Validating Live Hydration Suppression (Upstream 404s)...');
+        const preflightRegistrySyncService = require('../src/api/services/preflightRegistrySyncService');
+        const preflightServiceClient = require('../src/api/services/preflightServiceClient');
+        
+        // Mock getJob to force 404
+        const originalGetJob = preflightServiceClient.getJob;
+        preflightServiceClient.getJob = async () => {
+            const err = new Error('Job not found');
+            err.status = 404;
+            throw err;
+        };
+
+        const mockJobId = 'job_stale_123';
+        
+        // 1st time
+        let result = await preflightRegistrySyncService.syncListItem({ jobId: mockJobId, type: 'ANALYZE', status: 'COMPLETED' }, 'ppos-customer-1');
+        console.log('1st Sync:', result.source_status); // LISTED_BUT_NOT_GET_RESOLVABLE
+        
+        // 2nd time
+        result = await preflightRegistrySyncService.syncListItem({ jobId: mockJobId, type: 'ANALYZE', status: 'COMPLETED' }, 'ppos-customer-1');
+        console.log('2nd Sync:', result.source_status);
+        
+        // 3rd time
+        result = await preflightRegistrySyncService.syncListItem({ jobId: mockJobId, type: 'ANALYZE', status: 'COMPLETED' }, 'ppos-customer-1');
+        console.log('3rd Sync:', result.source_status);
+        
+        // 4th time (Should be suppressed)
+        result = await preflightRegistrySyncService.syncListItem({ jobId: mockJobId, type: 'ANALYZE', status: 'COMPLETED' }, 'ppos-customer-1');
+        console.log('4th Sync (Suppressed):', result.source_status, result.sync_error_json);
+        
+        if (!result.sync_error_json.live_hydration_disabled) {
+            throw new Error('live_hydration_disabled flag was not set after 3 consecutive 404s');
+        }
+        
+        console.log('✔ Live Hydration Suppression validated successfully.');
+
+        // Restore mock
+        preflightServiceClient.getJob = originalGetJob;
+
         // Cleanup
         if (fs.existsSync(filename)) fs.unlinkSync(filename);
         
