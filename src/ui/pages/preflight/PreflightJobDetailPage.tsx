@@ -240,7 +240,22 @@ export const PreflightJobDetailPage: React.FC = () => {
     }
   };
 
-  async function handleDownloadArtifact(artifact: any) {
+  function getArtifactDownloadId(artifact: any): string | null {
+  if (!artifact) return null;
+  if (typeof artifact === 'string') return artifact;
+
+  const candidate =
+    artifact.download_id ||
+    artifact.alias ||
+    artifact.id ||
+    artifact.artifact_id;
+
+  return typeof candidate === 'string' && candidate.trim()
+    ? candidate.trim()
+    : null;
+}
+
+async function handleDownloadArtifact(artifact: any) {
   const artifactId = getArtifactDownloadId(artifact);
 
   if (!artifactId) {
