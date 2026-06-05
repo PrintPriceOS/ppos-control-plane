@@ -1,0 +1,110 @@
+[
+  {
+    "issue_area": "NON_EMBEDDED_FONTS",
+    "canonical_fix_id": "EMBED_FONTS",
+    "detectable": true,
+    "detector_source": "FontAnalyzer",
+    "registry_declared": true,
+    "service_capability_declared": true,
+    "planner_behavior": "UNSUPPORTED",
+    "engine_execution": "NOT_IMPLEMENTED",
+    "worker_policy": {
+      "review_required": true,
+      "production_certified": false,
+      "certified_pdf_allowed": false
+    },
+    "service_policy": {
+      "implemented": false,
+      "autofixable": false,
+      "production_safe": false,
+      "requires_human_review": true
+    },
+    "control_plane_wording": {
+      "customer": "The PDF uses fonts that may not be safely available for production. A human review is required.",
+      "operator": "The PDF contains fonts that are not embedded. Output may vary across RIPs or production systems."
+    },
+    "truth_status": "REVIEW_REQUIRED_CAPABILITY",
+    "notes": []
+  },
+  {
+    "issue_area": "TYPE3_FONTS",
+    "canonical_fix_id": "OUTLINE_FONTS",
+    "detectable": true,
+    "detector_source": "FontAnalyzer",
+    "registry_declared": true,
+    "service_capability_declared": true,
+    "planner_behavior": "UNSUPPORTED",
+    "engine_execution": "NOT_IMPLEMENTED",
+    "worker_policy": {
+      "review_required": true,
+      "production_certified": false,
+      "certified_pdf_allowed": false
+    },
+    "service_policy": {
+      "implemented": false,
+      "autofixable": false,
+      "production_safe": false,
+      "requires_human_review": true
+    },
+    "control_plane_wording": {
+      "customer": "The PDF uses fonts that may not be safely available for production. A human review is required.",
+      "operator": "The PDF contains Type3 fonts, which can render unpredictably in print workflows and require review."
+    },
+    "truth_status": "REVIEW_REQUIRED_CAPABILITY",
+    "notes": []
+  },
+  {
+    "issue_area": "MISSING_GLYPHS",
+    "canonical_fix_id": "GLYPH_REPAIR",
+    "detectable": true,
+    "detector_source": "FontAnalyzer",
+    "registry_declared": true,
+    "service_capability_declared": true,
+    "planner_behavior": "UNSUPPORTED",
+    "engine_execution": "NOT_IMPLEMENTED",
+    "worker_policy": {
+      "review_required": true,
+      "production_certified": false,
+      "certified_pdf_allowed": false
+    },
+    "service_policy": {
+      "implemented": false,
+      "autofixable": false,
+      "production_safe": false,
+      "requires_human_review": true
+    },
+    "control_plane_wording": {
+      "customer": "The PDF uses fonts that may not be safely available for production. A human review is required.",
+      "operator": "Some characters may not render correctly because glyphs are missing. The source file or correct font may be required."
+    },
+    "truth_status": "BLOCKED_UNSAFE",
+    "notes": ["Treat as critical unless proven harmless"]
+  },
+  {
+    "issue_area": "FONT_SUBSTITUTION_RISK",
+    "canonical_fix_id": "REPLACE_MISSING_FONTS",
+    "detectable": true,
+    "detector_source": "FontAnalyzer",
+    "registry_declared": true,
+    "service_capability_declared": true,
+    "planner_behavior": "UNSUPPORTED",
+    "engine_execution": "NOT_IMPLEMENTED",
+    "worker_policy": {
+      "review_required": true,
+      "production_certified": false,
+      "certified_pdf_allowed": false
+    },
+    "service_policy": {
+      "implemented": false,
+      "autofixable": false,
+      "production_safe": false,
+      "requires_human_review": true
+    },
+    "control_plane_wording": {
+      "customer": "The PDF uses fonts that may not be safely available for production. A human review is required.",
+      "operator": "Font substitution risk detected. Layout and glyph rendering may change."
+    },
+    "truth_status": "REVIEW_REQUIRED_CAPABILITY",
+    "notes": []
+  }
+]

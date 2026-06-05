@@ -44,9 +44,8 @@ function selectPrimaryHumanArtifact(job, artifacts) {
     return null;
 }
 
-// Helper to translate fix strings to human readable text
-function translateFixMessage(fixCode, isSkipped = false) {
-    const code = String(fixCode || '').toUpperCase();
+function translateFixMessage(f, isSkipped = false) {
+    const code = String(f.code || f.fix_id || f || '').toUpperCase();
     if (code.includes('REBUILD_TRIMBOX')) return "Page geometry / TrimBox was rebuilt.";
     if (code.includes('APPLY_BLEED')) return "Bleed boxes were adjusted. Visual artwork was not extended automatically.";
     if (code.includes('INJECT_OUTPUT_INTENT')) return "OutputIntent was injected.";
@@ -56,7 +55,26 @@ function translateFixMessage(fixCode, isSkipped = false) {
     if (code.includes('STRIP_JAVASCRIPT')) return "Interactive JavaScript was removed.";
     if (code.includes('FLATTEN_ANNOTATIONS')) return "Annotations or annotation references were flattened/removed for print safety.";
     if (code.includes('FLATTEN_FORMS')) return "Interactive form fields were flattened or removed for print safety.";
-    
+    if (code.includes('REBUILD_XREF')) {
+        if (f.description && f.description.includes('No structural repair was necessary')) {
+            return "No structural repair was necessary.";
+        }
+        return "Structural sanitization applied via qpdf.";
+    }
+    // Font Governance (Phase 51A/B)
+    if (code.includes('EMBED_FONTS') && isSkipped) {
+        return "Font embedding was not applied. The PDF still requires review because some fonts may not be safely available in production.";
+    }
+    if (code.includes('EMBED_FONTS') && !isSkipped) {
+        return "Fonts were processed with Ghostscript. Review the corrected PDF carefully because font embedding can alter glyph rendering, kerning, line breaks, or layout.";
+    }
+    if (code.includes('NON_EMBEDDED_FONTS')) {
+        return "Automatic font embedding/substitution was not performed. Fonts remain un-embedded.";
+    }
+    if (code.includes('OUTLINE_FONTS')) return "Font outlining is not implemented.";
+    if (code.includes('REPLACE_MISSING_FONTS')) return "Automatic missing font replacement is not implemented.";
+    if (code.includes('GLYPH_REPAIR')) return "Automatic glyph repair is not implemented.";
+
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
 }
@@ -148,13 +166,13 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
 
         if (auditData) {
             if (Array.isArray(auditData.applied_fixes)) {
-                appliedFixesRaw = auditData.applied_fixes.map(f => f.code || f);
+                appliedFixesRaw = auditData.applied_fixes;
             }
             if (Array.isArray(auditData.skipped_fixes)) {
-                skippedFixesRaw = auditData.skipped_fixes.map(f => f.code || f);
+                skippedFixesRaw = auditData.skipped_fixes;
             }
             if (Array.isArray(auditData.failed_fixes)) {
-                failedFixesRaw = auditData.failed_fixes.map(f => f.code || f);
+                failedFixesRaw = auditData.failed_fixes;
             }
         }
     }
@@ -213,8 +231,36 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
 
         const applied = appliedFixesRaw;
         const skipped = skippedFixesRaw;
-        applied.forEach(f => opDetails.push(translateFixMessage(f.code || f)));
-        skipped.forEach(f => opDetails.push(translateFixMessage(f.code || f, true)));
+        applied.forEach(f => opDetails.push(translateFixMessage(f)));
+        skipped.forEach(f => opDetails.push(translateFixMessage(f, true)));
+        
+        // Phase 51A: Add findings and review reasons to operator details
+        const reasons = job.review_required_reasons || job.fix_audit?.review_required_reasons || [];
+        if (reasons.includes('NON_EMBEDDED_FONTS')) opDetails.push("The PDF contains fonts that are not embedded. Output may vary across RIPs or production systems.");
+        if (reasons.includes('TYPE3_FONTS')) opDetails.push("The PDF contains Type3 fonts, which can render unpredictably in print workflows and require review.");
+        if (reasons.includes('MISSING_GLYPHS')) opDetails.push("Some characters may not render correctly because glyphs are missing. The source file or correct font may be required.");
+        if (reasons.includes('FONT_SUBSTITUTION_RISK')) opDetails.push("Font substitution risk detected. Layout and glyph rendering may change.");
+        
+        const hasFontRisk = reasons.some(r => ['NON_EMBEDDED_FONTS', 'TYPE3_FONTS', 'MISSING_GLYPHS', 'FONT_SUBSTITUTION_RISK'].includes(r));
+        if (hasFontRisk) {
+            customerSummary = "The PDF uses fonts that may not be safely available for production. A human review is required.";
+        }
+
+        // Include affected font names if evidence is in findings
+        const findingsList = job.findings || job.analysis?.findings || [];
+        const affectedFonts = [];
+        findingsList.forEach(finding => {
+            if (['NON_EMBEDDED_FONTS', 'TYPE3_FONTS', 'MISSING_GLYPHS', 'FONT_SUBSTITUTION_RISK'].includes(finding.id || finding.code)) {
+                if (finding.evidence && finding.evidence.font_name) {
+                    affectedFonts.push(finding.evidence.font_name);
+                }
+            }
+        });
+        
+        if (affectedFonts.length > 0) {
+            const uniqueFonts = [...new Set(affectedFonts)];
+            opDetails.push(`Affected fonts: ${uniqueFonts.join(', ')}.`);
+        }
         
         operatorSummary = opDetails.length > 0 ? opDetails.join(" ") : "Review the fixed PDF and the technical change summary before releasing it.";
         
@@ -366,9 +412,12 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             applied_count: fixSummaryObj.applied_count || appliedFixesRaw.length || 0,
             skipped_count: fixSummaryObj.skipped_count || skippedFixesRaw.length || 0,
             failed_count: fixSummaryObj.failed_count || failedFixesRaw.length || 0,
-            applied_fixes: appliedFixesRaw.map(f => translateFixMessage(f.code || f)),
-            skipped_fixes: skippedFixesRaw.map(f => translateFixMessage(f.code || f, true)),
-            failed_fixes: failedFixesRaw.map(f => f.code || f),
+            applied_fixes: appliedFixesRaw.map(f => translateFixMessage(f)),
+            skipped_fixes: skippedFixesRaw.map(f => translateFixMessage(f, true)),
+            failed_fixes: failedFixesRaw.map(f => {
+                if (String(f.code || f).includes('EMBED_FONTS')) return "Font embedding failed or could not be completed. The source file or correct font files may be required.";
+                return f.code || f;
+            }),
             review_required: isReviewReq,
             production_certified: isProdCert,
             highest_risk_level: job.risk_level || 'UNKNOWN'
