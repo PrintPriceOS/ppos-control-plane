@@ -310,18 +310,33 @@ async function getGovernanceLedger(jobId, context) {
                 console.warn('[GOVERNANCE-LEDGER] Live artifact hydration failed, using registry payload:', err.message);
             }
 
+            const isDownloadable = (a) => (a.sizeBytes > 0 || a.size_bytes > 0) && (a.downloadable === true || a.path || a.url);
+
             artifactSummary.artifact_count = artifacts.length;
-            artifactSummary.downloadable_artifact_count = artifacts.filter(a => (a.sizeBytes > 0 || a.size_bytes > 0) && (a.path || a.url)).length;
+            artifactSummary.downloadable_artifact_count = artifacts.filter(isDownloadable).length;
             artifactSummary.zero_byte_artifact_count = artifacts.filter(a => (a.sizeBytes === 0 || a.size_bytes === 0) && a.type !== 'EMPTY').length;
             artifactSummary.physical_artifacts_ready = artifactSummary.downloadable_artifact_count > 0;
             
-            const isReport = (a) => ['analysis_report', 'report_json', 'fix_audit', 'audit_json', 'preflight_report', 'certified_report', 'REPORT'].includes((a.type || a.alias || '').toUpperCase());
-            const isCertified = (a) => ['certified_pdf', 'certified', 'CERTIFIED_PDF'].includes((a.type || a.alias || '').toUpperCase()) || (String(a.alias || '').toLowerCase() === 'production_pdf' && String(a.type || '').toLowerCase().includes('cert'));
-            const isFixed = (a) => ['fixed_pdf', 'final_fixed_pdf', 'FIXED_PDF'].includes((a.type || a.alias || '').toUpperCase()) || (String(a.alias || '').toLowerCase() === 'review_pdf' && String(a.type || '').toLowerCase().includes('fix'));
+            const isReport = (a) => {
+                const type = (a.type || '').toLowerCase();
+                const alias = (a.alias || '').toLowerCase();
+                const label = (a.label || '').toLowerCase();
+                const filename = (a.filename || '').toLowerCase();
+                const exactMatches = ['analysis_report', 'report_json', 'preflight_report', 'fix_audit', 'audit_json', 'certified_report', 'validation_report', 'diagnostic_report'];
+                
+                if (exactMatches.includes(type) || exactMatches.includes(alias)) return true;
+                if (label.includes('report') || label.includes('audit') || label.includes('analysis')) return true;
+                if (filename.includes('report') || filename.includes('audit')) return true;
+                if (filename.endsWith('.json') && !type.includes('unknown')) return true;
+                if (a.mime_type === 'application/json' && (filename.includes('report') || filename.includes('audit') || type.includes('report') || type.includes('audit'))) return true;
+                return false;
+            };
+            const isCertified = (a) => ['certified_pdf', 'certified'].includes((a.type || a.alias || '').toLowerCase()) || (String(a.alias || '').toLowerCase() === 'production_pdf' && String(a.type || '').toLowerCase().includes('cert'));
+            const isFixed = (a) => ['fixed_pdf', 'final_fixed_pdf'].includes((a.type || a.alias || '').toLowerCase()) || (String(a.alias || '').toLowerCase() === 'review_pdf' && String(a.type || '').toLowerCase().includes('fix'));
 
-            artifactSummary.primary_fixed_pdf_available = artifacts.some(a => isFixed(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
-            artifactSummary.certified_pdf_available = artifacts.some(a => isCertified(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
-            artifactSummary.report_available = artifacts.some(a => isReport(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
+            artifactSummary.primary_fixed_pdf_available = artifacts.some(a => isFixed(a) && isDownloadable(a));
+            artifactSummary.certified_pdf_available = artifacts.some(a => isCertified(a) && isDownloadable(a));
+            artifactSummary.report_available = artifacts.some(a => isReport(a) && isDownloadable(a));
         }
     } catch(err) {
          console.error('[GOVERNANCE-LEDGER] Failed to query job registry:', err.message);

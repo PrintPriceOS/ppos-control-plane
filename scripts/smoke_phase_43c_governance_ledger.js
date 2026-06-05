@@ -26,7 +26,8 @@ async function run() {
             status: 'COMPLETED_WITH_FINDINGS',
             artifacts: [
                 { type: 'OUTPUT_PDF', sizeBytes: 1024, path: 's3://bucket/test.pdf' },
-                { type: 'ZERO_BYTE', sizeBytes: 0, path: 's3://bucket/zero.pdf' }
+                { type: 'ZERO_BYTE', sizeBytes: 0, path: 's3://bucket/zero.pdf' },
+                { type: "analysis_report", filename: "report.json", mime_type: "application/json", downloadable: true, size_bytes: 6238 }
             ]
         })]);
 
@@ -123,11 +124,14 @@ async function run() {
         }
 
         // Test artifact summary
-        if (parentRes.artifact_summary.artifact_count !== 2 || parentRes.artifact_summary.downloadable_artifact_count !== 1 || parentRes.artifact_summary.zero_byte_artifact_count !== 1) {
+        if (parentRes.artifact_summary.artifact_count !== 3 || parentRes.artifact_summary.downloadable_artifact_count !== 2 || parentRes.artifact_summary.zero_byte_artifact_count !== 1) {
             console.error("❌ Artifact summary mismatch.");
             failures++;
+        } else if (parentRes.artifact_summary.report_available !== true) {
+            console.error("❌ report_available was not set to true for analysis_report artifact.");
+            failures++;
         } else {
-            console.log("✅ Artifact summary correctly parsed from registry.");
+            console.log("✅ Artifact summary correctly parsed from registry and report alias resolved.");
         }
 
         console.log("\n3. Testing getGovernanceLedger for child job (should include parent linkage)...");
