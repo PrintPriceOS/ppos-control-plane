@@ -804,6 +804,7 @@ class MarketplaceOrderService {
 
         const blockers = [];
         const warnings = [];
+        const humanReportGates = [];
 
         // 1. Selected offer required
         if (!order.selectedOfferId) {
@@ -893,38 +894,88 @@ class MarketplaceOrderService {
             // --- Phase 47 Human Report Readiness Checks ---
             try {
                 const snapshotRes = await humanReportSnapshotService.getLatestSnapshot(file.preflightJobId, { tenantId: order.tenantId });
+                
+                let gateObj = {
+                    file_kind: file.kind,
+                    job_id: file.preflightJobId,
+                    snapshot_id: null,
+                    outcome: 'UNKNOWN',
+                    active_decision: null,
+                    gate_code: null,
+                    ready: false,
+                    warning: null
+                };
+
                 if (!snapshotRes.ok || !snapshotRes.snapshot_id) {
                     blocked = true;
+                    gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_REQUIRED`;
                     blockers.push(`PREFLIGHT_HUMAN_REPORT_REQUIRED_${file.kind}`);
                 } else {
-                    const report = snapshotRes.report;
-                    const outcome = report.outcome;
+                    gateObj.snapshot_id = snapshotRes.snapshot_id;
+                    const report = typeof snapshotRes.report_json === 'string' 
+                        ? JSON.parse(snapshotRes.report_json) 
+                        : (snapshotRes.report_json || snapshotRes.report || {});
                     
+                    const innerReport = report.report || report;
+                    const outcome = innerReport.outcome || 'UNKNOWN';
+                    gateObj.outcome = outcome;
+                    gateObj.severity = innerReport.severity;
+
                     if (outcome === 'PROCESSING') {
                         blocked = true;
-                        blockers.push(`PREFLIGHT_HUMAN_REPORT_PROCESSING_${file.kind}`);
+                        gateObj.gate_code = `PREFLIGHT_PROCESSING`;
+                        blockers.push(`PREFLIGHT_PROCESSING_${file.kind}`);
                     } else if (outcome === 'BLOCKED') {
                         blocked = true;
-                        blockers.push(`PREFLIGHT_HUMAN_REPORT_BLOCKED_${file.kind}`);
+                        gateObj.gate_code = `PREFLIGHT_BLOCKED_BY_HUMAN_REPORT`;
+                        blockers.push(`PREFLIGHT_BLOCKED_BY_HUMAN_REPORT_${file.kind}`);
+                    } else if (outcome === 'UNKNOWN') {
+                        blocked = true;
+                        gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_UNKNOWN`;
+                        blockers.push(`PREFLIGHT_HUMAN_REPORT_UNKNOWN_${file.kind}`);
                     } else if (outcome === 'FIXED_REVIEW_REQUIRED') {
                         // Check for review approval
                         const approvalRes = await reviewApprovalService.getLatestDecision(file.preflightJobId, { tenantId: order.tenantId });
                         if (!approvalRes.ok || !approvalRes.decision) {
                             blocked = true;
+                            gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
                             blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
                         } else {
-                            const decision = approvalRes.decision.decision;
-                            if (decision === 'REJECTED_REQUIRES_REUPLOAD') {
+                            const decision = approvalRes.decision;
+                            gateObj.active_decision = decision.decision;
+                            gateObj.decision_id = decision.id;
+                            gateObj.approved_artifact_type = decision.approved_artifact_type;
+                            gateObj.approved_artifact_filename = decision.approved_artifact_filename;
+                            
+                            if (decision.decision === 'REJECTED_REQUIRES_REUPLOAD') {
                                 blocked = true;
+                                gateObj.gate_code = `PREFLIGHT_REVIEW_REJECTED`;
                                 blockers.push(`PREFLIGHT_REVIEW_REJECTED_${file.kind}`);
-                            } else if (decision === 'APPROVED_WITH_WARNINGS') {
-                                warnings.push(`PREFLIGHT_REVIEW_APPROVED_WITH_WARNINGS_${file.kind}`);
+                            } else if (decision.decision === 'APPROVED_WITH_WARNINGS') {
+                                gateObj.ready = true;
+                                gateObj.gate_code = `PREFLIGHT_APPROVED_WITH_WARNINGS`;
+                                gateObj.warning = `PREFLIGHT_APPROVED_WITH_WARNINGS_${file.kind}`;
+                                warnings.push(`PREFLIGHT_APPROVED_WITH_WARNINGS_${file.kind}`);
+                            } else if (decision.decision === 'APPROVED_FOR_PRODUCTION') {
+                                // FIXED_REVIEW_REQUIRED doesn't allow APPROVED_FOR_PRODUCTION unless overridden.
+                                // If they bypassed, we treat it as pass but log warning or just block.
+                                // We block since the user said it should only pass for CERTIFIED_READY.
+                                blocked = true;
+                                gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
+                                blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
                             }
-                            // APPROVED_FOR_PRODUCTION is implicitly fine.
                         }
+                    } else if (outcome === 'CERTIFIED_READY') {
+                        gateObj.ready = true;
+                        gateObj.gate_code = `PREFLIGHT_CERTIFIED_READY`;
+                    } else {
+                        blocked = true;
+                        gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_UNKNOWN`;
+                        blockers.push(`PREFLIGHT_HUMAN_REPORT_UNKNOWN_${file.kind}`);
                     }
-                    // CERTIFIED_READY is fine, no blocks.
                 }
+                
+                humanReportGates.push(gateObj);
             } catch (err) {
                 logger.warn({ event: 'HUMAN_REPORT_READINESS_CHECK_FAILED', jobId: file.preflightJobId, error: err.message });
                 blocked = true;
@@ -985,6 +1036,7 @@ class MarketplaceOrderService {
             statusSuggestion,
             blockers,
             warnings,
+            humanReportGates,
             requiredFiles: requiredFilesObj,
             preflight: {
                 aggregateStatus,
