@@ -44,14 +44,19 @@ function selectPrimaryHumanArtifact(job, artifacts) {
     return null;
 }
 
-function translateFixMessage(f, isSkipped = false) {
+function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     const code = String(f.code || f.fix_id || f || '').toUpperCase();
     if (code.includes('REBUILD_TRIMBOX')) return "Page geometry / TrimBox was rebuilt.";
     if (code.includes('APPLY_BLEED')) return "Bleed boxes were adjusted. Visual artwork was not extended automatically.";
-    if (code.includes('INJECT_OUTPUT_INTENT')) return "OutputIntent was injected.";
+    if (code.includes('INJECT_OUTPUT_INTENT')) {
+        if (colorGov.review_required_color_reasons && colorGov.review_required_color_reasons.length > 0) {
+            return "An OutputIntent profile was injected, but color profile conflicts or color risks remain and require review.";
+        }
+        return "An OutputIntent profile was injected. No color values were rewritten.";
+    }
     if (code.includes('CONVERT_CMYK')) return isSkipped 
         ? "CMYK conversion was skipped because explicit review mode is required." 
-        : "Colors were converted to CMYK.";
+        : "Color conversion to CMYK was applied. Review the corrected PDF carefully because color conversion can alter appearance, ink balance, gradients, images, and brand colors.";
     if (code.includes('STRIP_JAVASCRIPT')) return "Interactive JavaScript was removed.";
     if (code.includes('FLATTEN_ANNOTATIONS')) return "Annotations or annotation references were flattened/removed for print safety.";
     if (code.includes('FLATTEN_FORMS')) return "Interactive form fields were flattened or removed for print safety.";
@@ -74,6 +79,10 @@ function translateFixMessage(f, isSkipped = false) {
     if (code.includes('OUTLINE_FONTS')) return "Font outlining is not implemented.";
     if (code.includes('REPLACE_MISSING_FONTS')) return "Automatic missing font replacement is not implemented.";
     if (code.includes('GLYPH_REPAIR')) return "Automatic glyph repair is not implemented.";
+    if (code.includes('REDUCE_TAC') && isSkipped) return "Total ink coverage reduction is not currently implemented. A print operator must review this file.";
+    if (code.includes('MAP_RICH_BLACK_TEXT_TO_K_ONLY') && isSkipped) return "Rich black text remapping is not currently implemented. A print operator must review this file.";
+    if (code.includes('MAP_REGISTRATION_COLOR_TO_BLACK') && isSkipped) return "Registration color remapping is not currently implemented. A print operator must review this file.";
+    if (code.includes('NORMALIZE_ICC_PROFILE') && isSkipped) return "ICC/profile normalization is not currently implemented. A print operator must review this file.";
 
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
@@ -194,11 +203,51 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         primary_artifact_available: false
     };
 
-    const certLevel = job.certification_level || job.certificationLevel;
-    const isReviewReq = job.review_required === true || job.reviewRequired === true;
-    const isProdCert = job.production_certified === true || job.productionCertified === true;
-    
-    const primaryArtifact = selectPrimaryHumanArtifact(job, artifacts);
+    let certLevel = job.certification_level || job.certificationLevel;
+    let isReviewReq = job.review_required === true || job.reviewRequired === true;
+    let isProdCert = job.production_certified === true || job.productionCertified === true;
+
+    // Phase 52D: Defensive extraction of color_governance
+    let colorGov = job.color_governance 
+        || job.fix_summary?.color_governance 
+        || job.fix_audit?.color_governance 
+        || job.delta_summary?.color_governance 
+        || job.delta_report?.color_governance;
+        
+    if (!colorGov) {
+        const artifactsWithMeta = artifacts.find(a => a.metadata && a.metadata.color_governance);
+        if (artifactsWithMeta) colorGov = artifactsWithMeta.metadata.color_governance;
+    }
+    if (!colorGov && job.report?.color_governance) {
+        colorGov = job.report.color_governance;
+    }
+    if (!colorGov) colorGov = {};
+
+    let hasColorRisk = false;
+    if (colorGov.destructive_color_fix_applied || 
+        colorGov.color_conversion_applied || 
+        colorGov.certified_pdf_allowed === false || 
+        colorGov.production_certified === false || 
+        (colorGov.review_required_color_reasons && colorGov.review_required_color_reasons.length > 0)) {
+        hasColorRisk = true;
+    }
+
+    if (hasColorRisk) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === "CERTIFIED_READY" || certLevel === "FIXED_READY") {
+            certLevel = appliedFixesRaw.length > 0 ? "FIXED_REVIEW_REQUIRED" : "REVIEW_REQUIRED";
+        }
+        // Downgrade certified_pdf
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+            }
+        });
+    }
+
+    const primaryArtifact = selectPrimaryHumanArtifact({ ...job, review_required: isReviewReq, production_certified: isProdCert }, artifacts);
 
     if (certLevel === "CERTIFIED_READY" && isProdCert && !isReviewReq && primaryArtifact?.artifact_role === 'PRODUCTION_READY') {
         outcome = "CERTIFIED_READY";
@@ -216,11 +265,11 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             primary_artifact_filename: primaryArtifact?.filename || null,
             primary_artifact_available: !!primaryArtifact
         };
-    } else if (certLevel === "FIXED_REVIEW_REQUIRED" && isReviewReq) {
-        outcome = "FIXED_REVIEW_REQUIRED";
+    } else if ((certLevel === "FIXED_REVIEW_REQUIRED" || certLevel === "REVIEW_REQUIRED") && isReviewReq) {
+        outcome = certLevel;
         severity = "warning";
-        summaryTitle = "PDF fixed, review required before production";
-        customerSummary = "The PDF was corrected structurally, but it requires review before production.";
+        summaryTitle = certLevel === "FIXED_REVIEW_REQUIRED" ? "PDF fixed, review required before production" : "PDF review required before production";
+        customerSummary = certLevel === "FIXED_REVIEW_REQUIRED" ? "The PDF was corrected structurally, but it requires review before production." : "The PDF requires review before production.";
         
         let opDetails = [];
         
@@ -231,8 +280,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
 
         const applied = appliedFixesRaw;
         const skipped = skippedFixesRaw;
-        applied.forEach(f => opDetails.push(translateFixMessage(f)));
-        skipped.forEach(f => opDetails.push(translateFixMessage(f, true)));
+        applied.forEach(f => opDetails.push(translateFixMessage(f, false, colorGov)));
+        skipped.forEach(f => opDetails.push(translateFixMessage(f, true, colorGov)));
         
         // Phase 51A: Add findings and review reasons to operator details
         const reasons = job.review_required_reasons || job.fix_audit?.review_required_reasons || [];
@@ -244,6 +293,22 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         const hasFontRisk = reasons.some(r => ['NON_EMBEDDED_FONTS', 'TYPE3_FONTS', 'MISSING_GLYPHS', 'FONT_SUBSTITUTION_RISK'].includes(r));
         if (hasFontRisk) {
             customerSummary = "The PDF uses fonts that may not be safely available for production. A human review is required.";
+        }
+
+        // Phase 52D Color Governance reasons
+        const colorReasons = colorGov.review_required_color_reasons || [];
+        if (colorReasons.includes('ICC_MISMATCH')) opDetails.push("The PDF contains ICC/profile inconsistencies. Color appearance may vary between devices or print workflows.");
+        if (colorReasons.includes('MIXED_RGB_CMYK')) opDetails.push("The PDF contains mixed RGB and CMYK content. A human review is required before production.");
+        if (colorReasons.includes('RGB_DEVICE_COLOR') || colorReasons.includes('RGB_IMAGES')) opDetails.push("The PDF contains RGB color content. Conversion to print CMYK may alter visual appearance.");
+        if (colorReasons.includes('EXCESSIVE_TAC')) opDetails.push("The PDF may exceed total ink coverage limits. Automatic ink reduction was not applied.");
+        if (colorReasons.includes('RICH_BLACK_TEXT')) opDetails.push("The PDF may contain rich black text. Automatic mapping to pure black was not applied.");
+        if (colorReasons.includes('REGISTRATION_COLOR_MISUSE')) opDetails.push("The PDF may use registration color incorrectly. Automatic remapping was not applied.");
+
+        if (hasColorRisk) {
+            customerSummary = "The PDF contains color conditions that may affect print appearance. A human review is required before production.";
+            if (colorGov.highest_color_risk === 'critical') {
+                severity = 'critical';
+            }
         }
 
         // Include affected font names if evidence is in findings
@@ -412,8 +477,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             applied_count: fixSummaryObj.applied_count || appliedFixesRaw.length || 0,
             skipped_count: fixSummaryObj.skipped_count || skippedFixesRaw.length || 0,
             failed_count: fixSummaryObj.failed_count || failedFixesRaw.length || 0,
-            applied_fixes: appliedFixesRaw.map(f => translateFixMessage(f)),
-            skipped_fixes: skippedFixesRaw.map(f => translateFixMessage(f, true)),
+            applied_fixes: appliedFixesRaw.map(f => translateFixMessage(f, false, colorGov)),
+            skipped_fixes: skippedFixesRaw.map(f => translateFixMessage(f, true, colorGov)),
             failed_fixes: failedFixesRaw.map(f => {
                 if (String(f.code || f).includes('EMBED_FONTS')) return "Font embedding failed or could not be completed. The source file or correct font files may be required.";
                 return f.code || f;
