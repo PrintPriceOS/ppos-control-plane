@@ -22,36 +22,39 @@ async function runSmokeTests() {
         };
     };
 
+    let originalQuery;
     let lastSnapshotId = 'hrs_mock';
 
-    db.query = async (sql, params) => {
-        if (sql.includes('INSERT INTO control_plane_preflight_human_reports')) {
-            lastSnapshotId = params[0];
-            return [];
-        }
-        if (sql.includes('SELECT * FROM control_plane_preflight_human_reports') || sql.includes('SELECT report_json FROM control_plane_preflight_human_reports')) {
-            return [{
-                id: lastSnapshotId,
-                job_id: params[1],
-                generated_at: new Date(),
-                generated_by: 'system',
-                report_json: '{}'
-            }];
-        }
-        if (sql.includes('SELECT id FROM control_plane_preflight_human_reports')) {
-            return [{ id: lastSnapshotId }];
-        }
-        if (sql.includes('SELECT * FROM control_plane_preflight_review_approvals')) {
-            return [{
-                id: 'rev_mock',
-                decision: 'APPROVED_WITH_WARNINGS',
-                reason: 'Looks OK'
-            }];
-        }
-        return [];
-    };
-
     try {
+        originalQuery = db.query;
+
+        db.query = async (sql, params) => {
+            if (sql.includes('INSERT INTO control_plane_preflight_human_reports')) {
+                lastSnapshotId = params[0];
+                return [];
+            }
+            if (sql.includes('SELECT * FROM control_plane_preflight_human_reports') || sql.includes('SELECT report_json FROM control_plane_preflight_human_reports')) {
+                return [{
+                    id: lastSnapshotId,
+                    job_id: params[1],
+                    generated_at: new Date(),
+                    generated_by: 'system',
+                    report_json: '{}'
+                }];
+            }
+            if (sql.includes('SELECT id FROM control_plane_preflight_human_reports')) {
+                return [{ id: lastSnapshotId }];
+            }
+            if (sql.includes('SELECT * FROM control_plane_preflight_review_approvals')) {
+                return [{
+                    id: 'rev_mock',
+                    decision: 'APPROVED_WITH_WARNINGS',
+                    reason: 'Looks OK'
+                }];
+            }
+            return [];
+        };
+
         const jobId = 'smoke_job_' + Date.now();
         const tenantId = 'ppos-production';
         const context = { tenantId, userId: 'smoke_tester' };
