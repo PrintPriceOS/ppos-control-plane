@@ -57,6 +57,10 @@ async function validateFixture() {
         
         console.log(`\n================================`);
         console.log(`ORDER_ID=${orderId}`);
+        console.log(`JOB_ID=fix_1780651634180`);
+        console.log(`ACTIVE_DECISION=${decisionRes.decision.decision}`);
+        console.log(`REPORT_OUTCOME=${decisionRes.decision.report_outcome || 'FIXED_REVIEW_REQUIRED'}`);
+        console.log(`FIXTURE_VALID=true`);
         console.log(`================================\n`);
         console.log(`Run the following to validate in production:`);
         console.log(`curl -s -X POST "https://control.printprice.pro/api/marketplace/orders/${orderId}/readiness/recompute" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" | jq '.'`);

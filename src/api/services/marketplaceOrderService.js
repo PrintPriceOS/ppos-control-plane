@@ -927,7 +927,35 @@ class MarketplaceOrderService {
                     gateObj.outcome = outcome;
                     gateObj.severity = innerReport.severity;
 
-                    if (outcome === 'PROCESSING') {
+                    // Fetch active decision early to support trace mismatches on all outcomes
+                    const approvalRes = await reviewApprovalService.getLatestDecision(file.preflightJobId, { tenantId: order.tenantId });
+                    let decision = null;
+                    if (approvalRes.ok && approvalRes.decision) {
+                        decision = approvalRes.decision;
+                        gateObj.active_decision = decision.decision;
+                        gateObj.decision_id = decision.id;
+                        gateObj.decision_snapshot_id = decision.snapshot_id;
+                        gateObj.decision_report_outcome = decision.report_outcome;
+                        gateObj.approved_artifact_type = decision.approved_artifact_type;
+                        gateObj.approved_artifact_filename = decision.approved_artifact_filename;
+                        
+                        if (gateObj.decision_snapshot_id && gateObj.evaluated_snapshot_id && gateObj.decision_snapshot_id !== gateObj.evaluated_snapshot_id) {
+                            gateObj.snapshot_mismatch = true;
+                        }
+                    }
+
+                    if (gateObj.snapshot_mismatch && gateObj.decision_report_outcome && gateObj.decision_report_outcome !== outcome) {
+                        // Conflict overrides normal logic
+                        blocked = true;
+                        gateObj.gate_code = `PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT`;
+                        blockers.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT_${file.kind}`);
+                    } else {
+                        // If there's a mismatch but no conflict, just add a warning
+                        if (gateObj.snapshot_mismatch) {
+                            warnings.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_MISMATCH_${file.kind}`);
+                        }
+
+                        if (outcome === 'PROCESSING') {
                         blocked = true;
                         gateObj.gate_code = `PREFLIGHT_PROCESSING`;
                         blockers.push(`PREFLIGHT_PROCESSING_${file.kind}`);
@@ -941,34 +969,11 @@ class MarketplaceOrderService {
                         blockers.push(`PREFLIGHT_HUMAN_REPORT_UNKNOWN_${file.kind}`);
                     } else if (outcome === 'FIXED_REVIEW_REQUIRED') {
                         // Check for review approval
-                        const approvalRes = await reviewApprovalService.getLatestDecision(file.preflightJobId, { tenantId: order.tenantId });
-                        if (!approvalRes.ok || !approvalRes.decision) {
+                        if (!decision) {
                             blocked = true;
                             gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
                             blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
                         } else {
-                            const decision = approvalRes.decision;
-                            gateObj.active_decision = decision.decision;
-                            gateObj.decision_id = decision.id;
-                            gateObj.decision_snapshot_id = decision.snapshot_id;
-                            gateObj.decision_report_outcome = decision.report_outcome;
-                            gateObj.approved_artifact_type = decision.approved_artifact_type;
-                            gateObj.approved_artifact_filename = decision.approved_artifact_filename;
-                            
-                            // Mismatch trace
-                            if (gateObj.decision_snapshot_id && gateObj.evaluated_snapshot_id && gateObj.decision_snapshot_id !== gateObj.evaluated_snapshot_id) {
-                                gateObj.snapshot_mismatch = true;
-                                if (gateObj.decision_report_outcome && gateObj.outcome && gateObj.decision_report_outcome !== gateObj.outcome) {
-                                    // Conflict
-                                    blocked = true;
-                                    gateObj.gate_code = `PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT`;
-                                    blockers.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT_${file.kind}`);
-                                    continue; // Stop processing further rules for this file since it is conflicted
-                                } else {
-                                    warnings.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_MISMATCH_${file.kind}`);
-                                }
-                            }
-                            
                             if (decision.decision === 'REJECTED_REQUIRES_REUPLOAD') {
                                 blocked = true;
                                 gateObj.gate_code = `PREFLIGHT_REVIEW_REJECTED`;
@@ -993,6 +998,7 @@ class MarketplaceOrderService {
                         gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_UNKNOWN`;
                         blockers.push(`PREFLIGHT_HUMAN_REPORT_UNKNOWN_${file.kind}`);
                     }
+                }
                 }
                 
                 humanReportGates.push(gateObj);

@@ -4,27 +4,35 @@ async function findOrder(jobId) {
     try {
         console.log(`Searching for marketplace order linked to preflight job: ${jobId}`);
 
-        // Search bindings table
+        let orderMap = {};
+
+        // 1. Search bindings table
         const bindings = await db.query(`
             SELECT * FROM marketplace_order_preflight_bindings 
             WHERE preflight_job_id = ?
         `, [jobId]);
 
-        let orderIds = bindings.map(b => b.order_id);
-
-        if (orderIds.length === 0) {
-            // Search file table
-            const files = await db.query(`
-                SELECT * FROM marketplace_order_files 
-                WHERE preflight_job_id = ?
-            `, [jobId]);
-            orderIds = files.map(f => f.order_id);
+        for (const b of bindings) {
+            orderMap[b.order_id] = orderMap[b.order_id] || { bindings: 0, files: 0, order_found: false, fixture: false };
+            orderMap[b.order_id].bindings++;
         }
+
+        // 2. Search files table
+        const files = await db.query(`
+            SELECT * FROM marketplace_order_files 
+            WHERE preflight_job_id = ?
+        `, [jobId]);
+        
+        for (const f of files) {
+            orderMap[f.order_id] = orderMap[f.order_id] || { bindings: 0, files: 0, order_found: false, fixture: false };
+            orderMap[f.order_id].files++;
+        }
+
+        const orderIds = Object.keys(orderMap);
 
         if (orderIds.length === 0) {
             console.log(`No bindings or files found directly. Searching full JSON structures...`);
             
-            // This is slow but guaranteed if bound
             const orders = await db.query(`
                 SELECT order_id, status, readiness_json, metadata_json 
                 FROM marketplace_orders 
@@ -32,30 +40,54 @@ async function findOrder(jobId) {
                    OR JSON_SEARCH(metadata_json, 'all', ?) IS NOT NULL
             `, [jobId, jobId]);
             
-            orderIds = orders.map(o => o.order_id);
+            for (const o of orders) {
+                orderMap[o.order_id] = orderMap[o.order_id] || { bindings: 0, files: 0, order_found: true, fixture: false };
+                orderMap[o.order_id].order_found = true;
+                const meta = typeof o.metadata_json === 'string' ? JSON.parse(o.metadata_json) : (o.metadata_json || {});
+                if (meta.fixture) orderMap[o.order_id].fixture = true;
+            }
         }
 
-        if (orderIds.length === 0) {
+        const finalOrderIds = Object.keys(orderMap);
+
+        if (finalOrderIds.length === 0) {
             console.log(`[NOT_FOUND] No marketplace order is currently bound to preflight job ${jobId}.`);
             process.exit(0);
         }
 
-        const uniqueOrderIds = [...new Set(orderIds)];
-        console.log(`[FOUND] Preflight job ${jobId} is bound to order(s): ${uniqueOrderIds.join(', ')}`);
+        console.log(`[FOUND] Preflight job ${jobId} is bound to order(s):`);
 
-        for (const orderId of uniqueOrderIds) {
+        for (const orderId of finalOrderIds) {
             const rows = await db.query(`
                 SELECT order_id, status, readiness_json, metadata_json 
                 FROM marketplace_orders WHERE order_id = ?
             `, [orderId]);
             
+            const info = orderMap[orderId];
+            
             if (rows.length > 0) {
+                info.order_found = true;
                 const row = rows[0];
-                console.log(`\n--- Order: ${row.order_id} ---`);
-                console.log(`Status: ${row.status}`);
-                console.log(`Readiness JSON:`);
-                console.log(JSON.stringify(typeof row.readiness_json === 'string' ? JSON.parse(row.readiness_json) : row.readiness_json, null, 2));
+                const meta = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : (row.metadata_json || {});
+                if (meta.fixture) info.fixture = true;
+            } else {
+                info.order_found = false;
             }
+            
+            console.log(`ORDER_ID=${orderId}`);
+            console.log(`order_found: ${info.order_found}`);
+            console.log(`binding count: ${info.bindings}`);
+            console.log(`file count: ${info.files}`);
+            console.log(`fixture metadata: ${info.fixture}`);
+            
+            if (!info.order_found && (info.bindings > 0 || info.files > 0)) {
+                if (orderId.startsWith('ord_phase47_fixture_')) {
+                    console.log(`ORPHAN_FIXTURE_DETECTED`);
+                } else {
+                    console.log(`ORPHAN_BINDING_DETECTED`);
+                }
+            }
+            console.log('---');
         }
 
         process.exit(0);

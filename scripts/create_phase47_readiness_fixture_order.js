@@ -7,7 +7,10 @@ async function createFixture() {
         const snapshotId = 'hrs_1780658461568_mdk0ef0';
         const tenantId = 'ppos-production';
 
-        console.log(`Creating Phase 47.5 Readiness Fixture Order: ${orderId}`);
+        console.log(`Creating Phase 47.5 Readiness Fixture Order...`);
+
+        // Transaction start
+        await db.query('START TRANSACTION');
 
         const metadata = {
             fixture: true,
@@ -16,6 +19,41 @@ async function createFixture() {
             preflight_job_id: jobId,
             snapshot_id: snapshotId
         };
+
+        // Check if binding already exists
+        const existingBindings = await db.query(`SELECT * FROM marketplace_order_preflight_bindings WHERE preflight_job_id = ?`, [jobId]);
+        if (existingBindings.length > 0) {
+            const eb = existingBindings[0];
+            console.log(`EXISTING_BINDING_FOUND`);
+            console.log(`ORDER_ID=${eb.order_id}`);
+            console.log(`FILE_ID=${eb.file_id}`);
+            console.log(`PREFLIGHT_JOB_ID=${jobId}`);
+            
+            // Check if parent order exists
+            const parentOrder = await db.query(`SELECT * FROM marketplace_orders WHERE order_id = ?`, [eb.order_id]);
+            if (parentOrder.length === 0) {
+                if (eb.order_id.startsWith('ord_phase47_fixture_')) {
+                    console.log(`Repairing missing fixture parent order...`);
+                    await db.query(`
+                        INSERT INTO marketplace_orders (
+                            order_id, tenant_id, status, selected_offer_id, customer_id, readiness_json, metadata_json, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    `, [
+                        eb.order_id, tenantId, 'FILES_UPLOADED', 'offer_fixture', 'cust_fixture',
+                        JSON.stringify({ ready: false, blockers: [] }),
+                        JSON.stringify(metadata)
+                    ]);
+                } else {
+                    console.log(`ORPHAN_BINDING_FOUND`);
+                    await db.query('ROLLBACK');
+                    process.exit(1);
+                }
+            }
+            await db.query('COMMIT');
+            process.exit(0);
+        }
+
+        const orderId = `ord_phase47_fixture_${Date.now()}`;
 
         // 1. Insert Order
         await db.query(`
@@ -67,11 +105,13 @@ async function createFixture() {
             orderId, coverFileId, jobId, 'COVER_PDF', 'COMPLETED_WITH_FINDINGS', 'WARNING', JSON.stringify(analysisIntegrity)
         ]);
 
+        await db.query('COMMIT');
         console.log(`[SUCCESS] Fixture created successfully.`);
         console.log(`ORDER_ID=${orderId}`);
 
         process.exit(0);
     } catch (err) {
+        await db.query('ROLLBACK');
         console.error('Failed to create fixture:', err);
         process.exit(1);
     }
