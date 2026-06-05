@@ -103,8 +103,14 @@ async function runSmokeTests() {
                     reason: 'Looks OK'
                 }];
             }
+            if (sql.includes('INSERT INTO control_plane_preflight_review_approvals')) {
+                lastReviewInsert = params;
+                return [];
+            }
             return [];
         };
+
+        let lastReviewInsert = null;
 
         const jobId = 'smoke_job_' + Date.now();
         const tenantId = 'ppos-production';
@@ -245,10 +251,51 @@ async function runSmokeTests() {
 
         console.log('Public route validated successfully. Result passes through directly.');
 
-        console.log(`5. Testing createDecision...`);
-        const decisionRes = await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_WITH_WARNINGS', 'Looks OK', 'review_pdf', context);
-        if (!decisionRes.ok) throw new Error('Failed to create decision');
-        console.log(`Decision recorded: ${decisionRes.review_id}`);
+        console.log(`5. Testing createDecision governance...`);
+        
+        // A. FIXED_REVIEW_REQUIRED + APPROVED_WITH_WARNINGS without reason must fail
+        try {
+            await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_WITH_WARNINGS', '', { approved_artifact_type: 'review_pdf' }, context);
+            throw new Error('Should have failed without reason');
+        } catch (err) {
+            if (err.code !== 'REVIEW_REASON_REQUIRED') throw new Error('Assertion failed: wrong error code for missing reason: ' + err.code);
+        }
+
+        // B. FIXED_REVIEW_REQUIRED + APPROVED_WITH_WARNINGS with reason must pass
+        const decisionRes = await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_WITH_WARNINGS', 'Looks OK', { approved_artifact_type: 'review_pdf' }, context);
+        if (!decisionRes.ok) throw new Error('Failed to create decision B');
+        if (lastReviewInsert[7] !== 'Looks OK') throw new Error('Assertion failed: reason not saved');
+        if (lastReviewInsert[8] !== 'review_pdf') throw new Error('Assertion failed: approved_artifact_type not saved');
+        if (lastReviewInsert[10] !== 'fixed.pdf') throw new Error('Assertion failed: approved_artifact_filename not resolved');
+        if (lastReviewInsert[11] !== 'FIXED_REVIEW_REQUIRED') throw new Error('Assertion failed: report_outcome not extracted');
+
+        // C. REJECTED_REQUIRES_REUPLOAD with reason must pass and supersede
+        const decisionResC = await reviewApprovalService.createDecision(jobId, snapshotId, 'REJECTED_REQUIRES_REUPLOAD', 'Bad file', {}, context);
+        if (!decisionResC.ok) throw new Error('Failed to create decision C');
+        if (lastReviewInsert[4] !== 'REJECTED_REQUIRES_REUPLOAD') throw new Error('Assertion failed: decision C not saved');
+
+        // D. UNKNOWN report_outcome
+        const originalReportJson = lastReportJson;
+        lastReportJson = JSON.stringify({ report: { outcome: 'UNKNOWN' } });
+        try {
+            await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_WITH_WARNINGS', 'Force', {}, context);
+            throw new Error('Should have failed on UNKNOWN');
+        } catch (err) {
+            if (err.code !== 'REVIEW_DECISION_REJECTED') throw new Error('Assertion failed: wrong error for UNKNOWN: ' + err.code);
+        }
+
+        // E. BLOCKED
+        lastReportJson = JSON.stringify({ report: { outcome: 'BLOCKED' } });
+        try {
+            await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_FOR_PRODUCTION', 'Force', {}, context);
+            throw new Error('Should have failed on BLOCKED');
+        } catch (err) {
+            if (err.code !== 'REVIEW_DECISION_REJECTED') throw new Error('Assertion failed: wrong error for BLOCKED: ' + err.code);
+        }
+        
+        lastReportJson = originalReportJson;
+        
+        console.log(`Decision recorded and governance rules passed.`);
 
         console.log(`6. Testing getLatestDecision...`);
         const getDecisionRes = await reviewApprovalService.getLatestDecision(jobId, context);

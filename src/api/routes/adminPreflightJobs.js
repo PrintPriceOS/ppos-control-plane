@@ -2333,12 +2333,29 @@ router.post('/jobs/:jobId/human-report/share-token', async (req, res) => {
 router.post('/jobs/:jobId/review-decision', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
-    const { snapshotId, decision, reason, approvedArtifactType } = req.body;
+    const body = req.body || {};
+    const snapshotId = body.snapshotId || body.snapshot_id;
+    const decision = body.decision;
+    const reason = body.reason;
+    
+    const approved_artifact_type = body.approved_artifact_type || body.approvedArtifactType;
+    const approved_artifact_download_id = body.approved_artifact_download_id || body.approvedArtifactDownloadId;
+    const approved_artifact_filename = body.approved_artifact_filename || body.approvedArtifactFilename;
+
     try {
-        if (!snapshotId || !decision) return res.status(400).json({ ok: false, error: { message: 'snapshotId and decision are required' } });
-        const payload = await reviewApprovalService.createDecision(jobId, snapshotId, decision, reason, approvedArtifactType, context);
+        if (!snapshotId || !decision) {
+            return res.status(400).json({ ok: false, error: { message: 'snapshotId and decision are required' } });
+        }
+        const payload = await reviewApprovalService.createDecision(
+            jobId, snapshotId, decision, reason,
+            { approved_artifact_type, approved_artifact_download_id, approved_artifact_filename },
+            context
+        );
         res.json(payload);
     } catch (err) {
+        if (err.code && err.code.startsWith('REVIEW_')) {
+            return res.status(400).json({ ok: false, error: { code: err.code, message: err.message } });
+        }
         res.status(500).json({ ok: false, error: { message: err.message } });
     }
 });

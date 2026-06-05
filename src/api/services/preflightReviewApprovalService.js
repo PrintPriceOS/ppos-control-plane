@@ -10,10 +10,16 @@ function generateId(prefix = 'rev') {
 
 class PreflightReviewApprovalService {
 
+    unwrapStoredHumanReport(raw) {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const report = parsed?.report || parsed || {};
+        return { envelope: parsed || {}, report };
+    }
+
     /**
      * Records an operator's decision for a specific snapshot, superseding previous decisions.
      */
-    async createDecision(jobId, snapshotId, decision, reason, approvedArtifactType, context) {
+    async createDecision(jobId, snapshotId, decision, reason, artifactData, context) {
         logger.info({ event: 'CREATE_DECISION_STARTED', jobId, snapshotId, decision });
 
         const tenantId = context?.tenantId || 'ppos-production';
@@ -36,23 +42,75 @@ class PreflightReviewApprovalService {
             throw new Error('SNAPSHOT_NOT_FOUND');
         }
 
-        let report;
-        try {
-            report = typeof snapshotRows[0].report_json === 'string' 
-                ? JSON.parse(snapshotRows[0].report_json) 
-                : snapshotRows[0].report_json;
-        } catch(e) {
-            report = {};
+        const snapshot = snapshotRows[0];
+        const { report } = this.unwrapStoredHumanReport(snapshot.report_json);
+
+        const reportOutcome = snapshot.outcome || report.outcome || 'UNKNOWN';
+
+        const reviewRequired =
+            snapshot.review_required === 1 ||
+            snapshot.review_required === true ||
+            report.findings_summary?.review_required === true ||
+            report.fix_summary?.review_required === true ||
+            reportOutcome === 'FIXED_REVIEW_REQUIRED';
+
+        const finalReason = typeof reason === 'string' ? reason.trim() : '';
+
+        if (decision === 'APPROVED_WITH_WARNINGS' && reviewRequired) {
+            if (!finalReason) {
+                const err = new Error('A reason is required when approving a review-required preflight report with warnings.');
+                err.code = 'REVIEW_REASON_REQUIRED';
+                throw err;
+            }
+        }
+        if (decision === 'APPROVED_WITH_WARNINGS' && reportOutcome === 'FIXED_REVIEW_REQUIRED') {
+            if (!finalReason) {
+                const err = new Error('A reason is required when approving a review-required preflight report with warnings.');
+                err.code = 'REVIEW_REASON_REQUIRED';
+                throw err;
+            }
+        }
+        if (['APPROVED_FOR_PRODUCTION', 'APPROVED_WITH_WARNINGS'].includes(decision)) {
+            if (reportOutcome === 'BLOCKED') {
+                const err = new Error('Cannot approve a BLOCKED preflight report.');
+                err.code = 'REVIEW_DECISION_REJECTED';
+                throw err;
+            }
+            if (reportOutcome === 'PROCESSING') {
+                const err = new Error('Cannot approve a PROCESSING preflight report.');
+                err.code = 'REVIEW_DECISION_REJECTED';
+                throw err;
+            }
+            if (reportOutcome === 'UNKNOWN') {
+                const err = new Error('Cannot approve a preflight report with UNKNOWN outcome.');
+                err.code = 'REVIEW_DECISION_REJECTED';
+                throw err;
+            }
         }
 
-        const reportOutcome = report.outcome || 'UNKNOWN';
-        let approvedFilename = null;
-        let approvedDownloadId = null;
+        const approved_artifact_type = artifactData?.approved_artifact_type || null;
+        let approvedFilename = artifactData?.approved_artifact_filename || null;
+        let approvedDownloadId = artifactData?.approved_artifact_download_id || null;
 
-        if (approvedArtifactType && report.artifact_recommendations && report.artifact_recommendations[approvedArtifactType]) {
-            approvedFilename = report.artifact_recommendations[approvedArtifactType].filename;
-            // Get download token if applicable, or keep null
-            approvedDownloadId = null; // Can be filled if we store tokens
+        if (approved_artifact_type && (!approvedFilename || !approvedDownloadId)) {
+            let matchedArtifact = null;
+            if (report.artifact_recommendations) {
+                if (Array.isArray(report.artifact_recommendations)) {
+                    matchedArtifact = report.artifact_recommendations.find(a => a.type === approved_artifact_type || a.alias === approved_artifact_type);
+                } else {
+                    matchedArtifact = Object.values(report.artifact_recommendations).find(a => a.type === approved_artifact_type || a.alias === approved_artifact_type) || report.artifact_recommendations[approved_artifact_type];
+                }
+            }
+            
+            if (matchedArtifact) {
+                if (!approvedFilename && matchedArtifact.filename) approvedFilename = matchedArtifact.filename;
+                // Only use download_id if internal allowed. Keep simple: if it exists and we need it.
+                if (!approvedDownloadId && matchedArtifact.download_id && !matchedArtifact.customer_visible) approvedDownloadId = matchedArtifact.download_id;
+            } else if (approved_artifact_type === 'review_pdf' && reportOutcome === 'FIXED_REVIEW_REQUIRED' && report.recommended_next_action?.primary_artifact_type === 'review_pdf') {
+                if (!approvedFilename && report.recommended_next_action.primary_artifact_filename) {
+                    approvedFilename = report.recommended_next_action.primary_artifact_filename;
+                }
+            }
         }
 
         // 2. Supersede old active decisions
@@ -74,7 +132,7 @@ class PreflightReviewApprovalService {
             ) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?, ?, NOW())
         `, [
             reviewId, tenantId, jobId, snapshotId, decision, 
-            operatorId, operatorEmail, reason, approvedArtifactType,
+            operatorId, operatorEmail, finalReason, approved_artifact_type,
             approvedDownloadId, approvedFilename, reportOutcome
         ]);
 
