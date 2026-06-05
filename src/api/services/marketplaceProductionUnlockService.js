@@ -136,6 +136,12 @@ async function unlockProductionAfterPayment(orderId, options = {}) {
         };
     }
 
+    // 0. Phase 48: Strict Readiness Guard before unlock
+    const progressionAssert = await marketplaceOrderService.assertOrderReadyForFinancialProgression(orderId, {
+        action: 'unlock_production',
+        operatorId: options.operatorId || 'SYSTEM'
+    }, options);
+
     // Load order to modify
     const orders = await mysqlClient.query('SELECT * FROM marketplace_orders WHERE order_id = ?', [orderId]);
     const currentOrder = orders[0];
@@ -157,7 +163,9 @@ async function unlockProductionAfterPayment(orderId, options = {}) {
             invoiceStatus: invoice.status,
             paymentStatus: payment.status,
             invoiceGateDecision: evalResult.invoiceGateDecision
-        }
+        },
+        warnings: progressionAssert.warnings || [],
+        humanReportGates: progressionAssert.humanReportGates || []
     };
 
     const updatedMetadata = {

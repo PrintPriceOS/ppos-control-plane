@@ -1311,6 +1311,58 @@ class MarketplaceOrderService {
         logger.info({ event: 'MARKETPLACE_ORDER_MARK_HANDOFF_READY_DISABLED', id, actorId });
         return { ok: false, error: 'NOT_IMPLEMENTED', message: 'MES Dispatch & Handoff operations are disabled in Phase 36.1.' };
     }
+
+    /**
+     * Asserts that an order is ready for financial/operational progression.
+     * Force-refreshes readiness to ensure no stale approvals bypass the Human Report gate.
+     */
+    async assertOrderReadyForFinancialProgression(orderId, context = {}, options = {}) {
+        // 1. Force refresh readiness
+        const readiness = await this.computeReadiness(orderId);
+        
+        // 2. Check strict readiness
+        if (readiness.ready !== true) {
+            // Include Human Report blocker explicitly
+            const humanReportBlockers = readiness.blockers?.filter(b => b.startsWith('PREFLIGHT_REVIEW_')) || [];
+            
+            // 3. Emit structured audit
+            await this.addAuditEvent(orderId, 'FINANCIAL_PROGRESSION_BLOCKED_BY_READINESS', {
+                context,
+                readiness_ready: readiness.ready,
+                blockers: readiness.blockers,
+                humanReportBlockers,
+                warnings: readiness.warnings,
+                humanReportGates: readiness.humanReportGates
+            });
+            
+            const error = new Error('Order is not ready for invoice/payment progression.');
+            error.code = 'MARKETPLACE_READINESS_REQUIRED';
+            error.statusCode = 409;
+            error.readiness = {
+                ready: false,
+                blockers: readiness.blockers,
+                warnings: readiness.warnings,
+                humanReportGates: readiness.humanReportGates
+            };
+            throw error;
+        }
+
+        // Emit progression allowed with potential warnings
+        await this.addAuditEvent(orderId, 'FINANCIAL_PROGRESSION_ALLOWED', {
+            context,
+            warnings: readiness.warnings,
+            humanReportGates: readiness.humanReportGates
+        });
+
+        return {
+            ok: true,
+            orderId,
+            ready: true,
+            warnings: readiness.warnings || [],
+            humanReportGates: readiness.humanReportGates || [],
+            readiness
+        };
+    }
 }
 
 module.exports = new MarketplaceOrderService();

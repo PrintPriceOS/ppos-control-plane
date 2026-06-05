@@ -96,7 +96,31 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
 
     const eligible = blockers.length === 0;
 
-    if (!eligible) {
+    // Phase 48: Strict Readiness Guard for queue eligibility
+    // Must be re-evaluated to prevent stale readiness from unlocking machines
+    let progressionAssert = null;
+    try {
+        progressionAssert = await marketplaceOrderService.assertOrderReadyForFinancialProgression(orderId, {
+            action: 'evaluate_queue_eligibility',
+            operatorId: options.operatorId || 'SYSTEM'
+        }, options);
+        if (progressionAssert && progressionAssert.warnings) {
+            warnings.push(...progressionAssert.warnings);
+        }
+    } catch (err) {
+        if (err.code === 'MARKETPLACE_READINESS_REQUIRED') {
+            blockers.push('READINESS_REQUIRED');
+            if (err.readiness && err.readiness.blockers) {
+                blockers.push(...err.readiness.blockers);
+            }
+        } else {
+            blockers.push('READINESS_EVALUATION_FAILED');
+        }
+    }
+
+    const finalEligible = blockers.length === 0;
+
+    if (!finalEligible) {
         await lifecycleAudit.auditProductionQueueTransition('PRODUCTION_QUEUE_BLOCKED', 'FAILURE', {
             order_id: orderId,
             previous_status: order.status,
@@ -118,9 +142,10 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
     return {
         ok: true,
         orderId,
-        eligible,
+        eligible: finalEligible,
         blockers,
         warnings,
+        humanReportGates: progressionAssert ? progressionAssert.humanReportGates : [],
         orderStatus: order.status,
         metadata: {
             dispatchPackageStatus: dispatchPackage.status,

@@ -177,6 +177,12 @@ async function generateMarketplaceInvoice(orderId, options = {}) {
         evaluatedBy: options.issuedBy || options.operatorId || 'control-plane'
     });
 
+    // 1.5 Phase 48: Strict Readiness Guard
+    const progressionAssert = await marketplaceOrderService.assertOrderReadyForFinancialProgression(orderId, {
+        action: 'generate_invoice',
+        issuedBy: options.issuedBy || options.operatorId || 'control-plane'
+    }, options);
+
     if (!gateResult.invoiceReady) {
         logger.warn({ event: 'MARKETPLACE_INVOICE_BLOCKED', orderId, decision: gateResult.decision, blockers: gateResult.blockers });
         return {
@@ -222,7 +228,9 @@ async function generateMarketplaceInvoice(orderId, options = {}) {
         currency,
         issuedAt,
         issuedBy,
-        source: 'CONTROL_PLANE'
+        source: 'CONTROL_PLANE',
+        warnings: progressionAssert.warnings || [],
+        humanReportGates: progressionAssert.humanReportGates || []
     };
 
     // 6. Persist
@@ -272,6 +280,12 @@ async function requestMarketplacePaymentLink(orderId, options = {}) {
     assertPaymentEnabled();
 
     logger.info({ event: 'MARKETPLACE_PAYMENT_LINK_REQUEST_START', orderId });
+
+    // 0. Phase 48: Strict Readiness Guard
+    const progressionAssert = await marketplaceOrderService.assertOrderReadyForFinancialProgression(orderId, {
+        action: 'request_payment_link',
+        requestedBy: options.requestedBy || options.operatorId || options.issuedBy || 'control-plane'
+    }, options);
 
     // 1. Ensure invoice exists
     const invoiceResult = await generateMarketplaceInvoice(orderId, options);
@@ -353,7 +367,9 @@ async function requestMarketplacePaymentLink(orderId, options = {}) {
             reference
         },
         requestedAt,
-        requestedBy
+        requestedBy,
+        warnings: progressionAssert.warnings || [],
+        humanReportGates: progressionAssert.humanReportGates || []
     };
 
     // 6. Persist
@@ -471,6 +487,12 @@ async function markMarketplacePaymentConfirmed(orderId, payload = {}, options = 
 
     logger.info({ event: 'MARKETPLACE_PAYMENT_CONFIRM_START', orderId });
 
+    // 0. Phase 48: Strict Readiness Guard
+    const progressionAssert = await marketplaceOrderService.assertOrderReadyForFinancialProgression(orderId, {
+        action: 'confirm_payment',
+        confirmedBy: payload.confirmedBy || options.operatorId || options.issuedBy || 'control-plane'
+    }, options);
+
     const orderRow = await loadOrderRow(orderId);
     const metadata = safeParseJson(orderRow.metadata_json, {});
 
@@ -529,7 +551,9 @@ async function markMarketplacePaymentConfirmed(orderId, payload = {}, options = 
         paidAt: confirmedAt,
         confirmedAt,
         confirmedBy,
-        providerReference
+        providerReference,
+        warnings: progressionAssert.warnings || [],
+        humanReportGates: progressionAssert.humanReportGates || []
     };
 
     // Persist metadata + order status PAYMENT_CONFIRMED
