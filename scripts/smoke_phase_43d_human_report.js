@@ -9,6 +9,18 @@ const context = {
 async function runTests() {
     console.log("=== Running Phase 43D Human Report Smoke Tests ===\n");
 
+    console.log("=== Running Phase 43D Human Report Route Sanity Check ===");
+    const fs = require('fs');
+    const path = require('path');
+    const routeContent = fs.readFileSync(path.join(__dirname, '../src/api/routes/adminPreflightJobs.js'), 'utf8');
+    
+    const routeMatches = routeContent.match(/router\.get\('\/jobs\/:jobId\/human-report'/g) || [];
+    console.assert(routeMatches.length === 1, `Expected 1 human-report route, found ${routeMatches.length}`);
+    
+    console.assert(!routeContent.includes('getPreflightHumanReport'), "Should not contain getPreflightHumanReport");
+    console.assert(routeContent.includes('getHumanReport'), "Should contain getHumanReport");
+    console.log("✅ Route sanity check passed.\n");
+
     const tests = [
         {
             name: "CERTIFIED_READY (Happy Path)",

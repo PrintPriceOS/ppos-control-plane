@@ -2142,31 +2142,7 @@ router.post('/ui-audit', async (req, res) => {
     }
 });
 
-// --- 16.4 GET /api/admin/preflight/jobs/:jobId/human-report ---
-router.get('/jobs/:jobId/human-report', async (req, res) => {
-    const context = buildGatewayContext(req);
-    try {
-        const jobId = req.params.jobId;
-        const reportPayload = await humanReportService.getPreflightHumanReport(jobId, context);
-        
-        if (!reportPayload.ok) {
-            return res.status(500).json(reportPayload);
-        }
 
-        await logPreflightAdminEvent({ 
-            tenantId: context.tenantId, 
-            jobId, 
-            eventType: 'PREFLIGHT_HUMAN_REPORT_VIEWED', 
-            status: 'SUCCESS', 
-            traceId: context.traceId 
-        });
-
-        res.status(200).json(reportPayload);
-    } catch (err) {
-        console.error('[ADMIN-PREFLIGHT-ROUTER] GET /jobs/:jobId/human-report error:', err.message);
-        res.status(500).json({ ok: false, error: 'HUMAN_REPORT_ERROR', message: err.message });
-    }
-});
 
 // --- 16.5 GET /api/admin/preflight/jobs/:jobId/governance-ledger ---
 router.get('/jobs/:jobId/governance-ledger', async (req, res) => {
@@ -2286,7 +2262,13 @@ router.get('/jobs/:jobId/human-report', async (req, res) => {
         });
         res.json(payload);
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        res.status(500).json({
+            ok: false,
+            error: {
+                code: 'HUMAN_REPORT_ERROR',
+                message: err.message
+            }
+        });
     }
 });
 
