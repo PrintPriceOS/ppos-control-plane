@@ -76,6 +76,7 @@ import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
 import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
+import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
 import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
 
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
 
             <Route path="/login" element={<LoginPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
+            <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

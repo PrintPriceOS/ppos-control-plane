@@ -647,6 +647,54 @@ class ControlPlaneSchemaService {
                 ) ENGINE=InnoDB;
             `);
 
+            // --- PHASE 47: Human Report Operationalization ---
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS control_plane_preflight_human_reports (
+                    id VARCHAR(128) PRIMARY KEY,
+                    tenant_id VARCHAR(128) NOT NULL,
+                    job_id VARCHAR(128) NOT NULL,
+                    source_status VARCHAR(64) NULL,
+                    outcome VARCHAR(64) NOT NULL,
+                    severity VARCHAR(32) NOT NULL,
+                    summary_title VARCHAR(255) NULL,
+                    primary_artifact_type VARCHAR(128) NULL,
+                    primary_artifact_download_id TEXT NULL,
+                    primary_artifact_filename VARCHAR(255) NULL,
+                    production_certified BOOLEAN NOT NULL DEFAULT FALSE,
+                    review_required BOOLEAN NOT NULL DEFAULT FALSE,
+                    customer_visible BOOLEAN NOT NULL DEFAULT FALSE,
+                    report_json JSON NOT NULL,
+                    generated_by VARCHAR(128) NULL,
+                    generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    superseded_at DATETIME NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_human_reports_job_latest (tenant_id, job_id, generated_at),
+                    INDEX idx_human_reports_outcome (tenant_id, outcome),
+                    INDEX idx_human_reports_generated (generated_at)
+                ) ENGINE=InnoDB;
+            `);
+
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS control_plane_preflight_review_approvals (
+                    id VARCHAR(128) PRIMARY KEY,
+                    tenant_id VARCHAR(128) NOT NULL,
+                    job_id VARCHAR(128) NOT NULL,
+                    snapshot_id VARCHAR(128) NOT NULL,
+                    decision ENUM('APPROVED_FOR_PRODUCTION', 'REJECTED_REQUIRES_REUPLOAD', 'APPROVED_WITH_WARNINGS') NOT NULL,
+                    decision_status VARCHAR(64) NOT NULL DEFAULT 'ACTIVE',
+                    operator_id VARCHAR(128) NULL,
+                    operator_email VARCHAR(255) NULL,
+                    reason TEXT NULL,
+                    approved_artifact_type VARCHAR(128) NULL,
+                    approved_artifact_download_id TEXT NULL,
+                    approved_artifact_filename VARCHAR(255) NULL,
+                    report_outcome VARCHAR(64) NOT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    superseded_at DATETIME NULL,
+                    INDEX idx_review_job_latest (tenant_id, job_id, created_at)
+                ) ENGINE=InnoDB;
+            `);
+
             // --- PHASE 17/34 Autonomous Manufacturing Marketplace Persistence ---
             await db.query(`
                 CREATE TABLE IF NOT EXISTS job_marketplace_sessions (

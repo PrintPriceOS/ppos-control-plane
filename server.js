@@ -40,12 +40,14 @@ fastify.addHook('onRequest', async (request, reply) => {
     // 2. API BYPASS
     if (url.startsWith('/api/auth')) return;
     if (url.includes('/api/v2/analytics/public')) return;
+    if (url.startsWith('/api/public/preflight')) return;
 
     // 3. PROTECTED ROUTES
     if (
         (url.startsWith('/api') || url.startsWith('/federation')) &&
         !url.startsWith('/api/admin') &&
         !url.startsWith('/api/auth') &&
+        !url.startsWith('/api/public/preflight') &&
         !url.startsWith('/api/v2/analytics') &&
         !url.startsWith('/api/connectors/factory')
     ) {
@@ -266,6 +268,7 @@ const start = async () => {
             fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
+            fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
             const apiNotFoundFallback = (request, reply) => {
@@ -285,6 +288,8 @@ const start = async () => {
             fastify.all('/api/connectors/factory/*', apiNotFoundFallback);
             fastify.all('/api/marketplace', apiNotFoundFallback);
             fastify.all('/api/marketplace/*', apiNotFoundFallback);
+            fastify.all('/api/public/preflight', apiNotFoundFallback);
+            fastify.all('/api/public/preflight/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');

@@ -7,6 +7,8 @@
 
 const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('marketplace-order-service');
+const humanReportSnapshotService = require('./preflightHumanReportSnapshotService');
+const reviewApprovalService = require('./preflightReviewApprovalService');
 
 /**
  * Robust JSON parsing helper.
@@ -886,6 +888,47 @@ class MarketplaceOrderService {
                 blockers.push(`PREFLIGHT_NON_CERTIFIABLE_${file.kind}`);
             } else if (!acceptableStatuses.includes(file.preflightStatus)) {
                 blockers.push(`PREFLIGHT_UNACCEPTABLE_${file.kind}`);
+            }
+
+            // --- Phase 47 Human Report Readiness Checks ---
+            try {
+                const snapshotRes = await humanReportSnapshotService.getLatestSnapshot(file.preflightJobId, { tenantId: order.tenantId });
+                if (!snapshotRes.ok || !snapshotRes.snapshot_id) {
+                    blocked = true;
+                    blockers.push(`PREFLIGHT_HUMAN_REPORT_REQUIRED_${file.kind}`);
+                } else {
+                    const report = snapshotRes.report;
+                    const outcome = report.outcome;
+                    
+                    if (outcome === 'PROCESSING') {
+                        blocked = true;
+                        blockers.push(`PREFLIGHT_HUMAN_REPORT_PROCESSING_${file.kind}`);
+                    } else if (outcome === 'BLOCKED') {
+                        blocked = true;
+                        blockers.push(`PREFLIGHT_HUMAN_REPORT_BLOCKED_${file.kind}`);
+                    } else if (outcome === 'FIXED_REVIEW_REQUIRED') {
+                        // Check for review approval
+                        const approvalRes = await reviewApprovalService.getLatestDecision(file.preflightJobId, { tenantId: order.tenantId });
+                        if (!approvalRes.ok || !approvalRes.decision) {
+                            blocked = true;
+                            blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
+                        } else {
+                            const decision = approvalRes.decision.decision;
+                            if (decision === 'REJECTED_REQUIRES_REUPLOAD') {
+                                blocked = true;
+                                blockers.push(`PREFLIGHT_REVIEW_REJECTED_${file.kind}`);
+                            } else if (decision === 'APPROVED_WITH_WARNINGS') {
+                                warnings.push(`PREFLIGHT_REVIEW_APPROVED_WITH_WARNINGS_${file.kind}`);
+                            }
+                            // APPROVED_FOR_PRODUCTION is implicitly fine.
+                        }
+                    }
+                    // CERTIFIED_READY is fine, no blocks.
+                }
+            } catch (err) {
+                logger.warn({ event: 'HUMAN_REPORT_READINESS_CHECK_FAILED', jobId: file.preflightJobId, error: err.message });
+                blocked = true;
+                blockers.push(`PREFLIGHT_HUMAN_REPORT_ERROR_${file.kind}`);
             }
         }
 

@@ -18,6 +18,8 @@ const { isTerminalDiagnosticStatus, collectFindings, normalizePreflightArtifacts
 const auditLoggerService = require('../services/auditLoggerService');
 const governanceLedgerService = require('../services/preflightGovernanceLedgerService');
 const humanReportService = require('../services/preflightHumanReportService');
+const humanReportSnapshotService = require('../services/preflightHumanReportSnapshotService');
+const reviewApprovalService = require('../services/preflightReviewApprovalService');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -2269,6 +2271,72 @@ router.get('/jobs/:jobId/human-report', async (req, res) => {
                 message: err.message
             }
         });
+    }
+});
+
+// --- POST /api/admin/preflight/jobs/:jobId/human-report/snapshot ---
+router.post('/jobs/:jobId/human-report/snapshot', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const payload = await humanReportSnapshotService.createSnapshot(jobId, context);
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- GET /api/admin/preflight/jobs/:jobId/human-report/snapshot ---
+router.get('/jobs/:jobId/human-report/snapshot', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const payload = await humanReportSnapshotService.getLatestSnapshot(jobId, context);
+        if (!payload.ok && payload.error === 'NOT_FOUND') return res.status(404).json(payload);
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- POST /api/admin/preflight/jobs/:jobId/human-report/share-token ---
+router.post('/jobs/:jobId/human-report/share-token', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    const { snapshotId } = req.body;
+    try {
+        if (!snapshotId) return res.status(400).json({ ok: false, error: { message: 'snapshotId is required' } });
+        const payload = await humanReportSnapshotService.createShareToken(jobId, snapshotId, context);
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- POST /api/admin/preflight/jobs/:jobId/review-decision ---
+router.post('/jobs/:jobId/review-decision', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    const { snapshotId, decision, reason, approvedArtifactType } = req.body;
+    try {
+        if (!snapshotId || !decision) return res.status(400).json({ ok: false, error: { message: 'snapshotId and decision are required' } });
+        const payload = await reviewApprovalService.createDecision(jobId, snapshotId, decision, reason, approvedArtifactType, context);
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- GET /api/admin/preflight/jobs/:jobId/review-decision ---
+router.get('/jobs/:jobId/review-decision', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const payload = await reviewApprovalService.getLatestDecision(jobId, context);
+        if (!payload.ok && payload.error === 'NOT_FOUND') return res.status(404).json(payload);
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
     }
 });
 

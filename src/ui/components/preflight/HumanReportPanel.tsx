@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getAdminPreflightHumanReport } from "../../lib/adminApi";
 import { 
@@ -8,14 +8,21 @@ import {
     XCircleIcon, 
     ArrowDownTrayIcon, 
     DocumentTextIcon, 
-    ClipboardDocumentIcon 
+    ClipboardDocumentIcon,
+    CameraIcon,
+    LinkIcon
 } from "@heroicons/react/24/outline";
+import { PreflightReviewDecisionPanel } from "./PreflightReviewDecisionPanel";
 
 interface HumanReportPanelProps {
     jobId: string;
 }
 
 export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => {
+    const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
+    const [shareToken, setShareToken] = useState<string | null>(null);
+    const [snapshotId, setSnapshotId] = useState<string | null>(null);
+
     // 1. Fetch on mount and refetch if jobId changes
     const reportQ = useAdminQuery(`admin:preflight:job:${jobId}:human-report`, () => getAdminPreflightHumanReport(jobId), 15000);
 
@@ -111,6 +118,53 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
         }
     };
 
+    const handleSaveSnapshot = async () => {
+        try {
+            setIsSavingSnapshot(true);
+            const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+            const res = await fetch(`/api/admin/preflight/jobs/${jobId}/human-report/snapshot`, {
+                method: 'POST',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.message || 'Failed to save snapshot');
+            setSnapshotId(data.snapshot_id);
+            alert('Snapshot saved successfully!');
+            reportQ.refetch();
+        } catch (err: any) {
+            alert(`Error saving snapshot: ${err.message}`);
+        } finally {
+            setIsSavingSnapshot(false);
+        }
+    };
+
+    const handleGenerateShareLink = async () => {
+        if (!snapshotId) {
+            alert('You must save a snapshot first before generating a share link.');
+            return;
+        }
+        try {
+            const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+            const res = await fetch(`/api/admin/preflight/jobs/${jobId}/human-report/share-token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ snapshotId })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.message || 'Failed to generate token');
+            
+            const url = `${window.location.origin}/public/preflight/human-report/${data.token}`;
+            setShareToken(url);
+            handleCopy(url);
+            alert('Share link generated and copied to clipboard!');
+        } catch (err: any) {
+            alert(`Error generating share link: ${err.message}`);
+        }
+    };
+
     return (
         <div className="mb-8 font-manrope space-y-4">
             
@@ -143,7 +197,21 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                             Copy Operator Text
                         </button>
                     )}
+                    <div className="flex-1"></div>
+                    <button onClick={handleSaveSnapshot} disabled={isSavingSnapshot} className="flex items-center gap-1.5 px-3 py-1.5 border border-current opacity-80 hover:opacity-100 transition-opacity text-[10px] font-black uppercase tracking-widest bg-transparent disabled:opacity-50">
+                        <CameraIcon className="w-3.5 h-3.5" />
+                        {isSavingSnapshot ? 'Saving...' : 'Save Snapshot'}
+                    </button>
+                    <button onClick={handleGenerateShareLink} disabled={!snapshotId} className="flex items-center gap-1.5 px-3 py-1.5 border border-current opacity-80 hover:opacity-100 transition-opacity text-[10px] font-black uppercase tracking-widest bg-transparent disabled:opacity-50" title={!snapshotId ? "Save snapshot first" : ""}>
+                        <LinkIcon className="w-3.5 h-3.5" />
+                        Share Link
+                    </button>
                 </div>
+                {shareToken && (
+                    <div className="mt-2 text-[10px] font-mono break-all p-2 bg-black/5 dark:bg-white/5 border ppos-border">
+                        <strong>Share Link:</strong> {shareToken}
+                    </div>
+                )}
             </div>
 
             {/* Recommended Next Action & Available Files */}
@@ -261,6 +329,14 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
 
                 </div>
             </details>
+
+            {snapshotId && (report.outcome === 'FIXED_REVIEW_REQUIRED' || report.outcome === 'BLOCKED') && (
+                <PreflightReviewDecisionPanel 
+                    jobId={jobId} 
+                    snapshotId={snapshotId} 
+                    onDecisionMade={() => reportQ.refetch()} 
+                />
+            )}
         </div>
     );
 };
