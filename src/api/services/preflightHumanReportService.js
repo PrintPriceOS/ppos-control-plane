@@ -48,11 +48,12 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     const code = String(f.code || f.fix_id || f || '').toUpperCase();
     if (code.includes('REBUILD_TRIMBOX')) return "Page geometry / TrimBox was rebuilt.";
     if (code.includes('APPLY_BLEED')) return "Bleed boxes were adjusted. Visual artwork was not extended automatically.";
-    if (code.includes('INJECT_OUTPUT_INTENT')) {
-        if (colorGov.review_required_color_reasons && colorGov.review_required_color_reasons.length > 0) {
-            return "An OutputIntent profile was injected, but color profile conflicts or color risks remain and require review.";
+    if (code.includes('INJECT_OUTPUT_INTENT') || code.includes('INJECT_PDFX_OUTPUTINTENT')) {
+        let msg = "An OutputIntent profile was injected. No color values were rewritten.";
+        if (colorGov && colorGov.review_required_color_reasons && colorGov.review_required_color_reasons.length > 0) {
+            msg = "An OutputIntent profile was injected, but color profile conflicts or color risks remain and require review.";
         }
-        return "An OutputIntent profile was injected. No color values were rewritten.";
+        return msg + " An OutputIntent may have been injected, but OutputIntent injection alone does not prove PDF/X compliance.";
     }
     if (code.includes('CONVERT_CMYK')) return isSkipped 
         ? "CMYK conversion was skipped because explicit review mode is required." 
@@ -102,6 +103,13 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     if (code.includes('REPAIR_DAMAGED_IMAGE_OBJECT') && isSkipped) return "Damaged image object repair is not implemented automatically.";
     if (code.includes('VECTORIZE_BITMAP_TEXT') && isSkipped) return "Bitmap text vectorization is not implemented. This operation can alter text appearance and requires manual review.";
     if (code.includes('RESTORE_RASTERIZED_VECTOR') && isSkipped) return "Rasterized vector restoration is not implemented. Source vector artwork may be required.";
+
+    // Phase 55D
+    if (code.includes('VALIDATE_PDFX')) return "PDF/X validation was not performed because no standards validator was available.";
+    if (code.includes('VALIDATE_PDFA')) return "PDF/A validation was not performed because no standards validator was available.";
+    if (code.includes('GENERATE_PDFX') || code.includes('CONVERT_TO_PDFX')) return "PDF/X conversion is not implemented or validated. PDF/X compliance was not claimed.";
+    if (code.includes('CONVERT_TO_PDFA')) return "PDF/A conversion is not implemented or validated. PDF/A compliance was not claimed.";
+    if (code.includes('GENERATE_STANDARD_VALIDATION_REPORT')) return "A standards validation report was not generated because no validator evidence was available.";
 
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
@@ -406,8 +414,123 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         });
     }
 
-    let pdfxComplianceClaimed = job.pdfx_compliance_claimed === true;
+    // Phase 55D: Defensive extraction of standards_certification_governance
+    const stdSources = [
+        job.standards_certification_governance,
+        job.fix_summary?.standards_certification_governance,
+        job.fix_audit?.standards_certification_governance,
+        job.delta_summary?.standards_certification_governance,
+        job.delta_report?.standards_certification_governance,
+        job.report?.standards_certification_governance
+    ];
+    const artifactsWithStdMeta = artifacts.find(a => a.metadata && a.metadata.standards_certification_governance);
+    if (artifactsWithStdMeta) stdSources.push(artifactsWithStdMeta.metadata.standards_certification_governance);
+
+    let stdGov = {};
+    for (const source of stdSources) {
+        if (!source) continue;
+        if (source.review_required === true) stdGov.review_required = true;
+        if (source.certified_pdf_allowed === false) stdGov.certified_pdf_allowed = false;
+        if (source.production_certified === false) stdGov.production_certified = false;
+        if (source.standard_certified === false) stdGov.standard_certified = false;
+        if (source.standard_certified === true) stdGov.standard_certified = true;
+        if (source.compliance_claim_allowed === false) stdGov.compliance_claim_allowed = false;
+        if (source.validation_required === true) stdGov.validation_required = true;
+        if (source.validation_performed === true) stdGov.validation_performed = true;
+        if (source.validation_passed === true) stdGov.validation_passed = true;
+        if (source.validator_available === false) stdGov.validator_available = false;
+        if (source.validator_available === true) stdGov.validator_available = true;
+        if (source.outputintent_changed === true) stdGov.outputintent_changed = true;
+        if (source.outputintent_does_not_prove_pdfx === true) stdGov.outputintent_does_not_prove_pdfx = true;
+        if (source.pdfx_compliance_claimed === true) stdGov.pdfx_compliance_claimed = true;
+        if (source.pdfa_compliance_claimed === true) stdGov.pdfa_compliance_claimed = true;
+        if (source.standard_claimed) stdGov.standard_claimed = source.standard_claimed;
+        
+        if (source.validator_name) stdGov.validator_name = source.validator_name;
+        if (source.validator_version) stdGov.validator_version = source.validator_version;
+        if (source.standard_detected) stdGov.standard_detected = source.standard_detected;
+        if (source.validation_report_available === true) stdGov.validation_report_available = true;
+        if (source.validation_report_hash) stdGov.validation_report_hash = source.validation_report_hash;
+        if (source.validation_report_path) stdGov.validation_report_path = source.validation_report_path;
+
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            stdGov.review_required_reasons = [...new Set([...(stdGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.unsupported_standards_fixes && source.unsupported_standards_fixes.length > 0) {
+            stdGov.unsupported_standards_fixes = [...new Set([...(stdGov.unsupported_standards_fixes || []), ...source.unsupported_standards_fixes])];
+        }
+    }
+
+    let hasFullValidatorEvidence = false;
+    if (stdGov.validation_performed === true &&
+        stdGov.validation_passed === true &&
+        stdGov.validator_name &&
+        stdGov.validator_version &&
+        stdGov.standard_detected &&
+        (stdGov.validation_report_available === true || stdGov.validation_report_hash || stdGov.validation_report_path) &&
+        stdGov.compliance_claim_allowed !== false) {
+        hasFullValidatorEvidence = true;
+    }
+
+    let pdfxComplianceClaimed = job.pdfx_compliance_claimed === true || stdGov.pdfx_compliance_claimed === true;
+    let pdfaComplianceClaimed = job.pdfa_compliance_claimed === true || stdGov.pdfa_compliance_claimed === true;
+    let standardClaimed = job.standard_claimed || stdGov.standard_claimed || null;
+    let standardCertified = job.standard_certified === true || stdGov.standard_certified === true;
     let pdfxGenerationPerformed = job.pdfx_generation_performed === true;
+
+    // OutputIntent check
+    const appliedSkippedCodes = [...appliedFixesRaw, ...skippedFixesRaw, ...failedFixesRaw].map(f => String(f.code || f.fix_id || f || '').toUpperCase());
+    if (appliedSkippedCodes.some(c => c.includes('INJECT_OUTPUT_INTENT') || c.includes('INJECT_PDFX_OUTPUTINTENT'))) {
+        stdGov.outputintent_changed = true;
+        stdGov.outputintent_does_not_prove_pdfx = true;
+    }
+
+    // Downgrade claims if missing full validator evidence
+    if (!hasFullValidatorEvidence) {
+        if (pdfxComplianceClaimed || pdfaComplianceClaimed || standardCertified || standardClaimed || (stdGov.outputintent_changed && !stdGov.outputintent_does_not_prove_pdfx)) {
+            stdGov.review_required = true;
+            stdGov.review_required_reasons = [...new Set([...(stdGov.review_required_reasons || []), 'STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE'])];
+        }
+        stdGov.standard_certified = false;
+        stdGov.compliance_claim_allowed = false;
+        pdfxComplianceClaimed = false;
+        pdfaComplianceClaimed = false;
+        standardCertified = false;
+        standardClaimed = null;
+        if (stdGov.outputintent_changed) {
+             stdGov.outputintent_does_not_prove_pdfx = true;
+        }
+    }
+
+    let hasStandardsRisk = false;
+    if (stdGov.review_required === true || 
+        stdGov.certified_pdf_allowed === false || 
+        stdGov.production_certified === false || 
+        stdGov.standard_certified === false ||
+        stdGov.compliance_claim_allowed === false ||
+        stdGov.validation_required === true ||
+        stdGov.validator_available === false ||
+        (stdGov.review_required_reasons && stdGov.review_required_reasons.length > 0)) {
+        hasStandardsRisk = true;
+    }
+
+    if (hasStandardsRisk) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === "CERTIFIED_READY" || certLevel === "FIXED_READY") {
+            certLevel = appliedFixesRaw.length > 0 ? "FIXED_REVIEW_REQUIRED" : "REVIEW_REQUIRED";
+        }
+        // Downgrade certified_pdf
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.is_primary = false;
+                a.customer_visible = false;
+                a.production_certified = false;
+                a.standard_certified = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
 
     const skippedFailedCodes = [...skippedFixesRaw, ...failedFixesRaw].map(f => String(f.code || f.fix_id || f || '').toUpperCase());
     const unsupportedFixes = transGov.unsupported_transparency_overprint_fixes || [];
@@ -540,6 +663,34 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             if (iqGov.highest_image_quality_risk === 'critical') {
                 severity = 'critical';
             }
+        }
+
+        // Phase 55D Standards Governance reasons
+        const stdReasons = stdGov.review_required_reasons || [];
+        if (stdReasons.includes('PDFX_MISSING')) opDetails.push("The PDF does not declare a verified PDF/X standard. No PDF/X compliance was claimed.");
+        if (stdReasons.includes('PDFX_INVALID')) opDetails.push("The PDF contains an invalid or conflicting PDF/X declaration. A standards validator is required before PDF/X compliance can be claimed.");
+        if (stdReasons.includes('PDFX_CLAIMED_BUT_NOT_VALIDATED')) opDetails.push("The PDF appears to claim PDF/X compliance, but no real validator evidence is available. PDF/X compliance was not accepted.");
+        if (stdReasons.includes('PDFX_METADATA_CONFLICT')) opDetails.push("The PDF contains conflicting PDF/X metadata. Standards compliance requires validation.");
+        if (stdReasons.includes('PDFA_METADATA_CONFLICT')) opDetails.push("The PDF contains conflicting PDF/A metadata. PDF/A compliance was not accepted without validation.");
+        if (stdReasons.includes('OUTPUTINTENT_PRESENT_NOT_PDFX')) opDetails.push("An OutputIntent is present, but OutputIntent presence alone does not prove PDF/X compliance.");
+        if (stdReasons.includes('OUTPUTINTENT_MISSING_FOR_STANDARD')) opDetails.push("The PDF is missing the OutputIntent required for a standards claim. Compliance was not claimed.");
+        if (stdReasons.includes('OUTPUTINTENT_INVALID_FOR_STANDARD')) opDetails.push("The PDF contains an OutputIntent that is invalid or insufficient for the claimed standard.");
+        if (stdReasons.includes('STANDARD_VALIDATOR_UNAVAILABLE')) opDetails.push("No standards validator was available. PDF/X or PDF/A compliance was not claimed.");
+        if (stdReasons.includes('STANDARD_VALIDATION_FAILED')) opDetails.push("Standards validation failed. The PDF cannot be treated as standard-certified.");
+        if (stdReasons.includes('STANDARD_VALIDATION_REQUIRED')) opDetails.push("A standards validator is required before compliance can be claimed.");
+        if (stdReasons.includes('CERTIFIED_PDF_NOT_STANDARD_CERTIFIED')) opDetails.push("The generated certified.pdf artifact exists, but it is not standard-certified by PDF/X or PDF/A validation.");
+        if (stdReasons.includes('PRODUCTION_CERTIFIED_WITHOUT_STANDARD_VALIDATION')) opDetails.push("A production certification claim was found without standards validation evidence. The claim was revoked or downgraded.");
+        if (stdReasons.includes('STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE')) opDetails.push("A standards compliance claim was present, but required validator evidence was missing. The claim was not accepted.");
+
+        if (stdGov.validator_available === false) {
+            opDetails.push("No standards validator was available.");
+        }
+        if (stdGov.outputintent_changed || stdGov.outputintent_does_not_prove_pdfx) {
+            opDetails.push("An OutputIntent may be present or injected, but OutputIntent alone does not prove PDF/X compliance.");
+        }
+
+        if (hasStandardsRisk || stdGov.standard_certified === false || stdReasons.length > 0) {
+            customerSummary = "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.";
         }
 
         if (colorGov && colorGov.detector_gap === true) {
@@ -688,6 +839,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             label: a.label || a.alias || a.type,
             downloadable: a.downloadable !== false && a.size_bytes > 0,
             production_certified: a.production_certified === true,
+            standard_certified: a.standard_certified === true,
             customer_visible: a.customer_visible === true,
             artifact_role: a.artifact_role || 'INTERNAL',
             recommended_use: a.recommended_use || 'Internal review only.',
@@ -721,6 +873,13 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         customer_summary: customerSummary,
         operator_summary: operatorSummary,
         pdfx_compliance_claimed: pdfxComplianceClaimed,
+        pdfa_compliance_claimed: pdfaComplianceClaimed,
+        standard_claimed: standardClaimed,
+        standard_certified: standardCertified,
+        validation_performed: stdGov.validation_performed === true,
+        validation_passed: stdGov.validation_passed === true,
+        validator_name: stdGov.validator_name || null,
+        validator_version: stdGov.validator_version || null,
         pdfx_generation_performed: pdfxGenerationPerformed,
         technical_summary: job.summary || job.analysis?.summary || '',
         recommended_next_action: recommendedAction,
