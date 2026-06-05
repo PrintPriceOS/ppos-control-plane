@@ -30,6 +30,7 @@ import {
 } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { GovernanceLedgerPanel } from "./GovernanceLedgerPanel";
+import { HumanReportPanel } from "../../components/preflight/HumanReportPanel";
 import { toDisplayText } from "../../lib/display";
 import { 
   isTerminalDiagnosticStatus,
@@ -670,6 +671,9 @@ async function triggerArtifactDownload(artifact: any) {
               </div>
             )}
           </div>
+
+          {/* Phase 43D Human Report Panel */}
+          <HumanReportPanel jobId={jobId!} />
 
           {/* Canonical Governance Ledger */}
           <GovernanceLedgerPanel 

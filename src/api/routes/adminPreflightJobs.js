@@ -17,6 +17,7 @@ const preflightServiceClient = require('../services/preflightServiceClient');
 const { isTerminalDiagnosticStatus, collectFindings, normalizePreflightArtifacts } = require('../services/preflightStatusHelpers');
 const auditLoggerService = require('../services/auditLoggerService');
 const governanceLedgerService = require('../services/preflightGovernanceLedgerService');
+const humanReportService = require('../services/preflightHumanReportService');
 
 // Memory storage to stream files directly to the upstream gateway without disk overhead
 const upload = multer({ 
@@ -2138,6 +2139,32 @@ router.post('/ui-audit', async (req, res) => {
         console.error(`[CONTROL][PREFLIGHT][UI-AUDIT] Internal error processing payload: ${err.message}`, err);
         // Return 200 with an error object rather than crashing the client with 500
         res.status(200).json({ ok: false, error: 'UI_AUDIT_INTERNAL_ERROR', message: err.message });
+    }
+});
+
+// --- 16.4 GET /api/admin/preflight/jobs/:jobId/human-report ---
+router.get('/jobs/:jobId/human-report', async (req, res) => {
+    const context = buildGatewayContext(req);
+    try {
+        const jobId = req.params.jobId;
+        const reportPayload = await humanReportService.getPreflightHumanReport(jobId, context);
+        
+        if (!reportPayload.ok) {
+            return res.status(500).json(reportPayload);
+        }
+
+        await logPreflightAdminEvent({ 
+            tenantId: context.tenantId, 
+            jobId, 
+            eventType: 'PREFLIGHT_HUMAN_REPORT_VIEWED', 
+            status: 'SUCCESS', 
+            traceId: context.traceId 
+        });
+
+        res.status(200).json(reportPayload);
+    } catch (err) {
+        console.error('[ADMIN-PREFLIGHT-ROUTER] GET /jobs/:jobId/human-report error:', err.message);
+        res.status(500).json({ ok: false, error: 'HUMAN_REPORT_ERROR', message: err.message });
     }
 });
 

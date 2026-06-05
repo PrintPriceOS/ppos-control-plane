@@ -2591,3 +2591,7 @@ export async function updateTenantGovernance(tenantId: string, payload: Record<s
 export async function getAdminPreflightGovernanceLedger(jobId: string) {
     return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/governance-ledger`);
 }
+
+export async function getAdminPreflightHumanReport(jobId: string) {
+    return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/human-report`);
+}
