@@ -539,6 +539,21 @@ router.post('/:id/invoice/generate', async (req, res) => {
         if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
             return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
         }
+        if (err.code === 'MARKETPLACE_READINESS_REQUIRED') {
+            return res.status(err.statusCode || 409).json({
+                ok: false,
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    readiness: err.readiness || {
+                        ready: false,
+                        blockers: err.blockers || [],
+                        warnings: err.warnings || [],
+                        humanReportGates: err.humanReportGates || []
+                    }
+                }
+            });
+        }
         return res.status(500).json({ ok: false, error: 'INVOICE_GENERATE_ERROR', message: err.message });
     }
 });
@@ -592,6 +607,21 @@ router.post('/:id/payment/request-link', async (req, res) => {
         if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
             return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
         }
+        if (err.code === 'MARKETPLACE_READINESS_REQUIRED') {
+            return res.status(err.statusCode || 409).json({
+                ok: false,
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    readiness: err.readiness || {
+                        ready: false,
+                        blockers: err.blockers || [],
+                        warnings: err.warnings || [],
+                        humanReportGates: err.humanReportGates || []
+                    }
+                }
+            });
+        }
         return res.status(500).json({ ok: false, error: 'PAYMENT_LINK_ERROR', message: err.message });
     }
 });
@@ -624,6 +654,21 @@ router.post('/:id/payment/mark-confirmed', async (req, res) => {
         }
         if (err.code === 'PHASE37_PAYMENT_DISABLED' || err.message === 'PHASE37_PAYMENT_DISABLED') {
             return res.status(403).json({ ok: false, error: 'PHASE37_PAYMENT_DISABLED', message: 'Set PPOS_ENABLE_PHASE37_PAYMENT=true to enable Phase 37.1 invoice/payment operations.' });
+        }
+        if (err.code === 'MARKETPLACE_READINESS_REQUIRED') {
+            return res.status(err.statusCode || 409).json({
+                ok: false,
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    readiness: err.readiness || {
+                        ready: false,
+                        blockers: err.blockers || [],
+                        warnings: err.warnings || [],
+                        humanReportGates: err.humanReportGates || []
+                    }
+                }
+            });
         }
         return res.status(500).json({ ok: false, error: 'PAYMENT_CONFIRM_ERROR', message: err.message });
     }
@@ -858,6 +903,21 @@ router.post('/:id/production-unlock/execute', async (req, res) => {
         console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to execute production unlock for ${req.params.id}:`, err);
         if (err.message === 'ORDER_NOT_FOUND') {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        if (err.code === 'MARKETPLACE_READINESS_REQUIRED') {
+            return res.status(err.statusCode || 409).json({
+                ok: false,
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    readiness: err.readiness || {
+                        ready: false,
+                        blockers: err.blockers || [],
+                        warnings: err.warnings || [],
+                        humanReportGates: err.humanReportGates || []
+                    }
+                }
+            });
         }
         return res.status(500).json({ ok: false, error: 'PRODUCTION_UNLOCK_EXECUTE_ERROR', message: err.message });
     }

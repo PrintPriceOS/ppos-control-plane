@@ -136,6 +136,7 @@ async function runTests() {
             assert.fail('Should have thrown');
         } catch (err) {
             assert.strictEqual(err.code, 'MARKETPLACE_READINESS_REQUIRED');
+            assert.strictEqual(err.statusCode, 409);
             if (!err.readiness.blockers.some(b => b.includes('PREFLIGHT_REVIEW_REJECTED'))) {
                 console.log(err.readiness);
                 assert.fail('Missing PREFLIGHT_REVIEW_REJECTED');
@@ -149,6 +150,7 @@ async function runTests() {
             assert.fail('Should have thrown');
         } catch (err) {
             assert.strictEqual(err.code, 'MARKETPLACE_READINESS_REQUIRED');
+            assert.strictEqual(err.statusCode, 409);
             assert.ok(err.readiness.blockers.some(b => b.includes('PREFLIGHT_REVIEW_APPROVAL_REQUIRED')));
         }
 
@@ -173,6 +175,7 @@ async function runTests() {
             assert.fail('Should have thrown');
         } catch (err) {
             assert.strictEqual(err.code, 'MARKETPLACE_READINESS_REQUIRED');
+            assert.strictEqual(err.statusCode, 409);
             assert.ok(err.readiness.blockers.some(b => b.includes('PREFLIGHT_REVIEW_REJECTED')));
         }
 
@@ -197,6 +200,7 @@ async function runTests() {
             assert.fail('Should have thrown');
         } catch (err) {
             assert.strictEqual(err.code, 'MARKETPLACE_READINESS_REQUIRED');
+            assert.strictEqual(err.statusCode, 409);
             assert.ok(err.readiness.blockers.some(b => b.includes('PREFLIGHT_REVIEW_REJECTED')));
         }
 
@@ -234,6 +238,7 @@ async function runTests() {
             assert.fail('Should have thrown');
         } catch (err) {
             assert.strictEqual(err.code, 'MARKETPLACE_READINESS_REQUIRED');
+            assert.strictEqual(err.statusCode, 409);
             assert.ok(err.readiness.blockers.some(b => b.includes('PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT')));
         }
 

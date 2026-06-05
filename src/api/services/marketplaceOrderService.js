@@ -1344,6 +1344,9 @@ class MarketplaceOrderService {
                 warnings: readiness.warnings,
                 humanReportGates: readiness.humanReportGates
             };
+            error.blockers = readiness.blockers;
+            error.warnings = readiness.warnings;
+            error.humanReportGates = readiness.humanReportGates;
             throw error;
         }
 
