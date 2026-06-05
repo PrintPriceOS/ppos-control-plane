@@ -1,0 +1,133 @@
+{
+  "service_report_path": "C:\\Users\\KIKE\\Downloads\\ppos-preflight-service\\reports\\phase52e_service_color_real_hydration.json",
+  "scenarios": [
+    {
+      "scenario": "CONVERT_CMYK applied",
+      "input_mode": "REAL_ENGINE_OUTPUT",
+      "real_engine_detection": true,
+      "detector_gap": false,
+      "human_report_outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "customer_summary": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+      "operator_summary": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains RGB color content. Conversion to print CMYK may alter visual appearance.",
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "passed": false,
+        "reasons": [
+          "REJECTED_REQUIRES_REUPLOAD blocks readiness"
+        ]
+      },
+      "payment_gate_result": {
+        "passed": false,
+        "reasons": [
+          "REJECTED_REQUIRES_REUPLOAD blocks payment"
+        ]
+      },
+      "pass": true,
+      "notes": ""
+    },
+    {
+      "scenario": "INJECT_OUTPUT_INTENT only",
+      "input_mode": "REAL_ENGINE_OUTPUT",
+      "real_engine_detection": true,
+      "detector_gap": false,
+      "human_report_outcome": "CERTIFIED_READY",
+      "severity": "success",
+      "customer_summary": "Your PDF passed preflight and a certified production-ready file is available.",
+      "operator_summary": "File is certified for immediate production routing.",
+      "primary_artifact_type": "certified_pdf",
+      "certified_pdf_downgraded": false,
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "passed": true,
+        "reasons": []
+      },
+      "payment_gate_result": {
+        "passed": true,
+        "reasons": []
+      },
+      "pass": true,
+      "notes": ""
+    },
+    {
+      "scenario": "INJECT_OUTPUT_INTENT + ICC risk",
+      "input_mode": "REAL_ENGINE_OUTPUT",
+      "real_engine_detection": true,
+      "detector_gap": false,
+      "human_report_outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "customer_summary": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+      "operator_summary": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains ICC/profile inconsistencies. Color appearance may vary between devices or print workflows.",
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "passed": true,
+        "reasons": [
+          "Approved with warnings"
+        ]
+      },
+      "payment_gate_result": {
+        "passed": true,
+        "reasons": [
+          "Approved with warnings"
+        ]
+      },
+      "pass": true,
+      "notes": ""
+    },
+    {
+      "scenario": "Unsupported REDUCE_TAC",
+      "input_mode": "SYNTHETIC_POLICY_FALLBACK",
+      "real_engine_detection": false,
+      "detector_gap": false,
+      "human_report_outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "customer_summary": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+      "operator_summary": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF may exceed total ink coverage limits. Automatic ink reduction was not applied.",
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "passed": true,
+        "reasons": [
+          "Approved with warnings"
+        ]
+      },
+      "payment_gate_result": {
+        "passed": true,
+        "reasons": [
+          "Approved with warnings"
+        ]
+      },
+      "pass": true,
+      "notes": ""
+    },
+    {
+      "scenario": "Detector gap scenario",
+      "input_mode": "REAL_ENGINE_OUTPUT",
+      "real_engine_detection": true,
+      "detector_gap": true,
+      "human_report_outcome": "CERTIFIED_READY",
+      "severity": "success",
+      "customer_summary": "Your PDF passed preflight and a certified production-ready file is available.",
+      "operator_summary": "File is certified for immediate production routing. Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.",
+      "primary_artifact_type": "certified_pdf",
+      "certified_pdf_downgraded": false,
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "passed": true,
+        "reasons": []
+      },
+      "payment_gate_result": {
+        "passed": true,
+        "reasons": []
+      },
+      "pass": true,
+      "notes": ""
+    }
+  ],
+  "timestamp": "2026-06-05T21:33:28.141Z"
+}

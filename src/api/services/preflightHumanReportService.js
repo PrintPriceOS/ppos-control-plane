@@ -255,6 +255,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         summaryTitle = "PDF certified and ready for production";
         customerSummary = "Your PDF passed preflight and a certified production-ready file is available.";
         operatorSummary = "File is certified for immediate production routing.";
+        if (colorGov && colorGov.detector_gap === true) {
+            operatorSummary += " Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
         recommendedAction = {
             action_id: "use_certified",
             label: "Use Certified PDF",
@@ -311,6 +314,10 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             }
         }
 
+        if (colorGov && colorGov.detector_gap === true) {
+            opDetails.push("Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
+        }
+
         // Include affected font names if evidence is in findings
         const findingsList = job.findings || job.analysis?.findings || [];
         const affectedFonts = [];
@@ -345,6 +352,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         summaryTitle = "PDF fixed and ready for operator use";
         customerSummary = "The PDF was corrected and no additional review requirement was flagged.";
         operatorSummary = "Fixed PDF available for standard routing. Not fully production-certified.";
+        if (colorGov && colorGov.detector_gap === true) {
+            operatorSummary += " Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
         recommendedAction = {
             action_id: "use_fixed",
             label: "Use Fixed PDF",
