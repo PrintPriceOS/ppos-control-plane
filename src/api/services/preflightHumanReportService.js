@@ -278,6 +278,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (source.soft_masks_present === true) transGov.soft_masks_present = true;
         if (source.blend_modes_present === true) transGov.blend_modes_present = true;
         if (source.rasterization_risk === true) transGov.rasterization_risk = true;
+        if (source.detector_gap === true) transGov.detector_gap = true;
+        if (source.deferred === true) transGov.deferred = true;
+        if (source.fixture_gap === true) transGov.fixture_gap = true;
         
         if (source.highest_transparency_overprint_risk === 'critical') transGov.highest_transparency_overprint_risk = 'critical';
         else if (source.highest_transparency_overprint_risk === 'warning' && transGov.highest_transparency_overprint_risk !== 'critical') transGov.highest_transparency_overprint_risk = 'warning';
@@ -339,6 +342,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = "File is certified for immediate production routing.";
         if (colorGov && colorGov.detector_gap === true) {
             operatorSummary += " Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (transGov && transGov.detector_gap === true) {
+            operatorSummary += " Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
         }
         recommendedAction = {
             action_id: "use_certified",
@@ -427,6 +433,10 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             opDetails.push("Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
         }
 
+        if (transGov && transGov.detector_gap === true) {
+            opDetails.push("Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
+        }
+
         // Include affected font names if evidence is in findings
         const affectedFonts = [];
         findingsList.forEach(finding => {
@@ -462,6 +472,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = "Fixed PDF available for standard routing. Not fully production-certified.";
         if (colorGov && colorGov.detector_gap === true) {
             operatorSummary += " Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (transGov && transGov.detector_gap === true) {
+            operatorSummary += " Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
         }
         recommendedAction = {
             action_id: "use_fixed",
