@@ -3,8 +3,10 @@ const db = require('./mysqlClient');
 // Define classification rules for raw events
 const classificationRules = [
     { match: /SUBMITTED/i, category: 'submission', label: 'Job submitted', summary: 'The preflight job was submitted for processing.' },
+    { match: /JOB_CREATED/i, category: 'submission', label: 'Job created', summary: 'The preflight job record was created.' },
     { match: /FILE_SELECTED/i, category: 'submission', label: 'File selected', summary: 'A PDF file was selected for preflight processing.' },
     { match: /PANEL_OPENED/i, category: 'ui', label: 'Upload panel opened', summary: 'The operator opened the preflight upload panel.' },
+    { match: /GOVERNANCE_LEDGER_VIEWED/i, category: 'access', label: 'Governance ledger viewed', summary: 'The governance ledger was opened by an operator.' },
     { match: /VIEWED/i, category: 'access', label: 'Job viewed', summary: 'The job detail page was opened by an operator.' },
     { match: /FIX_TRIGGERED/i, category: 'autofix', label: 'Fix requested', summary: 'An automatic fix was requested for this preflight job.' },
     { match: /FIX_JOB_CREATED/i, category: 'autofix', label: 'Fix job created', summary: 'A child autofix job was created.' },
@@ -12,6 +14,8 @@ const classificationRules = [
     { match: /EMPTY_OR_UNAVAILABLE/i, category: 'artifact', label: 'Artifacts unavailable', summary: 'The engine registered artifacts but no downloadable bytes were available.' },
     { match: /FIXED_PDF_READY/i, category: 'artifact', label: 'Fixed PDF ready', summary: 'A corrected PDF artifact is available for download.' },
     { match: /CERTIFIED_PDF_READY/i, category: 'artifact', label: 'Certified PDF ready', summary: 'A certified PDF artifact is available.' },
+    { match: /ARTIFACTS_UPSTREAM_HYDRATED/i, category: 'artifact', label: 'Artifacts hydrated', summary: 'Downloadable artifacts were refreshed from the live upstream service.' },
+    { match: /ARTIFACTS_REGISTRY_FALLBACK/i, category: 'sync', label: 'Registry fallback used', summary: 'The Control Plane used the persistent registry because live upstream hydration was unavailable.' },
     { match: /DOWNLOAD_REQUESTED/i, category: 'download', label: 'PDF download requested', summary: 'An operator requested an artifact download.' },
     { match: /DOWNLOAD_FAILED/i, category: 'download', label: 'PDF download failed', summary: 'An artifact download was attempted but failed.' },
     { match: /TICKET_CREATED/i, category: 'download', label: 'Download ticket created', summary: 'A short-lived secure download ticket was issued.' },
@@ -22,7 +26,8 @@ const classificationRules = [
     { match: /FAILED/i, category: 'completion', label: 'Job failed', summary: 'The preflight job failed.' },
     { match: /NOTIFICATION_CREATED/i, category: 'notification', label: 'Notification created', summary: 'A Control Plane notification was created for this event.' },
     { match: /HYDRATION_FAILED/i, category: 'hydration', label: 'Hydration failed', summary: 'Failed to hydrate live status from upstream.' },
-    { match: /HYDRATION_SUCCESS/i, category: 'hydration', label: 'Hydration succeeded', summary: 'Live status was successfully fetched from upstream.' }
+    { match: /HYDRATION_SUCCESS/i, category: 'hydration', label: 'Hydration succeeded', summary: 'Live status was successfully fetched from upstream.' },
+    { match: /JOB_SYNCED/i, category: 'sync', label: 'Job synchronized', summary: 'The job status was synchronized with the upstream preflight service.' }
 ];
 
 function classifyGovernanceEvent(eventType, metadata) {
@@ -91,7 +96,7 @@ function mapAuditEventToLedgerEvent(row) {
         created_at: row.created_at,
         metadata,
         forensic: {
-            trace_id: metadata.traceId || row.request_id || null,
+            trace_id: row.trace_id || metadata.trace_id || metadata.traceId || row.request_id || null,
             tenant_id: row.tenant_id,
             source: metadata.source || 'api_audit_logs'
         }
@@ -185,6 +190,67 @@ async function getGovernanceLedger(jobId, context) {
     }
 
     let ledger = rows.map(mapAuditEventToLedgerEvent);
+    const rawEventCount = ledger.length;
+
+    // Compact repeated VIEWED events
+    const compactLedger = [];
+    let currentGroup = null;
+
+    for (const event of ledger) {
+        if (event.event_type === 'PREFLIGHT_JOB_VIEWED') {
+            if (!currentGroup) {
+                currentGroup = {
+                    ...event,
+                    count: 1,
+                    first_created_at: event.created_at,
+                    last_created_at: event.created_at,
+                    synthetic: false,
+                    label: 'Job viewed repeatedly',
+                    summary: `The job detail page was opened or refreshed 1 times during this period.`
+                };
+            } else {
+                const timeDiff = new Date(event.created_at).getTime() - new Date(currentGroup.last_created_at).getTime();
+                if (currentGroup.actor.user_id === event.actor.user_id && timeDiff <= 60000) {
+                    currentGroup.count++;
+                    currentGroup.last_created_at = event.created_at;
+                    currentGroup.summary = `The job detail page was opened or refreshed ${currentGroup.count} times during this period.`;
+                } else {
+                    if (currentGroup.count === 1) {
+                        currentGroup.label = 'Job viewed';
+                        currentGroup.summary = 'The job detail page was opened by an operator.';
+                    }
+                    compactLedger.push(currentGroup);
+                    currentGroup = {
+                        ...event,
+                        count: 1,
+                        first_created_at: event.created_at,
+                        last_created_at: event.created_at,
+                        label: 'Job viewed repeatedly',
+                        summary: `The job detail page was opened or refreshed 1 times during this period.`
+                    };
+                }
+            }
+        } else {
+            if (currentGroup) {
+                if (currentGroup.count === 1) {
+                    currentGroup.label = 'Job viewed';
+                    currentGroup.summary = 'The job detail page was opened by an operator.';
+                }
+                compactLedger.push(currentGroup);
+                currentGroup = null;
+            }
+            compactLedger.push(event);
+        }
+    }
+    if (currentGroup) {
+        if (currentGroup.count === 1) {
+            currentGroup.label = 'Job viewed';
+            currentGroup.summary = 'The job detail page was opened by an operator.';
+        }
+        compactLedger.push(currentGroup);
+    }
+
+    ledger = compactLedger;
 
     // 2. Fetch registry state to build summary & synthetic events if needed
     let localRecord = null;
@@ -233,14 +299,29 @@ async function getGovernanceLedger(jobId, context) {
             };
 
             // Build Artifact Summary
-            const artifacts = jobPayload.artifacts || [];
+            let artifacts = jobPayload.artifacts || [];
+            try {
+                const preflightServiceClient = require('./preflightServiceClient');
+                const liveArtifactsResponse = await preflightServiceClient.getJobArtifacts(jobId, context.Authorization, context.tenantId);
+                if (liveArtifactsResponse && liveArtifactsResponse.physical_artifacts_ready && Array.isArray(liveArtifactsResponse.artifacts)) {
+                    artifacts = liveArtifactsResponse.artifacts;
+                }
+            } catch (err) {
+                console.warn('[GOVERNANCE-LEDGER] Live artifact hydration failed, using registry payload:', err.message);
+            }
+
             artifactSummary.artifact_count = artifacts.length;
-            artifactSummary.downloadable_artifact_count = artifacts.filter(a => a.sizeBytes > 0 && (a.path || a.url)).length;
-            artifactSummary.zero_byte_artifact_count = artifacts.filter(a => a.sizeBytes === 0).length;
+            artifactSummary.downloadable_artifact_count = artifacts.filter(a => (a.sizeBytes > 0 || a.size_bytes > 0) && (a.path || a.url)).length;
+            artifactSummary.zero_byte_artifact_count = artifacts.filter(a => (a.sizeBytes === 0 || a.size_bytes === 0) && a.type !== 'EMPTY').length;
             artifactSummary.physical_artifacts_ready = artifactSummary.downloadable_artifact_count > 0;
-            artifactSummary.primary_fixed_pdf_available = artifacts.some(a => a.type === 'FIXED_PDF' && a.sizeBytes > 0);
-            artifactSummary.certified_pdf_available = artifacts.some(a => a.type === 'CERTIFIED_PDF' && a.sizeBytes > 0);
-            artifactSummary.report_available = artifacts.some(a => a.type === 'REPORT' && a.sizeBytes > 0);
+            
+            const isReport = (a) => ['analysis_report', 'report_json', 'fix_audit', 'audit_json', 'preflight_report', 'certified_report', 'REPORT'].includes((a.type || a.alias || '').toUpperCase());
+            const isCertified = (a) => ['certified_pdf', 'certified', 'CERTIFIED_PDF'].includes((a.type || a.alias || '').toUpperCase()) || (String(a.alias || '').toLowerCase() === 'production_pdf' && String(a.type || '').toLowerCase().includes('cert'));
+            const isFixed = (a) => ['fixed_pdf', 'final_fixed_pdf', 'FIXED_PDF'].includes((a.type || a.alias || '').toUpperCase()) || (String(a.alias || '').toLowerCase() === 'review_pdf' && String(a.type || '').toLowerCase().includes('fix'));
+
+            artifactSummary.primary_fixed_pdf_available = artifacts.some(a => isFixed(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
+            artifactSummary.certified_pdf_available = artifacts.some(a => isCertified(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
+            artifactSummary.report_available = artifacts.some(a => isReport(a) && (a.sizeBytes > 0 || a.size_bytes > 0));
         }
     } catch(err) {
          console.error('[GOVERNANCE-LEDGER] Failed to query job registry:', err.message);
@@ -281,11 +362,24 @@ async function getGovernanceLedger(jobId, context) {
         }
     }
 
+    if (ledger.length === 0 && !localRecord) {
+        return {
+            ok: true,
+            job_id: jobId,
+            source: 'empty',
+            event_count: 0,
+            ledger: [],
+            message: "No audit or registry records were found for this job."
+        };
+    }
+
     return {
         ok: true,
         job_id: jobId,
         source: ledger.some(l => l.synthetic) ? 'registry_fallback' : 'api_audit_logs',
+        raw_event_count: rawEventCount,
         event_count: ledger.length,
+        compacted_count: rawEventCount - ledger.length,
         ledger,
         status_summary: statusSummary,
         artifact_summary: artifactSummary

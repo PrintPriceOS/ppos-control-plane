@@ -32,11 +32,14 @@ async function run() {
 
         // Insert some audit events
         const events = [
-            { event: 'PREFLIGHT_JOB_SUBMITTED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
-            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
-            { event: 'PREFLIGHT_FIX_TRIGGERED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
-            { event: 'PREFLIGHT_FIX_JOB_CREATED', status: 'SUCCESS', meta: { parent_job_id: parentJobId, child_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
-            { event: 'PREFLIGHT_FIXED_PDF_READY', status: 'SUCCESS', meta: { fix_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } }
+            { event: 'PREFLIGHT_JOB_CREATED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', trace_id: 'trace-123' } },
+            { event: 'PREFLIGHT_JOB_SUBMITTED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_FIX_TRIGGERED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_FIX_JOB_CREATED', status: 'SUCCESS', meta: { parent_job_id: parentJobId, child_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } },
+            { event: 'PREFLIGHT_FIXED_PDF_READY', status: 'SUCCESS', meta: { fix_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE' } }
         ];
 
         // Schema-aware insert
@@ -81,9 +84,16 @@ async function run() {
             failures++;
         }
         
-        if (parentRes.event_count < 5) {
-            console.error(`❌ Expected at least 5 events for parent correlation, got ${parentRes.event_count}`);
+        if (parentRes.event_count < 6) { // Compacted count
+            console.error(`❌ Expected at least 6 compacted events for parent correlation, got ${parentRes.event_count}`);
             failures++;
+        }
+        
+        if (parentRes.raw_event_count <= parentRes.event_count) {
+             console.error("❌ Compaction did not reduce event count.");
+             failures++;
+        } else {
+             console.log(`✅ Event compaction worked: ${parentRes.raw_event_count} raw -> ${parentRes.event_count} compacted.`);
         }
         
         const hasChildEvent = parentRes.ledger.some(l => l.event_type === 'PREFLIGHT_FIXED_PDF_READY');
@@ -99,8 +109,17 @@ async function run() {
         if (!submittedEvent || submittedEvent.category !== 'submission' || submittedEvent.severity !== 'info') {
              console.error("❌ Normalization failed for SUBMITTED event (or event not found).");
              failures++;
+        }
+        
+        const createdEvent = parentRes.ledger.find(l => l.event_type === 'PREFLIGHT_JOB_CREATED');
+        if (!createdEvent || createdEvent.label !== 'Job created') {
+             console.error("❌ PREFLIGHT_JOB_CREATED did not map to 'Job created'.");
+             failures++;
+        } else if (createdEvent.forensic.trace_id !== 'trace-123') {
+             console.error("❌ forensic.trace_id did not correctly fallback to metadata.trace_id.");
+             failures++;
         } else {
-             console.log("✅ Normalization of categories and labels works.");
+             console.log("✅ Label mapping and trace_id fallback works.");
         }
 
         // Test artifact summary
@@ -133,6 +152,15 @@ async function run() {
              failures++;
         } else {
              console.log("✅ Synthetic fallback generated correctly.");
+        }
+
+        console.log("\n5. Testing empty fallback...");
+        const emptyRes = await getGovernanceLedger('non_existent_job_123', context);
+        if (emptyRes.source !== 'empty' || emptyRes.event_count !== 0) {
+             console.error("❌ Empty fallback failed for non-existent job.");
+             failures++;
+        } else {
+             console.log("✅ Empty fallback handles nonexistent jobs.");
         }
 
         if (failures === 0) {
