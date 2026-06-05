@@ -17,20 +17,55 @@ async function runSmokeTests() {
                 outcome: 'FIXED_REVIEW_REQUIRED',
                 severity: 'warning',
                 summary_title: 'PDF fixed, review required before production',
+                customer_summary: 'The PDF was corrected structurally, but it requires review before production.',
                 recommended_next_action: {
                     primary_artifact_type: 'review_pdf',
+                    primary_artifact_download_id: 'internal-id',
                     primary_artifact_filename: 'fixed.pdf'
                 },
                 fix_summary: {
                     production_certified: false,
                     review_required: true
-                }
+                },
+                artifact_recommendations: [
+                    {
+                        type: 'certified_pdf',
+                        filename: 'certified.pdf',
+                        customer_visible: false,
+                        production_certified: false,
+                        artifact_role: 'REVIEW_REQUIRED',
+                        download_id: 'secret-certified'
+                    },
+                    {
+                        type: 'fix_audit',
+                        filename: 'fix_audit.json',
+                        customer_visible: false,
+                        artifact_role: 'FORENSIC_AUDIT',
+                        download_id: 'secret-audit'
+                    },
+                    {
+                        type: 'delta_report',
+                        filename: 'delta_report.json',
+                        customer_visible: false,
+                        artifact_role: 'TECHNICAL_REPORT',
+                        download_id: 'secret-delta'
+                    },
+                    {
+                        type: 'fixed_pdf',
+                        filename: 'fixed.pdf',
+                        customer_visible: true,
+                        is_customer_safe: false,
+                        artifact_role: 'REVIEW_REQUIRED',
+                        download_id: 'internal-fixed'
+                    }
+                ]
             }
         };
     };
 
     let originalQuery;
     let lastSnapshotId = 'hrs_mock';
+    let lastReportJson = '{}';
 
     try {
         originalQuery = db.query;
@@ -38,6 +73,7 @@ async function runSmokeTests() {
         db.query = async (sql, params) => {
             if (sql.includes('INSERT INTO control_plane_preflight_human_reports')) {
                 lastSnapshotId = params[0];
+                lastReportJson = params[12]; // report_json is at index 12 in the INSERT query
                 
                 // Assert values
                 if (params[4] !== 'FIXED_REVIEW_REQUIRED') throw new Error('Assertion failed: outcome is ' + params[4]);
@@ -54,7 +90,7 @@ async function runSmokeTests() {
                     job_id: params[1],
                     generated_at: new Date(),
                     generated_by: 'system',
-                    report_json: '{}'
+                    report_json: lastReportJson
                 }];
             }
             if (sql.includes('SELECT id FROM control_plane_preflight_human_reports')) {
@@ -146,6 +182,25 @@ async function runSmokeTests() {
         console.log(`4. Testing validateShareToken...`);
         const validateRes = await humanReportSnapshotService.validateShareToken(token);
         if (!validateRes.ok) throw new Error('Failed to validate share token');
+        
+        const safeReport = validateRes.report;
+        if (safeReport.outcome !== 'FIXED_REVIEW_REQUIRED') throw new Error('Assertion failed: validateShareToken outcome');
+        if (safeReport.severity !== 'warning') throw new Error('Assertion failed: validateShareToken severity');
+        if (!safeReport.customer_summary) throw new Error('Assertion failed: validateShareToken customer_summary');
+        
+        // Assert artifacts
+        const artifacts = safeReport.artifact_recommendations || [];
+        const types = Array.isArray(artifacts) ? artifacts.map(a => a.type) : Object.keys(artifacts);
+        if (types.includes('certified_pdf')) throw new Error('Assertion failed: leaks certified_pdf');
+        if (types.includes('fix_audit')) throw new Error('Assertion failed: leaks fix_audit');
+        if (types.includes('delta_report')) throw new Error('Assertion failed: leaks delta_report');
+        
+        const hasSecretIds = JSON.stringify(safeReport).includes('secret-') || JSON.stringify(safeReport).includes('internal-');
+        if (hasSecretIds) throw new Error('Assertion failed: internal download IDs leaked');
+
+        if (!safeReport.recommended_next_action) throw new Error('Assertion failed: missing recommended_next_action');
+        if (safeReport.recommended_next_action.primary_artifact_download_id) throw new Error('Assertion failed: primary_artifact_download_id leaked');
+
         console.log('Share token validated successfully. Sanitized report generated.');
 
         console.log(`5. Testing createDecision...`);

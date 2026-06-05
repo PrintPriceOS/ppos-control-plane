@@ -32,6 +32,12 @@ class PreflightHumanReportSnapshotService {
         };
     }
     
+    unwrapStoredHumanReport(raw) {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const report = parsed?.report || parsed || {};
+        return { envelope: parsed || {}, report };
+    }
+    
     /**
      * Generates a new human report and saves it as a snapshot in the database.
      * Supersedes any existing snapshots for this job.
@@ -221,40 +227,80 @@ class PreflightHumanReportSnapshotService {
         }
 
         const row = rows[0];
-        let report;
+        let reportJson;
         try {
-            report = typeof row.report_json === 'string' ? JSON.parse(row.report_json) : row.report_json;
+            reportJson = typeof row.report_json === 'string' ? JSON.parse(row.report_json) : row.report_json;
         } catch (err) {
-            report = {};
+            reportJson = {};
         }
 
-        // Sanitize for customer: remove non-customer visible artifacts and internal trace details
-        const safeReport = {
-            ok: true,
-            job_id: report.job_id,
-            outcome: report.outcome,
-            severity: report.severity,
-            summary_title: report.summary_title,
-            primary_artifact_type: report.primary_artifact_type,
-            customer_summary: report.customer_summary || '',
-            operator_summary: report.operator_summary || '', // Include as it explains fixes, but it's safe.
-            fix_summary: report.fix_summary || {},
-            artifact_recommendations: {}
-        };
+        const { envelope, report } = this.unwrapStoredHumanReport(reportJson);
 
-        if (report.artifact_recommendations) {
-            for (const [key, artifact] of Object.entries(report.artifact_recommendations)) {
-                if (artifact.customer_visible) {
-                    safeReport.artifact_recommendations[key] = {
-                        artifact_type: artifact.artifact_type,
-                        filename: artifact.filename,
-                        size_bytes: artifact.size_bytes,
-                        role: artifact.role,
-                        customer_visible: true
-                    };
+        const sanitizeRecommendedNextAction = (recAction, allArtifacts) => {
+            if (!recAction) return null;
+            let primaryType = recAction.primary_artifact_type;
+            let primarySafe = false;
+
+            if (primaryType) {
+                if (Array.isArray(allArtifacts)) {
+                    const match = allArtifacts.find(a => a.artifact_type === primaryType || a.type === primaryType);
+                    if (match && match.customer_visible) primarySafe = true;
+                } else if (allArtifacts && allArtifacts[primaryType] && allArtifacts[primaryType].customer_visible) {
+                    primarySafe = true;
                 }
             }
-        }
+
+            if (!primarySafe && report.outcome === 'FIXED_REVIEW_REQUIRED') {
+                return {
+                    action_id: 'review_required',
+                    label: 'Review required before production',
+                    description: 'The corrected file must be reviewed before it can be used for production.',
+                    severity: 'warning',
+                    primary_artifact_available: false
+                };
+            }
+
+            if (!primarySafe) {
+                 return {
+                    action_id: recAction.action_id || 'unknown',
+                    label: recAction.label || '',
+                    description: recAction.description || '',
+                    severity: recAction.severity || 'info',
+                    primary_artifact_available: false
+                 };
+            }
+
+            return {
+                ...recAction,
+                primary_artifact_available: true
+            };
+        };
+
+        const sanitizeCustomerArtifacts = (allArtifacts) => {
+            const arr = [];
+            if (!allArtifacts) return arr;
+            
+            const processArt = (a, key) => {
+                if (a && a.customer_visible) {
+                    arr.push({
+                        type: a.type || a.artifact_type || key,
+                        filename: a.filename,
+                        size_bytes: a.size_bytes,
+                        role: a.artifact_role || a.role,
+                        customer_visible: true
+                    });
+                }
+            };
+
+            if (Array.isArray(allArtifacts)) {
+                allArtifacts.forEach(a => processArt(a, a.type || a.artifact_type));
+            } else {
+                for (const [key, artifact] of Object.entries(allArtifacts)) {
+                    processArt(artifact, key);
+                }
+            }
+            return arr;
+        };
 
         return {
             ok: true,
@@ -263,7 +309,14 @@ class PreflightHumanReportSnapshotService {
                 job_id: row.job_id,
                 generated_at: row.generated_at
             },
-            report: safeReport
+            report: {
+                outcome: report.outcome,
+                severity: report.severity,
+                summary_title: report.summary_title,
+                customer_summary: report.customer_summary || '',
+                recommended_next_action: sanitizeRecommendedNextAction(report.recommended_next_action, report.artifact_recommendations),
+                artifact_recommendations: sanitizeCustomerArtifacts(report.artifact_recommendations)
+            }
         };
     }
 }
