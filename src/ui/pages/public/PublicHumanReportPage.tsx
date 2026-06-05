@@ -1,21 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
 
-    const { data: reportData, isLoading, isError, error } = useQuery(
-        [`public:preflight:human-report:${token}`],
-        async () => {
-            const res = await fetch(`/api/public/preflight/human-report/${token}`);
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.message || 'Failed to load report');
-            return data;
-        },
-        { retry: false }
-    );
+    const [reportData, setReportData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isError, setIsError] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchReport = async () => {
+            try {
+                const res = await fetch(`/api/public/preflight/human-report/${token}`);
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.message || 'Failed to load report');
+                if (isMounted) {
+                    setReportData(data);
+                    setIsLoading(false);
+                }
+            } catch (err: any) {
+                if (isMounted) {
+                    setError(err);
+                    setIsError(true);
+                    setIsLoading(false);
+                }
+            }
+        };
+        fetchReport();
+        return () => { isMounted = false; };
+    }, [token]);
 
     if (isLoading) {
         return (

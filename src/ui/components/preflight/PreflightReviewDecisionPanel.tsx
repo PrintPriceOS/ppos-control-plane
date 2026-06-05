@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useState, useCallback } from 'react';
 import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 interface Props {
@@ -13,20 +12,29 @@ export const PreflightReviewDecisionPanel: React.FC<Props> = ({ jobId, snapshotI
     const [reason, setReason] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { data: latestDecision, refetch } = useQuery(
-        [`admin:preflight:job:${jobId}:decision`],
-        async () => {
+    const [latestDecision, setLatestDecision] = useState<any>(null);
+
+    const fetchDecision = useCallback(async () => {
+        try {
             const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
             const res = await fetch(`/api/admin/preflight/jobs/${jobId}/review-decision`, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
             const data = await res.json();
-            if (res.status === 404 && data.error === 'NOT_FOUND') return null;
+            if (res.status === 404 && data.error === 'NOT_FOUND') {
+                setLatestDecision(null);
+                return;
+            }
             if (!data.ok) throw new Error(data.message || 'Failed to fetch decision');
-            return data.decision;
-        },
-        { retry: false }
-    );
+            setLatestDecision(data.decision);
+        } catch (err) {
+            console.error('Failed to fetch latest decision', err);
+        }
+    }, [jobId]);
+
+    useEffect(() => {
+        fetchDecision();
+    }, [fetchDecision]);
 
     const handleSubmit = async () => {
         if (!decision) return;
@@ -49,7 +57,7 @@ export const PreflightReviewDecisionPanel: React.FC<Props> = ({ jobId, snapshotI
             const data = await res.json();
             if (!data.ok) throw new Error(data.message || 'Failed to submit decision');
             
-            await refetch();
+            await fetchDecision();
             onDecisionMade();
         } catch (err: any) {
             alert(`Error: ${err.message}`);
