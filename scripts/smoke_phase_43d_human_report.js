@@ -133,6 +133,55 @@ async function runTests() {
                 const fixedRec = dedupedArtifacts.find(a => a.filename === 'fixed.pdf');
                 console.assert(fixedRec.secondary_aliases.includes('final_fixed_pdf'), "Should include final_fixed_pdf as alias");
             }
+        },
+        {
+            name: "Phase 43D.3 Hydration from fix_audit",
+            job: {
+                certification_level: "FIXED_REVIEW_REQUIRED",
+                production_certified: false,
+                review_required: true,
+                fix_summary: {
+                    applied_count: 3,
+                    skipped_count: 1,
+                    failed_count: 0,
+                    applied_fixes: [],
+                    skipped_fixes: []
+                }
+            },
+            artifacts: [
+                { type: 'certified_pdf', production_certified: false, customer_visible: false, downloadable: true, size_bytes: 1000 },
+                { type: 'fixed_pdf', downloadable: true, size_bytes: 2000 },
+                {
+                    type: 'fix_audit',
+                    filename: 'fix_audit.json',
+                    metadata_json: JSON.stringify({
+                        applied_fixes: [
+                            { code: 'REBUILD_TRIMBOX', status: 'APPLIED' },
+                            { code: 'APPLY_BLEED', status: 'APPLIED' },
+                            { code: 'INJECT_OUTPUT_INTENT', status: 'APPLIED' }
+                        ],
+                        skipped_fixes: [
+                            { code: 'CONVERT_CMYK', status: 'SKIPPED' }
+                        ],
+                        failed_fixes: []
+                    })
+                }
+            ],
+            validate: (res) => {
+                const report = res.report;
+                const op = report.operator_summary;
+                console.assert(op.includes("certified.pdf exists physically but is not production-certified"), "Missing cert warning");
+                console.assert(op.includes("Page geometry / TrimBox was rebuilt."), "Missing TrimBox message");
+                console.assert(op.includes("Bleed boxes were adjusted."), "Missing Bleed message");
+                console.assert(op.includes("Visual artwork was not extended automatically."), "Missing Visual Artwork message");
+                console.assert(op.includes("OutputIntent was injected."), "Missing OutputIntent message");
+                console.assert(op.includes("CMYK conversion was skipped because explicit review mode is required."), "Missing CMYK skipped message");
+
+                const certItem = report.artifact_recommendations.find(a => a.type === 'certified_pdf');
+                console.assert(certItem.production_certified === false, "production_certified should be strict false");
+                console.assert(certItem.is_primary === false, "certified_pdf should not be primary");
+                console.assert(report.recommended_next_action.primary_artifact_type !== 'certified_pdf', "recommended_next_action should not point to certified_pdf");
+            }
         }
     ];
 

@@ -96,6 +96,69 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         return { ok: false, error: 'Job not found for human report generation' };
     }
 
+    let appliedFixesRaw = job.applied_fixes || job.fix_summary?.applied_fixes || [];
+    let skippedFixesRaw = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
+    let failedFixesRaw = job.failed_fixes || job.fix_summary?.failed_fixes || [];
+    const fixSummaryObj = job.fix_summary || {};
+
+    // Fallback hydration from fix_audit
+    if (appliedFixesRaw.length === 0 && skippedFixesRaw.length === 0 && 
+        ((fixSummaryObj.applied_count > 0) || (fixSummaryObj.skipped_count > 0))) {
+        
+        let auditData = null;
+        if (job.fix_audit) {
+            auditData = job.fix_audit;
+        } else {
+            const fixAuditArtifact = artifacts.find(a => a.type === 'fix_audit' || a.alias === 'fix_audit' || a.filename === 'fix_audit.json');
+            if (fixAuditArtifact) {
+                if (fixAuditArtifact.metadata_json) {
+                    auditData = typeof fixAuditArtifact.metadata_json === 'string' ? JSON.parse(fixAuditArtifact.metadata_json) : fixAuditArtifact.metadata_json;
+                } else if (fixAuditArtifact.metadata) {
+                    auditData = typeof fixAuditArtifact.metadata === 'string' ? JSON.parse(fixAuditArtifact.metadata) : fixAuditArtifact.metadata;
+                } else if (fixAuditArtifact.raw) {
+                    auditData = typeof fixAuditArtifact.raw === 'string' ? JSON.parse(fixAuditArtifact.raw) : fixAuditArtifact.raw;
+                } else {
+                    try {
+                        const actualArtifactId = fixAuditArtifact.download_id || fixAuditArtifact.id || fixAuditArtifact.alias;
+                        if (actualArtifactId) {
+                            const streamRes = await preflightServiceClient.downloadArtifact(jobId, actualArtifactId, null, context.tenantId);
+                            if (streamRes && streamRes.stream) {
+                                if (typeof streamRes.stream.on === 'function') {
+                                    auditData = await new Promise((resolve) => {
+                                        let data = '';
+                                        streamRes.stream.on('data', chunk => data += chunk.toString());
+                                        streamRes.stream.on('end', () => {
+                                            try { resolve(JSON.parse(data)); } catch (e) { resolve(null); }
+                                        });
+                                        streamRes.stream.on('error', () => resolve(null));
+                                    });
+                                } else {
+                                    try {
+                                        auditData = typeof streamRes.stream === 'string' ? JSON.parse(streamRes.stream) : streamRes.stream;
+                                    } catch(e) {}
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('[HUMAN-REPORT] Failed to download fix_audit artifact for hydration', err.message);
+                    }
+                }
+            }
+        }
+
+        if (auditData) {
+            if (Array.isArray(auditData.applied_fixes)) {
+                appliedFixesRaw = auditData.applied_fixes.map(f => f.code || f);
+            }
+            if (Array.isArray(auditData.skipped_fixes)) {
+                skippedFixesRaw = auditData.skipped_fixes.map(f => f.code || f);
+            }
+            if (Array.isArray(auditData.failed_fixes)) {
+                failedFixesRaw = auditData.failed_fixes.map(f => f.code || f);
+            }
+        }
+    }
+
     // Default structural mapping
     let outcome = "UNKNOWN";
     let severity = "neutral";
@@ -148,8 +211,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             opDetails.push("certified.pdf exists physically but is not production-certified and should not be customer-visible.");
         }
 
-        const applied = job.applied_fixes || job.fix_summary?.applied_fixes || [];
-        const skipped = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
+        const applied = appliedFixesRaw;
+        const skipped = skippedFixesRaw;
         applied.forEach(f => opDetails.push(translateFixMessage(f.code || f)));
         skipped.forEach(f => opDetails.push(translateFixMessage(f.code || f, true)));
         
@@ -289,11 +352,6 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         // Safe to ignore, we don't depend on it
     }
 
-    const appliedFixesRaw = job.applied_fixes || job.fix_summary?.applied_fixes || [];
-    const skippedFixesRaw = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
-    const failedFixesRaw = job.failed_fixes || job.fix_summary?.failed_fixes || [];
-
-    const fixSummaryObj = job.fix_summary || {};
     const reportPayload = {
         outcome,
         severity,
