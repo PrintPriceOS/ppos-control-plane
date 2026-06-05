@@ -91,6 +91,18 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     if (code.includes('RASTERIZE_TRANSPARENCY') && isSkipped) return "Transparency rasterization is not currently implemented. Rasterization can alter visual appearance and requires review.";
     if (code.includes('CONVERT_TO_PDFX_TRANSPARENCY_SAFE') && isSkipped) return "PDF/X transparency-safe conversion is not implemented or validated. PDF/X compliance was not claimed.";
 
+    // Phase 54D
+    if (code.includes('UPSCALE_LOW_RES_IMAGES') && isSkipped) return "Low-resolution image upscaling is not implemented as a safe automatic operation. Source images or human review may be required.";
+    if (code.includes('DOWNSAMPLE_EXCESSIVE_RESOLUTION') && isSkipped) return "Image downsampling is not currently applied automatically because it can remove visual detail.";
+    if (code.includes('RECOMPRESS_IMAGES') && isSkipped) return "Image recompression is not implemented as a safe automatic operation because it can introduce visible artifacts.";
+    if (code.includes('REPLACE_LOW_RES_IMAGES') && isSkipped) return "Image replacement requires source assets and was not performed automatically.";
+    if (code.includes('REPAIR_JPEG_ARTIFACTS') && isSkipped) return "JPEG artifact repair is not currently implemented. Human review or replacement source images may be required.";
+    if (code.includes('NORMALIZE_IMAGE_COLORSPACE') && isSkipped) return "Image color space normalization is not performed automatically and must follow color governance review.";
+    if (code.includes('REMOVE_IMAGE_ALPHA') && isSkipped) return "Image alpha removal is not implemented as a safe automatic operation because it can alter visual appearance.";
+    if (code.includes('REPAIR_DAMAGED_IMAGE_OBJECT') && isSkipped) return "Damaged image object repair is not implemented automatically.";
+    if (code.includes('VECTORIZE_BITMAP_TEXT') && isSkipped) return "Bitmap text vectorization is not implemented. This operation can alter text appearance and requires manual review.";
+    if (code.includes('RESTORE_RASTERIZED_VECTOR') && isSkipped) return "Rasterized vector restoration is not implemented. Source vector artwork may be required.";
+
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
 }
@@ -322,6 +334,78 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         });
     }
 
+    // Phase 54D: Defensive extraction of image_quality_governance
+    const iqSources = [
+        job.image_quality_governance,
+        job.fix_summary?.image_quality_governance,
+        job.fix_audit?.image_quality_governance,
+        job.delta_summary?.image_quality_governance,
+        job.delta_report?.image_quality_governance,
+        job.report?.image_quality_governance
+    ];
+    const artifactsWithIqMeta = artifacts.find(a => a.metadata && a.metadata.image_quality_governance);
+    if (artifactsWithIqMeta) iqSources.push(artifactsWithIqMeta.metadata.image_quality_governance);
+
+    let iqGov = {};
+    for (const source of iqSources) {
+        if (!source) continue;
+        if (source.review_required === true) iqGov.review_required = true;
+        if (source.certified_pdf_allowed === false) iqGov.certified_pdf_allowed = false;
+        if (source.production_certified === false) iqGov.production_certified = false;
+        if (source.visual_image_rewrite_applied === true) iqGov.visual_image_rewrite_applied = true;
+        if (source.image_rewrite_performed === true) iqGov.image_rewrite_performed = true;
+        if (source.low_res_images_present === true) iqGov.low_res_images_present = true;
+        if (source.excessive_resolution_present === true) iqGov.excessive_resolution_present = true;
+        if (source.jpeg_artifacts_present === true) iqGov.jpeg_artifacts_present = true;
+        if (source.image_replacement_required === true) iqGov.image_replacement_required = true;
+        if (source.bitmap_text_risk === true) iqGov.bitmap_text_risk = true;
+        if (source.rasterized_vector_risk === true) iqGov.rasterized_vector_risk = true;
+        if (source.image_object_damaged === true) iqGov.image_object_damaged = true;
+        
+        if (source.highest_image_quality_risk === 'critical') iqGov.highest_image_quality_risk = 'critical';
+        else if (source.highest_image_quality_risk === 'warning' && iqGov.highest_image_quality_risk !== 'critical') iqGov.highest_image_quality_risk = 'warning';
+        
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            iqGov.review_required_reasons = [...new Set([...(iqGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.unsupported_image_quality_fixes && source.unsupported_image_quality_fixes.length > 0) {
+            iqGov.unsupported_image_quality_fixes = [...new Set([...(iqGov.unsupported_image_quality_fixes || []), ...source.unsupported_image_quality_fixes])];
+        }
+    }
+
+    let hasImageQualityRisk = false;
+    if (iqGov.review_required === true || 
+        iqGov.certified_pdf_allowed === false || 
+        iqGov.production_certified === false || 
+        iqGov.visual_image_rewrite_applied === true || 
+        iqGov.image_rewrite_performed === true || 
+        iqGov.low_res_images_present === true || 
+        iqGov.jpeg_artifacts_present === true || 
+        iqGov.image_replacement_required === true || 
+        iqGov.bitmap_text_risk === true || 
+        iqGov.rasterized_vector_risk === true || 
+        iqGov.image_object_damaged === true || 
+        (iqGov.review_required_reasons && iqGov.review_required_reasons.length > 0)) {
+        hasImageQualityRisk = true;
+    }
+
+    if (hasImageQualityRisk) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === "CERTIFIED_READY" || certLevel === "FIXED_READY") {
+            certLevel = (appliedFixesRaw.length > 0 || iqGov.visual_image_rewrite_applied || iqGov.image_rewrite_performed) ? "FIXED_REVIEW_REQUIRED" : "REVIEW_REQUIRED";
+        }
+        // Downgrade certified_pdf
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+
     let pdfxComplianceClaimed = job.pdfx_compliance_claimed === true;
     let pdfxGenerationPerformed = job.pdfx_generation_performed === true;
 
@@ -345,6 +429,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
         if (transGov && transGov.detector_gap === true) {
             operatorSummary += " Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (iqGov && iqGov.detector_gap === true) {
+            operatorSummary += " Image quality detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
         }
         recommendedAction = {
             action_id: "use_certified",
@@ -429,12 +516,42 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             }
         }
 
+        // Phase 54D Image Quality Governance reasons
+        const iqReasons = iqGov.review_required_reasons || [];
+        if (iqGov.low_res_images_present || iqReasons.includes('LOW_RES_IMAGES') || findingsList.some(f => f.code === 'LOW_RES_IMAGES')) opDetails.push("The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.");
+        if (iqGov.excessive_resolution_present || iqReasons.includes('EXCESSIVE_RESOLUTION') || findingsList.some(f => f.code === 'EXCESSIVE_RESOLUTION')) opDetails.push("The PDF contains images with excessive resolution. Downsampling was not applied automatically.");
+        if (iqGov.jpeg_artifacts_present || iqReasons.includes('JPEG_ARTIFACTS') || findingsList.some(f => f.code === 'JPEG_ARTIFACTS')) opDetails.push("The PDF contains images with visible or suspected JPEG compression artifacts. Automatic artifact repair was not applied.");
+        if (iqReasons.includes('IMAGE_COMPRESSION_RISK') || findingsList.some(f => f.code === 'IMAGE_COMPRESSION_RISK')) opDetails.push("The PDF contains image compression conditions that may affect print quality.");
+        if (iqReasons.includes('IMAGE_DOWNSAMPLING_RISK') || findingsList.some(f => f.code === 'IMAGE_DOWNSAMPLING_RISK')) opDetails.push("The PDF may require image downsampling, which can remove visual detail and requires review.");
+        if (iqReasons.includes('IMAGE_UPSCALING_RISK') || findingsList.some(f => f.code === 'IMAGE_UPSCALING_RISK')) opDetails.push("The PDF contains images that may require upscaling. Upscaling cannot restore true image detail and requires review.");
+        if (iqGov.image_replacement_required || iqReasons.includes('IMAGE_REPLACEMENT_REQUIRED') || findingsList.some(f => f.code === 'IMAGE_REPLACEMENT_REQUIRED')) opDetails.push("The PDF may require replacement source images. Automatic image replacement was not performed.");
+        if (iqGov.bitmap_text_risk || iqReasons.includes('BITMAP_TEXT_RISK') || findingsList.some(f => f.code === 'BITMAP_TEXT_RISK')) opDetails.push("The PDF appears to contain text rendered as bitmap imagery. This can reduce sharpness and requires review.");
+        if (iqGov.rasterized_vector_risk || iqReasons.includes('RASTERIZED_VECTOR_RISK') || findingsList.some(f => f.code === 'RASTERIZED_VECTOR_RISK')) opDetails.push("The PDF appears to contain vector artwork rendered as raster imagery. Restoring vectors automatically is not supported.");
+        if (iqReasons.includes('IMAGE_COLORSPACE_RISK') || findingsList.some(f => f.code === 'IMAGE_COLORSPACE_RISK')) opDetails.push("The PDF contains image color space risks. This must be reviewed together with color governance.");
+        if (iqReasons.includes('IMAGE_ALPHA_RISK') || findingsList.some(f => f.code === 'IMAGE_ALPHA_RISK')) opDetails.push("The PDF contains image alpha/transparency conditions that may affect rendering and require review.");
+        if (iqGov.image_object_damaged || iqReasons.includes('IMAGE_OBJECT_DAMAGED') || findingsList.some(f => f.code === 'IMAGE_OBJECT_DAMAGED')) opDetails.push("The PDF contains damaged or problematic image objects. Automatic repair was not performed.");
+
+        if (iqGov.visual_image_rewrite_applied || iqGov.image_rewrite_performed) {
+             opDetails.push("Visual image rewrite was applied. This can alter image appearance.");
+        }
+
+        if (hasImageQualityRisk) {
+            customerSummary = "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.";
+            if (iqGov.highest_image_quality_risk === 'critical') {
+                severity = 'critical';
+            }
+        }
+
         if (colorGov && colorGov.detector_gap === true) {
             opDetails.push("Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
         }
 
         if (transGov && transGov.detector_gap === true) {
             opDetails.push("Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
+        }
+
+        if (iqGov && iqGov.detector_gap === true) {
+            opDetails.push("Image quality detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
         }
 
         // Include affected font names if evidence is in findings
@@ -475,6 +592,9 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
         if (transGov && transGov.detector_gap === true) {
             operatorSummary += " Transparency/overprint detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (iqGov && iqGov.detector_gap === true) {
+            operatorSummary += " Image quality detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
         }
         recommendedAction = {
             action_id: "use_fixed",
