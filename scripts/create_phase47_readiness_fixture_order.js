@@ -53,8 +53,6 @@ async function createFixture() {
             process.exit(0);
         }
 
-        const orderId = `ord_phase47_fixture_${Date.now()}`;
-
         // 1. Insert Order
         await db.query(`
             INSERT INTO marketplace_orders (
