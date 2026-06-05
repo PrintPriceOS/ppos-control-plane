@@ -96,8 +96,8 @@ async function run() {
 
         // Test normalizations
         const submittedEvent = parentRes.ledger.find(l => l.event_type === 'PREFLIGHT_JOB_SUBMITTED');
-        if (submittedEvent.category !== 'submission' || submittedEvent.severity !== 'info') {
-             console.error("❌ Normalization failed for SUBMITTED event.");
+        if (!submittedEvent || submittedEvent.category !== 'submission' || submittedEvent.severity !== 'info') {
+             console.error("❌ Normalization failed for SUBMITTED event (or event not found).");
              failures++;
         } else {
              console.log("✅ Normalization of categories and labels works.");

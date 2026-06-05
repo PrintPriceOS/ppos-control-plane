@@ -99,9 +99,9 @@ function mapAuditEventToLedgerEvent(row) {
 }
 
 async function getGovernanceLedger(jobId, context) {
-    // 1. Fetch related audit logs
-    const sql = `
-        SELECT id, event_type, status, user_id, tenant_id, created_at, metadata_json
+    // 1. First pass: Find all related job IDs
+    const relationSql = `
+        SELECT metadata_json
         FROM api_audit_logs
         WHERE 
             tenant_id = ?
@@ -116,20 +116,70 @@ async function getGovernanceLedger(jobId, context) {
                 OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.artifact_job_id')) = ?
                 OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.related_job_id')) = ?
             )
-        ORDER BY created_at ASC
     `;
     
-    // We pass jobId for all the parameterized values
-    const params = [
+    const relParams = [
         context.tenantId,
         jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId
     ];
 
     let rows = [];
+    let relatedJobs = new Set([jobId]);
+
     try {
+        const relResult = await db.query(relationSql, relParams);
+        const relRows = Array.isArray(relResult) && Array.isArray(relResult[0]) ? relResult[0] : (Array.isArray(relResult) ? relResult : []);
+        
+        for (const r of relRows) {
+            const meta = typeof r.metadata_json === 'string' ? JSON.parse(r.metadata_json) : (r.metadata_json || {});
+            if (meta.job_id) relatedJobs.add(meta.job_id);
+            if (meta.parent_job_id) relatedJobs.add(meta.parent_job_id);
+            if (meta.child_job_id) relatedJobs.add(meta.child_job_id);
+            if (meta.fix_job_id) relatedJobs.add(meta.fix_job_id);
+            if (meta.latest_fix_job_id) relatedJobs.add(meta.latest_fix_job_id);
+            if (meta.source_analyze_job_id) relatedJobs.add(meta.source_analyze_job_id);
+            if (meta.artifact_job_id) relatedJobs.add(meta.artifact_job_id);
+            if (meta.related_job_id) relatedJobs.add(meta.related_job_id);
+        }
+
+        const targetJobs = Array.from(relatedJobs);
+        const placeholders = targetJobs.map(() => '?').join(', ');
+        
+        // 2. Fetch all events for the related jobs
+        const sql = `
+            SELECT id, event_type, status, user_id, tenant_id, created_at, metadata_json
+            FROM api_audit_logs
+            WHERE 
+                tenant_id = ?
+                AND (
+                    JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.parent_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.child_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.fix_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.latest_fix_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.source_analyze_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.entity_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.artifact_job_id')) IN (${placeholders})
+                    OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.related_job_id')) IN (${placeholders})
+                )
+            ORDER BY created_at ASC
+        `;
+
+        const params = [context.tenantId];
+        for (let i = 0; i < 9; i++) {
+            params.push(...targetJobs);
+        }
+
         const result = await db.query(sql, params);
-        // handle mysqlClient returning array of arrays vs array of rows
-        rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : (Array.isArray(result) ? result : []);
+        const rawRows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : (Array.isArray(result) ? result : []);
+        
+        // Ensure distinct rows
+        const uniqueRows = new Map();
+        for (const r of rawRows) {
+             uniqueRows.set(r.id, r);
+        }
+        rows = Array.from(uniqueRows.values());
+
     } catch (err) {
         console.error('[GOVERNANCE-LEDGER] Failed to query audit logs:', err.message);
     }
