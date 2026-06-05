@@ -2267,5 +2267,27 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
         res.status(err.status || 500).json({ ok: false, error: { message: err.message } });
     }
 });
+// --- GET /api/admin/preflight/jobs/:jobId/human-report ---
+router.get('/jobs/:jobId/human-report', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const payload = await humanReportService.getHumanReport(jobId, context);
+        if (!payload.ok) {
+            return res.status(404).json(payload);
+        }
+        await logPreflightAdminEvent({
+            eventType: 'PREFLIGHT_HUMAN_REPORT_VIEWED',
+            tenantId: context.tenantId || 'system',
+            userId: context.userId || context.operatorId || 'system',
+            status: 'SUCCESS',
+            jobId: jobId,
+            traceId: context.traceId
+        });
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
 
 module.exports = router;

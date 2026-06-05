@@ -1,271 +1,341 @@
-const { getGovernanceLedger } = require('./preflightGovernanceLedgerService');
-const { getJobFromRegistry } = require('./preflightRegistrySyncService');
+const gateway = require('./preflightContractGateway');
 const preflightServiceClient = require('./preflightServiceClient');
+const db = require('./mysqlClient');
+const governanceLedgerService = require('./preflightGovernanceLedgerService');
 
-async function getPreflightHumanReport(jobId, context) {
-    try {
-        // 1. Fetch data sources
-        const ledgerRes = await getGovernanceLedger(jobId, context);
-        if (!ledgerRes.ok) {
-            throw new Error('Failed to retrieve governance ledger');
+// Helper to determine the primary artifact
+function selectPrimaryHumanArtifact(job, artifacts) {
+    if (!Array.isArray(artifacts)) return null;
+
+    const certPdf = artifacts.find(a => (a.type === 'certified_pdf' || a.alias === 'certified_pdf'));
+    const reviewPdf = artifacts.find(a => (a.type === 'review_pdf' || a.alias === 'review_pdf'));
+    const fixedPdf = artifacts.find(a => (a.type === 'fixed_pdf' || a.alias === 'fixed_pdf'));
+    const deltaReport = artifacts.find(a => (a.type === 'delta_report' || a.alias === 'delta_report'));
+    const reportJson = artifacts.find(a => (a.type === 'report_json' || a.alias === 'report_json'));
+    const analysisReport = artifacts.find(a => (a.type === 'analysis_report' || a.alias === 'analysis_report'));
+
+    // Rule 1: certified_pdf ONLY if production_certified=true AND customer_visible=true AND artifact_role=PRODUCTION_READY
+    if (certPdf && 
+        certPdf.production_certified === true && 
+        certPdf.customer_visible === true && 
+        certPdf.artifact_role === 'PRODUCTION_READY') {
+        return certPdf;
+    }
+
+    // Rule 2: review_pdf if review_required true and downloadable
+    if (job.review_required === true && reviewPdf && reviewPdf.downloadable) {
+        return reviewPdf;
+    }
+
+    // Rule 3: fixed_pdf if downloadable
+    if (fixedPdf && fixedPdf.downloadable) {
+        return fixedPdf;
+    }
+
+    // Rule 4: delta_report if no PDF output but available
+    if (deltaReport) {
+        return deltaReport;
+    }
+
+    // Rule 5: analysis_report or report_json
+    if (analysisReport) return analysisReport;
+    if (reportJson) return reportJson;
+
+    return null;
+}
+
+// Helper to translate fix strings to human readable text
+function translateFixMessage(fixCode, isSkipped = false) {
+    const code = String(fixCode || '').toUpperCase();
+    if (code.includes('REBUILD_TRIMBOX')) return "TrimBox rebuilt.";
+    if (code.includes('APPLY_BLEED')) return "Bleed boxes adjusted only; artwork was not visually extended.";
+    if (code.includes('INJECT_OUTPUT_INTENT')) return "OutputIntent injected.";
+    if (code.includes('CONVERT_CMYK')) return isSkipped 
+        ? "CMYK conversion skipped because it requires explicit review mode." 
+        : "Colors were converted to CMYK.";
+    if (code.includes('STRIP_JAVASCRIPT')) return "Interactive JavaScript was removed.";
+    if (code.includes('FLATTEN_ANNOTATIONS')) return "Annotations or annotation references were flattened/removed for print safety.";
+    if (code.includes('FLATTEN_FORMS')) return "Interactive form fields were flattened or removed for print safety.";
+    
+    if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
+    return `Applied structural correction: ${code}`;
+}
+
+async function getHumanReport(jobId, context, injectedJob = null, injectedArtifacts = null) {
+    let job = injectedJob;
+    let artifacts = injectedArtifacts;
+    let sourceStatus = 'LOCAL';
+
+    if (!job) {
+        try {
+            const upRes = await gateway.getJob(jobId, context);
+            job = upRes?.job || upRes;
+            sourceStatus = 'LIVE_UPSTREAM';
+        } catch (err) {
+            // fallback to local db
+            const rows = await db.query('SELECT canonical_payload_json FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+            if (rows.length > 0) {
+                const parsed = typeof rows[0].canonical_payload_json === 'string' ? JSON.parse(rows[0].canonical_payload_json) : rows[0].canonical_payload_json;
+                job = parsed?.job || parsed;
+                sourceStatus = 'LOCAL_FALLBACK';
+            }
         }
+    }
 
-        const registryJob = await getJobFromRegistry(jobId, context.tenantId);
-        let liveArtifacts = [];
+    if (!artifacts) {
         try {
             const liveArtifactsResponse = await preflightServiceClient.getJobArtifacts(jobId, context.Authorization, context.tenantId);
-            if (liveArtifactsResponse && Array.isArray(liveArtifactsResponse.artifacts)) {
-                liveArtifacts = liveArtifactsResponse.artifacts;
-            }
+            artifacts = liveArtifactsResponse?.artifacts || [];
         } catch (err) {
-            // Silently fallback to registry payload artifacts
+            // Fallback artifacts
+            artifacts = job?.artifacts || job?.artifact_list || [];
         }
+    }
 
-        const canonicalPayload = registryJob ? JSON.parse(registryJob.canonical_payload_json || '{}') : {};
-        const jobResult = canonicalPayload.job ? canonicalPayload.job.result : {};
-        const artifacts = liveArtifacts.length > 0 ? liveArtifacts : (canonicalPayload.artifacts || []);
-        const rawFindings = jobResult?.findings || jobResult?.issues || canonicalPayload.job?.findings || [];
-        
-        const displayStatus = ledgerRes.status_summary.display_status;
-        const statusSummary = ledgerRes.status_summary;
-        const artifactSummary = ledgerRes.artifact_summary;
+    if (!job) {
+        return { ok: false, error: 'Job not found for human report generation' };
+    }
 
-        // 2. Extract Findings
-        let criticalCount = 0;
-        let warningCount = 0;
-        let infoCount = 0;
-        let reviewRequired = false;
+    // Default structural mapping
+    let outcome = "UNKNOWN";
+    let severity = "neutral";
+    let summaryTitle = "Preflight Status Unknown";
+    let customerSummary = "The PDF status could not be determined.";
+    let operatorSummary = "Check raw technical details.";
+    let recommendedAction = {
+        action_id: "wait",
+        label: "Wait for completion",
+        description: "The system is still processing.",
+        severity: "neutral",
+        primary_artifact_type: null,
+        primary_artifact_download_id: null,
+        primary_artifact_filename: null,
+        primary_artifact_available: false
+    };
 
-        const processedFindings = (Array.isArray(rawFindings) ? rawFindings : []).map(f => {
-            const severity = (f.severity || '').toLowerCase();
-            if (severity === 'critical' || severity === 'error') criticalCount++;
-            else if (severity === 'warning') warningCount++;
-            else infoCount++;
+    const certLevel = job.certification_level || job.certificationLevel;
+    const isReviewReq = job.review_required === true || job.reviewRequired === true;
+    const isProdCert = job.production_certified === true || job.productionCertified === true;
+    
+    const primaryArtifact = selectPrimaryHumanArtifact(job, artifacts);
 
-            if (f.review_required) reviewRequired = true;
-
-            return {
-                severity: severity || 'info',
-                code: f.code || 'UNKNOWN',
-                title: f.title || f.message || 'Diagnostic finding',
-                description: f.description || f.message || '',
-                customer_safe_description: f.customer_visible ? (f.description || f.message) : 'An internal technical check was logged.',
-                recommended_action: f.recommended_action || null
-            };
-        });
-
-        // 3. Derive Outcome & Severity
-        let outcome = 'PROCESSING';
-        let severity = 'info';
-        
-        if (statusSummary.terminal) {
-            if (statusSummary.status.includes('FAILED') || statusSummary.display_status === 'FAILED' || (artifactSummary.zero_byte_artifact_count > 0 && !artifactSummary.physical_artifacts_ready)) {
-                outcome = 'BLOCKED';
-                severity = 'error';
-            } else if (statusSummary.status.includes('REVIEW') || displayStatus.includes('REVIEW_REQUIRED') || reviewRequired) {
-                outcome = 'REVIEW_REQUIRED';
-                severity = 'warning';
-            } else if (artifactSummary.certified_pdf_available) {
-                outcome = 'CERTIFIED_READY';
-                severity = (warningCount > 0) ? 'warning' : 'success';
-            } else if (artifactSummary.primary_fixed_pdf_available) {
-                outcome = 'FIXED_READY';
-                severity = (warningCount > 0) ? 'warning' : 'success';
-            } else if (artifactSummary.report_available) {
-                outcome = 'ANALYSIS_ONLY';
-                severity = (criticalCount > 0) ? 'error' : ((warningCount > 0) ? 'warning' : 'info');
-            } else {
-                outcome = 'BLOCKED';
-                severity = 'error';
-            }
-        }
-
-        // 4. Derive Decision & Recommended Next Action
-        const decision = {
-            production_ready: false,
-            customer_action_required: false,
-            operator_review_required: false,
-            recommended_artifact_type: null
+    if (certLevel === "CERTIFIED_READY" && isProdCert && !isReviewReq && primaryArtifact?.artifact_role === 'PRODUCTION_READY') {
+        outcome = "CERTIFIED_READY";
+        severity = "success";
+        summaryTitle = "PDF certified and ready for production";
+        customerSummary = "Your PDF passed preflight and a certified production-ready file is available.";
+        operatorSummary = "File is certified for immediate production routing.";
+        recommendedAction = {
+            action_id: "use_certified",
+            label: "Use Certified PDF",
+            description: "Download the production-certified PDF for manufacturing.",
+            severity: "success",
+            primary_artifact_type: primaryArtifact?.type || null,
+            primary_artifact_download_id: primaryArtifact?.download_id || primaryArtifact?.id || null,
+            primary_artifact_filename: primaryArtifact?.filename || null,
+            primary_artifact_available: !!primaryArtifact
         };
-
-        const recommendedNextAction = {
-            code: '',
-            label: '',
-            description: ''
-        };
-
-        if (outcome === 'CERTIFIED_READY') {
-            decision.production_ready = true;
-            decision.recommended_artifact_type = 'certified_pdf';
-            recommendedNextAction.code = 'USE_CERTIFIED_PDF';
-            recommendedNextAction.label = 'Use Certified PDF';
-            recommendedNextAction.description = 'The certified PDF is available and should be used as the production-ready artifact.';
-        } else if (outcome === 'FIXED_READY') {
-            decision.operator_review_required = true;
-            decision.recommended_artifact_type = 'fixed_pdf';
-            recommendedNextAction.code = 'USE_FIXED_PDF_OR_REVIEW';
-            recommendedNextAction.label = 'Review Fixed PDF';
-            recommendedNextAction.description = 'A fixed PDF is available. Review it before sending to production.';
-        } else if (outcome === 'REVIEW_REQUIRED') {
-            decision.operator_review_required = true;
-            decision.recommended_artifact_type = artifactSummary.primary_fixed_pdf_available ? 'fixed_pdf' : null;
-            recommendedNextAction.code = 'REVIEW_BEFORE_PRODUCTION';
-            recommendedNextAction.label = 'Review Before Production';
-            recommendedNextAction.description = 'The file was processed, but the result requires human review before production.';
-        } else if (outcome === 'BLOCKED') {
-            decision.customer_action_required = true;
-            recommendedNextAction.code = 'REQUEST_NEW_FILE_OR_MANUAL_INTERVENTION';
-            recommendedNextAction.label = 'Request New File or Manual Intervention';
-            recommendedNextAction.description = 'The file could not be safely certified or corrected automatically.';
-        } else if (outcome === 'ANALYSIS_ONLY') {
-            decision.operator_review_required = true;
-            decision.recommended_artifact_type = 'analysis_report';
-            recommendedNextAction.code = 'REVIEW_REPORT_OR_TRIGGER_FIX';
-            recommendedNextAction.label = 'Review Report or Trigger Fix';
-            recommendedNextAction.description = 'The file was analyzed and a report is available. Review the findings or run autofix.';
-        } else {
-            recommendedNextAction.code = 'WAIT_FOR_COMPLETION';
-            recommendedNextAction.label = 'Wait for Completion';
-            recommendedNextAction.description = 'The job is still processing. You can leave this page and return later.';
-        }
-
-        // 5. Build Artifact Recommendation list
-        const artifactList = [];
-        for (const a of artifacts) {
-            const isDownloadable = (a.sizeBytes > 0 || a.size_bytes > 0) && (a.downloadable === true || a.path || a.url);
-            if (!isDownloadable) continue;
-
-            const t = (a.type || a.alias || '').toLowerCase();
-            const filename = (a.filename || a.path || '').toLowerCase();
-            let normType = 'other';
-            let label = a.label || 'Artifact';
-            let customerVisible = false;
-
-            if (t.includes('cert') || filename.includes('cert')) {
-                normType = 'certified_pdf';
-                label = 'Certified PDF';
-                customerVisible = true;
-            } else if (t.includes('fix') || filename.includes('fix')) {
-                normType = 'fixed_pdf';
-                label = 'Fixed PDF';
-                customerVisible = (outcome !== 'REVIEW_REQUIRED');
-            } else if (t.includes('report') || t.includes('audit') || filename.includes('report') || filename.includes('audit') || (filename.endsWith('.json') && !t.includes('unknown'))) {
-                normType = 'analysis_report';
-                label = 'Analysis Report';
-            }
-
-            artifactList.push({
-                type: normType,
-                original_type: a.type || a.alias,
-                label,
-                filename: a.filename || 'downloadable_file',
-                size_bytes: a.size_bytes || a.sizeBytes || 0,
-                downloadable: true,
-                download_id: a.id || a.download_id,
-                download_url: a.url || a.download_url,
-                recommended_use: (normType === decision.recommended_artifact_type),
-                customer_visible: customerVisible
-            });
+    } else if (certLevel === "FIXED_REVIEW_REQUIRED" && isReviewReq) {
+        outcome = "FIXED_REVIEW_REQUIRED";
+        severity = "warning";
+        summaryTitle = "PDF fixed, review required before production";
+        customerSummary = "The PDF was corrected structurally, but it requires review before production.";
+        
+        let opDetails = [];
+        const applied = job.applied_fixes || job.fix_summary?.applied_fixes || [];
+        const skipped = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
+        applied.forEach(f => opDetails.push(translateFixMessage(f.code || f)));
+        skipped.forEach(f => opDetails.push(translateFixMessage(f.code || f, true)));
+        
+        const certPdf = artifacts.find(a => (a.type === 'certified_pdf' || a.alias === 'certified_pdf'));
+        if (certPdf && (!certPdf.production_certified || !certPdf.customer_visible)) {
+            opDetails.push("certified.pdf exists physically but is not production-certified and should not be customer-visible.");
         }
         
-        // Ensure primary recommended artifact type is highlighted
-        const primaryArtifact = artifactList.find(a => a.recommended_use) || null;
-
-        // 6. Build Summaries
-        let summaryTitle = 'Preflight completed';
-        if (outcome === 'CERTIFIED_READY') {
-            summaryTitle = warningCount > 0 ? 'PDF certified with warnings' : 'PDF analyzed and certified';
-        } else if (outcome === 'REVIEW_REQUIRED') {
-            summaryTitle = 'Human review required';
-        } else if (outcome === 'BLOCKED') {
-            summaryTitle = 'Preflight blocked due to critical issues';
-        } else if (outcome === 'ANALYSIS_ONLY') {
-            summaryTitle = 'Analysis completed';
-        } else if (outcome === 'PROCESSING') {
-            summaryTitle = 'Preflight in progress';
-        }
-
-        let customerSummary = 'Your PDF has been checked.';
-        if (outcome === 'CERTIFIED_READY') {
-            customerSummary = 'Your PDF has been checked successfully. A certified version is available for download. ' + (warningCount > 0 ? 'We found some minor warnings, but the file is ready for production.' : 'The file is ready for production.');
-        } else if (outcome === 'REVIEW_REQUIRED' || outcome === 'FIXED_READY') {
-            customerSummary = 'Your PDF has been processed and a corrected version is available, but it requires operator review before proceeding.';
-        } else if (outcome === 'BLOCKED') {
-            customerSummary = 'The preflight process encountered critical issues that could not be automatically resolved. Please provide a new file or contact support.';
-        } else if (outcome === 'ANALYSIS_ONLY') {
-            customerSummary = 'The file analysis is complete. Our team will review the results to determine next steps.';
-        } else {
-            customerSummary = 'Your file is currently being processed. You will be notified when it is complete.';
-        }
-
-        const operatorSummary = `The job status is ${displayStatus}. ${artifactSummary.physical_artifacts_ready ? 'Artifacts are available.' : 'No usable artifacts generated.'} ${criticalCount} critical issues, ${warningCount} warnings found. ${recommendedNextAction.label}.`;
+        operatorSummary = opDetails.length > 0 ? opDetails.join(" ") : "Review the fixed PDF and the technical change summary before releasing it.";
         
-        const technicalSummary = `Live upstream status is ${statusSummary.upstream_status || 'UNKNOWN'}. Artifact hydration returned ${artifactSummary.downloadable_artifact_count} downloadable artifacts. Governance ledger compacted ${ledgerRes.raw_event_count} audit events into ${ledgerRes.compacted_count || ledgerRes.event_count} operator-facing entries. Trace ID: ${ledgerRes.ledger?.[0]?.forensic?.trace_id || 'N/A'}.`;
-
-        const significantEvents = ledgerRes.ledger.slice(0, 5).map(l => l.label);
-
-        return {
-            ok: true,
-            job_id: jobId,
-            report_version: "43D.1",
-            generated_at: new Date().toISOString(),
-            status: statusSummary.status,
-            display_status: displayStatus,
-            decision,
-            outcome,
-            severity,
-            summary_title: summaryTitle,
-            customer_summary: customerSummary,
-            operator_summary: operatorSummary,
-            technical_summary: technicalSummary,
-            recommended_next_action: recommendedNextAction,
-            artifact_recommendation: {
-                primary_artifact_type: primaryArtifact?.type || decision.recommended_artifact_type,
-                primary_label: primaryArtifact?.label || (decision.recommended_artifact_type === 'certified_pdf' ? 'Certified PDF' : ''),
-                primary_download_available: !!primaryArtifact,
-                secondary_artifacts: artifactList.filter(a => !a.recommended_use)
-            },
-            findings_summary: {
-                findings_count: processedFindings.length,
-                critical_count: criticalCount,
-                warning_count: warningCount,
-                info_count: infoCount,
-                review_required: reviewRequired,
-                top_findings: processedFindings.slice(0, 5)
-            },
-            fixes_summary: {
-                fix_requested: ledgerRes.ledger.some(l => l.event_type === 'PREFLIGHT_FIX_TRIGGERED' || l.category === 'autofix'),
-                fix_job_id: null,
-                fixes_applied: [],
-                fixes_failed: [],
-                fixes_skipped: []
-            },
-            governance_summary: {
-                ledger_event_count: ledgerRes.event_count,
-                raw_event_count: ledgerRes.raw_event_count,
-                compacted_count: ledgerRes.compacted_count,
-                last_significant_event: significantEvents[0] || 'Unknown',
-                trace_id: ledgerRes.ledger?.[0]?.forensic?.trace_id || 'N/A',
-                governance_ledger_available: true
-            },
-            sections: [
-                { id: "overview", title: "Overview", severity, body: customerSummary },
-                { id: "artifacts", title: "Available Files", severity: "success", body: `Found ${artifactList.length} downloadable files.` },
-                { id: "findings", title: "Findings", severity: (criticalCount > 0 ? "error" : (warningCount > 0 ? "warning" : "success")), body: `Found ${processedFindings.length} findings.` },
-                { id: "next_action", title: "Recommended Next Action", severity: "info", body: recommendedNextAction.description }
-            ],
-            artifacts: artifactList
+        recommendedAction = {
+            action_id: "review_fixed",
+            label: "Review Fixed PDF",
+            description: "A fixed PDF is available, but human verification is required due to structural changes.",
+            severity: "warning",
+            primary_artifact_type: primaryArtifact?.type || null,
+            primary_artifact_download_id: primaryArtifact?.download_id || primaryArtifact?.alias || primaryArtifact?.id || null,
+            primary_artifact_filename: primaryArtifact?.filename || null,
+            primary_artifact_available: !!primaryArtifact
         };
-
-    } catch (err) {
-        console.error('[HUMAN-REPORT] Failed to generate human report:', err);
-        return {
-            ok: false,
-            error: err.message
+    } else if (certLevel === "FIXED_READY" && !isReviewReq && !isProdCert) {
+        outcome = "FIXED_READY";
+        severity = "info";
+        summaryTitle = "PDF fixed and ready for operator use";
+        customerSummary = "The PDF was corrected and no additional review requirement was flagged.";
+        operatorSummary = "Fixed PDF available for standard routing. Not fully production-certified.";
+        recommendedAction = {
+            action_id: "use_fixed",
+            label: "Use Fixed PDF",
+            description: "Download the fixed file.",
+            severity: "info",
+            primary_artifact_type: primaryArtifact?.type || null,
+            primary_artifact_download_id: primaryArtifact?.download_id || primaryArtifact?.alias || primaryArtifact?.id || null,
+            primary_artifact_filename: primaryArtifact?.filename || null,
+            primary_artifact_available: !!primaryArtifact
+        };
+    } else if (certLevel === "ANALYSIS_ONLY") {
+        outcome = "ANALYSIS_ONLY";
+        severity = "info";
+        summaryTitle = "PDF analyzed only";
+        customerSummary = "The PDF was analyzed. No corrected production file was generated.";
+        operatorSummary = "Analysis completed. Review the analysis report for findings.";
+        recommendedAction = {
+            action_id: "review_analysis",
+            label: "Review Analysis Report",
+            description: "View the diagnostic results.",
+            severity: "info",
+            primary_artifact_type: primaryArtifact?.type || null,
+            primary_artifact_download_id: primaryArtifact?.download_id || primaryArtifact?.alias || primaryArtifact?.id || null,
+            primary_artifact_filename: primaryArtifact?.filename || null,
+            primary_artifact_available: !!primaryArtifact
+        };
+    } else if (certLevel === "BLOCKED" || job.status === "FAILED") {
+        outcome = "BLOCKED";
+        severity = "error";
+        summaryTitle = "PDF blocked";
+        customerSummary = "The PDF cannot be used for production in its current state.";
+        operatorSummary = "Job is blocked. Critical failures or zero-byte artifacts detected.";
+        recommendedAction = {
+            action_id: "request_upload",
+            label: "Request corrected file upload",
+            description: "The file cannot be processed automatically. A new upload is required.",
+            severity: "error",
+            primary_artifact_type: null,
+            primary_artifact_download_id: null,
+            primary_artifact_filename: null,
+            primary_artifact_available: false
+        };
+    } else if (['PROCESSING', 'PENDING', 'RUNNING'].includes(job.status)) {
+        outcome = "PROCESSING";
+        severity = "neutral";
+        summaryTitle = "Preflight is still processing";
+        customerSummary = "The PDF is still being checked or corrected.";
+        operatorSummary = "Execution is still in progress upstream.";
+        recommendedAction = {
+            action_id: "wait",
+            label: "Wait for completion",
+            description: "Job is not yet in a terminal state.",
+            severity: "neutral",
+            primary_artifact_type: null,
+            primary_artifact_download_id: null,
+            primary_artifact_filename: null,
+            primary_artifact_available: false
         };
     }
+
+    // Process artifact recommendations for deduplication
+    const groupedArtifacts = {};
+    (artifacts || []).forEach(a => {
+        const key = a.filename + '_' + a.size_bytes;
+        if (!groupedArtifacts[key]) {
+            groupedArtifacts[key] = { ...a, secondary_aliases: [] };
+        } else {
+            // Group the aliases
+            if (a.alias && !groupedArtifacts[key].secondary_aliases.includes(a.alias)) {
+                groupedArtifacts[key].secondary_aliases.push(a.alias);
+            }
+        }
+    });
+
+    const dedupedArtifacts = Object.values(groupedArtifacts).map((a) => {
+        const isPrimary = primaryArtifact && (
+            (primaryArtifact.id && primaryArtifact.id === a.id) ||
+            (primaryArtifact.download_id && primaryArtifact.download_id === a.download_id) ||
+            (primaryArtifact.filename === a.filename && primaryArtifact.size_bytes === a.size_bytes)
+        );
+
+        let warning = null;
+        if (a.type === 'certified_pdf' && (!a.production_certified || !a.customer_visible)) {
+            warning = "Not production-certified and should not be customer-visible.";
+        }
+
+        return {
+            type: a.type || a.alias || 'OUTPUT',
+            filename: a.filename || a.name || 'document.pdf',
+            label: a.label || a.alias || a.type,
+            downloadable: a.downloadable !== false && a.size_bytes > 0,
+            customer_visible: a.customer_visible === true,
+            artifact_role: a.artifact_role || 'INTERNAL',
+            recommended_use: a.recommended_use || 'Internal review only.',
+            is_primary: isPrimary,
+            is_customer_safe: a.customer_visible === true && a.production_certified === true,
+            warning: warning,
+            download_id: a.download_id || a.alias || a.id,
+            secondary_aliases: a.secondary_aliases || []
+        };
+    });
+
+    // Governance
+    let govSummary = { event_count: 0, source: 'UNAVAILABLE', compacted_count: 0 };
+    try {
+        const gov = await governanceLedgerService.getGovernanceLedger(jobId, context);
+        if (gov && gov.events) {
+            govSummary = {
+                event_count: gov.events.length,
+                source: 'LEDGER',
+                compacted_count: gov.events.length
+            };
+        }
+    } catch (err) {
+        // Safe to ignore, we don't depend on it
+    }
+
+    const appliedFixesRaw = job.applied_fixes || job.fix_summary?.applied_fixes || [];
+    const skippedFixesRaw = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
+    const failedFixesRaw = job.failed_fixes || job.fix_summary?.failed_fixes || [];
+
+    const fixSummaryObj = job.fix_summary || {};
+    const reportPayload = {
+        outcome,
+        severity,
+        summary_title: summaryTitle,
+        customer_summary: customerSummary,
+        operator_summary: operatorSummary,
+        technical_summary: job.summary || job.analysis?.summary || '',
+        recommended_next_action: recommendedAction,
+        artifact_recommendations: dedupedArtifacts,
+        fix_summary: {
+            requested_count: fixSummaryObj.requested_count || job.requested_fixes?.length || 0,
+            applied_count: fixSummaryObj.applied_count || appliedFixesRaw.length || 0,
+            skipped_count: fixSummaryObj.skipped_count || skippedFixesRaw.length || 0,
+            failed_count: fixSummaryObj.failed_count || failedFixesRaw.length || 0,
+            applied_fixes: appliedFixesRaw.map(f => translateFixMessage(f.code || f)),
+            skipped_fixes: skippedFixesRaw.map(f => translateFixMessage(f.code || f, true)),
+            failed_fixes: failedFixesRaw.map(f => f.code || f),
+            review_required: isReviewReq,
+            production_certified: isProdCert,
+            highest_risk_level: job.risk_level || 'UNKNOWN'
+        },
+        findings_summary: {
+            critical: job.issue_count || 0,
+            warning: 0,
+            info: 0,
+            review_required: isReviewReq
+        },
+        governance_summary: govSummary,
+        copy_blocks: {
+            customer: customerSummary,
+            operator: operatorSummary
+        }
+    };
+
+    return {
+        ok: true,
+        job_id: jobId,
+        generated_at: new Date().toISOString(),
+        source_status: sourceStatus,
+        report: reportPayload
+    };
 }
 
 module.exports = {
-    getPreflightHumanReport
+    getHumanReport,
+    selectPrimaryHumanArtifact
 };

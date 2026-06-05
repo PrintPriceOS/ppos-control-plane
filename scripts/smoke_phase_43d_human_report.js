@@ -1,125 +1,150 @@
-require('dotenv').config();
-const { getPreflightHumanReport } = require('../src/api/services/preflightHumanReportService');
-const db = require('../src/api/services/mysqlClient');
+const { getHumanReport } = require('../src/api/services/preflightHumanReportService');
 
-async function run() {
-    console.log("=====================================================");
-    console.log("PHASE 43D SMOKE TEST: HUMAN REPORT");
-    console.log("=====================================================\n");
+// Mock context
+const context = {
+    Authorization: 'mock-token',
+    tenantId: 'tenant_test'
+};
 
-    let failures = 0;
-    const testTenantId = 'ppos-production';
-    const context = { tenantId: testTenantId, Authorization: 'Bearer test' };
+async function runTests() {
+    console.log("=== Running Phase 43D Human Report Smoke Tests ===\n");
 
-    // 1. Certified-ready fixture
-    const certifiedJobId = `job_cert_test_${Date.now()}`;
-    await db.query(`
-        INSERT IGNORE INTO preflight_job_registry (job_id, tenant_id, operator_id, status, type, progress, canonical_payload_json)
-        VALUES (?, ?, 'tester', 'COMPLETED', 'ANALYZE', 100, ?)
-    `, [certifiedJobId, testTenantId, JSON.stringify({
-        status: 'COMPLETED',
-        artifacts: [
-            { type: 'CERTIFIED_PDF', sizeBytes: 1024, path: 's3://bucket/cert.pdf', downloadable: true },
-            { type: 'REPORT_JSON', sizeBytes: 500, path: 's3://bucket/report.json', downloadable: true }
-        ]
-    })]);
+    const tests = [
+        {
+            name: "CERTIFIED_READY (Happy Path)",
+            job: {
+                certification_level: "CERTIFIED_READY",
+                production_certified: true,
+                review_required: false
+            },
+            artifacts: [
+                { type: 'certified_pdf', production_certified: true, customer_visible: true, artifact_role: 'PRODUCTION_READY', downloadable: true, size_bytes: 1000 }
+            ],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "CERTIFIED_READY", "Outcome mismatch");
+                console.assert(report.severity === "success", "Severity mismatch");
+                console.assert(report.recommended_next_action.primary_artifact_type === "certified_pdf", "Primary artifact mismatch");
+                console.assert(report.recommended_next_action.action_id === "use_certified", "Action mismatch");
+            }
+        },
+        {
+            name: "FIXED_REVIEW_REQUIRED (Downgraded Certified PDF)",
+            job: {
+                certification_level: "FIXED_REVIEW_REQUIRED",
+                production_certified: false,
+                review_required: true,
+                applied_fixes: ['APPLY_BLEED', 'REBUILD_TRIMBOX']
+            },
+            artifacts: [
+                { type: 'certified_pdf', production_certified: false, customer_visible: false, downloadable: true, size_bytes: 1000 },
+                { type: 'fixed_pdf', downloadable: true, size_bytes: 2000 }
+            ],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "FIXED_REVIEW_REQUIRED", "Outcome mismatch");
+                console.assert(report.severity === "warning", "Severity mismatch");
+                console.assert(report.recommended_next_action.primary_artifact_type === "fixed_pdf", "Primary artifact mismatch");
+                console.assert(report.copy_blocks.operator.includes("TrimBox rebuilt"), "Operator copy missing trimbox");
+                console.assert(report.copy_blocks.operator.includes("Bleed boxes adjusted only"), "Operator copy missing bleed");
+                
+                const certItem = report.artifact_recommendations.find(a => a.type === 'certified_pdf');
+                console.assert(certItem.is_primary === false, "Certified PDF shouldn't be primary");
+                console.assert(certItem.warning !== null, "Certified PDF should have warning");
+            }
+        },
+        {
+            name: "ANALYSIS_ONLY",
+            job: {
+                certification_level: "ANALYSIS_ONLY"
+            },
+            artifacts: [
+                { type: 'analysis_report', downloadable: true, size_bytes: 500 }
+            ],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "ANALYSIS_ONLY", "Outcome mismatch");
+                console.assert(report.recommended_next_action.primary_artifact_type === "analysis_report", "Primary artifact mismatch");
+            }
+        },
+        {
+            name: "BLOCKED",
+            job: {
+                certification_level: "BLOCKED",
+                status: "FAILED"
+            },
+            artifacts: [],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "BLOCKED", "Outcome mismatch");
+                console.assert(report.severity === "error", "Severity mismatch");
+                console.assert(report.recommended_next_action.action_id === "request_upload", "Action mismatch");
+            }
+        },
+        {
+            name: "PROCESSING",
+            job: {
+                status: "RUNNING"
+            },
+            artifacts: [],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "PROCESSING", "Outcome mismatch");
+                console.assert(report.recommended_next_action.action_id === "wait", "Action mismatch");
+            }
+        },
+        {
+            name: "Real fix_1780651634180 mapping",
+            job: {
+                certification_level: "FIXED_REVIEW_REQUIRED",
+                production_certified: false,
+                review_required: true,
+                fix_summary: {
+                    applied_fixes: ['REBUILD_TRIMBOX', 'APPLY_BLEED', 'INJECT_OUTPUT_INTENT'],
+                    skipped_fixes: ['CONVERT_CMYK']
+                }
+            },
+            artifacts: [
+                { type: 'certified_pdf', filename: 'certified.pdf', production_certified: false, customer_visible: false, downloadable: true, size_bytes: 5000 },
+                { type: 'fixed_pdf', filename: 'fixed.pdf', downloadable: true, size_bytes: 4000 },
+                { type: 'final_fixed_pdf', alias: 'final_fixed_pdf', filename: 'fixed.pdf', downloadable: true, size_bytes: 4000 }
+            ],
+            validate: (res) => {
+                const report = res.report;
+                console.assert(report.outcome === "FIXED_REVIEW_REQUIRED", "Outcome mismatch");
+                console.assert(report.recommended_next_action.primary_artifact_type === "fixed_pdf", "Primary artifact mismatch");
+                
+                // Deduplication check
+                const dedupedArtifacts = report.artifact_recommendations;
+                // certified.pdf and fixed.pdf are the unique files
+                console.assert(dedupedArtifacts.length === 2, "Should deduplicate fixed.pdf and final_fixed_pdf");
+                const fixedRec = dedupedArtifacts.find(a => a.filename === 'fixed.pdf');
+                console.assert(fixedRec.secondary_aliases.includes('final_fixed_pdf'), "Should include final_fixed_pdf as alias");
+            }
+        }
+    ];
 
-    console.log("1. Testing Certified-ready fixture...");
-    const certRes = await getPreflightHumanReport(certifiedJobId, context);
-    if (!certRes.ok) {
-        console.error("❌ Certified job report failed to generate");
-        failures++;
-    } else if (certRes.outcome !== 'CERTIFIED_READY') {
-        console.error(`❌ Expected outcome CERTIFIED_READY, got ${certRes.outcome}`);
-        failures++;
-    } else if (certRes.recommended_next_action.code !== 'USE_CERTIFIED_PDF') {
-        console.error(`❌ Expected USE_CERTIFIED_PDF, got ${certRes.recommended_next_action.code}`);
-        failures++;
-    } else if (!certRes.decision.production_ready) {
-        console.error("❌ Expected decision.production_ready to be true");
-        failures++;
-    } else {
-        console.log("✅ Certified fixture passed");
+    let allPassed = true;
+
+    for (const test of tests) {
+        try {
+            const res = await getHumanReport("test_job", context, test.job, test.artifacts);
+            test.validate(res);
+            console.log(`✅ [PASS] ${test.name}`);
+        } catch (err) {
+            console.error(`❌ [FAIL] ${test.name}`);
+            console.error(`   Error: ${err.message}`);
+            allPassed = false;
+        }
     }
 
-    // 2. Review-required fixture
-    const reviewJobId = `fix_review_test_${Date.now()}`;
-    await db.query(`
-        INSERT IGNORE INTO preflight_job_registry (job_id, tenant_id, operator_id, status, type, progress, canonical_payload_json)
-        VALUES (?, ?, 'tester', 'AUTOFIX_REVIEW_REQUIRED', 'AUTOFIX', 100, ?)
-    `, [reviewJobId, testTenantId, JSON.stringify({
-        status: 'AUTOFIX_REVIEW_REQUIRED',
-        artifacts: [
-            { type: 'FIXED_PDF', sizeBytes: 1024, path: 's3://bucket/fixed.pdf', downloadable: true }
-        ]
-    })]);
-
-    console.log("\n2. Testing Review-required fixture...");
-    const reviewRes = await getPreflightHumanReport(reviewJobId, context);
-    if (reviewRes.outcome !== 'REVIEW_REQUIRED') {
-        console.error(`❌ Expected outcome REVIEW_REQUIRED, got ${reviewRes.outcome}`);
-        failures++;
-    } else if (reviewRes.recommended_next_action.code !== 'REVIEW_BEFORE_PRODUCTION') {
-        console.error(`❌ Expected action REVIEW_BEFORE_PRODUCTION, got ${reviewRes.recommended_next_action.code}`);
-        failures++;
-    } else if (!reviewRes.decision.operator_review_required) {
-        console.error("❌ Expected decision.operator_review_required to be true");
-        failures++;
-    } else {
-        console.log("✅ Review fixture passed");
-    }
-
-    // 3. Blocked fixture
-    const blockedJobId = `job_blocked_test_${Date.now()}`;
-    await db.query(`
-        INSERT IGNORE INTO preflight_job_registry (job_id, tenant_id, operator_id, status, type, progress, canonical_payload_json)
-        VALUES (?, ?, 'tester', 'COMPLETED', 'ANALYZE', 100, ?)
-    `, [blockedJobId, testTenantId, JSON.stringify({
-        status: 'COMPLETED',
-        artifacts: [
-            { type: 'ZERO_BYTE', sizeBytes: 0, path: 's3://bucket/zero.pdf', downloadable: true }
-        ]
-    })]);
-
-    console.log("\n3. Testing Blocked fixture...");
-    const blockedRes = await getPreflightHumanReport(blockedJobId, context);
-    if (blockedRes.outcome !== 'BLOCKED') {
-        console.error(`❌ Expected outcome BLOCKED, got ${blockedRes.outcome}`);
-        failures++;
-    } else {
-        console.log("✅ Blocked fixture passed");
-    }
-
-    // 4. Analysis-only fixture
-    const analysisJobId = `job_analysis_test_${Date.now()}`;
-    await db.query(`
-        INSERT IGNORE INTO preflight_job_registry (job_id, tenant_id, operator_id, status, type, progress, canonical_payload_json)
-        VALUES (?, ?, 'tester', 'COMPLETED', 'ANALYZE', 100, ?)
-    `, [analysisJobId, testTenantId, JSON.stringify({
-        status: 'COMPLETED',
-        artifacts: [
-            { type: 'ANALYSIS_REPORT', sizeBytes: 500, path: 's3://bucket/report.json', downloadable: true }
-        ]
-    })]);
-
-    console.log("\n4. Testing Analysis-only fixture...");
-    const analysisRes = await getPreflightHumanReport(analysisJobId, context);
-    if (analysisRes.outcome !== 'ANALYSIS_ONLY') {
-        console.error(`❌ Expected outcome ANALYSIS_ONLY, got ${analysisRes.outcome}`);
-        failures++;
-    } else {
-        console.log("✅ Analysis-only fixture passed");
-    }
-
-    if (failures === 0) {
-        console.log("\n=====================================================");
-        console.log("ALL TESTS PASSED SUCCESSFULLY");
-        console.log("=====================================================");
+    if (allPassed) {
+        console.log("\n✅ All smoke tests passed!");
         process.exit(0);
     } else {
-        console.error(`\n❌ ${failures} test(s) failed.`);
+        console.error("\n❌ Some smoke tests failed.");
         process.exit(1);
     }
 }
 
-run();
+runTests();

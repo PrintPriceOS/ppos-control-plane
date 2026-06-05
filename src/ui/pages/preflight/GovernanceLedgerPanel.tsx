@@ -64,8 +64,8 @@ export const GovernanceLedgerPanel: React.FC<GovernanceLedgerPanelProps> = ({ le
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col mt-6">
-      <div className="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
+    <details className="bg-gray-900 border border-gray-800 rounded-lg flex flex-col mt-6 group">
+      <summary className="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center cursor-pointer list-none">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-indigo-400" />
           <h2 className="text-lg font-semibold text-white tracking-wide">Governance Ledger</h2>
@@ -78,15 +78,19 @@ export const GovernanceLedgerPanel: React.FC<GovernanceLedgerPanelProps> = ({ le
             </span>
           )}
         </div>
-        <button
-          onClick={onRefresh}
-          className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition-colors"
-        >
-          Refresh Ledger
-        </button>
-      </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => { e.preventDefault(); onRefresh(); }}
+            className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition-colors"
+          >
+            Refresh Ledger
+          </button>
+          <div className="text-gray-500 group-open:hidden"><ChevronDown className="w-5 h-5" /></div>
+          <div className="text-gray-500 hidden group-open:block"><ChevronUp className="w-5 h-5" /></div>
+        </div>
+      </summary>
 
-      <div className="p-4">
+      <div className="p-4 border-t border-gray-800">
         {source === 'registry_fallback' && (
           <div className="mb-4 text-xs text-amber-500/80 bg-amber-500/5 p-3 rounded border border-amber-500/10">
             Showing registry-derived ledger because no audit records were found.
@@ -165,6 +169,6 @@ export const GovernanceLedgerPanel: React.FC<GovernanceLedgerPanelProps> = ({ le
           })}
         </div>
       </div>
-    </div>
+    </details>
   );
 };
