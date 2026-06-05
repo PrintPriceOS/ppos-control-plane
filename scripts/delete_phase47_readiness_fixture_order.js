@@ -25,15 +25,18 @@ async function deleteFixtures() {
         const orphanFiles = await db.query(`SELECT order_id FROM marketplace_order_files WHERE order_id LIKE 'ord_phase47_fixture_%'`);
         const orphanEvents = await db.query(`SELECT order_id FROM marketplace_order_events WHERE order_id LIKE 'ord_phase47_fixture_%'`);
 
-        const allOrderIds = new Set([
+        const rawOrderIds = [
             ...orders.map(o => o.order_id),
             ...orphanBindings.map(b => b.order_id),
             ...orphanFiles.map(f => f.order_id),
             ...orphanEvents.map(e => e.order_id)
-        ]);
+        ];
+
+        const validOrderIds = rawOrderIds.filter(id => typeof id === 'string' && id.trim().length > 0);
+        const allOrderIds = new Set(validOrderIds);
 
         if (allOrderIds.size === 0) {
-            console.log(`No fixtures found.`);
+            console.log(`NO_VALID_FIXTURES_FOUND`);
             process.exit(0);
         }
 
