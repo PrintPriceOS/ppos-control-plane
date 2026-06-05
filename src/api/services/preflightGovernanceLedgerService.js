@@ -106,8 +106,7 @@ async function getGovernanceLedger(jobId, context) {
         WHERE 
             tenant_id = ?
             AND (
-                job_id = ?
-                OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.job_id')) = ?
+                JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.job_id')) = ?
                 OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.parent_job_id')) = ?
                 OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.child_job_id')) = ?
                 OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.fix_job_id')) = ?
@@ -123,7 +122,7 @@ async function getGovernanceLedger(jobId, context) {
     // We pass jobId for all the parameterized values
     const params = [
         context.tenantId,
-        jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId
+        jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId, jobId
     ];
 
     let rows = [];
