@@ -57,8 +57,8 @@ async function runTests() {
                 console.assert(report.outcome === "FIXED_REVIEW_REQUIRED", "Outcome mismatch");
                 console.assert(report.severity === "warning", "Severity mismatch");
                 console.assert(report.recommended_next_action.primary_artifact_type === "fixed_pdf", "Primary artifact mismatch");
-                console.assert(report.copy_blocks.operator.includes("TrimBox rebuilt"), "Operator copy missing trimbox");
-                console.assert(report.copy_blocks.operator.includes("Bleed boxes adjusted only"), "Operator copy missing bleed");
+                console.assert(report.copy_blocks.operator.includes("TrimBox was rebuilt"), "Operator copy missing trimbox");
+                console.assert(report.copy_blocks.operator.includes("Bleed boxes were adjusted"), "Operator copy missing bleed");
                 
                 const certItem = report.artifact_recommendations.find(a => a.type === 'certified_pdf');
                 console.assert(certItem.is_primary === false, "Certified PDF shouldn't be primary");

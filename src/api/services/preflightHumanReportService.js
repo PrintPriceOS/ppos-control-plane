@@ -47,11 +47,11 @@ function selectPrimaryHumanArtifact(job, artifacts) {
 // Helper to translate fix strings to human readable text
 function translateFixMessage(fixCode, isSkipped = false) {
     const code = String(fixCode || '').toUpperCase();
-    if (code.includes('REBUILD_TRIMBOX')) return "TrimBox rebuilt.";
-    if (code.includes('APPLY_BLEED')) return "Bleed boxes adjusted only; artwork was not visually extended.";
-    if (code.includes('INJECT_OUTPUT_INTENT')) return "OutputIntent injected.";
+    if (code.includes('REBUILD_TRIMBOX')) return "Page geometry / TrimBox was rebuilt.";
+    if (code.includes('APPLY_BLEED')) return "Bleed boxes were adjusted. Visual artwork was not extended automatically.";
+    if (code.includes('INJECT_OUTPUT_INTENT')) return "OutputIntent was injected.";
     if (code.includes('CONVERT_CMYK')) return isSkipped 
-        ? "CMYK conversion skipped because it requires explicit review mode." 
+        ? "CMYK conversion was skipped because explicit review mode is required." 
         : "Colors were converted to CMYK.";
     if (code.includes('STRIP_JAVASCRIPT')) return "Interactive JavaScript was removed.";
     if (code.includes('FLATTEN_ANNOTATIONS')) return "Annotations or annotation references were flattened/removed for print safety.";
@@ -142,15 +142,16 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         customerSummary = "The PDF was corrected structurally, but it requires review before production.";
         
         let opDetails = [];
-        const applied = job.applied_fixes || job.fix_summary?.applied_fixes || [];
-        const skipped = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
-        applied.forEach(f => opDetails.push(translateFixMessage(f.code || f)));
-        skipped.forEach(f => opDetails.push(translateFixMessage(f.code || f, true)));
         
         const certPdf = artifacts.find(a => (a.type === 'certified_pdf' || a.alias === 'certified_pdf'));
         if (certPdf && (!certPdf.production_certified || !certPdf.customer_visible)) {
             opDetails.push("certified.pdf exists physically but is not production-certified and should not be customer-visible.");
         }
+
+        const applied = job.applied_fixes || job.fix_summary?.applied_fixes || [];
+        const skipped = job.skipped_fixes || job.fix_summary?.skipped_fixes || [];
+        applied.forEach(f => opDetails.push(translateFixMessage(f.code || f)));
+        skipped.forEach(f => opDetails.push(translateFixMessage(f.code || f, true)));
         
         operatorSummary = opDetails.length > 0 ? opDetails.join(" ") : "Review the fixed PDF and the technical change summary before releasing it.";
         
@@ -261,6 +262,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             filename: a.filename || a.name || 'document.pdf',
             label: a.label || a.alias || a.type,
             downloadable: a.downloadable !== false && a.size_bytes > 0,
+            production_certified: a.production_certified === true,
             customer_visible: a.customer_visible === true,
             artifact_role: a.artifact_role || 'INTERNAL',
             recommended_use: a.recommended_use || 'Internal review only.',
