@@ -9,6 +9,29 @@ function generateId(prefix = 'hrs') {
 
 class PreflightHumanReportSnapshotService {
     
+    normalizeHumanReportPayload(payload) {
+        const report = payload?.report || payload;
+        
+        return {
+            job_id: payload?.job_id || payload?.jobId || payload?.job?.id || report?.job_id,
+            source_status: payload?.source_status || payload?.sourceStatus || report?.source_status || null,
+            report,
+            outcome: report?.outcome,
+            severity: report?.severity,
+            summary_title: report?.summary_title,
+            primary_artifact_type: report?.recommended_next_action?.primary_artifact_type || report?.primary_artifact_type || null,
+            primary_artifact_download_id: report?.recommended_next_action?.primary_artifact_download_id || null,
+            primary_artifact_filename: report?.recommended_next_action?.primary_artifact_filename || null,
+            production_certified: report?.fix_summary?.production_certified === true,
+            review_required: report?.fix_summary?.review_required === true || report?.findings_summary?.review_required === true,
+            customer_visible: Array.isArray(report?.artifact_recommendations)
+                ? report.artifact_recommendations.some(a => a.customer_visible === true)
+                : typeof report?.artifact_recommendations === 'object' && report?.artifact_recommendations !== null
+                    ? Object.values(report.artifact_recommendations).some(a => a.customer_visible === true)
+                    : false
+        };
+    }
+    
     /**
      * Generates a new human report and saves it as a snapshot in the database.
      * Supersedes any existing snapshots for this job.
@@ -20,9 +43,19 @@ class PreflightHumanReportSnapshotService {
         const generatedBy = context?.userId || 'SYSTEM';
 
         // 1. Generate live report
-        const report = await humanReportService.getHumanReport(jobId, context);
-        if (!report.ok) {
-            throw new Error(`Failed to generate human report: ${report.message || 'Unknown error'}`);
+        const payload = await humanReportService.getHumanReport(jobId, context);
+        if (!payload.ok) {
+            throw new Error(`Failed to generate human report: ${payload.message || 'Unknown error'}`);
+        }
+
+        const normalized = this.normalizeHumanReportPayload(payload);
+
+        if (!normalized.outcome) {
+            throw new Error("Human Report snapshot requires report.outcome");
+        }
+
+        if (!normalized.severity) {
+            throw new Error("Human Report snapshot requires report.severity");
         }
 
         // 2. Supersede old snapshots
@@ -34,17 +67,17 @@ class PreflightHumanReportSnapshotService {
 
         // 3. Insert new snapshot
         const snapshotId = generateId('hrs');
-        const primaryArtifactType = report.primary_artifact_type || null;
-        let primaryFilename = null;
         
-        if (primaryArtifactType && report.artifact_recommendations && report.artifact_recommendations[primaryArtifactType]) {
-            primaryFilename = report.artifact_recommendations[primaryArtifactType].filename;
+        let primaryFilename = normalized.primary_artifact_filename;
+        if (!primaryFilename && normalized.primary_artifact_type && normalized.report.artifact_recommendations) {
+             const arts = normalized.report.artifact_recommendations;
+             if (Array.isArray(arts)) {
+                 const match = arts.find(a => a.artifact_type === normalized.primary_artifact_type);
+                 if (match) primaryFilename = match.filename;
+             } else if (arts[normalized.primary_artifact_type]) {
+                 primaryFilename = arts[normalized.primary_artifact_type].filename;
+             }
         }
-
-        const certifiedPdf = report.artifact_recommendations?.certified_pdf || {};
-        const productionCertified = !!certifiedPdf.production_certified;
-        const customerVisible = !!certifiedPdf.customer_visible;
-        const reviewRequired = !!certifiedPdf.review_required || (report.outcome === 'FIXED_REVIEW_REQUIRED');
 
         await db.query(`
             INSERT INTO control_plane_preflight_human_reports (
@@ -55,17 +88,23 @@ class PreflightHumanReportSnapshotService {
         `, [
             snapshotId,
             tenantId,
-            jobId,
-            report.source_status || 'COMPLETED',
-            report.outcome,
-            report.severity || 'info',
-            report.summary_title || '',
-            primaryArtifactType,
+            normalized.job_id || jobId,
+            normalized.source_status || 'COMPLETED',
+            normalized.outcome,
+            normalized.severity || 'info',
+            normalized.summary_title || '',
+            normalized.primary_artifact_type,
             primaryFilename,
-            productionCertified,
-            reviewRequired,
-            customerVisible,
-            JSON.stringify(report),
+            normalized.production_certified ? 1 : 0,
+            normalized.review_required ? 1 : 0,
+            normalized.customer_visible ? 1 : 0,
+            JSON.stringify({
+                ok: true,
+                job_id: normalized.job_id || jobId,
+                generated_at: new Date().toISOString(),
+                source_status: normalized.source_status || 'COMPLETED',
+                report: normalized.report
+            }),
             generatedBy
         ]);
 
@@ -75,7 +114,7 @@ class PreflightHumanReportSnapshotService {
             ok: true,
             snapshot_id: snapshotId,
             job_id: jobId,
-            report: report
+            report: normalized.report
         };
     }
 

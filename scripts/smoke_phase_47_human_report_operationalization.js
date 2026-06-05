@@ -13,11 +13,18 @@ async function runSmokeTests() {
         return {
             ok: true,
             job_id: jobId,
-            outcome: 'FIXED_REVIEW_REQUIRED',
-            severity: 'warning',
-            primary_artifact_type: 'review_pdf',
-            artifact_recommendations: {
-                review_pdf: { filename: 'review.pdf', customer_visible: true }
+            report: {
+                outcome: 'FIXED_REVIEW_REQUIRED',
+                severity: 'warning',
+                summary_title: 'PDF fixed, review required before production',
+                recommended_next_action: {
+                    primary_artifact_type: 'review_pdf',
+                    primary_artifact_filename: 'fixed.pdf'
+                },
+                fix_summary: {
+                    production_certified: false,
+                    review_required: true
+                }
             }
         };
     };
@@ -31,6 +38,14 @@ async function runSmokeTests() {
         db.query = async (sql, params) => {
             if (sql.includes('INSERT INTO control_plane_preflight_human_reports')) {
                 lastSnapshotId = params[0];
+                
+                // Assert values
+                if (params[4] !== 'FIXED_REVIEW_REQUIRED') throw new Error('Assertion failed: outcome is ' + params[4]);
+                if (params[5] !== 'warning') throw new Error('Assertion failed: severity is null');
+                if (params[7] !== 'review_pdf') throw new Error('Assertion failed: primary_artifact_type is ' + params[7]);
+                if (params[9] !== 0) throw new Error('Assertion failed: production_certified is not false/0');
+                if (params[10] !== 1) throw new Error('Assertion failed: review_required is not true/1');
+
                 return [];
             }
             if (sql.includes('SELECT * FROM control_plane_preflight_human_reports') || sql.includes('SELECT report_json FROM control_plane_preflight_human_reports')) {

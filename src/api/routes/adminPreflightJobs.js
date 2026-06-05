@@ -2282,7 +2282,7 @@ router.post('/jobs/:jobId/human-report/snapshot', async (req, res) => {
         const payload = await humanReportSnapshotService.createSnapshot(jobId, context);
         res.json(payload);
     } catch (err) {
-        res.status(500).json({ ok: false, error: { message: err.message } });
+        res.status(500).json({ ok: false, error: { code: 'HUMAN_REPORT_SNAPSHOT_FAILED', message: err.message } });
     }
 });
 
