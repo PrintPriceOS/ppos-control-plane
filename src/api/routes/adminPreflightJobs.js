@@ -2303,9 +2303,25 @@ router.get('/jobs/:jobId/human-report/snapshot', async (req, res) => {
 router.post('/jobs/:jobId/human-report/share-token', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
-    const { snapshotId } = req.body;
+    
     try {
-        if (!snapshotId) return res.status(400).json({ ok: false, error: { message: 'snapshotId is required' } });
+        const body = req.body || {};
+        let snapshotId = body.snapshotId || body.snapshot_id || null;
+
+        if (!snapshotId) {
+            const latestRes = await humanReportSnapshotService.getLatestSnapshot(jobId, context);
+            if (!latestRes.ok || !latestRes.snapshot_id) {
+                return res.status(400).json({
+                    ok: false,
+                    error: {
+                        code: "HUMAN_REPORT_SNAPSHOT_REQUIRED",
+                        message: "A Human Report snapshot must be created before generating a share link."
+                    }
+                });
+            }
+            snapshotId = latestRes.snapshot_id;
+        }
+
         const payload = await humanReportSnapshotService.createShareToken(jobId, snapshotId, context);
         res.json(payload);
     } catch (err) {

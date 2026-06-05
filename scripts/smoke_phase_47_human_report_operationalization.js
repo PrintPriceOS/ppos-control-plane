@@ -86,10 +86,62 @@ async function runSmokeTests() {
         console.log('Got latest snapshot correctly.');
 
         console.log(`3. Testing createShareToken...`);
-        const tokenRes = await humanReportSnapshotService.createShareToken(jobId, snapshotId, context);
-        if (!tokenRes.ok) throw new Error('Failed to create share token');
-        const token = tokenRes.token;
-        console.log(`Share token generated: ${token.substring(0, 10)}...`);
+        
+        // Mock route handler logic
+        const mockRouteHandler = async (reqBody, mockLatestSnapshotId) => {
+            const req = { body: reqBody, params: { jobId } };
+            let response = null;
+            let status = 200;
+            const res = {
+                status: (s) => { status = s; return res; },
+                json: (j) => { response = j; }
+            };
+            
+            try {
+                const body = req.body || {};
+                let sid = body.snapshotId || body.snapshot_id || null;
+
+                if (!sid) {
+                    if (mockLatestSnapshotId === 'FAIL') {
+                        res.status(400).json({
+                            ok: false,
+                            error: {
+                                code: "HUMAN_REPORT_SNAPSHOT_REQUIRED",
+                                message: "A Human Report snapshot must be created before generating a share link."
+                            }
+                        });
+                        return { status, response };
+                    }
+                    sid = mockLatestSnapshotId || snapshotId;
+                }
+
+                const payload = await humanReportSnapshotService.createShareToken(jobId, sid, context);
+                res.json(payload);
+            } catch (err) {
+                res.status(500).json({ ok: false, error: { message: err.message } });
+            }
+            return { status, response };
+        };
+
+        // Case 1: body with snapshotId
+        const case1 = await mockRouteHandler({ snapshotId });
+        if (!case1.response.ok || !case1.response.share_url) throw new Error('Case 1 failed');
+        if (!case1.response.token || !case1.response.expires_at || !case1.response.expires_in) throw new Error('Case 1 missing fields');
+
+        // Case 2: body with snapshot_id
+        const case2 = await mockRouteHandler({ snapshot_id: snapshotId });
+        if (!case2.response.ok || !case2.response.share_url) throw new Error('Case 2 failed');
+
+        // Case 3: empty body with latest snapshot available
+        const case3 = await mockRouteHandler(undefined, snapshotId);
+        if (!case3.response.ok || !case3.response.share_url) throw new Error('Case 3 failed');
+
+        // Case 4: empty body with no latest snapshot
+        const case4 = await mockRouteHandler(undefined, 'FAIL');
+        if (case4.status !== 400 || case4.response.error.code !== 'HUMAN_REPORT_SNAPSHOT_REQUIRED') throw new Error('Case 4 failed');
+
+        const token = case1.response.token;
+        console.log(`Share token generated: ${token.substring(0, 10)}... and share_url: ${case1.response.share_url}`);
 
         console.log(`4. Testing validateShareToken...`);
         const validateRes = await humanReportSnapshotService.validateShareToken(token);

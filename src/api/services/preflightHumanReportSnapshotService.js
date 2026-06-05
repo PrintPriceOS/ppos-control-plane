@@ -179,9 +179,15 @@ class PreflightHumanReportSnapshotService {
 
         logger.info({ event: 'SHARE_TOKEN_CREATED', jobId, snapshotId });
 
+        const baseUrl = process.env.CONTROL_PLANE_PUBLIC_URL || process.env.PPOS_CONTROL_PUBLIC_URL || "https://control.printprice.pro";
+        const share_url = `${baseUrl}/public/preflight/human-report/${token}`;
+        const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
         return {
             ok: true,
             token,
+            share_url,
+            expires_at,
             expires_in: '7 days'
         };
     }
