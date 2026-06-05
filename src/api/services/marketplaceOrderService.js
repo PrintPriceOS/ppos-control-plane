@@ -898,12 +898,18 @@ class MarketplaceOrderService {
                 let gateObj = {
                     file_kind: file.kind,
                     job_id: file.preflightJobId,
-                    snapshot_id: null,
+                    evaluated_snapshot_id: null,
+                    decision_snapshot_id: null,
+                    snapshot_mismatch: false,
                     outcome: 'UNKNOWN',
+                    decision_report_outcome: null,
                     active_decision: null,
                     gate_code: null,
                     ready: false,
-                    warning: null
+                    warning: null,
+                    decision_id: null,
+                    approved_artifact_type: null,
+                    approved_artifact_filename: null
                 };
 
                 if (!snapshotRes.ok || !snapshotRes.snapshot_id) {
@@ -911,7 +917,7 @@ class MarketplaceOrderService {
                     gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_REQUIRED`;
                     blockers.push(`PREFLIGHT_HUMAN_REPORT_REQUIRED_${file.kind}`);
                 } else {
-                    gateObj.snapshot_id = snapshotRes.snapshot_id;
+                    gateObj.evaluated_snapshot_id = snapshotRes.snapshot_id;
                     const report = typeof snapshotRes.report_json === 'string' 
                         ? JSON.parse(snapshotRes.report_json) 
                         : (snapshotRes.report_json || snapshotRes.report || {});
@@ -944,8 +950,24 @@ class MarketplaceOrderService {
                             const decision = approvalRes.decision;
                             gateObj.active_decision = decision.decision;
                             gateObj.decision_id = decision.id;
+                            gateObj.decision_snapshot_id = decision.snapshot_id;
+                            gateObj.decision_report_outcome = decision.report_outcome;
                             gateObj.approved_artifact_type = decision.approved_artifact_type;
                             gateObj.approved_artifact_filename = decision.approved_artifact_filename;
+                            
+                            // Mismatch trace
+                            if (gateObj.decision_snapshot_id && gateObj.evaluated_snapshot_id && gateObj.decision_snapshot_id !== gateObj.evaluated_snapshot_id) {
+                                gateObj.snapshot_mismatch = true;
+                                if (gateObj.decision_report_outcome && gateObj.outcome && gateObj.decision_report_outcome !== gateObj.outcome) {
+                                    // Conflict
+                                    blocked = true;
+                                    gateObj.gate_code = `PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT`;
+                                    blockers.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_CONFLICT_${file.kind}`);
+                                    continue; // Stop processing further rules for this file since it is conflicted
+                                } else {
+                                    warnings.push(`PREFLIGHT_REVIEW_DECISION_SNAPSHOT_MISMATCH_${file.kind}`);
+                                }
+                            }
                             
                             if (decision.decision === 'REJECTED_REQUIRES_REUPLOAD') {
                                 blocked = true;
@@ -958,8 +980,6 @@ class MarketplaceOrderService {
                                 warnings.push(`PREFLIGHT_APPROVED_WITH_WARNINGS_${file.kind}`);
                             } else if (decision.decision === 'APPROVED_FOR_PRODUCTION') {
                                 // FIXED_REVIEW_REQUIRED doesn't allow APPROVED_FOR_PRODUCTION unless overridden.
-                                // If they bypassed, we treat it as pass but log warning or just block.
-                                // We block since the user said it should only pass for CERTIFIED_READY.
                                 blocked = true;
                                 gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
                                 blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
