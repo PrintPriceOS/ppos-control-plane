@@ -32,18 +32,43 @@ async function run() {
 
         // Insert some audit events
         const events = [
-            { event: 'PREFLIGHT_JOB_SUBMITTED', status: 'SUCCESS', meta: { job_id: parentJobId } },
-            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId } },
-            { event: 'PREFLIGHT_FIX_TRIGGERED', status: 'SUCCESS', meta: { job_id: parentJobId } },
-            { event: 'PREFLIGHT_FIX_JOB_CREATED', status: 'SUCCESS', meta: { parent_job_id: parentJobId, child_job_id: childJobId } },
-            { event: 'PREFLIGHT_FIXED_PDF_READY', status: 'SUCCESS', meta: { fix_job_id: childJobId } }
+            { event: 'PREFLIGHT_JOB_SUBMITTED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
+            { event: 'PREFLIGHT_JOB_VIEWED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
+            { event: 'PREFLIGHT_FIX_TRIGGERED', status: 'SUCCESS', meta: { job_id: parentJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
+            { event: 'PREFLIGHT_FIX_JOB_CREATED', status: 'SUCCESS', meta: { parent_job_id: parentJobId, child_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } },
+            { event: 'PREFLIGHT_FIXED_PDF_READY', status: 'SUCCESS', meta: { fix_job_id: childJobId, actor_role: 'ADMIN', actor: 'tester', source: 'PHASE_43C_SMOKE', legacy_action: 'test_action' } }
         ];
 
+        // Schema-aware insert
+        const descResult = await db.query('DESCRIBE api_audit_logs');
+        const descRows = Array.isArray(descResult) && Array.isArray(descResult[0]) ? descResult[0] : (Array.isArray(descResult) ? descResult : []);
+        const columns = descRows.map(r => r.Field);
+        
+        const insertCols = [];
+        const insertPlaceholders = [];
+        
+        if (columns.includes('tenant_id')) { insertCols.push('tenant_id'); insertPlaceholders.push('?'); }
+        if (columns.includes('user_id')) { insertCols.push('user_id'); insertPlaceholders.push('?'); }
+        if (columns.includes('user_role')) { insertCols.push('user_role'); insertPlaceholders.push('?'); }
+        if (columns.includes('action')) { insertCols.push('action'); insertPlaceholders.push('?'); }
+        if (columns.includes('event_type')) { insertCols.push('event_type'); insertPlaceholders.push('?'); }
+        if (columns.includes('status')) { insertCols.push('status'); insertPlaceholders.push('?'); }
+        if (columns.includes('metadata_json')) { insertCols.push('metadata_json'); insertPlaceholders.push('?'); }
+        if (columns.includes('created_at')) { insertCols.push('created_at'); insertPlaceholders.push('NOW() - INTERVAL 1 MINUTE'); }
+
+        const sql = `INSERT INTO api_audit_logs (${insertCols.join(', ')}) VALUES (${insertPlaceholders.join(', ')})`;
+
         for (const e of events) {
-            await db.query(`
-                INSERT INTO api_audit_logs (tenant_id, user_id, user_role, action, event_type, status, metadata_json, created_at)
-                VALUES (?, 'tester', 'ADMIN', 'test_action', ?, ?, ?, NOW() - INTERVAL 1 MINUTE)
-            `, [testTenantId, e.event, e.status, JSON.stringify(e.meta)]);
+            const vals = [];
+            if (columns.includes('tenant_id')) vals.push(testTenantId);
+            if (columns.includes('user_id')) vals.push('tester');
+            if (columns.includes('user_role')) vals.push('ADMIN');
+            if (columns.includes('action')) vals.push('test_action');
+            if (columns.includes('event_type')) vals.push(e.event);
+            if (columns.includes('status')) vals.push(e.status);
+            if (columns.includes('metadata_json')) vals.push(JSON.stringify(e.meta));
+            
+            await db.query(sql, vals);
         }
 
         console.log("✅ Mock data inserted successfully.");

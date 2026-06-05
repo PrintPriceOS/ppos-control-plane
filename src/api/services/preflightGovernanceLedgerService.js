@@ -69,7 +69,7 @@ function deriveSeverity(eventType, status, metadata) {
 function deriveActor(row, metadata) {
     return {
         user_id: row.user_id || metadata?.operator_id || metadata?.userId || 'system',
-        role: row.user_role || metadata?.userRole || 'SYSTEM',
+        role: metadata?.actor_role || metadata?.role || metadata?.userRole || 'SYSTEM',
         label: row.user_id ? `User ${row.user_id}` : 'System'
     };
 }
@@ -101,7 +101,7 @@ function mapAuditEventToLedgerEvent(row) {
 async function getGovernanceLedger(jobId, context) {
     // 1. Fetch related audit logs
     const sql = `
-        SELECT id, event_type, status, user_id, user_role, tenant_id, request_id, created_at, metadata_json
+        SELECT id, event_type, status, user_id, tenant_id, created_at, metadata_json
         FROM api_audit_logs
         WHERE 
             tenant_id = ?
