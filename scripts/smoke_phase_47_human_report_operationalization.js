@@ -212,6 +212,39 @@ async function runSmokeTests() {
 
         console.log('Share token validated successfully. Sanitized report generated.');
 
+        console.log(`4.1 Testing public route transparency...`);
+        const mockPublicRouteHandler = async (t) => {
+            const req = { params: { token: t } };
+            let response = null;
+            let status = 200;
+            const res = {
+                status: (s) => { status = s; return res; },
+                json: (j) => { response = j; }
+            };
+
+            const result = await humanReportSnapshotService.validateShareToken(req.params.token);
+            if (!result.ok) {
+                return res.status(result.statusCode || 400).json(result);
+            }
+            res.json(result);
+            return { status, response };
+        };
+
+        const publicRes = await mockPublicRouteHandler(token);
+        if (!publicRes.response.job_id) throw new Error('Assertion failed: public route missing job_id');
+        if (!publicRes.response.snapshot_id) throw new Error('Assertion failed: public route missing snapshot_id');
+        if (!publicRes.response.generated_at) throw new Error('Assertion failed: public route missing generated_at');
+        
+        const pubFixedPdf = Array.isArray(publicRes.response.report.artifact_recommendations) 
+            ? publicRes.response.report.artifact_recommendations.find(a => a.type === 'fixed_pdf') 
+            : publicRes.response.report.artifact_recommendations['fixed_pdf'];
+        
+        if (pubFixedPdf.production_certified !== false) throw new Error('Assertion failed: public route fixed_pdf production_certified is not false');
+        if (pubFixedPdf.artifact_role !== 'REVIEW_REQUIRED') throw new Error('Assertion failed: public route fixed_pdf artifact_role is not REVIEW_REQUIRED');
+        if (pubFixedPdf.downloadable !== false) throw new Error('Assertion failed: public route fixed_pdf downloadable is not false');
+
+        console.log('Public route validated successfully. Result passes through directly.');
+
         console.log(`5. Testing createDecision...`);
         const decisionRes = await reviewApprovalService.createDecision(jobId, snapshotId, 'APPROVED_WITH_WARNINGS', 'Looks OK', 'review_pdf', context);
         if (!decisionRes.ok) throw new Error('Failed to create decision');
