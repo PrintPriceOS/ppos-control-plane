@@ -282,13 +282,25 @@ class PreflightHumanReportSnapshotService {
             
             const processArt = (a, key) => {
                 if (a && a.customer_visible) {
-                    arr.push({
-                        type: a.type || a.artifact_type || key,
+                    const type = a.type || a.artifact_type || key;
+                    const role = a.artifact_role || a.role || (type === 'fixed_pdf' && report.outcome === 'FIXED_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'CUSTOMER_VISIBLE');
+                    
+                    const normalized = {
+                        type,
                         filename: a.filename,
-                        size_bytes: a.size_bytes,
-                        role: a.artifact_role || a.role,
-                        customer_visible: true
-                    });
+                        customer_visible: true,
+                        production_certified: a.production_certified === true,
+                        artifact_role: role
+                    };
+
+                    if (type === 'fixed_pdf' && report.outcome === 'FIXED_REVIEW_REQUIRED') {
+                        normalized.downloadable = false;
+                        normalized.recommended_use = 'Review required before production.';
+                    } else if (a.size_bytes !== undefined) {
+                        normalized.size_bytes = a.size_bytes;
+                    }
+
+                    arr.push(normalized);
                 }
             };
 
@@ -304,11 +316,9 @@ class PreflightHumanReportSnapshotService {
 
         return {
             ok: true,
-            snapshot: {
-                id: row.id,
-                job_id: row.job_id,
-                generated_at: row.generated_at
-            },
+            job_id: envelope.job_id || row.job_id || jobId,
+            snapshot_id: row.id || snapshotId,
+            generated_at: envelope.generated_at || row.generated_at || row.created_at,
             report: {
                 outcome: report.outcome,
                 severity: report.severity,

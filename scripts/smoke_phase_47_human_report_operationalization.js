@@ -182,6 +182,9 @@ async function runSmokeTests() {
         console.log(`4. Testing validateShareToken...`);
         const validateRes = await humanReportSnapshotService.validateShareToken(token);
         if (!validateRes.ok) throw new Error('Failed to validate share token');
+        if (!validateRes.job_id) throw new Error('Assertion failed: validateShareToken job_id');
+        if (!validateRes.snapshot_id) throw new Error('Assertion failed: validateShareToken snapshot_id');
+        if (!validateRes.generated_at) throw new Error('Assertion failed: validateShareToken generated_at');
         
         const safeReport = validateRes.report;
         if (safeReport.outcome !== 'FIXED_REVIEW_REQUIRED') throw new Error('Assertion failed: validateShareToken outcome');
@@ -195,6 +198,12 @@ async function runSmokeTests() {
         if (types.includes('fix_audit')) throw new Error('Assertion failed: leaks fix_audit');
         if (types.includes('delta_report')) throw new Error('Assertion failed: leaks delta_report');
         
+        const fixedPdf = Array.isArray(artifacts) ? artifacts.find(a => a.type === 'fixed_pdf') : artifacts['fixed_pdf'];
+        if (fixedPdf) {
+            if (fixedPdf.production_certified !== false) throw new Error('Assertion failed: fixed_pdf production_certified is not false');
+            if (fixedPdf.artifact_role !== 'REVIEW_REQUIRED') throw new Error('Assertion failed: fixed_pdf artifact_role is not REVIEW_REQUIRED');
+        }
+
         const hasSecretIds = JSON.stringify(safeReport).includes('secret-') || JSON.stringify(safeReport).includes('internal-');
         if (hasSecretIds) throw new Error('Assertion failed: internal download IDs leaked');
 
