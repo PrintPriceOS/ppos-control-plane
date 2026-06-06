@@ -4,7 +4,7 @@ const db = require('./mysqlClient');
 const governanceLedgerService = require('./preflightGovernanceLedgerService');
 
 // Helper to determine the primary artifact
-function selectPrimaryHumanArtifact(job, artifacts) {
+function selectPrimaryHumanArtifact(job, artifacts, artifactTrust = null) {
     if (!Array.isArray(artifacts)) return null;
 
     const certPdf = artifacts.find(a => (a.type === 'certified_pdf' || a.alias === 'certified_pdf'));
@@ -13,6 +13,15 @@ function selectPrimaryHumanArtifact(job, artifacts) {
     const deltaReport = artifacts.find(a => (a.type === 'delta_report' || a.alias === 'delta_report'));
     const reportJson = artifacts.find(a => (a.type === 'report_json' || a.alias === 'report_json'));
     const analysisReport = artifacts.find(a => (a.type === 'analysis_report' || a.alias === 'analysis_report'));
+
+    // Phase 56D: artifact_trust takes absolute priority over filename heuristics
+    if (artifactTrust) {
+        const pType = artifactTrust.primary_artifact_type;
+        if (pType === null) return null; // explicit null means no primary artifact should be exposed
+        if (pType === 'review_pdf' && reviewPdf) return reviewPdf;
+        if (pType === 'fixed_pdf' && fixedPdf) return fixedPdf;
+        if (pType === 'certified_pdf' && certPdf && artifactTrust.certified_pdf_allowed !== false) return certPdf;
+    }
 
     // Rule 1: certified_pdf ONLY if production_certified=true AND customer_visible=true AND artifact_role=PRODUCTION_READY
     if (certPdf && 
@@ -543,7 +552,105 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         pdfxGenerationPerformed = false;
     }
 
-    const primaryArtifact = selectPrimaryHumanArtifact({ ...job, review_required: isReviewReq, production_certified: isProdCert }, artifacts);
+    // Phase 56D: Defensive extraction of artifact_trust
+    const trustSources = [
+        job.artifact_trust,
+        job.fix_summary?.artifact_trust,
+        job.fix_audit?.artifact_trust,
+        job.delta_summary?.artifact_trust,
+        job.delta_report?.artifact_trust,
+        job.report?.artifact_trust
+    ];
+    const artifactsWithTrustMeta = artifacts.find(a => a.metadata && a.metadata.artifact_trust);
+    if (artifactsWithTrustMeta) trustSources.push(artifactsWithTrustMeta.metadata.artifact_trust);
+    if (injectedJob?.artifact_trust) trustSources.push(injectedJob.artifact_trust); 
+
+    let artTrust = {};
+    for (const source of trustSources) {
+        if (!source) continue;
+        if (source.trust_level && !artTrust.trust_level) artTrust.trust_level = source.trust_level;
+        if (source.primary_artifact_type && !artTrust.primary_artifact_type) artTrust.primary_artifact_type = source.primary_artifact_type;
+        
+        if (source.review_required === true) artTrust.review_required = true;
+        if (source.certified_pdf_allowed === false) artTrust.certified_pdf_allowed = false;
+        if (source.production_certified === false) artTrust.production_certified = false;
+        else if (source.production_certified === true && artTrust.production_certified !== false) artTrust.production_certified = true;
+        
+        if (source.standard_certified === false) artTrust.standard_certified = false;
+        else if (source.standard_certified === true && artTrust.standard_certified !== false) artTrust.standard_certified = true;
+        
+        if (source.customer_visible === false) artTrust.customer_visible = false;
+        else if (source.customer_visible === true && artTrust.customer_visible !== false) artTrust.customer_visible = true;
+
+        if (source.pdfx_compliance_claimed === true) artTrust.pdfx_compliance_claimed = true;
+        if (source.pdfa_compliance_claimed === true) artTrust.pdfa_compliance_claimed = true;
+        if (source.compliance_claim_allowed === false) artTrust.compliance_claim_allowed = false;
+
+        if (source.blocked_by_governance_domains && source.blocked_by_governance_domains.length > 0) {
+            artTrust.blocked_by_governance_domains = [...new Set([...(artTrust.blocked_by_governance_domains || []), ...source.blocked_by_governance_domains])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            artTrust.warnings = [...new Set([...(artTrust.warnings || []), ...source.warnings])];
+        }
+        if (source.primary_disallowed_reasons && source.primary_disallowed_reasons.length > 0) {
+            artTrust.primary_disallowed_reasons = [...new Set([...(artTrust.primary_disallowed_reasons || []), ...source.primary_disallowed_reasons])];
+        }
+        if (source.certification_labels && source.certification_labels.length > 0) {
+            artTrust.certification_labels = [...new Set([...(artTrust.certification_labels || []), ...source.certification_labels])];
+        }
+        if (source.evidence) {
+            artTrust.evidence = { ...(artTrust.evidence || {}), ...source.evidence };
+        }
+    }
+
+    if (artTrust.review_required === true) isReviewReq = true;
+    if (artTrust.production_certified === false) isProdCert = false;
+    else if (artTrust.production_certified === true && (!artTrust.blocked_by_governance_domains || artTrust.blocked_by_governance_domains.length === 0)) isProdCert = true;
+
+    // Validator evidence cross-check
+    if (artTrust.standard_certified === true) {
+        let hasTrustEvidence = false;
+        const ev = artTrust.evidence || {};
+        if (ev.validation_performed === true &&
+            ev.validation_passed === true &&
+            ev.validator_name &&
+            ev.validator_version &&
+            ev.standard_detected &&
+            (ev.validation_report_available === true || ev.validation_report_hash || ev.validation_report_path) &&
+            ev.compliance_claim_allowed !== false) {
+            hasTrustEvidence = true;
+        }
+        if (!hasTrustEvidence && !hasFullValidatorEvidence) {
+            artTrust.standard_certified = false;
+            artTrust.pdfx_compliance_claimed = false;
+            artTrust.pdfa_compliance_claimed = false;
+            if (artTrust.certification_labels) {
+                artTrust.certification_labels = artTrust.certification_labels.filter(l => !['Standards validated', 'PDF/X validated', 'PDF/A validated', 'PDF/X certified', 'PDF/A certified', 'Standard-certified'].includes(l));
+            }
+            artTrust.warnings = [...new Set([...(artTrust.warnings || []), 'STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE'])];
+        } else {
+            pdfxComplianceClaimed = artTrust.pdfx_compliance_claimed || pdfxComplianceClaimed;
+            pdfaComplianceClaimed = artTrust.pdfa_compliance_claimed || pdfaComplianceClaimed;
+            standardCertified = true;
+        }
+    } else if (artTrust.standard_certified === false) {
+        standardCertified = false;
+        pdfxComplianceClaimed = false;
+        pdfaComplianceClaimed = false;
+    }
+    
+    // Sanitize evidence before exposing to public report
+    if (artTrust.evidence) {
+        const safeEvidence = {};
+        for (const [k, v] of Object.entries(artTrust.evidence)) {
+            if (!['raw_command', 'local_path', 'internal_id', 'obj_'].some(b => k.includes(b))) {
+                safeEvidence[k] = v;
+            }
+        }
+        artTrust.evidence = safeEvidence;
+    }
+
+    const primaryArtifact = selectPrimaryHumanArtifact({ ...job, review_required: isReviewReq, production_certified: isProdCert }, artifacts, artTrust);
 
     if (certLevel === "CERTIFIED_READY" && isProdCert && !isReviewReq && primaryArtifact?.artifact_role === 'PRODUCTION_READY') {
         outcome = "CERTIFIED_READY";
@@ -592,13 +699,20 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         
         const certPdf = artifacts.find(a => (a.type === 'certified_pdf' || a.alias === 'certified_pdf'));
         if (certPdf && (!certPdf.production_certified || !certPdf.customer_visible)) {
-            opDetails.push("certified.pdf exists physically but is not production-certified and should not be customer-visible.");
+            opDetails.push("The artifact named certified.pdf exists, but the filename alone does not prove production certification or standards certification.");
         }
 
         const applied = appliedFixesRaw;
         const skipped = skippedFixesRaw;
         applied.forEach(f => opDetails.push(translateFixMessage(f, false, colorGov)));
         skipped.forEach(f => opDetails.push(translateFixMessage(f, true, colorGov)));
+        
+        if (artTrust.primary_artifact_type === 'review_pdf') {
+            opDetails.push("The recommended artifact requires human/operator review before production.");
+        }
+        if (artTrust.primary_artifact_type === 'fixed_pdf') {
+            opDetails.push("A corrected artifact exists, but this does not automatically imply production or standards certification.");
+        }
         
         // Phase 51A: Add findings and review reasons to operator details
         const reasons = job.review_required_reasons || job.fix_audit?.review_required_reasons || [];
@@ -689,7 +803,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (stdReasons.includes('PDFX_METADATA_CONFLICT')) opDetails.push("The PDF contains conflicting PDF/X metadata. Standards compliance requires validation.");
         if (stdReasons.includes('PDFA_METADATA_CONFLICT')) opDetails.push("The PDF contains conflicting PDF/A metadata. PDF/A compliance was not accepted without validation.");
         if (stdReasons.includes('OUTPUTINTENT_PRESENT_NOT_PDFX')) opDetails.push("An OutputIntent is present, but OutputIntent presence alone does not prove PDF/X compliance.");
-        if (stdReasons.includes('OUTPUTINTENT_MISSING_FOR_STANDARD')) opDetails.push("The PDF is missing the OutputIntent required for a standards claim. Compliance was not claimed.");
+        if (stdReasons.includes('OUTPUTINTENT_MISSING_FOR_STANDARD')) opDetails.push("The PDF is missing a required OutputIntent for the declared standard.");
+        if (stdReasons.includes('STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE') || (artTrust.warnings && artTrust.warnings.includes('STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE'))) opDetails.push("Standards certification was not accepted because required validator evidence is missing.");
         if (stdReasons.includes('OUTPUTINTENT_INVALID_FOR_STANDARD')) opDetails.push("The PDF contains an OutputIntent that is invalid or insufficient for the claimed standard.");
         if (stdReasons.includes('STANDARD_VALIDATOR_UNAVAILABLE')) opDetails.push("No standards validator was available. PDF/X or PDF/A compliance was not claimed.");
         if (stdReasons.includes('STANDARD_VALIDATION_FAILED')) opDetails.push("Standards validation failed. The PDF cannot be treated as standard-certified.");
@@ -873,24 +988,42 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (a.type === 'certified_pdf' && (!a.production_certified || !a.customer_visible)) {
             warning = "Not production-certified and should not be customer-visible.";
         }
+        
+        let customVisible = a.customer_visible === true;
+        let prodCert = a.production_certified === true;
+        let stdCert = a.standard_certified === true;
+        
+        // Phase 56D: override metadata visibility if artifactTrust conflicts
+        if (artTrust && artTrust.customer_visible === false && (a.type === 'certified_pdf' || a.alias === 'certified_pdf')) {
+            customVisible = false;
+        }
 
         return {
             type: a.type || a.alias || 'OUTPUT',
             filename: a.filename || a.name || 'document.pdf',
             label: a.label || a.alias || a.type,
             downloadable: a.downloadable !== false && a.size_bytes > 0,
-            production_certified: a.production_certified === true,
-            standard_certified: a.standard_certified === true,
-            customer_visible: a.customer_visible === true,
+            production_certified: prodCert,
+            standard_certified: stdCert,
+            customer_visible: customVisible,
             artifact_role: a.artifact_role || 'INTERNAL',
             recommended_use: a.recommended_use || 'Internal review only.',
             is_primary: isPrimary,
-            is_customer_safe: a.customer_visible === true && a.production_certified === true,
+            is_customer_safe: customVisible && prodCert,
             warning: warning,
             download_id: a.download_id || a.alias || a.id,
             secondary_aliases: a.secondary_aliases || []
         };
     });
+
+    // Finalize report payload trust properties
+    const safeTrust = { ...artTrust };
+    if (safeTrust.evidence) {
+        delete safeTrust.evidence.raw_command;
+        delete safeTrust.evidence.internal_id;
+        delete safeTrust.evidence.local_path;
+        delete safeTrust.evidence.obj_;
+    }
 
     // Governance
     let govSummary = { event_count: 0, source: 'UNAVAILABLE', compacted_count: 0 };
@@ -946,6 +1079,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             info: 0,
             review_required: isReviewReq
         },
+        artifact_trust: safeTrust,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,
