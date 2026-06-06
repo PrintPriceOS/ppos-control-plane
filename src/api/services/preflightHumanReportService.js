@@ -445,6 +445,10 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (source.pdfx_compliance_claimed === true) stdGov.pdfx_compliance_claimed = true;
         if (source.pdfa_compliance_claimed === true) stdGov.pdfa_compliance_claimed = true;
         if (source.standard_claimed) stdGov.standard_claimed = source.standard_claimed;
+        if (source.validator_gap === true) stdGov.validator_gap = true;
+        if (source.detector_gap === true) stdGov.detector_gap = true;
+        if (source.fixture_gap === true) stdGov.fixture_gap = true;
+        if (source.deferred === true) stdGov.deferred = true;
         
         if (source.validator_name) stdGov.validator_name = source.validator_name;
         if (source.validator_version) stdGov.validator_version = source.validator_version;
@@ -555,6 +559,18 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
         if (iqGov && iqGov.detector_gap === true) {
             operatorSummary += " Image quality detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.validator_gap === true) {
+            operatorSummary += " Standards validation was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.detector_gap === true) {
+            operatorSummary += " Standards detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.fixture_gap === true) {
+            operatorSummary += " Standards fixture validation gap preserved.";
+        }
+        if (stdGov && stdGov.deferred === true) {
+            operatorSummary += " Standards processing deferred.";
         }
         recommendedAction = {
             action_id: "use_certified",
@@ -693,6 +709,19 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             customerSummary = "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.";
         }
 
+        if (stdGov && stdGov.validator_gap === true) {
+            opDetails.push("Standards validation was incomplete for this fixture; no unsupported finding was inferred automatically.");
+        }
+        if (stdGov && stdGov.detector_gap === true) {
+            opDetails.push("Standards detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
+        }
+        if (stdGov && stdGov.fixture_gap === true) {
+            opDetails.push("Standards fixture validation gap preserved.");
+        }
+        if (stdGov && stdGov.deferred === true) {
+            opDetails.push("Standards processing deferred.");
+        }
+
         if (colorGov && colorGov.detector_gap === true) {
             opDetails.push("Color detection was incomplete for this fixture; no unsupported finding was inferred automatically.");
         }
@@ -746,6 +775,18 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
         if (iqGov && iqGov.detector_gap === true) {
             operatorSummary += " Image quality detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.validator_gap === true) {
+            operatorSummary += " Standards validation was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.detector_gap === true) {
+            operatorSummary += " Standards detection was incomplete for this fixture; no unsupported finding was inferred automatically.";
+        }
+        if (stdGov && stdGov.fixture_gap === true) {
+            operatorSummary += " Standards fixture validation gap preserved.";
+        }
+        if (stdGov && stdGov.deferred === true) {
+            operatorSummary += " Standards processing deferred.";
         }
         recommendedAction = {
             action_id: "use_fixed",
