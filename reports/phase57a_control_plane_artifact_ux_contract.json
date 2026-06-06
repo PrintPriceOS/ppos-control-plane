@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-06-06T11:39:36.923Z",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "results": [
+    {
+      "id": 1,
+      "name": "Customer review_pdf with review_required=true",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 2,
+      "name": "Customer fixed_pdf not production-certified",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 3,
+      "name": "Customer certified_pdf without artifact_trust approval",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 4,
+      "name": "Customer production-certified but not standard-certified",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 5,
+      "name": "Customer standard-certified with PDF/X evidence",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 6,
+      "name": "Operator review_pdf",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 7,
+      "name": "Operator certified_pdf not production-certified",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 8,
+      "name": "OutputIntent warning",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 9,
+      "name": "Audit JSON / Delta Report / Human Report buttons",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 10,
+      "name": "Public report sanitation",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 11,
+      "name": "Primary artifact UX",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 12,
+      "name": "Forbidden labels regression",
+      "status": "PASS",
+      "error": null
+    }
+  ]
+}

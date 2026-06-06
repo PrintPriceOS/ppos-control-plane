@@ -2,6 +2,7 @@ const gateway = require('./preflightContractGateway');
 const preflightServiceClient = require('./preflightServiceClient');
 const db = require('./mysqlClient');
 const governanceLedgerService = require('./preflightGovernanceLedgerService');
+const artifactUxLabelService = require('./artifactUxLabelService');
 
 // Helper to determine the primary artifact
 function selectPrimaryHumanArtifact(job, artifacts, artifactTrust = null) {
@@ -585,6 +586,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (source.pdfx_compliance_claimed === true) artTrust.pdfx_compliance_claimed = true;
         if (source.pdfa_compliance_claimed === true) artTrust.pdfa_compliance_claimed = true;
         if (source.compliance_claim_allowed === false) artTrust.compliance_claim_allowed = false;
+        if (source.outputintent_changed === true) artTrust.outputintent_changed = true;
+        if (source.outputintent_does_not_prove_pdfx === true) artTrust.outputintent_does_not_prove_pdfx = true;
 
         if (source.blocked_by_governance_domains && source.blocked_by_governance_domains.length > 0) {
             artTrust.blocked_by_governance_domains = [...new Set([...(artTrust.blocked_by_governance_domains || []), ...source.blocked_by_governance_domains])];
@@ -1040,6 +1043,33 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         // Safe to ignore, we don't depend on it
     }
 
+    const artifact_ux = {
+        primary: {},
+        artifacts: [],
+        customer_labels: [],
+        operator_labels: [],
+        forbidden_claims_removed: [],
+        warnings: []
+    };
+
+    dedupedArtifacts.forEach(a => {
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: {}, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: {}, audience: 'operator' });
+        
+        artifact_ux.customer_labels.push(cLabel);
+        artifact_ux.operator_labels.push(oLabel);
+        
+        cLabel.forbidden_claims.forEach(c => {
+            if (!artifact_ux.forbidden_claims_removed.includes(c)) artifact_ux.forbidden_claims_removed.push(c);
+        });
+        if (oLabel.warning && !artifact_ux.warnings.includes(oLabel.warning)) artifact_ux.warnings.push(oLabel.warning);
+        if (cLabel.warning && !artifact_ux.warnings.includes(cLabel.warning)) artifact_ux.warnings.push(cLabel.warning);
+        
+        const combined = { ...a, ux: { customer: cLabel, operator: oLabel } };
+        artifact_ux.artifacts.push(combined);
+        if (a.is_primary) artifact_ux.primary = combined;
+    });
+
     const reportPayload = {
         outcome,
         severity,
@@ -1058,6 +1088,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         technical_summary: job.summary || job.analysis?.summary || '',
         recommended_next_action: recommendedAction,
         artifact_recommendations: dedupedArtifacts,
+        artifact_ux: artifact_ux,
         fix_summary: {
             requested_count: fixSummaryObj.requested_count || job.requested_fixes?.length || 0,
             applied_count: fixSummaryObj.applied_count || appliedFixesRaw.length || 0,

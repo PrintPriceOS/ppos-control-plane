@@ -40,6 +40,7 @@ import {
   mapPhase10Status,
   collectFindings
 } from "../../lib/preflightStatusHelpers";
+import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 function renderAnalysisIntegrity(payload: any): string {
   if (!payload) return '100% Native';
@@ -797,16 +798,19 @@ async function triggerArtifactDownload(artifact: any) {
                     </div>
                   )}
 
-                  {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (
+                  {!zeroBytesOnly && primaryItem && primaryItem.downloadable ? (() => {
+                    const ux = getArtifactUxForArtifact(primaryItem, jobRes.canonicalPayload?.report?.artifact_ux || payload.artifact_ux, "operator");
+                    return (
                     <button 
                       onClick={() => triggerArtifactDownload(primaryItem)}
                       className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-primary text-white font-black uppercase tracking-widest shadow-sm hover:opacity-90 active:scale-95 transition-all group"
-                      title={primaryItem.label}
+                      title={ux.tooltip || primaryItem.label}
                     >
                       <DocumentArrowDownIcon className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
-                      <span>Download Fixed PDF</span>
+                      <span>{ux.button_label || 'Download Artifact'}</span>
                     </button>
-                  ) : (!zeroBytesOnly && primaryItem && !primaryItem.downloadable) ? (
+                    );
+                  })() : (!zeroBytesOnly && primaryItem && !primaryItem.downloadable) ? (
                     <div className="w-full flex flex-col items-center justify-center p-4 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-500">
                       <DocumentIcon className="w-6 h-6 mb-2 text-slate-400" />
                       <span className="text-xs font-bold text-center">Artifact registered but contains no downloadable bytes yet.</span>
@@ -818,17 +822,18 @@ async function triggerArtifactDownload(artifact: any) {
 
                   {secondaryItems.filter((a: any) => a.type !== 'output_file').length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {secondaryItems.filter((a: any) => a.type !== 'output_file').map((a: any, i: number) => (
-                        a.downloadable ? (
+                      {secondaryItems.filter((a: any) => a.type !== 'output_file').map((a: any, i: number) => {
+                        const ux = getArtifactUxForArtifact(a, jobRes.canonicalPayload?.report?.artifact_ux || payload.artifact_ux, "operator");
+                        return a.downloadable ? (
                           <button 
                             key={i}
                             onClick={() => triggerArtifactDownload(a)}
                             className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
-                            title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
+                            title={ux.tooltip || `Download ${a.filename} (${formatSize(a.size_bytes)})`}
                           >
                             <div className="flex items-center gap-2 truncate pr-2">
                               <DocumentIcon className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
-                              <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.label || a.alias || a.type}</span>
+                              <span className="text-xs font-bold text-slate-700 dark:text-[#ECECF1] truncate">{ux.display_label || a.label || a.alias || a.type}</span>
                             </div>
                             <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
                           </button>
@@ -836,16 +841,16 @@ async function triggerArtifactDownload(artifact: any) {
                           <div 
                             key={i}
                             className="flex items-center justify-between p-3 ppos-surface-muted border ppos-border opacity-50 cursor-not-allowed"
-                            title="Artifact registered but 0 bytes"
+                            title={ux.tooltip || "Artifact registered but 0 bytes"}
                           >
                             <div className="flex items-center gap-2 truncate pr-2">
                               <DocumentIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                              <span className="text-xs font-bold text-slate-500 truncate">{a.label || a.alias || a.type}</span>
+                              <span className="text-xs font-bold text-slate-500 truncate">{ux.display_label || a.label || a.alias || a.type}</span>
                             </div>
                             <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">0 B</span>
                           </div>
-                        )
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -856,17 +861,18 @@ async function triggerArtifactDownload(artifact: any) {
                         <ChevronDownIcon className="w-4 h-4 transition-transform group-open:rotate-180" />
                       </summary>
                       <div className="p-3 border-t ppos-border bg-white dark:bg-[#1E1E2D] grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {secondaryItems.filter((a: any) => a.type === 'output_file').map((a: any, i: number) => (
-                          a.downloadable ? (
+                        {secondaryItems.filter((a: any) => a.type === 'output_file').map((a: any, i: number) => {
+                          const ux = getArtifactUxForArtifact(a, jobRes.canonicalPayload?.report?.artifact_ux || payload.artifact_ux, "operator");
+                          return a.downloadable ? (
                             <button 
                               key={i}
                               onClick={() => triggerArtifactDownload(a)}
                               className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border hover:border-primary/40 transition-colors group"
-                              title={`Download ${a.filename} (${formatSize(a.size_bytes)})`}
+                              title={ux.tooltip || `Download ${a.filename} (${formatSize(a.size_bytes)})`}
                             >
                               <div className="flex items-center gap-2 truncate pr-2">
                                 <DocumentIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary transition-colors flex-shrink-0" />
-                                <span className="text-[10px] font-bold text-slate-700 dark:text-[#ECECF1] truncate">{a.filename}</span>
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-[#ECECF1] truncate">{ux.display_label || a.filename}</span>
                               </div>
                               <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">{formatSize(a.size_bytes)}</span>
                             </button>
@@ -874,16 +880,16 @@ async function triggerArtifactDownload(artifact: any) {
                             <div 
                               key={i}
                               className="flex items-center justify-between p-2 ppos-surface-muted border ppos-border opacity-50 cursor-not-allowed"
-                              title="Artifact registered but 0 bytes"
+                              title={ux.tooltip || "Artifact registered but 0 bytes"}
                             >
                               <div className="flex items-center gap-2 truncate pr-2">
                                 <DocumentIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                <span className="text-[10px] font-bold text-slate-500 truncate">{a.filename}</span>
+                                <span className="text-[10px] font-bold text-slate-500 truncate">{ux.display_label || a.filename}</span>
                               </div>
                               <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap">0 B</span>
                             </div>
-                          )
-                        ))}
+                          );
+                        })}
                       </div>
                     </details>
                   )}

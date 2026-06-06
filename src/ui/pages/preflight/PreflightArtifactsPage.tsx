@@ -12,6 +12,7 @@ import { getPreflightArtifacts, getGlobalArtifacts } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { short } from "../../lib/formatters";
+import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 
 export const PreflightArtifactsPage: React.FC = () => {
@@ -64,7 +65,9 @@ export const PreflightArtifactsPage: React.FC = () => {
         columns={[
           {
             header: 'Artifact Name',
-            accessor: (a) => (
+            accessor: (a) => {
+              const ux = getArtifactUxForArtifact(a, null, "operator");
+              return (
               <div className="flex items-center gap-3">
                 {a.mime_type?.includes('pdf') ? (
                   <DocumentArrowDownIcon className="w-4 h-4 text-primary" />
@@ -72,12 +75,13 @@ export const PreflightArtifactsPage: React.FC = () => {
                   <CommandLineIcon className="w-4 h-4 text-slate-400" />
                 )}
                 <div className="flex flex-col">
-                  <span className="font-bold truncate max-w-xs">{a.filename}</span>
+                  <span className="font-bold truncate max-w-xs" title={ux.tooltip}>{ux.display_label || a.filename}</span>
                   <span className="text-[10px] font-mono text-slate-400">ID: {short(a.id, 8)} • Job: {short(a.job_id, 8)}</span>
 
                 </div>
               </div>
-            )
+              );
+            }
           },
           {
             header: 'Tenant',
@@ -85,11 +89,14 @@ export const PreflightArtifactsPage: React.FC = () => {
           },
           {
             header: 'Type',
-            accessor: (a) => (
+            accessor: (a) => {
+              const ux = getArtifactUxForArtifact(a, null, "operator");
+              return (
               <span className="px-2 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/[0.06] text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
-                {a.type}
+                {ux.status_badge || a.type}
               </span>
-            )
+              );
+            }
           },
           {
             header: 'Size',

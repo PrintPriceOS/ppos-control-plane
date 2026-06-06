@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Drawer } from './Drawer';
 import { short } from '../lib/formatters';
 import { safeArray } from '../lib/display';
+import { getArtifactUxForArtifact } from '../../lib/artifactUx';
 import { GovernanceSnapshotViewer } from './GovernanceSnapshotViewer';
 import { ExecutionTimeline, TimelineEventItem } from './ExecutionTimeline';
 import { MachineDetailDrawer } from './MachineDetailDrawer';
@@ -415,45 +416,59 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {safeArray(forensics.artifacts).map((artifactItem, i) => (
+                          {safeArray(forensics.artifacts).map((artifactItem, i) => {
+                            const ux = getArtifactUxForArtifact(artifactItem, forensics.detail?.report?.artifact_ux || job?.artifact_ux || resultData?.artifact_ux || null, 'operator');
+                            return (
                             <div key={artifactItem.artifact_id || i} className={`p-2 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} flex flex-col justify-between text-[10px] leading-tight space-y-1`}>
                               <div className="min-w-0">
                                 <div className="flex items-center justify-between gap-1">
-                                  <span className={`font-bold ${COLORS.adaptive.textPrimary} truncate`} title={typeof artifactItem.filename === 'string' ? artifactItem.filename : renderErrorString(artifactItem.filename)}>
-                                    {renderErrorString(artifactItem.filename)}
+                                  <span className={`font-bold ${COLORS.adaptive.textPrimary} truncate`} title={ux.tooltip || (typeof artifactItem.filename === 'string' ? artifactItem.filename : renderErrorString(artifactItem.filename))}>
+                                    {ux.display_label || renderErrorString(artifactItem.filename)}
                                   </span>
                                   <span className={`text-[8px] font-bold ${COLORS.adaptive.textMuted} shrink-0`}>
                                     {artifactItem.size_bytes ? `${Number((artifactItem.size_bytes || 0) / 1024).toFixed(1)} KB` : '---'}
                                   </span>
                                 </div>
-                                {artifactItem.checksum_sha256 ? (
-                                  <span className={`text-[8px] font-mono ${COLORS.adaptive.textMuted} block truncate`} title={artifactItem.checksum_sha256}>
-                                    SHA256: {artifactItem.checksum_sha256.substring(0, 16)}...
+                                <div className="mt-1 flex items-center justify-between">
+                                  <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 border ${
+                                    ux.status_tone === 'danger' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                    ux.status_tone === 'warning' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                    ux.status_tone === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                    ux.status_tone === 'info' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                    `${COLORS.adaptive.surfaceMuted} ${COLORS.adaptive.textMuted} ${COLORS.adaptive.borderSubtle}`
+                                  }`}>
+                                    {ux.status_badge || 'Artifact'}
                                   </span>
-                                ) : (
-                                  <span className={`text-[8px] font-mono ${COLORS.adaptive.textMuted} block italic`}>Hash omitted</span>
-                                )}
+                                  {artifactItem.checksum_sha256 ? (
+                                    <span className={`text-[8px] font-mono ${COLORS.adaptive.textMuted} block truncate max-w-[100px]`} title={artifactItem.checksum_sha256}>
+                                      SHA256: {artifactItem.checksum_sha256.substring(0, 8)}...
+                                    </span>
+                                  ) : (
+                                    <span className={`text-[8px] font-mono ${COLORS.adaptive.textMuted} block italic`}>Hash omitted</span>
+                                  )}
+                                </div>
                               </div>
 
                               <div className={`pt-1 border-t ${COLORS.adaptive.borderSubtle} flex items-center justify-between text-[9px]`}>
-                                {artifactItem.available && artifactItem.download_url ? (
+                                {artifactItem.available && artifactItem.download_url && ux.download_allowed !== false ? (
                                   <a 
                                     href={artifactItem.download_url} 
                                     target="_blank" 
                                     rel="noreferrer"
                                     className="inline-flex items-center gap-0.5 font-black text-[#dc0000] hover:underline uppercase tracking-tight"
+                                    title={ux.tooltip || 'Download this artifact'}
                                   >
                                     <ArrowDownTrayIcon className="w-2.5 h-2.5" />
-                                    Fetch Asset
+                                    {ux.button_label || 'Fetch Asset'}
                                   </a>
                                 ) : (
-                                  <span className={`font-black ${COLORS.adaptive.textMuted} uppercase tracking-tight truncate font-normal`}>
-                                    {renderErrorString(artifactItem.reason || 'STORAGE UNLINKED')}
+                                  <span className={`font-black ${COLORS.adaptive.textMuted} uppercase tracking-tight truncate font-normal`} title={ux.tooltip || 'Download not allowed'}>
+                                    {ux.download_allowed === false ? 'Download Blocked' : renderErrorString(artifactItem.reason || 'STORAGE UNLINKED')}
                                   </span>
                                 )}
                               </div>
                             </div>
-                          ))}
+                          )})}
                         </div>
                       )}
                     </div>

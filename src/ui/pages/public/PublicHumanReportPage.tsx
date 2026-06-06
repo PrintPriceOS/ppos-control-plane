@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { getArtifactUxForArtifact } from '../../../lib/artifactUx';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -105,21 +106,32 @@ export const PublicHumanReportPage: React.FC = () => {
                     <div className="bg-white dark:bg-[#1E1E20] border ppos-border p-6">
                         <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 dark:text-slate-200 mb-4">Available Files</h3>
                         <div className="space-y-4">
-                            {availableArtifacts.map((art: any, idx) => (
+                            {availableArtifacts.map((art: any, idx) => {
+                                const ux = getArtifactUxForArtifact(art, report.artifact_ux, 'customer');
+                                return (
                                 <div key={idx} className="flex items-center justify-between p-4 border ppos-border bg-slate-50 dark:bg-black/20">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-sm font-bold text-slate-800 dark:text-[#ECECF1]">{art.filename}</span>
-                                        <span className="text-[10px] uppercase font-black tracking-widest text-slate-500">{art.role}</span>
+                                        <span className="text-sm font-bold text-slate-800 dark:text-[#ECECF1]" title={ux.tooltip}>{ux.display_label || art.filename}</span>
+                                        <span className={`text-[10px] uppercase font-black tracking-widest px-1.5 py-0.5 border inline-block w-fit ${
+                                            ux.status_tone === 'danger' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                            ux.status_tone === 'warning' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                            ux.status_tone === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                            ux.status_tone === 'info' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                            'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                        }`}>
+                                            {ux.status_badge || art.role || 'Artifact'}
+                                        </span>
                                     </div>
                                     <button 
                                         onClick={() => handleDownload(art.filename)}
                                         className="flex items-center gap-2 px-3 py-1.5 border border-primary text-primary hover:bg-primary/5 text-[10px] font-black uppercase tracking-widest transition-colors"
+                                        title={ux.tooltip || 'Download this artifact'}
                                     >
                                         <ArrowDownTrayIcon className="w-4 h-4" />
-                                        Download
+                                        {ux.button_label || 'Download'}
                                     </button>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 )}

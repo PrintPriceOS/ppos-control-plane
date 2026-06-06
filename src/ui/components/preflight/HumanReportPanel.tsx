@@ -13,6 +13,7 @@ import {
     LinkIcon
 } from "@heroicons/react/24/outline";
 import { PreflightReviewDecisionPanel } from "./PreflightReviewDecisionPanel";
+import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
     jobId: string;
@@ -236,26 +237,26 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                 <div className="glass p-5 border ppos-border rounded-none flex flex-col gap-3">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Available Files</span>
                     <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                        {artifact_recommendations.length > 0 ? artifact_recommendations.map((art: any, i: number) => (
-                            <div key={i} className={`p-3 border ppos-border flex flex-col gap-2 ${art.is_primary ? 'bg-primary/5 border-primary/20' : 'ppos-surface-muted'}`}>
+                        {artifact_recommendations.length > 0 ? artifact_recommendations.map((art: any, i: number) => {
+                            const ux = getArtifactUxForArtifact(art, report.artifact_ux, "operator");
+                            return (
+                            <div key={i} className={`p-3 border ppos-border flex flex-col gap-2 ${ux.is_primary ? 'bg-primary/5 border-primary/20' : 'ppos-surface-muted'}`}>
                                 <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2 flex-wrap" title={ux.tooltip}>
                                         <DocumentTextIcon className="w-4 h-4 text-slate-400" />
-                                        <span className="text-xs font-bold text-slate-800 dark:text-[#ECECF1]">{art.filename}</span>
-                                        {art.is_primary && (
+                                        <span className="text-xs font-bold text-slate-800 dark:text-[#ECECF1]">{ux.display_label}</span>
+                                        <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${ux.status_tone === 'danger' ? 'bg-red-500/20 text-red-600 dark:text-red-400' : ux.status_tone === 'success' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : ux.status_tone === 'warning' ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-slate-500/20 text-slate-600 dark:text-slate-400'}`}>
+                                            {ux.status_badge}
+                                        </span>
+                                        {ux.is_primary && (
                                             <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[9px] font-black uppercase tracking-widest">Primary</span>
                                         )}
-                                        {art.is_customer_safe ? (
-                                            <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest">Customer Safe</span>
-                                        ) : (
-                                            <span className="px-1.5 py-0.5 bg-slate-500/20 text-slate-600 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest">{art.customer_visible ? 'Operator' : 'Internal Only'}</span>
-                                        )}
                                     </div>
-                                    {art.downloadable && (
+                                    {ux.download_allowed && art.downloadable && (
                                         <button 
                                             onClick={() => handleDownload(art.download_id, art.filename)}
                                             className="text-primary hover:text-primary/80 transition-colors p-1"
-                                            title="Download File"
+                                            title={ux.button_label}
                                         >
                                             <ArrowDownTrayIcon className="w-4 h-4" />
                                         </button>
@@ -266,13 +267,13 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                                     <p className="text-[9px] text-slate-400 font-mono">Also available as: {art.secondary_aliases.join(', ')}</p>
                                 )}
 
-                                <p className="text-[10px] text-slate-500 font-bold">{art.recommended_use}</p>
+                                <p className="text-[10px] text-slate-500 font-bold">{ux.description || art.recommended_use}</p>
                                 
-                                {art.warning && (
-                                    <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold bg-amber-500/10 px-2 py-1 mt-1 border border-amber-500/20">{art.warning}</p>
+                                {ux.warning && (
+                                    <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold bg-amber-500/10 px-2 py-1 mt-1 border border-amber-500/20">{ux.warning}</p>
                                 )}
                             </div>
-                        )) : (
+                        )}) : (
                             <p className="text-xs text-slate-400 italic">No artifacts available.</p>
                         )}
                     </div>
