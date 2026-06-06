@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-06-06T11:30:01.449Z",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "results": [
+    {
+      "id": 1,
+      "name": "certified.pdf filename only",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 2,
+      "name": "review_pdf primary",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 3,
+      "name": "fixed_pdf primary",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 4,
+      "name": "production-certified but not standards-certified",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 5,
+      "name": "standards-certified with complete evidence",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 6,
+      "name": "standards claim without evidence",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 7,
+      "name": "OutputIntent only",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 8,
+      "name": "blocked governance domains",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 9,
+      "name": "customer_visible conflict",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 10,
+      "name": "public report sanitation",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 11,
+      "name": "review decision simulation",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "id": 12,
+      "name": "production queue readiness simulation",
+      "status": "PASS",
+      "error": null
+    }
+  ]
+}
