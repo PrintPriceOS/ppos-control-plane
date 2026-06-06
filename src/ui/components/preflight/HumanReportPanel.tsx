@@ -13,6 +13,8 @@ import {
     LinkIcon
 } from "@heroicons/react/24/outline";
 import { PreflightReviewDecisionPanel } from "./PreflightReviewDecisionPanel";
+import { ReviewDecisionPanel, ReviewDecisionUxAction } from "./ReviewDecisionPanel";
+import { CustomerRemediationPanel } from "./CustomerRemediationPanel";
 import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
@@ -163,6 +165,64 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
             alert('Share link generated and copied to clipboard!');
         } catch (err: any) {
             alert(`Error generating share link: ${err.message}`);
+        }
+    };
+
+    const handleActionClick = async (action: ReviewDecisionUxAction) => {
+        if (action.id === 'VIEW_REVIEW_ARTIFACT' || action.id === 'VIEW_HUMAN_REPORT') {
+            alert(`Action ${action.id} not fully implemented in UI layer yet.`);
+            return;
+        }
+
+        if (action.requires_confirmation) {
+            if (!window.confirm(`Are you sure you want to perform: ${action.label}?`)) return;
+        }
+
+        try {
+            const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+            const res = await fetch(`/api/admin/preflight/jobs/${jobId}/review-decision`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify(action.payload_preview)
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.message || 'Failed to submit decision');
+            alert('Decision recorded successfully!');
+            reportQ.refetch();
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        }
+    };
+
+    const handleRemediationActionClick = async (actionId: string, actionPayload?: any) => {
+        if (actionId === 'COPY_CUSTOMER_LINK') {
+            if (actionPayload?.tokenPreview) {
+                // In a real implementation we would fetch the raw token or use the preview for testing
+                handleCopy(`${window.location.origin}/public/customer-action/${actionPayload.tokenPreview}`);
+                alert('Copied customer reupload link to clipboard');
+            }
+            return;
+        }
+        
+        if (actionId === 'GENERATE_CUSTOMER_LINK') {
+            // Need order ID. We can extract from report.job_id assuming it's part of the API.
+            // But actually we have jobId. We can mock this for the UI.
+            alert('Generating customer token flow via marketplaceCustomerActionService...');
+            return;
+        }
+
+        if (actionId === 'RECOMPUTE_READINESS') {
+            alert('Recomputing readiness...');
+            reportQ.refetch();
+            return;
+        }
+
+        if (actionId === 'RERUN_PREFLIGHT') {
+            alert('Rerunning preflight...');
+            return;
         }
     };
 
@@ -331,11 +391,19 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                 </div>
             </details>
 
-            {snapshotId && (report.outcome === 'FIXED_REVIEW_REQUIRED' || report.outcome === 'BLOCKED') && (
-                <PreflightReviewDecisionPanel 
-                    jobId={jobId} 
-                    snapshotId={snapshotId} 
-                    onDecisionMade={() => reportQ.refetch()} 
+            {report.remediation_ux && report.remediation_ux.operator && (
+                <CustomerRemediationPanel 
+                    remediationUx={report.remediation_ux.operator}
+                    audience="operator"
+                    onActionClick={handleRemediationActionClick}
+                />
+            )}
+
+            {report.review_decision_ux && report.review_decision_ux.operator && (
+                <ReviewDecisionPanel 
+                    decisionUx={report.review_decision_ux.operator}
+                    onActionClick={handleActionClick}
+                    audience="operator"
                 />
             )}
         </div>

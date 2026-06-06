@@ -3,6 +3,10 @@ const preflightServiceClient = require('./preflightServiceClient');
 const db = require('./mysqlClient');
 const governanceLedgerService = require('./preflightGovernanceLedgerService');
 const artifactUxLabelService = require('./artifactUxLabelService');
+const { buildReviewDecisionUx } = require('./preflightReviewDecisionUxService');
+const { buildCustomerRemediationUx } = require('./customerRemediationUxService');
+const marketplaceOrderService = require('./marketplaceOrderService');
+const marketplaceCustomerActionService = require('./marketplaceCustomerActionService');
 
 // Helper to determine the primary artifact
 function selectPrimaryHumanArtifact(job, artifacts, artifactTrust = null) {
@@ -1116,6 +1120,93 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             customer: customerSummary,
             operator: operatorSummary
         }
+    };
+
+    const review_decision = job.review_decision || null; 
+    // Use job ID as fallback for snapshot ID in this local emulation if necessary, 
+    // but ideally humanReportSnapshotService provides it.
+    const snapshot_id = job.human_report_snapshot_id || job.snapshot_id || null;
+
+    reportPayload.review_decision_ux = {
+        operator: buildReviewDecisionUx({ 
+            human_report: reportPayload, 
+            artifact_trust: safeTrust, 
+            artifact_ux, 
+            readiness: null, 
+            review_decision, 
+            audience: 'operator', 
+            snapshot_id 
+        }),
+        customer: buildReviewDecisionUx({ 
+            human_report: reportPayload, 
+            artifact_trust: safeTrust, 
+            artifact_ux, 
+            readiness: null, 
+            review_decision, 
+            audience: 'customer', 
+            snapshot_id 
+        })
+    };
+
+    // Phase 59: Remediation UX
+    let order = null;
+    let readiness = null;
+    let customer_action = null;
+
+    const orderId = job.metadata?.orderId || job.orderId || null;
+
+    if (orderId) {
+        try {
+            // We use simple gets. Avoid throwing if order doesn't exist
+            const orderRes = await marketplaceOrderService.getOrder(orderId);
+            if (orderRes) {
+                order = orderRes;
+                try {
+                    const readyRes = await marketplaceOrderService.computeReadiness(orderId);
+                    readiness = { blockers: readyRes.blockers, warnings: readyRes.warnings };
+                } catch (e) {
+                    // Ignore
+                }
+                try {
+                    const actionRes = await marketplaceCustomerActionService.getCustomerAction(orderId);
+                    if (actionRes && actionRes.customerAction) {
+                        customer_action = actionRes.customerAction;
+                        customer_action.expired = actionRes.expired;
+                    }
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        } catch (e) {
+            // Ignore if order mapping fails or is mocked
+        }
+    }
+
+    reportPayload.remediation_ux = {
+        operator: buildCustomerRemediationUx({
+            order,
+            readiness,
+            review_decision,
+            review_decision_ux: reportPayload.review_decision_ux.operator,
+            human_report: reportPayload,
+            artifact_trust: safeTrust,
+            artifact_ux,
+            customer_action,
+            files: dedupedArtifacts,
+            audience: 'operator'
+        }),
+        customer: buildCustomerRemediationUx({
+            order,
+            readiness,
+            review_decision,
+            review_decision_ux: reportPayload.review_decision_ux.customer,
+            human_report: reportPayload,
+            artifact_trust: safeTrust,
+            artifact_ux,
+            customer_action,
+            files: dedupedArtifacts,
+            audience: 'customer'
+        })
     };
 
     return {

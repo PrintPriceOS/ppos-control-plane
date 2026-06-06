@@ -1,0 +1,592 @@
+{
+  "timestamp": "2026-06-06T13:13:25.772Z",
+  "scenarios": [
+    {
+      "name": "1. No Action Required (READY_TO_CONTINUE)",
+      "passed": true,
+      "checks": [
+        "✅ State matches: READY_TO_CONTINUE",
+        "✅ Invoice allowed matches: true"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": false,
+        "remediation_state": "READY_TO_CONTINUE",
+        "customer_summary": "Your file is ready and the order can continue.",
+        "operator_summary": "Ready to continue.",
+        "required_files": [],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "available_operator_actions": [
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": true,
+          "payment_allowed": true,
+          "production_unlock_allowed": true,
+          "production_queue_allowed": true
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "NOT_REQUIRED",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Continue order."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": false,
+        "remediation_state": "READY_TO_CONTINUE",
+        "customer_summary": "Your file is ready and the order can continue.",
+        "required_files": [],
+        "uploaded_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "readiness_effect": {
+          "invoice_allowed": true,
+          "payment_allowed": true,
+          "production_unlock_allowed": true,
+          "production_queue_allowed": true
+        },
+        "next_step": "Continue order."
+      }
+    },
+    {
+      "name": "2. Operator Rejects (REUPLOAD_REQUIRED)",
+      "passed": true,
+      "checks": [
+        "✅ State matches: REUPLOAD_REQUIRED",
+        "✅ Invoice allowed matches: false"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": true,
+        "remediation_state": "REUPLOAD_REQUIRED",
+        "customer_summary": "Your file needs to be replaced before the order can continue. Please upload a new version.",
+        "operator_summary": "File rejected. Waiting for customer to upload replacements.",
+        "required_files": [
+          {
+            "kind": "INTERIOR_PDF",
+            "label": "Interior PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [
+          "Upload the print-ready interior PDF."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_INTERIOR",
+            "label": "Upload Interior PDF",
+            "tooltip": "Upload the corrected print-ready interior PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "available_operator_actions": [
+          {
+            "id": "GENERATE_CUSTOMER_LINK",
+            "label": "Generate customer reupload link",
+            "tooltip": "Create or refresh the secure customer action link."
+          },
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "MISSING",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Upload replacement files."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": true,
+        "remediation_state": "REUPLOAD_REQUIRED",
+        "customer_summary": "Your file needs to be replaced before the order can continue. Please upload a new version.",
+        "required_files": [
+          {
+            "kind": "INTERIOR_PDF",
+            "label": "Interior PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "replacement_instructions": [
+          "Upload the print-ready interior PDF."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_INTERIOR",
+            "label": "Upload Interior PDF",
+            "tooltip": "Upload the corrected print-ready interior PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "next_step": "Upload replacement files."
+      }
+    },
+    {
+      "name": "3. Waiting for upload, existing token",
+      "passed": true,
+      "checks": [
+        "✅ State matches: WAITING_FOR_UPLOAD",
+        "✅ Invoice allowed matches: false"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": true,
+        "remediation_state": "WAITING_FOR_UPLOAD",
+        "customer_summary": "We are waiting for your replacement file. Invoice, payment, and production will continue after the new file is uploaded and approved.",
+        "operator_summary": "Blocked waiting for customer file upload.",
+        "required_files": [
+          {
+            "kind": "COVER_PDF",
+            "label": "Cover PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [
+          "Upload the full cover PDF, including front cover, spine, and back cover if applicable."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_COVER",
+            "label": "Upload Cover PDF",
+            "tooltip": "Upload the corrected full cover PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "available_operator_actions": [
+          {
+            "id": "COPY_CUSTOMER_LINK",
+            "label": "Copy customer reupload link",
+            "tooltip": "Copy the secure customer link for uploading replacement files.",
+            "tokenPreview": "cat_abcdef"
+          },
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "customer_action_link_available": true,
+        "customer_action_token_status": "AVAILABLE",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Upload replacement files."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": true,
+        "remediation_state": "WAITING_FOR_UPLOAD",
+        "customer_summary": "We are waiting for your replacement file. Invoice, payment, and production will continue after the new file is uploaded and approved.",
+        "required_files": [
+          {
+            "kind": "COVER_PDF",
+            "label": "Cover PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "replacement_instructions": [
+          "Upload the full cover PDF, including front cover, spine, and back cover if applicable."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_COVER",
+            "label": "Upload Cover PDF",
+            "tooltip": "Upload the corrected full cover PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "next_step": "Upload replacement files."
+      }
+    },
+    {
+      "name": "4. Token Expired",
+      "passed": true,
+      "checks": [
+        "✅ State matches: WAITING_FOR_UPLOAD",
+        "✅ Invoice allowed matches: false"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": true,
+        "remediation_state": "WAITING_FOR_UPLOAD",
+        "customer_summary": "We are waiting for your replacement file. Invoice, payment, and production will continue after the new file is uploaded and approved.",
+        "operator_summary": "Blocked waiting for customer file upload.",
+        "required_files": [
+          {
+            "kind": "COVER_PDF",
+            "label": "Cover PDF"
+          },
+          {
+            "kind": "INTERIOR_PDF",
+            "label": "Interior PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [
+          "Upload the full cover PDF, including front cover, spine, and back cover if applicable.",
+          "Upload the print-ready interior PDF."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_COVER",
+            "label": "Upload Cover PDF",
+            "tooltip": "Upload the corrected full cover PDF."
+          },
+          {
+            "id": "UPLOAD_INTERIOR",
+            "label": "Upload Interior PDF",
+            "tooltip": "Upload the corrected print-ready interior PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "available_operator_actions": [
+          {
+            "id": "GENERATE_CUSTOMER_LINK",
+            "label": "Regenerate customer reupload link",
+            "tooltip": "Create or refresh the secure customer action link."
+          },
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "EXPIRED",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Upload replacement files."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": true,
+        "remediation_state": "WAITING_FOR_UPLOAD",
+        "customer_summary": "We are waiting for your replacement file. Invoice, payment, and production will continue after the new file is uploaded and approved.",
+        "required_files": [
+          {
+            "kind": "COVER_PDF",
+            "label": "Cover PDF"
+          },
+          {
+            "kind": "INTERIOR_PDF",
+            "label": "Interior PDF"
+          }
+        ],
+        "uploaded_files": [],
+        "replacement_instructions": [
+          "Upload the full cover PDF, including front cover, spine, and back cover if applicable.",
+          "Upload the print-ready interior PDF."
+        ],
+        "available_customer_actions": [
+          {
+            "id": "UPLOAD_COVER",
+            "label": "Upload Cover PDF",
+            "tooltip": "Upload the corrected full cover PDF."
+          },
+          {
+            "id": "UPLOAD_INTERIOR",
+            "label": "Upload Interior PDF",
+            "tooltip": "Upload the corrected print-ready interior PDF."
+          },
+          {
+            "id": "VIEW_ISSUE_SUMMARY",
+            "label": "View issue summary",
+            "tooltip": "Review the summary explaining why a replacement file is required."
+          },
+          {
+            "id": "VIEW_REVIEW_REPORT",
+            "label": "View review report",
+            "tooltip": "Open the review report with warnings and next steps."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "next_step": "Upload replacement files."
+      }
+    },
+    {
+      "name": "5. Uploaded, pending preflight",
+      "passed": true,
+      "checks": [
+        "✅ State matches: PREFLIGHT_REQUIRED",
+        "✅ Invoice allowed matches: false"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": true,
+        "remediation_state": "PREFLIGHT_REQUIRED",
+        "customer_summary": "Your replacement file has been received and is waiting for preflight checks.",
+        "operator_summary": "Files uploaded. Preflight required.",
+        "required_files": [],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "available_operator_actions": [
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "NOT_REQUIRED",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Run preflight checks."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": true,
+        "remediation_state": "PREFLIGHT_REQUIRED",
+        "customer_summary": "Your replacement file has been received and is waiting for preflight checks.",
+        "required_files": [],
+        "uploaded_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "next_step": "Run preflight checks."
+      }
+    },
+    {
+      "name": "6. Approved with Warnings",
+      "passed": true,
+      "checks": [
+        "✅ State matches: APPROVED_WITH_WARNINGS",
+        "✅ Invoice allowed matches: true"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": false,
+        "remediation_state": "APPROVED_WITH_WARNINGS",
+        "customer_summary": "Your file was approved with warnings and the order may continue.",
+        "operator_summary": "Approved with warnings. Proceed to production.",
+        "required_files": [],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "available_operator_actions": [
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": true,
+          "payment_allowed": true,
+          "production_unlock_allowed": true,
+          "production_queue_allowed": true
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "NOT_REQUIRED",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Continue order."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": false,
+        "remediation_state": "APPROVED_WITH_WARNINGS",
+        "customer_summary": "Your file was approved with warnings and the order may continue.",
+        "required_files": [],
+        "uploaded_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "readiness_effect": {
+          "invoice_allowed": true,
+          "payment_allowed": true,
+          "production_unlock_allowed": true,
+          "production_queue_allowed": true
+        },
+        "next_step": "Continue order."
+      }
+    },
+    {
+      "name": "7. Preflight Review Required",
+      "passed": true,
+      "checks": [
+        "✅ State matches: PREFLIGHT_REVIEW_REQUIRED",
+        "✅ Invoice allowed matches: false"
+      ],
+      "remediation_ux_operator": {
+        "remediation_required": true,
+        "remediation_state": "PREFLIGHT_REVIEW_REQUIRED",
+        "customer_summary": "Your replacement file needs human review before the order can continue.",
+        "operator_summary": "Files preflighted. Human review decision required.",
+        "required_files": [],
+        "uploaded_files": [],
+        "missing_files": [],
+        "rejected_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "available_operator_actions": [
+          {
+            "id": "RECOMPUTE_READINESS",
+            "label": "Recompute readiness",
+            "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+          },
+          {
+            "id": "RERUN_PREFLIGHT",
+            "label": "Re-run preflight",
+            "tooltip": "Run preflight checks again after replacement files are uploaded."
+          }
+        ],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "customer_action_link_available": false,
+        "customer_action_token_status": "NOT_REQUIRED",
+        "warnings": [],
+        "blockers": [],
+        "next_step": "Operator review required."
+      },
+      "remediation_ux_customer": {
+        "remediation_required": true,
+        "remediation_state": "PREFLIGHT_REVIEW_REQUIRED",
+        "customer_summary": "Your replacement file needs human review before the order can continue.",
+        "required_files": [],
+        "uploaded_files": [],
+        "replacement_instructions": [],
+        "available_customer_actions": [],
+        "readiness_effect": {
+          "invoice_allowed": false,
+          "payment_allowed": false,
+          "production_unlock_allowed": false,
+          "production_queue_allowed": false
+        },
+        "next_step": "Operator review required."
+      }
+    }
+  ]
+}

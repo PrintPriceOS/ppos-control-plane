@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { getArtifactUxForArtifact } from '../../../lib/artifactUx';
+import { ReviewDecisionPanel } from '../../components/preflight/ReviewDecisionPanel';
+import { CustomerRemediationPanel } from '../../components/preflight/CustomerRemediationPanel';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -101,6 +103,22 @@ export const PublicHumanReportPage: React.FC = () => {
                         <p className="text-sm font-bold leading-relaxed opacity-90 whitespace-pre-wrap">{customer_summary}</p>
                     </div>
                 </div>
+
+                {report.review_decision_ux && report.review_decision_ux.customer && (
+                    <ReviewDecisionPanel 
+                        decisionUx={report.review_decision_ux.customer}
+                        onActionClick={() => {}}
+                        audience="customer"
+                    />
+                )}
+
+                {report.remediation_ux && report.remediation_ux.customer && (
+                    <CustomerRemediationPanel 
+                        remediationUx={report.remediation_ux.customer}
+                        audience="customer"
+                        onActionClick={() => alert('Customer actions would trigger here (e.g., upload flow)')}
+                    />
+                )}
 
                 {availableArtifacts.length > 0 && (
                     <div className="bg-white dark:bg-[#1E1E20] border ppos-border p-6">

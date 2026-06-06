@@ -967,27 +967,29 @@ class MarketplaceOrderService {
                         blocked = true;
                         gateObj.gate_code = `PREFLIGHT_HUMAN_REPORT_UNKNOWN`;
                         blockers.push(`PREFLIGHT_HUMAN_REPORT_UNKNOWN_${file.kind}`);
-                    } else if (outcome === 'FIXED_REVIEW_REQUIRED') {
+                    } else if (outcome === 'FIXED_REVIEW_REQUIRED' || outcome === 'REVIEW_REQUIRED') {
                         // Check for review approval
-                        if (!decision) {
+                        if (!decision || decision.decision === 'NO_DECISION') {
                             blocked = true;
-                            gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
-                            blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
+                            gateObj.gate_code = `PREFLIGHT_REVIEW_DECISION_REQUIRED`;
+                            blockers.push(`PREFLIGHT_REVIEW_DECISION_REQUIRED_${file.kind}`);
                         } else {
-                            if (decision.decision === 'REJECTED_REQUIRES_REUPLOAD') {
+                            if (decision.decision === 'REJECTED_REQUIRES_REUPLOAD' || decision.decision === 'REQUEST_CUSTOMER_REUPLOAD') {
                                 blocked = true;
-                                gateObj.gate_code = `PREFLIGHT_REVIEW_REJECTED`;
-                                blockers.push(`PREFLIGHT_REVIEW_REJECTED_${file.kind}`);
+                                gateObj.gate_code = `PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED`;
+                                blockers.push(`PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED_${file.kind}`);
                             } else if (decision.decision === 'APPROVED_WITH_WARNINGS') {
                                 gateObj.ready = true;
                                 gateObj.gate_code = `PREFLIGHT_APPROVED_WITH_WARNINGS`;
                                 gateObj.warning = `PREFLIGHT_APPROVED_WITH_WARNINGS_${file.kind}`;
                                 warnings.push(`PREFLIGHT_APPROVED_WITH_WARNINGS_${file.kind}`);
-                            } else if (decision.decision === 'APPROVED_FOR_PRODUCTION') {
-                                // FIXED_REVIEW_REQUIRED doesn't allow APPROVED_FOR_PRODUCTION unless overridden.
+                            } else if (decision.decision === 'NEEDS_MORE_INFORMATION') {
                                 blocked = true;
-                                gateObj.gate_code = `PREFLIGHT_REVIEW_APPROVAL_REQUIRED`;
-                                blockers.push(`PREFLIGHT_REVIEW_APPROVAL_REQUIRED_${file.kind}`);
+                                gateObj.gate_code = `PREFLIGHT_REVIEW_DECISION_REQUIRED`;
+                                blockers.push(`PREFLIGHT_REVIEW_DECISION_REQUIRED_${file.kind}`);
+                            } else if (decision.decision === 'APPROVED_FOR_PRODUCTION') {
+                                gateObj.ready = true;
+                                gateObj.gate_code = `PREFLIGHT_APPROVED_FOR_PRODUCTION`;
                             }
                         }
                     } else if (outcome === 'CERTIFIED_READY') {
