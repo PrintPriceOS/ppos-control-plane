@@ -1,0 +1,3153 @@
+[
+  {
+    "name": "1. NORMALIZE_OBJECT_STREAMS applied cleanly",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+      "operator_summary": "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [
+        {
+          "type": "fixed_pdf",
+          "filename": "fixed.pdf",
+          "label": "fixed_pdf",
+          "downloadable": true,
+          "production_certified": false,
+          "standard_certified": false,
+          "customer_visible": false,
+          "artifact_role": "INTERNAL",
+          "recommended_use": "Internal review only.",
+          "is_primary": null,
+          "is_customer_safe": false,
+          "warning": null,
+          "secondary_aliases": []
+        }
+      ],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [
+          {
+            "type": "fixed_pdf",
+            "filename": "fixed.pdf",
+            "label": "fixed_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "INTERNAL",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": null,
+            "secondary_aliases": [],
+            "ux": {
+              "customer": {
+                "artifact_type": "fixed_pdf",
+                "display_label": "Corrected file",
+                "short_label": "Corrected",
+                "status_badge": "Structure cleaned",
+                "status_tone": "info",
+                "button_label": "Download corrected file",
+                "tooltip": "PDF object streams were normalized. This is a structural cleanup, not standards validation.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": null,
+                "forbidden_claims": [],
+                "allowed_claims": [
+                  "Corrected"
+                ]
+              },
+              "operator": {
+                "artifact_type": "fixed_pdf",
+                "display_label": "Fixed PDF",
+                "short_label": "Fixed",
+                "status_badge": "Structure cleaned",
+                "status_tone": "info",
+                "button_label": "Download Fixed PDF",
+                "tooltip": "PDF object streams were normalized. This is a structural cleanup, not standards validation.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": null,
+                "forbidden_claims": [],
+                "allowed_claims": [
+                  "Corrected"
+                ]
+              }
+            }
+          }
+        ],
+        "customer_labels": [
+          {
+            "artifact_type": "fixed_pdf",
+            "display_label": "Corrected file",
+            "short_label": "Corrected",
+            "status_badge": "Structure cleaned",
+            "status_tone": "info",
+            "button_label": "Download corrected file",
+            "tooltip": "PDF object streams were normalized. This is a structural cleanup, not standards validation.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": null,
+            "forbidden_claims": [],
+            "allowed_claims": [
+              "Corrected"
+            ]
+          }
+        ],
+        "operator_labels": [
+          {
+            "artifact_type": "fixed_pdf",
+            "display_label": "Fixed PDF",
+            "short_label": "Fixed",
+            "status_badge": "Structure cleaned",
+            "status_tone": "info",
+            "button_label": "Download Fixed PDF",
+            "tooltip": "PDF object streams were normalized. This is a structural cleanup, not standards validation.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": null,
+            "forbidden_claims": [],
+            "allowed_claims": [
+              "Corrected"
+            ]
+          }
+        ],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": true,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {
+        "production_certified": true
+      },
+      "structural_metadata_governance": {
+        "object_streams_normalized": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+        "operator": "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification. The file structure was cleaned to improve compatibility. This does not change the visible artwork."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "2. NORMALIZE_OBJECT_STREAMS with qpdf warnings",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+      "operator_summary": "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "object_streams_normalized": true,
+        "qpdf_warnings": [
+          "Some weird xref"
+        ]
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. The file structure was cleaned to improve compatibility. This does not change the visible artwork.",
+        "operator": "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification. The file structure was cleaned to improve compatibility. This does not change the visible artwork."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "3. REVOKE_FALSE_CERTIFICATION applied",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+      "operator_summary": "Unsupported or unvalidated standards claims were revoked. This prevents false PDF/X or PDF/A claims but does not certify the file.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "Unsupported or unvalidated standards claims were revoked. This prevents false PDF/X or PDF/A claims but does not certify the file."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {
+        "standard_certified": false
+      },
+      "structural_metadata_governance": {
+        "false_certification_revoked": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+        "operator": "Unsupported or unvalidated standards claims were revoked. This prevents false PDF/X or PDF/A claims but does not certify the file."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "4. STRIP_INVALID_PDFX_METADATA applied",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+      "operator_summary": "Invalid or unsupported PDF/X metadata was removed. The PDF was not validated as PDF/X.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "Invalid or unsupported PDF/X metadata was removed. The PDF was not validated as PDF/X."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "invalid_pdfx_metadata_stripped": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+        "operator": "Invalid or unsupported PDF/X metadata was removed. The PDF was not validated as PDF/X."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "5. STRIP_INVALID_PDFA_METADATA applied",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+      "operator_summary": "Invalid or unsupported PDF/A metadata was removed. The PDF was not validated as PDF/A.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "Invalid or unsupported PDF/A metadata was removed. The PDF was not validated as PDF/A."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "invalid_pdfa_metadata_stripped": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+        "operator": "Invalid or unsupported PDF/A metadata was removed. The PDF was not validated as PDF/A."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "6. NORMALIZE_STANDARD_METADATA applied",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+      "operator_summary": "Standards-related metadata was normalized into an honest non-certified state. This does not create standards compliance.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "Standards-related metadata was normalized into an honest non-certified state. This does not create standards compliance."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "standard_metadata_normalized": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance.",
+        "operator": "Standards-related metadata was normalized into an honest non-certified state. This does not create standards compliance."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "7. GENERATE_STANDARD_VALIDATION_REPORT_INTERNAL",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "summary_title": "PDF fixed, review required before production",
+      "customer_summary": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. A standards review summary was generated for internal review. It is not an independent PDF/X or PDF/A validation certificate.",
+      "operator_summary": "An internal standards governance report was generated. This is not an external validator report and cannot be used as PDF/X or PDF/A certification evidence. A standards review summary was generated for internal review. It is not an independent PDF/X or PDF/A validation certificate.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "review_fixed",
+        "label": "Review Fixed PDF",
+        "description": "A fixed PDF is available, but human verification is required due to structural changes.",
+        "severity": "warning",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [
+        {
+          "type": "validation_report",
+          "filename": "val.html",
+          "label": "validation_report",
+          "downloadable": true,
+          "production_certified": false,
+          "standard_certified": false,
+          "customer_visible": false,
+          "artifact_role": "INTERNAL",
+          "recommended_use": "Internal review only.",
+          "is_primary": null,
+          "is_customer_safe": false,
+          "warning": null,
+          "secondary_aliases": []
+        }
+      ],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [
+          {
+            "type": "validation_report",
+            "filename": "val.html",
+            "label": "validation_report",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "INTERNAL",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": null,
+            "secondary_aliases": [],
+            "ux": {
+              "customer": {
+                "artifact_type": "validation_report",
+                "display_label": "Internal standards report",
+                "short_label": "Internal Report",
+                "status_badge": "Internal Governance",
+                "status_tone": "neutral",
+                "button_label": "Download Internal Report",
+                "tooltip": "Internal governance report only. Not a PDF/X or PDF/A validator certificate.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": null,
+                "forbidden_claims": [],
+                "allowed_claims": []
+              },
+              "operator": {
+                "artifact_type": "validation_report",
+                "display_label": "Internal standards report",
+                "short_label": "Internal Report",
+                "status_badge": "Internal Governance",
+                "status_tone": "neutral",
+                "button_label": "Download Internal Report",
+                "tooltip": "Internal governance report only. Not a PDF/X or PDF/A validator certificate.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": null,
+                "forbidden_claims": [],
+                "allowed_claims": []
+              }
+            }
+          }
+        ],
+        "customer_labels": [
+          {
+            "artifact_type": "validation_report",
+            "display_label": "Internal standards report",
+            "short_label": "Internal Report",
+            "status_badge": "Internal Governance",
+            "status_tone": "neutral",
+            "button_label": "Download Internal Report",
+            "tooltip": "Internal governance report only. Not a PDF/X or PDF/A validator certificate.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": null,
+            "forbidden_claims": [],
+            "allowed_claims": []
+          }
+        ],
+        "operator_labels": [
+          {
+            "artifact_type": "validation_report",
+            "display_label": "Internal standards report",
+            "short_label": "Internal Report",
+            "status_badge": "Internal Governance",
+            "status_tone": "neutral",
+            "button_label": "Download Internal Report",
+            "tooltip": "Internal governance report only. Not a PDF/X or PDF/A validator certificate.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": null,
+            "forbidden_claims": [],
+            "allowed_claims": []
+          }
+        ],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [
+          "An internal standards governance report was generated. This is not an external validator report and cannot be used as PDF/X or PDF/A certification evidence."
+        ],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "internal_standard_report_generated": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF has not been independently validated as PDF/X or PDF/A. A human review or standards validation is required before claiming standards compliance. A standards review summary was generated for internal review. It is not an independent PDF/X or PDF/A validation certificate.",
+        "operator": "An internal standards governance report was generated. This is not an external validator report and cannot be used as PDF/X or PDF/A certification evidence. A standards review summary was generated for internal review. It is not an independent PDF/X or PDF/A validation certificate."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "8. certified.pdf with metadata cleanup",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+      "operator_summary": "Check raw technical details. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [
+        {
+          "type": "certified_pdf",
+          "filename": "certified.pdf",
+          "label": "certified_pdf",
+          "downloadable": true,
+          "production_certified": false,
+          "standard_certified": false,
+          "customer_visible": false,
+          "artifact_role": "REVIEW_REQUIRED",
+          "recommended_use": "Internal review only.",
+          "is_primary": null,
+          "is_customer_safe": false,
+          "warning": "Not production-certified and should not be customer-visible.",
+          "secondary_aliases": []
+        }
+      ],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "secondary_aliases": [],
+            "ux": {
+              "customer": {
+                "artifact_type": "certified_pdf",
+                "display_label": "Corrected file",
+                "short_label": "Corrected",
+                "status_badge": "Metadata cleaned",
+                "status_tone": "info",
+                "button_label": "Download corrected file",
+                "tooltip": "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": "Metadata cleanup does not prove PDF/X or PDF/A compliance.",
+                "forbidden_claims": [],
+                "allowed_claims": [
+                  "Production approved",
+                  "Not yet validated as PDF/X or PDF/A"
+                ]
+              },
+              "operator": {
+                "artifact_type": "certified_pdf",
+                "display_label": "Corrected artifact with metadata cleanup",
+                "short_label": "Corrected",
+                "status_badge": "Structural cleanup",
+                "status_tone": "info",
+                "button_label": "Download Corrected artifact",
+                "tooltip": "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.",
+                "description": "",
+                "customer_visible": false,
+                "operator_visible": true,
+                "is_primary": false,
+                "download_allowed": true,
+                "warning": "Metadata cleanup does not prove PDF/X or PDF/A compliance.",
+                "forbidden_claims": [],
+                "allowed_claims": [
+                  "Production approved",
+                  "Not yet validated as PDF/X or PDF/A"
+                ]
+              }
+            }
+          }
+        ],
+        "customer_labels": [
+          {
+            "artifact_type": "certified_pdf",
+            "display_label": "Corrected file",
+            "short_label": "Corrected",
+            "status_badge": "Metadata cleaned",
+            "status_tone": "info",
+            "button_label": "Download corrected file",
+            "tooltip": "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": "Metadata cleanup does not prove PDF/X or PDF/A compliance.",
+            "forbidden_claims": [],
+            "allowed_claims": [
+              "Production approved",
+              "Not yet validated as PDF/X or PDF/A"
+            ]
+          }
+        ],
+        "operator_labels": [
+          {
+            "artifact_type": "certified_pdf",
+            "display_label": "Corrected artifact with metadata cleanup",
+            "short_label": "Corrected",
+            "status_badge": "Structural cleanup",
+            "status_tone": "info",
+            "button_label": "Download Corrected artifact",
+            "tooltip": "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.",
+            "description": "",
+            "customer_visible": false,
+            "operator_visible": true,
+            "is_primary": false,
+            "download_allowed": true,
+            "warning": "Metadata cleanup does not prove PDF/X or PDF/A compliance.",
+            "forbidden_claims": [],
+            "allowed_claims": [
+              "Production approved",
+              "Not yet validated as PDF/X or PDF/A"
+            ]
+          }
+        ],
+        "forbidden_claims_removed": [],
+        "warnings": [
+          "Metadata cleanup does not prove PDF/X or PDF/A compliance."
+        ]
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": true,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {
+        "production_certified": true,
+        "standard_certified": false
+      },
+      "structural_metadata_governance": {
+        "metadata_cleanup_applied": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+        "operator": "Check raw technical details. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "9. conflicting legacy metadata says standard_certified=true",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "standard_certified": false,
+        "false_certification_revoked": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "10. customer public sanitation",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {},
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  },
+  {
+    "name": "11. readiness / gates",
+    "passed": true,
+    "errors": [],
+    "report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+      "operator_summary": "Check raw technical details. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+      "pdfx_compliance_claimed": false,
+      "pdfa_compliance_claimed": false,
+      "standard_claimed": null,
+      "standard_certified": false,
+      "validation_performed": false,
+      "validation_passed": false,
+      "validator_name": null,
+      "validator_version": null,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "artifact_ux": {
+        "primary": {},
+        "artifacts": [],
+        "customer_labels": [],
+        "operator_labels": [],
+        "forbidden_claims_removed": [],
+        "warnings": []
+      },
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": true,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": true
+      },
+      "artifact_trust": {},
+      "structural_metadata_governance": {
+        "metadata_cleanup_applied": true
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.",
+        "operator": "Check raw technical details. The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A."
+      },
+      "review_decision_ux": {
+        "operator": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "A human decision is required before this order can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [
+            {
+              "id": "APPROVE_WITH_WARNINGS",
+              "label": "Approve with warnings",
+              "tooltip": "Allow the order to continue while preserving warnings in the audit trail. Use only after reviewing the artifact.",
+              "tone": "warning",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_WITH_WARNINGS",
+                "reason": "Operator approved with warnings"
+              }
+            },
+            {
+              "id": "APPROVE_FOR_PRODUCTION",
+              "label": "Approve for production",
+              "tooltip": "Approve this artifact for production. This does not imply PDF/X or PDF/A standards certification unless validator evidence exists.",
+              "tone": "success",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "APPROVED_FOR_PRODUCTION",
+                "reason": "Operator approved for production"
+              }
+            },
+            {
+              "id": "REJECT_REQUIRES_REUPLOAD",
+              "label": "Reject and require reupload",
+              "tooltip": "Reject this artifact and require the customer to upload a replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REJECTED_REQUIRES_REUPLOAD",
+                "reason": "Operator rejected. Reupload required."
+              }
+            },
+            {
+              "id": "REQUEST_CUSTOMER_REUPLOAD",
+              "label": "Request new file",
+              "tooltip": "Ask the customer to upload a corrected replacement file.",
+              "tone": "danger",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": true,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "REQUEST_CUSTOMER_REUPLOAD",
+                "reason": "Operator requests new file"
+              }
+            },
+            {
+              "id": "NEEDS_MORE_INFORMATION",
+              "label": "Needs more information",
+              "tooltip": "Pause the job while requesting clarification before approval or rejection.",
+              "tone": "info",
+              "disabled": true,
+              "disabled_reason": "A report snapshot_id is required to make a decision.",
+              "requires_confirmation": false,
+              "payload_preview": {
+                "snapshot_id": "MISSING",
+                "decision": "NEEDS_MORE_INFORMATION",
+                "reason": "Operator needs more info"
+              }
+            },
+            {
+              "id": "VIEW_REVIEW_ARTIFACT",
+              "label": "View review file",
+              "tooltip": "Open the recommended review artifact before making a decision.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            },
+            {
+              "id": "VIEW_HUMAN_REPORT",
+              "label": "View human report",
+              "tooltip": "Read the detailed explanation of findings, fixes, warnings, and review requirements.",
+              "tone": "primary",
+              "disabled": false,
+              "disabled_reason": null,
+              "requires_confirmation": false
+            }
+          ],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        },
+        "customer": {
+          "review_required": false,
+          "decision_state": "NO_DECISION",
+          "status_badge": "Review required",
+          "status_tone": "warning",
+          "decision_summary": "Your file requires review before invoice, payment, or production can continue.",
+          "requires_reupload": false,
+          "required_files": [],
+          "readiness_effect": {
+            "invoice_allowed": false,
+            "payment_allowed": false,
+            "production_unlock_allowed": false,
+            "production_queue_allowed": false
+          },
+          "available_actions": [],
+          "primary_review_artifact": null,
+          "warnings": [],
+          "blockers": []
+        }
+      },
+      "remediation_ux": {
+        "operator": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "operator_summary": "Ready to continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "missing_files": [],
+          "rejected_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "available_operator_actions": [
+            {
+              "id": "RECOMPUTE_READINESS",
+              "label": "Recompute readiness",
+              "tooltip": "Recalculate order readiness after replacement files or review decisions change."
+            },
+            {
+              "id": "RERUN_PREFLIGHT",
+              "label": "Re-run preflight",
+              "tooltip": "Run preflight checks again after replacement files are uploaded."
+            }
+          ],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "customer_action_link_available": false,
+          "customer_action_token_status": "NOT_REQUIRED",
+          "warnings": [],
+          "blockers": [],
+          "next_step": "Continue order."
+        },
+        "customer": {
+          "remediation_required": false,
+          "remediation_state": "READY_TO_CONTINUE",
+          "customer_summary": "Your file is ready and the order can continue.",
+          "required_files": [],
+          "uploaded_files": [],
+          "replacement_instructions": [],
+          "available_customer_actions": [],
+          "readiness_effect": {
+            "invoice_allowed": true,
+            "payment_allowed": true,
+            "production_unlock_allowed": true,
+            "production_queue_allowed": true
+          },
+          "next_step": "Continue order."
+        }
+      }
+    }
+  }
+]

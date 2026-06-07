@@ -27,9 +27,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     const ev = trust.evidence || {};
     const hasStandardsEvidence = ev.validation_performed === true && ev.validation_passed === true;
 
+    // Phase 61D: Extract structural governance
+    const structGov = human_report?.structural_metadata_governance || {};
+    const metadata_cleanup = structGov.metadata_cleanup_applied === true;
+    const object_streams_normalized = structGov.object_streams_normalized === true;
+    const internal_report = structGov.internal_standard_report_generated === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
-        const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected"];
+        const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
         let result = str;
         forbidden.forEach(c => {
             const regex = new RegExp(c, 'gi');
@@ -42,8 +48,12 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     };
     
     // Check initial label for forbidden claims
-    if (isCustomer) {
+    if (isCustomer || metadata_cleanup) {
         stripClaims(artifact.label || "");
+    }
+
+    if (metadata_cleanup) {
+        warning = "Metadata cleanup does not prove PDF/X or PDF/A compliance.";
     }
 
     if (type === 'review_pdf') {
@@ -180,20 +190,36 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             customer_visible = false;
         }
     } else if (type === 'human_report' || type === 'report_json') {
-        display_label = "Human Report";
-        short_label = "Report";
-        status_badge = "Summary";
-        button_label = "Download Human Report";
-        tooltip = "Readable summary for operators and customers, including review requirements and safe recommendations.";
+        if (internal_report) {
+            display_label = "Internal standards report";
+            short_label = "Internal Report";
+            status_badge = "Internal Governance";
+            button_label = "Download Internal Report";
+            tooltip = "Internal governance report only. Not a PDF/X or PDF/A validator certificate.";
+        } else {
+            display_label = "Human Report";
+            short_label = "Report";
+            status_badge = "Summary";
+            button_label = "Download Human Report";
+            tooltip = "Readable summary for operators and customers, including review requirements and safe recommendations.";
+        }
         if (isCustomer) {
             customer_visible = false;
         }
     } else if (type === 'validation_report') {
-        display_label = "Standards Validation Report";
-        short_label = "Validation";
-        status_badge = "Independent Validation";
-        button_label = "Download Validation Report";
-        tooltip = "Independent validator evidence for PDF/X or PDF/A compliance, if available.";
+        if (internal_report) {
+            display_label = "Internal standards report";
+            short_label = "Internal Report";
+            status_badge = "Internal Governance";
+            button_label = "Download Internal Report";
+            tooltip = "Internal governance report only. Not a PDF/X or PDF/A validator certificate.";
+        } else {
+            display_label = "Standards Validation Report";
+            short_label = "Validation";
+            status_badge = "Independent Validation";
+            button_label = "Download Validation Report";
+            tooltip = "Independent validator evidence for PDF/X or PDF/A compliance, if available.";
+        }
         if (isCustomer) {
             customer_visible = false;
         }
@@ -202,6 +228,28 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         status_badge = "Available";
         button_label = "Download";
         tooltip = "Download artifact.";
+    }
+
+    // Apply metadata cleanup / structural cleanup overrides for PDF artifacts
+    if (['certified_pdf', 'fixed_pdf', 'review_pdf'].includes(type)) {
+        if (metadata_cleanup && (!production_certified || !standard_certified || !hasStandardsEvidence)) {
+            if (type === 'certified_pdf') {
+                if (isCustomer) {
+                    display_label = "Corrected file";
+                    short_label = "Corrected";
+                } else {
+                    display_label = "Corrected artifact with metadata cleanup";
+                    short_label = "Corrected";
+                }
+                button_label = isCustomer ? "Download corrected file" : "Download Corrected artifact";
+            }
+            status_badge = isCustomer ? "Metadata cleaned" : "Structural cleanup";
+            status_tone = "info";
+            tooltip = "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.";
+        } else if (object_streams_normalized && !metadata_cleanup && (!production_certified || !standard_certified || !hasStandardsEvidence)) {
+            status_badge = "Structure cleaned";
+            tooltip = "PDF object streams were normalized. This is a structural cleanup, not standards validation.";
+        }
     }
 
     // Sanitize any remaining forbidden claims if customer

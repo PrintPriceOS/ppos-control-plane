@@ -122,7 +122,15 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     if (code.includes('VALIDATE_PDFA')) return "PDF/A validation was not performed because no standards validator was available.";
     if (code.includes('GENERATE_PDFX') || code.includes('CONVERT_TO_PDFX')) return "PDF/X conversion is not implemented or validated. PDF/X compliance was not claimed.";
     if (code.includes('CONVERT_TO_PDFA')) return "PDF/A conversion is not implemented or validated. PDF/A compliance was not claimed.";
+    if (code.includes('GENERATE_STANDARD_VALIDATION_REPORT_INTERNAL')) return "An internal standards governance report was generated. This is not an external validator report and cannot be used as PDF/X or PDF/A certification evidence.";
     if (code.includes('GENERATE_STANDARD_VALIDATION_REPORT')) return "A standards validation report was not generated because no validator evidence was available.";
+
+    // Phase 61D Structural/Metadata Fixes
+    if (code.includes('NORMALIZE_OBJECT_STREAMS')) return "PDF object streams were normalized using a structural rewrite process. This is a structural cleanup and does not imply PDF/X or PDF/A certification.";
+    if (code.includes('REVOKE_FALSE_CERTIFICATION')) return "Unsupported or unvalidated standards claims were revoked. This prevents false PDF/X or PDF/A claims but does not certify the file.";
+    if (code.includes('STRIP_INVALID_PDFX_METADATA')) return "Invalid or unsupported PDF/X metadata was removed. The PDF was not validated as PDF/X.";
+    if (code.includes('STRIP_INVALID_PDFA_METADATA')) return "Invalid or unsupported PDF/A metadata was removed. The PDF was not validated as PDF/A.";
+    if (code.includes('NORMALIZE_STANDARD_METADATA')) return "Standards-related metadata was normalized into an honest non-certified state. This does not create standards compliance.";
 
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
@@ -554,6 +562,88 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (skippedFailedCodes.includes('CONVERT_TO_PDFX_TRANSPARENCY_SAFE') || unsupportedFixes.includes('CONVERT_TO_PDFX_TRANSPARENCY_SAFE')) {
         pdfxComplianceClaimed = false;
         pdfxGenerationPerformed = false;
+    }
+
+    // Phase 61D: Defensive extraction of structural_metadata_governance
+    const structSources = [
+        job.structural_metadata_governance,
+        job.fix_summary?.structural_metadata_governance,
+        job.fix_audit?.structural_metadata_governance,
+        job.delta_summary?.structural_metadata_governance,
+        job.delta_report?.structural_metadata_governance,
+        job.report?.structural_metadata_governance
+    ];
+    const artifactsWithStructMeta = artifacts.find(a => a.metadata && a.metadata.structural_metadata_governance);
+    if (artifactsWithStructMeta) structSources.push(artifactsWithStructMeta.metadata.structural_metadata_governance);
+    if (injectedJob?.structural_metadata_governance) structSources.push(injectedJob.structural_metadata_governance);
+
+    let structGov = {};
+    for (const source of structSources) {
+        if (!source) continue;
+        if (source.review_required === true) structGov.review_required = true;
+        
+        // Conservative merges (false wins over true claims)
+        if (source.production_certified === false) structGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) structGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) structGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) structGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) structGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) structGov.compliance_claim_allowed = false;
+        if (source.validation_performed === false) structGov.validation_performed = false;
+        if (source.validation_passed === false) structGov.validation_passed = false;
+        if (source.standards_claim_allowed === false) structGov.standards_claim_allowed = false;
+
+        // Additions
+        if (source.structural_fix_applied === true) structGov.structural_fix_applied = true;
+        if (source.metadata_cleanup_applied === true) structGov.metadata_cleanup_applied = true;
+        if (source.object_streams_normalized === true) structGov.object_streams_normalized = true;
+        if (source.false_certification_revoked === true) structGov.false_certification_revoked = true;
+        if (source.invalid_pdfx_metadata_stripped === true) structGov.invalid_pdfx_metadata_stripped = true;
+        if (source.invalid_pdfa_metadata_stripped === true) structGov.invalid_pdfa_metadata_stripped = true;
+        if (source.standard_metadata_normalized === true) structGov.standard_metadata_normalized = true;
+        if (source.internal_standard_report_generated === true) structGov.internal_standard_report_generated = true;
+        if (source.qpdf_available === true) structGov.qpdf_available = true;
+
+        if (source.qpdf_warnings && source.qpdf_warnings.length > 0) {
+            structGov.qpdf_warnings = [...new Set([...(structGov.qpdf_warnings || []), ...source.qpdf_warnings])];
+        }
+        if (source.metadata_cleanup_warnings && source.metadata_cleanup_warnings.length > 0) {
+            structGov.metadata_cleanup_warnings = [...new Set([...(structGov.metadata_cleanup_warnings || []), ...source.metadata_cleanup_warnings])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            structGov.warnings = [...new Set([...(structGov.warnings || []), ...source.warnings])];
+        }
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            structGov.review_required_reasons = [...new Set([...(structGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.evidence) {
+            structGov.evidence = { ...(structGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize structGov evidence
+    if (structGov.evidence) {
+        const safeEvidence = {};
+        for (const [k, v] of Object.entries(structGov.evidence)) {
+            // customer_summary, artifact_ux, public report payload shouldn't have raw stuff.
+            if (!['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id', 'obj_', 'forensic_object_id', 'validator_command', 'parser_output'].some(b => k.includes(b))) {
+                safeEvidence[k] = v;
+            }
+        }
+        structGov.evidence = Object.keys(safeEvidence).length > 0 ? safeEvidence : undefined;
+    }
+
+    if (structGov.false_certification_revoked || structGov.metadata_cleanup_applied) {
+        if (!hasFullValidatorEvidence) {
+            standardCertified = false;
+            pdfxComplianceClaimed = false;
+            pdfaComplianceClaimed = false;
+        }
+    }
+
+    if (structGov.review_required === true) {
+        isReviewReq = true;
+        // Do not upgrade production_certified or anything else here.
     }
 
     // Phase 56D: Defensive extraction of artifact_trust
@@ -1046,6 +1136,29 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         // Safe to ignore, we don't depend on it
     }
 
+
+
+    // Phase 61D: Structural / Metadata Human Report wording
+    if (structGov.metadata_cleanup_applied) {
+        const msg = "The file metadata was cleaned to avoid unsupported certification claims. This does not mean the file has been independently validated as PDF/X or PDF/A.";
+        customerSummary = customerSummary + " " + msg;
+        operatorSummary = operatorSummary + " " + msg;
+    }
+    if (structGov.object_streams_normalized) {
+        const msg = "The file structure was cleaned to improve compatibility. This does not change the visible artwork.";
+        customerSummary = customerSummary + " " + msg;
+        operatorSummary = operatorSummary + " " + msg;
+    }
+    if (structGov.internal_standard_report_generated) {
+        const msg = "A standards review summary was generated for internal review. It is not an independent PDF/X or PDF/A validation certificate.";
+        customerSummary = customerSummary + " " + msg;
+        operatorSummary = operatorSummary + " " + msg;
+    }
+
+    // Clean up extra spaces
+    customerSummary = customerSummary.trim();
+    operatorSummary = operatorSummary.trim();
+
     const artifact_ux = {
         primary: {},
         artifacts: [],
@@ -1056,8 +1169,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     };
 
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: {}, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: {}, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1065,6 +1178,10 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         cLabel.forbidden_claims.forEach(c => {
             if (!artifact_ux.forbidden_claims_removed.includes(c)) artifact_ux.forbidden_claims_removed.push(c);
         });
+        if (structGov.false_certification_revoked) {
+             if (!artifact_ux.forbidden_claims_removed.includes("False standard claims")) artifact_ux.forbidden_claims_removed.push("False standard claims");
+        }
+
         if (oLabel.warning && !artifact_ux.warnings.includes(oLabel.warning)) artifact_ux.warnings.push(oLabel.warning);
         if (cLabel.warning && !artifact_ux.warnings.includes(cLabel.warning)) artifact_ux.warnings.push(cLabel.warning);
         
@@ -1114,6 +1231,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             review_required: isReviewReq
         },
         artifact_trust: safeTrust,
+        structural_metadata_governance: structGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,
