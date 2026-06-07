@@ -33,6 +33,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     const object_streams_normalized = structGov.object_streams_normalized === true;
     const internal_report = structGov.internal_standard_report_generated === true;
 
+    // Phase 62D: Extract page marks governance
+    const pmGov = human_report?.page_marks_governance || {};
+    const crop_marks_added = pmGov.crop_marks_added === true;
+    const removal_not_safe = pmGov.removal_not_safe === true;
+    const pm_review_required = pmGov.review_required === true;
+    const marks_inside_trim = pmGov.marks_inside_trim === true;
+    const insufficient_margin = pmGov.insufficient_margin === true;
+    const unsafe_geometry = pmGov.unsafe_geometry_detected === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -54,6 +63,14 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
 
     if (metadata_cleanup) {
         warning = "Metadata cleanup does not prove PDF/X or PDF/A compliance.";
+    }
+
+    // Phase 62D: page marks warnings for operator
+    if (crop_marks_added && isOperator) {
+        warning = warning ? warning + " Crop marks were added and require review before production." : "Crop marks were added and require review before production.";
+    }
+    if (removal_not_safe && isOperator) {
+        warning = warning ? warning + " Registration mark removal was skipped because safe removal could not be proven." : "Registration mark removal was skipped because safe removal could not be proven.";
     }
 
     if (type === 'review_pdf') {
@@ -249,6 +266,41 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         } else if (object_streams_normalized && !metadata_cleanup && (!production_certified || !standard_certified || !hasStandardsEvidence)) {
             status_badge = "Structure cleaned";
             tooltip = "PDF object streams were normalized. This is a structural cleanup, not standards validation.";
+        }
+
+        // Phase 62D: Page marks overrides for certified_pdf — must stay conservative
+        if (pm_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Page mark conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Page mark review required before production." : "Page mark review required before production.";
+                tooltip = "Page mark governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 62D: Crop marks added badge
+        if (crop_marks_added && ['fixed_pdf', 'certified_pdf'].includes(type)) {
+            status_badge = isCustomer ? "Crop marks added" : "Crop marks added";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Crop marks were added to help guide trimming. The file still requires review before production.";
+            } else {
+                tooltip = "Crop marks were added outside the TrimBox. Human review is required before production.";
+            }
+        }
+
+        // Phase 62D: removal_not_safe badge
+        if (removal_not_safe && !crop_marks_added) {
+            status_badge = "Review required";
+            status_tone = "warning";
         }
     }
 

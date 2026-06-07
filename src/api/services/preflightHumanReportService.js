@@ -132,6 +132,28 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     if (code.includes('STRIP_INVALID_PDFA_METADATA')) return "Invalid or unsupported PDF/A metadata was removed. The PDF was not validated as PDF/A.";
     if (code.includes('NORMALIZE_STANDARD_METADATA')) return "Standards-related metadata was normalized into an honest non-certified state. This does not create standards compliance.";
 
+    // Phase 62D Page Mark Fixes
+    if (code.includes('ADD_CROP_MARKS')) {
+        if (isSkipped) return "Crop marks could not be added because the page geometry did not provide enough margin outside the TrimBox.";
+        return "Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
+    }
+    if (code.includes('REMOVE_REGISTRATION_MARKS')) {
+        if (isSkipped) return "Registration mark removal was skipped because safe removal could not be proven.";
+        return "Registration marks were removed only where they were detected outside the TrimBox. Human review is required.";
+    }
+    if (code.includes('NORMALIZE_PAGE_MARKS')) {
+        return "Page mark normalization was evaluated. No production certification is implied.";
+    }
+    if (code.includes('PAGE_MARKS_UNSAFE_GEOMETRY') || code.includes('UNSAFE_GEOMETRY')) {
+        return "Page mark geometry was unsafe or uncertain. The file requires review before production.";
+    }
+    if (code.includes('MARKS_INSIDE_TRIM')) {
+        return "Marks were detected inside the TrimBox or near live artwork. Automatic removal was not performed.";
+    }
+    if (code.includes('INSUFFICIENT_MARGIN')) {
+        return "There was not enough margin outside the TrimBox to safely add crop marks.";
+    }
+
     if (isSkipped) return "The issue was detected, but this correction is not currently supported automatically.";
     return `Applied structural correction: ${code}`;
 }
@@ -563,6 +585,91 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         pdfxComplianceClaimed = false;
         pdfxGenerationPerformed = false;
     }
+
+    // Phase 62D: Defensive extraction of page_marks_governance
+    const pmSources = [
+        job.page_marks_governance,
+        job.fix_summary?.page_marks_governance,
+        job.fix_audit?.page_marks_governance,
+        job.delta_summary?.page_marks_governance,
+        job.delta_report?.page_marks_governance,
+        job.report?.page_marks_governance
+    ];
+    const artifactsWithPmMeta = artifacts.find(a => a.metadata && a.metadata.page_marks_governance);
+    if (artifactsWithPmMeta) pmSources.push(artifactsWithPmMeta.metadata.page_marks_governance);
+    if (injectedJob?.page_marks_governance) pmSources.push(injectedJob.page_marks_governance);
+
+    let pmGov = {};
+    for (const source of pmSources) {
+        if (!source) continue;
+        // review_required=true wins
+        if (source.review_required === true) pmGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) pmGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) pmGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) pmGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) pmGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) pmGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) pmGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.page_marks_fix_applied === true) pmGov.page_marks_fix_applied = true;
+        if (source.crop_marks_added === true) pmGov.crop_marks_added = true;
+        if (source.registration_marks_removed === true) pmGov.registration_marks_removed = true;
+        if (source.page_marks_normalized === true) pmGov.page_marks_normalized = true;
+        if (source.unsafe_geometry_detected === true) pmGov.unsafe_geometry_detected = true;
+        if (source.insufficient_margin === true) pmGov.insufficient_margin = true;
+        if (source.marks_inside_trim === true) pmGov.marks_inside_trim = true;
+        if (source.removal_not_safe === true) pmGov.removal_not_safe = true;
+        if (source.visually_sensitive === true) pmGov.visually_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            pmGov.review_required_reasons = [...new Set([...(pmGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            pmGov.warnings = [...new Set([...(pmGov.warnings || []), ...source.warnings])];
+        }
+        // Evidence: collect but sanitize later
+        if (source.evidence) {
+            pmGov.evidence = { ...(pmGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize pmGov evidence — never expose raw internals
+    if (pmGov.evidence) {
+        const safePmEvidence = {};
+        for (const [k, v] of Object.entries(pmGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safePmEvidence[k] = v;
+            }
+        }
+        pmGov.evidence = Object.keys(safePmEvidence).length > 0 ? safePmEvidence : undefined;
+    }
+
+    // Propagate page mark flags conservatively
+    if (pmGov.review_required === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || pmGov.page_marks_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (pmGov.production_certified === false) isProdCert = false;
+    if (pmGov.certified_pdf_allowed === false || pmGov.review_required === true) {
+        // Downgrade certified_pdf artifact
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (pmGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (pmGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (pmGov.standard_certified === false) standardCertified = false;
 
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
@@ -1155,6 +1262,38 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + msg;
     }
 
+    // Phase 62D: Page Marks Human Report wording
+    if (pmGov.crop_marks_added === true) {
+        operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
+        customerSummary = customerSummary + " Crop marks were added to help guide trimming. The file still requires review before production.";
+    }
+    if (pmGov.insufficient_margin === true) {
+        operatorSummary = operatorSummary + " There was not enough margin outside the TrimBox to safely add crop marks.";
+        customerSummary = customerSummary + " Crop marks could not be safely added because the page geometry did not provide enough space.";
+    }
+    if (pmGov.removal_not_safe === true && pmGov.registration_marks_removed !== true) {
+        operatorSummary = operatorSummary + " Registration mark removal was skipped because safe removal could not be proven.";
+        customerSummary = customerSummary + " Some marks could not be safely removed automatically. A human review is required.";
+    }
+    if (pmGov.registration_marks_removed === true) {
+        operatorSummary = operatorSummary + " Registration marks were removed only where they were detected outside the TrimBox. Human review is required.";
+        customerSummary = customerSummary + " Some marks could not be safely removed automatically. A human review is required.";
+    }
+    if (pmGov.marks_inside_trim === true) {
+        operatorSummary = operatorSummary + " Marks were detected inside the TrimBox or near live artwork. Automatic removal was not performed.";
+        customerSummary = customerSummary + " The file includes page mark conditions that may affect trimming or production setup. A human review is required.";
+    }
+    if (pmGov.unsafe_geometry_detected === true) {
+        operatorSummary = operatorSummary + " Page mark geometry was unsafe or uncertain. The file requires review before production.";
+        customerSummary = customerSummary + " The file includes page mark conditions that may affect trimming or production setup. A human review is required.";
+    }
+    if (pmGov.page_marks_normalized === true) {
+        operatorSummary = operatorSummary + " Page mark normalization was evaluated. No production certification is implied.";
+    }
+    if (pmGov.review_required === true && !pmGov.crop_marks_added && !pmGov.insufficient_margin && !pmGov.marks_inside_trim && !pmGov.unsafe_geometry_detected) {
+        customerSummary = customerSummary + " The file includes page mark conditions that may affect trimming or production setup. A human review is required.";
+    }
+
     // Clean up extra spaces
     customerSummary = customerSummary.trim();
     operatorSummary = operatorSummary.trim();
@@ -1168,9 +1307,23 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         warnings: []
     };
 
+    // Phase 62D: page marks artifact_ux warnings
+    if (pmGov.crop_marks_added === true) {
+        const w = "Crop marks were added and require review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (pmGov.removal_not_safe === true) {
+        const w = "Registration mark removal was skipped because safe removal could not be proven.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (pmGov.review_required === true) {
+        const w = "Page mark conditions require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1189,6 +1342,32 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         artifact_ux.artifacts.push(combined);
         if (a.is_primary) artifact_ux.primary = combined;
     });
+
+    // Build safe public page_marks_governance subset (no raw internals)
+    const safePmGov = {
+        review_required: pmGov.review_required === true,
+        production_certified: pmGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: pmGov.certified_pdf_allowed !== false ? undefined : false,
+        page_marks_fix_applied: pmGov.page_marks_fix_applied === true,
+        crop_marks_added: pmGov.crop_marks_added === true,
+        registration_marks_removed: pmGov.registration_marks_removed === true,
+        page_marks_normalized: pmGov.page_marks_normalized === true,
+        unsafe_geometry_detected: pmGov.unsafe_geometry_detected === true,
+        insufficient_margin: pmGov.insufficient_margin === true,
+        marks_inside_trim: pmGov.marks_inside_trim === true,
+        removal_not_safe: pmGov.removal_not_safe === true,
+        visually_sensitive: pmGov.visually_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: pmGov.review_required_reasons || [],
+        warnings: pmGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    // Clean up undefined fields for cleanliness
+    if (safePmGov.production_certified === undefined) delete safePmGov.production_certified;
+    if (safePmGov.certified_pdf_allowed === undefined) delete safePmGov.certified_pdf_allowed;
 
     const reportPayload = {
         outcome,
@@ -1232,6 +1411,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         },
         artifact_trust: safeTrust,
         structural_metadata_governance: structGov,
+        page_marks_governance: safePmGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,
