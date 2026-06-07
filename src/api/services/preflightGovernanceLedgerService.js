@@ -1,5 +1,19 @@
 const db = require('./mysqlClient');
 
+// Phase 62D.1 — Type guard: safely coerce sync_error_json to a string for text operations.
+// The DB column is declared JSON NULL, so drivers can return a string, an already-parsed
+// object/array, null, or a number depending on version and ORM mode.
+function normalizeSyncErrorText(value) {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return value.join(' ');
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value || '');
+    }
+}
+
 // Define classification rules for raw events
 const classificationRules = [
     { match: /SUBMITTED/i, category: 'submission', label: 'Job submitted', summary: 'The preflight job was submitted for processing.' },
@@ -293,7 +307,7 @@ async function getGovernanceLedger(jobId, context) {
                 display_status: mappedStatus,
                 upstream_status: jobPayload?.status || 'UNKNOWN',
                 registry_status: localRecord.status,
-                sourceStatus: localRecord.sync_error_json?.includes('live_hydration_disabled') ? 'PERSISTENT_REGISTRY' : 'LIVE_UPSTREAM', // Approximation
+                sourceStatus: normalizeSyncErrorText(localRecord.sync_error_json).includes('live_hydration_disabled') ? 'PERSISTENT_REGISTRY' : 'LIVE_UPSTREAM', // Approximation (Phase 62D.1)
                 progress: isTerminal ? 100 : (localRecord.progress || 10),
                 terminal: isTerminal
             };
