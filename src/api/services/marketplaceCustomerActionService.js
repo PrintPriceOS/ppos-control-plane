@@ -19,7 +19,6 @@
 
 const crypto = require('crypto');
 const mysqlClient = require('./mysqlClient');
-const orderService = require('./marketplaceOrderService');
 const logger = require('./logger').child('marketplace-customer-action');
 
 // ---------------------------------------------------------------------------
@@ -186,7 +185,7 @@ async function createCustomerAction(orderId, payload = {}, options = {}) {
     );
 
     // 7. Audit event
-    await orderService.appendOrderEvent(orderId, {
+    await require('./marketplaceOrderService').appendOrderEvent(orderId, {
         type: 'CUSTOMER_ACTION_CREATED',
         actorType: 'ADMIN',
         actorId: operatorId,

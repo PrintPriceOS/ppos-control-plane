@@ -53,12 +53,14 @@ function buildCustomerRemediationUx({
         (review_decision && (review_decision.decision === 'REJECTED_REQUIRES_REUPLOAD' || review_decision.decision === 'REQUEST_CUSTOMER_REUPLOAD'));
 
     const decisionIsReject = requiresReupload;
+    console.log("==> buildCustomerRemediationUx DEBUG: review_decision =", review_decision, "requiresReupload =", requiresReupload, "decisionIsReject =", decisionIsReject);
     const isApprovedWithWarnings = review_decision && review_decision.decision === 'APPROVED_WITH_WARNINGS';
     
     // Evaluate if we are waiting for upload (customer action required but no new files yet)
     // Or if files are uploaded but not preflighted
     const hasMissingFiles = customer_action && customer_action.requiredFiles && customer_action.requiredFiles.length > 0;
     const missingFileKinds = hasMissingFiles ? customer_action.requiredFiles : [];
+    console.log("==> missingFileKinds BEFORE:", missingFileKinds, "hasMissingFiles:", hasMissingFiles, "customer_action.requiredFiles:", customer_action?.requiredFiles);
     
     // Evaluate remediation state
     if (decisionIsReject) {

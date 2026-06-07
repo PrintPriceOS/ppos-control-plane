@@ -5,8 +5,7 @@ const governanceLedgerService = require('./preflightGovernanceLedgerService');
 const artifactUxLabelService = require('./artifactUxLabelService');
 const { buildReviewDecisionUx } = require('./preflightReviewDecisionUxService');
 const { buildCustomerRemediationUx } = require('./customerRemediationUxService');
-const marketplaceOrderService = require('./marketplaceOrderService');
-const marketplaceCustomerActionService = require('./marketplaceCustomerActionService');
+
 
 // Helper to determine the primary artifact
 function selectPrimaryHumanArtifact(job, artifacts, artifactTrust = null) {
@@ -1157,8 +1156,10 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
 
     if (orderId) {
         try {
+            const marketplaceOrderService = require('./marketplaceOrderService');
+            const marketplaceCustomerActionService = require('./marketplaceCustomerActionService');
             // We use simple gets. Avoid throwing if order doesn't exist
-            const orderRes = await marketplaceOrderService.getOrder(orderId);
+            const orderRes = await marketplaceOrderService.getOrder(orderId).catch(e => null);
             if (orderRes) {
                 order = orderRes;
                 try {
@@ -1182,6 +1183,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
     }
 
+    console.log("==> review_decision in HR service: ", review_decision);
     reportPayload.remediation_ux = {
         operator: buildCustomerRemediationUx({
             order,
