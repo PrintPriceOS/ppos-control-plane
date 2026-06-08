@@ -872,6 +872,88 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (inkGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (inkGov.standard_certified === false) standardCertified = false;
 
+    // Phase 65D: Defensive extraction of selective_image_governance (RGB→CMYK, ICC profiles, downsampling, low-res)
+    const selImgSources = [
+        job.selective_image_governance,
+        job.fix_summary?.selective_image_governance,
+        job.fix_audit?.selective_image_governance,
+        job.delta_summary?.selective_image_governance,
+        job.delta_report?.selective_image_governance,
+        job.report?.selective_image_governance
+    ];
+    const artifactsWithSelImgMeta = artifacts.find(a => a.metadata && a.metadata.selective_image_governance);
+    if (artifactsWithSelImgMeta) selImgSources.push(artifactsWithSelImgMeta.metadata.selective_image_governance);
+    if (injectedJob?.selective_image_governance) selImgSources.push(injectedJob.selective_image_governance);
+
+    let selImgGov = {};
+    for (const source of selImgSources) {
+        if (!source) continue;
+        if (source.review_required === true) selImgGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) selImgGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) selImgGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) selImgGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) selImgGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) selImgGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) selImgGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.image_fix_applied === true) selImgGov.image_fix_applied = true;
+        if (source.rgb_images_converted === true) selImgGov.rgb_images_converted = true;
+        if (source.image_profiles_normalized === true) selImgGov.image_profiles_normalized = true;
+        if (source.excessive_resolution_downsampled === true) selImgGov.excessive_resolution_downsampled = true;
+        if (source.low_res_unfixable === true) selImgGov.low_res_unfixable = true;
+        if (source.visual_change_expected === true) selImgGov.visual_change_expected = true;
+        if (source.visually_sensitive === true) selImgGov.visually_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            selImgGov.review_required_reasons = [...new Set([...(selImgGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            selImgGov.warnings = [...new Set([...(selImgGov.warnings || []), ...source.warnings])];
+        }
+        // Evidence: collect but sanitize later
+        if (source.evidence) {
+            selImgGov.evidence = { ...(selImgGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize selImgGov evidence — never expose raw internals
+    if (selImgGov.evidence) {
+        const safeSelImgEvidence = {};
+        for (const [k, v] of Object.entries(selImgGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safeSelImgEvidence[k] = v;
+            }
+        }
+        selImgGov.evidence = Object.keys(safeSelImgEvidence).length > 0 ? safeSelImgEvidence : undefined;
+    }
+
+    // Propagate selective image governance conservatively — image conversions/normalizations always require review
+    if (selImgGov.review_required === true || selImgGov.image_fix_applied === true || selImgGov.visual_change_expected === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || selImgGov.image_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (selImgGov.production_certified === false) isProdCert = false;
+    if (selImgGov.certified_pdf_allowed === false || selImgGov.review_required === true) {
+        // Downgrade certified_pdf artifact
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (selImgGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (selImgGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (selImgGov.standard_certified === false) standardCertified = false;
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1509,6 +1591,26 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + operatorMsg;
     }
 
+    // Phase 65D: Selective Image Governance Human Report wording
+    const selImgReasons = (selImgGov.review_required_reasons || []).map(r => String(r).toLowerCase());
+    const selImgReasonHas = (...needles) => needles.some(n => selImgReasons.some(r => r.includes(n)));
+
+    if (selImgGov.image_fix_applied === true || selImgGov.rgb_images_converted === true
+        || selImgGov.image_profiles_normalized === true || selImgGov.excessive_resolution_downsampled === true
+        || selImgGov.review_required === true || selImgGov.visual_change_expected === true
+        || selImgReasonHas('rgb_to_cmyk', 'icc_profile', 'downsample', 'resolution')) {
+        const customerMsg = "Some images were converted or normalized and require review.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = "Selective image governance fixes (RGB-to-CMYK conversion, ICC profile normalization, and/or downsampling of excessive resolution) were attempted on this file. These are visual, color-managed changes that affect image appearance and require operator review before production. This is not a standards or production certification.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (selImgGov.low_res_unfixable === true || selImgReasonHas('low_res', 'low-res')) {
+        const customerMsg = "Low-resolution images could not be safely improved automatically.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = "Low-resolution images were detected and flagged honestly — they could not be safely upscaled or improved automatically. Upscaling cannot restore true image detail and the file requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1582,9 +1684,24 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 65D: selective image governance artifact_ux warnings
+    if (selImgGov.image_fix_applied === true || selImgGov.rgb_images_converted === true
+        || selImgGov.image_profiles_normalized === true || selImgGov.excessive_resolution_downsampled === true) {
+        const w = "Some images were converted or normalized and require review.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (selImgGov.low_res_unfixable === true) {
+        const w = "Low-resolution images could not be safely improved automatically.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (selImgGov.review_required === true) {
+        const w = "Selective image governance findings require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1685,6 +1802,29 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (safeInkGov.production_certified === undefined) delete safeInkGov.production_certified;
     if (safeInkGov.certified_pdf_allowed === undefined) delete safeInkGov.certified_pdf_allowed;
 
+    // Build safe public selective_image_governance subset (no raw internals)
+    const safeSelImgGov = {
+        review_required: selImgGov.review_required === true || selImgGov.image_fix_applied === true || selImgGov.visual_change_expected === true,
+        production_certified: selImgGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: selImgGov.certified_pdf_allowed !== false ? undefined : false,
+        image_fix_applied: selImgGov.image_fix_applied === true,
+        rgb_images_converted: selImgGov.rgb_images_converted === true,
+        image_profiles_normalized: selImgGov.image_profiles_normalized === true,
+        excessive_resolution_downsampled: selImgGov.excessive_resolution_downsampled === true,
+        low_res_unfixable: selImgGov.low_res_unfixable === true,
+        visual_change_expected: selImgGov.visual_change_expected === true,
+        visually_sensitive: selImgGov.visually_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: selImgGov.review_required_reasons || [],
+        warnings: selImgGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    if (safeSelImgGov.production_certified === undefined) delete safeSelImgGov.production_certified;
+    if (safeSelImgGov.certified_pdf_allowed === undefined) delete safeSelImgGov.certified_pdf_allowed;
+
     const reportPayload = {
         outcome,
         severity,
@@ -1730,6 +1870,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         page_marks_governance: safePmGov,
         security_interactivity_governance: safeSiGov,
         ink_governance: safeInkGov,
+        selective_image_governance: safeSelImgGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

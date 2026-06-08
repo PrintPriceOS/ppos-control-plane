@@ -59,6 +59,13 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         || inkGov.rich_black_text_mapped === true || inkGov.registration_color_mapped === true
         || inkGov.black_text_normalized === true || inkGov.ink_fix_applied === true;
 
+    // Phase 65D: Extract selective image governance (RGB→CMYK, ICC profiles, downsampling, low-res)
+    const selImgGov = human_report?.selective_image_governance || {};
+    const sel_img_review_required = selImgGov.review_required === true || selImgGov.image_fix_applied === true || selImgGov.visual_change_expected === true;
+    const sel_img_color_managed_change = selImgGov.rgb_images_converted === true || selImgGov.image_profiles_normalized === true
+        || selImgGov.image_fix_applied === true;
+    const sel_img_resolution_warning = selImgGov.excessive_resolution_downsampled === true || selImgGov.low_res_unfixable === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -366,6 +373,25 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             }
         }
 
+        // Phase 65D: Selective image governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (sel_img_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Image conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Selective image governance review required before production." : "Selective image governance review required before production.";
+                tooltip = "Selective image governance requires human review before this file can be released for production.";
+            }
+        }
+
         // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
         // is governed by the conservative downgrade above)
         if (active_content_removed && type === 'fixed_pdf') {
@@ -427,6 +453,41 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                 tooltip = "Ink/color changes may affect appearance and require review.";
             } else {
                 tooltip = "Ink/color governance findings were detected. Human review of color appearance is required before production.";
+            }
+        }
+
+        // Phase 65D: Color-managed image change badge (RGB→CMYK conversion / ICC profile normalization)
+        // (fixed_pdf only — certified_pdf is governed by the conservative downgrade above)
+        if (sel_img_color_managed_change && type === 'fixed_pdf') {
+            status_badge = "Color-managed image change";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some images were converted or normalized and require review.";
+            } else {
+                tooltip = "Image color conversion (RGB-to-CMYK) and/or ICC profile normalization was applied. These are visual, color-managed changes that require operator review before production.";
+            }
+        }
+
+        // Phase 65D: Resolution warning badge (downsampling / unfixable low-res)
+        if (sel_img_resolution_warning && type === 'fixed_pdf') {
+            status_badge = "Resolution warning";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Low-resolution images could not be safely improved automatically.";
+            } else {
+                tooltip = "Excessive resolution was downsampled and/or low-resolution images were detected and could not be safely upscaled. Human review of image quality is required before production.";
+            }
+        }
+
+        // Phase 65D: generic Image review required badge — least specific selective-image
+        // badge, only when nothing more specific already communicates the review need
+        if (sel_img_review_required && !sel_img_color_managed_change && !sel_img_resolution_warning && type === 'fixed_pdf') {
+            status_badge = "Image review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some images were converted or normalized and require review.";
+            } else {
+                tooltip = "Selective image governance findings were detected. Human review of image appearance is required before production.";
             }
         }
     }
