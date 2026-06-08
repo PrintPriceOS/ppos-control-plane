@@ -71,9 +71,35 @@ function translateFixMessage(f, isSkipped = false, colorGov = {}) {
     if (code.includes('CONVERT_CMYK')) return isSkipped 
         ? "CMYK conversion was skipped because explicit review mode is required." 
         : "Color conversion to CMYK was applied. Review the corrected PDF carefully because color conversion can alter appearance, ink balance, gradients, images, and brand colors.";
-    if (code.includes('STRIP_JAVASCRIPT')) return "Interactive JavaScript was removed.";
-    if (code.includes('FLATTEN_ANNOTATIONS')) return "Annotations or annotation references were flattened/removed for print safety.";
-    if (code.includes('FLATTEN_FORMS')) return "Interactive form fields were flattened or removed for print safety.";
+    // Phase 63A Security / Interactive Object Fixes
+    if (code.includes('STRIP_JAVASCRIPT')) {
+        if (isSkipped) return "Embedded JavaScript removal was skipped because it could not be safely confirmed.";
+        return "Embedded JavaScript was removed because it can pose a security risk in production workflows. This does not certify the file for production.";
+    }
+    if (code.includes('REMOVE_LAUNCH_ACTIONS')) {
+        if (isSkipped) return "Launch action removal was skipped because it could not be safely confirmed.";
+        return "Launch actions that could open external programs or files were removed for security. This does not certify the file for production.";
+    }
+    if (code.includes('REMOVE_EMBEDDED_FILES')) {
+        if (isSkipped) return "Embedded file removal was skipped because it could not be safely confirmed.";
+        return "Embedded files attached to the PDF were removed for security. This does not certify the file for production.";
+    }
+    if (code.includes('REMOVE_DOCUMENT_OPEN_ACTIONS')) {
+        if (isSkipped) return "Document open action removal was skipped because it could not be safely confirmed.";
+        return "Actions that automatically run when the document opens were removed for security. This does not certify the file for production.";
+    }
+    if (code.includes('REMOVE_PAGE_OPEN_ACTIONS')) {
+        if (isSkipped) return "Page open action removal was skipped because it could not be safely confirmed.";
+        return "Actions that automatically run when a page opens were removed for security. This does not certify the file for production.";
+    }
+    if (code.includes('FLATTEN_ANNOTATIONS')) {
+        if (isSkipped) return "Annotation flattening was skipped because safe preservation of visual appearance could not be proven. The file requires human review.";
+        return "Annotations were flattened into the page content for print safety. This is a visual change and requires human review before production.";
+    }
+    if (code.includes('FLATTEN_FORMS')) {
+        if (isSkipped) return "Form flattening was skipped because safe preservation of visual appearance could not be proven. The file requires human review.";
+        return "Interactive form fields were flattened into the page content for print safety. This is a visual change and requires human review before production.";
+    }
     if (code.includes('REBUILD_XREF')) {
         if (f.description && f.description.includes('No structural repair was necessary')) {
             return "No structural repair was necessary.";
@@ -671,6 +697,96 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (pmGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (pmGov.standard_certified === false) standardCertified = false;
 
+    // Phase 63D: Defensive extraction of security_interactivity_governance
+    const siSources = [
+        job.security_interactivity_governance,
+        job.fix_summary?.security_interactivity_governance,
+        job.fix_audit?.security_interactivity_governance,
+        job.delta_summary?.security_interactivity_governance,
+        job.delta_report?.security_interactivity_governance,
+        job.report?.security_interactivity_governance
+    ];
+    const artifactsWithSiMeta = artifacts.find(a => a.metadata && a.metadata.security_interactivity_governance);
+    if (artifactsWithSiMeta) siSources.push(artifactsWithSiMeta.metadata.security_interactivity_governance);
+    if (injectedJob?.security_interactivity_governance) siSources.push(injectedJob.security_interactivity_governance);
+
+    let siGov = {};
+    for (const source of siSources) {
+        if (!source) continue;
+        // review_required=true wins
+        if (source.review_required === true) siGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) siGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) siGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) siGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) siGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) siGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) siGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.security_interactivity_fix_applied === true) siGov.security_interactivity_fix_applied = true;
+        if (source.active_content_removed === true) siGov.active_content_removed = true;
+        if (source.javascript_removed === true) siGov.javascript_removed = true;
+        if (source.launch_actions_removed === true) siGov.launch_actions_removed = true;
+        if (source.embedded_files_removed === true) siGov.embedded_files_removed = true;
+        if (source.document_open_actions_removed === true) siGov.document_open_actions_removed = true;
+        if (source.page_open_actions_removed === true) siGov.page_open_actions_removed = true;
+        if (source.annotations_flattened === true) siGov.annotations_flattened = true;
+        if (source.annotation_flatten_skipped === true) siGov.annotation_flatten_skipped = true;
+        if (source.forms_flattened === true) siGov.forms_flattened = true;
+        if (source.form_flatten_skipped === true) siGov.form_flatten_skipped = true;
+        if (source.unresolved_interactive_content === true) siGov.unresolved_interactive_content = true;
+        if (source.visually_sensitive === true) siGov.visually_sensitive = true;
+        if (source.security_sensitive === true) siGov.security_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            siGov.review_required_reasons = [...new Set([...(siGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            siGov.warnings = [...new Set([...(siGov.warnings || []), ...source.warnings])];
+        }
+        // Evidence: collect but sanitize later
+        if (source.evidence) {
+            siGov.evidence = { ...(siGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize siGov evidence — never expose raw internals
+    if (siGov.evidence) {
+        const safeSiEvidence = {};
+        for (const [k, v] of Object.entries(siGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safeSiEvidence[k] = v;
+            }
+        }
+        siGov.evidence = Object.keys(safeSiEvidence).length > 0 ? safeSiEvidence : undefined;
+    }
+
+    // Propagate security/interactivity flags conservatively
+    if (siGov.review_required === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || siGov.security_interactivity_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (siGov.production_certified === false) isProdCert = false;
+    if (siGov.certified_pdf_allowed === false || siGov.review_required === true) {
+        // Downgrade certified_pdf artifact
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (siGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (siGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (siGov.standard_certified === false) standardCertified = false;
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1262,6 +1378,26 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + msg;
     }
 
+    // Phase 63D: Security / Interactive Object Human Report wording
+    if (siGov.active_content_removed) {
+        const customerMsg = "Potentially unsafe interactive content (such as embedded scripts, launch actions, or attached files) was removed from the PDF for security. This does not certify the file for production.";
+        const operatorMsg = "Active/interactive content (JavaScript, launch actions, embedded files, or open actions) was removed for security. This is a security cleanup only and does not imply production certification or standards compliance.";
+        customerSummary = customerSummary + " " + customerMsg;
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (siGov.annotations_flattened || siGov.forms_flattened) {
+        const customerMsg = "Some interactive elements (annotations or form fields) were flattened into the page. This may change how the file looks and requires review before production.";
+        const operatorMsg = "Annotations and/or form fields were flattened into the page content. This is a visual change — confirm appearance preservation before approving for production.";
+        customerSummary = customerSummary + " " + customerMsg;
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (siGov.annotation_flatten_skipped || siGov.form_flatten_skipped || siGov.unresolved_interactive_content) {
+        const customerMsg = "Some interactive content could not be safely simplified automatically and still requires review.";
+        const operatorMsg = "Annotation/form flattening was skipped, or interactive content remains unresolved, because safe preservation of visual appearance could not be proven. Human review is required.";
+        customerSummary = customerSummary + " " + customerMsg;
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1321,9 +1457,23 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 63D: security/interactivity artifact_ux warnings
+    if (siGov.active_content_removed === true) {
+        const w = "Active/interactive content was removed for security and requires review.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (siGov.annotation_flatten_skipped === true || siGov.form_flatten_skipped === true || siGov.unresolved_interactive_content === true) {
+        const w = "Annotation/form flattening was skipped because safe appearance preservation could not be proven.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (siGov.review_required === true) {
+        const w = "Security/interactivity findings require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1369,6 +1519,36 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (safePmGov.production_certified === undefined) delete safePmGov.production_certified;
     if (safePmGov.certified_pdf_allowed === undefined) delete safePmGov.certified_pdf_allowed;
 
+    // Build safe public security_interactivity_governance subset (no raw internals)
+    const safeSiGov = {
+        review_required: siGov.review_required === true,
+        production_certified: siGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: siGov.certified_pdf_allowed !== false ? undefined : false,
+        security_interactivity_fix_applied: siGov.security_interactivity_fix_applied === true,
+        active_content_removed: siGov.active_content_removed === true,
+        javascript_removed: siGov.javascript_removed === true,
+        launch_actions_removed: siGov.launch_actions_removed === true,
+        embedded_files_removed: siGov.embedded_files_removed === true,
+        document_open_actions_removed: siGov.document_open_actions_removed === true,
+        page_open_actions_removed: siGov.page_open_actions_removed === true,
+        annotations_flattened: siGov.annotations_flattened === true,
+        annotation_flatten_skipped: siGov.annotation_flatten_skipped === true,
+        forms_flattened: siGov.forms_flattened === true,
+        form_flatten_skipped: siGov.form_flatten_skipped === true,
+        unresolved_interactive_content: siGov.unresolved_interactive_content === true,
+        visually_sensitive: siGov.visually_sensitive === true,
+        security_sensitive: siGov.security_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: siGov.review_required_reasons || [],
+        warnings: siGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    if (safeSiGov.production_certified === undefined) delete safeSiGov.production_certified;
+    if (safeSiGov.certified_pdf_allowed === undefined) delete safeSiGov.certified_pdf_allowed;
+
     const reportPayload = {
         outcome,
         severity,
@@ -1412,6 +1592,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         artifact_trust: safeTrust,
         structural_metadata_governance: structGov,
         page_marks_governance: safePmGov,
+        security_interactivity_governance: safeSiGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

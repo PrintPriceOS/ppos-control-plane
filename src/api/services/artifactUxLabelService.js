@@ -42,6 +42,16 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     const insufficient_margin = pmGov.insufficient_margin === true;
     const unsafe_geometry = pmGov.unsafe_geometry_detected === true;
 
+    // Phase 63D: Extract security/interactivity governance
+    const siGov = human_report?.security_interactivity_governance || {};
+    const active_content_removed = siGov.active_content_removed === true;
+    const interactive_content_reviewed = siGov.annotations_flattened === true || siGov.forms_flattened === true;
+    const flatten_skipped = siGov.annotation_flatten_skipped === true || siGov.form_flatten_skipped === true || siGov.unresolved_interactive_content === true;
+    const si_review_required = siGov.review_required === true;
+    const security_cleanup_applied = siGov.javascript_removed === true || siGov.launch_actions_removed === true
+        || siGov.embedded_files_removed === true || siGov.document_open_actions_removed === true
+        || siGov.page_open_actions_removed === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -71,6 +81,14 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     }
     if (removal_not_safe && isOperator) {
         warning = warning ? warning + " Registration mark removal was skipped because safe removal could not be proven." : "Registration mark removal was skipped because safe removal could not be proven.";
+    }
+
+    // Phase 63D: security/interactivity warnings for operator
+    if (active_content_removed && isOperator) {
+        warning = warning ? warning + " Active/interactive content was removed for security and requires review." : "Active/interactive content was removed for security and requires review.";
+    }
+    if (flatten_skipped && isOperator) {
+        warning = warning ? warning + " Annotation/form flattening was skipped because safe appearance preservation could not be proven." : "Annotation/form flattening was skipped because safe appearance preservation could not be proven.";
     }
 
     if (type === 'review_pdf') {
@@ -299,6 +317,65 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
 
         // Phase 62D: removal_not_safe badge
         if (removal_not_safe && !crop_marks_added) {
+            status_badge = "Review required";
+            status_tone = "warning";
+        }
+
+        // Phase 63D: Security/interactivity overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (si_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Security/interactivity conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Security/interactivity review required before production." : "Security/interactivity review required before production.";
+                tooltip = "Security/interactivity governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
+        // is governed by the conservative downgrade above)
+        if (active_content_removed && type === 'fixed_pdf') {
+            status_badge = "Active content removed";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Potentially unsafe interactive content was removed from this file for security. The file still requires review before production.";
+            } else {
+                tooltip = "JavaScript, launch actions, embedded files, or open actions were removed for security. Human review is required before production.";
+            }
+        }
+
+        // Phase 63D: Interactive content reviewed / flattening badges
+        // (review_pdf keeps its own "Needs review" badge; certified_pdf is governed
+        // by the conservative downgrade above)
+        if (interactive_content_reviewed && type === 'fixed_pdf') {
+            status_badge = "Interactive content reviewed";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some interactive elements were simplified. This may change how the file looks and requires review.";
+            } else {
+                tooltip = "Annotations and/or form fields were flattened into the page content. Confirm appearance preservation before approving for production.";
+            }
+        }
+
+        // Phase 63D: Security cleanup badge (least specific — only set if nothing more specific applied)
+        if (security_cleanup_applied && !active_content_removed && type === 'fixed_pdf') {
+            status_badge = "Security cleanup";
+            status_tone = "info";
+        }
+
+        // Phase 63D: generic Review required badge — only when no more specific
+        // security/interactivity badge already communicates the review need
+        // (certified_pdf is governed by the conservative downgrade above)
+        if ((si_review_required || flatten_skipped) && !active_content_removed && !interactive_content_reviewed
+            && type === 'fixed_pdf') {
             status_badge = "Review required";
             status_tone = "warning";
         }
