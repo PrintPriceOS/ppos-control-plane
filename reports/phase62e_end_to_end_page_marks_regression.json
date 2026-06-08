@@ -1,0 +1,37 @@
+{
+  "phase": "62E — End-to-End Page Marks Regression",
+  "generated_at": "2026-06-08T13:56:00.434Z",
+  "end_to_end_passed": true,
+  "layers": [
+    {
+      "layer": "Engine (62E.1)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Worker (62E.2)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Service (62E.3)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane (62E.4)",
+      "present": true,
+      "passed": true
+    }
+  ],
+  "acceptance_criteria": {
+    "page_marks_governance_preserved_end_to_end": true,
+    "geometry_evidence_preserved_end_to_end": true,
+    "unsafe_operations_skip_honestly": true,
+    "certified_pdf_downgraded_when_review_required": true,
+    "artifact_trust_remains_authoritative": true,
+    "human_report_and_artifact_ux_safe": true,
+    "public_output_sanitized": true,
+    "all_smoke_tests_pass": true
+  }
+}
