@@ -787,6 +787,91 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (siGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (siGov.standard_certified === false) standardCertified = false;
 
+    // Phase 64D: Defensive extraction of ink_governance (TAC / rich black / registration color)
+    const inkSources = [
+        job.ink_governance,
+        job.fix_summary?.ink_governance,
+        job.fix_audit?.ink_governance,
+        job.delta_summary?.ink_governance,
+        job.delta_report?.ink_governance,
+        job.report?.ink_governance
+    ];
+    const artifactsWithInkMeta = artifacts.find(a => a.metadata && a.metadata.ink_governance);
+    if (artifactsWithInkMeta) inkSources.push(artifactsWithInkMeta.metadata.ink_governance);
+    if (injectedJob?.ink_governance) inkSources.push(injectedJob.ink_governance);
+
+    let inkGov = {};
+    for (const source of inkSources) {
+        if (!source) continue;
+        // review_required=true wins
+        if (source.review_required === true) inkGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) inkGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) inkGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) inkGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) inkGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) inkGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) inkGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.ink_fix_applied === true) inkGov.ink_fix_applied = true;
+        if (source.tac_reduction_attempted === true) inkGov.tac_reduction_attempted = true;
+        if (source.tac_reduction_applied === true) inkGov.tac_reduction_applied = true;
+        if (source.rich_black_text_mapped === true) inkGov.rich_black_text_mapped = true;
+        if (source.registration_color_mapped === true) inkGov.registration_color_mapped = true;
+        if (source.black_text_normalized === true) inkGov.black_text_normalized = true;
+        if (source.small_text_rich_black_detected === true) inkGov.small_text_rich_black_detected = true;
+        if (source.visual_change_expected === true) inkGov.visual_change_expected = true;
+        if (source.visually_sensitive === true) inkGov.visually_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            inkGov.review_required_reasons = [...new Set([...(inkGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            inkGov.warnings = [...new Set([...(inkGov.warnings || []), ...source.warnings])];
+        }
+        // Evidence: collect but sanitize later
+        if (source.evidence) {
+            inkGov.evidence = { ...(inkGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize inkGov evidence — never expose raw internals
+    if (inkGov.evidence) {
+        const safeInkEvidence = {};
+        for (const [k, v] of Object.entries(inkGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safeInkEvidence[k] = v;
+            }
+        }
+        inkGov.evidence = Object.keys(safeInkEvidence).length > 0 ? safeInkEvidence : undefined;
+    }
+
+    // Propagate ink governance conservatively — visual/color changes always require review
+    if (inkGov.review_required === true || inkGov.ink_fix_applied === true || inkGov.visual_change_expected === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || inkGov.ink_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (inkGov.production_certified === false) isProdCert = false;
+    if (inkGov.certified_pdf_allowed === false || inkGov.review_required === true) {
+        // Downgrade certified_pdf artifact
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (inkGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (inkGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (inkGov.standard_certified === false) standardCertified = false;
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1398,6 +1483,32 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + operatorMsg;
     }
 
+    // Phase 64D: Ink / TAC / Black / Registration Color Human Report wording
+    const inkReasons = (inkGov.review_required_reasons || []).map(r => String(r).toLowerCase());
+    const inkReasonHas = (...needles) => needles.some(n => inkReasons.some(r => r.includes(n)));
+
+    if (inkGov.ink_fix_applied === true || inkGov.review_required === true || inkGov.visual_change_expected === true) {
+        const customerMsg = "Ink/color changes may affect appearance and require review.";
+        customerSummary = customerSummary + " " + customerMsg;
+    }
+    if (inkGov.tac_reduction_attempted === true || inkGov.tac_reduction_applied === true || inkReasonHas('tac', 'total_ink')) {
+        const operatorMsg = "Total Area Coverage (TAC/total ink) reduction was attempted on this file. Reducing total ink coverage changes how colors render and print and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (inkGov.rich_black_text_mapped === true || inkGov.black_text_normalized === true
+        || inkGov.small_text_rich_black_detected === true || inkReasonHas('rich_black', 'black_text', 'small_text')) {
+        const operatorMsg = "Rich black text or small text built from rich black was detected and/or mapped to single-channel (K-only) black. This changes how text renders and prints, especially at small sizes, and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (inkGov.registration_color_mapped === true || inkReasonHas('registration_color', 'registration_mark')) {
+        const operatorMsg = "Registration color (100% all-channel black, intended for press marks only) was detected and/or mapped to standard black. Leaving registration color on body content causes severe overprinting and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (inkGov.ink_fix_applied === true || inkGov.visual_change_expected === true) {
+        const operatorMsg = "Ink/color governance fixes were attempted on this file. These are visual, color-affecting changes — appearance must be confirmed before approving for production. This is not a standards or production certification.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1472,8 +1583,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     }
 
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1549,6 +1660,31 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (safeSiGov.production_certified === undefined) delete safeSiGov.production_certified;
     if (safeSiGov.certified_pdf_allowed === undefined) delete safeSiGov.certified_pdf_allowed;
 
+    // Build safe public ink_governance subset (no raw internals)
+    const safeInkGov = {
+        review_required: inkGov.review_required === true || inkGov.ink_fix_applied === true || inkGov.visual_change_expected === true,
+        production_certified: inkGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: inkGov.certified_pdf_allowed !== false ? undefined : false,
+        ink_fix_applied: inkGov.ink_fix_applied === true,
+        tac_reduction_attempted: inkGov.tac_reduction_attempted === true,
+        tac_reduction_applied: inkGov.tac_reduction_applied === true,
+        rich_black_text_mapped: inkGov.rich_black_text_mapped === true,
+        registration_color_mapped: inkGov.registration_color_mapped === true,
+        black_text_normalized: inkGov.black_text_normalized === true,
+        small_text_rich_black_detected: inkGov.small_text_rich_black_detected === true,
+        visual_change_expected: inkGov.visual_change_expected === true,
+        visually_sensitive: inkGov.visually_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: inkGov.review_required_reasons || [],
+        warnings: inkGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    if (safeInkGov.production_certified === undefined) delete safeInkGov.production_certified;
+    if (safeInkGov.certified_pdf_allowed === undefined) delete safeInkGov.certified_pdf_allowed;
+
     const reportPayload = {
         outcome,
         severity,
@@ -1593,6 +1729,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         structural_metadata_governance: structGov,
         page_marks_governance: safePmGov,
         security_interactivity_governance: safeSiGov,
+        ink_governance: safeInkGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

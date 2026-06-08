@@ -52,6 +52,13 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         || siGov.embedded_files_removed === true || siGov.document_open_actions_removed === true
         || siGov.page_open_actions_removed === true;
 
+    // Phase 64D: Extract ink / TAC / black / registration color governance
+    const inkGov = human_report?.ink_governance || {};
+    const ink_review_required = inkGov.review_required === true || inkGov.ink_fix_applied === true || inkGov.visual_change_expected === true;
+    const ink_color_sensitive_fix = inkGov.tac_reduction_attempted === true || inkGov.tac_reduction_applied === true
+        || inkGov.rich_black_text_mapped === true || inkGov.registration_color_mapped === true
+        || inkGov.black_text_normalized === true || inkGov.ink_fix_applied === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -340,6 +347,25 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             }
         }
 
+        // Phase 64D: Ink/color governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (ink_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Ink/color conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Ink/color review required before production." : "Ink/color review required before production.";
+                tooltip = "Ink/color governance requires human review before this file can be released for production.";
+            }
+        }
+
         // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
         // is governed by the conservative downgrade above)
         if (active_content_removed && type === 'fixed_pdf') {
@@ -378,6 +404,30 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             && type === 'fixed_pdf') {
             status_badge = "Review required";
             status_tone = "warning";
+        }
+
+        // Phase 64D: Color-sensitive ink/TAC/rich-black/registration-color fix badge
+        // (fixed_pdf only — certified_pdf is governed by the conservative downgrade above)
+        if (ink_color_sensitive_fix && type === 'fixed_pdf') {
+            status_badge = "Color-sensitive fix";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Ink/color changes may affect appearance and require review.";
+            } else {
+                tooltip = "Total ink coverage, rich black text, registration color, or black text handling was adjusted. These are visual, color-affecting changes that require operator review before production.";
+            }
+        }
+
+        // Phase 64D: Ink review required badge — least specific ink badge, only when
+        // nothing more specific already communicates the review need
+        if (ink_review_required && !ink_color_sensitive_fix && type === 'fixed_pdf') {
+            status_badge = "Ink review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Ink/color changes may affect appearance and require review.";
+            } else {
+                tooltip = "Ink/color governance findings were detected. Human review of color appearance is required before production.";
+            }
         }
     }
 
