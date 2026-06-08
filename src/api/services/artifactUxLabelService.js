@@ -66,6 +66,13 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         || selImgGov.image_fix_applied === true;
     const sel_img_resolution_warning = selImgGov.excessive_resolution_downsampled === true || selImgGov.low_res_unfixable === true;
 
+    // Phase 66D: Extract font governance (embedding, Type3, glyphs, encoding)
+    const fontGov = human_report?.font_governance || {};
+    const font_review_required = fontGov.review_required === true || fontGov.font_fix_applied === true
+        || fontGov.font_embedding_skipped === true || fontGov.type3_fonts_detected === true
+        || fontGov.font_encoding_repaired === true || fontGov.visual_change_expected === true;
+    const font_issue_unresolved = fontGov.glyphs_missing_unfixable === true || fontGov.font_source_available === false;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -392,6 +399,25 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             }
         }
 
+        // Phase 66D: Font governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if ((font_review_required || font_issue_unresolved) && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Font conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Font governance review required before production." : "Font governance review required before production.";
+                tooltip = "Font governance requires human review before this file can be released for production.";
+            }
+        }
+
         // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
         // is governed by the conservative downgrade above)
         if (active_content_removed && type === 'fixed_pdf') {
@@ -488,6 +514,36 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                 tooltip = "Some images were converted or normalized and require review.";
             } else {
                 tooltip = "Selective image governance findings were detected. Human review of image appearance is required before production.";
+            }
+        }
+
+        // Phase 66D: Font issue unresolved badge — most specific font badge, for findings
+        // that were honestly flagged but could not be safely fixed automatically
+        if (font_issue_unresolved && type === 'fixed_pdf') {
+            status_badge = "Font issue unresolved";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = fontGov.font_source_available === false
+                    ? "Font embedding could not be completed because font sources were unavailable."
+                    : "Some font issues could not be safely fixed automatically.";
+            } else {
+                tooltip = fontGov.font_source_available === false
+                    ? "Font embedding could not be completed because the original font sources were unavailable. The file was flagged honestly rather than producing a falsely certified result, and requires operator review before production."
+                    : "Missing glyphs were detected and could not be safely repaired. The file was flagged honestly rather than inventing glyph data, and requires operator review before production.";
+            }
+        }
+
+        // Phase 66D: generic Font review required badge — least specific font badge,
+        // only when nothing more specific already communicates the review need
+        if (font_review_required && !font_issue_unresolved && type === 'fixed_pdf') {
+            status_badge = "Font review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = fontGov.type3_fonts_detected === true
+                    ? "Type3 fonts require review."
+                    : "Some fonts were not embedded.";
+            } else {
+                tooltip = "Font governance findings (embedding, subsetting, Type3 outlining, and/or encoding repair) were detected. Human review of text rendering is required before production.";
             }
         }
     }

@@ -954,6 +954,93 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (selImgGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (selImgGov.standard_certified === false) standardCertified = false;
 
+    // Phase 66D: Defensive extraction of font_governance (embedding, Type3, glyphs, encoding)
+    const fontSources = [
+        job.font_governance,
+        job.fix_summary?.font_governance,
+        job.fix_audit?.font_governance,
+        job.delta_summary?.font_governance,
+        job.delta_report?.font_governance,
+        job.report?.font_governance
+    ];
+    const artifactsWithFontMeta = artifacts.find(a => a.metadata && a.metadata.font_governance);
+    if (artifactsWithFontMeta) fontSources.push(artifactsWithFontMeta.metadata.font_governance);
+    if (injectedJob?.font_governance) fontSources.push(injectedJob.font_governance);
+
+    let fontGov = {};
+    for (const source of fontSources) {
+        if (!source) continue;
+        if (source.review_required === true) fontGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) fontGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) fontGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) fontGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) fontGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) fontGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) fontGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.font_fix_applied === true) fontGov.font_fix_applied = true;
+        if (source.fonts_embedded === true) fontGov.fonts_embedded = true;
+        if (source.font_embedding_skipped === true) fontGov.font_embedding_skipped = true;
+        if (source.type3_fonts_detected === true) fontGov.type3_fonts_detected = true;
+        if (source.type3_fonts_outlined === true) fontGov.type3_fonts_outlined = true;
+        if (source.glyphs_missing_unfixable === true) fontGov.glyphs_missing_unfixable = true;
+        if (source.font_encoding_repaired === true) fontGov.font_encoding_repaired = true;
+        if (source.font_source_available === false) fontGov.font_source_available = false;
+        if (source.visual_change_expected === true) fontGov.visual_change_expected = true;
+        if (source.visually_sensitive === true) fontGov.visually_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            fontGov.review_required_reasons = [...new Set([...(fontGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            fontGov.warnings = [...new Set([...(fontGov.warnings || []), ...source.warnings])];
+        }
+        // Evidence: collect but sanitize later
+        if (source.evidence) {
+            fontGov.evidence = { ...(fontGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize fontGov evidence — never expose raw internals
+    if (fontGov.evidence) {
+        const safeFontEvidence = {};
+        for (const [k, v] of Object.entries(fontGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safeFontEvidence[k] = v;
+            }
+        }
+        fontGov.evidence = Object.keys(safeFontEvidence).length > 0 ? safeFontEvidence : undefined;
+    }
+
+    // Propagate font governance conservatively — embedding/Type3/glyph findings always require review
+    if (fontGov.review_required === true || fontGov.font_fix_applied === true || fontGov.font_embedding_skipped === true
+        || fontGov.type3_fonts_detected === true || fontGov.glyphs_missing_unfixable === true
+        || fontGov.font_source_available === false || fontGov.visual_change_expected === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || fontGov.font_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (fontGov.production_certified === false) isProdCert = false;
+    if (fontGov.certified_pdf_allowed === false || fontGov.review_required === true) {
+        // Downgrade certified_pdf artifact
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (fontGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (fontGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (fontGov.standard_certified === false) standardCertified = false;
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1611,6 +1698,41 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + operatorMsg;
     }
 
+    // Phase 66D: Font Governance Human Report wording
+    const fontReasons = (fontGov.review_required_reasons || []).map(r => String(r).toLowerCase());
+    const fontReasonHas = (...needles) => needles.some(n => fontReasons.some(r => r.includes(n)));
+
+    if (fontGov.font_embedding_skipped === true || fontGov.fonts_embedded === false
+        || (fontGov.font_fix_applied === true && fontGov.font_source_available !== false)
+        || fontReasonHas('embed', 'subset')) {
+        const customerMsg = "Some fonts were not embedded.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = "Some fonts were not embedded or could only be partially subset-embedded. This can change how the file renders across systems and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (fontGov.font_source_available === false || fontReasonHas('font_source', 'source_unavailable')) {
+        const customerMsg = "Font embedding could not be completed because font sources were unavailable.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = "Font embedding could not be completed because the original font sources were unavailable. The file was flagged honestly rather than producing a falsely certified result, and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (fontGov.type3_fonts_detected === true || fontReasonHas('type3', 'type_3')) {
+        const customerMsg = "Type3 fonts require review.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = fontGov.type3_fonts_outlined === true
+            ? "Type3 fonts were detected and outlined. Outlining changes how text is represented internally and requires operator review of appearance before production."
+            : "Type3 fonts were detected. These fonts require special handling and operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (fontGov.glyphs_missing_unfixable === true || fontReasonHas('missing_glyph', 'glyph')) {
+        const operatorMsg = "Missing glyphs were detected and could not be safely repaired. The file was flagged honestly rather than inventing glyph data, and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (fontGov.font_encoding_repaired === true || fontReasonHas('encoding')) {
+        const operatorMsg = "Font encoding issues were repaired. This is a structural, text-rendering-affecting change and requires operator review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1699,9 +1821,27 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 66D: font governance artifact_ux warnings
+    if (fontGov.font_embedding_skipped === true || fontGov.fonts_embedded === false || fontGov.font_fix_applied === true) {
+        const w = "Some fonts were not embedded.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (fontGov.font_source_available === false) {
+        const w = "Font embedding could not be completed because font sources were unavailable.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (fontGov.type3_fonts_detected === true) {
+        const w = "Type3 fonts require review.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (fontGov.review_required === true) {
+        const w = "Font governance findings require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1825,6 +1965,36 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (safeSelImgGov.production_certified === undefined) delete safeSelImgGov.production_certified;
     if (safeSelImgGov.certified_pdf_allowed === undefined) delete safeSelImgGov.certified_pdf_allowed;
 
+    // Build safe public font_governance subset (no raw internals)
+    const safeFontGov = {
+        review_required: fontGov.review_required === true || fontGov.font_fix_applied === true
+            || fontGov.font_embedding_skipped === true || fontGov.type3_fonts_detected === true
+            || fontGov.glyphs_missing_unfixable === true || fontGov.font_source_available === false
+            || fontGov.visual_change_expected === true,
+        production_certified: fontGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: fontGov.certified_pdf_allowed !== false ? undefined : false,
+        font_fix_applied: fontGov.font_fix_applied === true,
+        fonts_embedded: fontGov.fonts_embedded === true,
+        font_embedding_skipped: fontGov.font_embedding_skipped === true,
+        type3_fonts_detected: fontGov.type3_fonts_detected === true,
+        type3_fonts_outlined: fontGov.type3_fonts_outlined === true,
+        glyphs_missing_unfixable: fontGov.glyphs_missing_unfixable === true,
+        font_encoding_repaired: fontGov.font_encoding_repaired === true,
+        font_source_available: fontGov.font_source_available === false ? false : undefined,
+        visual_change_expected: fontGov.visual_change_expected === true,
+        visually_sensitive: fontGov.visually_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: fontGov.review_required_reasons || [],
+        warnings: fontGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    if (safeFontGov.production_certified === undefined) delete safeFontGov.production_certified;
+    if (safeFontGov.certified_pdf_allowed === undefined) delete safeFontGov.certified_pdf_allowed;
+    if (safeFontGov.font_source_available === undefined) delete safeFontGov.font_source_available;
+
     const reportPayload = {
         outcome,
         severity,
@@ -1871,6 +2041,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         security_interactivity_governance: safeSiGov,
         ink_governance: safeInkGov,
         selective_image_governance: safeSelImgGov,
+        font_governance: safeFontGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,
