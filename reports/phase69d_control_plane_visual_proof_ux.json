@@ -1,0 +1,173 @@
+{
+  "phase": "69D",
+  "title": "Control Plane Visual Proof UX",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-09T00:00:00.000Z",
+  "result": "PASS",
+  "smoke_result": "20 / 20 PASS",
+  "build_result": "SUCCESS",
+
+  "files_modified": [
+    "src/api/services/preflightHumanReportService.js",
+    "src/api/services/artifactUxLabelService.js",
+    "src/ui/components/preflight/HumanReportPanel.tsx",
+    "src/ui/pages/public/PublicHumanReportPage.tsx",
+    "src/ui/components/JobDetailDrawer.tsx"
+  ],
+
+  "files_created": [
+    "src/ui/components/preflight/VisualProofPanel.tsx",
+    "scripts/smoke_phase69d_control_plane_visual_proof_ux.js",
+    "reports/phase69d_control_plane_visual_proof_ux.json",
+    "reports/phase69d_control_plane_visual_proof_ux.md"
+  ],
+
+  "governance_implemented": {
+    "visual_diff_governance_extracted": true,
+    "safe_subset_built": true,
+    "raw_paths_omitted": true,
+    "internal_ids_omitted": true,
+    "thumbnail_artifact_ids_safe": true,
+    "diff_image_artifact_ids_safe": true,
+    "production_certified_always_false": true,
+    "standard_certified_always_false": true
+  },
+
+  "artifact_ux_badges": [
+    {
+      "badge": "Visual review required",
+      "condition": "visual_change_detected=true OR (visual_diff_required=true AND not performed)",
+      "applies_to": ["certified_pdf", "fixed_pdf"],
+      "tone": "warning",
+      "customer_safe": true
+    },
+    {
+      "badge": "Visual proof available",
+      "condition": "proof_artifacts_available=true AND visual_diff_performed=true AND visual_change_detected=false",
+      "applies_to": ["fixed_pdf"],
+      "tone": "info",
+      "customer_safe": true
+    },
+    {
+      "badge": "Rendered comparison",
+      "condition": "proof_artifacts_available=true AND visual_diff_performed=true AND visual_change_detected=true",
+      "applies_to": ["fixed_pdf"],
+      "tone": "warning",
+      "customer_safe": true
+    }
+  ],
+
+  "human_report_service": {
+    "extraction": "defensive multi-source merge (job, fix_summary, fix_audit, delta_summary, delta_report, report, artifact metadata)",
+    "safe_subset_fields": [
+      "visual_diff_required",
+      "visual_diff_performed",
+      "visual_change_detected",
+      "visual_review_required",
+      "render_tool_gap",
+      "max_changed_pixel_ratio",
+      "changed_pixel_ratio_avg",
+      "pages_rendered",
+      "pages_compared",
+      "dimensions_match",
+      "render_tool",
+      "render_tool_version",
+      "proof_artifacts_available",
+      "thumbnail_artifact_ids",
+      "diff_image_artifact_ids",
+      "production_certified",
+      "standard_certified",
+      "warnings",
+      "limitations"
+    ],
+    "blocked_evidence_keys": [
+      "command",
+      "local_path",
+      "raw_path",
+      "file_path",
+      "internal_id",
+      "obj_",
+      "forensic_object_id",
+      "raw_stream",
+      "diff_images",
+      "thumbnails"
+    ],
+    "certified_pdf_downgrade": "applies when visual_change_detected=true OR (visual_diff_required AND not performed)",
+    "customer_summary_updated": true,
+    "operator_summary_updated": true,
+    "artifact_ux_warnings_updated": true
+  },
+
+  "visual_proof_panel": {
+    "component": "VisualProofPanel.tsx",
+    "audiences": ["operator", "customer"],
+    "shows": {
+      "operator": [
+        "diff performed status",
+        "visual change detection",
+        "proof artifacts availability",
+        "render tool gap",
+        "pages rendered / compared",
+        "max / avg changed pixel ratio",
+        "dimensions match check",
+        "render tool and version",
+        "thumbnail artifact ID chips with fetch link",
+        "diff image artifact ID chips with fetch link",
+        "limitations",
+        "warnings",
+        "governance disclaimer"
+      ],
+      "customer": [
+        "diff performed status",
+        "visual change detection",
+        "proof artifacts availability",
+        "customer-safe thumbnail placeholder message",
+        "warnings"
+      ]
+    },
+    "never_shows": [
+      "raw file paths",
+      "local filesystem paths",
+      "internal job IDs in image src",
+      "production_certified",
+      "standard_certified",
+      "PDF/X or PDF/A certification claims"
+    ]
+  },
+
+  "integrations": {
+    "HumanReportPanel": {
+      "audience": "operator",
+      "position": "after operator details section, before CustomerRemediationPanel"
+    },
+    "PublicHumanReportPage": {
+      "audience": "customer",
+      "position": "after CustomerRemediationPanel"
+    },
+    "JobDetailDrawer": {
+      "audience": "operator",
+      "tab": "result",
+      "position": "after artifact pool, before bundle seal"
+    }
+  },
+
+  "smoke_tests": [
+    { "id": 1, "label": "visual_review_required downgrades certified_pdf", "result": "PASS" },
+    { "id": 2, "label": "proof available no change — badge: Visual proof available", "result": "PASS" },
+    { "id": 3, "label": "proof available with change — badge: Rendered comparison + pixel ratio in tooltip", "result": "PASS" },
+    { "id": 4, "label": "render tool gap propagated to operator warning", "result": "PASS" },
+    { "id": 5, "label": "safe evidence subset omits local_path, diff_images, thumbnails, command", "result": "PASS" },
+    { "id": 6, "label": "production_certified / standard_certified always false", "result": "PASS" }
+  ],
+
+  "acceptance": {
+    "visual_proof_displayed_safely": true,
+    "customer_output_sanitized": true,
+    "visual_changes_require_review": true,
+    "no_production_overclaim": true,
+    "no_standards_overclaim": true,
+    "no_raw_paths_leak": true,
+    "build_passes": true,
+    "smoke_passes": true
+  }
+}

@@ -14,12 +14,13 @@ import {
   getJobWorkerDetails, 
   getJobResult 
 } from '../lib/adminApi';
-import { 
-  CubeIcon, 
-  ClockIcon, 
+import {
+  CubeIcon,
+  ClockIcon,
   ArrowDownTrayIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import { VisualProofPanel } from './preflight/VisualProofPanel';
 import { COLORS } from '../design-system/tokens';
 
 interface JobDetailDrawerProps {
@@ -472,6 +473,15 @@ export const JobDetailDrawer: React.FC<JobDetailDrawerProps> = ({ job, isOpen, o
                         </div>
                       )}
                     </div>
+
+                    {/* Phase 69D: Visual Proof Panel in operator job drawer */}
+                    {(resultData?.visual_diff_governance || forensics.detail?.report?.visual_diff_governance) && (
+                      <VisualProofPanel
+                        visualDiffGovernance={resultData?.visual_diff_governance || forensics.detail?.report?.visual_diff_governance}
+                        audience="operator"
+                        jobId={job?.id}
+                      />
+                    )}
 
                     {resultData.certified_bundle_id && (
                       <div className={`p-1.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between text-[10px] font-mono`}>

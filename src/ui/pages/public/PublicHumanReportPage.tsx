@@ -4,6 +4,7 @@ import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XCircl
 import { getArtifactUxForArtifact } from '../../../lib/artifactUx';
 import { ReviewDecisionPanel } from '../../components/preflight/ReviewDecisionPanel';
 import { CustomerRemediationPanel } from '../../components/preflight/CustomerRemediationPanel';
+import { VisualProofPanel } from '../../components/preflight/VisualProofPanel';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -113,10 +114,18 @@ export const PublicHumanReportPage: React.FC = () => {
                 )}
 
                 {report.remediation_ux && report.remediation_ux.customer && (
-                    <CustomerRemediationPanel 
+                    <CustomerRemediationPanel
                         remediationUx={report.remediation_ux.customer}
                         audience="customer"
                         onActionClick={() => alert('Customer actions would trigger here (e.g., upload flow)')}
+                    />
+                )}
+
+                {/* Phase 69D: Visual Proof Panel (customer-safe view) */}
+                {report.visual_diff_governance && (
+                    <VisualProofPanel
+                        visualDiffGovernance={report.visual_diff_governance}
+                        audience="customer"
                     />
                 )}
 

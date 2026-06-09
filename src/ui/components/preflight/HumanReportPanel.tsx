@@ -15,6 +15,7 @@ import {
 import { PreflightReviewDecisionPanel } from "./PreflightReviewDecisionPanel";
 import { ReviewDecisionPanel, ReviewDecisionUxAction } from "./ReviewDecisionPanel";
 import { CustomerRemediationPanel } from "./CustomerRemediationPanel";
+import { VisualProofPanel } from "./VisualProofPanel";
 import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
@@ -391,8 +392,17 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                 </div>
             </details>
 
+            {/* Phase 69D: Visual Proof Panel (operator view) */}
+            {report.visual_diff_governance && (
+                <VisualProofPanel
+                    visualDiffGovernance={report.visual_diff_governance}
+                    audience="operator"
+                    jobId={jobId}
+                />
+            )}
+
             {report.remediation_ux && report.remediation_ux.operator && (
-                <CustomerRemediationPanel 
+                <CustomerRemediationPanel
                     remediationUx={report.remediation_ux.operator}
                     audience="operator"
                     onActionClick={handleRemediationActionClick}
@@ -400,7 +410,7 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
             )}
 
             {report.review_decision_ux && report.review_decision_ux.operator && (
-                <ReviewDecisionPanel 
+                <ReviewDecisionPanel
                     decisionUx={report.review_decision_ux.operator}
                     onActionClick={handleActionClick}
                     audience="operator"

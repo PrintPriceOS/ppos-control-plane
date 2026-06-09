@@ -1125,6 +1125,97 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (transPhysGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (transPhysGov.standard_certified === false) standardCertified = false;
 
+    // Phase 69D: Defensive extraction of visual_diff_governance
+    const visualDiffSources = [
+        job.visual_diff_governance,
+        job.fix_summary?.visual_diff_governance,
+        job.fix_audit?.visual_diff_governance,
+        job.delta_summary?.visual_diff_governance,
+        job.delta_report?.visual_diff_governance,
+        job.report?.visual_diff_governance
+    ];
+    const artifactsWithVisualDiffMeta = artifacts.find(a => a.metadata && a.metadata.visual_diff_governance);
+    if (artifactsWithVisualDiffMeta) visualDiffSources.push(artifactsWithVisualDiffMeta.metadata.visual_diff_governance);
+    if (injectedJob?.visual_diff_governance) visualDiffSources.push(injectedJob.visual_diff_governance);
+
+    let visualDiffGov = {};
+    for (const source of visualDiffSources) {
+        if (!source) continue;
+        // Conservative merges — review flags can only be set, never cleared
+        if (source.visual_diff_required === true) visualDiffGov.visual_diff_required = true;
+        if (source.visual_diff_performed === true) visualDiffGov.visual_diff_performed = true;
+        if (source.visual_change_detected === true) visualDiffGov.visual_change_detected = true;
+        if (source.visual_review_required === true) visualDiffGov.visual_review_required = true;
+        if (source.render_tool_gap === true) visualDiffGov.render_tool_gap = true;
+        if (source.proof_artifacts_available === true) visualDiffGov.proof_artifacts_available = true;
+        // Numeric: keep the max changed_pixel_ratio seen
+        if (typeof source.max_changed_pixel_ratio === 'number') {
+            visualDiffGov.max_changed_pixel_ratio = Math.max(visualDiffGov.max_changed_pixel_ratio || 0, source.max_changed_pixel_ratio);
+        }
+        if (typeof source.changed_pixel_ratio_avg === 'number') {
+            visualDiffGov.changed_pixel_ratio_avg = Math.max(visualDiffGov.changed_pixel_ratio_avg || 0, source.changed_pixel_ratio_avg);
+        }
+        if (typeof source.pages_rendered === 'number' && source.pages_rendered > (visualDiffGov.pages_rendered || 0)) {
+            visualDiffGov.pages_rendered = source.pages_rendered;
+        }
+        if (typeof source.pages_compared === 'number' && source.pages_compared > (visualDiffGov.pages_compared || 0)) {
+            visualDiffGov.pages_compared = source.pages_compared;
+        }
+        if (source.dimensions_match === false) visualDiffGov.dimensions_match = false;
+        else if (source.dimensions_match === true && visualDiffGov.dimensions_match !== false) visualDiffGov.dimensions_match = true;
+        if (source.render_tool && !visualDiffGov.render_tool) visualDiffGov.render_tool = source.render_tool;
+        if (source.render_tool_version && !visualDiffGov.render_tool_version) visualDiffGov.render_tool_version = source.render_tool_version;
+        if (source.warnings && source.warnings.length > 0) {
+            visualDiffGov.warnings = [...new Set([...(visualDiffGov.warnings || []), ...source.warnings])];
+        }
+        if (source.limitations && source.limitations.length > 0) {
+            visualDiffGov.limitations = [...new Set([...(visualDiffGov.limitations || []), ...source.limitations])];
+        }
+        // Evidence: collect for later sanitization
+        if (source.evidence) {
+            visualDiffGov.evidence = { ...(visualDiffGov.evidence || {}), ...source.evidence };
+        }
+        // Safe thumbnail/diff image refs (IDs only, never raw paths)
+        if (source.thumbnail_artifact_ids && source.thumbnail_artifact_ids.length > 0) {
+            visualDiffGov.thumbnail_artifact_ids = [...new Set([...(visualDiffGov.thumbnail_artifact_ids || []), ...source.thumbnail_artifact_ids])];
+        }
+        if (source.diff_image_artifact_ids && source.diff_image_artifact_ids.length > 0) {
+            visualDiffGov.diff_image_artifact_ids = [...new Set([...(visualDiffGov.diff_image_artifact_ids || []), ...source.diff_image_artifact_ids])];
+        }
+    }
+
+    // Sanitize visualDiffGov evidence — never expose raw paths, internal IDs, or commands
+    if (visualDiffGov.evidence) {
+        const safeVisualDiffEvidence = {};
+        const blockedKeys = ['command', 'local_path', 'raw_path', 'file_path', 'internal_id',
+            'obj_', 'forensic_object_id', 'raw_stream', 'diff_images', 'thumbnails'];
+        for (const [k, v] of Object.entries(visualDiffGov.evidence)) {
+            if (!blockedKeys.some(b => k.includes(b))) {
+                safeVisualDiffEvidence[k] = v;
+            }
+        }
+        visualDiffGov.evidence = Object.keys(safeVisualDiffEvidence).length > 0 ? safeVisualDiffEvidence : undefined;
+    }
+
+    // Propagate visual diff governance conservatively
+    if (visualDiffGov.visual_change_detected === true || visualDiffGov.visual_review_required === true
+        || (visualDiffGov.visual_diff_required === true && !visualDiffGov.visual_diff_performed)) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = 'FIXED_REVIEW_REQUIRED';
+        }
+        // Downgrade certified_pdf
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1848,6 +1939,26 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
     }
 
+    // Phase 69D: Visual Diff Human Report wording
+    if (visualDiffGov.visual_change_detected === true) {
+        const customerMsg = "Visual changes were detected in the corrected file. A human review of the visual result is required before production.";
+        const operatorMsg = "Visual diff analysis detected changes between the original and corrected file. Review the rendered proof before approving for production.";
+        customerSummary = customerSummary + " " + customerMsg;
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (visualDiffGov.visual_diff_required === true && !visualDiffGov.visual_diff_performed) {
+        const operatorMsg = "Visual diff was required for this fix type but could not be performed. The file requires human review before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (visualDiffGov.render_tool_gap === true) {
+        const operatorMsg = "Rendering tools were unavailable. Visual diff evidence could not be generated automatically.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (visualDiffGov.proof_artifacts_available === true && visualDiffGov.visual_diff_performed === true) {
+        const operatorMsg = "Rendered proof artifacts are available for comparison.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1968,6 +2079,20 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 69D: visual_diff_governance artifact_ux warnings
+    if (visualDiffGov.visual_change_detected === true) {
+        const w = "Visual changes detected — rendered proof review required before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (visualDiffGov.visual_diff_required === true && !visualDiffGov.visual_diff_performed) {
+        const w = "Visual diff was required but not performed. Human review is required.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (visualDiffGov.render_tool_gap === true) {
+        const w = "Rendering tools were unavailable. Visual proof could not be generated.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     // Phase 68D: Build safe public standards_certification_governance subset (no raw paths)
     const safeStdCertGov = {
         validation_performed: stdGov.validation_performed === true,
@@ -1984,9 +2109,39 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         review_required_reasons: stdGov.review_required_reasons || []
     };
 
+    // Phase 69D: Build safe public visual_diff_governance subset (no raw paths, no local file refs)
+    const safeVisualDiffGov = {
+        visual_diff_required: visualDiffGov.visual_diff_required === true,
+        visual_diff_performed: visualDiffGov.visual_diff_performed === true,
+        visual_change_detected: visualDiffGov.visual_change_detected === true,
+        visual_review_required: visualDiffGov.visual_review_required === true
+            || visualDiffGov.visual_change_detected === true
+            || (visualDiffGov.visual_diff_required === true && !visualDiffGov.visual_diff_performed),
+        render_tool_gap: visualDiffGov.render_tool_gap === true,
+        max_changed_pixel_ratio: visualDiffGov.max_changed_pixel_ratio || 0,
+        changed_pixel_ratio_avg: visualDiffGov.changed_pixel_ratio_avg || 0,
+        pages_rendered: visualDiffGov.pages_rendered || 0,
+        pages_compared: visualDiffGov.pages_compared || 0,
+        dimensions_match: visualDiffGov.dimensions_match !== false ? (visualDiffGov.dimensions_match === true ? true : null) : false,
+        render_tool: visualDiffGov.render_tool || null,
+        render_tool_version: visualDiffGov.render_tool_version || null,
+        proof_artifacts_available: visualDiffGov.proof_artifacts_available === true,
+        // thumbnail_artifact_ids: safe references by ID only (no paths)
+        thumbnail_artifact_ids: visualDiffGov.thumbnail_artifact_ids || [],
+        diff_image_artifact_ids: visualDiffGov.diff_image_artifact_ids || [],
+        production_certified: false,
+        standard_certified: false,
+        warnings: visualDiffGov.warnings || [],
+        limitations: visualDiffGov.limitations || []
+        // evidence.raw paths intentionally omitted; sanitized evidence attached via visualDiffGov.evidence
+    };
+    if (visualDiffGov.evidence) {
+        safeVisualDiffGov.evidence = visualDiffGov.evidence;
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -2217,6 +2372,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         font_governance: safeFontGov,
         transparency_overprint_physical_governance: safeTransPhysGov,
         standards_certification_governance: safeStdCertGov,
+        visual_diff_governance: safeVisualDiffGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

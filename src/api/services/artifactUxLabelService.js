@@ -84,6 +84,17 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         !!stdCertGov.validator_version &&
         !!stdCertGov.standard_detected &&
         stdCertGov.compliance_claim_allowed !== false;
+
+    // Phase 69D: Extract visual_diff_governance (safe subset — no raw paths or local refs)
+    const visualDiffGov = human_report?.visual_diff_governance || {};
+    const visual_diff_performed = visualDiffGov.visual_diff_performed === true;
+    const visual_change_detected = visualDiffGov.visual_change_detected === true;
+    const visual_review_required = visualDiffGov.visual_review_required === true
+        || visual_change_detected
+        || (visualDiffGov.visual_diff_required === true && !visual_diff_performed);
+    const render_tool_gap = visualDiffGov.render_tool_gap === true;
+    const proof_artifacts_available = visualDiffGov.proof_artifacts_available === true;
+
     const trans_phys_review_required = transPhysGov.review_required === true || transPhysGov.transparency_fix_applied === true
         || transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true
         || transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true
@@ -627,6 +638,56 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                 tooltip = "Transparency or overprint changes may affect appearance and require review.";
             } else {
                 tooltip = "Transparency/overprint physical governance findings were detected. Human visual review is required before production.";
+            }
+        }
+
+        // Phase 69D: Visual diff governance overrides for certified_pdf — downgrade when review required
+        if (visual_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Visual review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Visual changes require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Visual review required";
+                status_tone = "warning";
+                warning = warning
+                    ? warning + " Visual diff review required before production."
+                    : "Visual diff review required before production.";
+                tooltip = "Visual diff analysis requires human review of rendered proof before this file can be released for production.";
+            }
+        }
+
+        // Phase 69D: Visual proof available badge — for fixed_pdf and review_pdf
+        if (proof_artifacts_available && visual_diff_performed && type === 'fixed_pdf') {
+            if (!visual_change_detected) {
+                status_badge = "Visual proof available";
+                status_tone = "info";
+                if (isCustomer) {
+                    tooltip = "A rendered comparison was generated. No significant visual changes were detected.";
+                } else {
+                    tooltip = "Rendered proof artifacts are available for comparison. No significant visual changes were detected.";
+                }
+            } else {
+                status_badge = "Rendered comparison";
+                status_tone = "warning";
+                if (isCustomer) {
+                    tooltip = "A rendered comparison was generated. Visual changes were detected and require review.";
+                } else {
+                    tooltip = `Rendered comparison available. Visual changes detected — max changed pixel ratio: ${(visualDiffGov.max_changed_pixel_ratio || 0).toFixed(4)}. Human review required before production.`;
+                }
+            }
+        }
+
+        // Phase 69D: Render tool gap badge — when diff was required but tools unavailable
+        if (render_tool_gap && !visual_diff_performed && type === 'fixed_pdf') {
+            if (isOperator) {
+                warning = warning
+                    ? warning + " Rendering tools were unavailable. Visual proof could not be generated automatically."
+                    : "Rendering tools were unavailable. Visual proof could not be generated automatically.";
             }
         }
     }
