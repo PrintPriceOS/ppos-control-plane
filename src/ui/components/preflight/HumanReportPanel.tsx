@@ -16,6 +16,7 @@ import { PreflightReviewDecisionPanel } from "./PreflightReviewDecisionPanel";
 import { ReviewDecisionPanel, ReviewDecisionUxAction } from "./ReviewDecisionPanel";
 import { CustomerRemediationPanel } from "./CustomerRemediationPanel";
 import { VisualProofPanel } from "./VisualProofPanel";
+import { ProofApprovalPanel } from "./ProofApprovalPanel";
 import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
@@ -398,6 +399,15 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                     visualDiffGovernance={report.visual_diff_governance}
                     audience="operator"
                     jobId={jobId}
+                />
+            )}
+
+            {/* Phase 70D: Customer Proof Approval Panel (operator view) */}
+            {(report.proof_approval_governance || report.proof_approval_ux?.operator) && (
+                <ProofApprovalPanel
+                    proofApprovalGovernance={report.proof_approval_governance}
+                    proofApprovalUx={report.proof_approval_ux?.operator}
+                    audience="operator"
                 />
             )}
 

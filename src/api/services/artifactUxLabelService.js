@@ -85,6 +85,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         !!stdCertGov.standard_detected &&
         stdCertGov.compliance_claim_allowed !== false;
 
+    // Phase 70D: Extract proof_approval_governance
+    const proofApprGov = human_report?.proof_approval_governance || {};
+    const proof_required = proofApprGov.proof_required === true;
+    const proof_status = proofApprGov.proof_status || 'NOT_REQUIRED';
+    const proof_approved = proof_status === 'APPROVED';
+    const proof_rejected = proof_status === 'REJECTED';
+    const proof_pending_customer = proof_status === 'PENDING';
+    const approval_production_blocked = proof_required && !proof_approved;
+
     // Phase 69D: Extract visual_diff_governance (safe subset — no raw paths or local refs)
     const visualDiffGov = human_report?.visual_diff_governance || {};
     const visual_diff_performed = visualDiffGov.visual_diff_performed === true;
@@ -688,6 +697,66 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                 warning = warning
                     ? warning + " Rendering tools were unavailable. Visual proof could not be generated automatically."
                     : "Rendering tools were unavailable. Visual proof could not be generated automatically.";
+            }
+        }
+
+        // Phase 70D: Proof approval governance badges
+
+        // Downgrade certified_pdf when proof approval is blocking production
+        if (approval_production_blocked && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = proof_rejected
+                    ? "Customer rejected — reupload required"
+                    : proof_pending_customer
+                    ? "Awaiting customer approval"
+                    : "Proof approval required";
+                status_tone = proof_rejected ? "danger" : "warning";
+                button_label = "Download file";
+                tooltip = proof_rejected
+                    ? "You rejected the rendered proof. Please reupload a corrected file."
+                    : "A rendered proof of your file requires your approval before production.";
+            } else {
+                status_badge = proof_rejected
+                    ? "Customer rejected — reupload required"
+                    : proof_pending_customer
+                    ? "Awaiting customer approval"
+                    : "Proof approval required";
+                status_tone = proof_rejected ? "danger" : "warning";
+                warning = warning
+                    ? warning + " Proof approval is required before this file can be released for production."
+                    : "Proof approval is required before this file can be released for production.";
+                tooltip = proof_rejected
+                    ? "Customer rejected the rendered proof. A new file upload is required before production can proceed."
+                    : proof_pending_customer
+                    ? "Rendered proof has been shared with the customer. Awaiting their approval decision."
+                    : "Visual changes were detected. A rendered proof must be approved by the customer before production.";
+            }
+        }
+
+        // Badge on fixed_pdf when proof was approved
+        if (proof_approved && proof_required && type === 'fixed_pdf') {
+            if (!visual_review_required) {
+                status_badge = "Customer approved";
+                status_tone = "success";
+                if (isCustomer) {
+                    tooltip = "You approved the rendered proof. This file may proceed to production upon operator review.";
+                } else {
+                    tooltip = "The customer approved the rendered proof. The visual proof gate is satisfied.";
+                }
+            }
+        }
+
+        // Badge on fixed_pdf when awaiting customer approval
+        if (proof_pending_customer && type === 'fixed_pdf' && !proof_approved) {
+            status_badge = "Awaiting customer approval";
+            status_tone = "info";
+            if (isCustomer) {
+                tooltip = "A rendered proof of your corrected file is awaiting your approval.";
+            } else {
+                tooltip = "A rendered proof has been shared with the customer and is awaiting their decision.";
             }
         }
     }

@@ -5,6 +5,7 @@ const governanceLedgerService = require('./preflightGovernanceLedgerService');
 const artifactUxLabelService = require('./artifactUxLabelService');
 const { buildReviewDecisionUx } = require('./preflightReviewDecisionUxService');
 const { buildCustomerRemediationUx } = require('./customerRemediationUxService');
+const { buildProofApprovalUx } = require('./proofApprovalUxService');
 
 
 // Helper to determine the primary artifact
@@ -1216,6 +1217,98 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         });
     }
 
+    // Phase 70D: Defensive extraction of proof_approval_governance
+    const proofApprSources = [
+        job.proof_approval_governance,
+        job.fix_summary?.proof_approval_governance,
+        job.fix_audit?.proof_approval_governance,
+        job.delta_summary?.proof_approval_governance,
+        job.delta_report?.proof_approval_governance,
+        job.report?.proof_approval_governance
+    ];
+    const artifactsWithProofApprMeta = artifacts.find(a => a.metadata && a.metadata.proof_approval_governance);
+    if (artifactsWithProofApprMeta) proofApprSources.push(artifactsWithProofApprMeta.metadata.proof_approval_governance);
+    if (injectedJob?.proof_approval_governance) proofApprSources.push(injectedJob.proof_approval_governance);
+
+    let proofApprGov = {};
+    for (const source of proofApprSources) {
+        if (!source) continue;
+        // Conservative merges — review/block flags can only be set, never cleared
+        if (source.proof_required === true) proofApprGov.proof_required = true;
+        if (source.proof_available === true) proofApprGov.proof_available = true;
+        if (source.visual_change_detected === true) proofApprGov.visual_change_detected = true;
+        if (source.review_required === true) proofApprGov.review_required = true;
+        // proof_status: APPROVED wins over PENDING, REJECTED wins over PENDING, else keep most recent
+        if (source.proof_status === 'REJECTED') {
+            proofApprGov.proof_status = 'REJECTED';
+        } else if (source.proof_status === 'APPROVED' && proofApprGov.proof_status !== 'REJECTED') {
+            proofApprGov.proof_status = 'APPROVED';
+        } else if (source.proof_status === 'PENDING' && !proofApprGov.proof_status) {
+            proofApprGov.proof_status = 'PENDING';
+        } else if (source.proof_status && !proofApprGov.proof_status) {
+            proofApprGov.proof_status = source.proof_status;
+        }
+        if (source.proof_id && !proofApprGov.proof_id) proofApprGov.proof_id = source.proof_id;
+        if (source.customer_feedback && !proofApprGov.customer_feedback) proofApprGov.customer_feedback = source.customer_feedback;
+        if (source.warnings && source.warnings.length > 0) {
+            proofApprGov.warnings = [...new Set([...(proofApprGov.warnings || []), ...source.warnings])];
+        }
+        if (source.evidence) {
+            proofApprGov.evidence = { ...(proofApprGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize proofApprGov evidence — never expose raw paths or internal IDs
+    if (proofApprGov.evidence) {
+        const safeProofApprEvidence = {};
+        const blockedEvidenceKeys = ['command', 'local_path', 'raw_path', 'file_path', 'internal_id',
+            'obj_', 'forensic_object_id', 'raw_stream'];
+        for (const [k, v] of Object.entries(proofApprGov.evidence)) {
+            if (!blockedEvidenceKeys.some(b => k.includes(b))) {
+                safeProofApprEvidence[k] = v;
+            }
+        }
+        proofApprGov.evidence = Object.keys(safeProofApprEvidence).length > 0 ? safeProofApprEvidence : undefined;
+    }
+
+    // Propagate proof approval governance conservatively
+    const proofApprovalBlocks = proofApprGov.proof_required === true
+        && proofApprGov.proof_status !== 'APPROVED';
+    if (proofApprovalBlocks || proofApprGov.review_required === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = 'FIXED_REVIEW_REQUIRED';
+        }
+    }
+    if (proofApprGov.proof_status === 'REJECTED') {
+        // Rejected proof: downgrade certified_pdf
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+
+    // Build safe public proof_approval_governance subset (no raw paths, no customer_feedback in customer view)
+    const safeProofApprGov = {
+        proof_required: proofApprGov.proof_required === true,
+        proof_available: proofApprGov.proof_available === true,
+        proof_status: proofApprGov.proof_status || 'NOT_REQUIRED',
+        visual_change_detected: proofApprGov.visual_change_detected === true,
+        review_required: proofApprGov.review_required === true || proofApprovalBlocks,
+        production_certified: false,
+        standard_certified: false,
+        warnings: proofApprGov.warnings || []
+        // proof_id and customer_feedback intentionally omitted here; exposed via proof_approval_ux.operator only
+    };
+    if (proofApprGov.evidence) {
+        safeProofApprGov.evidence = proofApprGov.evidence;
+    }
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -2140,8 +2233,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     }
 
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -2373,6 +2466,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         transparency_overprint_physical_governance: safeTransPhysGov,
         standards_certification_governance: safeStdCertGov,
         visual_diff_governance: safeVisualDiffGov,
+        proof_approval_governance: safeProofApprGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,
@@ -2403,6 +2497,20 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
             review_decision, 
             audience: 'customer', 
             snapshot_id 
+        })
+    };
+
+    // Phase 70D: Proof Approval UX
+    reportPayload.proof_approval_ux = {
+        operator: buildProofApprovalUx({
+            proof_approval_governance: proofApprGov,
+            visual_diff_governance: visualDiffGov,
+            audience: 'operator'
+        }),
+        customer: buildProofApprovalUx({
+            proof_approval_governance: proofApprGov,
+            visual_diff_governance: visualDiffGov,
+            audience: 'customer'
         })
     };
 

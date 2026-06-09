@@ -5,6 +5,7 @@ import { getArtifactUxForArtifact } from '../../../lib/artifactUx';
 import { ReviewDecisionPanel } from '../../components/preflight/ReviewDecisionPanel';
 import { CustomerRemediationPanel } from '../../components/preflight/CustomerRemediationPanel';
 import { VisualProofPanel } from '../../components/preflight/VisualProofPanel';
+import { ProofApprovalPanel } from '../../components/preflight/ProofApprovalPanel';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -125,6 +126,15 @@ export const PublicHumanReportPage: React.FC = () => {
                 {report.visual_diff_governance && (
                     <VisualProofPanel
                         visualDiffGovernance={report.visual_diff_governance}
+                        audience="customer"
+                    />
+                )}
+
+                {/* Phase 70D: Customer Proof Approval Panel (customer-safe view) */}
+                {(report.proof_approval_governance || report.proof_approval_ux?.customer) && (
+                    <ProofApprovalPanel
+                        proofApprovalGovernance={report.proof_approval_governance}
+                        proofApprovalUx={report.proof_approval_ux?.customer}
                         audience="customer"
                     />
                 )}
