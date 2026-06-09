@@ -1836,6 +1836,18 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + operatorMsg;
     }
 
+    // Phase 68D: Standards Certificate Human Report wording
+    if (hasFullValidatorEvidence && stdGov.validator_name && stdGov.validator_version) {
+        if (pdfxComplianceClaimed) {
+            customerSummary = customerSummary + " PDF/X validated.";
+            operatorSummary = operatorSummary + ` PDF/X validation passed using ${stdGov.validator_name} ${stdGov.validator_version}.`;
+        }
+        if (pdfaComplianceClaimed) {
+            customerSummary = customerSummary + " PDF/A validated.";
+            operatorSummary = operatorSummary + ` PDF/A validation passed using ${stdGov.validator_name} ${stdGov.validator_version}.`;
+        }
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1956,9 +1968,25 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 68D: Build safe public standards_certification_governance subset (no raw paths)
+    const safeStdCertGov = {
+        validation_performed: stdGov.validation_performed === true,
+        validation_passed: stdGov.validation_passed === true,
+        standard_certified: hasFullValidatorEvidence && stdGov.standard_certified === true,
+        compliance_claim_allowed: hasFullValidatorEvidence && stdGov.compliance_claim_allowed !== false,
+        standard_detected: stdGov.standard_detected || null,
+        validator_name: stdGov.validator_name || null,
+        validator_version: stdGov.validator_version || null,
+        validation_report_hash: stdGov.validation_report_hash || null,
+        // validation_report_path intentionally omitted
+        pdfx_compliance_claimed: pdfxComplianceClaimed,
+        pdfa_compliance_claimed: pdfaComplianceClaimed,
+        review_required_reasons: stdGov.review_required_reasons || []
+    };
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -2188,6 +2216,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         selective_image_governance: safeSelImgGov,
         font_governance: safeFontGov,
         transparency_overprint_physical_governance: safeTransPhysGov,
+        standards_certification_governance: safeStdCertGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

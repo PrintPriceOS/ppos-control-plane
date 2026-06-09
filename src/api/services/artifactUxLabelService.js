@@ -75,6 +75,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
 
     // Phase 67D: Extract transparency/overprint physical governance (flatten, blend modes, overprint)
     const transPhysGov = human_report?.transparency_overprint_physical_governance || {};
+
+    // Phase 68D: Extract standards_certification_governance (safe subset — no raw paths)
+    const stdCertGov = human_report?.standards_certification_governance || {};
+    const has_full_validator_evidence = stdCertGov.validation_performed === true &&
+        stdCertGov.validation_passed === true &&
+        !!stdCertGov.validator_name &&
+        !!stdCertGov.validator_version &&
+        !!stdCertGov.standard_detected &&
+        stdCertGov.compliance_claim_allowed !== false;
     const trans_phys_review_required = transPhysGov.review_required === true || transPhysGov.transparency_fix_applied === true
         || transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true
         || transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true
@@ -278,6 +287,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             status_badge = "Internal Governance";
             button_label = "Download Internal Report";
             tooltip = "Internal governance report only. Not a PDF/X or PDF/A validator certificate.";
+        } else if (has_full_validator_evidence) {
+            const std = stdCertGov.standard_detected || '';
+            const isPdfa = std.toLowerCase().includes('pdf/a');
+            display_label = "Validated standards report";
+            short_label = "Validated";
+            status_badge = isPdfa ? "PDF/A validated" : "PDF/X validated";
+            status_tone = "success";
+            button_label = "Download validated standards report";
+            tooltip = `Validation passed using ${stdCertGov.validator_name} ${stdCertGov.validator_version}. Standard detected: ${std}.`;
         } else {
             display_label = "Standards Validation Report";
             short_label = "Validation";
