@@ -1,0 +1,53 @@
+{
+  "phase": "67E — End-to-End Transparency/Overprint Physical Regression",
+  "generated_at": "2026-06-09T01:55:09.839Z",
+  "end_to_end_passed": true,
+  "layers": [
+    {
+      "layer": "Engine (67A)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Worker (67B)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Service (67C)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane Human Report (67D)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane Regression (67E)",
+      "present": true,
+      "passed": true
+    }
+  ],
+  "acceptance_criteria": {
+    "physical_changes_always_review_required": true,
+    "transparency_flattened_state_preserved_end_to_end": true,
+    "blend_modes_normalized_state_preserved_end_to_end": true,
+    "overprint_flattened_state_preserved_end_to_end": true,
+    "overprint_preview_simulated_state_preserved_end_to_end": true,
+    "evidence_preserved_end_to_end": true,
+    "review_required_propagated_end_to_end": true,
+    "multi_source_defensive_extraction_correct": true,
+    "governance_preserved_end_to_end": true,
+    "no_production_standards_overclaim": true,
+    "certified_pdf_downgraded_when_review_required": true,
+    "physical_fixes_never_imply_print_ready_or_certified": true,
+    "human_report_safe_and_understandable": true,
+    "artifact_ux_safe": true,
+    "public_customer_output_sanitized": true,
+    "no_pdfx_pdfa_production_standards_claims": true,
+    "reports_generated_in_each_repo": true,
+    "aggregate_report_generated": true,
+    "all_smoke_tests_pass": true
+  }
+}
