@@ -1,0 +1,255 @@
+{
+  "phase": "69E",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-09T16:11:07.275Z",
+  "input_mode": "SERVICE_REPORT",
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "status": "PASS",
+  "results": [
+    {
+      "name": "1. Visual change detected — wording, review required, governance preserved end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "2. Visual diff performed, no change — \"Visual proof available\" badge and proof wording (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": false,
+        "visual_review_required": false,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "3. Render tool gap — warning propagated end-to-end, visual_review_required=true (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": false,
+        "visual_change_detected": false,
+        "visual_review_required": true,
+        "render_tool_gap": true,
+        "proof_artifacts_available": false,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "4. Visual diff required but not performed (no tool gap) — production blocked end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": false,
+        "visual_change_detected": false,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": false,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "5. Transparency flattening + visual change — both governance domains preserved end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "6. Raw path sanitation — evidence local_path, diff_images, thumbnails, command stripped (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "7. Multi-source extraction — visual_diff_governance nested in fix_summary propagates end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "8. Proof artifact IDs safe — thumbnail_artifact_ids and diff_image_artifact_ids preserved, raw paths stripped (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "9. Standards overclaim regression — FLATTEN_TRANSPARENCY + zero-change visual diff does not imply PDF/X, PDF/A, or production certification (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": false,
+        "visual_review_required": false,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    },
+    {
+      "name": "10. Golden path — complete visual diff evidence chain, all acceptance criteria met end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "visual_diff_governance": {
+        "visual_diff_required": true,
+        "visual_diff_performed": true,
+        "visual_change_detected": true,
+        "visual_review_required": true,
+        "render_tool_gap": false,
+        "proof_artifacts_available": true,
+        "production_certified": false,
+        "standard_certified": false
+      }
+    }
+  ],
+  "end_to_end": {
+    "phase": "69E — End-to-End Visual Diff Regression",
+    "generated_at": "2026-06-09T16:11:07.278Z",
+    "end_to_end_passed": true,
+    "control_plane_passed": true,
+    "upstream_present": true,
+    "status": "PASS",
+    "layers": [
+      {
+        "layer": "Engine (69A)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Worker (69B)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Service (69C)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane Visual Proof UX (69D)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane Regression (69E)",
+        "present": true,
+        "passed": true
+      }
+    ],
+    "acceptance_criteria": {
+      "visual_evidence_preserved_end_to_end": true,
+      "missing_visual_diff_blocks_fix_progression": true,
+      "visual_changes_require_review": true,
+      "proof_artifacts_displayed_safely": true,
+      "no_raw_paths_or_internal_ids_leak": true,
+      "visual_diff_governance_production_certified_always_false": true,
+      "visual_diff_governance_standard_certified_always_false": true,
+      "render_tool_gap_warning_propagated": true,
+      "multi_source_defensive_extraction_correct": true,
+      "transparency_fix_no_standards_overclaim": true,
+      "zero_change_visual_diff_no_false_review_from_visual_domain": true,
+      "thumbnail_diff_ids_safe_not_raw_paths": true,
+      "public_customer_output_sanitized": true,
+      "reports_generated_in_each_repo": true,
+      "aggregate_report_generated": true,
+      "all_smoke_tests_pass": true
+    }
+  }
+}
