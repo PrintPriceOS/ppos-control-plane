@@ -1041,6 +1041,90 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (fontGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
     if (fontGov.standard_certified === false) standardCertified = false;
 
+    // Phase 67D: Defensive extraction of transparency_overprint_physical_governance
+    const transPhysSources = [
+        job.transparency_overprint_physical_governance,
+        job.fix_summary?.transparency_overprint_physical_governance,
+        job.fix_audit?.transparency_overprint_physical_governance,
+        job.delta_summary?.transparency_overprint_physical_governance,
+        job.delta_report?.transparency_overprint_physical_governance,
+        job.report?.transparency_overprint_physical_governance
+    ];
+    const artifactsWithTransPhysMeta = artifacts.find(a => a.metadata && a.metadata.transparency_overprint_physical_governance);
+    if (artifactsWithTransPhysMeta) transPhysSources.push(artifactsWithTransPhysMeta.metadata.transparency_overprint_physical_governance);
+    if (injectedJob?.transparency_overprint_physical_governance) transPhysSources.push(injectedJob.transparency_overprint_physical_governance);
+
+    let transPhysGov = {};
+    for (const source of transPhysSources) {
+        if (!source) continue;
+        if (source.review_required === true) transPhysGov.review_required = true;
+        // Conservative: false wins on certification/compliance fields
+        if (source.production_certified === false) transPhysGov.production_certified = false;
+        if (source.certified_pdf_allowed === false) transPhysGov.certified_pdf_allowed = false;
+        if (source.standard_certified === false) transPhysGov.standard_certified = false;
+        if (source.pdfx_compliance_claimed === false) transPhysGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) transPhysGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) transPhysGov.compliance_claim_allowed = false;
+        // Additions (true wins)
+        if (source.transparency_fix_applied === true) transPhysGov.transparency_fix_applied = true;
+        if (source.transparency_flattened === true) transPhysGov.transparency_flattened = true;
+        if (source.blend_modes_normalized === true) transPhysGov.blend_modes_normalized = true;
+        if (source.overprint_flattened === true) transPhysGov.overprint_flattened = true;
+        if (source.overprint_preview_simulated === true) transPhysGov.overprint_preview_simulated = true;
+        if (source.visual_change_expected === true) transPhysGov.visual_change_expected = true;
+        if (source.rendering_safety_proven === false) transPhysGov.rendering_safety_proven = false;
+        if (source.visually_sensitive === true) transPhysGov.visually_sensitive = true;
+        // Deduplicate arrays
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            transPhysGov.review_required_reasons = [...new Set([...(transPhysGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            transPhysGov.warnings = [...new Set([...(transPhysGov.warnings || []), ...source.warnings])];
+        }
+        if (source.evidence) {
+            transPhysGov.evidence = { ...(transPhysGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize transPhysGov evidence — never expose raw internals
+    if (transPhysGov.evidence) {
+        const safeTransPhysEvidence = {};
+        for (const [k, v] of Object.entries(transPhysGov.evidence)) {
+            const blocked = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+                'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream'];
+            if (!blocked.some(b => k.includes(b))) {
+                safeTransPhysEvidence[k] = v;
+            }
+        }
+        transPhysGov.evidence = Object.keys(safeTransPhysEvidence).length > 0 ? safeTransPhysEvidence : undefined;
+    }
+
+    // Propagate physical transparency/overprint governance conservatively
+    if (transPhysGov.review_required === true || transPhysGov.transparency_flattened === true
+        || transPhysGov.overprint_flattened === true || transPhysGov.blend_modes_normalized === true
+        || transPhysGov.overprint_preview_simulated === true || transPhysGov.visual_change_expected === true
+        || transPhysGov.transparency_fix_applied === true) {
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = (appliedFixesRaw.length > 0 || transPhysGov.transparency_fix_applied) ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+    if (transPhysGov.production_certified === false) isProdCert = false;
+    if (transPhysGov.certified_pdf_allowed === false || transPhysGov.review_required === true) {
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+    if (transPhysGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (transPhysGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+    if (transPhysGov.standard_certified === false) standardCertified = false;
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -1733,6 +1817,25 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         operatorSummary = operatorSummary + " " + operatorMsg;
     }
 
+    // Phase 67D: Transparency/Overprint Physical Governance Human Report wording
+    if (transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true
+        || (transPhysGov.transparency_fix_applied === true && !transPhysGov.overprint_flattened)) {
+        const customerMsg = "Transparency flattening may affect appearance and requires review.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = transPhysGov.blend_modes_normalized === true
+            ? "Transparency was flattened and blend modes were normalized. Flattening can alter how colors and layers interact visually; human review of appearance is required before production."
+            : "Transparency was flattened. Flattening merges transparent layers and can change how the file renders; human review of appearance is required before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+    if (transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true) {
+        const customerMsg = "Overprint changes require visual verification.";
+        customerSummary = customerSummary + " " + customerMsg;
+        const operatorMsg = transPhysGov.overprint_preview_simulated === true
+            ? "Overprint was flattened and an overprint preview was simulated. Overprint simulation changes how inks interact on press; the result must be visually verified before production."
+            : "Overprint settings were flattened. Overprint changes affect how inks interact on press and can significantly alter printed output; human visual review is required before production.";
+        operatorSummary = operatorSummary + " " + operatorMsg;
+    }
+
     // Phase 62D: Page Marks Human Report wording
     if (pmGov.crop_marks_added === true) {
         operatorSummary = operatorSummary + " Crop marks were added outside the TrimBox. This changes production guidance and requires human review before production.";
@@ -1839,9 +1942,23 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 67D: transparency/overprint physical governance artifact_ux warnings
+    if (transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true) {
+        const w = "Transparency flattening may affect appearance and requires review.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true) {
+        const w = "Overprint changes require visual verification.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+    if (transPhysGov.review_required === true) {
+        const w = "Transparency/overprint physical findings require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -1995,6 +2112,34 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     if (safeFontGov.certified_pdf_allowed === undefined) delete safeFontGov.certified_pdf_allowed;
     if (safeFontGov.font_source_available === undefined) delete safeFontGov.font_source_available;
 
+    // Build safe public transparency_overprint_physical_governance subset (no raw internals)
+    const safeTransPhysGov = {
+        review_required: transPhysGov.review_required === true || transPhysGov.transparency_flattened === true
+            || transPhysGov.overprint_flattened === true || transPhysGov.blend_modes_normalized === true
+            || transPhysGov.overprint_preview_simulated === true || transPhysGov.visual_change_expected === true
+            || transPhysGov.transparency_fix_applied === true,
+        production_certified: transPhysGov.production_certified !== false ? undefined : false,
+        certified_pdf_allowed: transPhysGov.certified_pdf_allowed !== false ? undefined : false,
+        transparency_fix_applied: transPhysGov.transparency_fix_applied === true,
+        transparency_flattened: transPhysGov.transparency_flattened === true,
+        blend_modes_normalized: transPhysGov.blend_modes_normalized === true,
+        overprint_flattened: transPhysGov.overprint_flattened === true,
+        overprint_preview_simulated: transPhysGov.overprint_preview_simulated === true,
+        visual_change_expected: transPhysGov.visual_change_expected === true,
+        rendering_safety_proven: transPhysGov.rendering_safety_proven === false ? false : undefined,
+        visually_sensitive: transPhysGov.visually_sensitive === true,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        review_required_reasons: transPhysGov.review_required_reasons || [],
+        warnings: transPhysGov.warnings || []
+        // evidence intentionally omitted from public payload
+    };
+    if (safeTransPhysGov.production_certified === undefined) delete safeTransPhysGov.production_certified;
+    if (safeTransPhysGov.certified_pdf_allowed === undefined) delete safeTransPhysGov.certified_pdf_allowed;
+    if (safeTransPhysGov.rendering_safety_proven === undefined) delete safeTransPhysGov.rendering_safety_proven;
+
     const reportPayload = {
         outcome,
         severity,
@@ -2042,6 +2187,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         ink_governance: safeInkGov,
         selective_image_governance: safeSelImgGov,
         font_governance: safeFontGov,
+        transparency_overprint_physical_governance: safeTransPhysGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

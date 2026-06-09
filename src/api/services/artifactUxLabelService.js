@@ -73,6 +73,15 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
         || fontGov.font_encoding_repaired === true || fontGov.visual_change_expected === true;
     const font_issue_unresolved = fontGov.glyphs_missing_unfixable === true || fontGov.font_source_available === false;
 
+    // Phase 67D: Extract transparency/overprint physical governance (flatten, blend modes, overprint)
+    const transPhysGov = human_report?.transparency_overprint_physical_governance || {};
+    const trans_phys_review_required = transPhysGov.review_required === true || transPhysGov.transparency_fix_applied === true
+        || transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true
+        || transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true
+        || transPhysGov.visual_change_expected === true;
+    const trans_phys_overprint_change = transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true;
+    const trans_phys_transparency_change = transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true;
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -418,6 +427,25 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
             }
         }
 
+        // Phase 67D: Transparency/overprint physical governance overrides for certified_pdf —
+        // must stay conservative; downgrade wins over any "applied" badge when review is required
+        if (trans_phys_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Transparency/overprint physical conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Transparency/overprint physical review required before production." : "Transparency/overprint physical review required before production.";
+                tooltip = "Transparency/overprint physical governance requires human review before this file can be released for production.";
+            }
+        }
+
         // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
         // is governed by the conservative downgrade above)
         if (active_content_removed && type === 'fixed_pdf') {
@@ -544,6 +572,43 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                     : "Some fonts were not embedded.";
             } else {
                 tooltip = "Font governance findings (embedding, subsetting, Type3 outlining, and/or encoding repair) were detected. Human review of text rendering is required before production.";
+            }
+        }
+
+        // Phase 67D: Overprint review badge — most specific, for overprint flatten/simulate
+        if (trans_phys_overprint_change && type === 'fixed_pdf') {
+            status_badge = "Overprint review";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Overprint changes require visual verification.";
+            } else {
+                tooltip = transPhysGov.overprint_preview_simulated === true
+                    ? "Overprint was flattened and simulated. Overprint simulation changes how inks interact on press; the result must be visually verified before production."
+                    : "Overprint settings were flattened. Overprint changes affect how inks interact on press and can significantly alter printed output; human visual review is required before production.";
+            }
+        }
+
+        // Phase 67D: Transparency flattened badge — for transparency/blend mode flatten
+        if (trans_phys_transparency_change && !trans_phys_overprint_change && type === 'fixed_pdf') {
+            status_badge = "Transparency flattened";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Transparency flattening may affect appearance and requires review.";
+            } else {
+                tooltip = transPhysGov.blend_modes_normalized === true
+                    ? "Transparency was flattened and blend modes were normalized. Flattening can alter how colors and layers interact visually; human review of appearance is required before production."
+                    : "Transparency was flattened. Flattening merges transparent layers and can change how the file renders; human review of appearance is required before production.";
+            }
+        }
+
+        // Phase 67D: Visual review required badge — generic, when nothing more specific triggered
+        if (trans_phys_review_required && !trans_phys_overprint_change && !trans_phys_transparency_change && type === 'fixed_pdf') {
+            status_badge = "Visual review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Transparency or overprint changes may affect appearance and require review.";
+            } else {
+                tooltip = "Transparency/overprint physical governance findings were detected. Human visual review is required before production.";
             }
         }
     }
