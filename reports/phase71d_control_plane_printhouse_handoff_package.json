@@ -1,0 +1,77 @@
+{
+  "phase": "71D",
+  "title": "Control Plane Printhouse Handoff Package UX",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-10T00:00:00.000Z",
+  "status": "COMPLETE",
+  "smoke_result": {
+    "pass": 88,
+    "fail": 0,
+    "total": 88,
+    "result": "ALL TESTS PASSED"
+  },
+  "build_result": "SUCCESS",
+  "files_created": [
+    "src/api/services/productionHandoffPackageService.js",
+    "src/ui/components/preflight/ProductionHandoffPackagePanel.tsx",
+    "scripts/smoke_phase71d_control_plane_printhouse_handoff_package.js",
+    "reports/phase71d_control_plane_printhouse_handoff_package.json",
+    "reports/phase71d_control_plane_printhouse_handoff_package.md"
+  ],
+  "files_modified": [
+    "src/api/services/preflightHumanReportService.js",
+    "src/api/routes/adminPreflightJobs.js",
+    "src/ui/lib/adminApi.ts",
+    "src/ui/components/preflight/HumanReportPanel.tsx"
+  ],
+  "package_contents": [
+    "approved_artifact (type + hash, only when package_release_gate.ready=true)",
+    "included_reports",
+    "human_report_summary (recommended_next_action, review_required, production_certified, highest_risk_level)",
+    "fix_audit_summary (applied_count, skipped_count, failed_count)",
+    "validation_report_summary (standard_claimed, standard_certified, validation_performed/passed, validator name/version/hash)",
+    "artifact_trust",
+    "warnings (including blocked governance domains surfaced as warnings)",
+    "payment_status (invoice_status, payment_status, production_unlock_status)",
+    "order_summary (order_id, status, printhouse_id, customer_name, total, currency — no PII)",
+    "file_access_audit (sanitized PRINTHOUSE_FILE_* / PRINTHOUSE_HANDOFF_* events)"
+  ],
+  "package_release_gate": {
+    "ready_when": "production_package_governance.package_ready=true AND blocked_by_governance_domains is empty AND invoice.status=ISSUED AND payment.status=PAYMENT_CONFIRMED AND production_unlock.status=PRODUCTION_UNLOCKED",
+    "blockers": [
+      "PREFLIGHT_PACKAGE_NOT_READY",
+      "GOVERNANCE_DOMAINS_BLOCKING",
+      "INVOICE_NOT_ISSUED",
+      "PAYMENT_NOT_CONFIRMED",
+      "PRODUCTION_NOT_UNLOCKED"
+    ],
+    "approved_artifact_withheld_unless_gate_ready": true
+  },
+  "new_endpoint": {
+    "method": "GET",
+    "path": "/api/admin/preflight/jobs/:jobId/production-handoff-package",
+    "query_params": {
+      "orderId": "optional override for the linked marketplace order"
+    },
+    "audit_event": "PREFLIGHT_PRODUCTION_HANDOFF_PACKAGE_VIEWED"
+  },
+  "governance_policy": {
+    "handoff_package_is_certification_authority": false,
+    "handoff_package_is_packaging_manifest": true,
+    "package_ready_recomputed_at_control_plane": true,
+    "control_plane_can_only_downgrade_package_ready": true,
+    "evidence_paths_sanitized": true,
+    "no_pii_in_order_summary": true,
+    "no_tokens_in_file_access_audit": true
+  },
+  "acceptance_criteria": {
+    "only_approved_artifact_included_when_ready": true,
+    "reports_included": true,
+    "warnings_preserved": true,
+    "blocked_jobs_cannot_be_handed_off": true,
+    "customer_private_data_scoped_correctly": true,
+    "build_passes": true,
+    "smoke_passes": true
+  },
+  "input_reference": "../ppos-preflight-service/reports/phase71c_service_production_package_exposure.json"
+}
