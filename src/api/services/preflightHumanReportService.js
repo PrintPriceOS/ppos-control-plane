@@ -1309,6 +1309,71 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         safeProofApprGov.evidence = proofApprGov.evidence;
     }
 
+    // Phase 71D: Defensive extraction of production_package_governance
+    const productionPackageSources = [
+        job.production_package_governance,
+        job.fix_summary?.production_package_governance,
+        job.fix_audit?.production_package_governance,
+        job.delta_summary?.production_package_governance,
+        job.delta_report?.production_package_governance,
+        job.report?.production_package_governance,
+        job.artifact_summary?.production_package_governance
+    ];
+    const artifactsWithProductionPackageMeta = artifacts.find(a => a.metadata && a.metadata.production_package_governance);
+    if (artifactsWithProductionPackageMeta) productionPackageSources.push(artifactsWithProductionPackageMeta.metadata.production_package_governance);
+    if (injectedJob?.production_package_governance) productionPackageSources.push(injectedJob.production_package_governance);
+
+    let productionPackageGov = {};
+    for (const source of productionPackageSources) {
+        if (!source) continue;
+        // Conservative merges — package_ready can only be claimed if every upstream source agrees
+        if (source.package_ready === false) productionPackageGov.package_ready = false;
+        else if (source.package_ready === true && productionPackageGov.package_ready !== false) productionPackageGov.package_ready = true;
+        if (source.approved_artifact_type && !productionPackageGov.approved_artifact_type) productionPackageGov.approved_artifact_type = source.approved_artifact_type;
+        if (source.approved_artifact_hash && !productionPackageGov.approved_artifact_hash) productionPackageGov.approved_artifact_hash = source.approved_artifact_hash;
+        if (Array.isArray(source.included_reports) && source.included_reports.length > 0) {
+            productionPackageGov.included_reports = [...new Set([...(productionPackageGov.included_reports || []), ...source.included_reports])];
+        }
+        if (Array.isArray(source.blocked_by_governance_domains) && source.blocked_by_governance_domains.length > 0) {
+            productionPackageGov.blocked_by_governance_domains = [...new Set([...(productionPackageGov.blocked_by_governance_domains || []), ...source.blocked_by_governance_domains])];
+        }
+        if (Array.isArray(source.warnings) && source.warnings.length > 0) {
+            productionPackageGov.warnings = [...new Set([...(productionPackageGov.warnings || []), ...source.warnings])];
+        }
+        if (source.evidence) {
+            productionPackageGov.evidence = { ...(productionPackageGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Sanitize productionPackageGov evidence — never expose raw paths or internal IDs
+    if (productionPackageGov.evidence) {
+        const safeProductionPackageEvidence = {};
+        const blockedEvidenceKeys = ['command', 'local_path', 'raw_path', 'file_path', 'internal_id',
+            'obj_', 'forensic_object_id', 'raw_stream'];
+        for (const [k, v] of Object.entries(productionPackageGov.evidence)) {
+            if (!blockedEvidenceKeys.some(b => k.includes(b))) {
+                safeProductionPackageEvidence[k] = v;
+            }
+        }
+        productionPackageGov.evidence = Object.keys(safeProductionPackageEvidence).length > 0 ? safeProductionPackageEvidence : undefined;
+    }
+
+    // Control Plane is the final authority: package_ready can never be true if Control Plane's
+    // own production/review gates (isProdCert/isReviewReq) are not satisfied, regardless of
+    // upstream evidence.
+    const productionPackageReady = productionPackageGov.package_ready === true && isProdCert === true && isReviewReq === false;
+    const safeProductionPackageGov = {
+        package_ready: productionPackageReady,
+        approved_artifact_type: productionPackageReady ? (productionPackageGov.approved_artifact_type ?? null) : null,
+        approved_artifact_hash: productionPackageReady ? (productionPackageGov.approved_artifact_hash ?? null) : null,
+        included_reports: productionPackageGov.included_reports || [],
+        blocked_by_governance_domains: productionPackageGov.blocked_by_governance_domains || [],
+        warnings: productionPackageGov.warnings || []
+    };
+    if (productionPackageGov.evidence) {
+        safeProductionPackageGov.evidence = productionPackageGov.evidence;
+    }
+
     // Phase 61D: Defensive extraction of structural_metadata_governance
     const structSources = [
         job.structural_metadata_governance,
@@ -2722,6 +2787,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         visual_diff_governance: safeVisualDiffGov,
         proof_approval_governance: safeProofApprGov,
         heavy_pdf_probe_governance: safeHeavyPdfGov,
+        production_package_governance: safeProductionPackageGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

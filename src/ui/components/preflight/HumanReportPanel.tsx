@@ -18,6 +18,7 @@ import { CustomerRemediationPanel } from "./CustomerRemediationPanel";
 import { VisualProofPanel } from "./VisualProofPanel";
 import { ProofApprovalPanel } from "./ProofApprovalPanel";
 import { HeavyPdfProbePanel } from "./HeavyPdfProbePanel";
+import { ProductionHandoffPackagePanel } from "./ProductionHandoffPackagePanel";
 import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
@@ -416,6 +417,15 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
                 <ProofApprovalPanel
                     proofApprovalGovernance={report.proof_approval_governance}
                     proofApprovalUx={report.proof_approval_ux?.operator}
+                    audience="operator"
+                />
+            )}
+
+            {/* Phase 71D: Printhouse Handoff Package Panel (operator view) */}
+            {report.production_package_governance && (
+                <ProductionHandoffPackagePanel
+                    productionPackageGovernance={report.production_package_governance}
+                    jobId={jobId}
                     audience="operator"
                 />
             )}
