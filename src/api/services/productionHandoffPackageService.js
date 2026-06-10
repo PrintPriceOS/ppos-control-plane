@@ -120,6 +120,7 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
     const humanReportService = require('./preflightHumanReportService');
     const marketplaceOrderService = require('./marketplaceOrderService');
     const mysqlClient = require('./mysqlClient');
+    const machineCompatibilityService = require('./machineCompatibilityService');
 
     const reportRes = await humanReportService.getHumanReport(jobId, context);
     if (!reportRes || !reportRes.ok) {
@@ -148,6 +149,19 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
     let productionUnlock = null;
     let fileAccessAudit = [];
 
+    let policy_profile_snapshot_json = null;
+    let profile_snapshot_hash = '';
+    let printhouse_snapshot_json = null;
+    let machine_snapshot_json = null;
+    let media_snapshot_json = null;
+    let sla_profile_snapshot_json = null;
+    let policy_profile_governance = null;
+    let machine_compatibility_governance = null;
+
+    const handoffBlockers = [];
+    let binding = null;
+    let tenantId = context.tenantId || 'system';
+
     if (orderId) {
         try {
             order = await marketplaceOrderService.getOrder(orderId);
@@ -156,13 +170,32 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
         }
 
         try {
-            const rows = await mysqlClient.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+            const rows = await mysqlClient.query('SELECT tenant_id, metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
             if (rows && rows.length > 0) {
+                tenantId = rows[0].tenant_id;
                 const raw = rows[0].metadata_json;
                 const metadata = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
                 invoice = metadata.invoice || null;
                 payment = metadata.payment || null;
                 productionUnlock = metadata.production_unlock || null;
+
+                const bindingService = require('./printhouseProfileBindingService');
+                binding = await bindingService.getOrderPrinthouseBinding(orderId, tenantId);
+                if (binding) {
+                    policy_profile_snapshot_json = binding.policy_profile_snapshot_json;
+                    printhouse_snapshot_json = binding.printhouse_snapshot_json;
+                    machine_snapshot_json = binding.machine_snapshot_json;
+                    media_snapshot_json = binding.media_snapshot_json;
+                    sla_profile_snapshot_json = binding.sla_profile_snapshot_json;
+                    
+                    if (binding.policy_profile_snapshot_json) {
+                        try {
+                            const parsedPolicy = JSON.parse(binding.policy_profile_snapshot_json);
+                            profile_snapshot_hash = bindingService.hashSnapshot(parsedPolicy);
+                        } catch (e) {}
+                    }
+                    policy_profile_governance = report.policy_profile_governance || null;
+                }
             }
         } catch (e) {
             // ignore
@@ -176,6 +209,62 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
         }
     }
 
+    // Phase 76D Handoff Package Validation Gates
+    if (!binding) {
+        handoffBlockers.push('PRINTHOUSE_PROFILE_BINDING_MISSING');
+    } else if (!policy_profile_snapshot_json || !printhouse_snapshot_json || !machine_snapshot_json || !media_snapshot_json || !sla_profile_snapshot_json) {
+        handoffBlockers.push('CAPABILITY_SNAPSHOT_MISSING');
+    }
+
+    if (policy_profile_governance && policy_profile_governance.profile_passed === false) {
+        handoffBlockers.push('POLICY_PROFILE_FAILED');
+        if (Array.isArray(policy_profile_governance.blocking_reasons)) {
+            for (const r of policy_profile_governance.blocking_reasons) {
+                if (!handoffBlockers.includes(r)) handoffBlockers.push(r);
+            }
+        }
+    }
+
+    // Run machine compatibility checks
+    let compat = null;
+    if (binding && policy_profile_snapshot_json && printhouse_snapshot_json && machine_snapshot_json && media_snapshot_json && sla_profile_snapshot_json) {
+        compat = await machineCompatibilityService.evaluateMachineCompatibilityForOrder({
+            orderId,
+            tenantId,
+            jobId,
+            actor: { id: context.operatorId || 'SYSTEM', role: 'SYSTEM' }
+        });
+        machine_compatibility_governance = compat;
+
+        // Check if overridden
+        let overrideApproved = false;
+        try {
+            const rows = await mysqlClient.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+            if (rows && rows.length > 0) {
+                const metadata = typeof rows[0].metadata_json === 'string' ? JSON.parse(rows[0].metadata_json) : (rows[0].metadata_json || {});
+                overrideApproved = metadata.machine_compatibility_override?.approved === true;
+            }
+        } catch (e) {}
+
+        if (!compat.compatible && !overrideApproved) {
+            handoffBlockers.push('MACHINE_INCOMPATIBLE');
+            if (compat.blocking_reasons) {
+                for (const r of compat.blocking_reasons) {
+                    if (!handoffBlockers.includes(r)) handoffBlockers.push(r);
+                }
+            }
+        }
+    }
+
+    if (report.artifact_trust) {
+        if (report.artifact_trust.production_certified === false) {
+            handoffBlockers.push('ARTIFACT_TRUST_NOT_PRODUCTION_CERTIFIED');
+        }
+        if (report.artifact_trust.review_required === true) {
+            handoffBlockers.push('ARTIFACT_TRUST_REVIEW_REQUIRED');
+        }
+    }
+
     const packageReleaseGate = evaluatePackageReleaseGate({
         productionPackageGovernance,
         invoice,
@@ -183,17 +272,118 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
         productionUnlock
     });
 
-    const approvedArtifact = packageReleaseGate.ready
+    if (!packageReleaseGate.ready) {
+        for (const bl of packageReleaseGate.blockers) {
+            if (!handoffBlockers.includes(bl)) handoffBlockers.push(bl);
+        }
+    }
+
+    // Check production artifact
+    const approvedArtifact = (packageReleaseGate.ready && !handoffBlockers.includes('PRODUCTION_ARTIFACT_MISSING'))
         ? {
             type: productionPackageGovernance.approved_artifact_type || null,
             hash: productionPackageGovernance.approved_artifact_hash || null
         }
         : null;
 
+    if (!approvedArtifact) {
+        handoffBlockers.push('PRODUCTION_ARTIFACT_MISSING');
+    }
+
     const warnings = [...new Set([
         ...(productionPackageGovernance.warnings || []),
         ...(productionPackageGovernance.blocked_by_governance_domains || []).map(d => `Blocked by governance domain: ${d}`)
     ])];
+
+    const auditEventData = {
+        orderId,
+        jobId,
+        blockers: handoffBlockers,
+        warnings
+    };
+
+    // Emit eligibility checked event
+    try {
+        await mysqlClient.query(`
+            INSERT INTO printhouse_capability_audit 
+            (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+            binding?.printhouse_id || 'system',
+            tenantId,
+            'PRODUCTION_HANDOFF_PACKAGE_ELIGIBILITY_CHECKED',
+            context.operatorId || 'system',
+            'system',
+            JSON.stringify(auditEventData)
+        ]);
+    } catch (e) {}
+
+    if (handoffBlockers.length > 0) {
+        // Emit blocked event
+        try {
+            await mysqlClient.query(`
+                INSERT INTO printhouse_capability_audit 
+                (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+                binding?.printhouse_id || 'system',
+                tenantId,
+                'PRODUCTION_HANDOFF_PACKAGE_BLOCKED',
+                context.operatorId || 'system',
+                'system',
+                JSON.stringify(handoffBlockers)
+            ]);
+        } catch (e) {}
+
+        return {
+            ok: false,
+            package_ready: false,
+            blocked: true,
+            blocking_reasons: handoffBlockers
+        };
+    }
+
+    // Emit success events
+    try {
+        await mysqlClient.query(`
+            INSERT INTO printhouse_capability_audit 
+            (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+            binding?.printhouse_id || 'system',
+            tenantId,
+            'PRODUCTION_HANDOFF_PACKAGE_READY',
+            context.operatorId || 'system',
+            'system',
+            JSON.stringify({ orderId, jobId })
+        ]);
+
+        await mysqlClient.query(`
+            INSERT INTO printhouse_capability_audit 
+            (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+            binding?.printhouse_id || 'system',
+            tenantId,
+            'CAPABILITY_SNAPSHOTS_ATTACHED_TO_HANDOFF',
+            context.operatorId || 'system',
+            'system',
+            JSON.stringify({ profile_snapshot_hash })
+        ]);
+
+        await mysqlClient.query(`
+            INSERT INTO printhouse_capability_audit 
+            (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+            binding?.printhouse_id || 'system',
+            tenantId,
+            'MACHINE_COMPATIBILITY_ATTACHED_TO_HANDOFF',
+            context.operatorId || 'system',
+            'system',
+            JSON.stringify({ compat: true })
+        ]);
+    } catch (e) {}
 
     return {
         ok: true,
@@ -223,7 +413,15 @@ async function buildProductionHandoffPackage(jobId, context = {}, options = {}) 
             production_unlock_status: productionUnlock?.status || 'PRODUCTION_LOCKED'
         },
         order_summary: buildOrderSummary(order),
-        file_access_audit: fileAccessAudit
+        file_access_audit: fileAccessAudit,
+        policy_profile_snapshot_json,
+        profile_snapshot_hash,
+        printhouse_snapshot_json,
+        machine_snapshot_json,
+        media_snapshot_json,
+        sla_profile_snapshot_json,
+        policy_profile_governance,
+        machine_compatibility_governance
     };
 }
 

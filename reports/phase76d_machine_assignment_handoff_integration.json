@@ -1,0 +1,16 @@
+{
+    "tested_at": "2026-06-10T20:17:27.297Z",
+    "status": "SUCCESS",
+    "scenarios_passed": 20,
+    "scenarios_failed": 0,
+    "assertions_passed": 47,
+    "assertions_failed": 0,
+    "compatibility_checks_passed": true,
+    "queue_gate_checks_passed": true,
+    "handoff_gate_checks_passed": true,
+    "override_rules_passed": true,
+    "snapshot_immutability_passed": true,
+    "artifact_trust_authority_passed": true,
+    "audit_events_created": true,
+    "no_overclaim_passed": true
+}

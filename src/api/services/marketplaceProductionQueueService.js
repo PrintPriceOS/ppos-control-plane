@@ -25,7 +25,7 @@ function safeParseJson(str, fallback = {}) {
 async function evaluateProductionQueueEligibility(orderId, options = {}) {
     logger.info({ event: 'PRODUCTION_QUEUE_EVALUATING', orderId });
 
-    const orders = await mysqlClient.query('SELECT status, metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+    const orders = await mysqlClient.query('SELECT tenant_id, status, metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
     if (!orders || orders.length === 0) {
         throw new Error('ORDER_NOT_FOUND');
     }
@@ -41,6 +41,98 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
     // Eligibility check blockers
     const blockers = [];
     const warnings = [];
+
+    // Profile Binding checks
+    const tenantId = order.tenant_id;
+    const bindingService = require('./printhouseProfileBindingService');
+    const machineCompatibilityService = require('./machineCompatibilityService');
+    const binding = await bindingService.getOrderPrinthouseBinding(orderId, tenantId);
+    
+    let isBindingOk = false;
+    let jobId = null;
+    try {
+        const files = await mysqlClient.query(
+            'SELECT preflight_job_id FROM marketplace_order_files WHERE order_id = ? LIMIT 1',
+            [orderId]
+        );
+        if (files && files.length > 0) jobId = files[0].preflight_job_id;
+    } catch (e) {}
+
+    if (!binding) {
+        blockers.push('MISSING_PROFILE_BINDING');
+        blockers.push('PRINTHOUSE_PROFILE_BINDING_MISSING');
+    } else if (binding.binding_status !== 'BOUND') {
+        blockers.push('PROFILE_BINDING_INCOMPLETE');
+    } else if (!binding.printhouse_snapshot_json || !binding.machine_snapshot_json || !binding.media_snapshot_json || !binding.policy_profile_snapshot_json || !binding.sla_profile_snapshot_json) {
+        blockers.push('CAPABILITY_SNAPSHOT_MISSING');
+    } else {
+        // Evaluate policy profile and machine compatibility
+        isBindingOk = true;
+        try {
+            if (jobId) {
+                const gateway = require('./preflightContractGateway');
+                const jobState = await gateway.getJob(jobId);
+                
+                const evaluation = await bindingService.evaluateBoundPolicyProfileForJob({
+                    orderId,
+                    jobId,
+                    tenantId,
+                    preflightGovernance: jobState.preflight_governance || jobState,
+                    artifactTrust: jobState.artifact_trust,
+                    proofApprovalGovernance: jobState.proof_approval_governance,
+                    heavyPdfProbeGovernance: jobState.heavy_pdf_probe_governance,
+                    standardsCertificationGovernance: jobState.standards_certification_governance
+                });
+
+                if (!evaluation.profile_passed) {
+                    blockers.push('POLICY_PROFILE_FAILED');
+                    if (evaluation.blocking_reasons) {
+                        for (const reason of evaluation.blocking_reasons) {
+                            if (!blockers.includes(reason)) blockers.push(reason);
+                        }
+                    }
+                }
+                
+                // Attach evaluation results to job governance
+                await bindingService.attachPolicyProfileGovernanceToJob({
+                    orderId,
+                    jobId,
+                    tenantId,
+                    evaluation
+                });
+
+                // Phase 76D Machine Compatibility Evaluation
+                const compat = await machineCompatibilityService.evaluateMachineCompatibilityForOrder({
+                    orderId,
+                    tenantId,
+                    jobId,
+                    actor: { id: options.operatorId || 'SYSTEM', role: 'SYSTEM' }
+                });
+
+                // Check override
+                const overrideApproved = metadata.machine_compatibility_override?.approved === true;
+                if (!compat.compatible && !overrideApproved) {
+                    blockers.push('MACHINE_INCOMPATIBLE');
+                    if (compat.blocking_reasons) {
+                        for (const reason of compat.blocking_reasons) {
+                            if (!blockers.includes(reason)) blockers.push(reason);
+                        }
+                    }
+                }
+
+                await machineCompatibilityService.attachMachineCompatibilityGovernance({
+                    orderId,
+                    jobId,
+                    tenantId,
+                    evaluation: compat,
+                    actor: { id: options.operatorId || 'SYSTEM', role: 'SYSTEM' }
+                });
+            }
+        } catch (e) {
+            blockers.push('POLICY_PROFILE_EVALUATION_FAILED');
+            logger.error({ event: 'POLICY_PROFILE_EVALUATION_ERROR', error: e.message });
+        }
+    }
 
     // Order status must be PRODUCTION_ACCEPTED for initial queueing
     if (!options.ignoreOrderStatus && order.status !== 'PRODUCTION_ACCEPTED') {
@@ -179,12 +271,22 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
         });
     }
 
+    const governance_domains = {
+        artifact_trust: blockers.some(b => b.includes('ARTIFACT_TRUST')) ? 'BLOCKED' : 'PASSED',
+        policy_profile: blockers.includes('POLICY_PROFILE_FAILED') ? 'BLOCKED' : 'PASSED',
+        machine_compatibility: (blockers.includes('MACHINE_INCOMPATIBLE') || blockers.includes('PRINTHOUSE_PROFILE_BINDING_MISSING')) ? 'BLOCKED' : 'PASSED',
+        proof: blockers.includes('VISUAL_PROOF_APPROVAL_REQUIRED') ? 'BLOCKED' : 'PASSED',
+        payment: (blockers.includes('PAYMENT_NOT_CONFIRMED') || blockers.includes('INVOICE_NOT_ISSUED')) ? 'BLOCKED' : 'PASSED',
+        handoff: blockers.includes('HANDOFF_PACKAGE_NOT_FOUND') ? 'BLOCKED' : 'PASSED'
+    };
+
     return {
         ok: true,
         orderId,
         eligible: finalEligible,
         blockers,
         warnings,
+        governance_domains,
         humanReportGates: progressionAssert ? progressionAssert.humanReportGates : [],
         orderStatus: order.status,
         metadata: {

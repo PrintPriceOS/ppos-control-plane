@@ -76,6 +76,7 @@ import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
 import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
+import { PrinthouseOnboardingPage } from './pages/printhouse/PrinthouseOnboardingPage';
 import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
 import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
@@ -99,6 +100,7 @@ export const App: React.FC = () => {
                 <Route path="/audit" element={<div className="p-8"><AuditExplorerPage /></div>} />
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
+                <Route path="/admin/printhouse-onboarding" element={<PrinthouseOnboardingPage />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
 

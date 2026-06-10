@@ -228,4 +228,119 @@ router.post('/sessions/:sessionId/select', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/marketplace/orders/:orderId/machine-compatibility
+ */
+router.get('/orders/:orderId/machine-compatibility', requireGlobalAdmin, async (req, res) => {
+    try {
+        const orderId = req.params.orderId;
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || 'system';
+
+        const machineCompatibilityService = require('../services/machineCompatibilityService');
+
+        // Resolve jobId linked to order
+        const files = await db.query('SELECT preflight_job_id FROM marketplace_order_files WHERE order_id = ? LIMIT 1', [orderId]);
+        const jobId = (files && files.length > 0) ? files[0].preflight_job_id : null;
+
+        const compat = await machineCompatibilityService.evaluateMachineCompatibilityForOrder({
+            orderId,
+            tenantId,
+            jobId,
+            actor: context
+        });
+
+        return res.json({ ok: true, machine_compatibility_governance: compat });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:orderId/machine-compatibility/override
+ */
+router.post('/orders/:orderId/machine-compatibility/override', requireGlobalAdmin, async (req, res) => {
+    try {
+        const orderId = req.params.orderId;
+        const { approve_override, override_reason } = req.body;
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || 'system';
+
+        if (!approve_override) {
+            return res.status(400).json({ ok: false, error: 'APPROVE_OVERRIDE_REQUIRED' });
+        }
+
+        const machineCompatibilityService = require('../services/machineCompatibilityService');
+
+        // Resolve jobId linked to order
+        const files = await db.query('SELECT preflight_job_id FROM marketplace_order_files WHERE order_id = ? LIMIT 1', [orderId]);
+        const jobId = (files && files.length > 0) ? files[0].preflight_job_id : null;
+
+        const compat = await machineCompatibilityService.evaluateMachineCompatibilityForOrder({
+            orderId,
+            tenantId,
+            jobId,
+            actor: context
+        });
+
+        const canOverride = machineCompatibilityService.canOverrideMachineWarning({
+            evaluation: compat,
+            actor: context,
+            overrideReason: override_reason
+        });
+
+        if (!canOverride.allowed) {
+            // Emit rejected audit event
+            await db.query(`
+                INSERT INTO printhouse_capability_audit 
+                (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+                compat.printhouse_id || 'system',
+                tenantId,
+                'MACHINE_COMPATIBILITY_OVERRIDE_REJECTED',
+                context.userId || 'system',
+                context.role || 'operator',
+                JSON.stringify({ orderId, reason: canOverride.reason, override_reason })
+            ]);
+
+            return res.status(400).json({ ok: false, error: 'OVERRIDE_BLOCKED', reason: canOverride.reason });
+        }
+
+        // Apply override
+        const orderRows = await db.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+        if (!orderRows || orderRows.length === 0) {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
+        }
+
+        const metadata = typeof orderRows[0].metadata_json === 'string' ? JSON.parse(orderRows[0].metadata_json) : (orderRows[0].metadata_json || {});
+        metadata.machine_compatibility_override = {
+            approved: true,
+            approved_by: context.userId || 'system',
+            approved_at: new Date().toISOString(),
+            override_reason
+        };
+
+        await db.query('UPDATE marketplace_orders SET metadata_json = ? WHERE order_id = ?', [JSON.stringify(metadata), orderId]);
+
+        // Emit approved audit event
+        await db.query(`
+            INSERT INTO printhouse_capability_audit 
+            (printhouse_id, tenant_id, event_type, actor_user_id, actor_role, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+            compat.printhouse_id || 'system',
+            tenantId,
+            'MACHINE_COMPATIBILITY_OVERRIDE_APPROVED',
+            context.userId || 'system',
+            context.role || 'operator',
+            JSON.stringify({ orderId, override_reason })
+        ]);
+
+        return res.json({ ok: true, machine_compatibility_override: metadata.machine_compatibility_override });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;
