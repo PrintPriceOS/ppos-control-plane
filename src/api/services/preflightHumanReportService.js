@@ -1683,6 +1683,229 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         safeHeavyPdfGov.evidence = heavyPdfGov.evidence;
     }
 
+    // Phase 72: Defensive extraction of policy_profile_governance
+    const policyProfileSources = [
+        job.policy_profile_governance,
+        job.fix_summary?.policy_profile_governance,
+        job.fix_audit?.policy_profile_governance,
+        job.delta_summary?.policy_profile_governance,
+        job.delta_report?.policy_profile_governance,
+        job.report?.policy_profile_governance,
+        job.artifact_summary?.policy_profile_governance
+    ];
+    const artifactsWithPolicyProfileMeta = artifacts.find(a => a.metadata && a.metadata.policy_profile_governance);
+    if (artifactsWithPolicyProfileMeta) policyProfileSources.push(artifactsWithPolicyProfileMeta.metadata.policy_profile_governance);
+    if (injectedJob?.policy_profile_governance) policyProfileSources.push(injectedJob.policy_profile_governance);
+
+    let policyProfileGov = null;
+    for (const source of policyProfileSources) {
+        if (source && Object.keys(source).length > 0) {
+            policyProfileGov = source;
+            break;
+        }
+    }
+
+    let safePolicyProfileGov = null;
+    if (policyProfileGov) {
+        const PATH_PATTERN = /[A-Za-z]:[/\\]|\/(tmp|var|home|storage)\//;
+        const sanitizeWarning = (w) => {
+            if (typeof w !== 'string') return '[REDACTED]';
+            if (PATH_PATTERN.test(w)) return '[PATH_REDACTED]';
+            return w;
+        };
+
+        safePolicyProfileGov = {
+            profile_id: policyProfileGov.profile_id || 'NONE',
+            profile_label: policyProfileGov.profile_label || null,
+            profile_passed: policyProfileGov.profile_passed === true,
+            profile_blockers: (policyProfileGov.profile_blockers || []).map(sanitizeWarning),
+            profile_warnings: (policyProfileGov.profile_warnings || []).map(sanitizeWarning),
+            evaluated_at: policyProfileGov.evaluated_at || null,
+            production_certified: false,
+            standard_certified: false,
+            compliance_claim_allowed: false,
+            print_ready_claim_allowed: false
+        };
+
+        if (safePolicyProfileGov.profile_passed === false) {
+            isReviewReq = true;
+            isProdCert = false;
+            if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+                certLevel = 'REVIEW_REQUIRED';
+            }
+            // Downgrade certified_pdf
+            artifacts.forEach(a => {
+                if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                    a.production_certified = false;
+                    a.customer_visible = false;
+                    a.is_primary = false;
+                    a.artifact_role = 'REVIEW_REQUIRED';
+                }
+            });
+        }
+    }
+
+    // Phase 73: Defensive extraction of machine_readiness_governance
+    const machineReadinessSources = [
+        job.machine_readiness_governance,
+        job.fix_summary?.machine_readiness_governance,
+        job.fix_audit?.machine_readiness_governance,
+        job.delta_summary?.machine_readiness_governance,
+        job.delta_report?.machine_readiness_governance,
+        job.report?.machine_readiness_governance,
+        job.artifact_summary?.machine_readiness_governance
+    ];
+    let machineReadinessGov = null;
+    for (const source of machineReadinessSources) {
+        if (source && Object.keys(source).length > 0) {
+            machineReadinessGov = source;
+            break;
+        }
+    }
+    if (injectedJob?.machine_readiness_governance) {
+        machineReadinessGov = injectedJob.machine_readiness_governance;
+    }
+
+    let safeMachineReadinessGov = null;
+    if (machineReadinessGov) {
+        safeMachineReadinessGov = {
+            machine_match_required: machineReadinessGov.machine_match_required === true,
+            incompatible_machine_reasons: machineReadinessGov.incompatible_machine_reasons || {},
+            warnings: machineReadinessGov.warnings || [],
+            machine_signals: machineReadinessGov.machine_signals || null,
+            production_certified: false,
+            standard_certified: false
+        };
+    }
+
+    // Phase 74: Defensive extraction of audit_bundle_governance
+    const auditBundleSources = [
+        job.audit_bundle_governance,
+        job.fix_summary?.audit_bundle_governance,
+        job.fix_audit?.audit_bundle_governance,
+        job.delta_summary?.audit_bundle_governance,
+        job.delta_report?.audit_bundle_governance,
+        job.report?.audit_bundle_governance,
+        job.artifact_summary?.audit_bundle_governance
+    ];
+    let auditBundleGov = null;
+    for (const source of auditBundleSources) {
+        if (source && Object.keys(source).length > 0) {
+            auditBundleGov = source;
+            break;
+        }
+    }
+    if (injectedJob?.audit_bundle_governance) {
+        auditBundleGov = injectedJob.audit_bundle_governance;
+    }
+
+    let safeAuditBundleGov = null;
+    if (auditBundleGov) {
+        safeAuditBundleGov = {
+            fix_audit_hash: auditBundleGov.fix_audit_hash || null,
+            delta_report_hash: auditBundleGov.delta_report_hash || null,
+            governance_domains: auditBundleGov.governance_domains || [],
+            artifact_trust: auditBundleGov.artifact_trust || {},
+            warnings: auditBundleGov.warnings || [],
+            production_certified: false,
+            standard_certified: false
+        };
+    }
+
+    // Phase 75: Defensive extraction of recommendation_governance
+    const recGovSources = [
+        job.recommendation_governance,
+        job.fix_summary?.recommendation_governance,
+        job.fix_audit?.recommendation_governance,
+        job.delta_summary?.recommendation_governance,
+        job.delta_report?.recommendation_governance,
+        job.report?.recommendation_governance,
+        job.artifact_summary?.recommendation_governance
+    ];
+    let recGov = null;
+    for (const source of recGovSources) {
+        if (source && Object.keys(source).length > 0) {
+            recGov = source;
+            break;
+        }
+    }
+    if (injectedJob?.recommendation_governance) {
+        recGov = injectedJob.recommendation_governance;
+    }
+
+    let safeRecGov = null;
+    if (recGov) {
+        safeRecGov = {
+            recommendation_signals: {
+                fixability: recGov.recommendation_signals?.fixability || 'UNKNOWN',
+                risk_level: recGov.recommendation_signals?.risk_level || recGov.recommendation_signals?.riskLevel || 'UNKNOWN',
+                visual_sensitivity: recGov.recommendation_signals?.visual_sensitivity || recGov.recommendation_signals?.visualSensitivity || 'UNKNOWN',
+                missing_tool: recGov.recommendation_signals?.missing_tool || recGov.recommendation_signals?.missingTool || null,
+                validator_required: recGov.recommendation_signals?.validator_required || recGov.recommendation_signals?.validatorRequired || false,
+                operator_review_reason: recGov.recommendation_signals?.operator_review_reason || recGov.recommendation_signals?.operatorReviewReason || null
+            },
+            recommended_next_actions: Array.isArray(recGov.recommended_next_actions) ? recGov.recommended_next_actions : [],
+            unsafe_auto_actions: Array.isArray(recGov.unsafe_auto_actions) ? recGov.unsafe_auto_actions : [],
+            human_review_actions: Array.isArray(recGov.human_review_actions) ? recGov.human_review_actions : [],
+            production_certified: false,
+            standard_certified: false
+        };
+    } else {
+        const hasHighRisk = job.risk_level === 'HIGH' || isReviewReq;
+        safeRecGov = {
+            recommendation_signals: {
+                fixability: 'PARTIAL',
+                risk_level: job.risk_level || 'UNKNOWN',
+                visual_sensitivity: hasHighRisk ? 'HIGH' : 'LOW',
+                missing_tool: null,
+                validator_required: isReviewReq,
+                operator_review_reason: isReviewReq ? 'File requires human review.' : null
+            },
+            recommended_next_actions: isReviewReq 
+                ? [{ action_id: 'operator_review', label: 'Operator Review Required', description: 'Review preflight findings before releasing to production.', severity: 'warning' }]
+                : [{ action_id: 'release_to_production', label: 'Release to Production', description: 'No blockers detected. Safe to manufacture.', severity: 'success' }],
+            unsafe_auto_actions: isReviewReq ? ['AUTO_APPLY_DESTRUCTIVE_FIXES'] : [],
+            human_review_actions: isReviewReq ? ['MANUAL_VISUAL_INSPECTION'] : [],
+            production_certified: false,
+            standard_certified: false
+        };
+    }
+
+    // Phase 71: Defensive extraction of production_package_governance
+    const prodPackSources = [
+        job.production_package_governance,
+        job.fix_summary?.production_package_governance,
+        job.fix_audit?.production_package_governance,
+        job.delta_summary?.production_package_governance,
+        job.delta_report?.production_package_governance,
+        job.report?.production_package_governance,
+        job.artifact_summary?.production_package_governance
+    ];
+    let prodPackGov = null;
+    for (const source of prodPackSources) {
+        if (source && Object.keys(source).length > 0) {
+            prodPackGov = source;
+            break;
+        }
+    }
+
+    let safeProdPackGov = null;
+    if (prodPackGov) {
+        const packageReady = prodPackGov.package_ready === true && isProdCert === true && isReviewReq === false;
+        safeProdPackGov = {
+            ...prodPackGov,
+            package_ready: packageReady,
+            approved_artifact_type: packageReady ? (prodPackGov.approved_artifact_type || null) : null,
+            approved_artifact_hash: packageReady ? (prodPackGov.approved_artifact_hash || null) : null,
+            warnings: [
+                ...(prodPackGov.warnings || [])
+            ]
+        };
+        if (safePolicyProfileGov && safePolicyProfileGov.profile_passed === false) {
+            safeProdPackGov.warnings.push("Policy profile findings require human review before production.");
+        }
+    }
+
     const primaryArtifact = selectPrimaryHumanArtifact({ ...job, review_required: isReviewReq, production_certified: isProdCert }, artifacts, artTrust);
 
     if (certLevel === "CERTIFIED_READY" && isProdCert && !isReviewReq && primaryArtifact?.artifact_role === 'PRODUCTION_READY') {
@@ -2440,6 +2663,12 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         }
     }
 
+    // Phase 72: policy_profile_governance artifact_ux warnings
+    if (safePolicyProfileGov && safePolicyProfileGov.profile_passed === false) {
+        const w = "Policy profile findings require human review before production.";
+        if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+    }
+
     // Phase 68D: Build safe public standards_certification_governance subset (no raw paths)
     const safeStdCertGov = {
         validation_performed: stdGov.validation_performed === true,
@@ -2722,6 +2951,11 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         visual_diff_governance: safeVisualDiffGov,
         proof_approval_governance: safeProofApprGov,
         heavy_pdf_probe_governance: safeHeavyPdfGov,
+        policy_profile_governance: safePolicyProfileGov,
+        production_package_governance: safeProdPackGov,
+        machine_readiness_governance: safeMachineReadinessGov,
+        audit_bundle_governance: safeAuditBundleGov,
+        recommendation_governance: safeRecGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

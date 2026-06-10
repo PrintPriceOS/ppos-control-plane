@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "passed": true,
+  "compiled_at": "2026-06-10T19:24:37.091Z",
+  "manifest": {
+    "manifest_hash": "c8a47323ceae25d133792a86f32d009f66003e02a20d2762b507e394619d5d4a",
+    "artifacts": [
+      {
+        "name": "certified.pdf",
+        "type": "certified_pdf",
+        "hash": "abc123hash",
+        "size_bytes": 1048576,
+        "customer_visible": true
+      }
+    ],
+    "preflight_outcome": {
+      "governance_summary": {}
+    }
+  }
+}

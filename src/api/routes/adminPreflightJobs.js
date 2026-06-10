@@ -1258,6 +1258,18 @@ router.post(['/jobs/:jobId/actions/fix', '/jobs/:jobId/fix'], async (req, res) =
             if (!CANONICAL_ORDER.includes(fix)) finalFixes.push(fix);
         });
 
+        // Safety Gate: Block unsafe auto-apply fixes without explicit operator confirmation
+        const unsafeFixes = ['CONVERT_CMYK', 'APPLY_BLEED', 'FLATTEN_TRANSPARENCY', 'FLATTEN_FORMS', 'FLATTEN_ANNOTATIONS'];
+        const requestedUnsafe = finalFixes.filter(f => unsafeFixes.includes(f));
+        if (requestedUnsafe.length > 0 && options.approve_unsafe !== true && options.approveUnsafe !== true) {
+            return res.status(400).json({
+                ok: false,
+                error: 'UNSAFE_AUTO_ACTION_BLOCKED',
+                message: `Potentially destructive fixes require explicit operator authorization: ${requestedUnsafe.join(', ')}`,
+                unsafe_fixes: requestedUnsafe
+            });
+        }
+
         options.fixes = finalFixes;
         options.requested_fixes = finalFixes;
         options.requestedFixes = finalFixes;
@@ -2368,6 +2380,54 @@ router.get('/jobs/:jobId/review-decision', async (req, res) => {
         const payload = await reviewApprovalService.getLatestDecision(jobId, context);
         if (!payload.ok && payload.error === 'NOT_FOUND') return res.status(404).json(payload);
         res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- GET /api/admin/preflight/jobs/:jobId/audit-bundle ---
+router.get('/jobs/:jobId/audit-bundle', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        let orderId = req.query.orderId || req.query.order_id;
+        if (!orderId) {
+            const bindings = await db.query(
+                'SELECT order_id FROM marketplace_order_preflight_bindings WHERE preflight_job_id = ? LIMIT 1',
+                [jobId]
+            );
+            const rows = Array.isArray(bindings) && Array.isArray(bindings[0]) ? bindings[0] : (Array.isArray(bindings) ? bindings : []);
+            if (rows.length > 0) {
+                orderId = rows[0].order_id;
+            }
+        }
+        if (!orderId) {
+            orderId = 'ord_unknown';
+        }
+        
+        const audience = req.query.audience || 'customer';
+        const auditBundleService = require('../services/preflightAuditBundleService');
+        const payload = await auditBundleService.compileAuditBundle(orderId, jobId, context, { audience });
+        
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: { message: err.message } });
+    }
+});
+
+// --- GET /api/admin/preflight/jobs/:jobId/recommendations ---
+router.get('/jobs/:jobId/recommendations', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const payload = await humanReportService.getHumanReport(jobId, context);
+        if (!payload.ok) {
+            return res.status(404).json(payload);
+        }
+        res.json({
+            ok: true,
+            recommendation_governance: payload.report?.recommendation_governance || null
+        });
     } catch (err) {
         res.status(500).json({ ok: false, error: { message: err.message } });
     }

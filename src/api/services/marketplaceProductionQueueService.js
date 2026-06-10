@@ -43,7 +43,7 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
     const warnings = [];
 
     // Order status must be PRODUCTION_ACCEPTED for initial queueing
-    if (order.status !== 'PRODUCTION_ACCEPTED') {
+    if (!options.ignoreOrderStatus && order.status !== 'PRODUCTION_ACCEPTED') {
         blockers.push('INVALID_ORDER_STATUS_FOR_QUEUE');
     }
 
@@ -91,6 +91,46 @@ async function evaluateProductionQueueEligibility(orderId, options = {}) {
         );
         if (!machines || machines.length === 0) {
             warnings.push('MACHINE_REGISTRY_NOT_VERIFIED');
+        }
+    }
+
+    // Resolve preflight job to get machine capability signals
+    let machineReadinessGov = null;
+    try {
+        const files = await mysqlClient.query(
+            'SELECT preflight_job_id FROM marketplace_order_files WHERE order_id = ? LIMIT 1',
+            [orderId]
+        );
+        if (files && files.length > 0) {
+            const jobId = files[0].preflight_job_id;
+            const humanReportService = require('./preflightHumanReportService');
+            const reportRes = await humanReportService.getHumanReport(jobId, { operatorId: options.operatorId || 'SYSTEM' });
+            if (reportRes && reportRes.ok && reportRes.report) {
+                machineReadinessGov = reportRes.report.machine_readiness_governance;
+            }
+        }
+    } catch (e) {
+        // Tolerant preflight signals resolution
+    }
+
+    if (machineReadinessGov) {
+        // Preserve warnings from preflight machine governance
+        if (Array.isArray(machineReadinessGov.warnings)) {
+            for (const w of machineReadinessGov.warnings) {
+                if (!warnings.includes(w)) warnings.push(w);
+            }
+        }
+
+        // If machine matching is required and machineId is provided
+        if (machineId && machineReadinessGov.machine_match_required === true) {
+            const incompatibleReasons = machineReadinessGov.incompatible_machine_reasons || {};
+            const reasonsForMachine = incompatibleReasons[machineId] || incompatibleReasons['default'] || [];
+            if (Array.isArray(reasonsForMachine) && reasonsForMachine.length > 0) {
+                blockers.push('PRODUCTION_MACHINE_INCOMPATIBLE');
+                for (const reason of reasonsForMachine) {
+                    if (!warnings.includes(reason)) warnings.push(reason);
+                }
+            }
         }
     }
 
@@ -188,6 +228,9 @@ async function createProductionQueueEntry(orderId, payload = {}, options = {}) {
     });
 
     if (!evalResult.eligible) {
+        if (evalResult.blockers.includes('PRODUCTION_MACHINE_INCOMPATIBLE')) {
+            throw new Error('PRODUCTION_MACHINE_INCOMPATIBLE');
+        }
         throw new Error('PRODUCTION_QUEUE_CREATION_BLOCKED');
     }
 
@@ -351,12 +394,28 @@ async function assignProductionMachine(orderId, machineId, payload = {}, options
         };
     }
 
+    // Phase 73: Check machine capability compatibility matching
+    const evalResult = await evaluateProductionQueueEligibility(orderId, {
+        machineId,
+        operatorId: options.operatorId,
+        ignoreOrderStatus: true
+    });
+    if (!evalResult.eligible) {
+        if (evalResult.blockers.includes('PRODUCTION_MACHINE_INCOMPATIBLE')) {
+            throw new Error('PRODUCTION_MACHINE_INCOMPATIBLE');
+        }
+        throw new Error('PRODUCTION_QUEUE_CREATION_BLOCKED');
+    }
+
     const assignedAt = new Date().toISOString();
     const assignedBy = options.operatorId || 'SYSTEM';
     const note = payload.note || '';
 
     // Check machine registry validation warning
-    const warnings = [...(metadata.production_queue.warnings || [])];
+    const warnings = [...new Set([
+        ...(metadata.production_queue.warnings || []),
+        ...(evalResult.warnings || [])
+    ])];
     const machines = await mysqlClient.query(
         'SELECT id FROM print_node_machine_profiles WHERE id = ? AND status = "ACTIVE"',
         [machineId]

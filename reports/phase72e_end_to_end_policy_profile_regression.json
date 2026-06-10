@@ -1,0 +1,250 @@
+{
+  "generated_at": "2026-06-10T19:03:38.727Z",
+  "phase": "72E",
+  "repo": "ppos-control-plane",
+  "category": "end_to_end_policy_profile_regression",
+  "smoke_passed": true,
+  "governance": {
+    "profile_constraints_preserved": true,
+    "profile_blockers_prevent_release": true,
+    "overclaim_prevention_layer": "preflightHumanReportService & policyProfileService",
+    "pii_and_path_redaction": true
+  },
+  "summary": {
+    "total": 46,
+    "passed": 46,
+    "failed": 0
+  },
+  "results": [
+    {
+      "label": "72A Engine report loaded",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72B Worker report loaded",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72C Service report loaded",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72D Control Plane report loaded",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72A: smoke_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72B: smoke_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72C: smoke_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72D: smoke_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72A: Policy profile schema validations passed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72B: Worker policy profile blockers drive correct status",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "72C: Service normalizer preserves policy_profile_governance",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 handoff build ok",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 release gate ready",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 no blockers",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 approved_artifact exposed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 type is certified_pdf",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 handoff build ok",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 release gate blocked",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 blocked by PREFLIGHT_PACKAGE_NOT_READY",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 approved_artifact is withheld",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 warnings note policy profile failures",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 policy_profile_governance attached to report",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 profile_passed=false in report",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 blockers includes BLEED",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 artifact_ux warnings has policy profile warning",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 buildProfilePanel ok",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 panel status is blocked",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 panel contains blockers detail",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 description explains the bleed blocker",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed: production_certified\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed: standard_certified\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed: compliance_claim_allowed\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed: print_ready_claim_allowed\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 production_certified always false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 standard_certified always false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Raw paths scrubbed from report",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 No PII key leaked: customer_email",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 No PII key leaked: email",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 No PII key leaked: phone",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 No PII key leaked: address",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 No PII key leaked: customer_address",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Raw paths scrubbed from panel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed in panel: production_certified\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed in panel: standard_certified\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed in panel: compliance_claim_allowed\":true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Malicious claim scrubbed in panel: print_ready_claim_allowed\":true",
+      "pass": true,
+      "detail": null
+    }
+  ]
+}
