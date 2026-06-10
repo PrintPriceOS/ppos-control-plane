@@ -1,0 +1,116 @@
+{
+  "phase": "62F-E — End-to-End Heavy PDF Probe Regression",
+  "generated_at": "2026-06-10T00:10:30.651Z",
+  "input_mode": "ALL_LAYER_REPORTS_PRESENT",
+  "end_to_end_passed": true,
+  "layers": [
+    {
+      "layer": "Engine (62F-A)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Worker (62F-B)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Service (62F-C)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane (62F-D)",
+      "present": true,
+      "passed": true
+    }
+  ],
+  "checks": [
+    {
+      "name": "1. qpdf warning-only output is not generic TOOL_EXTRACTION_FAILED",
+      "passed": true,
+      "notes": "Engine semantic_status=WARNING_ONLY, Worker pass=true, degraded_reason=\"PDF_STRUCTURAL_WARNING:qpdf; PDF_FONT_WEIGHT_WARNING:pdfimages\""
+    },
+    {
+      "name": "2. pdfimages warning-only output is not generic TOOL_EXTRACTION_FAILED",
+      "passed": true,
+      "notes": "Engine semantic_status=WARNING_ONLY, Worker pass=true, degraded_reason=\"PDF_STRUCTURAL_WARNING:qpdf; PDF_FONT_WEIGHT_WARNING:pdfimages\""
+    },
+    {
+      "name": "3. fatal probe failures remain fatal",
+      "passed": true,
+      "notes": "Engine qpdf=FAILED_FATAL, pdfimages fatal=true, Worker qpdf pass=true, pdfimages pass=true, CP outcome=BLOCKED"
+    },
+    {
+      "name": "4. timeout/OOM are explicit",
+      "passed": true,
+      "notes": "Engine qpdf timeout=FAILED_TIMEOUT, OOM=FAILED_OOM"
+    },
+    {
+      "name": "5. heavy_pdf_probe_governance preserved Engine -> Worker -> Service -> Control Plane",
+      "passed": true,
+      "notes": "Engine present=true, Worker all-present=true, Service pass=true, CP heavy_pdf_detected=true"
+    },
+    {
+      "name": "6. degraded_but_usable supports review route",
+      "passed": true,
+      "notes": "Worker pass=true, CP outcome=REVIEW_REQUIRED, CP review_required=true"
+    },
+    {
+      "name": "7. fatal_document_failure supports remediation/reupload route",
+      "passed": true,
+      "notes": "Worker pass=true, CP4 outcome=BLOCKED/action=request_upload, CP10 outcome=BLOCKED/action=request_upload"
+    },
+    {
+      "name": "8. artifact_trust remains authoritative",
+      "passed": true,
+      "notes": "Worker degraded trust=DEGRADED_ANALYSIS_REVIEW_REQUIRED, fatal trust=ANALYSIS_FAILED_REVIEW_REQUIRED"
+    },
+    {
+      "name": "9. certified.pdf is not trusted by filename",
+      "passed": true,
+      "notes": "Worker pass=true, certified_pdf_allowed=false, CP12 passed=true"
+    },
+    {
+      "name": "10. No production, standards, PDF/X, PDF/A, or print-ready overclaim",
+      "passed": true,
+      "notes": "Engine overclaim_guard ok=true, Worker all ok=true, CP11 passed=true"
+    },
+    {
+      "name": "11. Customer output is sanitized",
+      "passed": true,
+      "notes": "Service customer scenarios=13 all pass=true, CP6 passed=true"
+    },
+    {
+      "name": "12. Operator output is useful",
+      "passed": true,
+      "notes": "Service operator scenarios=9 all pass=true, CP7 passed=true"
+    },
+    {
+      "name": "13. Aggregate report generated",
+      "passed": true,
+      "notes": "phase62f_end_to_end_heavy_pdf_probe_regression.{json,md} written by this script"
+    },
+    {
+      "name": "14. All smoke tests pass",
+      "passed": true,
+      "notes": "Engine (62F-A): present=true, passed=true; Worker (62F-B): present=true, passed=true; Service (62F-C): present=true, passed=true; Control Plane (62F-D): present=true, passed=true"
+    }
+  ],
+  "acceptance_criteria": {
+    "qpdf_warning_only_not_generic_extraction_failed": true,
+    "pdfimages_warning_only_not_generic_extraction_failed": true,
+    "fatal_probe_failures_remain_fatal": true,
+    "timeout_oom_explicit": true,
+    "heavy_pdf_probe_governance_preserved_end_to_end": true,
+    "degraded_but_usable_supports_review_route": true,
+    "fatal_document_failure_supports_remediation_route": true,
+    "artifact_trust_remains_authoritative": true,
+    "certified_pdf_not_trusted_by_filename": true,
+    "no_production_standards_pdfx_pdfa_print_ready_overclaim": true,
+    "customer_output_sanitized": true,
+    "operator_output_useful": true,
+    "aggregate_report_generated": true,
+    "all_smoke_tests_pass": true
+  }
+}
