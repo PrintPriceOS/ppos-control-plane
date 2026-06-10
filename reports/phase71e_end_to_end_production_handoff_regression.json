@@ -1,0 +1,227 @@
+{
+  "phase": "71E",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-10T19:29:08.692Z",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "status": "PASS",
+  "results": [
+    {
+      "name": "A1. Golden path — production_certified, no review, package_ready=true end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": true,
+        "approved_artifact_type": "certified_pdf",
+        "approved_artifact_hash": "hash-71e-001",
+        "included_reports": [
+          "human_report.json",
+          "fix_audit.json",
+          "certified.pdf"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "A2. review_required=true forces package_ready=false and withholds artifact end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": false,
+        "approved_artifact_type": null,
+        "approved_artifact_hash": null,
+        "included_reports": [
+          "human_report.json",
+          "fix_audit.json"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "A3. production_certified=false forces package_ready=false end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": false,
+        "approved_artifact_type": null,
+        "approved_artifact_hash": null,
+        "included_reports": [
+          "human_report.json"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "A4. Conservative merge — package_ready=false from any source wins end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": false,
+        "approved_artifact_type": null,
+        "approved_artifact_hash": null,
+        "included_reports": [
+          "human_report.json",
+          "fix_audit.json"
+        ],
+        "blocked_by_governance_domains": [
+          "payment_governance"
+        ],
+        "warnings": [
+          "Payment not confirmed; package not ready."
+        ]
+      }
+    },
+    {
+      "name": "A5. Blocked governance domains and warnings preserved when package not ready end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": false,
+        "approved_artifact_type": null,
+        "approved_artifact_hash": null,
+        "included_reports": [
+          "fix_audit.json",
+          "fixed.pdf"
+        ],
+        "blocked_by_governance_domains": [
+          "review_required",
+          "production_certification"
+        ],
+        "warnings": [
+          "Artifact requires human review before packaging for production.",
+          "Artifact is not production certified; package not ready."
+        ]
+      }
+    },
+    {
+      "name": "A6. Evidence sanitization — raw paths and internal IDs never leak end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": true,
+        "approved_artifact_type": "certified_pdf",
+        "approved_artifact_hash": "hash-71e-006",
+        "included_reports": [
+          "certified.pdf"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": [],
+        "evidence": {
+          "physical_artifacts_ready": true,
+          "primary_artifact_type": "certified_pdf",
+          "primary_artifact_filename": "certified.pdf"
+        }
+      }
+    },
+    {
+      "name": "A7. Multi-source extraction — production_package_governance nested in delta_report propagates end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": true,
+        "approved_artifact_type": "certified_pdf",
+        "approved_artifact_hash": "hash-71e-007",
+        "included_reports": [
+          "delta_report.json"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "A8. included_reports merged and deduped from multiple governance sources end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "production_package_governance": {
+        "package_ready": true,
+        "approved_artifact_type": "certified_pdf",
+        "approved_artifact_hash": "hash-71e-008",
+        "included_reports": [
+          "human_report.json",
+          "fix_audit.json",
+          "delta_report.json"
+        ],
+        "blocked_by_governance_domains": [],
+        "warnings": []
+      }
+    },
+    {
+      "name": "B1. Golden path — all gates satisfied, approved artifact and clean handoff package end-to-end (regression)",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "B2. Blocked — payment not confirmed, approved artifact withheld, handoff blocked end-to-end (regression)",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "B3. Blocked governance domains surfaced as warnings, handoff blocked end-to-end (regression)",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "B4. No order linkage — package not ready, no PII, safe defaults end-to-end (regression)",
+      "passed": true,
+      "errors": []
+    }
+  ],
+  "end_to_end": {
+    "phase": "71E — End-to-End Production Handoff Regression",
+    "generated_at": "2026-06-10T19:29:08.693Z",
+    "end_to_end_passed": true,
+    "control_plane_passed": true,
+    "upstream_present": true,
+    "status": "PASS",
+    "layers": [
+      {
+        "layer": "Engine Artifact Hash Manifest (71A)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Worker Production Package Governance (71B)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Service Production Package Exposure (71C)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane Printhouse Handoff Package (71D)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane End-to-End Regression (71E)",
+        "present": true,
+        "passed": true
+      }
+    ],
+    "acceptance_criteria": {
+      "only_approved_artifact_included": true,
+      "artifact_withheld_unless_release_gate_ready": true,
+      "reports_included_and_preserved": true,
+      "warnings_preserved": true,
+      "blocked_governance_domains_surfaced_as_warnings": true,
+      "blocked_jobs_cannot_be_handed_off": true,
+      "review_required_blocks_package_ready": true,
+      "production_certified_required_for_package_ready": true,
+      "conservative_merge_false_wins": true,
+      "multi_source_defensive_extraction_correct": true,
+      "evidence_sanitized_no_raw_paths_or_internal_ids": true,
+      "customer_private_data_scoped_correctly": true,
+      "file_access_audit_sanitized": true,
+      "no_raw_paths_or_tokens_leak": true,
+      "reports_generated_in_each_repo": true,
+      "aggregate_report_generated": true,
+      "all_smoke_tests_pass": true
+    }
+  }
+}
