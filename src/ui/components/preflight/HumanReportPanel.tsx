@@ -17,6 +17,7 @@ import { ReviewDecisionPanel, ReviewDecisionUxAction } from "./ReviewDecisionPan
 import { CustomerRemediationPanel } from "./CustomerRemediationPanel";
 import { VisualProofPanel } from "./VisualProofPanel";
 import { ProofApprovalPanel } from "./ProofApprovalPanel";
+import { HeavyPdfProbePanel } from "./HeavyPdfProbePanel";
 import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
@@ -392,6 +393,14 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
 
                 </div>
             </details>
+
+            {/* Phase 62F-D: Heavy PDF Probe Panel (operator view) */}
+            {report.heavy_pdf_probe_governance && (
+                <HeavyPdfProbePanel
+                    heavyPdfProbeGovernance={report.heavy_pdf_probe_governance}
+                    audience="operator"
+                />
+            )}
 
             {/* Phase 69D: Visual Proof Panel (operator view) */}
             {report.visual_diff_governance && (

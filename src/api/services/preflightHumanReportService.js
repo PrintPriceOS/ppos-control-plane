@@ -1491,6 +1491,198 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         artTrust.evidence = safeEvidence;
     }
 
+    // Phase 62F-D: Defensive extraction of heavy_pdf_probe_governance
+    const heavyPdfSources = [
+        job.heavy_pdf_probe_governance,
+        job.fix_summary?.heavy_pdf_probe_governance,
+        job.fix_audit?.heavy_pdf_probe_governance,
+        job.delta_summary?.heavy_pdf_probe_governance,
+        job.delta_report?.heavy_pdf_probe_governance,
+        job.report?.heavy_pdf_probe_governance,
+        job.artifact_summary?.heavy_pdf_probe_governance,
+        job.analysisIntegrity?.probeSemantics,
+        job.report?.analysisIntegrity?.probeSemantics
+    ];
+    const artifactsWithHeavyPdfMeta = artifacts.find(a => a.metadata && a.metadata.heavy_pdf_probe_governance);
+    if (artifactsWithHeavyPdfMeta) heavyPdfSources.push(artifactsWithHeavyPdfMeta.metadata.heavy_pdf_probe_governance);
+    if (injectedJob?.heavy_pdf_probe_governance) heavyPdfSources.push(injectedJob.heavy_pdf_probe_governance);
+
+    let heavyPdfGov = {};
+    for (const source of heavyPdfSources) {
+        if (!source) continue;
+        if (source.heavy_pdf_detected === true) heavyPdfGov.heavy_pdf_detected = true;
+        if (typeof source.file_size_bytes === 'number') heavyPdfGov.file_size_bytes = source.file_size_bytes;
+        if (typeof source.file_size_mb === 'number') heavyPdfGov.file_size_mb = source.file_size_mb;
+        if (typeof source.page_count === 'number') heavyPdfGov.page_count = source.page_count;
+        if (source.probe_semantics_applied === true) heavyPdfGov.probe_semantics_applied = true;
+        if (source.analysis_degraded === true) heavyPdfGov.analysis_degraded = true;
+        if (source.degraded_but_usable === true) heavyPdfGov.degraded_but_usable = true;
+        if (source.fatal_document_failure === true) heavyPdfGov.fatal_document_failure = true;
+        if (source.review_required === true) heavyPdfGov.review_required = true;
+
+        // Conservative merges: false wins on certification/compliance flags
+        if (source.certifiable === false) heavyPdfGov.certifiable = false;
+        if (source.production_certified === false) heavyPdfGov.production_certified = false;
+        if (source.standard_certified === false) heavyPdfGov.standard_certified = false;
+        if (source.certified_pdf_allowed === false) heavyPdfGov.certified_pdf_allowed = false;
+        if (source.pdfx_compliance_claimed === false) heavyPdfGov.pdfx_compliance_claimed = false;
+        if (source.pdfa_compliance_claimed === false) heavyPdfGov.pdfa_compliance_claimed = false;
+        if (source.compliance_claim_allowed === false) heavyPdfGov.compliance_claim_allowed = false;
+
+        if (source.probe_summary) heavyPdfGov.probe_summary = { ...(heavyPdfGov.probe_summary || {}), ...source.probe_summary };
+        if (source.tools) {
+            heavyPdfGov.tools = { ...(heavyPdfGov.tools || {}) };
+            for (const [toolName, toolData] of Object.entries(source.tools)) {
+                heavyPdfGov.tools[toolName] = { ...(heavyPdfGov.tools[toolName] || {}), ...toolData };
+            }
+        }
+        if (source.warnings && source.warnings.length > 0) {
+            heavyPdfGov.warnings = [...new Set([...(heavyPdfGov.warnings || []), ...source.warnings])];
+        }
+        if (source.review_required_reasons && source.review_required_reasons.length > 0) {
+            heavyPdfGov.review_required_reasons = [...new Set([...(heavyPdfGov.review_required_reasons || []), ...source.review_required_reasons])];
+        }
+        if (source.evidence) {
+            heavyPdfGov.evidence = { ...(heavyPdfGov.evidence || {}), ...source.evidence };
+        }
+    }
+
+    // Phase 62F-D: defensive extraction of related top-level governance flags
+    const heavyPdfAnalysisStatus = job.analysis_status || job.report?.analysis_status
+        || job.fix_audit?.analysis_status || job.delta_report?.analysis_status
+        || injectedJob?.analysis_status || null;
+    const heavyPdfDegradedReasons = [...new Set([
+        ...(job.degraded_reasons || []),
+        ...(job.report?.degraded_reasons || []),
+        ...(job.fix_audit?.degraded_reasons || []),
+        ...(injectedJob?.degraded_reasons || [])
+    ])];
+    const strictForensicMode = job.strict_forensic_mode === true || job.report?.strict_forensic_mode === true
+        || job.fix_audit?.strict_forensic_mode === true || stdGov.strict_forensic_mode === true
+        || injectedJob?.strict_forensic_mode === true;
+
+    // Detect heavy PDF from raw file size even without an explicit governance flag
+    const HEAVY_PDF_THRESHOLD_BYTES = 500 * 1024 * 1024;
+    const heavyPdfReportedSize = heavyPdfGov.file_size_bytes
+        || job.file_size_bytes || job.report?.file_size_bytes || job.fix_audit?.file_size_bytes || 0;
+    if (heavyPdfGov.heavy_pdf_detected !== true && heavyPdfReportedSize >= HEAVY_PDF_THRESHOLD_BYTES) {
+        heavyPdfGov.heavy_pdf_detected = true;
+        heavyPdfGov.file_size_bytes = heavyPdfReportedSize;
+    }
+    // If degraded_but_usable was not explicit, infer it conservatively from analysis_status
+    if (heavyPdfGov.heavy_pdf_detected === true && heavyPdfGov.fatal_document_failure !== true
+        && heavyPdfGov.degraded_but_usable !== true
+        && (heavyPdfAnalysisStatus === 'DEGRADED' || heavyPdfGov.analysis_degraded === true)) {
+        heavyPdfGov.degraded_but_usable = true;
+    }
+
+    // Sanitize heavyPdfGov.evidence and per-tool evidence — strip raw transcripts, paths, and object IDs
+    const HEAVY_PDF_BLOCKED_EVIDENCE_KEYS = ['qpdf_command', 'command', 'local_path', 'raw_xmp', 'internal_id',
+        'obj_', 'forensic_object_id', 'validator_command', 'parser_output', 'raw_stream', 'raw_path', 'file_path'];
+    const HEAVY_PDF_TEMP_PATH_PATTERN = /(\/(?:tmp|var|private|storage|root|home)\/\S*|[A-Za-z]:\\\S*)/g;
+
+    function sanitizeHeavyPdfEvidence(evidence) {
+        if (!evidence) return undefined;
+        const safe = {};
+        for (const [k, v] of Object.entries(evidence)) {
+            if (HEAVY_PDF_BLOCKED_EVIDENCE_KEYS.some(b => k.includes(b))) continue;
+            if (typeof v === 'string') {
+                let sanitized = v.replace(HEAVY_PDF_TEMP_PATH_PATTERN, '[path removed]');
+                if (sanitized.length > 500) sanitized = sanitized.slice(0, 500) + '... [truncated]';
+                safe[k] = sanitized;
+            } else {
+                safe[k] = v;
+            }
+        }
+        return Object.keys(safe).length > 0 ? safe : undefined;
+    }
+
+    function sanitizeHeavyPdfTool(toolData) {
+        if (!toolData) return undefined;
+        return {
+            raw_status: toolData.raw_status || null,
+            semantic_status: toolData.semantic_status || null,
+            severity: toolData.severity || null,
+            usable_output: toolData.usable_output === true,
+            fatal: toolData.fatal === true,
+            warning_classes: toolData.warning_classes || [],
+            fatal_classes: toolData.fatal_classes || [],
+            evidence: sanitizeHeavyPdfEvidence(toolData.evidence)
+        };
+    }
+
+    heavyPdfGov.evidence = sanitizeHeavyPdfEvidence(heavyPdfGov.evidence);
+    if (heavyPdfGov.tools) {
+        const sanitizedHeavyPdfTools = {};
+        for (const [toolName, toolData] of Object.entries(heavyPdfGov.tools)) {
+            sanitizedHeavyPdfTools[toolName] = sanitizeHeavyPdfTool(toolData);
+        }
+        heavyPdfGov.tools = sanitizedHeavyPdfTools;
+    }
+
+    // Propagate heavy PDF probe governance conservatively
+    const heavyPdfFatal = heavyPdfGov.fatal_document_failure === true;
+    const heavyPdfReviewRequired = heavyPdfGov.review_required === true || heavyPdfGov.degraded_but_usable === true;
+
+    if (heavyPdfFatal) {
+        // Fatal document failure: require remediation/reupload, never offer production download
+        isReviewReq = true;
+        isProdCert = false;
+        certLevel = 'BLOCKED';
+    } else if (heavyPdfReviewRequired) {
+        // Degraded-but-usable / explicit review required: route to operator review, never auto-certify
+        isReviewReq = true;
+        isProdCert = false;
+        if (certLevel === 'CERTIFIED_READY' || certLevel === 'FIXED_READY') {
+            certLevel = appliedFixesRaw.length > 0 ? 'FIXED_REVIEW_REQUIRED' : 'REVIEW_REQUIRED';
+        }
+    }
+
+    if (heavyPdfGov.production_certified === false) isProdCert = false;
+    if (heavyPdfGov.standard_certified === false) standardCertified = false;
+    if (heavyPdfGov.pdfx_compliance_claimed === false) pdfxComplianceClaimed = false;
+    if (heavyPdfGov.pdfa_compliance_claimed === false) pdfaComplianceClaimed = false;
+
+    if (heavyPdfFatal || heavyPdfReviewRequired || heavyPdfGov.certified_pdf_allowed === false) {
+        artifacts.forEach(a => {
+            if (a.type === 'certified_pdf' || a.alias === 'certified_pdf') {
+                a.production_certified = false;
+                a.customer_visible = false;
+                a.is_primary = false;
+                a.artifact_role = 'REVIEW_REQUIRED';
+            }
+        });
+    }
+
+    // Build safe public heavy_pdf_probe_governance subset (no raw transcripts, paths, or object IDs)
+    const safeHeavyPdfGov = {
+        heavy_pdf_detected: heavyPdfGov.heavy_pdf_detected === true,
+        file_size_bytes: heavyPdfGov.file_size_bytes || 0,
+        file_size_mb: heavyPdfGov.file_size_mb || (heavyPdfGov.file_size_bytes ? Math.round((heavyPdfGov.file_size_bytes / (1024 * 1024)) * 100) / 100 : 0),
+        page_count: heavyPdfGov.page_count || 0,
+        probe_semantics_applied: heavyPdfGov.probe_semantics_applied === true,
+        analysis_status: heavyPdfAnalysisStatus,
+        analysis_degraded: heavyPdfGov.analysis_degraded === true,
+        degraded_but_usable: heavyPdfGov.degraded_but_usable === true && !heavyPdfFatal,
+        fatal_document_failure: heavyPdfFatal,
+        strict_forensic_mode: strictForensicMode === true,
+        review_required: heavyPdfFatal || heavyPdfReviewRequired,
+        certifiable: heavyPdfGov.certifiable === true && !heavyPdfFatal,
+        production_certified: false,
+        standard_certified: false,
+        pdfx_compliance_claimed: false,
+        pdfa_compliance_claimed: false,
+        compliance_claim_allowed: false,
+        probe_summary: heavyPdfGov.probe_summary || {},
+        tools: heavyPdfGov.tools || {},
+        warnings: heavyPdfGov.warnings || [],
+        review_required_reasons: heavyPdfGov.review_required_reasons || [],
+        degraded_reasons: heavyPdfDegradedReasons
+    };
+    if (heavyPdfGov.evidence) {
+        safeHeavyPdfGov.evidence = heavyPdfGov.evidence;
+    }
+
     const primaryArtifact = selectPrimaryHumanArtifact({ ...job, review_required: isReviewReq, production_certified: isProdCert }, artifacts, artTrust);
 
     if (certLevel === "CERTIFIED_READY" && isProdCert && !isReviewReq && primaryArtifact?.artifact_role === 'PRODUCTION_READY') {
@@ -2084,6 +2276,41 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         customerSummary = customerSummary + " The file includes page mark conditions that may affect trimming or production setup. A human review is required.";
     }
 
+    // Phase 62F-D: Heavy PDF Probe Governance Human Report wording
+    if (heavyPdfGov.heavy_pdf_detected === true) {
+        if (heavyPdfFatal) {
+            const customerMsg = "The PDF could not be reliably inspected because a critical probe failed. Re-exporting or repairing the source PDF is recommended.";
+            const operatorMsg = "The PDF could not be reliably inspected because a critical heavy-PDF probe failed. Re-exporting or repairing the source PDF is recommended before this job can proceed.";
+            customerSummary = customerSummary + " " + customerMsg;
+            operatorSummary = operatorSummary + " " + operatorMsg;
+        } else if (heavyPdfGov.degraded_but_usable === true) {
+            const operatorMsg = "Analysis completed, but some heavy-PDF probes returned warnings. The file requires review before production approval.";
+            const customerMsg = "The file was uploaded and analyzed, but the analysis found technical warnings in the PDF structure. The file is not automatically approved for production. A review is required before this file can proceed.";
+            customerSummary = customerSummary + " " + customerMsg;
+            operatorSummary = operatorSummary + " " + operatorMsg;
+        }
+
+        const heavyPdfQpdfStatus = heavyPdfGov.tools?.qpdf?.semantic_status;
+        if (heavyPdfQpdfStatus === 'WARNING_ONLY' || heavyPdfQpdfStatus === 'SUCCESS_WITH_WARNINGS') {
+            operatorSummary = operatorSummary + " qpdf reported structural warnings, such as linearization or hint-table inconsistencies. These do not necessarily mean the file is unreadable, but they prevent automatic certification.";
+        }
+
+        const heavyPdfImagesStatus = heavyPdfGov.tools?.pdfimages?.semantic_status;
+        if (heavyPdfImagesStatus === 'WARNING_ONLY' || heavyPdfImagesStatus === 'SUCCESS_WITH_WARNINGS') {
+            operatorSummary = operatorSummary + " Image extraction reported warnings. The analysis continued, but image-related results should be reviewed.";
+        }
+
+        if (strictForensicMode === true) {
+            operatorSummary = operatorSummary + " Strict forensic mode prevents automatic certification when probe warnings reduce analysis confidence.";
+        }
+
+        if (heavyPdfFatal) {
+            customerSummary = customerSummary + " If requested, please re-export the PDF from the source application and upload it again.";
+        } else if (heavyPdfReviewRequired && !customerSummary.includes("A review is required before this file can proceed")) {
+            customerSummary = customerSummary + " The file is not automatically approved for production. A review is required before this file can proceed.";
+        }
+    }
+
     // Clean up extra spaces
     customerSummary = customerSummary.trim();
     operatorSummary = operatorSummary.trim();
@@ -2186,6 +2413,33 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
     }
 
+    // Phase 62F-D: heavy_pdf_probe_governance artifact_ux warnings
+    if (heavyPdfGov.heavy_pdf_detected === true) {
+        if (heavyPdfFatal) {
+            const w = "The PDF could not be reliably inspected; re-exporting or repairing the source file is recommended.";
+            if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+        } else {
+            if (heavyPdfGov.degraded_but_usable === true) {
+                const w = "Heavy PDF analysis completed with probe warnings and requires review.";
+                if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+            }
+            const heavyPdfQpdfStatus = heavyPdfGov.tools?.qpdf?.semantic_status;
+            if (heavyPdfQpdfStatus === 'WARNING_ONLY' || heavyPdfQpdfStatus === 'SUCCESS_WITH_WARNINGS') {
+                const w = "qpdf reported structural warnings that require review before certification.";
+                if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+            }
+            const heavyPdfImagesStatus = heavyPdfGov.tools?.pdfimages?.semantic_status;
+            if (heavyPdfImagesStatus === 'WARNING_ONLY' || heavyPdfImagesStatus === 'SUCCESS_WITH_WARNINGS') {
+                const w = "pdfimages reported warnings during image extraction that require review.";
+                if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+            }
+        }
+        if (heavyPdfReviewRequired || heavyPdfFatal) {
+            const w = "Heavy PDF probe warnings require human review before production.";
+            if (!artifact_ux.warnings.includes(w)) artifact_ux.warnings.push(w);
+        }
+    }
+
     // Phase 68D: Build safe public standards_certification_governance subset (no raw paths)
     const safeStdCertGov = {
         validation_performed: stdGov.validation_performed === true,
@@ -2233,8 +2487,8 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
     }
 
     dedupedArtifacts.forEach(a => {
-        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov }, audience: 'customer' });
-        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov }, audience: 'operator' });
+        const cLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov, heavy_pdf_probe_governance: safeHeavyPdfGov }, audience: 'customer' });
+        const oLabel = artifactUxLabelService.buildArtifactUxLabels({ artifact: a, artifact_trust: safeTrust, human_report: { structural_metadata_governance: structGov, page_marks_governance: pmGov, security_interactivity_governance: siGov, ink_governance: inkGov, selective_image_governance: selImgGov, font_governance: fontGov, transparency_overprint_physical_governance: transPhysGov, standards_certification_governance: safeStdCertGov, visual_diff_governance: safeVisualDiffGov, proof_approval_governance: safeProofApprGov, heavy_pdf_probe_governance: safeHeavyPdfGov }, audience: 'operator' });
         
         artifact_ux.customer_labels.push(cLabel);
         artifact_ux.operator_labels.push(oLabel);
@@ -2467,6 +2721,7 @@ async function getHumanReport(jobId, context, injectedJob = null, injectedArtifa
         standards_certification_governance: safeStdCertGov,
         visual_diff_governance: safeVisualDiffGov,
         proof_approval_governance: safeProofApprGov,
+        heavy_pdf_probe_governance: safeHeavyPdfGov,
         governance_summary: govSummary,
         copy_blocks: {
             customer: customerSummary,

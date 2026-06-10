@@ -111,6 +111,17 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
     const trans_phys_overprint_change = transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true;
     const trans_phys_transparency_change = transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true;
 
+    // Phase 62F-D: Extract heavy_pdf_probe_governance
+    const heavyPdfGov = human_report?.heavy_pdf_probe_governance || {};
+    const heavy_pdf_detected = heavyPdfGov.heavy_pdf_detected === true;
+    const heavy_pdf_review_required = heavyPdfGov.review_required === true;
+    const heavy_pdf_fatal = heavyPdfGov.fatal_document_failure === true;
+    const heavy_pdf_degraded_usable = heavyPdfGov.degraded_but_usable === true;
+    const heavy_pdf_qpdf_status = heavyPdfGov.tools?.qpdf?.semantic_status;
+    const heavy_pdf_pdfimages_status = heavyPdfGov.tools?.pdfimages?.semantic_status;
+    const heavy_pdf_qpdf_warning = ['WARNING_ONLY', 'SUCCESS_WITH_WARNINGS'].includes(heavy_pdf_qpdf_status);
+    const heavy_pdf_pdfimages_warning = ['WARNING_ONLY', 'SUCCESS_WITH_WARNINGS'].includes(heavy_pdf_pdfimages_status);
+
     const stripClaims = (str) => {
         if (!str) return str;
         const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
@@ -757,6 +768,56 @@ function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audienc
                 tooltip = "A rendered proof of your corrected file is awaiting your approval.";
             } else {
                 tooltip = "A rendered proof has been shared with the customer and is awaiting their decision.";
+            }
+        }
+
+        // Phase 62F-D: Heavy PDF probe governance — downgrade certified_pdf when review required or fatal
+        if ((heavy_pdf_review_required || heavy_pdf_fatal) && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = heavy_pdf_fatal ? "Technical review required" : "Review required";
+                status_tone = heavy_pdf_fatal ? "danger" : "warning";
+                button_label = "Download file";
+                tooltip = heavy_pdf_fatal
+                    ? "The PDF may need to be re-exported if the warnings cannot be resolved."
+                    : "Automatic certification is not allowed until review is completed.";
+            } else {
+                status_badge = heavy_pdf_fatal ? "Technical review required" : "Review required";
+                status_tone = heavy_pdf_fatal ? "danger" : "warning";
+                warning = warning
+                    ? warning + " Heavy PDF probe warnings require review before production."
+                    : "Heavy PDF probe warnings require review before production.";
+                tooltip = "The file was analyzed, but one or more PDF probes returned warnings. Automatic certification is not allowed until review is completed.";
+            }
+        }
+
+        // Phase 62F-D: Heavy PDF badges for fixed_pdf/review_pdf — only when nothing more specific has set the badge
+        if (heavy_pdf_detected && ['fixed_pdf', 'review_pdf'].includes(type)) {
+            const defaultBadge = (type === 'fixed_pdf')
+                ? (isCustomer ? "Corrected" : "Fix output")
+                : (isCustomer ? "Needs review" : "Human review required");
+            if (status_badge === defaultBadge) {
+                if (heavy_pdf_fatal) {
+                    status_badge = "Technical review required";
+                    status_tone = "danger";
+                    tooltip = "The PDF may need to be re-exported if the warnings cannot be resolved.";
+                } else if (heavy_pdf_qpdf_warning || heavy_pdf_pdfimages_warning) {
+                    status_badge = "Probe warning";
+                    status_tone = "warning";
+                    tooltip = "The file was analyzed, but one or more PDF probes returned warnings. Automatic certification is not allowed until review is completed.";
+                } else if (heavy_pdf_degraded_usable || heavy_pdf_review_required) {
+                    status_badge = "Analysis warnings";
+                    status_tone = "warning";
+                    tooltip = "The file was analyzed, but one or more PDF probes returned warnings.";
+                } else {
+                    status_badge = "Heavy PDF";
+                    status_tone = "info";
+                    tooltip = isCustomer
+                        ? "This file is large and required additional analysis."
+                        : "This file exceeds the heavy PDF size threshold. Additional analysis warnings may apply if probes report issues.";
+                }
             }
         }
     }

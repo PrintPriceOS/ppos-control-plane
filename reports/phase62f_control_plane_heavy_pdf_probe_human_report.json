@@ -1,0 +1,278 @@
+{
+  "phase": "62F-D",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-09T23:56:35.113Z",
+  "input_mode": "SERVICE_REPORT_PRESENT",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "status": "PASS",
+  "results": [
+    {
+      "name": "1. Heavy PDF degraded_but_usable=true — analysis completed with probe warnings, review required",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "2. qpdf WARNING_ONLY — operator wording explains linearization/hint-table warnings",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "3. pdfimages WARNING_ONLY — operator wording explains image extraction warnings",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "4. qpdf FAILED_FATAL — fatal_document_failure blocks production and recommends remediation",
+      "passed": true,
+      "errors": [],
+      "outcome": "BLOCKED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": false,
+        "fatal_document_failure": true,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "request_upload"
+    },
+    {
+      "name": "5. Strict forensic mode — operator wording notes certification is blocked under reduced confidence",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": true,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "6. Customer sanitation — no raw paths, object IDs, transcripts, or overclaims",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "7. Operator detail — full per-tool semantic statuses, warning classes, and probe summary exposed",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "8. Artifact UX badges — Probe warning (fixed/review_pdf), Review required (certified_pdf)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "9. Readiness gate — heavy PDF review_required blocks production certification end-to-end",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": false,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "10. Remediation — fatal_document_failure recommends reupload, no production download",
+      "passed": true,
+      "errors": [],
+      "outcome": "BLOCKED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": false,
+        "fatal_document_failure": true,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "request_upload"
+    },
+    {
+      "name": "11. Standards overclaim regression — heavy PDF governance never implies certification or compliance",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    },
+    {
+      "name": "12. certified.pdf filename regression — filename alone does not bypass heavy PDF review gate",
+      "passed": true,
+      "errors": [],
+      "outcome": "REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "heavy_pdf_probe_governance": {
+        "heavy_pdf_detected": true,
+        "analysis_status": null,
+        "degraded_but_usable": true,
+        "fatal_document_failure": false,
+        "review_required": true,
+        "strict_forensic_mode": false,
+        "certifiable": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "recommended_next_action": "review_fixed"
+    }
+  ],
+  "acceptance_criteria": {
+    "consumes_heavy_pdf_probe_governance": true,
+    "human_report_wording_clear_and_safe": true,
+    "customer_output_sanitized": true,
+    "operator_output_useful": true,
+    "artifact_ux_reflects_heavy_pdf_warning_state": true,
+    "readiness_gates_remain_conservative": true,
+    "fatal_failures_require_remediation": true,
+    "degraded_but_usable_supports_review_route": true,
+    "no_production_or_standards_overclaim": true,
+    "no_downgrade_of_fatal_to_warning": true,
+    "no_upgrade_of_warning_to_fatal": true,
+    "certified_pdf_filename_does_not_bypass_review": true
+  }
+}

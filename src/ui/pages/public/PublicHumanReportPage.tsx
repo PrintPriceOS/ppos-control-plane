@@ -6,6 +6,7 @@ import { ReviewDecisionPanel } from '../../components/preflight/ReviewDecisionPa
 import { CustomerRemediationPanel } from '../../components/preflight/CustomerRemediationPanel';
 import { VisualProofPanel } from '../../components/preflight/VisualProofPanel';
 import { ProofApprovalPanel } from '../../components/preflight/ProofApprovalPanel';
+import { HeavyPdfProbePanel } from '../../components/preflight/HeavyPdfProbePanel';
 
 export const PublicHumanReportPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -119,6 +120,14 @@ export const PublicHumanReportPage: React.FC = () => {
                         remediationUx={report.remediation_ux.customer}
                         audience="customer"
                         onActionClick={() => alert('Customer actions would trigger here (e.g., upload flow)')}
+                    />
+                )}
+
+                {/* Phase 62F-D: Heavy PDF Probe Panel (customer-safe view) */}
+                {report.heavy_pdf_probe_governance && (
+                    <HeavyPdfProbePanel
+                        heavyPdfProbeGovernance={report.heavy_pdf_probe_governance}
+                        audience="customer"
                     />
                 )}
 
