@@ -2286,6 +2286,38 @@ router.get('/jobs/:jobId/human-report', async (req, res) => {
     }
 });
 
+// --- GET /api/admin/preflight/jobs/:jobId/production-handoff-package ---
+router.get('/jobs/:jobId/production-handoff-package', async (req, res) => {
+    const context = buildGatewayContext(req);
+    const { jobId } = req.params;
+    try {
+        const productionHandoffPackageService = require('../services/productionHandoffPackageService');
+        const payload = await productionHandoffPackageService.buildProductionHandoffPackage(jobId, context, {
+            orderId: req.query.orderId || null
+        });
+        if (!payload.ok) {
+            return res.status(404).json(payload);
+        }
+        await logPreflightAdminEvent({
+            eventType: 'PREFLIGHT_PRODUCTION_HANDOFF_PACKAGE_VIEWED',
+            tenantId: context.tenantId || 'system',
+            userId: context.userId || context.operatorId || 'system',
+            status: 'SUCCESS',
+            jobId: jobId,
+            traceId: context.traceId
+        });
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({
+            ok: false,
+            error: {
+                code: 'PRODUCTION_HANDOFF_PACKAGE_ERROR',
+                message: err.message
+            }
+        });
+    }
+});
+
 // --- POST /api/admin/preflight/jobs/:jobId/human-report/snapshot ---
 router.post('/jobs/:jobId/human-report/snapshot', async (req, res) => {
     const context = buildGatewayContext(req);

@@ -2595,3 +2595,8 @@ export async function getAdminPreflightGovernanceLedger(jobId: string) {
 export async function getAdminPreflightHumanReport(jobId: string) {
     return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/human-report`);
 }
+
+export async function getAdminPreflightProductionHandoffPackage(jobId: string, orderId?: string) {
+    const qs = orderId ? `?orderId=${encodeURIComponent(orderId)}` : '';
+    return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/production-handoff-package${qs}`);
+}
