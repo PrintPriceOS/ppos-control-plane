@@ -1,0 +1,2 @@
+import React from "react";
+export const CustomerLiveOrderDetailPage = () => <div><div>Order status is shown for your convenience. Production can continue only after all required checks and approvals are complete.</div></div>;

@@ -1,0 +1,1 @@
+export interface CustomerLiveOrder { live_order_id: string; live_order_number: string; customer_visible_status: string; }
