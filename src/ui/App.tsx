@@ -80,6 +80,9 @@ import { PrinthouseOnboardingPage } from './pages/printhouse/PrinthouseOnboardin
 import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
 import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
+import { TenantPilotReadinessPage } from './pages/pilot/TenantPilotReadinessPage';
+
+import { BillingUsageDashboardPage } from './pages/billing/BillingUsageDashboardPage';
 
 export const App: React.FC = () => {
     return (
@@ -109,6 +112,9 @@ export const App: React.FC = () => {
                 <Route path="/jobs" element={<JobsPage />} />
                 <Route path="/queues-workers" element={<QueuesWorkersPage />} />
                 <Route path="/tenants" element={<TenantManagement />} />
+                <Route path="/admin/tenant-pilots" element={<TenantPilotReadinessPage />} />
+                <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
+
 
                 {/* PREFLIGHT OPERATIONS */}
                 <Route path="/preflight/jobs" element={<PreflightJobsPage />} />

@@ -233,6 +233,19 @@ async function createOrder(payload) {
         });
     }
 
+    // Usage metering hook
+    try {
+        const usageMeteringService = require('./usageMeteringService');
+        await usageMeteringService.recordUsageEvent({
+            tenantId: payload.tenant_id || 'default',
+            eventType: 'ORDER_CREATED',
+            resourceId: String(insertId),
+            resourceType: 'ORDER'
+        });
+    } catch (e) {
+        console.error('[ORDER][USAGE-METERING-FAILED]', e.message);
+    }
+
     return insertId;
 }
 

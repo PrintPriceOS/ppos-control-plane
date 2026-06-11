@@ -119,25 +119,28 @@ router.get('/jobs', async (req, res) => {
 router.post('/jobs', upload.single('pdf'), async (req, res) => {
   const tenantId = resolveTargetTenantId(req);
   const context = resolveActorContext(req);
+  const quotaEnforcementService = require('../services/quotaEnforcementService');
+  const usageMeteringService = require('../services/usageMeteringService');
+  const billingEventService = require('../services/billingEventService');
+  const commercialPlanService = require('../services/commercialPlanService');
+  const db = require('../services/mysqlClient');
+
   try {
     // 1. Native Direct Pipeline check (file attached as 'pdf')
     if (req.file) {
-      // Check Tenant Plan File Limits
-      const tenantPlanGovernanceService = require('../services/tenantPlanGovernanceService');
-      const limitCheck = await tenantPlanGovernanceService.checkFileLimit(tenantId, req.file.size, context);
-      if (!limitCheck.ok) {
-        try {
-          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        } catch (e) {}
-        return res.status(403).json({
-          ok: false,
-          error: {
-            code: 'TENANT_FILE_LIMIT_EXCEEDED',
-            message: limitCheck.blockers[0]?.message || 'File size limit exceeded for plan',
-            blockers: limitCheck.blockers
-          }
-        });
-      }
+      // Assert quota limits first
+      await quotaEnforcementService.assertQuotaAllowed({
+          tenantId,
+          action: 'UPLOAD_FILE',
+          bytes: req.file.size,
+          actor: context
+      });
+
+      await quotaEnforcementService.assertQuotaAllowed({
+          tenantId,
+          action: 'CREATE_PREFLIGHT_JOB',
+          actor: context
+      });
 
       const fileBuffer = fs.readFileSync(req.file.path);
       const fileObj = {
@@ -173,6 +176,48 @@ router.post('/jobs', upload.single('pdf'), async (req, res) => {
         metadata: { strategy: payload.strategy, policy: payload.policy }
       });
 
+      if (result.ok) {
+          // Record usage events
+          await usageMeteringService.recordUsageEvent({
+              tenantId,
+              eventType: 'FILE_UPLOADED',
+              resourceId: req.file.filename || req.file.originalname,
+              resourceType: 'PDF',
+              bytes: req.file.size
+          });
+
+          await usageMeteringService.recordUsageEvent({
+              tenantId,
+              eventType: 'PREFLIGHT_JOB_CREATED',
+              resourceId: result.job?.id,
+              resourceType: 'JOB'
+          });
+
+          // Check if overage billing event is required
+          const decision = await quotaEnforcementService.evaluateQuotaForAction({
+              tenantId,
+              action: 'CREATE_PREFLIGHT_JOB',
+              actor: context
+          });
+          if (decision.billing_event_required) {
+              const ent = await commercialPlanService.evaluateTenantEntitlement({ tenantId });
+              let includedJobs = 0;
+              try {
+                  const planRows = await db.query('SELECT included_preflight_jobs_monthly FROM commercial_plans WHERE plan_code = ?', [ent.plan_code]);
+                  includedJobs = Number(planRows[0]?.included_preflight_jobs_monthly || 0);
+              } catch (e) {}
+
+              await billingEventService.recordOverage({
+                  tenantId,
+                  metric: 'preflight_jobs_count',
+                  quantity: decision.current_usage + 1,
+                  includedQuantity: includedJobs,
+                  unitPriceCents: 10,
+                  periodKey: usageMeteringService.getCurrentPeriodKey()
+              });
+          }
+      }
+
       const statusVal = result.ok ? 200 : 503;
       return res.status(statusVal).json(result);
     }
@@ -187,6 +232,13 @@ router.post('/jobs', upload.single('pdf'), async (req, res) => {
         error: { code: 'MISSING_PARAMS', message: 'uploadId and type are required for staged uploads' } 
       });
     }
+
+    // Assert preflight job quota
+    await quotaEnforcementService.assertQuotaAllowed({
+        tenantId,
+        action: 'CREATE_PREFLIGHT_JOB',
+        actor: context
+    });
 
     const job = await operations.createJob(tenantId, { 
       uploadId, 
@@ -204,6 +256,39 @@ router.post('/jobs', upload.single('pdf'), async (req, res) => {
         metadata: { jobId: job.id, type, uploadId }
     });
 
+    if (job) {
+        await usageMeteringService.recordUsageEvent({
+            tenantId,
+            eventType: 'PREFLIGHT_JOB_CREATED',
+            resourceId: job.id,
+            resourceType: 'JOB'
+        });
+
+        // Check if overage billing event is required
+        const decision = await quotaEnforcementService.evaluateQuotaForAction({
+            tenantId,
+            action: 'CREATE_PREFLIGHT_JOB',
+            actor: context
+        });
+        if (decision.billing_event_required) {
+            const ent = await commercialPlanService.evaluateTenantEntitlement({ tenantId });
+            let includedJobs = 0;
+            try {
+                const planRows = await db.query('SELECT included_preflight_jobs_monthly FROM commercial_plans WHERE plan_code = ?', [ent.plan_code]);
+                includedJobs = Number(planRows[0]?.included_preflight_jobs_monthly || 0);
+            } catch (e) {}
+
+            await billingEventService.recordOverage({
+                tenantId,
+                metric: 'preflight_jobs_count',
+                quantity: decision.current_usage + 1,
+                includedQuantity: includedJobs,
+                unitPriceCents: 10,
+                periodKey: usageMeteringService.getCurrentPeriodKey()
+            });
+        }
+    }
+
     res.json({ ok: true, job, source_status: 'LIVE_UPSTREAM' });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) {
@@ -216,6 +301,18 @@ router.post('/jobs', upload.single('pdf'), async (req, res) => {
         status: 'FAILURE',
         metadata: { error: error.message }
     });
+
+    if (error.code === 'QUOTA_EXCEEDED') {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'QUOTA_EXCEEDED',
+                message: error.message,
+                decision: error.decision
+            }
+        });
+    }
+
     const status = error.message.includes('NOT_FOUND') ? 404 : 500;
     res.status(status).json({ 
       ok: false, 

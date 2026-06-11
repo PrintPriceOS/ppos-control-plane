@@ -38,6 +38,7 @@ export const navigationConfig: NavItem[] = [
     // Operations & Marketplace
     { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'] },
     { id: 'financials', label: 'Financial Ops', path: '/ops/financials', icon: 'BanknotesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
+    { id: 'billing-usage', label: 'Billing & Plans', path: '/admin/billing-usage', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 
     // System / Admin

@@ -1,0 +1,159 @@
+{
+    "tested_at": "2026-06-11T07:07:24.169Z",
+    "status": "SUCCESS",
+    "scenarios_run": 20,
+    "passed": 30,
+    "failed": 0,
+    "results": [
+        {
+            "label": "S1: 7 default plans loaded into mock memory",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: PILOT plan assigned successfully",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Entitlement stored correctly in mock DB",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: SYSTEM tenant allowed to exceed preflight limits",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: SYSTEM tenant bypasses billing/quota limits",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S4: Plans list queried successfully",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: First usage event recorded successfully",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: Duplicate usage event detected and ignored",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S6: Usage event logged",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: Custom quantity (10) logged successfully",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S8: preflight_jobs_count incremented to 2",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S8: api_requests_count incremented to 10",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S9: 1 order allowed under limit of 100",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S10: PRO tenant allowed above limit under overage mode",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S10: Soft warning and billing event required flags set",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Order blocked on FREE tier",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Hard block and correct block reason recorded",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: Correctly calculated 5 overage units * 10 cents = 50 cents",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S13: Billing event persisted in mock DB",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S13: Persisted event type is OVERAGE_RECORDED",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S14: FREE tier does not trigger billing events",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: Evaluation respects custom limit override",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S16: Super Admin can record adjustments",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S17: Viewer correctly unauthorized to record manual adjustments",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S18: Throws customer-safe error message",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S18: Throws detailed error message for admin",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S19: Grand total cannot go negative (50 cents overage + -100 cents adjustment = 0 cents minimum)",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S19: Total overages aggregated",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S19: Events list populated in summary",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S20: Tenant free events do not overlap with tenant pro events",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
 import {
   UsersIcon,
   ArrowPathIcon,
@@ -135,13 +137,23 @@ export default function TenantManagement() {
             Phase 39.2 — Operational Governance, Limits & Entitlements
           </p>
         </div>
-        <button
-          onClick={loadTenants}
-          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-mono text-xs flex items-center gap-2 transition-all"
-        >
-          <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'SYNCING...' : 'SYNC CONSOLE'}
-        </button>
+        <div className="flex gap-2">
+          <Link
+            to="/admin/tenant-pilots"
+            className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <ShieldCheckIcon className="w-4 h-4" />
+            PILOT READINESS CONSOLE
+          </Link>
+          <button
+            onClick={loadTenants}
+            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'SYNCING...' : 'SYNC CONSOLE'}
+          </button>
+        </div>
+
       </div>
 
       {/* Error Banner */}

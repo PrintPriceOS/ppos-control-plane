@@ -173,6 +173,8 @@ const adminAssetsRouter = require('./adminAssets');
 const adminMarketplaceOrdersRouter = require('./adminMarketplaceOrders');
 const adminMarketplacePrinthouseHandoffRouter = require('./adminMarketplacePrinthouseHandoff');
 const adminTenantGovernanceRouter = require('./adminTenantGovernance');
+const adminTenantPilotRouter = require('./adminTenantPilot');
+const adminTenantBillingRouter = require('./adminTenantBilling');
 
 
 /**
@@ -188,6 +190,8 @@ router.use('/marketplace/ready', negotiationAdminRouter); // Important: more spe
 router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
 router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
 router.use('/tenant-governance', adminTenantGovernanceRouter);
+router.use('/tenant-pilots', adminTenantPilotRouter);
+router.use('/tenant-billing', adminTenantBillingRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);

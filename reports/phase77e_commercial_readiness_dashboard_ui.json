@@ -1,0 +1,108 @@
+{
+    "tested_at": "2026-06-11T06:50:04.762Z",
+    "status": "SUCCESS",
+    "passed": 20,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "File exists: src/ui/types/tenantPilot.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/api/tenantPilotClient.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/pilot/TenantPilotReadinessPage.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/pilot/TenantPilotDetailDrawer.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listTenantPilots",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getTenantPilotReadiness",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: enablePilotAccess",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: disablePilotAccess",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: enablePartnerAccess",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: disablePartnerAccess",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: requestLiveProductionEnablement",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: blockLiveProductionEnablement",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx contains router path /admin/tenant-pilots",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx registers TenantPilotReadinessPage component",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "TenantManagement.tsx console includes path link to /admin/tenant-pilots",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Drawer UI warns that LIVE production is disabled throughout Phase 77",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Drawer UI sets expected target state to PARTNER PILOT READY",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Drawer UI displays evaluation readiness domains snapshot",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Drawer UI details readiness blockers",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Drawer UI demands action reason justification",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}
