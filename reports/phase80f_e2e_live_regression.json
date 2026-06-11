@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-06-11T14:09:39.132Z",
+  "total_assertions": 12,
+  "passed": 12,
+  "failed": 0,
+  "assertions": [
+    {
+      "label": "R1: Initial guard check blocks all live actions",
+      "status": "PASS"
+    },
+    {
+      "label": "R2: Partner successfully requests enablement",
+      "status": "PASS"
+    },
+    {
+      "label": "R3: SYSTEM_ADMIN moves to review",
+      "status": "PASS"
+    },
+    {
+      "label": "R4: SYSTEM_ADMIN approves request",
+      "status": "PASS"
+    },
+    {
+      "label": "R5: Approval does NOT activate LIVE automatically",
+      "status": "PASS"
+    },
+    {
+      "label": "R6: Pre-activation guard check still blocks",
+      "status": "PASS"
+    },
+    {
+      "label": "R7: SYSTEM_ADMIN activates LIVE",
+      "status": "PASS"
+    },
+    {
+      "label": "R8: Post-activation guard allows action under scope",
+      "status": "PASS"
+    },
+    {
+      "label": "R9: SYSTEM_ADMIN revokes LIVE",
+      "status": "PASS"
+    },
+    {
+      "label": "R10: Post-revoke guard check blocks all live actions",
+      "status": "PASS"
+    },
+    {
+      "label": "R11: Full workflow audit trail captured",
+      "status": "PASS"
+    },
+    {
+      "label": "R12: Revocation strictly recorded in impact table",
+      "status": "PASS"
+    }
+  ]
+}
