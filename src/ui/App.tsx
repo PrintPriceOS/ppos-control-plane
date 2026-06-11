@@ -83,6 +83,7 @@ import { MachineDrawerProvider } from './components/federation/MachineDrawerCont
 import { TenantPilotReadinessPage } from './pages/pilot/TenantPilotReadinessPage';
 
 import { BillingUsageDashboardPage } from './pages/billing/BillingUsageDashboardPage';
+import { ProductionMonitoringDashboardPage } from './pages/production-monitoring/ProductionMonitoringDashboardPage';
 
 export const App: React.FC = () => {
     return (
@@ -114,6 +115,7 @@ export const App: React.FC = () => {
                 <Route path="/tenants" element={<TenantManagement />} />
                 <Route path="/admin/tenant-pilots" element={<TenantPilotReadinessPage />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
+                <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 
 
                 {/* PREFLIGHT OPERATIONS */}

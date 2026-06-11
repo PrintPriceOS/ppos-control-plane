@@ -175,6 +175,7 @@ const adminMarketplacePrinthouseHandoffRouter = require('./adminMarketplacePrint
 const adminTenantGovernanceRouter = require('./adminTenantGovernance');
 const adminTenantPilotRouter = require('./adminTenantPilot');
 const adminTenantBillingRouter = require('./adminTenantBilling');
+const adminProductionMonitoringRouter = require('./adminProductionMonitoring');
 
 
 /**
@@ -192,6 +193,7 @@ router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffR
 router.use('/tenant-governance', adminTenantGovernanceRouter);
 router.use('/tenant-pilots', adminTenantPilotRouter);
 router.use('/tenant-billing', adminTenantBillingRouter);
+router.use('/production-monitoring', adminProductionMonitoringRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);
