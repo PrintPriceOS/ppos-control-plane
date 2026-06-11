@@ -20,7 +20,7 @@ class PublicMarketplaceGuardService {
         if (!state.public_marketplace_launch_enabled) {
             blockers.push('Launch disabled');
         }
-        if (state.launch_status === 'EMERGENCY_STOP') {
+        if (state.launch_status === 'EMERGENCY_STOP' || state.emergency_stop_active) {
             blockers.push('Emergency stop active');
         }
         if (state.launch_status === 'PAUSED') {
