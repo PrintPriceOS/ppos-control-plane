@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "SC1: Use Phase 95-style financial operations readiness run",
+    "SC2: Evaluate release gate",
+    "SC3: Generate checks",
+    "SC4: Evaluate risk/rollback readiness",
+    "SC5: Request manual approval",
+    "SC6: Approve controlled release eligibility",
+    "SC7: Revoke approval",
+    "SC8: Generate export preview (mocked via UI panel)",
+    "SC9: Verify no payment/refund/payout/external submission/tax filing/FULL_PUBLIC enablement",
+    "SC10: Verify source records remain unchanged",
+    "SC11: Verify audit timeline includes all gate, risk, approval, and revocation events"
+  ],
+  "failed": []
+}

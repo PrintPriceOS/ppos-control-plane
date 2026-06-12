@@ -1,0 +1,14 @@
+{
+  "passed": [
+    "SC1: Use a reconciled financial snapshot from Phase 92-style data",
+    "SC2: Build tax/VAT readiness classification",
+    "SC3: Create readiness snapshot",
+    "SC4: Generate findings/warnings",
+    "SC5: Apply manual review action",
+    "SC6: Produce export preview (mocked via UI panel existence)",
+    "SC7: Verify no external submission",
+    "SC8: Verify original payment/invoice/order records unchanged",
+    "SC9: Verify audit timeline includes all readiness events"
+  ],
+  "failed": []
+}

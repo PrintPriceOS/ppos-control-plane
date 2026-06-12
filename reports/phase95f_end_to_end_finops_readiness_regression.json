@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "SC1: Use Phase 92-style reconciled financial snapshot",
+    "SC2: Use Phase 93-style tax/VAT readiness snapshot",
+    "SC3: Use Phase 94-style governed invoice",
+    "SC4: Aggregate financial operations readiness (detect blocker)",
+    "SC5: Generate readiness checklist",
+    "SC6: Detect blockers/warnings in checklist",
+    "SC7: Apply manual review action",
+    "SC8: Generate export preview (mocked via UI panel)",
+    "SC9: Verify no payment/refund/payout/external submission/FULL_PUBLIC enablement",
+    "SC10: Verify source records remain unchanged",
+    "SC11: Verify audit timeline includes all readiness events"
+  ],
+  "failed": []
+}

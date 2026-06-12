@@ -1,0 +1,18 @@
+{
+  "passed": [
+    "SC1: Use Phase 92-style reconciled financial snapshot",
+    "SC2: Use Phase 93-style tax/VAT readiness snapshot",
+    "SC3: Build governed invoice draft",
+    "SC4: Mark invoice ready for review",
+    "SC5: Create a new invoice version",
+    "SC6: Finalize invoice manually",
+    "SC7: Build governed credit note against the invoice",
+    "SC8: Link credit note to invoice",
+    "SC9: Finalize credit note manually",
+    "SC10: Generate export preview (mocked via UI panel existence)",
+    "SC11: Verify no payment/refund/payout/external tax/invoice submission",
+    "SC12: Verify original order/payment/reconciliation/tax snapshots remain unchanged",
+    "SC13: Verify audit timeline includes invoice and credit note lifecycle events"
+  ],
+  "failed": []
+}

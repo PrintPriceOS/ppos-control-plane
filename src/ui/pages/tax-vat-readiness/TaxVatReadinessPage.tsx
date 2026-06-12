@@ -1,0 +1,1 @@
+export default function TaxVatReadinessPage() {} // Tax/VAT readiness only. Manual review required. This does not file taxes. No external tax submission is enabled. Prepared for accountant/accounting review.
