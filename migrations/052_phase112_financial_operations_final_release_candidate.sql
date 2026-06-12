@@ -1,0 +1,110 @@
+-- migrations/052_phase112_financial_operations_final_release_candidate.sql
+
+CREATE TABLE IF NOT EXISTS financial_operations_final_release_candidates (
+    id VARCHAR(255) PRIMARY KEY,
+    final_release_candidate_id VARCHAR(255) NOT NULL,
+    tenant_id VARCHAR(255),
+    release_candidate_name VARCHAR(255) NOT NULL,
+    release_candidate_status VARCHAR(50) NOT NULL,
+    release_candidate_scope VARCHAR(255),
+    release_candidate_mode VARCHAR(50),
+    pre_production_runbook_id VARCHAR(255),
+    go_live_simulation_id VARCHAR(255),
+    compliance_report_run_id VARCHAR(255),
+    activation_review_id VARCHAR(255),
+    readiness_run_id VARCHAR(255),
+    release_candidate_version INT DEFAULT 1,
+    release_readiness_status VARCHAR(50),
+    security_status VARCHAR(50),
+    compliance_status VARCHAR(50),
+    privacy_status VARCHAR(50),
+    provider_status VARCHAR(50),
+    rollback_status VARCHAR(50),
+    incident_status VARCHAR(50),
+    audit_status VARCHAR(50),
+    approval_status VARCHAR(50),
+    production_activation_enabled BOOLEAN DEFAULT FALSE,
+    full_public_enabled BOOLEAN DEFAULT FALSE,
+    live_provider_connectivity_enabled BOOLEAN DEFAULT FALSE,
+    blockers_json JSONB,
+    warnings_json JSONB,
+    evidence_json JSONB,
+    source_snapshot_json JSONB,
+    result_snapshot_json JSONB,
+    metadata_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255),
+    approved_at TIMESTAMP,
+    approved_by VARCHAR(255),
+    revoked_at TIMESTAMP,
+    revoked_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_final_release_candidate_checks (
+    id VARCHAR(255) PRIMARY KEY,
+    release_candidate_check_id VARCHAR(255) NOT NULL,
+    final_release_candidate_id VARCHAR(255) NOT NULL,
+    check_key VARCHAR(100) NOT NULL,
+    check_label VARCHAR(255) NOT NULL,
+    check_status VARCHAR(50) NOT NULL,
+    check_order INT,
+    category VARCHAR(100),
+    required_for_release_candidate BOOLEAN DEFAULT TRUE,
+    blockers_json JSONB,
+    warnings_json JSONB,
+    evidence_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_final_release_candidate_evidence (
+    id VARCHAR(255) PRIMARY KEY,
+    release_candidate_evidence_id VARCHAR(255) NOT NULL,
+    final_release_candidate_id VARCHAR(255) NOT NULL,
+    evidence_key VARCHAR(100) NOT NULL,
+    evidence_label VARCHAR(255) NOT NULL,
+    evidence_status VARCHAR(50) NOT NULL,
+    evidence_source_type VARCHAR(100),
+    evidence_source_id VARCHAR(255),
+    evidence_json JSONB,
+    redacted_preview_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_final_release_candidate_findings (
+    id VARCHAR(255) PRIMARY KEY,
+    final_release_candidate_id VARCHAR(255),
+    release_candidate_check_id VARCHAR(255),
+    release_candidate_evidence_id VARCHAR(255),
+    finding_code VARCHAR(100) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    recommended_action TEXT,
+    evidence_json JSONB,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_final_release_candidate_audit_events (
+    id VARCHAR(255) PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    actor_id VARCHAR(255),
+    actor_type VARCHAR(50) NOT NULL,
+    final_release_candidate_id VARCHAR(255),
+    release_candidate_check_id VARCHAR(255),
+    release_candidate_evidence_id VARCHAR(255),
+    tenant_id VARCHAR(255),
+    payload_json JSONB,
+    created_at TIMESTAMP NOT NULL
+);

@@ -1,0 +1,110 @@
+-- migrations/051_phase111_financial_operations_pre_production_runbook.sql
+
+CREATE TABLE IF NOT EXISTS financial_operations_pre_production_runbooks (
+    id VARCHAR(255) PRIMARY KEY,
+    pre_production_runbook_id VARCHAR(255) NOT NULL,
+    tenant_id VARCHAR(255),
+    runbook_name VARCHAR(255) NOT NULL,
+    runbook_status VARCHAR(50) NOT NULL,
+    runbook_scope VARCHAR(255),
+    runbook_mode VARCHAR(50),
+    go_live_simulation_id VARCHAR(255),
+    compliance_report_run_id VARCHAR(255),
+    activation_review_id VARCHAR(255),
+    readiness_run_id VARCHAR(255),
+    owner_team VARCHAR(100),
+    operator_role VARCHAR(100),
+    escalation_owner VARCHAR(255),
+    runbook_version INT DEFAULT 1,
+    approval_status VARCHAR(50),
+    rollback_status VARCHAR(50),
+    incident_status VARCHAR(50),
+    compliance_status VARCHAR(50),
+    privacy_status VARCHAR(50),
+    provider_status VARCHAR(50),
+    blockers_json JSONB,
+    warnings_json JSONB,
+    evidence_json JSONB,
+    source_snapshot_json JSONB,
+    result_snapshot_json JSONB,
+    metadata_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_pre_production_runbook_sections (
+    id VARCHAR(255) PRIMARY KEY,
+    runbook_section_id VARCHAR(255) NOT NULL,
+    pre_production_runbook_id VARCHAR(255) NOT NULL,
+    section_key VARCHAR(100) NOT NULL,
+    section_label VARCHAR(255) NOT NULL,
+    section_status VARCHAR(50) NOT NULL,
+    section_order INT,
+    category VARCHAR(100),
+    required_for_pre_production BOOLEAN DEFAULT TRUE,
+    instructions_json JSONB,
+    blockers_json JSONB,
+    warnings_json JSONB,
+    evidence_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_pre_production_runbook_tasks (
+    id VARCHAR(255) PRIMARY KEY,
+    runbook_task_id VARCHAR(255) NOT NULL,
+    pre_production_runbook_id VARCHAR(255) NOT NULL,
+    runbook_section_id VARCHAR(255),
+    task_key VARCHAR(100) NOT NULL,
+    task_label VARCHAR(255) NOT NULL,
+    task_status VARCHAR(50) NOT NULL,
+    task_order INT,
+    task_type VARCHAR(50),
+    owner_role VARCHAR(100),
+    requires_manual_confirmation BOOLEAN DEFAULT TRUE,
+    production_execution_enabled BOOLEAN DEFAULT FALSE,
+    full_public_enabled BOOLEAN DEFAULT FALSE,
+    live_provider_connectivity_enabled BOOLEAN DEFAULT FALSE,
+    evidence_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_pre_production_runbook_findings (
+    id VARCHAR(255) PRIMARY KEY,
+    pre_production_runbook_id VARCHAR(255),
+    runbook_section_id VARCHAR(255),
+    runbook_task_id VARCHAR(255),
+    finding_code VARCHAR(100) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    recommended_action TEXT,
+    evidence_json JSONB,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_pre_production_runbook_audit_events (
+    id VARCHAR(255) PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    actor_id VARCHAR(255),
+    actor_type VARCHAR(50) NOT NULL,
+    pre_production_runbook_id VARCHAR(255),
+    runbook_section_id VARCHAR(255),
+    runbook_task_id VARCHAR(255),
+    tenant_id VARCHAR(255),
+    payload_json JSONB,
+    created_at TIMESTAMP NOT NULL
+);
