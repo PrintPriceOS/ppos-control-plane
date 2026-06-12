@@ -1,0 +1,17 @@
+{
+  "passed": [
+    "SC1: Use Phase 108-style data retention/privacy readiness evidence (implicit)",
+    "SC2: Create compliance report definition",
+    "SC3: Approve compliance report definition for readiness",
+    "SC4: Build compliance report preview",
+    "SC5: Build report sections",
+    "SC6: Detect blocker/warning for missing source coverage",
+    "SC7: Resolve a finding through review workflow",
+    "SC8: Generate export preview",
+    "SC9: Verify no live operations enabled",
+    "SC10: Verify no secrets or personal identifiers appear unredacted",
+    "SC11: Verify source/config records remain unchanged",
+    "SC12: Verify audit timeline includes all required events"
+  ],
+  "failed": []
+}
