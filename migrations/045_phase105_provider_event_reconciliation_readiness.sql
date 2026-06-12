@@ -1,0 +1,112 @@
+-- migrations/045_phase105_provider_event_reconciliation_readiness.sql
+
+CREATE TABLE IF NOT EXISTS financial_operations_provider_event_reconciliation_runs (
+    id VARCHAR(255) PRIMARY KEY,
+    event_reconciliation_run_id VARCHAR(255) NOT NULL,
+    tenant_id VARCHAR(255),
+    provider_key VARCHAR(100) NOT NULL,
+    provider_type VARCHAR(100) NOT NULL,
+    provider_name VARCHAR(255) NOT NULL,
+    webhook_sandbox_id VARCHAR(255),
+    provider_sandbox_id VARCHAR(255),
+    credential_vault_id VARCHAR(255),
+    readiness_run_id VARCHAR(255),
+    reconciliation_status VARCHAR(50) NOT NULL,
+    reconciliation_scope VARCHAR(255),
+    event_mode VARCHAR(50) NOT NULL,
+    source_event_count INT DEFAULT 0,
+    matched_event_count INT DEFAULT 0,
+    unmatched_event_count INT DEFAULT 0,
+    duplicate_event_count INT DEFAULT 0,
+    mismatched_event_count INT DEFAULT 0,
+    blockers_json JSONB,
+    warnings_json JSONB,
+    evidence_json JSONB,
+    source_snapshot_json JSONB,
+    result_snapshot_json JSONB,
+    metadata_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    completed_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_provider_event_records (
+    id VARCHAR(255) PRIMARY KEY,
+    provider_event_record_id VARCHAR(255) NOT NULL,
+    event_reconciliation_run_id VARCHAR(255) NOT NULL,
+    tenant_id VARCHAR(255),
+    provider_key VARCHAR(100) NOT NULL,
+    provider_type VARCHAR(100) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    event_mode VARCHAR(50) NOT NULL,
+    event_status VARCHAR(50) NOT NULL,
+    provider_event_id VARCHAR(255),
+    internal_reference_id VARCHAR(255),
+    idempotency_key VARCHAR(255),
+    event_timestamp TIMESTAMP,
+    amount DECIMAL(19,4),
+    currency VARCHAR(3),
+    request_payload_json JSONB,
+    normalized_event_json JSONB,
+    redacted_payload_json JSONB,
+    evidence_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_provider_event_matches (
+    id VARCHAR(255) PRIMARY KEY,
+    provider_event_match_id VARCHAR(255) NOT NULL,
+    event_reconciliation_run_id VARCHAR(255) NOT NULL,
+    provider_event_record_id VARCHAR(255) NOT NULL,
+    internal_reference_id VARCHAR(255),
+    internal_reference_type VARCHAR(100),
+    match_status VARCHAR(50) NOT NULL,
+    match_confidence VARCHAR(50),
+    match_reason TEXT,
+    amount_match_status VARCHAR(50),
+    currency_match_status VARCHAR(50),
+    timestamp_match_status VARCHAR(50),
+    evidence_json JSONB,
+    created_at TIMESTAMP NOT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_provider_event_reconciliation_findings (
+    id VARCHAR(255) PRIMARY KEY,
+    event_reconciliation_run_id VARCHAR(255) NOT NULL,
+    provider_event_record_id VARCHAR(255),
+    provider_event_match_id VARCHAR(255),
+    finding_code VARCHAR(100) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    recommended_action TEXT,
+    evidence_json JSONB,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS financial_operations_provider_event_reconciliation_audit_events (
+    id VARCHAR(255) PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    actor_id VARCHAR(255),
+    actor_type VARCHAR(50) NOT NULL,
+    event_reconciliation_run_id VARCHAR(255),
+    provider_event_record_id VARCHAR(255),
+    provider_event_match_id VARCHAR(255),
+    webhook_sandbox_id VARCHAR(255),
+    provider_sandbox_id VARCHAR(255),
+    credential_vault_id VARCHAR(255),
+    tenant_id VARCHAR(255),
+    provider_key VARCHAR(100),
+    provider_type VARCHAR(100),
+    payload_json JSONB,
+    created_at TIMESTAMP NOT NULL
+);

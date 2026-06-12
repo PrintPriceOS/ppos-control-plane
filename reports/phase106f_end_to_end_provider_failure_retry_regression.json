@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "SC1: Use Phase 105-style provider event reconciliation readiness evidence (implicit)",
+    "SC2: Create provider failure/retry readiness run using mock/stub/dry-run provider failures",
+    "SC3: Classify provider failures",
+    "SC4 & SC5: Simulate retry policy and backoff schedule / Simulate retry attempts",
+    "SC6: Evaluate circuit breaker and dead-letter readiness",
+    "SC7: Generate findings for a missing idempotency case",
+    "SC8: Generate export preview",
+    "SC9: Verify no production activation/FULL_PUBLIC/live provider/live credentials/live endpoint/live event processing/live retry/payment/refund/payout/external invoice submission/tax filing enablement",
+    "SC10: Verify no secrets or live signatures appear in outputs, audit payloads, or export preview",
+    "SC11: Verify source/config records remain unchanged",
+    "SC12: Verify audit timeline includes classification, retry simulation, attempts, circuit breaker, dead-letter, findings, warning/blocker, and export-preview events"
+  ],
+  "failed": []
+}
