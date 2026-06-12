@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "SC1: Use Phase 97-style active controlled pilot program (implicit)",
+    "SC2: Create controlled partner sandbox",
+    "SC3: Activate partner sandbox manually",
+    "SC4: Create sandbox session",
+    "SC5: Create sandbox run",
+    "SC6: Execute mock provider only",
+    "SC7: Execute dry-run only",
+    "SC8: Generate export preview",
+    "SC9: Verify no real payment/refund/payout/external execution enabled",
+    "SC10: Verify source records remain unchanged",
+    "SC11: Verify audit timeline includes sandbox, session, run, mock-provider events"
+  ],
+  "failed": []
+}

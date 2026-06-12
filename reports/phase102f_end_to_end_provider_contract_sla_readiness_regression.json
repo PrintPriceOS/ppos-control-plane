@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "SC1: Use Phase 101-style provider sandbox readiness evidence (implicit)",
+    "SC2: Create provider contract readiness record",
+    "SC3: Complete legal, finance, security, operations, and data-processing reviews",
+    "SC4: Approve contract for readiness",
+    "SC5: Create provider SLA readiness record",
+    "SC6: Evaluate SLA readiness",
+    "SC7: Approve SLA for readiness",
+    "SC8: Generate export preview",
+    "SC9: Verify no production activation/FULL_PUBLIC/live provider/payment execution enablement",
+    "SC10: Verify source/config records remain unchanged",
+    "SC11: Verify audit timeline includes contract, SLA, review, approval events"
+  ],
+  "failed": []
+}
