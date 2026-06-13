@@ -84,6 +84,7 @@ import { TenantPilotReadinessPage } from './pages/pilot/TenantPilotReadinessPage
 
 import { BillingUsageDashboardPage } from './pages/billing/BillingUsageDashboardPage';
 import { ProductionMonitoringDashboardPage } from './pages/production-monitoring/ProductionMonitoringDashboardPage';
+import FinancialOperationsProductionActivationReviewPage from './pages/financial-operations-production-activation-review/FinancialOperationsProductionActivationReviewPage';
 
 export const App: React.FC = () => {
     return (
@@ -114,6 +115,8 @@ export const App: React.FC = () => {
                 <Route path="/queues-workers" element={<QueuesWorkersPage />} />
                 <Route path="/tenants" element={<TenantManagement />} />
                 <Route path="/admin/tenant-pilots" element={<TenantPilotReadinessPage />} />
+                <Route path="/admin/production-activation" element={<FinancialOperationsProductionActivationReviewPage />} />
+                <Route path="/admin/production-activation/:id" element={<FinancialOperationsProductionActivationReviewPage />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

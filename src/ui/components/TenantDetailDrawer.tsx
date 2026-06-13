@@ -258,6 +258,14 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
             <ShieldCheckIcon className="w-4 h-4 text-primary" />
             Quick Actions
           </h3>
+          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono mb-2">
+            <a 
+              href={`/admin/production-activation/${tenant.id}`}
+              className="py-2 px-3 bg-red-600 text-white hover:bg-red-700 text-left uppercase tracking-wider font-bold block col-span-2 text-center"
+            >
+              GO TO PRODUCTION ACTIVATION GATE REVIEW
+            </a>
+          </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
             <button onClick={alignSystem} disabled={loading} className="py-2 px-3 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 text-left uppercase tracking-wider">
               Align as SYSTEM
