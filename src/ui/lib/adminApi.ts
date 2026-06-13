@@ -105,6 +105,17 @@ function getFallbackForPath(path: string): any {
         base.source_status = "MARKETPLACE_LEDGER_UNAVAILABLE";
         return base;
     }
+    if (cleanPath.includes('/printhouse-capabilities')) {
+        base.printhouses = [];
+        base.printhouse = {};
+        base.machines = [];
+        base.media = [];
+        base.profiles = [];
+        base.readiness = { eligible: false, blockers: [] };
+        base.audit = [];
+        base.source_status = "PRINTHOUSE_CAPABILITIES_UNAVAILABLE";
+        return base;
+    }
     
     base.data = [];
     return base;

@@ -31,7 +31,7 @@ export const PrinthouseOnboardingPage: React.FC = () => {
         try {
             const res = await listPrinthouses();
             if (res.ok) {
-                setPrinthouses(res.printhouses);
+                setPrinthouses(res.printhouses || []);
             } else {
                 setError((res as any).error || 'Failed to fetch printhouses');
             }
