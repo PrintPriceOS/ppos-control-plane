@@ -15,7 +15,7 @@ export interface PrinthouseLimits { min_copies: number; max_pages: number; }
 export interface BySignature { '32p'?: number; '24p'?: number; '16p'?: number; '12p'?: number; '8p'?: number; '4p'?: number; }
 export interface ByColour { '1': number; '2': number; '3': number; '4': number; '5': number; }
 export interface BySection { [key: string]: number; }
-export interface ByCountry { belgium: number; netherlands: number; finland: number; hungary: number; poland: number; }
+export interface ByCountry { [key: string]: number; }
 export interface PrinthouseRates {
     interior_one_colour_fixed: BySignature; interior_one_colour_var: BySignature;
     interior_two_colour_fixed: BySignature; interior_two_colour_var: BySignature;
@@ -68,7 +68,7 @@ export interface Printhouse {
 export const SIG_KEYS: Array<keyof BySignature> = ['32p', '24p', '16p', '12p', '8p', '4p'];
 export const COLOUR_KEYS: Array<keyof ByColour> = ['1', '2', '3', '4', '5'];
 export const SECTIONS = Array.from({ length: 24 }, (_, i) => String(i + 1));
-export const COUNTRIES: Array<keyof ByCountry> = ['belgium', 'netherlands', 'finland', 'hungary', 'poland'];
+export const COUNTRIES: string[] = ['belgium', 'netherlands', 'finland', 'hungary', 'poland'];
 export const BINDING_CONFIGS = [
     { key: 'pb' as const, label: 'Perfect Bound' },
     { key: 'ss' as const, label: 'Saddle Stitch' },
@@ -152,6 +152,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
 
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
+    const [selectedCountryToAdd, setSelectedCountryToAdd] = useState('ES');
 
     React.useEffect(() => {
         if (!isOpen) return;
@@ -181,6 +182,40 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
 
     const setRateField = (key: keyof PrinthouseRates, subKey: string, val: number) =>
         setRates(r => ({ ...r, [key]: { ...(r[key] as any), [subKey]: val } }));
+
+    const handleAddCountryZone = () => {
+        const countryCode = selectedCountryToAdd.toLowerCase().trim();
+        if (!countryCode) return;
+        setRates(r => {
+            const percentage_technical_costs = { ...(r.percentage_technical_costs || {}) };
+            const transport_costs = { ...(r.transport_costs || {}) };
+            if (percentage_technical_costs[countryCode] === undefined) {
+                percentage_technical_costs[countryCode] = 0;
+            }
+            if (transport_costs[countryCode] === undefined) {
+                transport_costs[countryCode] = 0;
+            }
+            return {
+                ...r,
+                percentage_technical_costs,
+                transport_costs
+            };
+        });
+    };
+
+    const handleDeleteCountryZone = (countryCode: string) => {
+        setRates(r => {
+            const percentage_technical_costs = { ...(r.percentage_technical_costs || {}) };
+            const transport_costs = { ...(r.transport_costs || {}) };
+            delete percentage_technical_costs[countryCode];
+            delete transport_costs[countryCode];
+            return {
+                ...r,
+                percentage_technical_costs,
+                transport_costs
+            };
+        });
+    };
 
     const handleSave = async () => {
         if (!form.id.trim() || !form.name.trim()) return;
@@ -632,34 +667,114 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                                     {/* ── TRANSPORT ── */}
                                     {tab === 'Transport' && (
                                         <div className="space-y-8 max-w-3xl">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" checked={form.rates.technical_costs_for_transport}
-                                                    onChange={e => setRates(r => ({ ...r, technical_costs_for_transport: e.target.checked }))}
-                                                    className="w-4 h-4 rounded-none border-zinc-300 dark:border-zinc-700 text-[#dc0000] focus:ring-[#dc0000] bg-white dark:bg-zinc-900" />
-                                                <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Technical costs for transport</span>
-                                            </label>
-                                            <div className="max-w-xs">
-                                                <label className={lbl}>Additional Transport Multiplier</label>
-                                                <input type="number" step="0.01" min={1} value={form.rates.additional_transport_multiplier}
-                                                    onChange={e => setRates(r => ({ ...r, additional_transport_multiplier: parseFloat(e.target.value) || 1 }))} className={inp} />
-                                            </div>
-                                            {([
-                                                { label: '% Technical Costs by Country', key: 'percentage_technical_costs' },
-                                                { label: 'Transport Costs by Country', key: 'transport_costs' },
-                                            ] as const).map(({ label, key }) => (
-                                                <div key={key}>
-                                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-3">{label}</h3>
-                                                    <div className="grid grid-cols-5 gap-3">
-                                                        {COUNTRIES.map(c => (
-                                                            <div key={c}>
-                                                                <label className={lbl}>{c}</label>
-                                                                <input type="number" step="0.01" value={form.rates[key][c]}
-                                                                    onChange={e => setRates(r => ({ ...r, [key]: { ...r[key], [c]: parseFloat(e.target.value) || 0 } }))} className={inp} />
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                            <div className="space-y-4">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" checked={form.rates.technical_costs_for_transport}
+                                                        onChange={e => setRates(r => ({ ...r, technical_costs_for_transport: e.target.checked }))}
+                                                        className="w-4 h-4 rounded-none border-zinc-300 dark:border-zinc-700 text-[#dc0000] focus:ring-[#dc0000] bg-white dark:bg-zinc-900" />
+                                                    <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Technical costs for transport</span>
+                                                </label>
+                                                <div className="max-w-xs">
+                                                    <label className={lbl}>Additional Transport Multiplier</label>
+                                                    <input type="number" step="0.01" min={1} value={form.rates.additional_transport_multiplier}
+                                                        onChange={e => setRates(r => ({ ...r, additional_transport_multiplier: parseFloat(e.target.value) || 1 }))} className={inp} />
                                                 </div>
-                                            ))}
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                                                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2">Dynamic Country Shipping Matrix</h3>
+                                                <div className="flex gap-2 items-end max-w-md bg-zinc-50 dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-800">
+                                                    <div className="flex-1">
+                                                        <label className={lbl}>Select Country Zone</label>
+                                                        <select
+                                                            value={selectedCountryToAdd}
+                                                            onChange={e => setSelectedCountryToAdd(e.target.value)}
+                                                            className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000]"
+                                                        >
+                                                            {['ES', 'PT', 'FR', 'DE', 'IT', 'UK', 'BE', 'NL', 'PL', 'FI', 'HU', 'US', 'CA'].map(code => (
+                                                                <option key={code} value={code}>{code}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddCountryZone}
+                                                        className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#dc0000]/95 transition-colors"
+                                                    >
+                                                        + Add Country Zone
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-3 p-4 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                                                    {Array.from(new Set([
+                                                        ...Object.keys(form.rates.percentage_technical_costs || {}),
+                                                        ...Object.keys(form.rates.transport_costs || {})
+                                                    ])).sort().length === 0 ? (
+                                                        <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest text-center py-4">No countries configured</p>
+                                                    ) : (
+                                                        <div className="divide-y divide-zinc-200 dark:divide-zinc-800 space-y-3">
+                                                            {Array.from(new Set([
+                                                                ...Object.keys(form.rates.percentage_technical_costs || {}),
+                                                                ...Object.keys(form.rates.transport_costs || {})
+                                                            ])).sort().map((c, idx) => (
+                                                                <div key={c} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${idx > 0 ? 'pt-3' : ''}`}>
+                                                                    <span className="px-2.5 py-1 bg-zinc-950 border border-zinc-800 text-xs font-black font-mono text-zinc-100 min-w-[60px] text-center">
+                                                                        {c.toUpperCase()}
+                                                                    </span>
+                                                                    <div className="grid grid-cols-2 gap-3 flex-1">
+                                                                        <div>
+                                                                            <label className="block text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-0.5">% Technical Cost</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                value={form.rates.percentage_technical_costs[c] ?? 0}
+                                                                                onChange={e => {
+                                                                                    const val = parseFloat(e.target.value) || 0;
+                                                                                    setRates(r => ({
+                                                                                        ...r,
+                                                                                        percentage_technical_costs: {
+                                                                                            ...(r.percentage_technical_costs || {}),
+                                                                                            [c]: val
+                                                                                        }
+                                                                                    }));
+                                                                                }}
+                                                                                className="px-2 py-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000]"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="block text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-0.5">Transport Cost</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                value={form.rates.transport_costs[c] ?? 0}
+                                                                                onChange={e => {
+                                                                                    const val = parseFloat(e.target.value) || 0;
+                                                                                    setRates(r => ({
+                                                                                        ...r,
+                                                                                        transport_costs: {
+                                                                                            ...(r.transport_costs || {}),
+                                                                                            [c]: val
+                                                                                        }
+                                                                                    }));
+                                                                                }}
+                                                                                className="px-2 py-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000]"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteCountryZone(c)}
+                                                                        className="p-2 text-zinc-400 hover:text-red-500 transition-colors self-end sm:self-center"
+                                                                        title="Delete Zone"
+                                                                    >
+                                                                        <TrashIcon className="w-5 h-5" />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 

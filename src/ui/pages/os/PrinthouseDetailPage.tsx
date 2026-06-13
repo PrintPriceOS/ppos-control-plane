@@ -367,6 +367,10 @@ function PaperCostsTab({ r }: { r: PrinthouseRates }) {
 }
 
 function TransportTab({ r }: { r: PrinthouseRates }) {
+    const techKeys = Object.keys(r?.percentage_technical_costs || {});
+    const transKeys = Object.keys(r?.transport_costs || {});
+    const allCountryKeys = Array.from(new Set([...techKeys, ...transKeys])).sort();
+
     return (
         <div className="space-y-6 max-w-3xl">
             <div className={card}>
@@ -378,19 +382,27 @@ function TransportTab({ r }: { r: PrinthouseRates }) {
             </div>
             <div className={card}>
                 <h3 className={sectionTitle}>% Technical Costs by Country</h3>
-                <div className="grid grid-cols-5 gap-3">
-                    {COUNTRIES.map(c => (
-                        <Cell key={c} label={c}>{r.percentage_technical_costs[c]}</Cell>
-                    ))}
-                </div>
+                {allCountryKeys.length === 0 ? (
+                    <p className="text-xs text-zinc-500 font-mono">NO REGIONS CONFIGURED</p>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        {allCountryKeys.map(c => (
+                            <Cell key={c} label={c.toUpperCase()}>{r.percentage_technical_costs?.[c] ?? 0}</Cell>
+                        ))}
+                    </div>
+                )}
             </div>
             <div className={card}>
                 <h3 className={sectionTitle}>Transport Costs by Country</h3>
-                <div className="grid grid-cols-5 gap-3">
-                    {COUNTRIES.map(c => (
-                        <Cell key={c} label={c}>{r.transport_costs[c]}</Cell>
-                    ))}
-                </div>
+                {allCountryKeys.length === 0 ? (
+                    <p className="text-xs text-zinc-500 font-mono">NO REGIONS CONFIGURED</p>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        {allCountryKeys.map(c => (
+                            <Cell key={c} label={c.toUpperCase()}>{r.transport_costs?.[c] ?? 0}</Cell>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
