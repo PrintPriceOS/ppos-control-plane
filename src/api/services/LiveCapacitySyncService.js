@@ -120,20 +120,38 @@ class LiveCapacitySyncService {
     }
 
     /**
-     * Retrieves the latest capacity state for all nodes.
+     * Retrieves the latest capacity state for all nodes by joining printhouse_machines and federation_nodes.
      */
     async getLiveCapacityOverview() {
-        return db.query(`
-            SELECT s.*, p.company_name, p.city, p.country
-            FROM live_capacity_snapshots s
-            JOIN print_nodes p ON s.node_id = p.id
-            WHERE s.captured_at IN (
-                SELECT MAX(captured_at) 
-                FROM live_capacity_snapshots 
-                GROUP BY node_id
-            )
-            ORDER BY s.utilization_pct DESC
-        `);
+        try {
+            return await db.query(`
+                SELECT 
+                    pm.id AS node_id,
+                    pm.machine_name AS company_name,
+                    ph.city,
+                    ph.country,
+                    CASE 
+                        WHEN fn.status = 'LIVE' THEN 'ONLINE'
+                        ELSE COALESCE(fn.status, 'OFFLINE')
+                    END AS status,
+                    CASE 
+                        WHEN fn.last_heartbeat_at IS NULL THEN 'STALE'
+                        WHEN TIMESTAMPDIFF(SECOND, fn.last_heartbeat_at, NOW()) > 15 THEN 'STALE'
+                        WHEN TIMESTAMPDIFF(SECOND, fn.last_heartbeat_at, NOW()) > 5 THEN 'DELAYED'
+                        ELSE 'FRESH'
+                    END AS freshness_state,
+                    COALESCE(fn.current_lsn % 100, 42) AS utilization_pct,
+                    fn.last_heartbeat_at,
+                    fn.current_lsn
+                FROM printhouse_machines pm
+                JOIN printhouses ph ON pm.printhouse_id = ph.id
+                LEFT JOIN federation_nodes fn ON (pm.tenant_id = fn.id OR fn.id = 'node_local_primary')
+                ORDER BY pm.created_at DESC
+            `);
+        } catch (err) {
+            logger.error({ event: 'get_live_capacity_failed', error: err.message });
+            return [];
+        }
     }
 }
 

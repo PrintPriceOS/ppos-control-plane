@@ -223,6 +223,23 @@ class PrinthouseCapabilityService {
             after: created
         });
 
+        // Federation: Log the new capability to the append-only consensus log
+        try {
+            const logInsert = await db.query(
+                `INSERT INTO federation_capacity_log (origin_node_id, resource_type, capacity_delta, payload_json)
+                 VALUES (?, ?, ?, ?)` ,
+                ['node_local_primary', 'MACHINE_CAPABILITY', 1, JSON.stringify(created)]
+            );
+            if (logInsert && logInsert.insertId) {
+                await db.query(
+                    `UPDATE federation_nodes SET current_lsn = ? WHERE id = ?`,
+                    [logInsert.insertId, 'node_local_primary']
+                );
+            }
+        } catch (fErr) {
+            console.error('[FEDERATION-LOG-ERROR] Failed to replicate capability change:', fErr.message);
+        }
+
         await this.evaluatePrinthouseOnboardingReadiness(printhouseId);
         return created;
     }
@@ -322,6 +339,23 @@ class PrinthouseCapabilityService {
             before,
             after
         });
+
+        // Federation: Log the updated capability to the append-only consensus log
+        try {
+            const logInsert = await db.query(
+                `INSERT INTO federation_capacity_log (origin_node_id, resource_type, capacity_delta, payload_json)
+                 VALUES (?, ?, ?, ?)` ,
+                ['node_local_primary', 'MACHINE_CAPABILITY', 0, JSON.stringify(after)]
+            );
+            if (logInsert && logInsert.insertId) {
+                await db.query(
+                    `UPDATE federation_nodes SET current_lsn = ? WHERE id = ?`,
+                    [logInsert.insertId, 'node_local_primary']
+                );
+            }
+        } catch (fErr) {
+            console.error('[FEDERATION-LOG-ERROR] Failed to replicate capability change:', fErr.message);
+        }
 
         await this.evaluatePrinthouseOnboardingReadiness(before.printhouse_id);
         return after;
