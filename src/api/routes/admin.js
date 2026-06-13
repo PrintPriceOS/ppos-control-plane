@@ -215,6 +215,10 @@ router.use('/federation', federationAdminRouter);
 router.use('/global', globalGovernanceAdminRouter);
 router.use('/printhouses', printhousesAdminRouter);
 router.use('/printhouse-capabilities', printhouseCapabilitiesRouter);
+router.use('/machine-templates', (req, res, next) => {
+  req.url = '/machine-templates' + req.url.substring(req.path.length);
+  next();
+}, printhouseCapabilitiesRouter);
 router.use('/orders', ordersAdminRouter);
 router.use('/preflight', adminPreflightJobsRouter);
 router.use('/preflight', preflightAdminRouter);

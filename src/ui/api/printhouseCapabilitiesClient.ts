@@ -119,5 +119,5 @@ export async function listCapabilityAudit(printhouseId: string): Promise<{ ok: b
 }
 
 export async function getMachineTemplates(query: string): Promise<{ ok: boolean; templates: any[] }> {
-    return adminFetch<{ ok: boolean; templates: any[] }>(`${BASE_URL}/machine-templates?q=${encodeURIComponent(query)}`);
+    return adminFetch<{ ok: boolean; templates: any[] }>(`/api/admin/machine-templates?q=${encodeURIComponent(query)}`);
 }

@@ -93,15 +93,11 @@ router.get('/machine-templates', async (req, res) => {
             return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
         }
         const query = (req.query.q || '').trim().toLowerCase();
-        if (!query) {
-            return res.json({ ok: true, templates: MACHINE_TEMPLATES });
-        }
         const filtered = MACHINE_TEMPLATES.filter(t => 
             (t.manufacturer || '').toLowerCase().includes(query) || 
-            (t.model || '').toLowerCase().includes(query) ||
-            (t.machine_name || '').toLowerCase().includes(query)
+            (t.model || '').toLowerCase().includes(query)
         );
-        return res.json({ ok: true, templates: filtered });
+        res.json({ ok: true, templates: filtered });
     } catch (err) {
         console.error('[PRINTHOUSE_CAPABILITIES] Error listing templates:', err);
         return res.status(500).json({ ok: false, error: err.message });
