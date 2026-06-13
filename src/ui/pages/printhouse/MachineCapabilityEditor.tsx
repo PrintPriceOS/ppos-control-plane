@@ -248,7 +248,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                             </div>
 
                             {showSuggestions && (searchQuery.length >= 2 || (templates && templates.length > 0)) && (
-                                <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-zinc-950 border border-zinc-800 shadow-xl rounded-none">
+                                <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto block bg-zinc-950 border border-zinc-800 shadow-xl rounded-none">
                                     <div className="p-2 border-b border-zinc-800 text-[9px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-950 flex justify-between items-center">
                                         <span>Suggestions Match ({templates ? templates.length : 0})</span>
                                         <button 
