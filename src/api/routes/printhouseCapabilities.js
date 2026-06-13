@@ -772,9 +772,9 @@ router.get('/machine-templates', async (req, res) => {
             return res.json({ ok: true, templates: MACHINE_TEMPLATES });
         }
         const filtered = MACHINE_TEMPLATES.filter(t => 
-            t.manufacturer.toLowerCase().includes(query) || 
-            t.model.toLowerCase().includes(query) ||
-            t.machine_name.toLowerCase().includes(query)
+            (t.manufacturer || '').toLowerCase().includes(query) || 
+            (t.model || '').toLowerCase().includes(query) ||
+            (t.machine_name || '').toLowerCase().includes(query)
         );
         return res.json({ ok: true, templates: filtered });
     } catch (err) {
