@@ -247,10 +247,10 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                 )}
                             </div>
 
-                            {showSuggestions && (searchQuery.length >= 2 || templates.length > 0) && (
+                            {showSuggestions && (searchQuery.length >= 2 || (templates && templates.length > 0)) && (
                                 <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-zinc-950 border border-zinc-800 shadow-xl rounded-none">
                                     <div className="p-2 border-b border-zinc-800 text-[9px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-950 flex justify-between items-center">
-                                        <span>Suggestions Match ({templates.length})</span>
+                                        <span>Suggestions Match ({templates ? templates.length : 0})</span>
                                         <button 
                                             type="button" 
                                             onClick={() => setShowSuggestions(false)}
@@ -259,13 +259,13 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                             [Close]
                                         </button>
                                     </div>
-                                    {templates.length === 0 ? (
+                                    {!templates || templates.length === 0 ? (
                                         <div className="p-3 text-xs font-mono text-zinc-500 bg-zinc-950">
                                             No presets found matching "{searchQuery}"
                                         </div>
                                     ) : (
                                         <ul className="divide-y divide-zinc-900 bg-zinc-950">
-                                            {templates.map((tpl) => (
+                                            {(templates || []).map((tpl) => (
                                                 <li key={tpl.id}>
                                                     <button
                                                         type="button"
@@ -462,12 +462,12 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                 </form>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {machines.length === 0 ? (
+                    {!machines || machines.length === 0 ? (
                         <div className="col-span-full py-12 text-center text-xs font-bold text-zinc-400 border border-dashed ppos-border">
                             No machines added yet. Onboard at least one machine.
                         </div>
                     ) : (
-                        machines.map(m => (
+                        (machines || []).map(m => (
                             <div key={m.id} className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">

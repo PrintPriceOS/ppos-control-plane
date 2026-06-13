@@ -186,34 +186,24 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
     const handleAddCountryZone = () => {
         const countryCode = selectedCountryToAdd.toLowerCase().trim();
         if (!countryCode) return;
-        setRates(r => {
-            const percentage_technical_costs = { ...(r.percentage_technical_costs || {}) };
-            const transport_costs = { ...(r.transport_costs || {}) };
-            if (percentage_technical_costs[countryCode] === undefined) {
-                percentage_technical_costs[countryCode] = 0;
-            }
-            if (transport_costs[countryCode] === undefined) {
-                transport_costs[countryCode] = 0;
-            }
-            return {
-                ...r,
-                percentage_technical_costs,
-                transport_costs
-            };
+        setForm(prev => {
+            const updatedRates = { ...prev.rates };
+            updatedRates.percentage_technical_costs = { ...updatedRates.percentage_technical_costs, [countryCode]: 0 };
+            updatedRates.transport_costs = { ...updatedRates.transport_costs, [countryCode]: 0 };
+            return { ...prev, rates: updatedRates };
         });
     };
 
     const handleDeleteCountryZone = (countryCode: string) => {
-        setRates(r => {
-            const percentage_technical_costs = { ...(r.percentage_technical_costs || {}) };
-            const transport_costs = { ...(r.transport_costs || {}) };
+        setForm(prev => {
+            const updatedRates = { ...prev.rates };
+            const percentage_technical_costs = { ...updatedRates.percentage_technical_costs };
+            const transport_costs = { ...updatedRates.transport_costs };
             delete percentage_technical_costs[countryCode];
             delete transport_costs[countryCode];
-            return {
-                ...r,
-                percentage_technical_costs,
-                transport_costs
-            };
+            updatedRates.percentage_technical_costs = percentage_technical_costs;
+            updatedRates.transport_costs = transport_costs;
+            return { ...prev, rates: updatedRates };
         });
     };
 
