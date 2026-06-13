@@ -11,6 +11,7 @@ import {
     Printhouse, PrinthouseRates, PrinthouseFormModal,
     SIG_KEYS, COLOUR_KEYS, SECTIONS, COUNTRIES, BINDING_CONFIGS, BindingKey,
 } from './PrinthousesPage';
+import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
@@ -397,7 +398,7 @@ function TransportTab({ r }: { r: PrinthouseRates }) {
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['Basic', 'Operational Geography', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
+const DETAIL_TABS = ['Basic', 'Operational Geography', 'Machines', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
 type DetailTab = typeof DETAIL_TABS[number];
 
 export const PrinthouseDetailPage: React.FC = () => {
@@ -492,6 +493,14 @@ export const PrinthouseDetailPage: React.FC = () => {
             <div>
                 {tab === 'Basic' && <BasicTab ph={ph} />}
                 {tab === 'Operational Geography' && <OperationalTab ph={ph} />}
+                {tab === 'Machines' && (
+                    <MachineCapabilityEditor 
+                        printhouseId={ph.id} 
+                        onMutationSuccess={() => {
+                            q.refetch();
+                        }}
+                    />
+                )}
                 {tab === 'Interior' && (r ? <InteriorTab r={r} /> : <NoRates />)}
                 {tab === 'Cover & Endpapers' && (r ? <CoverEndpapersTab r={r} /> : <NoRates />)}
                 {tab === 'Lamination & UV' && (r ? <LaminationUvTab r={r} /> : <NoRates />)}

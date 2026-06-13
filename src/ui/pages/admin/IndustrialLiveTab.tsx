@@ -22,11 +22,15 @@ import {
     ExclamationCircleIcon, 
     QueueListIcon,
     BoltIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    XMarkIcon,
+    PlusIcon
 } from '@heroicons/react/24/outline';
 
 import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
 import { COLORS } from '../../design-system/tokens';
+import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
+import { listPrinthouses } from '../../api/printhouseCapabilitiesClient';
 
 export const IndustrialLiveTab: React.FC = () => {
     const liveState = useAdminQuery('industrial-live-state', getIndustrialLiveState, 5000);
@@ -37,6 +41,23 @@ export const IndustrialLiveTab: React.FC = () => {
 
     const [selectedMachineId, setSelectedMachineId] = React.useState<string | null>(null);
     const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+    
+    const [isOnboardOpen, setIsOnboardOpen] = React.useState(false);
+    const [printhouses, setPrinthouses] = React.useState<any[]>([]);
+    const [selectedPrinthouseId, setSelectedPrinthouseId] = React.useState<string>('');
+
+    React.useEffect(() => {
+        if (isOnboardOpen) {
+            listPrinthouses().then(res => {
+                if (res.ok && res.printhouses) {
+                    setPrinthouses(res.printhouses);
+                    if (res.printhouses.length > 0) {
+                        setSelectedPrinthouseId(res.printhouses[0].id);
+                    }
+                }
+            });
+        }
+    }, [isOnboardOpen]);
 
     const openMachine = (id: string) => {
         setSelectedMachineId(id);
@@ -68,6 +89,13 @@ export const IndustrialLiveTab: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setIsOnboardOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-none"
+                    >
+                        <PlusIcon className="w-4 h-4 text-white" />
+                        ONBOARD FLEET UNIT
+                    </button>
                     <button 
                         onClick={handleScan}
                         className={`flex items-center gap-2 px-4 py-2 ${COLORS.adaptive.surfaceMuted} ${COLORS.adaptive.textPrimary} text-xs font-bold border ${COLORS.adaptive.borderSubtle} hover:border-zinc-400 transition-colors shadow-none`}
@@ -272,6 +300,54 @@ export const IndustrialLiveTab: React.FC = () => {
                 machineId={selectedMachineId} 
                 onClose={() => setIsDrawerOpen(false)} 
             />
+
+            {isOnboardOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} p-6 shadow-2xl space-y-6`}>
+                        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+                            <div>
+                                <h3 className={`text-sm font-black ${COLORS.adaptive.textPrimary} uppercase tracking-widest`}>Onboard Fleet Unit</h3>
+                                <p className={`text-[10px] ${COLORS.adaptive.textMuted} font-medium`}>Direct regional database unit registration.</p>
+                            </div>
+                            <button 
+                                onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); }}
+                                className={`p-1.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.textPrimary} hover:border-[#dc0000] transition-colors`}
+                            >
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className={`block text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-2`}>Select Target Printhouse</label>
+                                <select 
+                                    value={selectedPrinthouseId}
+                                    onChange={e => setSelectedPrinthouseId(e.target.value)}
+                                    className={`w-full max-w-md px-3 py-2 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-xs font-bold focus:outline-none focus:border-[#dc0000] ${COLORS.adaptive.textPrimary} bg-transparent`}
+                                >
+                                    <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
+                                    {printhouses.map(ph => (
+                                        <option key={ph.id} value={ph.id} className="bg-white dark:bg-zinc-950">
+                                            {ph.name} ({ph.city || 'Global'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {selectedPrinthouseId && (
+                                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                                    <MachineCapabilityEditor 
+                                        printhouseId={selectedPrinthouseId} 
+                                        onMutationSuccess={() => {
+                                            capacity.refetch();
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
