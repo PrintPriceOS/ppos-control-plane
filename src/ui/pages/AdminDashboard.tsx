@@ -24,6 +24,8 @@ import { NotificationsTab } from "./admin/NotificationsTab";
 import { EngagementSignalsTab } from "./admin/EngagementSignalsTab";
 import { NetworkOpsTab } from "./admin/NetworkOpsTab";
 import { FederatedNodesNetworkPanel } from "../components/FederatedNodesNetworkPanel";
+import { ProductionNodeRegistryTab } from "./admin/ProductionNodeRegistryTab";
+import { PrinthouseOnboardingPage } from "./printhouse/PrinthouseOnboardingPage";
 import {
     ChartBarIcon,
     UsersIcon,
@@ -49,7 +51,7 @@ import {
     TruckIcon
 } from "@heroicons/react/24/outline";
 
-type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+type Tab = "overview" | "success" | "tenants" | "printhouses" | "onboarding" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
 
 
 type Range = "24h" | "7d" | "30d";
@@ -83,6 +85,8 @@ const AdminDashboardInner: React.FC = () => {
             ["overview", t("admin.tabs.overview" as any), ChartBarIcon],
             ["success", "Success Workspace", HeartIcon],
             ["tenants", "Tenants & Subscriptions", UsersIcon],
+            ["printhouses", "Printhouses", BuildingOfficeIcon],
+            ["onboarding", "Printhouse Onboarding", WrenchScrewdriverIcon],
             ["network", "Network Operations", BuildingOfficeIcon],
             ["pricing", "Pricing Intelligence", CurrencyEuroIcon],
             ["offers", "Production Offers", QueueListIcon],
@@ -241,6 +245,8 @@ const AdminDashboardInner: React.FC = () => {
                         {activeTab === "overview" && <OverviewTab key={`overview-${reloadKey}`} range={range} refreshMs={refresh} />}
                         {activeTab === "success" && <SuccessWorkspace key={`success-${reloadKey}`} />}
                         {activeTab === "tenants" && <TenantManagement key={`tenants-${reloadKey}`} />}
+                        {activeTab === "printhouses" && <ProductionNodeRegistryTab key={`printhouses-${reloadKey}`} />}
+                        {activeTab === "onboarding" && <PrinthouseOnboardingPage key={`onboarding-${reloadKey}`} />}
                         {activeTab === "network" && (
                             <div className="space-y-6">
                                 <FederatedNodesNetworkPanel />
