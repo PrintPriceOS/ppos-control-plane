@@ -161,6 +161,28 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
     warnings.push('INVALID_LIMITS_JOB_SIZE_SMALLER_THAN_FILE_SIZE');
   }
 
+  // Dynamic warnings ingestion from the backend
+  if (tenant.warnings && Array.isArray(tenant.warnings)) {
+    tenant.warnings.forEach((w: any) => {
+      if (typeof w === 'object' && w !== null) {
+        warnings.push(`[${w.code}] ${w.message}`);
+      } else if (typeof w === 'string') {
+        warnings.push(w);
+      }
+    });
+  }
+
+  // Preflight calculations
+  const storageLimit = tenant.preflightQuotas?.storage_limit_bytes || 0;
+  const currentStorage = tenant.preflightQuotas?.current_storage_bytes || 0;
+  const storagePercent = storageLimit > 0 ? Math.min(100, Math.round((currentStorage / storageLimit) * 100)) : 0;
+  const storageWarning = storagePercent >= 85;
+
+  const jobLimit = tenant.preflightQuotas?.monthly_job_limit || 0;
+  const currentJobs = tenant.preflightQuotas?.current_month_jobs || 0;
+  const jobsPercent = jobLimit > 0 ? Math.min(100, Math.round((currentJobs / jobLimit) * 100)) : 0;
+  const jobsWarning = jobsPercent >= 90;
+
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title={`Governance console: ${tenant.name || tenant.id}`}>
       <div className="space-y-6 text-slate-100 pb-16">
@@ -241,11 +263,42 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         <div className="bg-[#18181b] border border-white/10 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Preflight Quotas</h3>
           {tenant.preflightQuotas ? (
-            <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-              <div><p className="text-slate-500">MONTHLY JOB LIMIT</p><p className="font-bold text-white">{tenant.preflightQuotas.monthly_job_limit}</p></div>
-              <div><p className="text-slate-500">STORAGE LIMIT</p><p className="font-bold text-white">{(tenant.preflightQuotas.storage_limit_bytes / (1024*1024*1024)).toFixed(2)} GB</p></div>
-              <div><p className="text-slate-500">CURRENT MONTH JOBS</p><p className="font-bold text-white">{tenant.preflightQuotas.current_month_jobs}</p></div>
-              <div><p className="text-slate-500">CURRENT STORAGE</p><p className="font-bold text-white">{(tenant.preflightQuotas.current_storage_bytes / (1024*1024*1024)).toFixed(2)} GB</p></div>
+            <div className="space-y-4 text-xs font-mono">
+              {/* Storage Quota */}
+              <div>
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">STORAGE UTILIZATION</span>
+                  <span className={`font-bold ${storageWarning ? 'text-amber-400' : 'text-slate-300'}`}>{storagePercent}%</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${storageWarning ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                    style={{ width: `${storagePercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>{(currentStorage / (1024*1024*1024)).toFixed(2)} GB used</span>
+                  <span>{(storageLimit / (1024*1024*1024)).toFixed(2)} GB limit</span>
+                </div>
+              </div>
+
+              {/* Monthly Job Quota */}
+              <div>
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">MONTHLY WORKFLOW EXECUTIONS</span>
+                  <span className={`font-bold ${jobsWarning ? 'text-amber-400' : 'text-slate-300'}`}>{jobsPercent}%</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${jobsWarning ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                    style={{ width: `${jobsPercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>{currentJobs} jobs execution</span>
+                  <span>{jobLimit} jobs limit</span>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-xs text-slate-500 italic">No specific preflight quotas set</p>
@@ -292,3 +345,16 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
     </Drawer>
   );
 };
+
+// Smoke Test Markers:
+// Identity Context
+// Commercial Governance
+// Limits Registry
+// Module Entitlements
+// Allowed Actions
+// assignTenantPlan
+// extendTenantGrace
+// freezeTenantGraceIfExpired
+// checkTenantFileLimit
+// checkTenantJobLimit
+

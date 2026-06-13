@@ -4,6 +4,7 @@
  * Centralized governance, visibility, and multi-region coordination.
  */
 require('dotenv').config();
+const mysqlClient = require('./src/api/services/mysqlClient');
 const fastify = require('fastify')({
     logger: {
         level: process.env.PPOS_LOG_LEVEL || 'info',
@@ -366,6 +367,11 @@ const start = async () => {
         console.log(`[BOOT] Attempting to listen on port: ${PORT}`);
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
+        
+        if (typeof process.send === 'function') {
+            process.send('ready');
+            console.log('[BOOT] Sent ready signal to PM2');
+        }
     } catch (err) {
         console.error('[FATAL-STARTUP-ERROR]', err);
         // Write to a file so we can see it in Plesk File Manager
@@ -378,5 +384,32 @@ const start = async () => {
         process.exit(1);
     }
 };
+
+const gracefulShutdown = async (signal) => {
+    console.log(`[SHUTDOWN] Intercepted signal: ${signal}. Initiating graceful teardown...`);
+    try {
+        console.log('[SHUTDOWN] Closing HTTP server...');
+        await fastify.close();
+        console.log('[SHUTDOWN] HTTP server closed.');
+    } catch (err) {
+        console.error('[SHUTDOWN] Error closing HTTP server:', err.message);
+    }
+
+    console.log('[SHUTDOWN] Waiting for active async operations to settle...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+        console.log('[SHUTDOWN] Closing database connection pool...');
+        await mysqlClient.closePool();
+    } catch (err) {
+        console.error('[SHUTDOWN] Error closing database pool:', err.message);
+    }
+
+    console.log('[SHUTDOWN] Teardown complete. Exiting.');
+    process.exit(0);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 start();

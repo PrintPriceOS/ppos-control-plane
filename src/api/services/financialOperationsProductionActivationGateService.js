@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('./mysqlClient');
+const notificationDispatcher = require('./notificationDispatcherService');
 
 class FinancialOperationsProductionActivationGateService {
     constructor() {
@@ -103,6 +104,14 @@ class FinancialOperationsProductionActivationGateService {
 
         this._mockGates.push(gate);
         await this._recordEvent('FINOPS_PRODUCTION_ACTIVATION_GATE_CREATED', gate, null, actor, `Gate ${gate.activation_gate_name} created`);
+
+        // Non-blocking fire-and-forget background call
+        notificationDispatcher.dispatch('PRODUCTION_ACTIVATION_REQUESTED', {
+            gateId: gate.production_activation_gate_id,
+            tenantId: gate.tenant_id,
+            initiatedBy: actor.userId
+        }).catch(() => {});
+
         return gate;
     }
 

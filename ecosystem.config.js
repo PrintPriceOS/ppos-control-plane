@@ -38,7 +38,7 @@ module.exports = {
       max_memory_restart: '1500M',
       kill_timeout: 10000,       // 10s graceful shutdown window
       listen_timeout: 15000,     // 15s startup readiness timeout
-      wait_ready: false,
+      wait_ready: true,
       restart_delay: 2000,       // 2s cooldown between restarts
       exp_backoff_restart_delay: 100,
       error_file: './logs/control-plane-error.log',

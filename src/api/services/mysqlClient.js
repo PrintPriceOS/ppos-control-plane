@@ -15,8 +15,12 @@ function getPool() {
         password: process.env.MYSQL_PASSWORD,
         database: process.env.MYSQL_DATABASE,
         waitForConnections: true,
-        connectionLimit: 10,
+        connectionLimit: parseInt(process.env.DB_POOL_LIMIT || '25'),
         queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        maxIdle: 10,
+        idleTimeout: 60000,
         connectTimeout: 5000 // Industrial: Fail fast if host unreachable
     };
 
@@ -106,4 +110,17 @@ async function query(sql, params = []) {
     }
 }
 
-module.exports = { getPool, query };
+async function closePool() {
+    if (pool) {
+        try {
+            await pool.end();
+            logger.info({ event: 'pool_closed', message: 'MySQL connection pool closed cleanly' });
+        } catch (err) {
+            logger.error({ event: 'pool_close_failed', error: err.message });
+        } finally {
+            pool = null;
+        }
+    }
+}
+
+module.exports = { getPool, query, closePool };

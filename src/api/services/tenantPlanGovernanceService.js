@@ -9,6 +9,7 @@ const db = require('./mysqlClient');
 const logger = require('./logger').child('tenant-governance');
 const auditLogger = require('./auditLoggerService');
 const matrix = require('./tenantEntitlementMatrix');
+const notificationDispatcher = require('./notificationDispatcherService');
 
 class TenantPlanGovernanceService {
     /**
@@ -201,6 +202,84 @@ class TenantPlanGovernanceService {
         const blockers = [];
         const warnings = [];
 
+        // Evaluate database-driven warnings / alerts
+        const quotas = tenant.preflight_quotas || {
+            monthly_job_limit: 1000,
+            storage_limit_bytes: 10737418240, // 10GB
+            current_month_jobs: 0,
+            current_storage_bytes: 0
+        };
+
+        const currentStorage = Number(quotas.current_storage_bytes || 0);
+        const limitStorage = Number(quotas.storage_limit_bytes || 10737418240);
+        const storageUsageRatio = limitStorage > 0 ? (currentStorage / limitStorage) : 0;
+        const storage_usage_percent = Number((storageUsageRatio * 100).toFixed(1));
+
+        if (storageUsageRatio >= 0.85) {
+            const severity = storageUsageRatio >= 0.95 ? 'CRITICAL' : 'WARNING';
+            const msg = `[STORAGE_LIMIT_WARNING] Storage usage is at ${storage_usage_percent}% (${(currentStorage / (1024*1024*1024)).toFixed(2)} GB of ${(limitStorage / (1024*1024*1024)).toFixed(2)} GB).`;
+            warnings.push({
+                code: 'STORAGE_LIMIT_WARNING',
+                severity,
+                message: msg
+            });
+            await this.logGovernanceEvent(tenantId, 'STORAGE_LIMIT_WARNING', {
+                actorId: actorContext.userId || 'system',
+                planCode: tenant.plan_code,
+                commercialStatus: tenant.commercial_status,
+                reason: msg,
+                metadata: { currentStorage, limitStorage, severity }
+            }).catch(() => {});
+
+            if (storageUsageRatio >= 0.95) {
+                // Non-blocking fire-and-forget background call
+                notificationDispatcher.dispatch('CRITICAL_STORAGE_BREACH', {
+                    tenantId,
+                    storagePercentage: storage_usage_percent
+                }).catch(err => {
+                    logger.warn({ event: 'critical_storage_breach_dispatch_failed', error: err.message });
+                });
+            }
+        }
+
+        const currentJobs = Number(quotas.current_month_jobs || 0);
+        const limitJobs = Number(quotas.monthly_job_limit || 1000);
+        const jobsUsageRatio = limitJobs > 0 ? (currentJobs / limitJobs) : 0;
+        const jobs_usage_percent = Number((jobsUsageRatio * 100).toFixed(1));
+
+        if (jobsUsageRatio >= 0.90) {
+            const severity = jobsUsageRatio >= 0.98 ? 'CRITICAL' : 'WARNING';
+            const msg = `[MONTHLY_JOB_LIMIT_WARNING] Monthly job usage is at ${jobs_usage_percent}% (${currentJobs} of ${limitJobs} jobs).`;
+            warnings.push({
+                code: 'MONTHLY_JOB_LIMIT_WARNING',
+                severity,
+                message: msg
+            });
+            await this.logGovernanceEvent(tenantId, 'MONTHLY_JOB_LIMIT_WARNING', {
+                actorId: actorContext.userId || 'system',
+                planCode: tenant.plan_code,
+                commercialStatus: tenant.commercial_status,
+                reason: msg,
+                metadata: { currentJobs, limitJobs, severity }
+            }).catch(() => {});
+        }
+
+        if (graceActive && daysRemaining <= 2) {
+            const msg = `[GRACE_PERIOD_WARNING] Founding Printhouse grace period has only ${daysRemaining} days remaining.`;
+            warnings.push({
+                code: 'GRACE_PERIOD_WARNING',
+                severity: 'WARNING',
+                message: msg
+            });
+            await this.logGovernanceEvent(tenantId, 'GRACE_PERIOD_WARNING', {
+                actorId: actorContext.userId || 'system',
+                planCode: tenant.plan_code,
+                commercialStatus: tenant.commercial_status,
+                reason: msg,
+                metadata: { daysRemaining, graceEndsAt: effectiveGraceEnds }
+            }).catch(() => {});
+        }
+
         // Check if grace is expired
         if (graceExpired && tenant.commercial_status !== matrix.COMMERCIAL_STATUSES.GRACE_EXPIRED) {
             // Auto-trigger freeze if detected passively
@@ -236,7 +315,11 @@ class TenantPlanGovernanceService {
             },
             limits: tenant.limits,
             resourceLimits: tenant.resource_limits,
-            preflightQuotas: tenant.preflight_quotas,
+            preflightQuotas: tenant.preflight_quotas ? {
+                ...tenant.preflight_quotas,
+                storage_usage_percent,
+                jobs_usage_percent
+            } : null,
             effective_limits: tenant.effective_limits,
             modules: tenant.modules,
             actions,
