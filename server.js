@@ -29,6 +29,9 @@ const fastify = require('fastify')({
 
 
 const path = require('path');
+const federationRouter = require('./src/api/routes/adminFederationCluster');
+const federationConsensusService = require('./src/api/services/federationConsensusService');
+const federationSyncService = require('./src/api/services/federationSyncService');
 
 // Security: Admin Auth Hook
 fastify.addHook('onRequest', async (request, reply) => {
@@ -270,6 +273,7 @@ const start = async () => {
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
+            fastify.use('/api/federation', federationRouter);
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
             const apiNotFoundFallback = (request, reply) => {
@@ -291,6 +295,8 @@ const start = async () => {
             fastify.all('/api/marketplace/*', apiNotFoundFallback);
             fastify.all('/api/public/preflight', apiNotFoundFallback);
             fastify.all('/api/public/preflight/*', apiNotFoundFallback);
+            fastify.all('/api/federation', apiNotFoundFallback);
+            fastify.all('/api/federation/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
@@ -368,6 +374,10 @@ const start = async () => {
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
         
+        // Start federation consensus and synchronization loops
+        await federationConsensusService.start();
+        await federationSyncService.start();
+        
         if (typeof process.send === 'function') {
             process.send('ready');
             console.log('[BOOT] Sent ready signal to PM2');
@@ -387,6 +397,14 @@ const start = async () => {
 
 const gracefulShutdown = async (signal) => {
     console.log(`[SHUTDOWN] Intercepted signal: ${signal}. Initiating graceful teardown...`);
+    try {
+        console.log('[SHUTDOWN] Stopping Federation daemons...');
+        await federationConsensusService.stop();
+        await federationSyncService.stop();
+    } catch (err) {
+        console.error('[SHUTDOWN] Error stopping Federation daemons:', err.message);
+    }
+    
     try {
         console.log('[SHUTDOWN] Closing HTTP server...');
         await fastify.close();

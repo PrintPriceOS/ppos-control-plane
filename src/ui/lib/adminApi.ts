@@ -87,6 +87,24 @@ function getFallbackForPath(path: string): any {
         base.source_status = "GLOBAL_BLOCKS_UNAVAILABLE";
         return base;
     }
+    if (cleanPath.endsWith('/federation/status')) {
+        base.nodes = [];
+        base.activeLease = null;
+        base.localNodeId = 'unknown';
+        base.isReadOnly = false;
+        base.source_status = "FEDERATION_STATUS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/marketplace/auctions')) {
+        base.auctions = [];
+        base.source_status = "MARKETPLACE_AUCTIONS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/marketplace/ledger')) {
+        base.ledger = [];
+        base.source_status = "MARKETPLACE_LEDGER_UNAVAILABLE";
+        return base;
+    }
     
     base.data = [];
     return base;
@@ -2599,4 +2617,79 @@ export async function getAdminPreflightHumanReport(jobId: string) {
 export async function getAdminPreflightProductionHandoffPackage(jobId: string, orderId?: string) {
     const qs = orderId ? `?orderId=${encodeURIComponent(orderId)}` : '';
     return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/production-handoff-package${qs}`);
+}
+
+export interface FederatedNode {
+    id: string;
+    node_name: string;
+    base_url: string;
+    status: 'LIVE' | 'DEGRADED' | 'OFFLINE';
+    last_heartbeat_at: string | null;
+    current_lsn: number;
+    sync_latency_ms?: number;
+}
+
+export interface ClusterLeaseInfo {
+    lease_key: string;
+    holder_node_id: string;
+    expires_at: string;
+    version: number;
+}
+
+export interface FederationClusterStatusResponse {
+    nodes: FederatedNode[];
+    activeLease: ClusterLeaseInfo | null;
+    localNodeId: string;
+    isReadOnly: boolean;
+}
+
+export async function getFederationClusterStatus() {
+    return adminFetch<FederationClusterStatusResponse>('/api/federation/status');
+}
+
+export interface MarketplaceAuction {
+    id: string;
+    owner_node_id: string;
+    machine_category: string;
+    capacity_quantity: number;
+    reserve_price: number;
+    slot_start_time: string;
+    slot_end_time: string;
+    close_at: string;
+    status: 'OPEN' | 'MATCHED' | 'EXPIRED';
+}
+
+export interface LedgerEntry {
+    entry_id: number;
+    transaction_id: string;
+    account_id: string;
+    entry_type: 'DEBIT' | 'CREDIT';
+    asset_type: 'CURRENCY' | 'CAPACITY_UNITS';
+    amount: number;
+    parent_hash: string;
+    cryptographic_hash: string;
+    timestamp: string;
+}
+
+export async function getMarketplaceAuctions() {
+    try {
+        return await adminFetch<MarketplaceAuction[]>('/api/admin/marketplace/auctions');
+    } catch (err) {
+        return [];
+    }
+}
+
+export async function placeMarketplaceBid(auctionId: string, bidAmount: number) {
+    return adminFetch<{ ok: boolean; message?: string }>('/api/admin/marketplace/bid', {
+        method: 'POST',
+        body: JSON.stringify({ auctionId, bidAmount })
+    });
+}
+
+export async function getMarketplaceLedger() {
+    try {
+        return await adminFetch<LedgerEntry[]>('/api/admin/marketplace/ledger');
+    } catch (err) {
+        return [];
+    }
 }

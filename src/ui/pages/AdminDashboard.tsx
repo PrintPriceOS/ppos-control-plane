@@ -23,6 +23,7 @@ import { ControlsTab } from "./admin/ControlsTab";
 import { NotificationsTab } from "./admin/NotificationsTab";
 import { EngagementSignalsTab } from "./admin/EngagementSignalsTab";
 import { NetworkOpsTab } from "./admin/NetworkOpsTab";
+import { FederatedNodesNetworkPanel } from "../components/FederatedNodesNetworkPanel";
 import {
     ChartBarIcon,
     UsersIcon,
@@ -240,7 +241,12 @@ const AdminDashboardInner: React.FC = () => {
                         {activeTab === "overview" && <OverviewTab key={`overview-${reloadKey}`} range={range} refreshMs={refresh} />}
                         {activeTab === "success" && <SuccessWorkspace key={`success-${reloadKey}`} />}
                         {activeTab === "tenants" && <TenantManagement key={`tenants-${reloadKey}`} />}
-                        {activeTab === "network" && <NetworkOpsTab key={`network-${reloadKey}`} />}
+                        {activeTab === "network" && (
+                            <div className="space-y-6">
+                                <FederatedNodesNetworkPanel />
+                                <NetworkOpsTab key={`network-${reloadKey}`} />
+                            </div>
+                        )}
                         {activeTab === "pricing" && <PricingIntelligenceTab key={`pricing-${reloadKey}`} />}
                         {activeTab === "offers" && <OffersTab key={`offers-${reloadKey}`} />}
                         {activeTab === "marketplace" && <MarketplacePage key={`marketplace-${reloadKey}`} />}

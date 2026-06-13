@@ -4,15 +4,17 @@ import {
     InboxStackIcon,
     BuildingStorefrontIcon,
     ClipboardDocumentCheckIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    GlobeAltIcon
 } from "@heroicons/react/24/outline";
 import { OrderIntakeTab } from "./OrderIntakeTab";
 import { PricingSessionsTab } from "./PricingSessionsTab";
 import { ProductionReadinessTab } from "./ProductionReadinessTab";
 import { MarketplacePrinthouseHandoffTab } from "./MarketplacePrinthouseHandoffTab";
 import { MarketplaceAuditTab } from "./MarketplaceAuditTab";
+import { AutonomousMarketplaceTab } from "./AutonomousMarketplaceTab";
 
-type MarketplaceSubTab = "intake" | "sessions" | "readiness" | "handoff" | "audit";
+type MarketplaceSubTab = "intake" | "sessions" | "readiness" | "handoff" | "capacity_auctions" | "audit";
 
 export const MarketplacePage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<MarketplaceSubTab>("intake");
@@ -22,6 +24,7 @@ export const MarketplacePage: React.FC = () => {
         { id: "sessions", label: "Pricing Sessions", icon: BuildingStorefrontIcon },
         { id: "readiness", label: "Production Readiness", icon: ClipboardDocumentCheckIcon },
         { id: "handoff", label: "Printhouse Handoff", icon: ClipboardDocumentCheckIcon },
+        { id: "capacity_auctions", label: "Capacity Auctions", icon: GlobeAltIcon },
         { id: "audit", label: "Audit / Events", icon: ShieldCheckIcon },
     ];
 
@@ -63,6 +66,7 @@ export const MarketplacePage: React.FC = () => {
                 {activeTab === "sessions" && <PricingSessionsTab />}
                 {activeTab === "readiness" && <ProductionReadinessTab />}
                 {activeTab === "handoff" && <MarketplacePrinthouseHandoffTab />}
+                {activeTab === "capacity_auctions" && <AutonomousMarketplaceTab />}
                 {activeTab === "audit" && <MarketplaceAuditTab />}
             </div>
         </div>
