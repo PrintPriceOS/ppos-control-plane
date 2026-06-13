@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Machine } from '../../types/printhouseCapabilities';
-import { listMachines, createMachine, updateMachine } from '../../api/printhouseCapabilitiesClient';
+import { listMachines, createMachine, updateMachine, getMachineTemplates } from '../../api/printhouseCapabilitiesClient';
 import { PlusIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface MachineCapabilityEditorProps {
@@ -18,9 +18,72 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
     const [editingMachine, setEditingMachine] = useState<Partial<Machine> | null>(null);
     const [isAdding, setIsAdding] = useState(false);
 
+    const [searchQuery, setSearchQuery] = useState('');
+    const [templates, setTemplates] = useState<any[]>([]);
+    const [searchingTemplates, setSearchingTemplates] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
     useEffect(() => {
         loadMachines();
     }, [printhouseId]);
+
+    useEffect(() => {
+        if (searchQuery.length < 2) {
+            setTemplates([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(async () => {
+            setSearchingTemplates(true);
+            try {
+                const res = await getMachineTemplates(searchQuery);
+                if (res.ok) {
+                    setTemplates(res.templates);
+                    setShowSuggestions(true);
+                }
+            } catch (err) {
+                console.error('Error fetching templates:', err);
+            } finally {
+                setSearchingTemplates(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const handleSelectTemplate = (tpl: any) => {
+        setEditingMachine({
+            ...editingMachine,
+            machine_name: tpl.machine_name || '',
+            machine_type: tpl.machine_type || 'OFFSET',
+            manufacturer: tpl.manufacturer || '',
+            model: tpl.model || '',
+            max_sheet_width_mm: tpl.max_sheet_width_mm || 0,
+            max_sheet_height_mm: tpl.max_sheet_height_mm || 0,
+            min_sheet_width_mm: tpl.min_sheet_width_mm || 0,
+            min_sheet_height_mm: tpl.min_sheet_height_mm || 0,
+            max_print_width_mm: tpl.max_print_width_mm || 0,
+            max_print_height_mm: tpl.max_print_height_mm || 0,
+            max_tac_percent: tpl.max_tac_percent || 0,
+            supports_pdfx: !!tpl.supports_pdfx,
+            supports_pdfa: !!tpl.supports_pdfa,
+            supports_variable_data: !!tpl.supports_variable_data,
+            supports_white_ink: !!tpl.supports_white_ink,
+            supports_spot_uv: !!tpl.supports_spot_uv,
+            supports_lamination: !!tpl.supports_lamination,
+            supports_hardcover: !!tpl.supports_hardcover,
+            supports_softcover: !!tpl.supports_softcover,
+            supports_saddle_stitch: !!tpl.supports_saddle_stitch,
+            supports_perfect_binding: !!tpl.supports_perfect_binding,
+            supports_case_binding: !!tpl.supports_case_binding,
+            supported_color_modes_json: tpl.supported_color_modes_json || [],
+            supported_print_methods_json: tpl.supported_print_methods_json || [],
+            supported_sides_json: tpl.supported_sides_json || []
+        });
+        setSearchQuery('');
+        setShowSuggestions(false);
+    };
 
     const loadMachines = async () => {
         setLoading(true);
@@ -162,6 +225,71 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                         {editingMachine.id ? 'Edit Machine Details' : 'Onboard New Machine'}
                     </h4>
 
+                    {/* Preloader Search Section (only on onboarding new machine) */}
+                    {!editingMachine.id && (
+                        <div className="relative border-b ppos-border pb-4 mb-4">
+                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                                Search Machine Template (Manufacturer / Model)
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Type at least 2 characters (e.g., Heidelberg, HP Indigo, Canon)..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setShowSuggestions(true)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:border-primary text-zinc-900 dark:text-zinc-100 placeholder-zinc-500"
+                                />
+                                {searchingTemplates && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                                        <div className="animate-spin rounded-full h-4.5 w-4.5 border-b-2 border-primary"></div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {showSuggestions && (searchQuery.length >= 2 || templates.length > 0) && (
+                                <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-zinc-950 border border-zinc-800 shadow-xl rounded-none">
+                                    <div className="p-2 border-b border-zinc-800 text-[9px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-950 flex justify-between items-center">
+                                        <span>Suggestions Match ({templates.length})</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowSuggestions(false)}
+                                            className="text-zinc-500 hover:text-zinc-300 font-sans text-[10px] uppercase tracking-wider"
+                                        >
+                                            [Close]
+                                        </button>
+                                    </div>
+                                    {templates.length === 0 ? (
+                                        <div className="p-3 text-xs font-mono text-zinc-500 bg-zinc-950">
+                                            No presets found matching "{searchQuery}"
+                                        </div>
+                                    ) : (
+                                        <ul className="divide-y divide-zinc-900 bg-zinc-950">
+                                            {templates.map((tpl) => (
+                                                <li key={tpl.id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSelectTemplate(tpl)}
+                                                        className="w-full text-left px-3 py-2 text-xs font-mono text-zinc-300 hover:text-white hover:bg-[#dc0000]/10 transition-colors flex items-center justify-between"
+                                                    >
+                                                        <span>
+                                                            <span className="font-bold text-zinc-100">{tpl.manufacturer}</span>
+                                                            <span className="text-zinc-500 mx-1">—</span>
+                                                            <span className="text-zinc-300">{tpl.model}</span>
+                                                        </span>
+                                                        <span className="text-[10px] bg-zinc-900 px-1.5 py-0.5 border border-zinc-800 text-zinc-400 font-bold uppercase tracking-wide">
+                                                            {tpl.machine_type}
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Machine Name *</label>
@@ -228,7 +356,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                             <input 
                                 type="number"
                                 value={editingMachine.max_tac_percent || ''}
-                                onChange={e => setEditingMachine({ ...editingMachine, max_tac_percent: e.target.value ? Number(e.target.value) : undefined })}
+                                onChange={e => setEditingMachine({ ...editingMachine, max_tac_percent: e.target.value ? Number(e.target.value) || 0 : undefined })}
                                 className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-primary text-zinc-900 dark:text-zinc-100"
                             />
                         </div>
@@ -239,27 +367,27 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Min Sheet Width</label>
-                                <input type="number" value={editingMachine.min_sheet_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, min_sheet_width_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.min_sheet_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, min_sheet_width_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Max Sheet Width</label>
-                                <input type="number" value={editingMachine.max_sheet_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_sheet_width_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.max_sheet_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_sheet_width_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Min Sheet Height</label>
-                                <input type="number" value={editingMachine.min_sheet_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, min_sheet_height_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.min_sheet_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, min_sheet_height_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Max Sheet Height</label>
-                                <input type="number" value={editingMachine.max_sheet_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_sheet_height_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.max_sheet_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_sheet_height_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Max Print Width</label>
-                                <input type="number" value={editingMachine.max_print_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_print_width_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.max_print_width_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_print_width_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1">Max Print Height</label>
-                                <input type="number" value={editingMachine.max_print_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_print_height_mm: Number(e.target.value) })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
+                                <input type="number" value={editingMachine.max_print_height_mm || ''} onChange={e => setEditingMachine({ ...editingMachine, max_print_height_mm: Number(e.target.value) || 0 })} className="w-full p-1 border border-zinc-200 dark:border-zinc-800 text-xs bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100" />
                             </div>
                         </div>
                     </div>
@@ -270,7 +398,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                             <input 
                                 type="number"
                                 value={editingMachine.max_pages_per_job || ''}
-                                onChange={e => setEditingMachine({ ...editingMachine, max_pages_per_job: e.target.value ? Number(e.target.value) : undefined })}
+                                onChange={e => setEditingMachine({ ...editingMachine, max_pages_per_job: e.target.value ? Number(e.target.value) || 0 : undefined })}
                                 className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-primary text-zinc-900 dark:text-zinc-100"
                             />
                         </div>
@@ -280,7 +408,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                             <input 
                                 type="number"
                                 value={editingMachine.max_file_size_mb || ''}
-                                onChange={e => setEditingMachine({ ...editingMachine, max_file_size_mb: e.target.value ? Number(e.target.value) : undefined })}
+                                onChange={e => setEditingMachine({ ...editingMachine, max_file_size_mb: e.target.value ? Number(e.target.value) || 0 : undefined })}
                                 className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-primary text-zinc-900 dark:text-zinc-100"
                             />
                         </div>

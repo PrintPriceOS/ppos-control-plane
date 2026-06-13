@@ -117,3 +117,7 @@ export async function getReadiness(printhouseId: string): Promise<{ ok: boolean;
 export async function listCapabilityAudit(printhouseId: string): Promise<{ ok: boolean; audit: CapabilityAuditLog[] }> {
     return adminFetch<{ ok: boolean; audit: CapabilityAuditLog[] }>(`${BASE_URL}/${printhouseId}/audit`);
 }
+
+export async function getMachineTemplates(query: string): Promise<{ ok: boolean; templates: any[] }> {
+    return adminFetch<{ ok: boolean; templates: any[] }>(`${BASE_URL}/machine-templates?q=${encodeURIComponent(query)}`);
+}
