@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeftIcon,
@@ -107,6 +107,18 @@ export const PreflightJobDetailPage: React.FC = () => {
   const auditTimelineQ = useAdminQuery(`admin:preflight:job:${jobId}:audit-timeline`, () => getAdminPreflightJobAuditTimeline(jobId!), 15000);
   const ledgerQ = useAdminQuery(`admin:preflight:job:${jobId}:governance-ledger`, () => getAdminPreflightGovernanceLedger(jobId!), 15000);
 
+  // Accelerated dynamic polling (1500ms) with clean unmount/cleanup to prevent memory leaks
+  useEffect(() => {
+    const jobStatus = (jobQ.data?.status || '').toUpperCase();
+    if (jobStatus === 'PROCESSING' || jobStatus === 'QUEUED') {
+      const intervalId = setInterval(() => {
+        jobQ.refetch();
+        artifactsQ.refetch();
+      }, 1500);
+      return () => clearInterval(intervalId);
+    }
+  }, [jobQ.data?.status]);
+
   if (jobQ.status === 'loading') {
     return (
       <div className="flex items-center justify-center py-24 font-manrope">
@@ -207,6 +219,19 @@ export const PreflightJobDetailPage: React.FC = () => {
   // Deduplicate findings and sanitize structural issue counts using collectFindings
   const deduplicatedIssuesCount = findings.length;
 
+  // Defensive computed progress bar percentage checking for nuls
+  const statusUpper = (status || '').toUpperCase();
+  let preflightProgressPercent = 0;
+  if (statusUpper === 'QUEUED') {
+    preflightProgressPercent = 5;
+  } else if (['COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(statusUpper)) {
+    preflightProgressPercent = 100;
+  } else {
+    const executedLen = payload?.analyzerCoverage?.executed?.length || 0;
+    const registeredLen = payload?.analyzerCoverage?.registered?.length || 12;
+    preflightProgressPercent = Math.round((executedLen / registeredLen) * 100);
+  }
+
   const handleTriggerFix = async () => {
     if (!jobId || isFixBlocked) return;
     setActionStatus('fixing');
@@ -214,10 +239,10 @@ export const PreflightJobDetailPage: React.FC = () => {
     setChildFixJobId(null);
     try {
       const res = await requestAdminPreflightFix(jobId, selectedPolicy ? { policy: selectedPolicy } : {});
-      if (res && res.child_job_id) {
-        setChildFixJobId(res.child_job_id);
-      } else if (res && res.fix_job_id) {
-        setChildFixJobId(res.fix_job_id);
+      if (res && res.fixJobId) {
+        setChildFixJobId(res.fixJobId);
+      } else if (res && res.jobId) {
+        setChildFixJobId(res.jobId);
       }
       await jobQ.refetch();
       await artifactsQ.refetch();
@@ -638,6 +663,28 @@ async function triggerArtifactDownload(artifact: any) {
               </div>
             </div>
           </div>
+
+          {/* Premium High-Contrast Red Progress Bar */}
+          {(statusUpper === 'PROCESSING' || statusUpper === 'QUEUED' || preflightProgressPercent < 100) && (
+            <div className="glass p-5 rounded-none border border-primary/20 bg-slate-900/95 dark:bg-[#131314] text-slate-100 space-y-3 font-manrope">
+              <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <ArrowPathIcon className="w-3.5 h-3.5 text-primary animate-spin" />
+                  Active Preflight Worker Processing
+                </span>
+                <span className="text-primary font-black">{preflightProgressPercent}%</span>
+              </div>
+              <div className="w-full bg-white/10 h-2.5 overflow-hidden">
+                <div 
+                  className="bg-primary h-full transition-all duration-300 ease-out" 
+                  style={{ width: `${preflightProgressPercent}%` }} 
+                />
+              </div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Stage: {payload.step || 'Worker Analysis Queue'} • {payload?.analyzerCoverage?.executed?.length || 0}/{payload?.analyzerCoverage?.registered?.length || 12} Analyzers Passed
+              </div>
+            </div>
+          )}
 
           {/* Forensic Real Timeline */}
           <div className="space-y-4">

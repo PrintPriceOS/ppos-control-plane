@@ -2071,11 +2071,26 @@ export async function getAdminPreflightJob(jobId: string) {
     return adminFetch<{ ok: boolean, jobId: string, status: string, source_status: string, canonicalPayload?: any, registryRecord?: any }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}`);
 }
 
-export async function requestAdminPreflightFix(jobId: string, options: any = {}) {
-    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
+export interface PreflightFixResponse {
+    ok: boolean;
+    jobId: string;
+    fixJobId: string;
+    status: string;
+    source_status: string;
+}
+
+export async function requestAdminPreflightFix(jobId: string, options: any = {}): Promise<PreflightFixResponse> {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
         method: 'POST',
         body: JSON.stringify(options)
     });
+    return {
+        ok: !!res?.ok,
+        jobId: res?.jobId || res?.child_job_id || res?.fix_job_id || jobId,
+        fixJobId: res?.fixJobId || res?.fix_job_id || res?.child_job_id || "",
+        status: res?.status || "",
+        source_status: res?.source_status || ""
+    };
 }
 
 export async function retryAdminPreflightJob(jobId: string) {

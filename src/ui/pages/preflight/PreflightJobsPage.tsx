@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+// ... (rest of imports remain identical)
 import { 
   QueueListIcon, 
   FunnelIcon, 
@@ -87,6 +88,22 @@ export const PreflightJobsPage: React.FC = () => {
 
   const storageQ = useAdminQuery('preflight:storage:global', () => getStorageSummary(), 30000);
   const policiesQ = useAdminQuery('preflight:policies:admin', () => getAdminPreflightPolicies(), 30000);
+
+  // Accelerated dynamic polling (1500ms) with clean unmount/cleanup if any job in the list is active
+  useEffect(() => {
+    const jobs = jobsQ.data?.jobs || [];
+    const hasActiveJob = jobs.some((j: any) => {
+      const statusUpper = (j.status || '').toUpperCase();
+      return statusUpper === 'PROCESSING' || statusUpper === 'QUEUED';
+    });
+    if (hasActiveJob) {
+      const intervalId = setInterval(() => {
+        jobsQ.refetch();
+      }, 1500);
+      return () => clearInterval(intervalId);
+    }
+  }, [jobsQ.data?.jobs]);
+
   const policiesData = policiesQ.data;
   const policiesList = policiesData?.policies || [];
   const isPoliciesUnavailable = policiesData && policiesList.length === 0;

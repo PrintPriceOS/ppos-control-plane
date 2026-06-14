@@ -1616,6 +1616,39 @@ router.get('/jobs/:jobId/artifacts/:artifactId', async (req, res) => {
             sizeBytes: artifactRecord.size_bytes
         })}`);
 
+        const fs = require('fs');
+        const storageRoot = process.env.PPOS_PREFLIGHT_STORAGE_ROOT || '/opt/printprice-os/storage/preflight';
+        const tenantIdVal = context.tenantId || 'system';
+        
+        const localCandidates = [
+            path.join(storageRoot, tenantIdVal, 'artifacts', jobId, artifactId),
+            path.join(storageRoot, tenantIdVal, 'artifacts', artifactId),
+            path.join(storageRoot, tenantIdVal, 'uploads', jobId, artifactId),
+            path.join(storageRoot, tenantIdVal, 'uploads', artifactId),
+            path.join('/tmp/ppos-preflight', jobId, artifactId),
+            path.join('/tmp/ppos-preflight', artifactId),
+            path.join(storageRoot, tenantIdVal, 'artifacts', artifactRecord.filename || artifactId)
+        ];
+
+        let filePath = null;
+        for (const candidate of localCandidates) {
+            try {
+                if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                    filePath = candidate;
+                    break;
+                }
+            } catch (e) {}
+        }
+
+        if (filePath) {
+            console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD] Serving local file from disk proxy: ${filePath}`);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="preflight_fixed_${jobId}.pdf"`);
+            return fs.createReadStream(filePath).pipe(res);
+        }
+
+        console.log(`[CONTROL][PREFLIGHT][ARTIFACT-DOWNLOAD] Local candidate files not found. Falling back to upstream streaming.`);
+
         // Ask service client to stream
         const streamResponse = await preflightServiceClient.downloadArtifact(jobId, resolvedArtifactId, context.Authorization, context.tenantId);
 
