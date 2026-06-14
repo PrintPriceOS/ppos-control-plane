@@ -134,10 +134,8 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
     e.stopPropagation();
     const remaining = files.filter((_, i) => i !== index);
     setFiles(remaining);
-    if (remaining.length === 0) {
-      setIsPdfValidated(false);
-      setMagicBytesStatus('IDLE');
-    }
+    setIsPdfValidated(false);
+    setMagicBytesStatus('IDLE');
   };
 
   const resetAndClose = () => {
@@ -286,22 +284,24 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-3">
                       {/* Mode Toggles */}
                       <div className="flex bg-slate-200/50 dark:bg-white/5 p-0.5 border ppos-border">
                         <button 
-                          onClick={() => { setMode('SINGLE'); setFiles([]); setStatus('idle'); setError(null); }}
+                          onClick={() => { setMode('SINGLE'); setFiles([]); setStatus('idle'); setError(null); setMagicBytesStatus('IDLE'); setIsPdfValidated(false); }}
                           className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${mode === 'SINGLE' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
                         >
                           Single Pipeline
                         </button>
                         <button 
-                          onClick={() => { setMode('BATCH'); setFiles([]); setStatus('idle'); setError(null); }}
+                          onClick={() => { setMode('BATCH'); setFiles([]); setStatus('idle'); setError(null); setMagicBytesStatus('IDLE'); setIsPdfValidated(false); }}
                           className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${mode === 'BATCH' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
                         >
                           Batch Array
                         </button>
                       </div>
+
+
+
 
                       <button 
                         onClick={resetAndClose}

@@ -8,11 +8,9 @@ import { short } from "../../lib/formatters";
 
 export const PreflightCertificatesPage: React.FC = () => {
   const navigate = useNavigate();
-  // Fetch jobs with type CERTIFY or completed jobs in general
-  const q = useAdminQuery("preflight:certificates", () => getPreflightJobs({ status: 'COMPLETED', limit: 50 }), 30000);
+  const q = useAdminQuery("preflight:certificates", () => getPreflightJobs({ status: 'COMPLETED', type: 'CERTIFY', limit: 50 }), 30000);
 
-  // Filter for jobs that are either explicitly CERTIFY or resulted in a no-op (meaning pure certification)
-  const certJobs = q.data?.jobs.filter(j => j.type === 'CERTIFY' || j.noopFix) || [];
+  const certJobs = q.data?.jobs || [];
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeftIcon,
   CubeIcon,
@@ -94,6 +94,7 @@ function renderAnalysisIntegrity(payload: any): string {
 
 export const PreflightJobDetailPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
+  const navigate = useNavigate();
   
   const [selectedPolicy, setSelectedPolicy] = useState('');
   const [actionStatus, setActionStatus] = useState<'idle' | 'fixing' | 'retrying' | 'error' | 'success'>('idle');
@@ -240,10 +241,12 @@ export const PreflightJobDetailPage: React.FC = () => {
     setChildFixJobId(null);
     try {
       const res = await requestAdminPreflightFix(jobId, selectedPolicy ? { policy: selectedPolicy } : {});
-      if (res && res.fixJobId) {
-        setChildFixJobId(res.fixJobId);
-      } else if (res && res.jobId) {
-        setChildFixJobId(res.jobId);
+      const targetJobId = res?.jobId || res?.fixJobId;
+      if (targetJobId) {
+        setChildFixJobId(targetJobId);
+        alert("Autofix Environment Spawned Successfully");
+        navigate(`/preflight/jobs/${targetJobId}`);
+        return;
       }
       await jobQ.refetch();
       await artifactsQ.refetch();
