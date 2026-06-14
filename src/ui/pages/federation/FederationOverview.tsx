@@ -9,10 +9,12 @@ export const FederationOverview: React.FC = () => {
         const fetchInstances = async () => {
             try {
                 const d = await adminFetch<any>('/api/admin/federation/registry');
-                if (d.ok) setInstances(d.registry);
+                if (d.ok) setInstances(d.registry || []);
             } catch (e) {}
         };
         fetchInstances();
+        const intervalId = setInterval(fetchInstances, 2500);
+        return () => clearInterval(intervalId);
     }, []);
 
     const healthyCount = instances.filter(i => i.status === 'HEALTHY').length;
@@ -20,42 +22,42 @@ export const FederationOverview: React.FC = () => {
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
-            <div className="flex justify-between items-center border-b pb-4">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">🌍 Distributed Federation Core</h1>
-                <div className="space-x-2">
-                    <Link to="/federation/registry" className="px-3 py-1 bg-slate-100 text-slate-700 rounded-none text-sm hover:bg-slate-200">Instance Registry</Link>
-                    <Link to="/federation/signals" className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-none text-sm hover:bg-indigo-100">Live Signals</Link>
-                    <Link to="/federation/decisions" className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-none text-sm hover:bg-emerald-100">Decisions</Link>
+            <div className="flex justify-between items-center border-b ppos-border pb-4 flex-wrap gap-4">
+                <h1 className="text-2xl font-black tracking-tight text-[#ECECF1]">🌍 Distributed Federation Core</h1>
+                <div className="flex bg-slate-200/50 dark:bg-white/5 p-0.5 border ppos-border">
+                    <Link to="/federation/registry" className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-all">Instance Registry</Link>
+                    <Link to="/federation/signals" className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-all">Live Signals</Link>
+                    <Link to="/federation/decisions" className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-all">Decisions</Link>
                 </div>
             </div>
 
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-400">
                 PrintPrice OS forms a mesh network capable of policy-governed inter-instance load balancing.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-900 border border-slate-800 rounded-none p-5 text-white">
-                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Local Identity</h3>
-                    <div className="font-mono text-xl">{localOps?.instanceId || 'RESOLVING...'}</div>
-                    <div className="text-xs text-indigo-400 mt-2">{localOps?.serviceTier || 'UNKNOWN'} Tier Node</div>
+                <div className="glass border ppos-border ppos-surface p-5 text-[#ECECF1]">
+                    <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Local Identity</h3>
+                    <div className="font-mono font-black text-2xl tracking-tight text-indigo-400">{localOps?.instanceId || 'RESOLVING...'}</div>
+                    <div className="text-xs text-indigo-400/80 mt-2 font-bold uppercase tracking-wider">{localOps?.serviceTier || 'UNKNOWN'} Tier Node</div>
                 </div>
                 
-                <div className="bg-white border rounded-none p-5 shadow-sm border-slate-200">
-                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Total Mesh Nodes</h3>
-                    <div className="font-mono text-3xl font-light text-slate-700">{instances.length}</div>
-                    <div className="text-xs text-slate-400 mt-2">Active Sovereign Datacenters</div>
+                <div className="glass border ppos-border ppos-surface p-5 text-[#ECECF1]">
+                    <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Total Mesh Nodes</h3>
+                    <div className="font-mono font-black text-3xl tracking-tight text-[#ECECF1]">{instances.length}</div>
+                    <div className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-wider">Active Sovereign Datacenters</div>
                 </div>
 
-                <div className="bg-white border rounded-none p-5 shadow-sm border-slate-200">
-                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Peer Health Ratio</h3>
-                    <div className="font-mono text-3xl font-light text-slate-700">{healthyCount}/{instances.length}</div>
-                    <div className="text-xs text-slate-400 mt-2">Instances accepting traffic allocations.</div>
+                <div className="glass border ppos-border ppos-surface p-5 text-[#ECECF1]">
+                    <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Peer Health Ratio</h3>
+                    <div className="font-mono font-black text-3xl tracking-tight text-[#ECECF1]">{healthyCount}/{instances.length}</div>
+                    <div className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-wider">Instances accepting traffic.</div>
                 </div>
             </div>
 
-            <div className="p-4 bg-amber-50 text-amber-800 rounded-none text-sm border border-amber-200 flex items-start gap-4">
-                <div className="font-bold">POLICY LOCK</div>
-                <div>Tenant data is strictly mathematically sandboxed. Regions synchronize purely via generalized capacity vectors. <strong>Payload Isolation</strong> algorithms guarantee absolute boundary compliance for any cross-region transaction.</div>
+            <div className="p-4 bg-amber-500/10 text-amber-500 rounded-none text-sm border border-amber-500/20 flex items-start gap-4">
+                <div className="font-black uppercase tracking-widest text-xs border border-amber-500/30 px-2 py-0.5 bg-amber-500/10">POLICY LOCK</div>
+                <div className="text-xs font-bold leading-relaxed">Tenant data is strictly mathematically sandboxed. Regions synchronize purely via generalized capacity vectors. <strong>Payload Isolation</strong> algorithms guarantee absolute boundary compliance for any cross-region transaction.</div>
             </div>
         </div>
     );
