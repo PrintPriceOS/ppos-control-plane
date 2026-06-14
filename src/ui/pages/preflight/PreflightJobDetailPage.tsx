@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeftIcon,
@@ -16,8 +16,16 @@ import {
   DocumentIcon,
   ArrowPathIcon,
   WrenchScrewdriverIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
+import {
+  Dialog,
+  Transition,
+  TransitionChild,
+  DialogPanel,
+  DialogTitle
+} from "@headlessui/react";
 import { 
   getAdminPreflightJob, 
   listAdminPreflightArtifacts, 
@@ -100,6 +108,8 @@ export const PreflightJobDetailPage: React.FC = () => {
   const [actionStatus, setActionStatus] = useState<'idle' | 'fixing' | 'retrying' | 'error' | 'success'>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
   const [childFixJobId, setChildFixJobId] = useState<string | null>(null);
+  const [isHumanReportModalOpen, setIsHumanReportModalOpen] = useState(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 
   // High-Fidelity unmocked queries
   const jobQ = useAdminQuery(`admin:preflight:job:${jobId}`, () => getAdminPreflightJob(jobId!), 5000);
@@ -119,6 +129,15 @@ export const PreflightJobDetailPage: React.FC = () => {
       return () => clearInterval(intervalId);
     }
   }, [jobQ.data?.status]);
+
+  // Memory safety: clean up URL object resources on change or unmount
+  useEffect(() => {
+    return () => {
+      if (previewBlobUrl) {
+        window.URL.revokeObjectURL(previewBlobUrl);
+      }
+    };
+  }, [previewBlobUrl]);
 
   if (jobQ.status === 'loading') {
     return (
@@ -759,7 +778,61 @@ async function triggerArtifactDownload(artifact: any) {
           </div>
 
           {/* Phase 43D Human Report Panel */}
-          <HumanReportPanel jobId={jobId!} />
+          <HumanReportPanel 
+            jobId={jobId!} 
+            jobPayload={jobQ.data}
+            onActionClick={async (action) => {
+              if (action.id === 'VIEW_HUMAN_REPORT') {
+                setIsHumanReportModalOpen(true);
+              } else if (action.id === 'VIEW_REVIEW_ARTIFACT') {
+                let artifactId = action.metadata?.artifact_id;
+
+                if (!artifactId || artifactId === 'VIEW_REVIEW_ARTIFACT') {
+                  const report = jobQ.data?.canonicalPayload?.report || jobQ.data?.report;
+                  const primaryReviewArt = report?.review_decision_ux?.operator?.primary_review_artifact;
+                  artifactId = primaryReviewArt?.download_id || primaryReviewArt?.id;
+                }
+
+                if (!artifactId || artifactId === 'VIEW_REVIEW_ARTIFACT') {
+                  const report = jobQ.data?.canonicalPayload?.report || jobQ.data?.report;
+                  const recs = report?.artifact_recommendations || [];
+                  const found = recs.find((r: any) => r.type?.toLowerCase().includes('fixed') || r.filename?.toLowerCase().includes('fixed') || r.artifact_role === 'INTERNAL');
+                  artifactId = found?.download_id || found?.id;
+                }
+
+                if (!artifactId || artifactId === 'VIEW_REVIEW_ARTIFACT') {
+                  const items = artifactsQ.data?.artifacts || [];
+                  const candidates = ['final_fixed_pdf', 'fixed_pdf', 'corrected_pdf', 'repaired_pdf', 'repair_pdf', 'production_pdf', 'printable_pdf'];
+                  const found = items.find((a: any) => candidates.includes(a.alias) && a.downloadable === true);
+                  artifactId = found?.download_id || found?.id || found?.artifact_id;
+                }
+
+                if (!artifactId || artifactId === 'VIEW_REVIEW_ARTIFACT') {
+                  const items = artifactsQ.data?.artifacts || [];
+                  const found = items.find((a: any) => a.mime_type?.includes('pdf') || a.filename?.endsWith('.pdf'));
+                  artifactId = found?.download_id || found?.id || found?.artifact_id;
+                }
+
+                if (!artifactId) {
+                  alert('No suitable review artifact found for preview.');
+                  return;
+                }
+
+                try {
+                  const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+                  const res = await fetch(`/api/admin/preflight/artifacts/${artifactId}/download`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                  });
+                  if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  setPreviewBlobUrl(url);
+                } catch (err: any) {
+                  alert('Failed to load review artifact: ' + err.message);
+                }
+              }
+            }}
+          />
 
           {/* Canonical Governance Ledger */}
           <GovernanceLedgerPanel 
@@ -1004,6 +1077,123 @@ async function triggerArtifactDownload(artifact: any) {
         </div>
 
       </div>
+
+      {/* Premium Full-Width Dialog Modal for Human Report view */}
+      <Transition show={isHumanReportModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setIsHumanReportModalOpen(false)}>
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <TransitionChild
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                enterTo="opacity-100 translate-y-0 sm:scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              >
+                <DialogPanel className="relative transform overflow-hidden rounded-none ppos-surface p-6 text-left shadow-2xl border ppos-border transition-all sm:my-8 w-full max-w-5xl">
+                  <div className="flex items-center justify-between border-b ppos-border pb-4 mb-4">
+                    <DialogTitle as="h3" className="text-lg font-black uppercase tracking-widest text-slate-900 dark:text-[#ECECF1]">
+                      Detailed Industrial Human Report
+                    </DialogTitle>
+                    <button
+                      onClick={() => setIsHumanReportModalOpen(false)}
+                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all"
+                    >
+                      <XMarkIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto pr-2">
+                    <HumanReportPanel jobId={jobId!} jobPayload={jobQ.data} />
+                  </div>
+                </DialogPanel>
+              </TransitionChild>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Premium Side-Drawer Dialog for Secure Stream Visor */}
+      <Transition show={!!previewBlobUrl} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => {
+          if (previewBlobUrl) {
+            window.URL.revokeObjectURL(previewBlobUrl);
+            setPreviewBlobUrl(null);
+          }
+        }}>
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                <TransitionChild
+                  as={Fragment}
+                  enter="transform transition ease-in-out duration-500 sm:duration-700"
+                  enterFrom="translate-x-full"
+                  enterTo="translate-x-0"
+                  leave="transform transition ease-in-out duration-500 sm:duration-700"
+                  leaveFrom="translate-x-0"
+                  leaveTo="translate-x-full"
+                >
+                  <DialogPanel className="pointer-events-auto w-screen max-w-4xl border-l ppos-border bg-slate-50 dark:bg-[#131314]">
+                    <div className="flex h-full flex-col overflow-y-scroll py-6 shadow-xl">
+                      <div className="px-6 pb-4 border-b ppos-border flex items-center justify-between">
+                        <DialogTitle as="h3" className="text-lg font-black uppercase tracking-widest text-slate-900 dark:text-[#ECECF1]">
+                          Industrial PDF Review Visor
+                        </DialogTitle>
+                        <button
+                          onClick={() => {
+                            if (previewBlobUrl) {
+                              window.URL.revokeObjectURL(previewBlobUrl);
+                              setPreviewBlobUrl(null);
+                            }
+                          }}
+                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all"
+                        >
+                          <XMarkIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <div className="relative flex-1 p-6">
+                        {previewBlobUrl && (
+                          <iframe
+                            src={previewBlobUrl}
+                            sandbox="allow-scripts allow-same-origin"
+                            className="w-full h-[78vh] border-none"
+                            title="Industrial PDF Review Artifact"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </DialogPanel>
+                </TransitionChild>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 };

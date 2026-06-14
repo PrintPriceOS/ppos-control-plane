@@ -23,9 +23,11 @@ import { getArtifactUxForArtifact } from "../../../lib/artifactUx";
 
 interface HumanReportPanelProps {
     jobId: string;
+    jobPayload?: any;
+    onActionClick?: (action: any) => void;
 }
 
-export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => {
+export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId, jobPayload, onActionClick }) => {
     const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
     const [shareToken, setShareToken] = useState<string | null>(null);
     const [snapshotId, setSnapshotId] = useState<string | null>(null);
@@ -33,8 +35,10 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
     // 1. Fetch on mount and refetch if jobId changes
     const reportQ = useAdminQuery(`admin:preflight:job:${jobId}:human-report`, () => getAdminPreflightHumanReport(jobId), 15000);
 
+    const report = reportQ.data?.report || jobPayload?.canonicalPayload?.report || jobPayload?.report;
+
     // 2. Explicit non-blocking error state
-    if (reportQ.status === 'error' || (reportQ.data && !reportQ.data.ok)) {
+    if (!report && (reportQ.status === 'error' || (reportQ.data && !reportQ.data.ok))) {
         return (
             <div className="p-5 border border-red-500/20 bg-red-500/5 text-red-500 flex flex-col gap-2 font-manrope rounded-none mb-8">
                 <div className="flex items-center gap-2 font-black uppercase tracking-widest text-xs">
@@ -52,15 +56,10 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
         );
     }
 
-    if (reportQ.status === 'loading') {
-        return (
-            <div className="p-8 flex flex-col items-center justify-center border ppos-border ppos-surface-muted mb-8 font-manrope">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 animate-pulse">Generating Report...</span>
-            </div>
-        );
+    if (reportQ.status === 'loading' && !jobPayload) {
+        return <div className="p-10 font-bold uppercase tracking-widest text-zinc-500 text-xs">Loading Forensic Analysis Metadata...</div>;
     }
 
-    const report = reportQ.data?.report;
     if (!report) return null;
 
     const { 
@@ -174,6 +173,10 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId }) => 
 
     const handleActionClick = async (action: ReviewDecisionUxAction) => {
         if (action.id === 'VIEW_REVIEW_ARTIFACT' || action.id === 'VIEW_HUMAN_REPORT') {
+            if (onActionClick) {
+                onActionClick(action);
+                return;
+            }
             alert(`Action ${action.id} not fully implemented in UI layer yet.`);
             return;
         }

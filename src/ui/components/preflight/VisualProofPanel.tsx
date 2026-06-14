@@ -239,21 +239,38 @@ const ThumbnailRef: React.FC<{ artifactId: string; jobId?: string; label: string
         ? `/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}/download-ticket`
         : null;
 
+    const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    // Append secure token pass matching download route tolerance
+    const authenticatedUrl = `/api/admin/preflight/artifacts/${artifactId}/download?token=${encodeURIComponent(token)}`;
+
     return (
-        <div className="flex items-center gap-1 px-2 py-1 border ppos-border bg-white dark:bg-black/20 text-[9px] font-mono text-slate-600 dark:text-slate-400">
-            <PhotoIcon className="w-3 h-3 shrink-0 text-slate-400" />
-            <span className="truncate max-w-[120px]" title={artifactId}>{label}</span>
-            {downloadUrl && (
-                <a
-                    href={downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline font-black text-[8px] uppercase tracking-widest ml-1"
-                    title="Request download ticket"
-                >
-                    Fetch
-                </a>
-            )}
+        <div className="flex flex-col gap-2 p-2 border ppos-border bg-white dark:bg-black/20 text-[9px] font-mono text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-1">
+                <PhotoIcon className="w-3 h-3 shrink-0 text-slate-400" />
+                <span className="truncate max-w-[120px]" title={artifactId}>{label}</span>
+                {downloadUrl && (
+                    <a
+                        href={downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline font-black text-[8px] uppercase tracking-widest ml-1"
+                        title="Request download ticket"
+                    >
+                        Fetch
+                    </a>
+                )}
+            </div>
+            {/* Authenticated image preview to prevent 401 request denials across the Docker bridge gateway */}
+            <div className="mt-1 max-w-[150px] border ppos-border overflow-hidden bg-slate-950/20">
+                <img 
+                    src={authenticatedUrl} 
+                    alt={label} 
+                    className="w-full h-auto max-h-[100px] object-contain"
+                    onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                    }}
+                />
+            </div>
         </div>
     );
 };
