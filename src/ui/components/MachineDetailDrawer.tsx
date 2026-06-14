@@ -112,7 +112,7 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
       };
 
       setData({
-        header: headerData,
+        federation: headerData,
         telemetry: telemetryData,
         history: historyData,
         capacity: capacityData
@@ -124,206 +124,208 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
     }
   };
 
+  const node = data?.federation;
+  const instanceId = data?.federation?.instanceId ?? data?.federation?.instance_id ?? data?.federation?.id ?? 'N/A';
+  const currentStatus = data?.federation?.status ?? 'UNKNOWN';
+  const tier = data?.federation?.serviceTier ?? data?.federation?.service_tier ?? 'STANDARD';
+  const trust = data?.federation?.trustLevel ?? data?.federation?.trust_level ?? 'MEDIUM';
+  const regionName = data?.federation?.region ?? 'global';
+  const endpointUrl = data?.federation?.endpoint ?? 'N/A';
+
+  // Defensive array guards — eliminates TypeError: .map is not a function at runtime
+  const capabilitiesArray = Array.isArray(data?.federation?.capabilities)
+    ? data!.federation!.capabilities
+    : Array.isArray(data?.capacity?.pressure?.routing_eligibility)
+    ? data!.capacity!.pressure!.routing_eligibility
+    : [];
+  const dispatchArray = Array.isArray(data?.history?.incidents)
+    ? data!.history!.incidents
+    : [];
+
+  // Pre-normalized scalars — eliminates direct property access crashes on null payloads
+  const tel = data?.telemetry ?? {};
+  const jobsRunning   = tel.jobs_running    ?? tel.jobsRunning    ?? 0;
+  const jobsQueued    = tel.jobs_queued     ?? tel.jobsQueued     ?? 0;
+  const jobsFailed    = tel.jobs_failed_24h ?? tel.jobsFailed24h  ?? 0;
+  const throughput    = tel.throughput_h    ?? tel.throughputH    ?? 0;
+  const utilization   = tel.utilization_pct ?? tel.utilizationPct ?? 0;
+  const avgTurnaround = tel.avg_turnaround  ?? tel.avgTurnaround  ?? 0;
+
+  const hist = data?.history ?? {};
+  const t24h = hist.t24h ?? { completed: 0, failed: 0, sla_avg: 0, preflight_avg: 0 };
+  const t7d  = hist.t7d  ?? { completed: 0, failed: 0 };
+
+  const pressure      = data?.capacity?.pressure ?? {};
+  const pressureBarPct       = pressure.pressure_bar_pct     ?? pressure.pressureBarPct     ?? 0;
+  const overloadRisk         = pressure.overload_risk        ?? pressure.overloadRisk        ?? 'LOW';
+  const dispatchContention   = pressure.dispatch_contention  ?? pressure.dispatchContention  ?? 0;
+  const estimatedBacklogMins = pressure.estimated_backlog_mins ?? pressure.estimatedBacklogMins ?? 0;
+
   return (
     <Drawer 
       isOpen={isOpen} 
       onClose={onClose} 
-      title={`Machine: ${data?.header?.name ? toDisplayText(data.header.name) : (machineId || 'Details')}`}
+      title={`Node: ${instanceId}`}
       maxWidth="max-w-2xl"
     >
-      <div className="flex flex-col h-full italic-text-off">
+      <div className="glass border-l border-zinc-800 bg-zinc-950/85 backdrop-blur-md text-[#ECECF1] p-6 h-full shadow-2xl overflow-y-auto italic-text-off">
         {loading && (
-          <div className="flex-1 flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-4">
               <BoltIcon className="w-8 h-8 text-[#dc0000] animate-pulse" />
-              <span className={`text-[10px] font-black uppercase tracking-widest ${COLORS.adaptive.textMuted}`}>Syncing Industrial Data...</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Syncing Industrial Data...</span>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="flex-1 flex items-center justify-center p-12 text-center">
+          <div className="flex items-center justify-center p-12 text-center">
              <div className="space-y-4">
                 <ExclamationCircleIcon className="w-12 h-12 text-[#dc0000] mx-auto" />
-                <h3 className={`text-lg font-black uppercase ${COLORS.adaptive.textPrimary}`}>Telemetry Failure</h3>
-                <p className={`text-sm max-w-xs ${COLORS.adaptive.textSecondary}`}>{toDisplayText(error)}</p>
+                <h3 className="text-lg font-black uppercase text-white">Telemetry Failure</h3>
+                <p className="text-sm max-w-xs text-zinc-400">{toDisplayText(error)}</p>
                 <button onClick={fetchAllData} className="px-6 py-2 border border-[#dc0000] text-[#dc0000] text-[10px] font-black uppercase hover:bg-[#dc0000] hover:text-white transition-all">Retry Synchronization</button>
              </div>
           </div>
         )}
 
         {data && !loading && (
-          <div className="flex-1 space-y-8">
+          <div className="space-y-8">
             {/* 1. MACHINE HEADER */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
+            <section className="p-6 rounded-none border border-zinc-800 bg-zinc-950/40 text-[#ECECF1]">
                <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h1 className={`text-2xl font-black uppercase leading-none mb-2 tracking-tight ${COLORS.adaptive.textPrimary}`}>{toDisplayText(data.header?.name)}</h1>
-                    <div className={`flex items-center gap-4 text-[10px] font-bold ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>
-                       <span>{toDisplayText(data.header?.manufacturer)} / {toDisplayText(data.header?.model)}</span>
-                       <span className="w-1 h-1 bg-zinc-500 rounded-none" />
-                       <span>{toDisplayText(data.header?.region)}</span>
+                    <h1 className="text-2xl font-black uppercase leading-none mb-2 tracking-tight text-white">{toDisplayText(node?.name || `Node ${instanceId}`)}</h1>
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                       <span>{toDisplayText(node?.manufacturer || 'SYNTHETIC_PEER')} / {toDisplayText(node?.model || 'EDGE_PROFILE')}</span>
+                       <span className="w-1 h-1 bg-zinc-700 rounded-none" />
+                       <span>{regionName}</span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`px-4 py-1 border text-[12px] font-black uppercase ${
-                      data.header.status === 'ONLINE' ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-500 bg-emerald-500/5' :
-                      data.header.status === 'OFFLINE' ? 'border-red-600/40 text-[#dc0000] bg-red-600/5' :
-                      'border-amber-500/40 text-amber-600 dark:text-amber-500 bg-amber-500/5'
+                    <div className={`px-4 py-1 border text-[12px] font-black uppercase font-mono ${
+                      currentStatus === 'ONLINE' || currentStatus === 'HEALTHY' ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5 animate-pulse' :
+                      currentStatus === 'DEGRADED' ? 'border-amber-500/40 text-amber-500 bg-amber-500/5' :
+                      'border-red-600/40 text-[#dc0000] bg-red-600/5'
                     }`}>
-                      {data.header.status}
+                      {currentStatus}
                     </div>
-                    <div className={`text-[8px] font-black ${COLORS.adaptive.textMuted} mt-2 uppercase tracking-tight`}>Heartbeat: {data.header.heartbeat_age_sec || '---'}s ago</div>
+                    <div className="text-[8px] font-black text-zinc-500 mt-2 uppercase tracking-tight font-mono">Heartbeat: {node?.heartbeat_age_sec ?? node?.heartbeatAgeSec ?? '---'}s ago</div>
                   </div>
                </div>
 
-               <div className="grid grid-cols-4 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
-                  <StatItem label="Uptime" value={`${data.header.uptime_pct}%`} color="zinc" />
-                  <StatItem label="Region" value={data.header.region} color="zinc" />
-                  <StatItem label="Mode" value={data.header.mode} color="zinc" />
-                  <StatItem label="Federation" value="CONNECTED" color="emerald" />
+               <div className="grid grid-cols-4 gap-4 pt-4 border-t border-zinc-850">
+                  <StatItem label="Uptime" value={`${node?.uptime_pct ?? node?.uptimePct ?? 100}%`} color="zinc" className="font-mono font-black text-xl tracking-tight text-white" />
+                  <StatItem label="Region" value={regionName} color="zinc" />
+                  <StatItem label="Mode" value={node?.mode ?? 'FEDERATED'} color="zinc" />
+                  <StatItem label="Trust Tier" value={trust} color="emerald" />
+               </div>
+               
+               <div className="mt-4 pt-4 border-t border-zinc-850 text-xs font-mono text-zinc-400 break-all">
+                  <span className="text-zinc-500 uppercase mr-2 font-bold">Endpoint:</span>
+                  {endpointUrl}
                </div>
             </section>
 
             {/* 2. INDUSTRIAL CAPABILITIES */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-               <SectionHeader icon={CpuChipIcon} title="Industrial Capabilities" />
-               <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-                  <CapabilityGroup label="Media / GSM" items={safeArray(data.capacity?.capabilities?.paper_types).concat(safeArray(data.capacity?.capabilities?.gsm_ranges))} />
-                  <CapabilityGroup label="Formats / Max Size" items={safeArray(data.capacity?.capabilities?.trim_formats).concat([data.capacity?.capabilities?.max_sheet_size || 'N/A'])} />
-                  <div className="col-span-2 grid grid-cols-4 gap-2 mt-2">
-                     <CapabilityBadge label="UV" active={data.capacity.capabilities.uv_support} />
-                     <CapabilityBadge label="Varnish" active={data.capacity.capabilities.varnish_support} />
-                     <CapabilityBadge label="Foil" active={data.capacity.capabilities.foil_support} />
-                     <CapabilityBadge label="Hardcover" active={data.capacity.capabilities.hardcover_support} />
-                     <CapabilityBadge label="Sewn" active={data.capacity.capabilities.sewn_binding_support} />
-                     <CapabilityBadge label="Coating" active={data.capacity.capabilities.coating_support} />
-                     <CapabilityBadge label="Lamination" active={data.capacity.capabilities.lamination_support} />
-                  </div>
+            <section className="p-6 rounded-none border border-zinc-800 bg-zinc-950/40 text-[#ECECF1]">
+               <SectionHeader icon={CpuChipIcon} title="Capabilities Matrix" />
+               <div className="flex flex-wrap gap-2">
+                 {capabilitiesArray.map((cap: string) => (
+                     <span key={cap} className="px-2 py-0.5 font-mono text-[10px] font-black uppercase bg-zinc-900 border border-zinc-800 text-zinc-400 tracking-wider">
+                         {cap}
+                     </span>
+                 ))}
+                 {capabilitiesArray.length === 0 && (
+                     <span className="text-[10px] font-mono font-black text-zinc-500 uppercase">No Capabilities Registered</span>
+                 )}
                </div>
             </section>
 
             {/* 3. LIVE TELEMETRY */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
+            <section className="p-6 rounded-none border border-zinc-800 bg-zinc-950/40 text-[#ECECF1]">
                <SectionHeader icon={BoltIcon} title="Live Telemetry" />
                <div className="grid grid-cols-3 gap-6">
-                  <MetricCardItem label="Jobs Running" value={data.telemetry.jobs_running} subValue="Real-time Active" />
-                  <MetricCardItem label="Jobs Queued" value={data.telemetry.jobs_queued} subValue="Backlog Pressure" />
-                  <MetricCardItem label="Jobs Failed (24h)" value={data.telemetry.jobs_failed_24h} subValue="Non-recoverable" color="red" />
-                  <MetricCardItem label="Throughput/h" value={data.telemetry.throughput_h} subValue="Completed Units" />
-                  <MetricCardItem label="Utilization %" value={`${data.telemetry.utilization_pct}%`} subValue="Capacity Used" />
-                  <MetricCardItem label="Avg Turnaround" value={`${data.telemetry.avg_turnaround}m`} subValue="Lifecycle Average" />
+                   <MetricCardItem label="Jobs Running" value={jobsRunning} subValue="Real-time Active" />
+                   <MetricCardItem label="Jobs Queued" value={jobsQueued} subValue="Backlog Pressure" />
+                   <MetricCardItem label="Jobs Failed (24h)" value={jobsFailed} subValue="Non-recoverable" color="red" />
+                   <MetricCardItem label="Throughput/h" value={throughput} subValue="Completed Units" />
+                   <MetricCardItem label="Utilization %" value={`${utilization}%`} subValue="Capacity Used" />
+                   <MetricCardItem label="Avg Turnaround" value={`${avgTurnaround}m`} subValue="Lifecycle Average" />
                </div>
             </section>
 
             {/* 4. QUEUE PRESSURE */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+            <section className="p-6 rounded-none border border-zinc-800 bg-zinc-950/40 text-[#ECECF1]">
                <SectionHeader icon={QueueListIcon} title="Queue Pressure" />
                <div className="space-y-6">
                   <div className="space-y-2">
                      <div className="flex justify-between items-end">
-                        <span className={`text-[10px] font-black uppercase ${COLORS.adaptive.textMuted}`}>Saturation Visualization</span>
-                        <span className={`text-sm font-black ${COLORS.adaptive.textPrimary}`}>{data.capacity.pressure.pressure_bar_pct}%</span>
+                        <span className="text-[10px] font-black uppercase text-zinc-500">Saturation Visualization</span>
+                        <span className="text-sm font-black text-white font-mono">{pressureBarPct}%</span>
                      </div>
-                     <div className="h-2 bg-zinc-200 dark:bg-zinc-800 flex">
+                     <div className="h-2 bg-zinc-900 flex border border-zinc-800">
                         <div 
                           className="h-full bg-[#dc0000] transition-all duration-1000" 
-                          style={{ width: `${data.capacity.pressure.pressure_bar_pct}%` }} 
+                          style={{ width: `${pressureBarPct}%` }} 
                         />
                      </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                     <div className={`p-4 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
-                        <span className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase block mb-1`}>Overload Risk</span>
+                     <div className="p-4 border border-zinc-800 bg-zinc-950/40 text-zinc-300">
+                        <span className="text-[8px] font-black text-zinc-500 uppercase block mb-1">Overload Risk</span>
                         <span className={`text-xs font-black uppercase ${
-                          data.capacity.pressure.overload_risk === 'HIGH' ? 'text-[#dc0000]' :
-                          data.capacity.pressure.overload_risk === 'MEDIUM' ? 'text-amber-500' :
+                          overloadRisk === 'HIGH' ? 'text-[#dc0000]' :
+                          overloadRisk === 'MEDIUM' ? 'text-amber-500' :
                           'text-emerald-500'
-                        }`}>{data.capacity.pressure.overload_risk}</span>
+                        }`}>{overloadRisk}</span>
                      </div>
-                     <div className={`p-4 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
-                        <span className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase block mb-1`}>Dispatch Contention</span>
-                        <span className={`text-xs font-black uppercase ${COLORS.adaptive.textPrimary}`}>{data.capacity.pressure.dispatch_contention} Pending</span>
+                     <div className="p-4 border border-zinc-800 bg-zinc-950/40 text-zinc-300">
+                        <span className="text-[8px] font-black text-zinc-500 uppercase block mb-1">Dispatch Contention</span>
+                        <span className="text-xs font-black uppercase text-white font-mono">{dispatchContention} Pending</span>
                      </div>
-                     <div className={`p-4 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
-                        <span className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase block mb-1`}>Est. Backlog</span>
-                        <span className={`text-xs font-black uppercase ${COLORS.adaptive.textPrimary}`}>{data.capacity.pressure.estimated_backlog_mins}m</span>
+                     <div className="p-4 border border-zinc-800 bg-zinc-950/40 text-zinc-300">
+                        <span className="text-[8px] font-black text-zinc-500 uppercase block mb-1">Est. Backlog</span>
+                        <span className="text-xs font-black uppercase text-white font-mono">{estimatedBacklogMins}m</span>
                      </div>
                   </div>
                </div>
             </section>
 
             {/* 5. HISTORICAL THROUGHPUT */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface}`}>
+            <section className="p-6 rounded-none border border-zinc-800 bg-zinc-950/40 text-[#ECECF1]">
                <SectionHeader icon={ChartBarIcon} title="Historical Performance" />
                <div className="grid grid-cols-2 gap-4">
-                  <div className={`p-4 border ${COLORS.adaptive.borderSubtle} space-y-4`}>
-                     <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>24h Window</span>
-                     <div className="space-y-2">
+                  <div className="p-4 border border-zinc-800 bg-zinc-950/20 space-y-4">
+                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">24h Window</span>
+                     <div className="space-y-2 font-mono">
                         <div className="flex justify-between text-[11px] font-bold">
-                           <span className={`${COLORS.adaptive.textMuted} uppercase`}>SLA Success Ratio</span>
-                           <span className={COLORS.adaptive.textPrimary}>{data.history.t24h.sla_avg}%</span>
+                           <span className="text-zinc-500 uppercase">SLA Success</span>
+                           <span className="text-white">{t24h.sla_avg ?? 0}%</span>
                         </div>
                         <div className="flex justify-between text-[11px] font-bold">
-                           <span className={`${COLORS.adaptive.textMuted} uppercase`}>Avg Preflight Score</span>
-                           <span className={COLORS.adaptive.textPrimary}>{data.history.t24h.preflight_avg}%</span>
+                           <span className="text-zinc-500 uppercase">Preflight Score</span>
+                           <span className="text-white">{t24h.preflight_avg ?? 0}%</span>
                         </div>
                         <div className="flex justify-between text-[11px] font-bold">
-                           <span className={`${COLORS.adaptive.textMuted} uppercase`}>Jobs Completed</span>
-                           <span className={COLORS.adaptive.textPrimary}>{data.history.t24h.completed}</span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className={`p-4 border ${COLORS.adaptive.borderSubtle} space-y-4`}>
-                     <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>7d Window</span>
-                     <div className="space-y-2">
-                        <div className="flex justify-between text-[11px] font-bold">
-                           <span className={`${COLORS.adaptive.textMuted} uppercase`}>Volume</span>
-                           <span className={COLORS.adaptive.textPrimary}>{data.history.t7d.completed} Units</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] font-bold">
-                           <span className={`${COLORS.adaptive.textMuted} uppercase`}>Failure Ratio</span>
-                           <span className="text-[#dc0000]">{Number(((data.history.t7d.failed || 0) / (data.history.t7d.completed || 1)) * 100).toFixed(2)}%</span>
+                           <span className="text-zinc-500 uppercase">Completed</span>
+                           <span className="text-white">{t24h.completed ?? 0}</span>
                         </div>
                      </div>
                   </div>
-               </div>
-            </section>
-
-            {/* 6. ROUTING ELIGIBILITY */}
-            <section className={`p-6 rounded-none border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-               <SectionHeader icon={ShieldCheckIcon} title="Routing Eligibility" />
-               <div className="flex flex-wrap gap-2">
-                  {safeArray(data.capacity?.pressure?.routing_eligibility).map((tag: string) => (
-                    <div key={tag} className={`px-3 py-1.5 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} text-[10px] font-black uppercase tracking-widest ${COLORS.adaptive.textPrimary}`}>
-                       {tag.replace('_', ' ')}
-                    </div>
-                  ))}
-                  {safeArray(data.capacity?.pressure?.routing_eligibility).length === 0 && (
-                    <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>NO SPECIAL ELIGIBILITY DETECTED</span>
-                  )}
-               </div>
-            </section>
-
-            {/* 7. LIVE INCIDENTS */}
-            <section className="pt-2">
-               <SectionHeader icon={ExclamationCircleIcon} title="Recent Incidents" />
-               <div className="space-y-2 mt-4">
-                  {safeArray(data.history?.incidents).map((incident: any) => (
-                    <div key={incident?.id || Math.random()} className={`p-4 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} flex items-start justify-between group`}>
-                       <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                             <span className={`w-1.5 h-1.5 rounded-none ${incident?.severity === 'CRITICAL' ? 'bg-[#dc0000]' : 'bg-amber-500'}`} />
-                             <span className={`text-[10px] font-black uppercase ${COLORS.adaptive.textPrimary} tracking-widest`}>{toDisplayText(incident?.type || 'INCIDENT')}</span>
-                          </div>
-                          <p className={`text-xs ${COLORS.adaptive.textSecondary} font-medium`}>{toDisplayText(incident?.message)}</p>
-                       </div>
-                       <span className={`text-[8px] font-bold ${COLORS.adaptive.textMuted} uppercase whitespace-nowrap`}>{incident?.created_at ? new Date(incident.created_at).toLocaleTimeString() : ''}</span>
-                    </div>
-                  ))}
-                  {safeArray(data.history?.incidents).length === 0 && (
-                    <div className={`py-8 text-center border border-dashed ${COLORS.adaptive.borderSubtle} text-[10px] font-black uppercase ${COLORS.adaptive.textMuted}`}>No active incidents detected.</div>
-                  )}
+                  <div className="p-4 border border-zinc-800 bg-zinc-950/20 space-y-4">
+                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">7d Window</span>
+                     <div className="space-y-2 font-mono">
+                        <div className="flex justify-between text-[11px] font-bold">
+                           <span className="text-zinc-500 uppercase">Volume</span>
+                           <span className="text-white">{t7d.completed ?? 0} Units</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] font-bold">
+                           <span className="text-zinc-500 uppercase">Failure Ratio</span>
+                           <span className="text-[#dc0000]">{Number(((t7d.failed ?? 0) / (t7d.completed || 1)) * 100).toFixed(2)}%</span>
+                        </div>
+                     </div>
+                  </div>
                </div>
             </section>
           </div>
@@ -333,45 +335,26 @@ export const MachineDetailDrawer: React.FC<MachineDetailDrawerProps> = ({ machin
   );
 };
 
-const StatItem = ({ label, value, color }: { label: string, value: any, color: string }) => (
+const StatItem = ({ label, value, color, className }: { label: string, value: any, color: string, className?: string }) => (
   <div className="space-y-1">
-    <span className={`text-[8px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest block`}>{label}</span>
-    <span className={`text-sm font-black uppercase ${color === 'emerald' ? 'text-emerald-600 dark:text-emerald-500' : COLORS.adaptive.textPrimary}`}>{value || '---'}</span>
+    <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest block">{label}</span>
+    <span className={className || `text-sm font-black uppercase ${color === 'emerald' ? 'text-emerald-500' : 'text-[#ECECF1]'}`}>{value || '---'}</span>
   </div>
 );
 
 const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
   <div className="flex items-center gap-3 mb-4 border-l-2 border-[#dc0000] pl-3">
     <Icon className="w-4 h-4 text-[#dc0000]" />
-    <h2 className={`text-xs font-black uppercase tracking-[0.2em] ${COLORS.adaptive.textSecondary}`}>{title}</h2>
-  </div>
-);
-
-const CapabilityGroup = ({ label, items }: { label: string, items: string[] }) => (
-  <div className="space-y-3">
-    <span className={`text-[9px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>{label}</span>
-    <div className="flex flex-wrap gap-1.5">
-       {items.map((it, i) => (
-         <span key={i} className={`text-[10px] font-bold ${COLORS.adaptive.textPrimary} ${COLORS.adaptive.surface} px-2 py-0.5 border ${COLORS.adaptive.borderPrimary} uppercase`}>{it}</span>
-       ))}
-    </div>
-  </div>
-);
-
-const CapabilityBadge = ({ label, active }: { label: string, active: boolean }) => (
-  <div className={`py-2 px-1 border text-center transition-all ${
-    active ? `border-[#dc0000]/40 bg-[#dc0000]/5 ${COLORS.adaptive.textPrimary}` : `${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.textMuted}`
-  }`}>
-    <span className="text-[8px] font-black uppercase tracking-tight">{label}</span>
+    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#ECECF1]">{title}</h2>
   </div>
 );
 
 const MetricCardItem = ({ label, value, subValue, color }: { label: string, value: any, subValue: string, color?: string }) => (
-  <div className={`space-y-2 border-l ${COLORS.adaptive.borderSubtle} pl-4 py-2 hover:border-[#dc0000] transition-colors`}>
-    <span className={`text-[9px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>{label}</span>
+  <div className="space-y-2 border-l border-zinc-850 pl-4 py-2 hover:border-[#dc0000] transition-colors">
+    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
     <div className="flex flex-col">
-       <span className={`text-2xl font-black tracking-tight ${color === 'red' ? 'text-[#dc0000]' : COLORS.adaptive.textPrimary}`}>{value}</span>
-       <span className={`text-[8px] font-bold ${COLORS.adaptive.textMuted} uppercase tracking-tight`}>{subValue}</span>
+       <span className={`font-mono font-black text-xl tracking-tight text-white ${color === 'red' ? 'text-[#dc0000]' : ''}`}>{value}</span>
+       <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tight">{subValue}</span>
     </div>
   </div>
 );
