@@ -2732,3 +2732,7 @@ export async function executeFederationSimulation() {
         method: 'POST'
     });
 }
+
+export async function getFederationRegistry() {
+    return adminFetch<any>('/api/admin/federation/registry');
+}

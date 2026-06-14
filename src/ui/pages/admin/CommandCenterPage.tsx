@@ -27,7 +27,8 @@ import {
   getIndustrialTelemetryOverview, 
   getDispatches, 
   rollbackDispatch,
-  scoreDispatch
+  scoreDispatch,
+  getFederationRegistry
 } from "../../lib/adminApi";
 import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from "../../hooks/useAdminData";
@@ -206,68 +207,126 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 
 // --- TACTICAL SUB-COMPONENTS ---
 
-const IncidentBridge = () => {
+const IncidentBridge = ({ auditData }: { auditData?: any[] }) => {
   const incidents = useAdminQuery('hawk-eye:incidents', getIndustrialIncidents, 10000);
+  const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
+  
+  const incidentCount = incidents.data?.incidentBridge?.count 
+    ?? auditData?.filter((a: any) => a.event?.includes('BLOCKED')).length 
+    ?? (Array.isArray(anomalies.data) ? anomalies.data.length : 0)
+    ?? (Array.isArray(incidents.data) ? incidents.data.length : 0);
+    
+  const bridgeStatus = incidentCount > 0 ? 'DEGRADED' : 'ONLINE';
+
   return (
-    <TacticalPanel title="Incident Bridge" icon={ExclamationTriangleIcon} badge="Real-time" color="red" status={incidents.status}>
+    <div className="glass border border-zinc-800 bg-zinc-950/40 text-zinc-300 p-5 rounded-none shadow-sm flex flex-col gap-4">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div className="flex items-center gap-2">
+          <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ECECF1]">Incident Bridge</h3>
+        </div>
+        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
+          bridgeStatus === 'DEGRADED' ? 'bg-red-950/40 text-red-400 border-red-500/20' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20'
+        }`}>
+          {bridgeStatus}
+        </span>
+      </div>
       <div className="space-y-2">
+        <div className="font-mono font-bold text-xs">
+          Active Incidents: {incidentCount}
+        </div>
         {safeArray(incidents.data).slice(0, 5).map((inc: any) => (
-          <div key={inc.id} className="p-2.5 border border-[#dc0000]/20 bg-[#dc0000]/5 flex items-center justify-between">
+          <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
-              <span className={`text-[9px] font-black ${COLORS.adaptive.textPrimary} uppercase truncate max-w-[120px]`}>{inc.title || inc.type}</span>
+              <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
             </div>
-            <span className="text-[8px] font-black text-[#dc0000] uppercase">{inc.severity}</span>
+            <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
           </div>
         ))}
-        {safeArray(incidents.data).length === 0 && (
-          <div className={`p-3 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex flex-col gap-1.5`}>
+        {incidentCount === 0 && (
+          <div className="p-3 bg-zinc-950/20 border border-zinc-800 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-              <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Sector Clear</span>
-              <span className="text-[8px] font-black text-[#10B981]">SECURE</span>
+              <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase">Sector Clear</span>
+              <span className="text-[8px] font-mono font-black text-emerald-400">SECURE</span>
             </div>
-            <div className={`text-[8px] ${COLORS.adaptive.textMuted} flex justify-between`}>
+            <div className="text-[8px] text-zinc-500 flex justify-between font-mono">
               <span>Continuous Sweep</span>
-              <span className="font-mono">Active [100%]</span>
+              <span>Active [100%]</span>
             </div>
           </div>
         )}
       </div>
-    </TacticalPanel>
+    </div>
   );
 };
 
-const IntelligenceAnomalies = () => {
+const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: any[], overviewData?: any }) => {
   const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
+  
+  const inferenceActive = anomalies.data?.intelligenceActive 
+    ?? registryData?.some((i: any) => i.capabilities?.includes('ML_INFERENCE')) 
+    ?? true;
+    
+  const optimizationScore = anomalies.data?.optimizationScore 
+    ?? overviewData?.efficiencyRate 
+    ?? overviewData?.efficiency_rate 
+    ?? 0.85;
+
   return (
-    <TacticalPanel title="Intelligence Layer" icon={BoltIcon} badge="Pattern Analysis" color="primary" status={anomalies.status}>
-      <div className="space-y-2">
-        {safeArray(anomalies.data).slice(0, 4).map((anom: any) => (
-          <div key={anom.id} className={`p-2.5 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted} flex items-center justify-between`}>
-            <div className="flex items-center gap-2.5">
-              <div className="w-1 h-5 bg-[#dc0000]" />
-              <div className="flex flex-col">
-                <span className={`text-[9px] font-black ${COLORS.adaptive.textPrimary} uppercase truncate`}>{anom.title}</span>
-                <span className={`text-[7px] ${COLORS.adaptive.textMuted} uppercase`}>{anom.severity} Risk</span>
+    <div className="glass border border-zinc-800 bg-zinc-950/40 text-zinc-300 p-5 rounded-none shadow-sm flex flex-col gap-4">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div className="flex items-center gap-2">
+          <BoltIcon className="w-4 h-4 text-blue-400" />
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ECECF1]">Intelligence Layer</h3>
+        </div>
+        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
+          inferenceActive ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20' : 'bg-zinc-950/40 text-zinc-400 border-zinc-800'
+        }`}>
+          {inferenceActive ? 'ACTIVE' : 'INERT'}
+        </span>
+      </div>
+      <div className="space-y-3">
+        <div className="flex justify-between items-center text-xs font-mono font-bold">
+          <span>Inference Engines</span>
+          <span className={inferenceActive ? 'text-emerald-400' : 'text-zinc-500'}>
+            {inferenceActive ? 'ONLINE' : 'OFFLINE'}
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-xs font-mono font-bold">
+          <span>Optimization Rate</span>
+          <span className="text-white">
+            {Math.round(optimizationScore * 100)}%
+          </span>
+        </div>
+        <div className="space-y-2 pt-2 border-t border-zinc-800/60">
+          {safeArray(anomalies.data).slice(0, 4).map((anom: any) => (
+            <div key={anom.id} className="p-2 border border-zinc-800 bg-zinc-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-[#dc0000]" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate">{anom.title}</span>
+                  <span className="text-[7px] font-mono text-zinc-500 uppercase">{anom.severity} Risk</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-black text-red-400">{anom.confidence}%</span>
+            </div>
+          ))}
+          {safeArray(anomalies.data).length === 0 && (
+            <div className="p-3 bg-zinc-950/20 border border-zinc-800 flex flex-col gap-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase">Telemetry Inference</span>
+                <span className="text-[8px] font-mono font-black text-emerald-400">OPTIMAL</span>
+              </div>
+              <div className="text-[8px] text-zinc-500 flex justify-between font-mono">
+                <span>Drift Variance</span>
+                <span>&lt; 0.002σ</span>
               </div>
             </div>
-            <span className="text-[10px] font-black text-[#dc0000]">{anom.confidence}%</span>
-          </div>
-        ))}
-        {safeArray(anomalies.data).length === 0 && (
-          <div className={`p-3 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex flex-col gap-1.5`}>
-            <div className="flex justify-between items-center">
-              <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Telemetry Inference</span>
-              <span className="text-[8px] font-black text-[#10B981]">OPTIMAL</span>
-            </div>
-            <div className={`text-[8px] ${COLORS.adaptive.textMuted} flex justify-between`}>
-              <span>Drift Variance</span>
-              <span className="font-mono">&lt; 0.002σ</span>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </TacticalPanel>
+    </div>
   );
 };
 
@@ -430,6 +489,7 @@ export const CommandCenterPage: React.FC = () => {
   const routing = useAdminQuery('hawk-eye:routing', getRoutingEconomicOverview, 60000);
   const audit = useAdminQuery('hawk-eye:audit', () => getAudit({ limit: 20 }), 5000);
   const blocks = useAdminQuery('hawk-eye:blocks', getGovernanceBlocks, 30000);
+  const registry = useAdminQuery('hawk-eye:registry', getFederationRegistry, 10000);
 
   const handleCommand = async (action: string) => {
     if (!window.confirm(`Trigger ${action.toUpperCase()}?`)) return;
@@ -520,8 +580,8 @@ export const CommandCenterPage: React.FC = () => {
             </div>
           </TacticalPanel>
 
-          <IncidentBridge />
-          <IntelligenceAnomalies />
+          <IncidentBridge auditData={audit.data} />
+          <IntelligenceAnomalies registryData={registry.data?.registry} overviewData={network.data} />
         </div>
 
         {/* COLUMN 3: ECONOMY & LOGISTICS */}
