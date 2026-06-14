@@ -35,8 +35,8 @@ CREATE TABLE cohort_expansion_executions (
     rollback_at TIMESTAMP,
     rollback_reason TEXT,
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE cohort_expansion_execution_events (
@@ -53,7 +53,7 @@ CREATE TABLE cohort_expansion_execution_events (
     before_json JSON,
     after_json JSON,
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE cohort_expansion_limit_snapshots (
@@ -65,5 +65,5 @@ CREATE TABLE cohort_expansion_limit_snapshots (
     limits_json JSON,
     public_guard_config_json JSON,
     launch_control_flags_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -23,7 +23,7 @@ CREATE TABLE beta_funnel_events (
     safe_metadata_json JSON,
     internal_metadata_json JSON,
     pii_minimized_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_funnel_stage_snapshots (
@@ -41,7 +41,7 @@ CREATE TABLE beta_funnel_stage_snapshots (
     p95_time_seconds INTEGER,
     blockers_json JSON,
     warnings_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_observability_alerts (
@@ -59,8 +59,8 @@ CREATE TABLE beta_observability_alerts (
     acknowledged_at TIMESTAMP,
     resolved_by VARCHAR(255),
     resolved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_funnel_saved_views (
@@ -69,6 +69,6 @@ CREATE TABLE beta_funnel_saved_views (
     tenant_id VARCHAR(255) NOT NULL,
     view_name VARCHAR(255) NOT NULL,
     filter_json JSON,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

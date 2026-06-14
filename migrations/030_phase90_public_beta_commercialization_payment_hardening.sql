@@ -23,8 +23,8 @@ CREATE TABLE beta_payment_modes (
     risk_rules_json JSON,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_payment_records (
@@ -59,8 +59,8 @@ CREATE TABLE beta_payment_records (
     confirmed_by_role VARCHAR(50),
     confirmed_at TIMESTAMP,
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_payment_events (
@@ -78,7 +78,7 @@ CREATE TABLE beta_payment_events (
     before_json JSON,
     after_json JSON,
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_commercial_audit_snapshots (
@@ -92,5 +92,5 @@ CREATE TABLE beta_commercial_audit_snapshots (
     invoice_snapshot_json JSON,
     order_gate_snapshot_json JSON,
     public_guard_snapshot_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

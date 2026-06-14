@@ -16,19 +16,19 @@ CREATE TABLE IF NOT EXISTS marketplace_invite_codes (
     max_orders INT,
     orders_count INT NOT NULL DEFAULT 0,
     status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
-    expires_at TIMESTAMPTZ,
+    expires_at TIMESTAMP,
     issued_by VARCHAR(255),
     issued_by_role VARCHAR(50),
-    issued_at TIMESTAMPTZ,
+    issued_at TIMESTAMP,
     redeemed_by_customer_id VARCHAR(255),
-    redeemed_at TIMESTAMPTZ,
+    redeemed_at TIMESTAMP,
     revoked_by VARCHAR(255),
     revoked_by_role VARCHAR(50),
-    revoked_at TIMESTAMPTZ,
+    revoked_at TIMESTAMP,
     revocation_reason TEXT,
     metadata_json JSON,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS beta_registrations (
@@ -39,15 +39,15 @@ CREATE TABLE IF NOT EXISTS beta_registrations (
     customer_id VARCHAR(255),
     email VARCHAR(255) NOT NULL,
     registration_status VARCHAR(50) NOT NULL DEFAULT 'STARTED',
-    terms_accepted_at TIMESTAMPTZ,
-    privacy_accepted_at TIMESTAMPTZ,
-    beta_limitations_accepted_at TIMESTAMPTZ,
+    terms_accepted_at TIMESTAMP,
+    privacy_accepted_at TIMESTAMP,
+    beta_limitations_accepted_at TIMESTAMP,
     source_channel VARCHAR(50) NOT NULL DEFAULT 'INVITE_CODE',
     beta_scope_json JSON,
     blocking_reasons_json JSON,
     warning_reasons_json JSON,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS beta_invite_events (
@@ -62,5 +62,5 @@ CREATE TABLE IF NOT EXISTS beta_invite_events (
     actor_role VARCHAR(50),
     message TEXT,
     metadata_json JSON,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

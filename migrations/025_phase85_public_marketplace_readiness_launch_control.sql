@@ -20,27 +20,27 @@ CREATE TABLE IF NOT EXISTS marketplace_launch_controls (
     warning_reasons_json JSON,
     requested_by VARCHAR(255),
     requested_by_role VARCHAR(50),
-    requested_at TIMESTAMPTZ,
+    requested_at TIMESTAMP,
     approved_by VARCHAR(255),
     approved_by_role VARCHAR(50),
-    approved_at TIMESTAMPTZ,
+    approved_at TIMESTAMP,
     activated_by VARCHAR(255),
     activated_by_role VARCHAR(50),
-    activated_at TIMESTAMPTZ,
+    activated_at TIMESTAMP,
     paused_by VARCHAR(255),
     paused_by_role VARCHAR(50),
-    paused_at TIMESTAMPTZ,
+    paused_at TIMESTAMP,
     emergency_stopped_by VARCHAR(255),
     emergency_stopped_by_role VARCHAR(50),
-    emergency_stopped_at TIMESTAMPTZ,
+    emergency_stopped_at TIMESTAMP,
     emergency_stop_reason TEXT,
     rolled_back_by VARCHAR(255),
     rolled_back_by_role VARCHAR(50),
-    rolled_back_at TIMESTAMPTZ,
+    rolled_back_at TIMESTAMP,
     rollback_reason TEXT,
     metadata_json JSON,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS marketplace_launch_cohorts (
@@ -59,12 +59,12 @@ CREATE TABLE IF NOT EXISTS marketplace_launch_cohorts (
     max_live_jobs_per_day INT,
     requires_manual_review BOOLEAN NOT NULL DEFAULT TRUE,
     requires_invite_code BOOLEAN NOT NULL DEFAULT FALSE,
-    starts_at TIMESTAMPTZ,
-    ends_at TIMESTAMPTZ,
+    starts_at TIMESTAMP,
+    ends_at TIMESTAMP,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS marketplace_launch_events (
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS marketplace_launch_events (
     before_json JSON,
     after_json JSON,
     metadata_json JSON,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS marketplace_public_guard_decisions (
@@ -95,5 +95,5 @@ CREATE TABLE IF NOT EXISTS marketplace_public_guard_decisions (
     warning_reasons_json JSON,
     actor_user_id VARCHAR(255),
     actor_role VARCHAR(50),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

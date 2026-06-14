@@ -13,8 +13,8 @@ CREATE TABLE cohort_expansion_reviews (
     created_by_role VARCHAR(50),
     reviewed_by VARCHAR(255),
     reviewed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE beta_hardening_actions (
@@ -31,8 +31,8 @@ CREATE TABLE beta_hardening_actions (
     created_by VARCHAR(255),
     resolved_by VARCHAR(255),
     resolved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE cohort_expansion_audit_events (
@@ -45,5 +45,5 @@ CREATE TABLE cohort_expansion_audit_events (
     actor_id VARCHAR(255),
     actor_role VARCHAR(50),
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

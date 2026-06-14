@@ -24,8 +24,8 @@ CREATE TABLE partner_commercial_terms (
     partner_safe_summary_json JSON,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE partner_settlement_records (
@@ -58,8 +58,8 @@ CREATE TABLE partner_settlement_records (
     approved_at TIMESTAMP,
     payout_execution_reference VARCHAR(255),
     payout_evidence_json JSON,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE partner_settlement_line_items (
@@ -70,7 +70,7 @@ CREATE TABLE partner_settlement_line_items (
     amount DECIMAL(12,2) NOT NULL,
     currency VARCHAR(10),
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE partner_payout_holds (
@@ -87,8 +87,8 @@ CREATE TABLE partner_payout_holds (
     released_by VARCHAR(255),
     released_by_role VARCHAR(50),
     released_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE partner_settlement_events (
@@ -105,5 +105,5 @@ CREATE TABLE partner_settlement_events (
     before_json JSON,
     after_json JSON,
     metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
