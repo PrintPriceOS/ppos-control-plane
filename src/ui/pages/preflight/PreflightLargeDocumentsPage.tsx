@@ -107,13 +107,13 @@ export const PreflightLargeDocumentsPage: React.FC = () => {
 };
 
 const StatsCard = ({ label, value, icon: Icon, color }: any) => (
-  <div className="glass p-6 rounded-none border border-white dark:border-white/[0.08] flex items-center gap-4">
-    <div className={`w-12 h-12 rounded-none bg-white dark:bg-[#131314]/[0.05] flex items-center justify-center shadow-sm`}>
+  <div className="glass border ppos-border text-zinc-900 dark:text-[#ECECF1] p-6 rounded-none flex items-center gap-4">
+    <div className="w-12 h-12 rounded-none bg-white dark:bg-white/[0.05] flex items-center justify-center shadow-sm border ppos-border">
       <Icon className={`w-6 h-6 ${color}`} />
     </div>
     <div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</p>
-      <h3 className="text-xl font-black text-slate-900 dark:text-[#ECECF1] leading-none">{value}</h3>
+      <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest leading-none mb-1">{label}</p>
+      <h3 className="text-xl font-black leading-none">{value}</h3>
     </div>
   </div>
 );

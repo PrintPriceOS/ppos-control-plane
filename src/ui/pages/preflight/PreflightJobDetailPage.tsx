@@ -517,7 +517,7 @@ async function triggerArtifactDownload(artifact: any) {
                 <button 
                   disabled={actionStatus !== 'idle'}
                   onClick={handleTriggerRetry}
-                  className="flex items-center gap-2 px-5 py-2 ppos-surface-muted border ppos-border text-xs font-black uppercase tracking-widest hover:border-primary/40 active:scale-95 transition-all disabled:opacity-40"
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-black uppercase tracking-widest border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all disabled:opacity-40"
                   title="Proxy to upstream retry contract"
                 >
                   {actionStatus === 'retrying' ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <ArrowPathIcon className="w-4 h-4" />}

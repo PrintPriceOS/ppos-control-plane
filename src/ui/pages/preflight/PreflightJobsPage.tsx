@@ -345,7 +345,7 @@ export const PreflightJobsPage: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className="font-bold text-xs truncate max-w-[180px] text-slate-800 dark:text-white mt-0.5" title={j.filename || 'Untitled.pdf'}>
+                      <span className="font-medium text-slate-600 dark:text-zinc-400 truncate max-w-[220px] block" title={j.filename}>
                         {j.filename || 'Untitled.pdf'}
                       </span>
                     </div>
