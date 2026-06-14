@@ -4,13 +4,17 @@ import { listMachines, createMachine, updateMachine, getMachineTemplates } from 
 import { PlusIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface MachineCapabilityEditorProps {
-    printhouseId: string;
+    printhouseId?: string;
     onMutationSuccess: () => void;
+    editingMachine?: any;
+    onCancelEdit?: () => void;
 }
 
 export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = ({ 
     printhouseId, 
-    onMutationSuccess 
+    onMutationSuccess,
+    editingMachine: propEditingMachine,
+    onCancelEdit
 }) => {
     const [machines, setMachines] = useState<Machine[]>([]);
     const [loading, setLoading] = useState(false);
@@ -24,7 +28,19 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
     const [showSuggestions, setShowSuggestions] = useState(false);
 
     useEffect(() => {
-        loadMachines();
+        if (propEditingMachine) {
+            setEditingMachine({ ...propEditingMachine });
+            setIsAdding(true);
+        } else {
+            setEditingMachine(null);
+            setIsAdding(false);
+        }
+    }, [propEditingMachine]);
+
+    useEffect(() => {
+        if (printhouseId) {
+            loadMachines();
+        }
     }, [printhouseId]);
 
     useEffect(() => {
@@ -150,10 +166,16 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
         setError(null);
         try {
             let res;
+            const targetPrinthouseId = printhouseId || editingMachine.printhouse_id || editingMachine.printhouseId;
+            if (!targetPrinthouseId) {
+                setError('Target Printhouse ID is required');
+                setLoading(false);
+                return;
+            }
             if (editingMachine.id) {
-                res = await updateMachine(printhouseId, editingMachine.id, editingMachine);
+                res = await updateMachine(targetPrinthouseId, editingMachine.id, editingMachine);
             } else {
-                res = await createMachine(printhouseId, editingMachine);
+                res = await createMachine(targetPrinthouseId, editingMachine);
             }
 
             if (res.ok) {
@@ -446,7 +468,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                     <div className="flex items-center justify-end gap-3 border-t ppos-border pt-4">
                         <button 
                             type="button"
-                            onClick={() => { setEditingMachine(null); setIsAdding(false); setError(null); }}
+                            onClick={() => { setEditingMachine(null); setIsAdding(false); setError(null); if (onCancelEdit) onCancelEdit(); }}
                             className="px-4 py-2 border ppos-border text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                         >
                             Cancel
@@ -456,7 +478,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                             disabled={loading}
                             className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-wider hover:bg-primary/95 disabled:opacity-50"
                         >
-                            {loading ? 'Saving...' : 'Save Machine'}
+                            {loading ? 'Saving...' : (editingMachine.id ? '⚡ UPDATE MACHINE CONFIGURATION' : 'Save Machine')}
                         </button>
                     </div>
                 </form>
@@ -468,7 +490,14 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                         </div>
                     ) : (
                         (machines || []).map(m => (
-                            <div key={m.id} className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
+                            <div key={m.id} className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between relative group">
+                                <button 
+                                    onClick={() => handleEdit(m)}
+                                    className="absolute top-2 right-2 p-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-[#dc0000] hover:border-[#dc0000] transition-colors"
+                                    title="Edit Machine Spec"
+                                >
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                </button>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-black text-zinc-900 dark:text-zinc-100">{m.machine_name}</span>

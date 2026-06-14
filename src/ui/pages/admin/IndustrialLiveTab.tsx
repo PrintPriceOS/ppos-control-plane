@@ -30,7 +30,7 @@ import {
 import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
 import { COLORS } from '../../design-system/tokens';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
-import { listPrinthouses } from '../../api/printhouseCapabilitiesClient';
+import { listPrinthouses, listMachines } from '../../api/printhouseCapabilitiesClient';
 
 export const IndustrialLiveTab: React.FC = () => {
     const liveState = useAdminQuery('industrial-live-state', getIndustrialLiveState, 5000);
@@ -45,13 +45,14 @@ export const IndustrialLiveTab: React.FC = () => {
     const [isOnboardOpen, setIsOnboardOpen] = React.useState(false);
     const [printhouses, setPrinthouses] = React.useState<any[]>([]);
     const [selectedPrinthouseId, setSelectedPrinthouseId] = React.useState<string>('');
+    const [editingMachine, setEditingMachine] = React.useState<any>(null);
 
     React.useEffect(() => {
         if (isOnboardOpen) {
             listPrinthouses().then(res => {
                 if (res.ok && res.printhouses) {
                     setPrinthouses(res.printhouses);
-                    if (res.printhouses.length > 0) {
+                    if (res.printhouses.length > 0 && !selectedPrinthouseId) {
                         setSelectedPrinthouseId(res.printhouses[0].id);
                     }
                 }
@@ -90,7 +91,7 @@ export const IndustrialLiveTab: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button 
-                        onClick={() => setIsOnboardOpen(true)}
+                        onClick={() => { setEditingMachine(null); setSelectedPrinthouseId(''); setIsOnboardOpen(true); }}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-none"
                     >
                         <PlusIcon className="w-4 h-4 text-white" />
@@ -123,32 +124,60 @@ export const IndustrialLiveTab: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {safeArray(capacity.data?.overview).map((node: any) => (
-                            <button 
+                            <div 
                                 key={node.node_id} 
-                                onClick={() => openMachine(node.node_id)}
-                                className={`p-4 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} group hover:border-[#dc0000] ${COLORS.adaptive.hoverSurface} transition-all text-left rounded-none`}
+                                className={`p-4 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} group hover:border-[#dc0000] ${COLORS.adaptive.hoverSurface} transition-all text-left rounded-none flex flex-col justify-between`}
                             >
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className={`w-2 h-2 rounded-none ${node.status === 'ONLINE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
-                                    <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>{node.city || 'GLOBAL'}</span>
-                                </div>
-                                <p className={`text-sm font-black ${COLORS.adaptive.textPrimary} mb-1 truncate`}>{node.company_name}</p>
-                                <div className="mt-4">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className={`text-[10px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>{node.freshness_state} LOAD</span>
-                                        <span className={`text-[10px] font-black ${COLORS.adaptive.textPrimary}`}>{node.utilization_pct}%</span>
+                                <div className="cursor-pointer" onClick={() => openMachine(node.node_id)}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className={`w-2 h-2 rounded-none ${node.status === 'ONLINE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
+                                        <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>{node.city || 'GLOBAL'}</span>
                                     </div>
-                                    <div className={`h-1.5 w-full ${COLORS.adaptive.surface} rounded-none overflow-hidden`}>
-                                        <div 
-                                            className={`h-full rounded-none transition-all duration-1000 ${
-                                                node.utilization_pct > 90 ? 'bg-[#dc0000]' : 
-                                                node.utilization_pct > 70 ? 'bg-amber-500' : 'bg-[#10B981]'
-                                            }`} 
-                                            style={{ width: `${node.utilization_pct}%` }} 
-                                        />
+                                    <p className={`text-sm font-black ${COLORS.adaptive.textPrimary} mb-1 truncate`}>{node.company_name}</p>
+                                    <div className="mt-4">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className={`text-[10px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>{node.freshness_state} LOAD</span>
+                                            <span className={`text-[10px] font-black ${COLORS.adaptive.textPrimary}`}>{node.utilization_pct}%</span>
+                                        </div>
+                                        <div className={`h-1.5 w-full ${COLORS.adaptive.surface} rounded-none overflow-hidden`}>
+                                            <div 
+                                                className={`h-full rounded-none transition-all duration-1000 ${
+                                                    node.utilization_pct > 90 ? 'bg-[#dc0000]' : 
+                                                    node.utilization_pct > 70 ? 'bg-amber-500' : 'bg-[#10B981]'
+                                                }`} 
+                                                style={{ width: `${node.utilization_pct}%` }} 
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </button>
+                                <div className="mt-4 pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
+                                    <button
+                                        onClick={async () => {
+                                            if (!node.printhouse_id) {
+                                                alert('Printhouse association not found for this node.');
+                                                return;
+                                            }
+                                            try {
+                                                const res = await listMachines(node.printhouse_id);
+                                                if (res.ok && res.machines) {
+                                                    const found = res.machines.find((x: any) => x.id === node.node_id);
+                                                    if (found) {
+                                                        setEditingMachine(found);
+                                                        setIsOnboardOpen(true);
+                                                    } else {
+                                                        alert('Machine specifications not found in capabilities registry.');
+                                                    }
+                                                }
+                                            } catch (err) {
+                                                console.error(err);
+                                            }
+                                        }}
+                                        className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 transition-colors"
+                                    >
+                                        Edit Specs
+                                    </button>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -310,7 +339,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                 <p className={`text-[10px] ${COLORS.adaptive.textMuted} font-medium`}>Direct regional database unit registration.</p>
                             </div>
                             <button 
-                                onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); }}
+                                onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); setEditingMachine(null); }}
                                 className={`p-1.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.textPrimary} hover:border-[#dc0000] transition-colors`}
                             >
                                 <XMarkIcon className="w-5 h-5" />
@@ -318,28 +347,37 @@ export const IndustrialLiveTab: React.FC = () => {
                         </div>
 
                         <div className="space-y-4">
-                            <div>
-                                <label className={`block text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-2`}>Select Target Printhouse</label>
-                                <select 
-                                    value={selectedPrinthouseId}
-                                    onChange={e => setSelectedPrinthouseId(e.target.value)}
-                                    className={`w-full max-w-md px-3 py-2 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-xs font-bold focus:outline-none focus:border-[#dc0000] ${COLORS.adaptive.textPrimary} bg-transparent`}
-                                >
-                                    <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
-                                    {printhouses.map(ph => (
-                                        <option key={ph.id} value={ph.id} className="bg-white dark:bg-zinc-950">
-                                            {ph.name} ({ph.city || 'Global'})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {!editingMachine && (
+                                <div>
+                                    <label className={`block text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-2`}>Select Target Printhouse</label>
+                                    <select 
+                                        value={selectedPrinthouseId}
+                                        onChange={e => setSelectedPrinthouseId(e.target.value)}
+                                        className={`w-full max-w-md px-3 py-2 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-xs font-bold focus:outline-none focus:border-[#dc0000] ${COLORS.adaptive.textPrimary} bg-transparent`}
+                                    >
+                                        <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
+                                        {printhouses.map(ph => (
+                                            <option key={ph.id} value={ph.id} className="bg-white dark:bg-zinc-950">
+                                                {ph.name} ({ph.city || 'Global'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
-                            {selectedPrinthouseId && (
+                            {(selectedPrinthouseId || editingMachine) && (
                                 <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
                                     <MachineCapabilityEditor 
-                                        printhouseId={selectedPrinthouseId} 
+                                        printhouseId={selectedPrinthouseId || editingMachine?.printhouse_id} 
+                                        editingMachine={editingMachine}
                                         onMutationSuccess={() => {
                                             capacity.refetch();
+                                            setIsOnboardOpen(false);
+                                            setEditingMachine(null);
+                                        }}
+                                        onCancelEdit={() => {
+                                            setIsOnboardOpen(false);
+                                            setEditingMachine(null);
                                         }}
                                     />
                                 </div>

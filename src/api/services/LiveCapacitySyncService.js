@@ -127,6 +127,7 @@ class LiveCapacitySyncService {
             return await db.query(`
                 SELECT 
                     pm.id AS node_id,
+                    pm.printhouse_id AS printhouse_id,
                     pm.machine_name AS company_name,
                     ph.city,
                     ph.country,

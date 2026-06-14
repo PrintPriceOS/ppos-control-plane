@@ -152,7 +152,11 @@ const calculateCompleteness = (node, location, healthState) => {
  */
 router.get('/', async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM print_nodes');
+        const rows = await db.query(`
+            SELECT pn.*, pm.printhouse_id 
+            FROM print_nodes pn
+            LEFT JOIN printhouse_machines pm ON pn.id = pm.id
+        `);
         
         if (!rows || rows.length === 0) {
             return res.json({
@@ -181,6 +185,7 @@ router.get('/', async (req, res) => {
             return {
                 id: node.id,
                 tenantId: node.tenant_id,
+                printhouseId: node.printhouse_id || null,
                 companyName: node.company_name,
                 status: node.status,
                 healthState,

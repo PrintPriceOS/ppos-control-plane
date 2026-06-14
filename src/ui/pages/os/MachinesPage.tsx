@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     CpuChipIcon, 
     SignalIcon, 
@@ -8,12 +8,15 @@ import {
     MagnifyingGlassIcon,
     ArrowPathIcon,
     ClockIcon,
-    MapPinIcon
+    MapPinIcon,
+    XMarkIcon
 } from "@heroicons/react/24/outline";
 import { DataTable } from '../../components/DataTable';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getMachines } from '../../lib/adminApi';
 import { StatusBadge } from '../../components/StatusBadge';
+import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
+import { listPrinthouses, listMachines } from '../../api/printhouseCapabilitiesClient';
 
 interface Machine {
     id: string;
@@ -44,6 +47,24 @@ export const MachinesPage: React.FC = () => {
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     
+    const [isOnboardOpen, setIsOnboardOpen] = useState(false);
+    const [printhouses, setPrinthouses] = useState<any[]>([]);
+    const [selectedPrinthouseId, setSelectedPrinthouseId] = useState<string>('');
+    const [editingMachine, setEditingMachine] = useState<any>(null);
+
+    useEffect(() => {
+        if (isOnboardOpen) {
+            listPrinthouses().then(res => {
+                if (res.ok && res.printhouses) {
+                    setPrinthouses(res.printhouses);
+                    if (res.printhouses.length > 0 && !selectedPrinthouseId) {
+                        setSelectedPrinthouseId(res.printhouses[0].id);
+                    }
+                }
+            });
+        }
+    }, [isOnboardOpen]);
+
     const q = useAdminQuery<{ ok: boolean; total: number; machines: Machine[]; status: string; timestamp: string }>('machines', getMachines);
 
     const rawMachines = q.data?.machines ?? [];
@@ -91,15 +112,25 @@ export const MachinesPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
-                   <button 
-                     onClick={() => q.refetch()}
-                     className="p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400"
-                     title="Force Telemetry Refresh"
-                   >
-                     <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
-                   </button>
-                </div>
+                 <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => {
+                          setEditingMachine(null);
+                          setSelectedPrinthouseId('');
+                          setIsOnboardOpen(true);
+                      }}
+                      className="px-4 py-2 bg-[#dc0000] text-white text-xs font-bold hover:bg-[#dc0000]/90 transition-colors uppercase tracking-wider shadow-none"
+                    >
+                      + Onboard Fleet Unit
+                    </button>
+                    <button 
+                      onClick={() => q.refetch()}
+                      className="p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400"
+                      title="Force Telemetry Refresh"
+                    >
+                      <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
+                    </button>
+                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -316,6 +347,36 @@ export const MachinesPage: React.FC = () => {
                             </div>
                         ),
                         sortKey: 'lastHeartbeatAt'
+                    },
+                    {
+                        header: 'Actions',
+                        accessor: (m) => (
+                            <button
+                                onClick={async () => {
+                                    if (!m.printhouseId) {
+                                        alert('Printhouse association not found for this node.');
+                                        return;
+                                    }
+                                    try {
+                                        const res = await listMachines(m.printhouseId);
+                                        if (res.ok && res.machines) {
+                                            const found = res.machines.find((x: any) => x.id === m.id);
+                                            if (found) {
+                                                setEditingMachine(found);
+                                                setIsOnboardOpen(true);
+                                            } else {
+                                                alert('Machine specifications not found in capabilities registry.');
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                }}
+                                className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 transition-colors"
+                            >
+                                Edit Specs
+                            </button>
+                        )
                     }
                 ]}
             />
@@ -336,6 +397,63 @@ export const MachinesPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {isOnboardOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-6">
+                        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+                            <div>
+                                <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest">Onboard / Edit Fleet Unit</h3>
+                                <p className="text-[10px] text-zinc-500 font-medium">Direct regional database unit registration.</p>
+                            </div>
+                            <button 
+                                onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); setEditingMachine(null); }}
+                                className="p-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 hover:border-[#dc0000] transition-colors"
+                            >
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {!editingMachine && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2">Select Target Printhouse</label>
+                                    <select 
+                                        value={selectedPrinthouseId}
+                                        onChange={e => setSelectedPrinthouseId(e.target.value)}
+                                        className="w-full max-w-md px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:border-[#dc0000] text-zinc-900 dark:text-zinc-100 bg-transparent"
+                                    >
+                                        <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
+                                        {printhouses.map(ph => (
+                                            <option key={ph.id} value={ph.id} className="bg-white dark:bg-zinc-950">
+                                                {ph.name} ({ph.city || 'Global'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {(selectedPrinthouseId || editingMachine) && (
+                                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                                    <MachineCapabilityEditor 
+                                        printhouseId={selectedPrinthouseId || editingMachine?.printhouseId} 
+                                        editingMachine={editingMachine}
+                                        onMutationSuccess={() => {
+                                            q.refetch();
+                                            setIsOnboardOpen(false);
+                                            setEditingMachine(null);
+                                        }}
+                                        onCancelEdit={() => {
+                                            setIsOnboardOpen(false);
+                                            setEditingMachine(null);
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
