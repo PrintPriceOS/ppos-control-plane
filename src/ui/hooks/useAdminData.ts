@@ -1,5 +1,5 @@
 // hooks/useAdminData.ts
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 type Status = "idle" | "loading" | "success" | "error" | "refetching";
 
@@ -22,8 +22,12 @@ export function useAdminQuery<T>(key: string, fetcher: () => Promise<T>, refetch
 
     useEffect(() => {
         let alive = true;
-        if (!data) setStatus("loading");
-        else setStatus("refetching");
+        if (!data) {
+            setStatus("loading");
+        } else {
+            // Keep status as success to prevent flicker, but we can still fetch in background
+            setStatus("success");
+        }
         setError(null);
 
         fetcher()
@@ -43,7 +47,7 @@ export function useAdminQuery<T>(key: string, fetcher: () => Promise<T>, refetch
         };
     }, [memoKey, tick]);
 
-    const refetch = () => setTick(t => t + 1);
+    const refetch = useCallback(() => setTick(t => t + 1), []);
 
     return { status, data, error, refetch };
 }
