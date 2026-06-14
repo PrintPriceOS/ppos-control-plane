@@ -447,3 +447,4 @@ router.get('/:printhouseId/audit', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.MACHINE_TEMPLATES = MACHINE_TEMPLATES;

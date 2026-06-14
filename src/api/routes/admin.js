@@ -215,10 +215,20 @@ router.use('/federation', federationAdminRouter);
 router.use('/global', globalGovernanceAdminRouter);
 router.use('/printhouses', printhousesAdminRouter);
 router.use('/printhouse-capabilities', printhouseCapabilitiesRouter);
-router.use('/machine-templates', (req, res, next) => {
-  req.url = '/machine-templates' + req.url.substring(req.path.length);
-  next();
-}, printhouseCapabilitiesRouter);
+router.get('/machine-templates', async (req, res) => {
+  try {
+    const query = (req.query.q || '').trim().toLowerCase();
+    const templates = printhouseCapabilitiesRouter.MACHINE_TEMPLATES || [];
+    const filtered = templates.filter(t => 
+        (t.manufacturer || '').toLowerCase().includes(query) || 
+        (t.model || '').toLowerCase().includes(query)
+    );
+    res.json({ ok: true, templates: filtered });
+  } catch (err) {
+    console.error('[ADMIN-ROUTER] Error listing templates:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 router.use('/orders', ordersAdminRouter);
 router.use('/preflight', adminPreflightJobsRouter);
 router.use('/preflight', preflightAdminRouter);
