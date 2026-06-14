@@ -26,7 +26,7 @@ class PreflightContractGateway {
             'http://127.0.0.1:8001'
         ).replace(/\/+$/, '');
 
-        this.internalToken = (
+        this.internalTokenFallback = (
             process.env.PREFLIGHT_JWT ||
             process.env.PREFLIGHT_SERVICE_TOKEN ||
             process.env.PPOS_INTERNAL_SERVICE_TOKEN ||
@@ -35,6 +35,32 @@ class PreflightContractGateway {
         );
 
         this.timeoutMs = parseInt(process.env.PREFLIGHT_ADMIN_LONG_TIMEOUT_MS || '300000', 10);
+    }
+
+    getInternalToken(context = {}) {
+        const jwtSecret = process.env.JWT_SECRET;
+        if (jwtSecret) {
+            try {
+                const jwt = require('jsonwebtoken');
+                const tenantId = context.tenantId || 'ppos-production';
+                const role = context.role || 'SUPER_ADMIN';
+                return jwt.sign({
+                    sub: 'control-plane-internal',
+                    role: role,
+                    tenant_id: tenantId,
+                    tenantId: tenantId,
+                    scopes: ['preflight:read', 'preflight:write', 'admin:preflight'],
+                    origin: 'ppos-control-plane'
+                }, jwtSecret, {
+                    issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro',
+                    audience: process.env.PPOS_PREFLIGHT_JWT_AUDIENCE || process.env.JWT_AUDIENCE || 'ppos:control',
+                    expiresIn: '15m'
+                });
+            } catch (err) {
+                console.error('[PREFLIGHT-GATEWAY] Failed to sign dynamic internal token:', err.message);
+            }
+        }
+        return this.internalTokenFallback;
     }
 
     getBaseUrl() {
@@ -57,8 +83,10 @@ class PreflightContractGateway {
         const operatorId = context.operatorId || '';
         const policy = context.policy || '';
 
+        const tokenToUse = this.getInternalToken(context) || context.token || '';
+
         const headers = {
-            'X-Admin-Api-Key': this.internalToken,
+            'X-Admin-Api-Key': tokenToUse,
             'X-Request-ID': requestId,
             'X-Trace-ID': traceId,
             'X-Tenant-Id': tenantId,
@@ -73,7 +101,6 @@ class PreflightContractGateway {
             ...customHeaders
         };
 
-        const tokenToUse = this.internalToken || context.token || '';
         if (tokenToUse && tokenToUse !== 'null' && tokenToUse !== 'undefined') {
             headers.Authorization = `Bearer ${tokenToUse}`;
         }
