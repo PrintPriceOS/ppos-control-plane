@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS financial_operations_readiness_runs (
     invoice_status VARCHAR(50) NOT NULL,
     credit_note_status VARCHAR(50) NOT NULL,
     accounting_export_status VARCHAR(50) NOT NULL,
-    blockers_json JSONB,
-    warnings_json JSONB,
-    evidence_json JSONB,
-    source_snapshot_json JSONB,
+    blockers_json JSON,
+    warnings_json JSON,
+    evidence_json JSON,
+    source_snapshot_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL,
     updated_at TIMESTAMP NOT NULL
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS financial_operations_readiness_findings (
     category VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
     recommended_action TEXT,
-    evidence_json JSONB,
+    evidence_json JSON,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     resolved_at TIMESTAMP,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS financial_operations_readiness_checklist (
     checklist_label VARCHAR(255) NOT NULL,
     checklist_status VARCHAR(50) NOT NULL,
     required_for_launch BOOLEAN NOT NULL DEFAULT FALSE,
-    evidence_json JSONB,
+    evidence_json JSON,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
@@ -65,6 +65,6 @@ CREATE TABLE IF NOT EXISTS financial_operations_readiness_audit_events (
     tax_vat_snapshot_id VARCHAR(255),
     governed_invoice_id VARCHAR(255),
     governed_credit_note_id VARCHAR(255),
-    payload_json JSONB,
+    payload_json JSON,
     created_at TIMESTAMP NOT NULL
 );

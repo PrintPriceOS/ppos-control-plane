@@ -18,14 +18,14 @@ CREATE TABLE partner_commercial_terms (
     requires_no_dispute BOOLEAN DEFAULT true,
     requires_no_refund_pending BOOLEAN DEFAULT true,
     requires_customer_payment_confirmed BOOLEAN DEFAULT true,
-    tax_withholding_json JSONB,
+    tax_withholding_json JSON,
     bank_details_ref VARCHAR(255),
-    customer_safe_summary_json JSONB,
-    partner_safe_summary_json JSONB,
+    customer_safe_summary_json JSON,
+    partner_safe_summary_json JSON,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE partner_settlement_records (
@@ -49,17 +49,17 @@ CREATE TABLE partner_settlement_records (
     dispute_hold_amount DECIMAL(12,2),
     net_payable_amount DECIMAL(12,2),
     currency VARCHAR(10),
-    calculation_snapshot_json JSONB,
-    readiness_snapshot_json JSONB,
-    blocking_reasons_json JSONB,
-    warning_reasons_json JSONB,
+    calculation_snapshot_json JSON,
+    readiness_snapshot_json JSON,
+    blocking_reasons_json JSON,
+    warning_reasons_json JSON,
     approved_by VARCHAR(255),
     approved_by_role VARCHAR(50),
-    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_at TIMESTAMP,
     payout_execution_reference VARCHAR(255),
-    payout_evidence_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    payout_evidence_json JSON,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE partner_settlement_line_items (
@@ -69,8 +69,8 @@ CREATE TABLE partner_settlement_line_items (
     description TEXT,
     amount DECIMAL(12,2) NOT NULL,
     currency VARCHAR(10),
-    metadata_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    metadata_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE partner_payout_holds (
@@ -86,9 +86,9 @@ CREATE TABLE partner_payout_holds (
     created_by_role VARCHAR(50),
     released_by VARCHAR(255),
     released_by_role VARCHAR(50),
-    released_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    released_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE partner_settlement_events (
@@ -102,8 +102,8 @@ CREATE TABLE partner_settlement_events (
     actor_user_id VARCHAR(255),
     actor_role VARCHAR(50),
     message TEXT,
-    before_json JSONB,
-    after_json JSONB,
-    metadata_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    before_json JSON,
+    after_json JSON,
+    metadata_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );

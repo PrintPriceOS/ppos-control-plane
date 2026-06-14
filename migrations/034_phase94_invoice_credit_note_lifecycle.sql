@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS governed_invoices (
     subtotal_amount NUMERIC NOT NULL,
     tax_amount NUMERIC NOT NULL,
     total_amount NUMERIC NOT NULL,
-    source_snapshot_json JSONB,
-    tax_readiness_snapshot_json JSONB,
-    reconciliation_snapshot_json JSONB,
-    metadata_json JSONB,
+    source_snapshot_json JSON,
+    tax_readiness_snapshot_json JSON,
+    reconciliation_snapshot_json JSON,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS governed_invoice_versions (
     subtotal_amount NUMERIC NOT NULL,
     tax_amount NUMERIC NOT NULL,
     total_amount NUMERIC NOT NULL,
-    invoice_payload_json JSONB,
+    invoice_payload_json JSON,
     change_reason TEXT,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL
@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS governed_credit_notes (
     total_amount NUMERIC NOT NULL,
     reason_code VARCHAR(100) NOT NULL,
     reason_note TEXT,
-    source_invoice_snapshot_json JSONB,
-    metadata_json JSONB,
+    source_invoice_snapshot_json JSON,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL,
     finalized_at TIMESTAMP,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS governed_credit_note_versions (
     subtotal_amount NUMERIC NOT NULL,
     tax_amount NUMERIC NOT NULL,
     total_amount NUMERIC NOT NULL,
-    credit_note_payload_json JSONB,
+    credit_note_payload_json JSON,
     change_reason TEXT,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS invoice_credit_note_links (
     link_type VARCHAR(50) NOT NULL,
     amount_applied NUMERIC NOT NULL,
     currency VARCHAR(10) NOT NULL,
-    metadata_json JSONB,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL
 );
@@ -106,6 +106,6 @@ CREATE TABLE IF NOT EXISTS invoice_lifecycle_audit_events (
     tenant_id VARCHAR(255),
     reconciliation_run_id VARCHAR(255),
     tax_vat_snapshot_id VARCHAR(255),
-    payload_json JSONB,
+    payload_json JSON,
     created_at TIMESTAMP NOT NULL
 );

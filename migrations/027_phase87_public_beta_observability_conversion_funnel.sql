@@ -20,10 +20,10 @@ CREATE TABLE beta_funnel_events (
     correlation_id VARCHAR(255),
     session_id VARCHAR(255),
     idempotency_key VARCHAR(255),
-    safe_metadata_json JSONB,
-    internal_metadata_json JSONB,
-    pii_minimized_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    safe_metadata_json JSON,
+    internal_metadata_json JSON,
+    pii_minimized_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE beta_funnel_stage_snapshots (
@@ -39,9 +39,9 @@ CREATE TABLE beta_funnel_stage_snapshots (
     avg_time_from_previous_stage_seconds INTEGER,
     p50_time_seconds INTEGER,
     p95_time_seconds INTEGER,
-    blockers_json JSONB,
-    warnings_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    blockers_json JSON,
+    warnings_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE beta_observability_alerts (
@@ -52,15 +52,15 @@ CREATE TABLE beta_observability_alerts (
     severity VARCHAR(50) NOT NULL,
     alert_status VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
-    metric_snapshot_json JSONB,
+    metric_snapshot_json JSON,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
     acknowledged_by VARCHAR(255),
-    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    acknowledged_at TIMESTAMP,
     resolved_by VARCHAR(255),
-    resolved_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    resolved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE beta_funnel_saved_views (
@@ -68,7 +68,7 @@ CREATE TABLE beta_funnel_saved_views (
     actor_user_id VARCHAR(255) NOT NULL,
     tenant_id VARCHAR(255) NOT NULL,
     view_name VARCHAR(255) NOT NULL,
-    filter_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    filter_json JSON,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -7,14 +7,14 @@ CREATE TABLE cohort_expansion_reviews (
     review_status VARCHAR(50) NOT NULL,
     review_decision VARCHAR(50),
     review_notes TEXT,
-    health_snapshot_json JSONB,
-    hardening_snapshot_json JSONB,
+    health_snapshot_json JSON,
+    hardening_snapshot_json JSON,
     created_by VARCHAR(255),
     created_by_role VARCHAR(50),
     reviewed_by VARCHAR(255),
-    reviewed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    reviewed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE beta_hardening_actions (
@@ -30,9 +30,9 @@ CREATE TABLE beta_hardening_actions (
     resolution_notes TEXT,
     created_by VARCHAR(255),
     resolved_by VARCHAR(255),
-    resolved_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    resolved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE cohort_expansion_audit_events (
@@ -44,6 +44,6 @@ CREATE TABLE cohort_expansion_audit_events (
     event_type VARCHAR(50) NOT NULL,
     actor_id VARCHAR(255),
     actor_role VARCHAR(50),
-    metadata_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    metadata_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );

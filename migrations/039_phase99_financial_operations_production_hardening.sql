@@ -16,11 +16,11 @@ CREATE TABLE IF NOT EXISTS financial_operations_hardening_runs (
     rollback_status VARCHAR(50) NOT NULL,
     incident_response_status VARCHAR(50) NOT NULL,
     audit_status VARCHAR(50) NOT NULL,
-    blockers_json JSONB,
-    warnings_json JSONB,
-    evidence_json JSONB,
-    source_snapshot_json JSONB,
-    metadata_json JSONB,
+    blockers_json JSON,
+    warnings_json JSON,
+    evidence_json JSON,
+    source_snapshot_json JSON,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS financial_operations_hardening_checks (
     category VARCHAR(50) NOT NULL,
     severity VARCHAR(20) NOT NULL,
     required_for_production BOOLEAN DEFAULT TRUE,
-    evidence_json JSONB,
+    evidence_json JSON,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS financial_operations_hardening_findings (
     category VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
     recommended_action TEXT,
-    evidence_json JSONB,
+    evidence_json JSON,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     resolved_at TIMESTAMP,
@@ -68,6 +68,6 @@ CREATE TABLE IF NOT EXISTS financial_operations_hardening_audit_events (
     release_gate_id VARCHAR(255),
     readiness_run_id VARCHAR(255),
     tenant_id VARCHAR(255),
-    payload_json JSONB,
+    payload_json JSON,
     created_at TIMESTAMP NOT NULL
 );

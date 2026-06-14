@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS financial_reconciliation_runs (
     mismatch_count INTEGER DEFAULT 0,
     warning_count INTEGER DEFAULT 0,
     blocking_count INTEGER DEFAULT 0,
-    summary_json JSONB,
+    summary_json JSON,
     created_by VARCHAR(255) NOT NULL,
     created_by_role VARCHAR(100) NOT NULL,
     created_at TIMESTAMP NOT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS financial_ledger_snapshots (
     source_reference VARCHAR(255),
     source_event_id VARCHAR(255),
     safe_source_hash VARCHAR(255),
-    snapshot_json JSONB,
+    snapshot_json JSON,
     created_at TIMESTAMP NOT NULL
 );
 
@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS financial_reconciliation_mismatches (
     severity VARCHAR(50) NOT NULL, -- INFO, WARNING, BLOCKER, CRITICAL
     entity_type VARCHAR(100) NOT NULL,
     entity_id VARCHAR(255) NOT NULL,
-    expected_value_json JSONB,
-    actual_value_json JSONB,
+    expected_value_json JSON,
+    actual_value_json JSON,
     message TEXT NOT NULL,
     resolution_status VARCHAR(50) NOT NULL, -- OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED
     resolved_by VARCHAR(255),
@@ -84,9 +84,9 @@ CREATE TABLE IF NOT EXISTS accounting_export_batches (
     file_path TEXT,
     file_hash VARCHAR(255),
     row_count INTEGER DEFAULT 0,
-    totals_json JSONB,
-    blocking_reasons_json JSONB,
-    warning_reasons_json JSONB,
+    totals_json JSON,
+    blocking_reasons_json JSON,
+    warning_reasons_json JSON,
     generated_by VARCHAR(255),
     generated_by_role VARCHAR(100),
     generated_at TIMESTAMP,
@@ -108,9 +108,9 @@ CREATE TABLE IF NOT EXISTS financial_reconciliation_events (
     actor_user_id VARCHAR(255) NOT NULL,
     actor_role VARCHAR(100) NOT NULL,
     message TEXT,
-    before_json JSONB,
-    after_json JSONB,
-    metadata_json JSONB,
+    before_json JSON,
+    after_json JSON,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL
 );
 
@@ -124,8 +124,8 @@ CREATE TABLE IF NOT EXISTS financial_reconciliation_adjustments (
     amount NUMERIC NOT NULL,
     currency VARCHAR(10) NOT NULL,
     reason TEXT NOT NULL,
-    before_json JSONB,
-    after_json JSONB,
+    before_json JSON,
+    after_json JSON,
     created_by VARCHAR(255) NOT NULL,
     created_by_role VARCHAR(100) NOT NULL,
     approved_by VARCHAR(255),

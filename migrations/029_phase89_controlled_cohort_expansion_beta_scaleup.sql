@@ -8,35 +8,35 @@ CREATE TABLE cohort_expansion_executions (
     tenant_id VARCHAR(255) NOT NULL,
     execution_status VARCHAR(50) NOT NULL,
     expansion_type VARCHAR(50) NOT NULL,
-    previous_limits_json JSONB,
-    proposed_limits_json JSONB,
-    applied_limits_json JSONB,
-    rollback_limits_json JSONB,
-    readiness_snapshot_json JSONB,
-    hardening_snapshot_json JSONB,
-    observability_snapshot_json JSONB,
-    guard_snapshot_json JSONB,
-    blocking_reasons_json JSONB,
-    warning_reasons_json JSONB,
+    previous_limits_json JSON,
+    proposed_limits_json JSON,
+    applied_limits_json JSON,
+    rollback_limits_json JSON,
+    readiness_snapshot_json JSON,
+    hardening_snapshot_json JSON,
+    observability_snapshot_json JSON,
+    guard_snapshot_json JSON,
+    blocking_reasons_json JSON,
+    warning_reasons_json JSON,
     requested_by VARCHAR(255),
     requested_by_role VARCHAR(50),
-    requested_at TIMESTAMP WITH TIME ZONE,
+    requested_at TIMESTAMP,
     approved_by VARCHAR(255),
     approved_by_role VARCHAR(50),
-    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_at TIMESTAMP,
     executed_by VARCHAR(255),
     executed_by_role VARCHAR(50),
-    executed_at TIMESTAMP WITH TIME ZONE,
+    executed_at TIMESTAMP,
     paused_by VARCHAR(255),
     paused_by_role VARCHAR(50),
-    paused_at TIMESTAMP WITH TIME ZONE,
+    paused_at TIMESTAMP,
     rollback_by VARCHAR(255),
     rollback_by_role VARCHAR(50),
-    rollback_at TIMESTAMP WITH TIME ZONE,
+    rollback_at TIMESTAMP,
     rollback_reason TEXT,
-    metadata_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    metadata_json JSON,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE cohort_expansion_execution_events (
@@ -50,10 +50,10 @@ CREATE TABLE cohort_expansion_execution_events (
     actor_user_id VARCHAR(255),
     actor_role VARCHAR(50),
     message TEXT,
-    before_json JSONB,
-    after_json JSONB,
-    metadata_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    before_json JSON,
+    after_json JSON,
+    metadata_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE cohort_expansion_limit_snapshots (
@@ -62,8 +62,8 @@ CREATE TABLE cohort_expansion_limit_snapshots (
     cohort_id VARCHAR(255) NOT NULL,
     tenant_id VARCHAR(255) NOT NULL,
     snapshot_type VARCHAR(50) NOT NULL,
-    limits_json JSONB,
-    public_guard_config_json JSONB,
-    launch_control_flags_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    limits_json JSON,
+    public_guard_config_json JSON,
+    launch_control_flags_json JSON,
+    created_at TIMESTAMP DEFAULT NOW()
 );

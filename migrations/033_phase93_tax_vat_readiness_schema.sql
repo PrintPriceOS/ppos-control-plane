@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS tax_vat_jurisdictions (
     intra_eu_supported BOOLEAN DEFAULT false,
     marketplace_facilitator_supported BOOLEAN DEFAULT false,
     status VARCHAR(50) NOT NULL,
-    metadata_json JSONB,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS tax_vat_rules (
     effective_to TIMESTAMP,
     status VARCHAR(50) NOT NULL,
     source_note TEXT,
-    metadata_json JSONB,
+    metadata_json JSON,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
@@ -55,9 +55,9 @@ CREATE TABLE IF NOT EXISTS tax_vat_readiness_snapshots (
     reverse_charge_flag BOOLEAN DEFAULT false,
     exemption_flag BOOLEAN DEFAULT false,
     readiness_status VARCHAR(50) NOT NULL,
-    warnings_json JSONB,
-    evidence_json JSONB,
-    source_snapshot_json JSONB,
+    warnings_json JSON,
+    evidence_json JSON,
+    source_snapshot_json JSON,
     created_at TIMESTAMP NOT NULL,
     created_by VARCHAR(255) NOT NULL
 );
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS tax_vat_readiness_findings (
     category VARCHAR(100) NOT NULL,
     message TEXT NOT NULL,
     recommended_action TEXT,
-    evidence_json JSONB,
+    evidence_json JSON,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     resolved_at TIMESTAMP,
@@ -87,6 +87,6 @@ CREATE TABLE IF NOT EXISTS tax_vat_readiness_audit_events (
     tenant_id VARCHAR(255),
     snapshot_id VARCHAR(255),
     reconciliation_run_id VARCHAR(255),
-    payload_json JSONB,
+    payload_json JSON,
     created_at TIMESTAMP NOT NULL
 );
