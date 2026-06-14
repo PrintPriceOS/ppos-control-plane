@@ -39,7 +39,7 @@ export const MarketplacePage: React.FC = () => {
                 </p>
             </div>
 
-            <div className="flex border-b border-slate-200 dark:border-white/10 gap-1 overflow-x-auto">
+            <div className="flex border-b border-slate-200 dark:border-zinc-800 gap-1 overflow-x-auto">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
 
@@ -50,8 +50,8 @@ export const MarketplacePage: React.FC = () => {
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${
                                 activeTab === tab.id
-                                    ? "border-primary text-primary bg-primary/5"
-                                    : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-white/5"
+                                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20"
+                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-900/30"
                             }`}
                         >
                             <Icon className="w-4 h-4" />

@@ -177,6 +177,30 @@ const adminTenantPilotRouter = require('./adminTenantPilot');
 const adminTenantBillingRouter = require('./adminTenantBilling');
 const adminProductionMonitoringRouter = require('./adminProductionMonitoring');
 
+// Financial Operations Routers
+const adminFinancialOperationsComplianceReporting = require('./adminFinancialOperationsComplianceReporting');
+const adminFinancialOperationsDataRetentionPrivacy = require('./adminFinancialOperationsDataRetentionPrivacy');
+const adminFinancialOperationsFinalReleaseCandidate = require('./adminFinancialOperationsFinalReleaseCandidate');
+const adminFinancialOperationsGoLiveSimulation = require('./adminFinancialOperationsGoLiveSimulation');
+const adminFinancialOperationsPartnerSandbox = require('./adminFinancialOperationsPartnerSandbox');
+const adminFinancialOperationsPilotMode = require('./adminFinancialOperationsPilotMode');
+const adminFinancialOperationsPreProductionRunbook = require('./adminFinancialOperationsPreProductionRunbook');
+const adminFinancialOperationsProductionActivationReview = require('./adminFinancialOperationsProductionActivationReview');
+const adminFinancialOperationsProductionHardening = require('./adminFinancialOperationsProductionHardening');
+const adminFinancialOperationsProviderContractSla = require('./adminFinancialOperationsProviderContractSla');
+const adminFinancialOperationsProviderCredentialVault = require('./adminFinancialOperationsProviderCredentialVault');
+const adminFinancialOperationsProviderEventReconciliation = require('./adminFinancialOperationsProviderEventReconciliation');
+const adminFinancialOperationsProviderFailureRetry = require('./adminFinancialOperationsProviderFailureRetry');
+const adminFinancialOperationsProviderSandbox = require('./adminFinancialOperationsProviderSandbox');
+const adminFinancialOperationsProviderSettlementFiles = require('./adminFinancialOperationsProviderSettlementFiles');
+const adminFinancialOperationsProviderWebhookSandbox = require('./adminFinancialOperationsProviderWebhookSandbox');
+const adminFinancialOperationsReadiness = require('./adminFinancialOperationsReadiness');
+const adminFinancialOperationsReleaseGates = require('./adminFinancialOperationsReleaseGates');
+const adminFinancialReconciliation = require('./adminFinancialReconciliation');
+const adminGovernedInvoices = require('./adminGovernedInvoices');
+const adminPartnerSettlement = require('./adminPartnerSettlement');
+const adminTaxVatReadiness = require('./adminTaxVatReadiness');
+
 
 /**
  * Mount Sub-routers (Top Priority)
@@ -194,6 +218,31 @@ router.use('/tenant-governance', adminTenantGovernanceRouter);
 router.use('/tenant-pilots', adminTenantPilotRouter);
 router.use('/tenant-billing', adminTenantBillingRouter);
 router.use('/production-monitoring', adminProductionMonitoringRouter);
+
+// Mount Financial Operations Sub-routers
+router.use('/', adminFinancialOperationsComplianceReporting);
+router.use('/', adminFinancialOperationsDataRetentionPrivacy);
+router.use('/', adminFinancialOperationsFinalReleaseCandidate);
+router.use('/', adminFinancialOperationsGoLiveSimulation);
+router.use('/', adminFinancialOperationsPartnerSandbox);
+router.use('/', adminFinancialOperationsPilotMode);
+router.use('/', adminFinancialOperationsPreProductionRunbook);
+router.use('/', adminFinancialOperationsProductionActivationReview);
+router.use('/', adminFinancialOperationsProductionHardening);
+router.use('/', adminFinancialOperationsProviderContractSla);
+router.use('/', adminFinancialOperationsProviderCredentialVault);
+router.use('/', adminFinancialOperationsProviderEventReconciliation);
+router.use('/', adminFinancialOperationsProviderFailureRetry);
+router.use('/', adminFinancialOperationsProviderSandbox);
+router.use('/', adminFinancialOperationsProviderSettlementFiles);
+router.use('/', adminFinancialOperationsProviderWebhookSandbox);
+router.use('/', adminFinancialOperationsReadiness);
+router.use('/', adminFinancialOperationsReleaseGates);
+router.use('/', adminFinancialReconciliation);
+router.use('/', adminGovernedInvoices);
+router.use('/', adminPartnerSettlement);
+router.use('/', adminTaxVatReadiness);
+
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);

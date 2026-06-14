@@ -28,8 +28,25 @@ export const FinancialOpsTab: React.FC = () => {
                 adminApi.getFinanceTransactions(),
                 adminApi.getFinanceMetrics()
             ]);
-            setTransactions(Array.isArray(tData) ? tData : []);
-            setMetrics(mData);
+
+            // Handle wrapped or direct list structures defensively
+            let txsList: any[] = [];
+            if (Array.isArray(tData)) {
+                txsList = tData;
+            } else if (tData && Array.isArray((tData as any).transactions)) {
+                txsList = (tData as any).transactions;
+            } else if (tData && (tData as any).data && Array.isArray((tData as any).data.transactions)) {
+                txsList = (tData as any).data.transactions;
+            } else if (tData && Array.isArray((tData as any).data)) {
+                txsList = (tData as any).data;
+            }
+            setTransactions(txsList);
+
+            let resolvedMetrics = mData;
+            if (mData && (mData as any).data) {
+                resolvedMetrics = (mData as any).data;
+            }
+            setMetrics(resolvedMetrics);
             setLoading(false);
         } catch (err) {
             console.error('Failed to fetch finance data:', err);
@@ -46,10 +63,13 @@ export const FinancialOpsTab: React.FC = () => {
     };
 
     // Pre-normalize metrics contract
-    const totalGross = metrics?.total_gross ?? metrics?.totalGross ?? 0;
-    const totalFees = metrics?.total_fees ?? metrics?.totalFees ?? 0;
-    const settledCount = metrics?.settled_count ?? metrics?.settledCount ?? 0;
-    const totalCount = metrics?.total_count ?? metrics?.totalCount ?? 0;
+    const totalGross = Number(metrics?.total_gross ?? metrics?.totalGross ?? metrics?.gross ?? 0);
+    const totalFees = Number(metrics?.total_fees ?? metrics?.totalFees ?? metrics?.fees ?? 0);
+    const settledCount = Number(metrics?.settled_count ?? metrics?.settledCount ?? 0);
+    const totalCount = Number(metrics?.total_count ?? metrics?.totalCount ?? 0);
+
+    // Strict defensive validation check
+    const safeTransactions = Array.isArray(transactions) ? transactions : [];
 
     return (
         <div className="space-y-6 font-manrope">
@@ -77,13 +97,13 @@ export const FinancialOpsTab: React.FC = () => {
                     <div className="p-5 rounded-none border border-slate-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm transition-all">
                         <div className="text-[10px] font-black uppercase tracking-widest mb-1 text-slate-500 dark:text-zinc-400">Total Gross Volume</div>
                         <div className="font-mono font-black tracking-tight text-slate-900 dark:text-white text-2xl">
-                            {totalGross.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) || '0 €'}
+                            {Number(totalGross).toFixed(2)} €
                         </div>
                     </div>
                     <div className="p-5 rounded-none border border-slate-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm transition-all">
                         <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">Platform Revenue</div>
                         <div className="font-mono font-black tracking-tight text-emerald-600 dark:text-emerald-400 text-2xl">
-                            {totalFees.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) || '0 €'}
+                            {Number(totalFees).toFixed(2)} €
                         </div>
                     </div>
                     <div className="p-5 rounded-none border border-slate-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm transition-all">
@@ -116,19 +136,18 @@ export const FinancialOpsTab: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800/60">
-                                {!Array.isArray(transactions) || transactions.length === 0 ? (
+                                {safeTransactions.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-4 py-10 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-600">
                                             No ledger transactions registered.
                                         </td>
                                     </tr>
                                 ) : (
-                                    transactions.map((tx, i) => {
+                                    safeTransactions.map((tx, i) => {
                                         const isSelected = selectedTx?.id === tx.id;
                                         // Normalize row contract
                                         const grossAmount = tx.gross_amount ?? tx.grossAmount ?? 0;
                                         const platformFee = tx.platform_fee ?? tx.platformFee ?? 0;
-                                        const currency = tx.currency ?? 'EUR';
                                         const txStatus = tx.transaction_status ?? tx.transactionStatus ?? 'PENDING';
 
                                         return (
@@ -146,11 +165,11 @@ export const FinancialOpsTab: React.FC = () => {
                                                 <td className="px-4 py-4">
                                                     <div className="text-[11px] font-bold truncate max-w-[150px] text-slate-700 dark:text-zinc-350">{tx.job_name || 'N/A'}</div>
                                                 </td>
-                                                <td className="px-4 py-4 text-right font-mono font-black text-slate-900 dark:text-white text-xs">
-                                                    {Number(grossAmount).toFixed(2)} {currency}
+                                                <td className="px-4 py-4 text-right font-mono font-black tracking-tight text-slate-900 dark:text-white text-xs">
+                                                    {Number(grossAmount).toFixed(2)} €
                                                 </td>
-                                                <td className="px-4 py-4 text-right font-mono font-black text-emerald-650 dark:text-emerald-450 text-xs">
-                                                    {Number(platformFee).toFixed(2)} {currency}
+                                                <td className="px-4 py-4 text-right font-mono font-black tracking-tight text-emerald-650 dark:text-emerald-450 text-xs">
+                                                    {Number(platformFee).toFixed(2)} €
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-none border uppercase tracking-widest ${
@@ -196,8 +215,8 @@ export const FinancialOpsTab: React.FC = () => {
                                                     <div className="text-[8px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest">{entry.account_type}</div>
                                                     <div className="text-[10px] font-black text-slate-900 dark:text-zinc-250">{entry.entry_type}</div>
                                                 </div>
-                                                <div className={`font-mono font-black text-xs ${isDebit ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                    {Number(entry.amount || 0).toFixed(2)} {entry.currency}
+                                                <div className={`font-mono font-black tracking-tight text-xs ${isDebit ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                    {Number(entry.amount || 0).toFixed(2)} €
                                                 </div>
                                             </div>
                                         );

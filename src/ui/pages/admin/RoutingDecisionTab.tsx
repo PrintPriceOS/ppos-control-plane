@@ -63,24 +63,26 @@ export const RoutingDecisionTab: React.FC = () => {
         }
     };
 
+    const safeRecommendations = Array.isArray(recommendations) ? recommendations : [];
+
     return (
         <div className="space-y-8 animate-slide-fade">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <div className="p-2 bg-indigo-500 rounded-none shadow-none shadow-indigo-200">
-                            <ArrowsRightLeftIcon className="w-6 h-6 text-slate-900 dark:text-white" />
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+                        <div className="p-2 bg-indigo-500 dark:bg-indigo-600 rounded-none shadow-none text-slate-900 dark:text-white">
+                            <ArrowsRightLeftIcon className="w-5 h-5" />
                         </div>
                         Autonomous Routing Engine
                     </h2>
-                    <p className="text-sm text-slate-500 font-medium mt-1">Multi-factor manufacturing orchestration & dispatch intelligence.</p>
+                    <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium mt-1">Multi-factor manufacturing orchestration & dispatch intelligence.</p>
                 </div>
 
                 {health && (
                     <div className={`flex items-center gap-3 px-4 py-2 rounded-none border ${
-                        health.state === 'LIVE' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
-                        health.state === 'DEGRADED' ? 'bg-amber-50 border-amber-100 text-amber-700' :
-                        'bg-red-50 border-red-100 text-red-700'
+                        health.state === 'LIVE' ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400' :
+                        health.state === 'DEGRADED' ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/50 text-amber-700 dark:text-amber-400' :
+                        'bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/50 text-red-700 dark:text-red-400'
                     }`}>
                         <div className={`w-2 h-2 rounded-none animate-pulse ${
                             health.state === 'LIVE' ? 'bg-emerald-500' : 'bg-amber-500'
@@ -93,17 +95,17 @@ export const RoutingDecisionTab: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Specs Input */}
                 <div className="lg:col-span-4 space-y-6">
-                    <div className="glass p-6 rounded-none border border-white shadow-none">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                            <QueueListIcon className="w-4 h-4 text-indigo-500" />
+                    <div className="bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm p-6 rounded-none border border-slate-200 dark:border-zinc-800 shadow-none">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <QueueListIcon className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                             Production Specs
                         </h3>
                         
                         <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Binding Type</label>
+                                <label className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest mb-1.5 block">Binding Type</label>
                                 <select 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-none px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    className="w-full bg-slate-100/50 dark:bg-black/40 border border-slate-200 dark:border-zinc-800 rounded-none px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     value={specs.binding}
                                     onChange={(e) => setSpecs({...specs, binding: e.target.value})}
                                 >
@@ -114,9 +116,9 @@ export const RoutingDecisionTab: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Paper Stock</label>
+                                <label className="text-[10px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1.5 block">Paper Stock</label>
                                 <select 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-none px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    className="w-full bg-slate-100/50 dark:bg-black/40 border border-slate-200 dark:border-zinc-800 rounded-none px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     value={specs.paper}
                                     onChange={(e) => setSpecs({...specs, paper: e.target.value})}
                                 >
@@ -128,18 +130,18 @@ export const RoutingDecisionTab: React.FC = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Run Length</label>
+                                    <label className="text-[10px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1.5 block">Run Length</label>
                                     <input 
                                         type="number"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-none px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        className="w-full bg-slate-100/50 dark:bg-black/40 border border-slate-200 dark:border-zinc-800 rounded-none px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
                                         value={specs.copies}
                                         onChange={(e) => setSpecs({...specs, copies: parseInt(e.target.value)})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Colour</label>
+                                    <label className="text-[10px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1.5 block">Colour</label>
                                     <select 
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-none px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        className="w-full bg-slate-100/50 dark:bg-black/40 border border-slate-200 dark:border-zinc-800 rounded-none px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
                                         value={specs.colour}
                                         onChange={(e) => setSpecs({...specs, colour: e.target.value})}
                                     >
@@ -153,18 +155,18 @@ export const RoutingDecisionTab: React.FC = () => {
                                 <label className="flex items-center gap-3 cursor-pointer group">
                                     <input 
                                         type="checkbox"
-                                        className="w-5 h-5 rounded-none border-slate-200 text-indigo-600 focus:ring-indigo-500"
+                                        className="w-5 h-5 rounded-none border-slate-200 dark:border-zinc-800 bg-transparent text-indigo-600 focus:ring-indigo-500"
                                         checked={specs.is_rush}
                                         onChange={(e) => setSpecs({...specs, is_rush: e.target.checked})}
                                     />
-                                    <span className="text-sm font-black text-slate-700 group-hover:text-indigo-600 transition-colors">Rush Production Mode</span>
+                                    <span className="text-sm font-black text-slate-700 dark:text-zinc-350 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Rush Production Mode</span>
                                 </label>
                             </div>
 
                             <button 
                                 onClick={handleSearch}
                                 disabled={searching}
-                                className="w-full btn-primary-premium !py-4 mt-6 flex items-center justify-center gap-2"
+                                className="w-full bg-slate-900 dark:bg-zinc-800 text-white rounded-none py-3 mt-6 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-zinc-700 transition-all shadow-none"
                             >
                                 {searching ? (
                                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
@@ -178,26 +180,26 @@ export const RoutingDecisionTab: React.FC = () => {
 
                     {/* Readiness Summary */}
                     {health && (
-                        <div className="bg-slate-900 rounded-none p-6 text-white shadow-none">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Readiness Intelligence</h4>
+                        <div className="bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm rounded-none p-6 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-800 shadow-none">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-400 mb-4">Readiness Intelligence</h4>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold">Compatible Nodes</span>
-                                    <span className="text-xs font-black text-indigo-400">{health.details.nodes}</span>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Compatible Nodes</span>
+                                    <span className="text-xs font-mono tracking-tight font-black text-indigo-600 dark:text-indigo-400">{health.details.nodes}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold">Machine Registry</span>
-                                    <span className="text-xs font-black text-indigo-400">{health.details.machines}</span>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Machine Registry</span>
+                                    <span className="text-xs font-mono tracking-tight font-black text-indigo-600 dark:text-indigo-400">{health.details.machines}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold">Pricing Profiles</span>
-                                    <span className="text-xs font-black text-emerald-400">{health.details.pricing}</span>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Pricing Profiles</span>
+                                    <span className="text-xs font-mono tracking-tight font-black text-emerald-600 dark:text-emerald-450">{health.details.pricing}</span>
                                 </div>
                                 {health.missing.length > 0 && (
-                                    <div className="mt-4 pt-4 border-t border-white/10">
-                                        <div className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-2">Signals Missing</div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-zinc-850/60">
+                                        <div className="text-[9px] font-black text-amber-500 dark:text-amber-450 uppercase tracking-widest mb-2">Signals Missing</div>
                                         {health.missing.map((m: string) => (
-                                            <div key={m} className="text-[10px] text-slate-400 flex items-center gap-2">
+                                            <div key={m} className="text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-2">
                                                 <ExclamationTriangleIcon className="w-3 h-3 text-amber-500" /> {m}
                                             </div>
                                         ))}
@@ -210,78 +212,78 @@ export const RoutingDecisionTab: React.FC = () => {
 
                 {/* Recommendations List */}
                 <div className="lg:col-span-8 space-y-6">
-                    {recommendations.length > 0 ? (
+                    {safeRecommendations.length > 0 ? (
                         <div className="space-y-4">
-                            {recommendations.map((rec, i) => (
-                                <div key={i} className="glass rounded-none border border-white shadow-none overflow-hidden animate-slide-fade" style={{ animationDelay: `${i * 100}ms` }}>
+                            {safeRecommendations.map((rec, i) => (
+                                <div key={i} className="bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm rounded-none border border-slate-200 dark:border-zinc-800 shadow-none overflow-hidden animate-slide-fade" style={{ animationDelay: `${i * 100}ms` }}>
                                     <div className="p-6">
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-slate-900 rounded-none flex items-center justify-center text-white text-xl font-black">
+                                                <div className="w-12 h-12 bg-slate-900 dark:bg-zinc-800 rounded-none flex items-center justify-center text-white dark:text-zinc-200 text-xl font-black">
                                                     #{i + 1}
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-lg font-black text-slate-900 tracking-tight">Node {String(rec?.nodeId || '').slice(0, 8)}</h4>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Machine: {String(rec?.machineId || '').replace(/machine_|_primary/g, '')}</p>
+                                                    <h4 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Node {String(rec?.nodeId || '').slice(0, 8)}</h4>
+                                                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-widest">Machine: {String(rec?.machineId || '').replace(/machine_|_primary/g, '')}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-3xl font-black text-indigo-600 leading-none">{rec.finalScore}</div>
-                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Routing Score</div>
+                                                <div className="text-3xl font-mono tracking-tight font-black text-indigo-600 dark:text-indigo-400 leading-none">{rec.finalScore}</div>
+                                                <div className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest mt-1">Routing Score</div>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                                            <div className="text-center p-3 bg-slate-50 rounded-none border border-slate-100">
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Technical</div>
-                                                <div className="text-sm font-black text-slate-900">{rec.technicalScore}</div>
+                                            <div className="text-center p-3 bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border border-slate-100 dark:border-zinc-850/60">
+                                                <div className="text-[8px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1">Technical</div>
+                                                <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.technicalScore}</div>
                                             </div>
-                                            <div className="text-center p-3 bg-slate-50 rounded-none border border-slate-100">
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Economic</div>
-                                                <div className="text-sm font-black text-slate-900">{rec.economicScore}</div>
+                                            <div className="text-center p-3 bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border border-slate-100 dark:border-zinc-850/60">
+                                                <div className="text-[8px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1">Economic</div>
+                                                <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.economicScore}</div>
                                             </div>
-                                            <div className="text-center p-3 bg-slate-50 rounded-none border border-slate-100">
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Reliability</div>
-                                                <div className="text-sm font-black text-slate-900">{rec.reliabilityScore}</div>
+                                            <div className="text-center p-3 bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border border-slate-100 dark:border-zinc-850/60">
+                                                <div className="text-[8px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1">Reliability</div>
+                                                <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.reliabilityScore}</div>
                                             </div>
-                                            <div className="text-center p-3 bg-slate-50 rounded-none border border-slate-100">
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Congestion</div>
-                                                <div className="text-sm font-black text-slate-900">{rec.congestionScore}</div>
+                                            <div className="text-center p-3 bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border border-slate-100 dark:border-zinc-850/60">
+                                                <div className="text-[8px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1">Congestion</div>
+                                                <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.congestionScore}</div>
                                             </div>
-                                            <div className="text-center p-3 bg-slate-50 rounded-none border border-slate-100">
-                                                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">SLA</div>
-                                                <div className="text-sm font-black text-slate-900">{rec.slaScore}</div>
+                                            <div className="text-center p-3 bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border border-slate-100 dark:border-zinc-850/60">
+                                                <div className="text-[8px] font-black text-slate-550 dark:text-zinc-400 uppercase tracking-widest mb-1">SLA</div>
+                                                <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.slaScore}</div>
                                             </div>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2 mb-6">
                                             {rec.reasons.map((r: string, j: number) => (
-                                                <span key={j} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-none text-[10px] font-black uppercase tracking-tight border border-indigo-100">
+                                                <span key={j} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-none text-[10px] font-black uppercase tracking-tight border border-indigo-100 dark:border-indigo-900/50">
                                                     <CheckBadgeIcon className="w-3.5 h-3.5" /> {r}
                                                 </span>
                                             ))}
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+                                        <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-zinc-850/60">
                                             <div className="flex gap-6">
                                                 <div className="flex items-center gap-2">
                                                     <CurrencyEuroIcon className="w-5 h-5 text-emerald-500" />
                                                     <div>
-                                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Est. Production Cost</div>
-                                                        <div className="text-sm font-black text-slate-900">€{rec.estimatedCost.toLocaleString()}</div>
+                                                        <div className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest leading-none mb-1">Est. Production Cost</div>
+                                                        <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">€{rec.estimatedCost.toLocaleString()}</div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <BoltIcon className="w-5 h-5 text-amber-500" />
                                                     <div>
-                                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Est. Turnaround</div>
-                                                        <div className="text-sm font-black text-slate-900">{rec.estimatedProductionDays} Days</div>
+                                                        <div className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest leading-none mb-1">Est. Turnaround</div>
+                                                        <div className="text-sm font-mono tracking-tight font-black text-slate-900 dark:text-white">{rec.estimatedProductionDays} Days</div>
                                                     </div>
                                                 </div>
                                             </div>
                                             <button 
                                                 onClick={() => handleDispatch(rec)}
-                                                className="px-6 py-2.5 bg-slate-900 text-white rounded-none text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-none shadow-slate-200"
+                                                className="px-6 py-2.5 bg-slate-900 dark:bg-zinc-800 text-white dark:text-zinc-200 rounded-none text-xs font-black uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-zinc-700 transition-all shadow-none"
                                             >
                                                 Execute Dispatch
                                             </button>
@@ -291,8 +293,8 @@ export const RoutingDecisionTab: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="h-full min-h-[500px] glass rounded-none border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                            <div className="p-6 bg-slate-100 rounded-none animate-pulse">
+                        <div className="h-full min-h-[500px] bg-slate-50/50 dark:bg-zinc-900/20 rounded-none border-2 border-dashed border-slate-200 dark:border-zinc-800 flex flex-col items-center justify-center text-slate-500 dark:text-zinc-400 space-y-4">
+                            <div className="p-6 bg-slate-100 dark:bg-zinc-800 rounded-none animate-pulse">
                                 <ViewfinderCircleIcon className="w-12 h-12 opacity-20" />
                             </div>
                             <div className="text-center">
