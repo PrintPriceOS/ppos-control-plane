@@ -218,4 +218,31 @@ router.get('/map', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/federation/simulation
+ */
+router.post('/simulation', async (req, res) => {
+    try {
+        const registry = require('../upstream/src/federation/instanceRegistry');
+        const decisionEngine = require('../upstream/src/federation/federatedDecisionEngine');
+        
+        // 1. Force inject a state anomaly: Mark local-ops-1 as DEGRADED to trigger distress telemetry
+        registry.updateStatus('local-ops-1', 'DEGRADED');
+        
+        // 2. Synthesize the immediate evacuation pathway governed by sovereign policy rules
+        const evacuationResult = decisionEngine.synthesizeEvacuationRoute({ clusterPressure: 'CRITICAL', safetyChecked: true });
+        
+        res.json({
+            ok: true,
+            source_status: "MUTATED_LIVE",
+            actionTaken: evacuationResult.action,
+            targetNode: evacuationResult.targetInstance || null,
+            constraintsApplied: evacuationResult.constraintsApplied || [],
+            message: "Capacity pressure simulation injected. Local node shifted to DEGRADED. Evacuation route calculated."
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message, code: 'FEDERATION_SIMULATION_FATAL' });
+    }
+});
+
 module.exports = router;

@@ -62,7 +62,23 @@ export const NetworkOpsTab: React.FC = () => {
 
     useEffect(() => {
         fetchData();
+        const intervalId = setInterval(fetchData, 5000);
+        return () => clearInterval(intervalId);
     }, [filters]);
+
+    const handlePressureSimulation = async () => {
+        try {
+            const res = await adminApi.executeFederationSimulation();
+            if (res.ok) {
+                alert(`Tactical Simulation Injected:\n\nAction: ${res.actionTaken}\nTarget: ${res.targetNode}\nMessage: ${res.message}`);
+                fetchData();
+            } else {
+                alert('Simulation trigger failed');
+            }
+        } catch (err: any) {
+            alert(`Simulation failed: ${err.message || err}`);
+        }
+    };
 
     const handleAction = async (id: string, action: 'approve' | 'suspend') => {
         try {
@@ -114,13 +130,22 @@ export const NetworkOpsTab: React.FC = () => {
                     </h2>
                     <p className="text-slate-500 font-medium text-xs">Internal operations monitoring for the PrintPrice Global Network.</p>
                 </div>
-                <button
-                    onClick={fetchData}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-none text-xs font-black text-slate-700 hover:bg-slate-50 transition-all shadow-none active:scale-95"
-                >
-                    <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    Sync Reality
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handlePressureSimulation}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#dc0000] border border-red-700 rounded-none text-xs font-black text-white hover:bg-red-700 transition-all shadow-none active:scale-95"
+                    >
+                        <CpuChipIcon className="w-4 h-4" />
+                        Execute Pressure Simulation
+                    </button>
+                    <button
+                        onClick={fetchData}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-none text-xs font-black text-slate-700 hover:bg-slate-50 transition-all shadow-none active:scale-95"
+                    >
+                        <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        Sync Reality
+                    </button>
+                </div>
             </div>
 
             {/* Dash Core */}

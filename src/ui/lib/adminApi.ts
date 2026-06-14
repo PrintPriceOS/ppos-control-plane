@@ -2719,3 +2719,16 @@ export async function getMarketplaceLedger() {
         return [];
     }
 }
+
+export async function executeFederationSimulation() {
+    return adminFetch<{
+        ok: boolean;
+        source_status: string;
+        actionTaken: string;
+        targetNode: string | null;
+        constraintsApplied: string[];
+        message: string;
+    }>('/api/admin/federation/simulation', {
+        method: 'POST'
+    });
+}
