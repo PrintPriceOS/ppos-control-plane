@@ -8,7 +8,7 @@ import {
   ArchiveBoxIcon,
   TrashIcon
 } from "@heroicons/react/24/outline";
-import { getPreflightArtifacts, getGlobalArtifacts } from "../../lib/adminApi";
+import { getPreflightArtifacts, getGlobalArtifacts, deletePreflightArtifact } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { short } from "../../lib/formatters";
@@ -24,9 +24,35 @@ export const PreflightArtifactsPage: React.FC = () => {
     15000
   );
 
-  const handleDownload = (id: string) => {
-    const token = localStorage.getItem('admin_token');
-    window.open(`/api/admin/preflight/artifacts/${id}/download?token=${token}`, '_blank');
+  const handleDownload = async (id: string) => {
+    try {
+      const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+      const res = await fetch(`/api/admin/preflight/artifacts/${id}/download`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`Download failed: ${res.statusText}`);
+      
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get('content-disposition');
+      let filename = `artifact_${id}.pdf`;
+      if (contentDisposition) {
+        const matches = /filename="([^"]+)"/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Download failed: ' + err.message);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -67,6 +93,18 @@ export const PreflightArtifactsPage: React.FC = () => {
             header: 'Artifact Name',
             accessor: (a) => {
               const ux = getArtifactUxForArtifact(a, null, "operator");
+              const indexTag = a.id ? `[#${a.id.slice(0, 6).toUpperCase()}]` : '';
+              const isMutated = a.type === 'OUTPUT' || a.type?.toLowerCase().includes('fixed') || a.type?.toLowerCase().includes('mutated') || a.type?.toLowerCase().includes('autofix') || a.filename?.toLowerCase().includes('fixed') || a.filename?.toLowerCase().includes('certified');
+              const stateBadge = isMutated ? (
+                <span className="px-2 py-0.5 font-mono text-[8px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-none tracking-wider">
+                  ⚡ AUTOFIX_MUTATED
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 font-mono text-[8px] font-black uppercase bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 rounded-none tracking-wider">
+                  📥 SOURCE_ORIGINAL
+                </span>
+              );
+
               return (
               <div className="flex items-center gap-3">
                 {a.mime_type?.includes('pdf') ? (
@@ -74,10 +112,17 @@ export const PreflightArtifactsPage: React.FC = () => {
                 ) : (
                   <CommandLineIcon className="w-4 h-4 text-slate-400" />
                 )}
-                <div className="flex flex-col">
-                  <span className="font-bold truncate max-w-xs" title={ux.tooltip}>{ux.display_label || a.filename}</span>
-                  <span className="text-[10px] font-mono text-slate-400">ID: {short(a.id, 8)} • Job: {short(a.job_id, 8)}</span>
-
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 font-mono text-[9px] uppercase tracking-tight rounded-none">
+                      {indexTag}
+                    </span>
+                    <span className="font-bold truncate max-w-xs" title={ux.tooltip}>{ux.display_label || a.filename}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {stateBadge}
+                    <span className="text-[10px] font-mono text-slate-400">ID: {short(a.id, 8)} • Job: {short(a.job_id, 8)}</span>
+                  </div>
                 </div>
               </div>
               );

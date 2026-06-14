@@ -10,13 +10,15 @@ export const PreflightQuotasPage: React.FC = () => {
   };
 
   const tenants = q.data?.tenants || [];
+  const totalLimitBytes = tenants.reduce((acc: number, t: any) => acc + (t.quotaBytes || 0), 0);
+  const globalProgress = totalLimitBytes > 0 ? ((q.data?.totalBytes || 0) / totalLimitBytes) * 100 : 0;
 
   return (
     <div className="space-y-6 italic-text-off">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">Storage Quotas</h1>
-          <p className="text-sm text-slate-500 font-medium">Multi-tenant storage usage and 2GB hard-limit enforcement.</p>
+          <p className="text-sm text-slate-500 font-medium">Multi-tenant storage usage and quota enforcement.</p>
         </div>
       </div>
 
@@ -24,8 +26,8 @@ export const PreflightQuotasPage: React.FC = () => {
         <QuotaCard
           label="Global Utilization"
           value={formatSize(q.data?.totalBytes || 0)}
-          limit={formatSize(tenants.length * 2147483648)}
-          progress={((q.data?.totalBytes || 0) / (tenants.length * 2147483648 || 1)) * 100}
+          limit={formatSize(totalLimitBytes)}
+          progress={globalProgress}
         />
       </div>
 

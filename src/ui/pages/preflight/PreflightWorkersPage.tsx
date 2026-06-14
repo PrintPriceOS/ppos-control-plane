@@ -17,6 +17,7 @@ export const PreflightWorkersPage: React.FC = () => {
       <DataTable 
         isLoading={q.status === 'loading'}
         data={q.data?.workers || []}
+        rowClassName={(w) => w.status !== 'ONLINE' && w.status !== 'BUSY' ? '!bg-red-500/[0.04] dark:!bg-red-950/20 border-l-2 border-l-red-500' : ''}
         columns={[
           {
             header: 'Worker ID',
@@ -59,6 +60,25 @@ export const PreflightWorkersPage: React.FC = () => {
           {
             header: 'Last Seen',
             accessor: (w) => <span className="text-xs text-slate-400">{new Date(w.lastSeen).toLocaleTimeString()}</span>
+          },
+          {
+            header: 'Cluster Governance',
+            accessor: (w) => (
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => alert(`Isolating node: ${w.name}`)}
+                  className="px-2.5 py-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-[9px] font-black uppercase tracking-wider transition-all border border-red-500/20"
+                >
+                  Isolate Node
+                </button>
+                <button 
+                  onClick={() => alert(`Flushing cache for node: ${w.name}`)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-[9px] font-black uppercase tracking-wider transition-all border border-slate-200 dark:border-zinc-700"
+                >
+                  Flush Cache
+                </button>
+              </div>
+            )
           }
         ]}
       />

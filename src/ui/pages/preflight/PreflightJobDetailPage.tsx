@@ -227,9 +227,10 @@ export const PreflightJobDetailPage: React.FC = () => {
   } else if (['COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(statusUpper)) {
     preflightProgressPercent = 100;
   } else {
-    const executedLen = payload?.analyzerCoverage?.executed?.length || 0;
-    const registeredLen = payload?.analyzerCoverage?.registered?.length || 12;
-    preflightProgressPercent = Math.round((executedLen / registeredLen) * 100);
+    const executedCount = payload?.analyzerCoverage?.executed?.length || 0;
+    const registeredCount = payload?.analyzerCoverage?.registered?.length || 0;
+    const pct = registeredCount > 0 ? Math.min(100, Math.round((executedCount / registeredCount) * 100)) : 0;
+    preflightProgressPercent = pct;
   }
 
   const handleTriggerFix = async () => {
@@ -666,7 +667,7 @@ async function triggerArtifactDownload(artifact: any) {
 
           {/* Premium High-Contrast Red Progress Bar */}
           {(statusUpper === 'PROCESSING' || statusUpper === 'QUEUED' || preflightProgressPercent < 100) && (
-            <div className="glass p-5 rounded-none border border-primary/20 bg-slate-900/95 dark:bg-[#131314] text-slate-100 space-y-3 font-manrope">
+            <div className="glass p-5 rounded-none border border-primary/20 bg-slate-900/95 dark:bg-[#131314] text-slate-100 space-y-4 font-manrope">
               <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-slate-300">
                 <span className="flex items-center gap-1.5">
                   <ArrowPathIcon className="w-3.5 h-3.5 text-primary animate-spin" />
@@ -682,6 +683,40 @@ async function triggerArtifactDownload(artifact: any) {
               </div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Stage: {payload.step || 'Worker Analysis Queue'} • {payload?.analyzerCoverage?.executed?.length || 0}/{payload?.analyzerCoverage?.registered?.length || 12} Analyzers Passed
+              </div>
+
+              {/* Core Analyzers Grid */}
+              <div className="pt-2 border-t border-white/10">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-2">Core Analyzers Coverage</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {['Geometry', 'Color', 'Fonts', 'Ink', 'Overprint', 'Transparency'].map((analyzer) => {
+                    const executed = payload?.analyzerCoverage?.executed || [];
+                    const isExecuted = executed.some((e: string) => e.toLowerCase() === analyzer.toLowerCase());
+                    const isProcessing = statusUpper === 'PROCESSING';
+                    
+                    // Find the next in line
+                    const coreAnalyzers = ['Geometry', 'Color', 'Fonts', 'Ink', 'Overprint', 'Transparency'];
+                    const foundNext = coreAnalyzers.find(a => 
+                      !executed.some((e: string) => e.toLowerCase() === a.toLowerCase())
+                    );
+                    const isNext = isProcessing && foundNext === analyzer;
+
+                    return (
+                      <div 
+                        key={analyzer}
+                        className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider text-center border transition-all duration-300 ${
+                          isExecuted 
+                            ? 'bg-emerald-600 border-emerald-500 text-white shadow-sm'
+                            : isNext 
+                              ? 'bg-blue-600/30 border-blue-500 text-blue-400 animate-pulse'
+                              : 'bg-slate-800/40 border-slate-700/50 text-slate-500'
+                        }`}
+                      >
+                        {analyzer}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

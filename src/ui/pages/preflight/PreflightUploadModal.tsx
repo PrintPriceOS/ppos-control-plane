@@ -63,6 +63,8 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
   const [status, setStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [isPdfValidated, setIsPdfValidated] = useState<boolean>(false);
+  const [magicBytesStatus, setMagicBytesStatus] = useState<'IDLE' | 'VERIFYING_STRUCTURE' | 'STRUCTURE_VALIDATED' | 'STRUCTURE_CORRUPTED'>('IDLE');
   
   // High-fidelity Status Polling States
   const [polledData, setPolledData] = useState<any>(null);
@@ -96,11 +98,13 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
       
       if (pdfCandidates.length !== selectedFiles.length) {
         setError('Validation Rejected: Upload payload contains invalid mime formats. Only standard PDF file streams are allowed.');
+        setMagicBytesStatus('STRUCTURE_CORRUPTED');
         return;
       }
 
       setError(null);
       setStatus('idle');
+      setMagicBytesStatus('VERIFYING_STRUCTURE');
 
       // Client-side strict Magic Byte validation for 100% forensic security
       const verifiedFiles: File[] = [];
@@ -108,10 +112,15 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
         const isValidMagic = await checkMagicBytes(f);
         if (!isValidMagic) {
           setError(`Forensic Rejection: Document "${f.name}" failed magic bytes check (%PDF- mismatch). File stream is corrupted or non-compliant.`);
+          setIsPdfValidated(false);
+          setMagicBytesStatus('STRUCTURE_CORRUPTED');
           return;
         }
         verifiedFiles.push(f);
       }
+
+      setIsPdfValidated(true);
+      setMagicBytesStatus('STRUCTURE_VALIDATED');
 
       if (mode === 'SINGLE') {
         setFiles([verifiedFiles[0]].filter(Boolean));
@@ -123,11 +132,18 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
 
   const removeFile = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    const remaining = files.filter((_, i) => i !== index);
+    setFiles(remaining);
+    if (remaining.length === 0) {
+      setIsPdfValidated(false);
+      setMagicBytesStatus('IDLE');
+    }
   };
 
   const resetAndClose = () => {
     setFiles([]);
+    setIsPdfValidated(false);
+    setMagicBytesStatus('IDLE');
     setStatus('idle');
     setError(null);
     setResult(null);
@@ -482,9 +498,15 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                           onClick={() => fileInputRef.current?.click()}
                           className={`
                             group relative border-2 border-dashed rounded-none p-8 text-center cursor-pointer transition-all duration-300
-                            ${files.length > 0 
-                              ? 'border-primary/40 bg-primary/[0.01]' 
-                              : 'ppos-border hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-white/5'}
+                            ${magicBytesStatus === 'VERIFYING_STRUCTURE'
+                              ? 'border-blue-500 bg-blue-500/[0.01] dark:bg-blue-500/[0.02]'
+                              : magicBytesStatus === 'STRUCTURE_VALIDATED'
+                                ? 'border-emerald-500 bg-emerald-500/[0.01] dark:bg-emerald-500/[0.02]'
+                                : magicBytesStatus === 'STRUCTURE_CORRUPTED'
+                                  ? 'border-red-500 bg-red-500/[0.01] dark:bg-red-500/[0.02]'
+                                  : files.length > 0 
+                                    ? 'border-primary/40 bg-primary/[0.01]' 
+                                    : 'ppos-border hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-white/5'}
                           `}
                         >
                           <input 
@@ -497,15 +519,32 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                           />
                           
                           <div className="flex flex-col items-center">
-                            {files.length > 0 ? (
+                            {magicBytesStatus === 'STRUCTURE_CORRUPTED' ? (
+                              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold text-left space-y-1 max-w-xl mx-auto w-full" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center gap-2 font-black uppercase tracking-wider">
+                                  <ExclamationCircleIcon className="w-4 h-4 flex-shrink-0" />
+                                  <span>STRUCTURE_CORRUPTED</span>
+                                </div>
+                                <p className="text-[11px]">{error || 'Verification probe rejected upload payload.'}</p>
+                                <div className="pt-2 text-center">
+                                  <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-4 py-1.5 bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider"
+                                  >
+                                    Try Another File
+                                  </button>
+                                </div>
+                              </div>
+                            ) : files.length > 0 ? (
                               <div className="w-full space-y-3" onClick={e => e.stopPropagation()}>
                                 <div className="flex items-center justify-between pb-2 border-b ppos-border">
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                       {files.length} Document{files.length > 1 ? 's' : ''} Staged
                                     </span>
-                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-500 text-[8px] font-mono font-bold uppercase">
-                                      %PDF- Magic Verified
+                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-500 text-[8px] font-mono font-bold uppercase flex items-center gap-1">
+                                      <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
+                                      STRUCTURE_VALIDATED (%PDF- Magic Verified)
                                     </span>
                                   </div>
                                   <button 
@@ -540,11 +579,21 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                             ) : (
                               <div className="flex flex-col items-center py-5 space-y-3">
                                 <div className="w-16 h-16 rounded-none ppos-surface-muted flex items-center justify-center text-slate-300 dark:text-zinc-600 group-hover:text-primary group-hover:scale-105 transition-all">
-                                  {mode === 'SINGLE' ? <CloudArrowUpIcon className="w-8 h-8" /> : <RectangleStackIcon className="w-8 h-8" />}
+                                  {magicBytesStatus === 'VERIFYING_STRUCTURE' ? (
+                                    <ArrowPathIcon className="w-8 h-8 text-primary animate-spin" />
+                                  ) : mode === 'SINGLE' ? (
+                                    <CloudArrowUpIcon className="w-8 h-8" />
+                                  ) : (
+                                    <RectangleStackIcon className="w-8 h-8" />
+                                  )}
                                 </div>
                                 <div className="space-y-1">
                                   <div className="text-base font-black text-slate-900 dark:text-[#ECECF1]">
-                                    {mode === 'SINGLE' ? 'Click or Drag PDF payload block to instantiate single job' : 'Drop batch PDF array files for clustered extraction'}
+                                    {magicBytesStatus === 'VERIFYING_STRUCTURE' 
+                                      ? 'VERIFYING_STRUCTURE — Probe verifying magic bytes...' 
+                                      : mode === 'SINGLE' 
+                                        ? 'Click or Drag PDF payload block to instantiate single job' 
+                                        : 'Drop batch PDF array files for clustered extraction'}
                                   </div>
                                   <div className="text-xs font-bold text-slate-400">
                                     Pre-execution validation probes inspect file Magic Bytes headers securely
@@ -691,7 +740,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                       </button>
                       
                       <button 
-                        disabled={files.length === 0 || !policy || !!isPoliciesUnavailable || status === 'executing'}
+                        disabled={files.length === 0 || !policy || !!isPoliciesUnavailable || status === 'executing' || !isPdfValidated}
                         onClick={handleExecute}
                         className={`
                           relative overflow-hidden group flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-none font-black text-xs uppercase tracking-widest
