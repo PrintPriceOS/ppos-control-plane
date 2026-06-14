@@ -14,7 +14,8 @@ import {
     getRerouteEvents, 
     getLiveCapacity,
     triggerSLAScan,
-    triggerRebalance
+    triggerRebalance,
+    getPrinthouses
 } from '../../lib/adminApi';
 import { 
     ServerIcon, 
@@ -30,7 +31,7 @@ import {
 import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
 import { COLORS } from '../../design-system/tokens';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
-import { listPrinthouses, listMachines } from '../../api/printhouseCapabilitiesClient';
+import { listMachines } from '../../api/printhouseCapabilitiesClient';
 
 export const IndustrialLiveTab: React.FC = () => {
     const liveState = useAdminQuery('industrial-live-state', getIndustrialLiveState, 5000);
@@ -49,16 +50,19 @@ export const IndustrialLiveTab: React.FC = () => {
 
     React.useEffect(() => {
         if (isOnboardOpen) {
-            listPrinthouses().then(res => {
-                if (res.ok && res.printhouses) {
-                    setPrinthouses(res.printhouses);
-                    if (res.printhouses.length > 0 && !selectedPrinthouseId) {
-                        setSelectedPrinthouseId(res.printhouses[0].id);
-                    }
+            getPrinthouses().then(data => {
+                const normalized = (data || []).map((p: any) => ({
+                    ...p,
+                    id: p.id || p._id || p.printer_id || p.node_id || p.tenant_id,
+                    name: p.name || p.company_name || p.companyName || p.id
+                }));
+                setPrinthouses(normalized);
+                if (normalized.length > 0 && !selectedPrinthouseId) {
+                    setSelectedPrinthouseId(normalized[0].id);
                 }
             });
         }
-    }, [isOnboardOpen]);
+    }, [isOnboardOpen, selectedPrinthouseId]);
 
     const openMachine = (id: string) => {
         setSelectedMachineId(id);

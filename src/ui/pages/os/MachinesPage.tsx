@@ -13,10 +13,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { DataTable } from '../../components/DataTable';
 import { useAdminQuery } from '../../hooks/useAdminData';
-import { getMachines } from '../../lib/adminApi';
+import { getMachines, getPrinthouses } from '../../lib/adminApi';
 import { StatusBadge } from '../../components/StatusBadge';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
-import { listPrinthouses, listMachines } from '../../api/printhouseCapabilitiesClient';
+import { listMachines } from '../../api/printhouseCapabilitiesClient';
 
 interface Machine {
     id: string;
@@ -54,16 +54,19 @@ export const MachinesPage: React.FC = () => {
 
     useEffect(() => {
         if (isOnboardOpen) {
-            listPrinthouses().then(res => {
-                if (res.ok && res.printhouses) {
-                    setPrinthouses(res.printhouses);
-                    if (res.printhouses.length > 0 && !selectedPrinthouseId) {
-                        setSelectedPrinthouseId(res.printhouses[0].id);
-                    }
+            getPrinthouses().then(data => {
+                const normalized = (data || []).map((p: any) => ({
+                    ...p,
+                    id: p.id || p._id || p.printer_id || p.node_id || p.tenant_id,
+                    name: p.name || p.company_name || p.companyName || p.id
+                }));
+                setPrinthouses(normalized);
+                if (normalized.length > 0 && !selectedPrinthouseId) {
+                    setSelectedPrinthouseId(normalized[0].id);
                 }
             });
         }
-    }, [isOnboardOpen]);
+    }, [isOnboardOpen, selectedPrinthouseId]);
 
     const q = useAdminQuery<{ ok: boolean; total: number; machines: Machine[]; status: string; timestamp: string }>('machines', getMachines);
 
