@@ -157,22 +157,45 @@ router.post('/:printhouseId/machines', async (req, res) => {
     }
 });
 
-// GET /api/admin/printhouse-capabilities/:printhouseId/machines - List Machines
-router.get('/:printhouseId/machines', async (req, res) => {
+// GET /api/admin/printhouse-capabilities/:tenantId/machines - List Machines
+router.get('/:tenantId/machines', async (req, res) => {
     try {
-        const { actor, tenantId } = getActorAndTenant(req);
-        const { printhouseId } = req.params;
+        const { actor } = getActorAndTenant(req);
+        const { tenantId } = req.params;
 
-        const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
-        if (!printhouse) {
-            return res.status(404).json({ ok: false, error: 'PRINTHOUSE_NOT_FOUND' });
+        // Backward compatibility if tenantId is actually a printhouseId (starts with 'print_')
+        if (tenantId.startsWith('print_')) {
+            const printhouseId = tenantId;
+            const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
+            if (!printhouse) {
+                return res.status(404).json({ ok: false, error: 'PRINTHOUSE_NOT_FOUND' });
+            }
+            if (!actor.isSuperAdmin && actor.role !== 'SUPER_ADMIN' && printhouse.tenant_id !== actor.tenantId) {
+                return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_TENANT_ACCESS' });
+            }
+
+            const machines = await printhouseCapabilityService.listMachines(printhouseId);
+            return res.json({ ok: true, machines });
         }
-        if (!actor.isSuperAdmin && actor.role !== 'SUPER_ADMIN' && printhouse.tenant_id !== tenantId) {
+
+        // Strict isolation: check tenant permission
+        if (!actor.isSuperAdmin && actor.role !== 'SUPER_ADMIN' && actor.tenantId !== tenantId) {
             return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_TENANT_ACCESS' });
         }
 
-        const machines = await printhouseCapabilityService.listMachines(printhouseId);
-        return res.json({ ok: true, machines });
+        // List all machines belonging to this tenantId
+        const rows = await require('../services/mysqlClient').query(
+            'SELECT * FROM printhouse_machines WHERE tenant_id = ?', 
+            [tenantId]
+        );
+        rows.forEach(r => {
+            r.supported_color_modes_json = safeParseJson(r.supported_color_modes_json, []);
+            r.supported_print_methods_json = safeParseJson(r.supported_print_methods_json, []);
+            r.supported_sides_json = safeParseJson(r.supported_sides_json, []);
+            r.metadata_json = safeParseJson(r.metadata_json, {});
+        });
+
+        return res.json({ ok: true, machines: rows });
     } catch (err) {
         console.error('[PRINTHOUSE_CAPABILITIES] Error listing machines:', err);
         return res.status(500).json({ ok: false, error: err.message });
