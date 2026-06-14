@@ -130,7 +130,11 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId, jobPa
             const token = localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
             const res = await fetch(`/api/admin/preflight/jobs/${jobId}/human-report/snapshot`, {
                 method: 'POST',
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ report: jobPayload?.canonicalPayload?.report || jobPayload?.report || report, rawJob: jobPayload })
             });
             const data = await res.json();
             if (!data.ok) throw new Error(data.message || 'Failed to save snapshot');
@@ -204,32 +208,9 @@ export const HumanReportPanel: React.FC<HumanReportPanelProps> = ({ jobId, jobPa
         }
     };
 
-    const handleRemediationActionClick = async (actionId: string, actionPayload?: any) => {
-        if (actionId === 'COPY_CUSTOMER_LINK') {
-            if (actionPayload?.tokenPreview) {
-                // In a real implementation we would fetch the raw token or use the preview for testing
-                handleCopy(`${window.location.origin}/public/customer-action/${actionPayload.tokenPreview}`);
-                alert('Copied customer reupload link to clipboard');
-            }
-            return;
-        }
-        
-        if (actionId === 'GENERATE_CUSTOMER_LINK') {
-            // Need order ID. We can extract from report.job_id assuming it's part of the API.
-            // But actually we have jobId. We can mock this for the UI.
-            alert('Generating customer token flow via marketplaceCustomerActionService...');
-            return;
-        }
-
-        if (actionId === 'RECOMPUTE_READINESS') {
-            alert('Recomputing readiness...');
-            reportQ.refetch();
-            return;
-        }
-
-        if (actionId === 'RERUN_PREFLIGHT') {
-            alert('Rerunning preflight...');
-            return;
+    const handleRemediationActionClick = (actionId: string, actionPayload?: any) => {
+        if (onActionClick) {
+            onActionClick({ id: actionId, ...actionPayload, source: 'remediation' });
         }
     };
 
