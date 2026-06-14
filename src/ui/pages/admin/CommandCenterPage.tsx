@@ -210,11 +210,13 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 const IncidentBridge = ({ auditData }: { auditData?: any[] }) => {
   const incidents = useAdminQuery('hawk-eye:incidents', getIndustrialIncidents, 10000);
   const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
+  const auditArray = Array.isArray(auditData) ? auditData : [];
+  const anomaliesArray = Array.isArray(anomalies.data) ? anomalies.data : [];
   
   const incidentCount = incidents.data?.incidentBridge?.count 
-    ?? auditData?.filter((a: any) => a.event?.includes('BLOCKED')).length 
-    ?? (Array.isArray(anomalies.data) ? anomalies.data.length : 0)
-    ?? (Array.isArray(incidents.data) ? incidents.data.length : 0);
+    ?? auditArray.filter((a: any) => a.event?.includes('BLOCKED')).length 
+    ?? anomaliesArray.length 
+    ?? 0;
     
   const bridgeStatus = incidentCount > 0 ? 'DEGRADED' : 'ONLINE';
 
