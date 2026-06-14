@@ -283,7 +283,7 @@ export const ProductionMonitoringDashboardPage: React.FC = () => {
                     <h1 className="text-xl font-black uppercase tracking-widest">
                         Live Production SLA Monitoring
                     </h1>
-                    <p className={`text-xs ${COLORS.adaptive.textSecondary} font-semibold mt-1`}>
+                    <p className="text-xs text-zinc-500 font-semibold mt-1">
                         Operational queues, machine load, and governance gate monitoring console.
                     </p>
                 </div>
@@ -293,14 +293,14 @@ export const ProductionMonitoringDashboardPage: React.FC = () => {
                     <input 
                         type="text" 
                         placeholder="Filter by Tenant ID"
-                        className={`px-3 py-1.5 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} text-xs font-semibold rounded-none focus:outline-none`}
+                        className="px-3 py-1.5 border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-semibold rounded-none focus:outline-none focus:border-zinc-500 placeholder:text-zinc-600"
                         value={tenantIdFilter}
                         onChange={(e) => setTenantIdFilter(e.target.value)}
                     />
                     <input 
                         type="text" 
                         placeholder="Filter by Printhouse ID"
-                        className={`px-3 py-1.5 border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} text-xs font-semibold rounded-none focus:outline-none`}
+                        className="px-3 py-1.5 border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-semibold rounded-none focus:outline-none focus:border-zinc-500 placeholder:text-zinc-600"
                         value={printhouseIdFilter}
                         onChange={(e) => setPrinthouseIdFilter(e.target.value)}
                     />
