@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS financial_operations_provider_settlement_file_rows (
     tenant_id VARCHAR(255),
     provider_key VARCHAR(100) NOT NULL,
     provider_type VARCHAR(100) NOT NULL,
-    row_number INT NOT NULL,
+    `row_number` INT NOT NULL,
     row_status VARCHAR(50) NOT NULL,
     transaction_reference VARCHAR(255),
     provider_transaction_id VARCHAR(255),
