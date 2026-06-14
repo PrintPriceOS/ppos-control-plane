@@ -15,53 +15,53 @@ export const IndustrialMapTab: React.FC = () => {
     const { data: mapState } = useAdminQuery('routing:map', getRoutingMap, 5000);
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const warnings = safeArray(mapState?.warnings);
+    const warnings = safeArray(mapState?.warnings ?? []);
     const sourceStatus = mapState?.source_status || '';
     const hasWarnings = warnings.length > 0 || sourceStatus === 'PARTIAL_COORDINATES' || sourceStatus === 'NO_COORDINATES_AVAILABLE';
 
-    const safeDecisions = safeArray(liveData?.decisions);
+    const safeDecisions = safeArray(liveData?.decisions ?? []);
 
     return (
         <div className="space-y-6">
             {/* Compact Telemetry Warning Strip */}
             {hasWarnings && (
-                <div className="border-l-2 border-amber-500 bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/20 rounded-none overflow-hidden transition-all">
-                    <div 
+                <div className="border-l-2 border-amber-500 bg-amber-500/5 border border-amber-500/20 rounded-none overflow-hidden transition-all">
+                    <div
                         className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-amber-500/10 transition-colors select-none"
                         onClick={() => setIsExpanded(!isExpanded)}
                     >
                         <div className="flex items-center gap-3">
                             <div className="w-1.5 h-1.5 bg-amber-500 animate-pulse" />
-                            <span className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-wider">
+                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">
                                 {toDisplayText(sourceStatus).replace(/_/g, ' ')} — {warnings.length} {warnings.length === 1 ? 'node' : 'nodes'} excluded from map
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[8px] font-bold text-amber-600/80 dark:text-amber-500/80 uppercase tracking-widest">
+                            <span className="text-[8px] font-bold text-amber-500/80 uppercase tracking-widest">
                                 {isExpanded ? 'Collapse Telemetry' : 'Inspect Exclusions'}
                             </span>
-                            <span className="text-[9px] font-mono text-amber-600 dark:text-amber-500 font-bold">
+                            <span className="text-[9px] font-mono text-amber-500 font-bold">
                                 {isExpanded ? '▲' : '▼'}
                             </span>
                         </div>
                     </div>
 
                     {isExpanded && warnings.length > 0 && (
-                        <div className="border-t border-amber-500/10 bg-white/50 dark:bg-black/20 divide-y divide-amber-500/5 max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="border-t border-amber-500/10 bg-zinc-950/40 divide-y divide-amber-500/5 max-h-60 overflow-y-auto custom-scrollbar">
                             {warnings.map((w: any, idx: number) => (
                                 <div key={w?.id || idx} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono">
                                     <div className="flex items-center gap-2">
-                                        <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[8px]">
+                                        <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 font-bold text-[8px]">
                                             {toDisplayText(w?.type || w?.entityType || 'NODE')}
                                         </span>
-                                        <span className="font-bold text-slate-800 dark:text-zinc-200">
+                                        <span className="font-bold text-zinc-200">
                                             {toDisplayText(w?.name || 'Unknown')}
                                         </span>
-                                        <span className="text-slate-400 dark:text-zinc-500 text-[8px]">
+                                        <span className="text-zinc-500 text-[8px]">
                                             ({toDisplayText(w?.id || w?.entityId || 'N/A')})
                                         </span>
                                     </div>
-                                    <span className="text-amber-600 dark:text-amber-500/90 text-[8px] max-w-md truncate">
+                                    <span className="text-amber-500/90 text-[8px] max-w-md truncate">
                                         {toDisplayText(w?.message || w?.reason || w)}
                                     </span>
                                 </div>
@@ -81,25 +81,25 @@ export const IndustrialMapTab: React.FC = () => {
 
                 {/* Live Event Stream */}
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-[#131314] border border-white/10 overflow-hidden flex flex-col h-[700px] rounded-none">
-                        <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#131314]/[0.02] flex items-center justify-between">
-                            <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Routing Decalog</h3>
+                    <div className="glass border border-zinc-800 bg-zinc-950/40 overflow-hidden flex flex-col h-[700px] rounded-none">
+                        <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-950/60 flex items-center justify-between">
+                            <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Routing Decalog</h3>
                             <div className="w-1.5 h-1.5 bg-primary animate-pulse" />
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                             {safeDecisions.map((d: any) => {
                                 const safeDecId = d?.id ? String(d.id).substring(0, 8) : 'N/A';
                                 return (
-                                    <div key={d?.id || Math.random()} className="p-3 bg-white/5 border border-white/5 rounded-none">
+                                    <div key={d?.id || Math.random()} className="p-3 bg-zinc-900/40 border border-zinc-800 rounded-none">
                                         <div className="flex justify-between items-start mb-2">
-                                            <span className="text-[8px] font-mono font-bold text-blue-600 uppercase tracking-tighter">#{safeDecId}</span>
+                                            <span className="text-[8px] font-mono font-bold text-blue-400 uppercase tracking-tighter">#{safeDecId}</span>
                                             <span className="text-[9px] font-black text-emerald-500 uppercase">{toDisplayText(d?.routing_score)}%</span>
                                         </div>
-                                        <p className="text-[9px] font-bold text-slate-800 dark:text-zinc-300 leading-relaxed mb-2">
+                                        <p className="text-[9px] font-bold text-zinc-300 leading-relaxed mb-2">
                                             {toDisplayText(d?.explanation)}
                                         </p>
-                                        <div className="flex justify-between items-center text-[7px] font-black text-slate-400 uppercase">
+                                        <div className="flex justify-between items-center text-[7px] font-black text-zinc-500 uppercase">
                                             <span>Node: {toDisplayText(d?.selected_machine_id)}</span>
                                             <span>{d?.created_at ? new Date(d.created_at).toLocaleTimeString() : ''}</span>
                                         </div>
@@ -114,11 +114,11 @@ export const IndustrialMapTab: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        
-                        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-[#131314]/[0.01]">
-                            <div className="flex items-center justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
+
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-950/60">
+                            <div className="flex items-center justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest">
                                 <span>Session Decisions</span>
-                                <span className="text-slate-900 dark:text-white">{safeDecisions.length}</span>
+                                <span className="text-white font-mono">{safeDecisions.length}</span>
                             </div>
                         </div>
                     </div>
@@ -132,17 +132,16 @@ export const IndustrialMapTab: React.FC = () => {
                 <StatusCard label="Cross-Border Load" value="---" trend="OFFLINE" />
                 <StatusCard label="Carbon Reduction" value="---" trend="NO DATA" />
             </div>
-
         </div>
     );
 };
 
 const StatusCard = ({ label, value, trend }: { label: string, value: string, trend: string }) => (
-    <div className="p-4 bg-white dark:bg-[#131314] border border-white/10 rounded-none">
+    <div className="p-4 glass border border-zinc-800 bg-zinc-950/40 rounded-none">
         <div className="flex justify-between items-start mb-2">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
             <span className={`text-[8px] font-black ${trend.startsWith('+') ? 'text-emerald-500' : 'text-blue-500'}`}>{trend}</span>
         </div>
-        <div className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{value}</div>
+        <div className="text-xl font-mono font-black text-white tabular-nums">{value}</div>
     </div>
 );

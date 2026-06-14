@@ -29,7 +29,6 @@ import {
 } from '@heroicons/react/24/outline';
 
 import { MachineDetailDrawer } from '../../components/MachineDetailDrawer';
-import { COLORS } from '../../design-system/tokens';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 import { listMachines } from '../../api/printhouseCapabilitiesClient';
 
@@ -85,12 +84,12 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Header Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className={`p-3 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
+                    <div className="p-3 glass border border-zinc-800 bg-zinc-950/40">
                         <BoltIcon className="w-6 h-6 text-blue-500" />
                     </div>
                     <div>
-                        <h2 className={`text-xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>Live Orchestration Loop</h2>
-                        <p className={`text-xs ${COLORS.adaptive.textMuted} font-medium`}>Autonomous dispatch and SLA monitoring active.</p>
+                        <h2 className="text-xl font-black text-white tracking-tight">Live Orchestration Loop</h2>
+                        <p className="text-xs text-zinc-500 font-medium">Autonomous dispatch and SLA monitoring active.</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -103,7 +102,7 @@ export const IndustrialLiveTab: React.FC = () => {
                     </button>
                     <button 
                         onClick={handleScan}
-                        className={`flex items-center gap-2 px-4 py-2 ${COLORS.adaptive.surfaceMuted} ${COLORS.adaptive.textPrimary} text-xs font-bold border ${COLORS.adaptive.borderSubtle} hover:border-zinc-400 transition-colors shadow-none`}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-900/20 text-zinc-200 text-xs font-bold border border-zinc-700 hover:border-zinc-400 transition-colors shadow-none"
                     >
                         <ArrowPathIcon className="w-4 h-4" />
                         RUN SLA SCAN
@@ -121,29 +120,29 @@ export const IndustrialLiveTab: React.FC = () => {
             {/* Industrial Heatmap & Risks */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Capacity Heatmap */}
-                <div className={`lg:col-span-2 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} p-6`}>
-                    <h3 className={`text-xs font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-6 flex items-center gap-2`}>
+                <div className="lg:col-span-2 glass border border-zinc-800 bg-zinc-950/40 p-6">
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ServerIcon className="w-4 h-4" />
                         Global Capacity Heatmap (Live Telemetry)
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {safeArray(capacity.data?.overview).map((node: any) => (
+                        {safeArray(capacity.data?.overview ?? []).map((node: any) => (
                             <div 
                                 key={node.node_id} 
-                                className={`p-4 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} group hover:border-[#dc0000] ${COLORS.adaptive.hoverSurface} transition-all text-left rounded-none flex flex-col justify-between`}
+                                className="p-4 bg-zinc-900/20 border border-zinc-800 group hover:border-[#dc0000] hover:bg-zinc-900/50 transition-all text-left rounded-none flex flex-col justify-between"
                             >
                                 <div className="cursor-pointer" onClick={() => openMachine(node.node_id)}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className={`w-2 h-2 rounded-none ${node.status === 'ONLINE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
-                                        <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>{node.city || 'GLOBAL'}</span>
+                                        <span className="text-[10px] font-black text-zinc-500 uppercase">{node.city || 'GLOBAL'}</span>
                                     </div>
-                                    <p className={`text-sm font-black ${COLORS.adaptive.textPrimary} mb-1 truncate`}>{node.company_name}</p>
+                                    <p className="text-sm font-black text-white mb-1 truncate">{node.company_name}</p>
                                     <div className="mt-4">
                                         <div className="flex items-center justify-between mb-1">
-                                            <span className={`text-[10px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>{node.freshness_state} LOAD</span>
-                                            <span className={`text-[10px] font-black ${COLORS.adaptive.textPrimary}`}>{node.utilization_pct}%</span>
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase">{node.freshness_state} LOAD</span>
+                                            <span className="text-[10px] font-mono font-black text-white tracking-tight">{node.utilization_pct}%</span>
                                         </div>
-                                        <div className={`h-1.5 w-full ${COLORS.adaptive.surface} rounded-none overflow-hidden`}>
+                                        <div className="h-1.5 w-full bg-zinc-950/40 rounded-none overflow-hidden">
                                             <div 
                                                 className={`h-full rounded-none transition-all duration-1000 ${
                                                     node.utilization_pct > 90 ? 'bg-[#dc0000]' : 
@@ -154,7 +153,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="mt-4 pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
+                                <div className="mt-4 pt-2 border-t border-zinc-800 flex justify-end">
                                     <button
                                         onClick={async () => {
                                             if (!node.printhouse_id) {
@@ -176,7 +175,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                                 console.error(err);
                                             }
                                         }}
-                                        className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 transition-colors"
+                                        className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400 transition-colors"
                                     >
                                         Edit Specs
                                     </button>
@@ -187,32 +186,32 @@ export const IndustrialLiveTab: React.FC = () => {
                 </div>
 
                 {/* Live SLA Risks */}
-                <div className={`${COLORS.adaptive.surface} rounded-none border ${COLORS.adaptive.borderPrimary} p-6`}>
-                    <h3 className={`text-xs font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-6 flex items-center gap-2`}>
+                <div className="glass border border-zinc-800 bg-zinc-950/40 p-6">
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <ExclamationCircleIcon className="w-4 h-4" />
                         Evidence-Backed SLA Risks
                     </h3>
                     <div className="space-y-4">
-                        {safeArray(slaRisks.data?.risks).map((risk: any) => (
+                        {safeArray(slaRisks.data?.risks ?? []).map((risk: any) => (
                             <div 
                                 key={risk.dispatch_id} 
                                 onClick={() => openMachine(risk.node_id)}
-                                className={`p-4 rounded-none ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} relative overflow-hidden group cursor-pointer hover:border-amber-500 transition-all`}
+                                className="p-4 rounded-none bg-zinc-900/20 border border-zinc-800 relative overflow-hidden group cursor-pointer hover:border-amber-500 transition-all"
                             >
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                                     risk.risk_level === 'CRITICAL' ? 'bg-[#dc0000]' : 
                                     risk.risk_level === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500'
                                 }`} />
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-tight`}>#{String(risk?.dispatch_id || '').slice(-8)}</span>
+                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-tight">#{String(risk?.dispatch_id || '').slice(-8)}</span>
                                     <div className="flex items-center gap-1">
                                         <ShieldCheckIcon className="w-3 h-3 text-[#10B981]" />
                                         <span className="text-[10px] font-bold text-[#10B981] uppercase">{risk.evidence_count} Proofs</span>
                                     </div>
                                 </div>
-                                <p className={`text-xs font-black ${COLORS.adaptive.textPrimary} mb-1`}>{risk.node_name}</p>
+                                <p className="text-xs font-black text-white mb-1">{risk.node_name}</p>
                                 <div className="flex items-center justify-between">
-                                    <span className={`text-[10px] font-medium ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>DRIFT: +{risk.sla_drift_minutes}m</span>
+                                    <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">DRIFT: +{risk.sla_drift_minutes}m</span>
                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-none border ${
                                         risk.risk_level === 'CRITICAL' ? 'bg-[#dc0000]/10 text-[#dc0000] border-[#dc0000]/20' : 
                                         risk.risk_level === 'HIGH' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
@@ -224,10 +223,10 @@ export const IndustrialLiveTab: React.FC = () => {
                         ))}
                         {(!slaRisks.data?.risks || slaRisks.data.risks.length === 0) && (
                             <div className="text-center py-10">
-                                <div className={`w-10 h-10 ${COLORS.adaptive.surfaceMuted} rounded-none flex items-center justify-center mx-auto mb-3 border ${COLORS.adaptive.borderSubtle}`}>
-                                    <ShieldCheckIcon className={`w-5 h-5 ${COLORS.adaptive.textMuted}`} />
+                                <div className="w-10 h-10 bg-zinc-900/20 rounded-none flex items-center justify-center mx-auto mb-3 border border-zinc-800">
+                                    <ShieldCheckIcon className="w-5 h-5 text-zinc-500" />
                                 </div>
-                                <p className={`text-xs font-bold ${COLORS.adaptive.textMuted}`}>All dispatches within SLA.</p>
+                                <p className="text-xs font-bold text-zinc-500">All dispatches within SLA.</p>
                             </div>
                         )}
                     </div>
@@ -235,50 +234,50 @@ export const IndustrialLiveTab: React.FC = () => {
             </div>
 
             {/* Active Dispatch Queue */}
-            <div className={`${COLORS.adaptive.surface} rounded-none border ${COLORS.adaptive.borderPrimary} overflow-hidden`}>
-                <div className={`p-6 border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
-                    <h3 className={`text-xs font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest flex items-center gap-2`}>
+            <div className="glass border border-zinc-800 bg-zinc-950/40 rounded-none overflow-hidden">
+                <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+                    <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <QueueListIcon className="w-4 h-4" />
                         Active Industrial Dispatch Queue
                     </h3>
-                    <span className={`text-[10px] font-black px-2 py-1 ${COLORS.adaptive.surfaceMuted} ${COLORS.adaptive.textSecondary} border ${COLORS.adaptive.borderSubtle} rounded-none`}>
+                    <span className="text-[10px] font-mono font-black px-2 py-1 bg-zinc-900/20 text-zinc-400 border border-zinc-800 rounded-none">
                         {activeDispatches.data?.dispatches?.length || 0} ACTIVE
                     </span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
-                            <tr className={`${COLORS.adaptive.surfaceMuted} border-b ${COLORS.adaptive.borderSubtle}`}>
-                                <th className={`px-6 py-4 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>Dispatch ID</th>
-                                <th className={`px-6 py-4 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>Target Node</th>
-                                <th className={`px-6 py-4 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>Status</th>
-                                <th className={`px-6 py-4 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>SLA ETA</th>
-                                <th className={`px-6 py-4 text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase`}>Created</th>
+                            <tr className="bg-zinc-900/20 border-b border-zinc-800">
+                                <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase">Dispatch ID</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase">Target Node</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase">SLA ETA</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase">Created</th>
                             </tr>
                         </thead>
-                        <tbody className={`divide-y ${COLORS.adaptive.divideSubtle}`}>
-                            {safeArray(activeDispatches.data?.dispatches).map((d: any) => (
+                        <tbody className="divide-y divide-zinc-800/50">
+                            {safeArray(activeDispatches.data?.dispatches ?? []).map((d: any) => (
                                 <tr 
                                     key={d.id} 
                                     onClick={() => openMachine(d.print_node_id)}
-                                    className={`${COLORS.adaptive.hoverSurface} cursor-pointer transition-colors`}
+                                    className="hover:bg-zinc-900/50 cursor-pointer transition-colors"
                                 >
                                     <td className="px-6 py-4 text-xs font-mono font-bold text-blue-500">#{String(d?.id || '').slice(0, 12)}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
-                                            <span className={`text-xs font-black ${COLORS.adaptive.textPrimary}`}>{d.node_name}</span>
-                                            <span className={`text-[10px] ${COLORS.adaptive.textMuted} font-bold uppercase`}>{d.receiver_tenant_id}</span>
+                                            <span className="text-xs font-black text-white">{d.node_name}</span>
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase">{d.receiver_tenant_id}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded-none border text-[10px] font-black uppercase ${
                                             d.status === 'IN_PRODUCTION' ? 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' :
-                                            d.status === 'ALLOCATED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : `${COLORS.adaptive.surfaceMuted} ${COLORS.adaptive.textMuted} border ${COLORS.adaptive.borderSubtle}`
+                                            d.status === 'ALLOCATED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-900/20 text-zinc-500 border-zinc-800'
                                         }`}>
                                             {d.status}
                                         </span>
                                     </td>
-                                    <td className={`px-6 py-4 text-xs font-bold ${COLORS.adaptive.textSecondary}`}>
+                                    <td className="px-6 py-4 text-xs font-bold text-zinc-400">
                                         {(() => {
                                             if (!d.sla_estimate_json) return '—';
                                             try {
@@ -291,7 +290,7 @@ export const IndustrialLiveTab: React.FC = () => {
                                             }
                                         })()}
                                     </td>
-                                    <td className={`px-6 py-4 text-[10px] font-bold ${COLORS.adaptive.textMuted}`}>{new Date(d.created_at).toLocaleString()}</td>
+                                    <td className="px-6 py-4 text-[10px] font-bold text-zinc-500">{new Date(d.created_at).toLocaleString()}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -300,29 +299,29 @@ export const IndustrialLiveTab: React.FC = () => {
             </div>
 
             {/* Reroute Timeline */}
-            <div className={`${COLORS.adaptive.surface} rounded-none border ${COLORS.adaptive.borderPrimary} p-6`}>
-                <h3 className={`text-xs font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-6`}>Autonomous Reroute & Event Log</h3>
+            <div className="glass border border-zinc-800 bg-zinc-950/40 p-6">
+                <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6">Autonomous Reroute &amp; Event Log</h3>
                 <div className="space-y-3">
-                    {safeArray(reroutes.data?.events).map((e: any) => (
-                        <div key={e.id} className={`p-4 ${COLORS.adaptive.surfaceMuted} rounded-none border ${COLORS.adaptive.borderSubtle} flex items-center justify-between transition-all`}>
+                    {safeArray(reroutes.data?.events ?? []).map((e: any) => (
+                        <div key={e.id} className="p-4 bg-zinc-900/20 rounded-none border border-zinc-800 flex items-center justify-between transition-all">
                             <div className="flex items-center gap-4">
                                 <div className={`p-2 rounded-none border ${e.event_type === 'AUTONOMOUS_REROUTE' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
                                     {e.event_type === 'AUTONOMOUS_REROUTE' ? <BoltIcon className="w-5 h-5" /> : <ExclamationCircleIcon className="w-5 h-5" />}
                                 </div>
                                 <div>
-                                    <p className={`text-xs font-black ${COLORS.adaptive.textPrimary}`}>{e.message}</p>
-                                    <p className={`text-[10px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>{e.event_type} • {new Date(e.created_at).toLocaleTimeString()}</p>
+                                    <p className="text-xs font-black text-white">{e.message}</p>
+                                    <p className="text-[10px] font-bold text-zinc-500 uppercase">{e.event_type} • {new Date(e.created_at).toLocaleTimeString()}</p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>Impact</p>
+                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Impact</p>
                                 <p className="text-xs font-bold text-[#10B981]">SLA PRESERVED</p>
                             </div>
                         </div>
                     ))}
                     {(reroutes.data?.events || []).length === 0 && (
                         <div className="py-10 text-center opacity-30">
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${COLORS.adaptive.textMuted}`}>No Autonomous Events Logged</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">No Autonomous Events Logged</p>
                         </div>
                     )}
                 </div>
@@ -336,15 +335,15 @@ export const IndustrialLiveTab: React.FC = () => {
 
             {isOnboardOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} p-6 shadow-2xl space-y-6`}>
-                        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+                    <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto glass border border-zinc-800 bg-zinc-950/40 p-6 shadow-2xl space-y-6">
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                             <div>
-                                <h3 className={`text-sm font-black ${COLORS.adaptive.textPrimary} uppercase tracking-widest`}>Onboard Fleet Unit</h3>
-                                <p className={`text-[10px] ${COLORS.adaptive.textMuted} font-medium`}>Direct regional database unit registration.</p>
+                                <h3 className="text-sm font-black text-white uppercase tracking-widest">Onboard Fleet Unit</h3>
+                                <p className="text-[10px] text-zinc-500 font-medium">Direct regional database unit registration.</p>
                             </div>
                             <button 
                                 onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); setEditingMachine(null); }}
-                                className={`p-1.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.textPrimary} hover:border-[#dc0000] transition-colors`}
+                                className="p-1.5 bg-zinc-900/20 border border-zinc-800 text-zinc-200 hover:border-[#dc0000] transition-colors"
                             >
                                 <XMarkIcon className="w-5 h-5" />
                             </button>
@@ -353,15 +352,15 @@ export const IndustrialLiveTab: React.FC = () => {
                         <div className="space-y-4">
                             {!editingMachine && (
                                 <div>
-                                    <label className={`block text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest mb-2`}>Select Target Printhouse</label>
+                                    <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Select Target Printhouse</label>
                                     <select 
                                         value={selectedPrinthouseId}
                                         onChange={e => setSelectedPrinthouseId(e.target.value)}
-                                        className={`w-full max-w-md px-3 py-2 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-xs font-bold focus:outline-none focus:border-[#dc0000] ${COLORS.adaptive.textPrimary} bg-transparent`}
+                                        className="w-full max-w-md px-3 py-2 bg-zinc-900/20 border border-zinc-800 text-xs font-bold focus:outline-none focus:border-[#dc0000] text-zinc-200 bg-transparent"
                                     >
                                         <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
                                         {printhouses.map(ph => (
-                                            <option key={ph.id} value={ph.id} className="bg-white dark:bg-zinc-950">
+                                            <option key={ph.id} value={ph.id} className="bg-zinc-950">
                                                 {ph.name} ({ph.city || 'Global'})
                                             </option>
                                         ))}
@@ -370,7 +369,7 @@ export const IndustrialLiveTab: React.FC = () => {
                             )}
 
                             {(selectedPrinthouseId || editingMachine) && (
-                                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                                <div className="border-t border-zinc-800 pt-6">
                                     <MachineCapabilityEditor 
                                         printhouseId={selectedPrinthouseId || editingMachine?.printhouse_id} 
                                         editingMachine={editingMachine}

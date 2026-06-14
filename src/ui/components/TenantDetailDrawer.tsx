@@ -5,9 +5,19 @@ import {
   ShieldCheckIcon, 
   ExclamationTriangleIcon, 
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ClockIcon,
+  CommandLineIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
-import { updateTenantGovernance } from '../lib/adminApi';
+import { 
+  updateTenantGovernance,
+  assignTenantPlan,
+  extendTenantGrace,
+  freezeTenantGraceIfExpired,
+  checkTenantFileLimit,
+  checkTenantJobLimit
+} from '../lib/adminApi';
 
 interface TenantDetailDrawerProps {
   tenant: any | null;
@@ -19,6 +29,24 @@ interface TenantDetailDrawerProps {
 export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, isOpen, onClose, onRefresh }) => {
   const [loading, setLoading] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Form states for Plan Assignment
+  const [selectedPlan, setSelectedPlan] = useState(tenant?.planCode || 'FOUNDING_PRINTHOUSE');
+  const [graceDays, setGraceDays] = useState(7);
+  const [assignReason, setAssignReason] = useState('Founding print house pilot onboarding');
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // Form states for Grace Period extension
+  const [extendDays, setExtendDays] = useState(7);
+  const [extendReason, setExtendReason] = useState('Extension requested for pilot onboarding');
+  const [graceLoading, setGraceLoading] = useState(false);
+
+  // Limits simulation state
+  const [selectedFileLimit, setSelectedFileLimit] = useState<number | null>(null);
+  const [selectedJobLimit, setSelectedJobLimit] = useState<number | null>(null);
+  const [fileSimResult, setFileSimResult] = useState<{ allowed: boolean; message?: string } | null>(null);
+  const [jobSimResult, setJobSimResult] = useState<{ allowed: boolean; message?: string } | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
 
   if (!tenant) return null;
 
@@ -41,6 +69,112 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
       showFeedback('error', err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAssignPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAssignLoading(true);
+    try {
+      const payload: any = {
+        planCode: selectedPlan,
+        reason: assignReason
+      };
+      if (selectedPlan === 'FOUNDING_PRINTHOUSE') {
+        payload.commercialStatus = 'GRACE';
+        payload.graceDays = Number(graceDays);
+      }
+      const res = await assignTenantPlan(tenant.id, payload);
+      if (res && res.ok) {
+        showFeedback('success', `Plan assigned successfully`);
+        onRefresh();
+      } else {
+        showFeedback('error', res?.error?.message || 'Plan assignment failed');
+      }
+    } catch (err: any) {
+      showFeedback('error', err.message || 'An unexpected error occurred');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleExtendGrace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extendReason.trim()) {
+      showFeedback('error', 'Reason is required for grace extension');
+      return;
+    }
+    setGraceLoading(true);
+    try {
+      const res = await extendTenantGrace(tenant.id, {
+        graceDays: Number(extendDays),
+        reason: extendReason
+      });
+      if (res && res.ok) {
+        showFeedback('success', `Grace period extended successfully`);
+        onRefresh();
+      } else {
+        showFeedback('error', res?.error?.message || 'Grace extension failed');
+      }
+    } catch (err: any) {
+      showFeedback('error', err.message || 'An unexpected error occurred');
+    } finally {
+      setGraceLoading(false);
+    }
+  };
+
+  const handleFreezeGrace = async () => {
+    setGraceLoading(true);
+    try {
+      const res = await freezeTenantGraceIfExpired(tenant.id);
+      if (res && res.ok) {
+        showFeedback('success', res.idempotent ? 'Tenant is already frozen' : 'Grace period frozen successfully');
+        onRefresh();
+      } else {
+        showFeedback('error', res?.error?.message || 'Freeze failed');
+      }
+    } catch (err: any) {
+      showFeedback('error', err.message || 'An unexpected error occurred');
+    } finally {
+      setGraceLoading(false);
+    }
+  };
+
+  const handleSimulateFileLimit = async (mb: number) => {
+    setSimLoading(true);
+    setSelectedFileLimit(mb);
+    try {
+      const res = await checkTenantFileLimit(tenant.id, mb * 1024 * 1024);
+      if (res) {
+        if (res.ok) {
+          setFileSimResult({ allowed: true, message: `ALLOWED: File size matches the tier's limit criteria.` });
+        } else {
+          setFileSimResult({ allowed: false, message: res.blockers?.[0]?.message || 'BLOCKED: Limit exceeded' });
+        }
+      }
+    } catch (err: any) {
+      showFeedback('error', err.message);
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  const handleSimulateJobLimit = async (mb: number) => {
+    setSimLoading(true);
+    setSelectedJobLimit(mb);
+    try {
+      const res = await checkTenantJobLimit(tenant.id, mb * 1024 * 1024);
+      if (res) {
+        if (res.ok) {
+          setJobSimResult({ allowed: true, message: `ALLOWED: Job size matches the tier's limit criteria.` });
+        } else {
+          setJobSimResult({ allowed: false, message: res.blockers?.[0]?.message || 'BLOCKED: Limit exceeded' });
+        }
+      }
+    } catch (err: any) {
+      showFeedback('error', err.message);
+    } finally {
+      setSimLoading(false);
     }
   };
 
@@ -89,19 +223,6 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         burst_multiplier: 1.5,
         priority_class: 'HIGH',
         plan_tier: 'enterprise'
-      }
-    });
-  };
-
-  const alignFoundingPrinthouse = () => {
-    handleUpdate({
-      plan_code: 'FOUNDING_PRINTHOUSE',
-      service_tier: 'enterprise',
-      access_level: 'FULL',
-      limits_json: {
-        maxFileSizeMb: 1024,
-        maxJobSizeMb: 2048,
-        allowLargeUploads: true
       }
     });
   };
@@ -185,12 +306,12 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title={`Governance console: ${tenant.name || tenant.id}`}>
-      <div className="space-y-6 text-slate-100 pb-16">
+      <div className="space-y-6 text-zinc-300 pb-16">
         
         {/* Feedback Messages */}
         {actionFeedback && (
-          <div className={`p-4 border font-bold flex items-center gap-3 animate-pulse ${
-            actionFeedback.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+          <div className={`p-4 border font-bold flex items-center gap-3 animate-pulse glass ${
+            actionFeedback.type === 'success' ? 'bg-emerald-950/20 border-emerald-800 text-emerald-400' : 'bg-rose-950/20 border-rose-800 text-rose-400'
           }`}>
             {actionFeedback.type === 'success' ? <CheckCircleIcon className="w-5 h-5 shrink-0" /> : <XCircleIcon className="w-5 h-5 shrink-0" />}
             <p className="text-xs uppercase tracking-wider">{actionFeedback.message}</p>
@@ -198,26 +319,237 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         )}
 
         {/* SECTION 1: Overview */}
-        <div className="bg-[#18181b] border border-white/10 p-4">
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
-            <GlobeAltIcon className="w-4 h-4 text-primary" />
+            <GlobeAltIcon className="w-4 h-4 text-rose-500" />
             Overview
           </h3>
           <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+            <div><p className="text-slate-500">TENANT ID</p><p className="font-bold text-white select-all">{tenant.id}</p></div>
             <div><p className="text-slate-500">TENANT NAME</p><p className="font-bold text-white">{tenant.name || 'Unnamed'}</p></div>
-            <div><p className="text-slate-500">TYPE</p><span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold uppercase">{tenant.type || 'PRINTHOUSE'}</span></div>
-            <div><p className="text-slate-500">STATUS</p><span className="text-white">{tenant.status}</span></div>
-            <div><p className="text-slate-500">PLAN</p><span className="text-white">{tenant.plan}</span></div>
+            <div><p className="text-slate-500">TYPE</p><span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold uppercase inline-block">{tenant.type || 'PRINTHOUSE'}</span></div>
+            <div><p className="text-slate-500">STATUS</p><span className="text-white font-bold">{tenant.status}</span></div>
+            <div><p className="text-slate-500">PLAN</p><span className="text-white font-bold">{tenant.plan}</span></div>
             <div><p className="text-slate-500">PLAN CODE</p><span className="text-white font-bold">{tenant.planCode}</span></div>
             <div><p className="text-slate-500">SERVICE TIER</p><span className="text-white font-bold">{tenant.serviceTier}</span></div>
-            <div><p className="text-slate-500">COMMERCIAL STATUS</p><span className="text-white">{tenant.commercialStatus}</span></div>
+            <div><p className="text-slate-500">COMMERCIAL STATUS</p><span className="text-amber-400 font-bold">{tenant.commercialStatus}</span></div>
             <div><p className="text-slate-500">ACCESS LEVEL</p><span className="text-white font-bold">{tenant.accessLevel}</span></div>
+          </div>
+        </div>
+
+        {/* SECTION: Plan Assignment Form */}
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
+            <SparklesIcon className="w-4 h-4 text-yellow-500" />
+            Plan Governance Assignment
+          </h3>
+          <form onSubmit={handleAssignPlan} className="space-y-3 text-xs font-mono">
+            <div>
+              <label className="block text-[9px] font-black uppercase text-zinc-400 mb-1">Select Target Plan *</label>
+              <select
+                value={selectedPlan}
+                onChange={(e) => setSelectedPlan(e.target.value)}
+                className="w-full px-3 py-1.5 border border-zinc-800 bg-zinc-950 text-zinc-300 font-bold rounded-none focus:outline-none focus:border-zinc-700"
+              >
+                <option value="FREE">FREE</option>
+                <option value="PRO">PRO</option>
+                <option value="ENTERPRISE">ENTERPRISE</option>
+                <option value="FOUNDING_PRINTHOUSE">FOUNDING PRINTHOUSE</option>
+                <option value="SYSTEM">SYSTEM</option>
+              </select>
+            </div>
+
+            {selectedPlan === 'FOUNDING_PRINTHOUSE' && (
+              <div>
+                <label className="block text-[9px] font-black uppercase text-zinc-400 mb-1">Grace Period (Days) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={graceDays}
+                  onChange={(e) => setGraceDays(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 border border-zinc-800 bg-zinc-950 text-zinc-300 font-bold rounded-none focus:outline-none"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[9px] font-black uppercase text-zinc-400 mb-1">Reason for Change / Onboarding Notes *</label>
+              <input
+                type="text"
+                required
+                value={assignReason}
+                onChange={(e) => setAssignReason(e.target.value)}
+                placeholder="Audit reason for changes"
+                className="w-full px-3 py-1.5 border border-zinc-800 bg-zinc-950 text-zinc-300 font-bold rounded-none focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={assignLoading}
+              className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 text-white text-[10px] font-black uppercase tracking-wider transition-colors rounded-none disabled:opacity-50"
+            >
+              {assignLoading ? 'ASSIGNING...' : 'EXECUTE PLAN TRANSITION'}
+            </button>
+          </form>
+        </div>
+
+        {/* SECTION: Grace Period and Freezes */}
+        {tenant.planCode === 'FOUNDING_PRINTHOUSE' && (
+          <div className="glass border border-zinc-800 bg-zinc-950/40 p-4 space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+              <ClockIcon className="w-4 h-4 text-amber-500" />
+              Grace Period & Control Freeze
+            </h3>
+            
+            <div className="text-xs font-mono space-y-1">
+              <p>
+                Status:{' '}
+                {tenant.grace?.active ? (
+                  <span className="text-emerald-400 font-black uppercase">Active Grace Period</span>
+                ) : tenant.grace?.expired ? (
+                  <span className="text-rose-500 font-black uppercase">Grace Expired</span>
+                ) : (
+                  <span className="text-slate-500 font-black">UNINITIALIZED</span>
+                )}
+              </p>
+              {tenant.grace?.endsAt && (
+                <p className="text-[10px] text-zinc-400">
+                  Target End Date: {new Date(tenant.grace.extendedUntil || tenant.grace.endsAt).toLocaleDateString()}
+                </p>
+              )}
+              {tenant.grace?.active && (
+                <p className="text-xs text-amber-400 font-bold">
+                  Remaining Days: {tenant.grace.daysRemaining} days left
+                </p>
+              )}
+            </div>
+
+            {/* Extend Grace Form */}
+            <form onSubmit={handleExtendGrace} className="space-y-2.5 pt-2 border-t border-zinc-800/50">
+              <p className="text-[9px] font-black uppercase text-zinc-400">Extend Active Grace</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-1">
+                  <label className="block text-[8px] font-bold text-zinc-500 mb-0.5">DAYS</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={extendDays}
+                    onChange={(e) => setExtendDays(Number(e.target.value))}
+                    className="w-full px-2 py-1 border border-zinc-800 bg-zinc-950 text-zinc-300 text-xs font-bold rounded-none"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[8px] font-bold text-zinc-500 mb-0.5">REASON</label>
+                  <input
+                    type="text"
+                    required
+                    value={extendReason}
+                    onChange={(e) => setExtendReason(e.target.value)}
+                    placeholder="Audit reason"
+                    className="w-full px-2 py-1 border border-zinc-800 bg-zinc-950 text-zinc-300 text-xs font-bold rounded-none"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={graceLoading}
+                className="w-full py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-600/30 text-amber-300 text-[9px] font-black uppercase tracking-wider transition-colors rounded-none"
+              >
+                {graceLoading ? 'WORKING...' : 'EXTEND GRACE PERIOD'}
+              </button>
+            </form>
+
+            {/* Freeze control button */}
+            {tenant.grace?.expired && tenant.commercialStatus !== 'GRACE_EXPIRED' && (
+              <div className="pt-2 border-t border-zinc-800/50">
+                <p className="text-[9px] font-black text-rose-400 mb-2">
+                  CRITICAL: Grace has expired but account controls are unfrozen.
+                </p>
+                <button
+                  onClick={handleFreezeGrace}
+                  disabled={graceLoading}
+                  className="w-full py-2 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-800/40 text-rose-400 text-[10px] font-black uppercase tracking-wider transition-colors rounded-none"
+                >
+                  {graceLoading ? 'FREEZING...' : 'ENFORCE OPERATIONAL FREEZE'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SECTION: Limits Simulation */}
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4 space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+            <CommandLineIcon className="w-4 h-4 text-emerald-500" />
+            Interactive Limits Simulation
+          </h3>
+
+          {/* File size limits */}
+          <div className="space-y-2">
+            <p className="text-[9px] font-black uppercase text-zinc-400">Simulate File Upload Size</p>
+            <div className="flex flex-wrap gap-1">
+              {[25, 150, 780, 1024].map((mb) => (
+                <button
+                  key={mb}
+                  onClick={() => handleSimulateFileLimit(mb)}
+                  disabled={simLoading}
+                  className={`px-3 py-1 border text-[10px] font-mono transition-all duration-150 ${
+                    selectedFileLimit === mb
+                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-black'
+                      : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 text-zinc-400'
+                  }`}
+                >
+                  {mb} MB
+                </button>
+              ))}
+            </div>
+            {fileSimResult && selectedFileLimit !== null && (
+              <div className={`p-2 border text-[10px] font-mono leading-relaxed ${
+                fileSimResult.allowed 
+                  ? 'bg-emerald-950/20 border-emerald-800/50 text-emerald-400' 
+                  : 'bg-rose-950/20 border-rose-800/50 text-rose-400'
+              }`}>
+                {fileSimResult.message}
+              </div>
+            )}
+          </div>
+
+          {/* Job size limits */}
+          <div className="space-y-2 pt-2 border-t border-zinc-800/40">
+            <p className="text-[9px] font-black uppercase text-zinc-400">Simulate Total Job Package Size</p>
+            <div className="flex flex-wrap gap-1">
+              {[300, 2048].map((mb) => (
+                <button
+                  key={mb}
+                  onClick={() => handleSimulateJobLimit(mb)}
+                  disabled={simLoading}
+                  className={`px-3 py-1 border text-[10px] font-mono transition-all duration-150 ${
+                    selectedJobLimit === mb
+                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-black'
+                      : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 text-zinc-400'
+                  }`}
+                >
+                  {mb} MB
+                </button>
+              ))}
+            </div>
+            {jobSimResult && selectedJobLimit !== null && (
+              <div className={`p-2 border text-[10px] font-mono leading-relaxed ${
+                jobSimResult.allowed 
+                  ? 'bg-emerald-950/20 border-emerald-800/50 text-emerald-400' 
+                  : 'bg-rose-950/20 border-rose-800/50 text-rose-400'
+              }`}>
+                {jobSimResult.message}
+              </div>
+            )}
           </div>
         </div>
 
         {/* SECTION 5: Warnings */}
         {warnings.length > 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/30 p-4">
+          <div className="bg-amber-500/10 border border-amber-500/30 p-4 glass">
             <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-amber-500/20 pb-2 mb-3 flex items-center gap-2">
               <ExclamationTriangleIcon className="w-4 h-4" />
               Configuration Warnings
@@ -229,7 +561,7 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         )}
 
         {/* SECTION 2: Effective Entitlements */}
-        <div className="bg-[#18181b] border border-white/10 p-4">
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Effective Entitlements</h3>
           <div className="grid grid-cols-2 gap-4 text-xs font-mono">
             <div><p className="text-slate-500">MAX FILE SIZE (MB)</p><p className="font-bold text-white">{tenant.limits?.maxFileSizeMb || 25}</p></div>
@@ -242,7 +574,7 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         </div>
 
         {/* SECTION 3: Resource Limits */}
-        <div className="bg-[#18181b] border border-white/10 p-4">
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Resource Limits</h3>
           {tenant.resourceLimits ? (
             <div className="grid grid-cols-2 gap-4 text-xs font-mono">
@@ -260,7 +592,7 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         </div>
 
         {/* SECTION 4: Preflight Quotas */}
-        <div className="bg-[#18181b] border border-white/10 p-4">
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Preflight Quotas</h3>
           {tenant.preflightQuotas ? (
             <div className="space-y-4 text-xs font-mono">
@@ -306,10 +638,10 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-[#18181b] border border-white/10 p-4">
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
-            <ShieldCheckIcon className="w-4 h-4 text-primary" />
-            Quick Actions
+            <ShieldCheckIcon className="w-4 h-4 text-emerald-500" />
+            Quick System Templates
           </h3>
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono mb-2">
             <a 
@@ -325,9 +657,6 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
             </button>
             <button onClick={alignEnterprise} disabled={loading} className="py-2 px-3 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-left uppercase tracking-wider">
               Align as ENTERPRISE
-            </button>
-            <button onClick={alignFoundingPrinthouse} disabled={loading} className="py-2 px-3 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-left uppercase tracking-wider">
-              Align as FOUNDING PRINTHOUSE
             </button>
             <button onClick={enableLargeUploads} disabled={loading} className="py-2 px-3 bg-white/5 text-slate-300 hover:bg-white/10 text-left uppercase tracking-wider">
               Enable Large Uploads
@@ -357,4 +686,3 @@ export const TenantDetailDrawer: React.FC<TenantDetailDrawerProps> = ({ tenant, 
 // freezeTenantGraceIfExpired
 // checkTenantFileLimit
 // checkTenantJobLimit
-
