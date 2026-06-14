@@ -1,6 +1,6 @@
 import React from 'react';
 import { MachineLoadSnapshot } from '../../types/productionMonitoring';
-import { COLORS } from '../../design-system/tokens';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface Props {
     machines: MachineLoadSnapshot[];
@@ -8,82 +8,63 @@ interface Props {
 }
 
 export const MachineLoadPanel: React.FC<Props> = ({ machines, onRaiseOfflineIncident }) => {
-    
-    const getLoadStyle = (status: string) => {
-        switch (status) {
-            case 'OFFLINE':
-                return { bg: 'bg-red-500/10 border-red-500/20 text-red-500', label: 'OFFLINE' };
-            case 'OVERLOADED':
-                return { bg: 'bg-orange-500/10 border-orange-500/20 text-orange-600', label: 'OVERLOADED' };
-            case 'BUSY':
-                return { bg: 'bg-amber-500/10 border-amber-500/20 text-amber-600', label: 'BUSY' };
-            case 'NORMAL':
-                return { bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600', label: 'NORMAL' };
-            default:
-                return { bg: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300', label: 'IDLE' };
-        }
-    };
-
     return (
-        <div className={`border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} p-6`}>
-            <h3 className={`text-xs font-black uppercase tracking-widest mb-6 ${COLORS.adaptive.textSecondary}`}>
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-6 border-l-2 border-[#dc0000] pl-3">
                 Printhouse Machine Fleet Workloads
             </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {machines.length === 0 ? (
-                    <div className="col-span-full py-8 text-center text-xs font-semibold text-zinc-500">
+                    <div className="col-span-full py-10 text-center text-[10px] font-black uppercase tracking-widest text-zinc-600">
                         No printers currently monitored.
                     </div>
                 ) : (
                     machines.map((mac) => {
-                        const style = getLoadStyle(mac.load_status);
                         const isOffline = mac.load_status === 'OFFLINE';
                         return (
-                            <div 
+                            <div
                                 key={mac.machine_id}
-                                className={`border ${COLORS.adaptive.borderPrimary} p-4 flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors`}
+                                className="border border-zinc-800 bg-zinc-950/30 p-4 flex flex-col justify-between hover:border-zinc-700 hover:bg-zinc-900/40 transition-all"
                             >
                                 <div>
-                                    <div className="flex justify-between items-start mb-2">
+                                    <div className="flex justify-between items-start mb-3">
                                         <div>
-                                            <h4 className={`text-sm font-black ${COLORS.adaptive.textPrimary}`}>
+                                            <h4 className="text-sm font-black text-white leading-none mb-1">
                                                 {mac.machine_name}
                                             </h4>
-                                            <span className="text-[10px] font-mono text-zinc-500">
-                                                {mac.machine_id} • {mac.machine_type}
+                                            <span className="text-[9px] font-mono text-zinc-500">
+                                                {mac.machine_id} · {mac.machine_type}
                                             </span>
                                         </div>
-                                        <span className={`px-2 py-0.5 border text-[9px] font-black uppercase tracking-wider ${style.bg}`}>
-                                            {style.label}
-                                        </span>
+                                        <StatusBadge status={mac.load_status || 'IDLE'} />
                                     </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-4 my-4 bg-zinc-50 dark:bg-zinc-800/10 p-2 border border-zinc-100 dark:border-zinc-800/30">
+
+                                    <div className="grid grid-cols-2 gap-3 my-3 border border-zinc-800 bg-zinc-900/20 p-3">
                                         <div>
-                                            <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Active Jobs</div>
-                                            <div className={`text-sm font-bold ${COLORS.adaptive.textPrimary}`}>{mac.active_jobs_count}</div>
+                                            <div className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">Active Jobs</div>
+                                            <div className="font-mono font-black text-white text-sm">{mac.active_jobs_count}</div>
                                         </div>
                                         <div>
-                                            <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Queued Jobs</div>
-                                            <div className={`text-sm font-bold ${COLORS.adaptive.textPrimary}`}>{mac.queued_jobs_count}</div>
+                                            <div className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">Queued Jobs</div>
+                                            <div className="font-mono font-black text-white text-sm">{mac.queued_jobs_count}</div>
                                         </div>
                                     </div>
-                                    
-                                    <div className="space-y-1 text-[11px] font-medium text-zinc-500">
+
+                                    <div className="space-y-1.5 text-[10px] font-medium text-zinc-500">
                                         <div className="flex justify-between">
-                                            <span>Est. Queue wait:</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">
-                                                {isOffline ? 'Infinite' : `${mac.estimated_queue_minutes} mins`}
+                                            <span>Est. Queue Wait</span>
+                                            <span className="font-mono text-zinc-300">
+                                                {isOffline ? '∞ Infinite' : `${mac.estimated_queue_minutes}m`}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span>Capacity Score:</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">{mac.capacity_score}/100</span>
+                                            <span>Capacity Score</span>
+                                            <span className="font-mono text-zinc-300">{mac.capacity_score}/100</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span>Next Slot:</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                                            <span>Next Slot</span>
+                                            <span className="font-mono text-zinc-300">
                                                 {isOffline ? 'N/A' : mac.next_available_at ? new Date(mac.next_available_at).toLocaleTimeString() : 'Immediate'}
                                             </span>
                                         </div>
@@ -91,9 +72,9 @@ export const MachineLoadPanel: React.FC<Props> = ({ machines, onRaiseOfflineInci
                                 </div>
 
                                 {isOffline && (
-                                    <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
-                                        <button 
-                                            className="w-full text-center px-3 py-1.5 border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-black uppercase tracking-wider hover:bg-red-500/20 transition-colors"
+                                    <div className="mt-4 pt-3 border-t border-zinc-800">
+                                        <button
+                                            className="w-full text-center px-3 py-1.5 border border-red-600/30 bg-red-600/10 text-[#dc0000] text-[9px] font-black uppercase tracking-wider hover:bg-red-600/20 transition-all"
                                             onClick={() => onRaiseOfflineIncident(mac.machine_id, mac.machine_name, mac.tenant_id, mac.printhouse_id)}
                                         >
                                             Raise Warning Incident

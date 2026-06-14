@@ -1,6 +1,5 @@
 import React from 'react';
 import { ProductionMonitoringSnapshot } from '../../types/productionMonitoring';
-import { COLORS } from '../../design-system/tokens';
 
 interface Props {
     snapshots: ProductionMonitoringSnapshot[];
@@ -8,12 +7,10 @@ interface Props {
 }
 
 export const OperationalAlertsPanel: React.FC<Props> = ({ snapshots, selectedOrderId }) => {
-    
     // Aggregate warnings and alerts across all active snapshots
     const alerts: Array<{ orderId: string; type: 'WARNING' | 'RISK' | 'BREACH'; message: string; action: string }> = [];
 
     snapshots.forEach(s => {
-        // Warning alerts
         if (s.warning_reasons_json && s.warning_reasons_json.length > 0) {
             s.warning_reasons_json.forEach(w => {
                 alerts.push({
@@ -24,8 +21,6 @@ export const OperationalAlertsPanel: React.FC<Props> = ({ snapshots, selectedOrd
                 });
             });
         }
-
-        // SLA status alerts
         if (s.sla_status === 'AT_RISK') {
             alerts.push({
                 orderId: s.order_id,
@@ -44,34 +39,34 @@ export const OperationalAlertsPanel: React.FC<Props> = ({ snapshots, selectedOrd
     });
 
     return (
-        <div className={`border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} p-6`}>
-            <h3 className={`text-xs font-black uppercase tracking-widest mb-6 ${COLORS.adaptive.textSecondary}`}>
-                Operational Alerts & Recommendations
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-6 border-l-2 border-[#dc0000] pl-3">
+                Operational Alerts &amp; Recommendations
             </h3>
 
             {alerts.length === 0 ? (
-                <div className="py-4 text-center text-xs text-zinc-500 font-semibold">
+                <div className="py-6 text-center text-[10px] font-black uppercase tracking-widest text-zinc-600">
                     No active warnings or alerts. All queue parameters nominal.
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {alerts.map((alert, idx) => {
                         const isSelected = selectedOrderId === alert.orderId;
-                        const cardStyles = 
-                            alert.type === 'BREACH' ? 'border-red-500/20 bg-red-500/5 text-red-700' :
-                            alert.type === 'RISK' ? 'border-amber-500/20 bg-amber-500/5 text-amber-700' :
-                            'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/10 text-zinc-800 dark:text-zinc-300';
-                        
+                        const cardStyles =
+                            alert.type === 'BREACH'  ? 'border-red-600/30 bg-red-950/15 text-[#dc0000]' :
+                            alert.type === 'RISK'    ? 'border-amber-500/30 bg-amber-950/15 text-amber-400' :
+                            'border-zinc-700 bg-zinc-900/20 text-zinc-300';
+
                         return (
-                            <div 
-                                key={idx} 
-                                className={`border p-4 ${cardStyles} ${isSelected ? 'ring-1 ring-red-500' : ''}`}
+                            <div
+                                key={idx}
+                                className={`border p-4 transition-all ${cardStyles} ${isSelected ? 'ring-1 ring-[#dc0000]' : ''}`}
                             >
-                                <div className="text-xs font-black mb-1">
+                                <div className="text-[10px] font-black mb-1">
                                     {alert.message}
                                 </div>
-                                <div className="text-[10px] text-zinc-500 font-medium">
-                                    <strong>Recommendation:</strong> {alert.action}
+                                <div className="text-[9px] text-zinc-500 font-mono">
+                                    <strong className="text-zinc-400">Recommendation:</strong> {alert.action}
                                 </div>
                             </div>
                         );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProductionIncident } from '../../types/productionMonitoring';
-import { COLORS } from '../../design-system/tokens';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface Props {
     incidents: ProductionIncident[];
@@ -19,28 +19,17 @@ export const ProductionIncidentsPanel: React.FC<Props> = ({
     onDismiss,
     onOpenCreateModal
 }) => {
-    const isAdminOrOperator = userRole === 'SUPER_ADMIN' || userRole === 'OPS_ADMIN' || userRole === 'PRINTHOUSE_ADMIN' || userRole === 'PRINTHOUSE_OPERATOR';
-    
+    const isAdminOrOperator = ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(userRole);
+
     const [actioningIncidentId, setActioningIncidentId] = useState<number | null>(null);
     const [actionType, setActionType] = useState<'RESOLVE' | 'DISMISS' | null>(null);
     const [inputText, setInputText] = useState('');
 
-    const getSeverityStyle = (sev: string) => {
-        switch (sev) {
-            case 'CRITICAL': return 'bg-red-600 text-white';
-            case 'HIGH': return 'bg-red-500/10 text-red-500 border border-red-500/20';
-            case 'MEDIUM': return 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
-            default: return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300';
-        }
-    };
-
-    const getStatusStyle = (status: string) => {
-        switch (status) {
-            case 'OPEN': return 'bg-red-500/10 text-red-600 border border-red-500/20';
-            case 'ACKNOWLEDGED': return 'bg-blue-500/10 text-blue-600 border border-blue-500/20';
-            case 'RESOLVED': return 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
-            default: return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400';
-        }
+    const getSeverityChip = (sev: string) => {
+        if (sev === 'CRITICAL') return 'bg-red-600 text-white border-transparent';
+        if (sev === 'HIGH')     return 'border-red-600/40 text-[#dc0000] bg-red-600/10';
+        if (sev === 'MEDIUM')   return 'border-amber-500/40 text-amber-400 bg-amber-500/10';
+        return 'border-zinc-700 text-zinc-400 bg-zinc-800/40';
     };
 
     const handleActionSubmit = () => {
@@ -56,14 +45,14 @@ export const ProductionIncidentsPanel: React.FC<Props> = ({
     };
 
     return (
-        <div className={`border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} p-6`}>
+        <div className="glass border border-zinc-800 bg-zinc-950/40 p-6">
             <div className="flex justify-between items-center mb-6">
-                <h3 className={`text-xs font-black uppercase tracking-widest ${COLORS.adaptive.textSecondary}`}>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 border-l-2 border-[#dc0000] pl-3">
                     Production Incidents Log
                 </h3>
                 {isAdminOrOperator && (
-                    <button 
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider"
+                    <button
+                        className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
                         onClick={onOpenCreateModal}
                     >
                         Report Manual Incident
@@ -71,71 +60,63 @@ export const ProductionIncidentsPanel: React.FC<Props> = ({
                 )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {incidents.length === 0 ? (
-                    <div className="py-8 text-center text-xs font-semibold text-zinc-500">
+                    <div className="py-10 text-center text-[10px] font-black uppercase tracking-widest text-zinc-600">
                         No incidents reported. All production systems nominal.
                     </div>
                 ) : (
                     incidents.map((inc) => (
-                        <div 
+                        <div
                             key={inc.id}
-                            className={`border ${COLORS.adaptive.borderPrimary} p-4 bg-zinc-50/50 dark:bg-zinc-900/10`}
+                            className="border border-zinc-800 p-4 bg-zinc-900/20 hover:bg-zinc-900/40 transition-all"
                         >
                             <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase ${getSeverityStyle(inc.severity)}`}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-[8px] font-black px-2 py-0.5 border uppercase tracking-wider ${getSeverityChip(inc.severity)}`}>
                                             {inc.severity}
                                         </span>
-                                        <h4 className={`text-xs font-black ${COLORS.adaptive.textPrimary}`}>
+                                        <h4 className="text-xs font-black text-white">
                                             #{inc.id}: {inc.title}
                                         </h4>
                                     </div>
                                     <span className="text-[9px] text-zinc-500 font-mono">
-                                        Type: {inc.incident_type} • Order: {inc.order_id} • Opened: {new Date(inc.opened_at).toLocaleString()}
+                                        {inc.incident_type} · Order: {inc.order_id} · {new Date(inc.opened_at).toLocaleString()}
                                     </span>
                                 </div>
-                                <span className={`px-2 py-0.5 text-[10px] font-bold border ${getStatusStyle(inc.status)}`}>
-                                    {inc.status}
-                                </span>
+                                <StatusBadge status={inc.status} />
                             </div>
 
-                            <p className={`text-xs ${COLORS.adaptive.textSecondary} my-3 leading-relaxed`}>
+                            <p className="text-[11px] text-zinc-400 my-3 leading-relaxed">
                                 {inc.description}
                             </p>
 
                             {inc.resolution_notes && (
-                                <div className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20 border-l-2 border-emerald-500 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 mt-2">
+                                <div className="p-3 bg-emerald-950/30 border-l-2 border-emerald-500 text-[10px] font-medium text-emerald-400 mt-2">
                                     <strong>Resolution notes:</strong> {inc.resolution_notes}
                                 </div>
                             )}
 
                             {isAdminOrOperator && inc.status !== 'RESOLVED' && inc.status !== 'DISMISSED' && (
-                                <div className="mt-4 pt-3 border-t border-zinc-200/50 dark:border-zinc-800/30 flex gap-2 justify-end">
+                                <div className="mt-4 pt-3 border-t border-zinc-800 flex gap-2 justify-end">
                                     {inc.status === 'OPEN' && (
-                                        <button 
-                                            className="px-3 py-1 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider"
+                                        <button
+                                            className="px-3 py-1 border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-[9px] font-bold uppercase transition-all"
                                             onClick={() => onAcknowledge(inc.id)}
                                         >
                                             Acknowledge
                                         </button>
                                     )}
-                                    <button 
-                                        className="px-3 py-1 border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 text-[10px] font-bold uppercase tracking-wider"
-                                        onClick={() => {
-                                            setActioningIncidentId(inc.id);
-                                            setActionType('RESOLVE');
-                                        }}
+                                    <button
+                                        className="px-3 py-1 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[9px] font-bold uppercase transition-all"
+                                        onClick={() => { setActioningIncidentId(inc.id); setActionType('RESOLVE'); }}
                                     >
                                         Resolve
                                     </button>
-                                    <button 
-                                        className="px-3 py-1 border border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-500/20 text-[10px] font-bold uppercase tracking-wider"
-                                        onClick={() => {
-                                            setActioningIncidentId(inc.id);
-                                            setActionType('DISMISS');
-                                        }}
+                                    <button
+                                        className="px-3 py-1 border border-zinc-700 bg-zinc-800/30 text-zinc-400 hover:bg-zinc-700 text-[9px] font-bold uppercase transition-all"
+                                        onClick={() => { setActioningIncidentId(inc.id); setActionType('DISMISS'); }}
                                     >
                                         Dismiss
                                     </button>
@@ -143,29 +124,26 @@ export const ProductionIncidentsPanel: React.FC<Props> = ({
                             )}
 
                             {actioningIncidentId === inc.id && (
-                                <div className="mt-4 p-4 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                                    <label className="block text-[10px] font-black uppercase text-zinc-400 mb-2">
-                                        {actionType === 'RESOLVE' ? 'Provide Resolution Notes' : 'Provide Dismissal Reason'}
+                                <div className="mt-4 p-4 border border-zinc-800 bg-zinc-950/60">
+                                    <label className="block text-[9px] font-black uppercase text-zinc-500 mb-2">
+                                        {actionType === 'RESOLVE' ? 'Resolution Notes' : 'Dismissal Reason'}
                                     </label>
-                                    <textarea 
-                                        className="w-full p-2 border border-zinc-300 dark:border-zinc-700 bg-transparent text-xs text-zinc-900 dark:text-zinc-100 rounded-none mb-3"
+                                    <textarea
+                                        className="w-full p-2 border border-zinc-700 bg-zinc-900 text-xs text-zinc-100 rounded-none mb-3 focus:outline-none focus:border-zinc-500"
                                         rows={2}
                                         value={inputText}
                                         onChange={(e) => setInputText(e.target.value)}
                                         placeholder={actionType === 'RESOLVE' ? 'Describe how the issue was resolved...' : 'Describe why this incident was dismissed...'}
                                     />
                                     <div className="flex gap-2 justify-end">
-                                        <button 
-                                            className="px-3 py-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold uppercase"
-                                            onClick={() => {
-                                                setActioningIncidentId(null);
-                                                setActionType(null);
-                                            }}
+                                        <button
+                                            className="px-3 py-1 border border-zinc-700 bg-zinc-800 text-zinc-200 text-[9px] font-bold uppercase"
+                                            onClick={() => { setActioningIncidentId(null); setActionType(null); }}
                                         >
                                             Cancel
                                         </button>
-                                        <button 
-                                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase"
+                                        <button
+                                            className="px-3 py-1 bg-[#dc0000] hover:bg-red-700 text-white text-[9px] font-black uppercase"
                                             onClick={handleActionSubmit}
                                         >
                                             Submit
