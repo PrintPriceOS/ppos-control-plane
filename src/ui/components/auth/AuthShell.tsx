@@ -84,6 +84,32 @@ const ParticleCanvas: React.FC = () => {
     );
 };
 
+export const MotionBackground: React.FC = () => {
+    const dark = isDarkMode();
+    const opacity1 = dark ? 0.08 : 0.04;
+    const opacity2 = dark ? 0.06 : 0.03;
+    return (
+        <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+            <div style={{
+                position: 'absolute', top: '10%', left: '15%', width: '600px', height: '600px',
+                borderRadius: '50%',
+                background: `radial-gradient(circle, rgba(220, 0, 0, ${opacity1}) 0%, transparent 70%)`,
+                filter: 'blur(60px)',
+                animation: 'orb-drift-1 25s infinite alternate ease-in-out',
+                willChange: 'transform',
+            }} />
+            <div style={{
+                position: 'absolute', bottom: '15%', right: '10%', width: '500px', height: '500px',
+                borderRadius: '50%',
+                background: `radial-gradient(circle, rgba(220, 0, 0, ${opacity2}) 0%, transparent 70%)`,
+                filter: 'blur(50px)',
+                animation: 'orb-drift-2 30s infinite alternate ease-in-out',
+                willChange: 'transform',
+            }} />
+        </div>
+    );
+};
+
 // ── Utility: check dark mode ─────────────────────────────────────────────────
 
 function isDarkMode() {
@@ -138,22 +164,39 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         borderRadius: '0px',
     };
 
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [tiltStyle, setTiltStyle] = React.useState<CSSProperties>({
+        transition: 'transform 0.2s ease-out'
+    });
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        const cardEl = cardRef.current;
+        if (!cardEl) return;
+        const rect = cardEl.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const rX = -(y / (rect.height / 2)) * 0.5;
+        const rY = (x / (rect.width / 2)) * 0.5;
+        setTiltStyle({
+            transform: `perspective(1000px) rotateX(${rX}deg) rotateY(${rY}deg)`,
+            transition: 'transform 0.1s ease-out'
+        });
+    };
+
+    const handleMouseLeave = () => {
+        setTiltStyle({
+            transform: `perspective(1000px) rotateX(0deg) rotateY(0deg)`,
+            transition: 'transform 0.2s ease-out'
+        });
+    };
+
     return (
         <div style={backdrop}>
             {/* Animated background particles */}
             <ParticleCanvas />
 
-            {/* Decorative gradient blobs */}
-            <div style={{
-                position: 'fixed', top: '-30%', left: '-10%', width: '500px', height: '500px',
-                background: 'radial-gradient(circle, rgba(220,0,0,0.06) 0%, transparent 70%)',
-                pointerEvents: 'none', zIndex: 0,
-            }} aria-hidden="true" />
-            <div style={{
-                position: 'fixed', bottom: '-20%', right: '-5%', width: '400px', height: '400px',
-                background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)',
-                pointerEvents: 'none', zIndex: 0,
-            }} aria-hidden="true" />
+            {/* Dynamic drift orbs */}
+            <MotionBackground />
 
             <div style={card}>
                 {/* Branding */}
@@ -188,8 +231,15 @@ export const AuthShell: React.FC<AuthShellProps> = ({
                 </div>
 
                 {/* Glass Card */}
-                <div style={glassCard}>
-                    {children}
+                <div style={{ perspective: '1000px' }}>
+                    <div 
+                        ref={cardRef}
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        style={{ ...glassCard, ...tiltStyle }}
+                    >
+                        {children}
+                    </div>
                 </div>
 
                 {/* Footer */}
@@ -322,6 +372,8 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
             fontFamily: "'Manrope', system-ui, sans-serif",
             letterSpacing: '0.02em',
             borderRadius: '0px',
+            position: 'relative',
+            overflow: 'hidden',
             ...(style || {}),
         }}
         onMouseEnter={(e) => {
@@ -331,6 +383,19 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
             (e.currentTarget).style.filter = '';
         }}
     >
+        {/* Shimmer light streak */}
+        {!disabled && !loading && (
+            <span style={{
+                position: 'absolute',
+                top: 0,
+                width: '50%',
+                height: '100%',
+                background: 'linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0) 100%)',
+                transform: 'skewX(-25deg)',
+                animation: 'ppos-shimmer 5s infinite ease-in-out',
+                pointerEvents: 'none',
+            }} />
+        )}
         {loading ? (
             <>
                 <span style={{
@@ -350,6 +415,24 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
 if (typeof document !== 'undefined' && !document.getElementById('ppos-auth-shell-styles')) {
     const s = document.createElement('style');
     s.id = 'ppos-auth-shell-styles';
-    s.textContent = `@keyframes ppos-auth-spin { to { transform: rotate(360deg); } }`;
+    s.textContent = `
+        @keyframes ppos-auth-spin { to { transform: rotate(360deg); } }
+        @keyframes orb-drift-1 {
+            0% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(80px, -50px) scale(1.05); }
+            66% { transform: translate(-40px, 40px) scale(0.95); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes orb-drift-2 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-80px, 60px) scale(0.95); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes ppos-shimmer {
+            0% { left: -100%; }
+            20% { left: 100%; }
+            100% { left: 100%; }
+        }
+    `;
     document.head.appendChild(s);
 }

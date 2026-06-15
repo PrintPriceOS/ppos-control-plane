@@ -31,7 +31,7 @@ import {
     QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
 import { setAuthToken, setAuthUser } from '../lib/authStore';
-import { AuthInput, AuthButton } from '../components/auth/AuthShell';
+import { AuthInput, AuthButton, MotionBackground } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
@@ -525,6 +525,32 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     const { toasts, addToast, dismiss } = useAuthToast();
     const dark = isDark();
 
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [tiltStyle, setTiltStyle] = useState<CSSProperties>({
+        transition: 'transform 0.2s ease-out'
+    });
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        const cardEl = cardRef.current;
+        if (!cardEl) return;
+        const rect = cardEl.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const rX = -(y / (rect.height / 2)) * 0.5;
+        const rY = (x / (rect.width / 2)) * 0.5;
+        setTiltStyle({
+            transform: `perspective(1000px) rotateX(${rX}deg) rotateY(${rY}deg)`,
+            transition: 'transform 0.1s ease-out'
+        });
+    };
+
+    const handleMouseLeave = () => {
+        setTiltStyle({
+            transform: `perspective(1000px) rotateX(0deg) rotateY(0deg)`,
+            transition: 'transform 0.2s ease-out'
+        });
+    };
+
     const set = (key: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const val = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
         setFormData((p) => ({ ...p, [key]: val }));
@@ -890,9 +916,12 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     return (
         <>
             <div style={backdrop}>
+                {/* Dynamic drift orbs */}
+                <MotionBackground />
+
                 <div style={cardWrap}>
                     {/* Branding */}
-                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', position: 'relative', zIndex: 1 }}>
                         <div style={{ width: 52, height: 52, background: dark ? 'rgba(220,0,0,0.15)' : 'rgba(220,0,0,0.08)', border: '1px solid rgba(220,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <PrintPriceLogo className="w-8 h-8" />
                         </div>
@@ -907,7 +936,13 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     </div>
 
                     {/* Stepper Card */}
-                    <div style={glassCard}>
+                    <div style={{ perspective: '1000px', position: 'relative', zIndex: 1 }}>
+                        <div 
+                            ref={cardRef}
+                            onMouseMove={handleMouseMove}
+                            onMouseLeave={handleMouseLeave}
+                            style={{ ...glassCard, ...tiltStyle }}
+                        >
                         {/* Step indicator */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
                             {[1, 2, 3, 4, 5, 6, 7].map(i => (
@@ -1926,6 +1961,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                             </form>
                         )}
                     </div>
+                </div>
 
                     {/* Footer */}
                     <p style={{ textAlign: 'center', fontSize: '12px', color: dark ? '#3f3f46' : '#94a3b8', fontWeight: 600, margin: 0 }}>
