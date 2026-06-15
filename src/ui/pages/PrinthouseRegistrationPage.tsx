@@ -28,11 +28,78 @@ import {
     CpuChipIcon,
     TrashIcon,
     PlusIcon,
+    QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
 import { setAuthToken, setAuthUser } from '../lib/authStore';
 import { AuthInput, AuthButton } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tooltip & Validation helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const InfoTooltip: React.FC<{ text: string }> = ({ text }) => {
+    const [show, setShow] = useState(false);
+    return (
+        <div style={{ position: 'relative', display: 'inline-block', marginLeft: '6px' }}>
+            <QuestionMarkCircleIcon 
+                style={{ width: '14px', height: '14px', cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
+                onMouseEnter={() => setShow(true)}
+                onMouseLeave={() => setShow(false)}
+            />
+            {show && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#1f2937',
+                    color: '#fff',
+                    fontSize: '11px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    whiteSpace: 'normal',
+                    width: '180px',
+                    zIndex: 1000,
+                    marginBottom: '6px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    lineHeight: '1.3'
+                }}>
+                    {text}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ValidatedInput: React.FC<{
+    id: string;
+    label: string;
+    type: string;
+    placeholder?: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    icon: any;
+    error?: string | null;
+    validator: (val: string) => boolean;
+    autoFocus?: boolean;
+    autoComplete?: string;
+    disabled?: boolean;
+    rightSlot?: React.ReactNode;
+}> = ({ validator, value, ...props }) => {
+    const isValid = value.trim() !== '' && validator(value);
+    return (
+        <div style={{ position: 'relative' }}>
+            <AuthInput {...props} value={value} />
+            {isValid && (
+                <div style={{ position: 'absolute', right: props.rightSlot ? '40px' : '14px', top: '35px', pointerEvents: 'none', zIndex: 10 }}>
+                    <CheckCircleIcon style={{ width: '16px', height: '16px', color: '#10b981' }} />
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Password strength checker
@@ -464,6 +531,50 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         }
     };
 
+    // Recovery of draft B2B onboarding data
+    useEffect(() => {
+        const saved = localStorage.getItem('printhouse_onboarding_draft');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setFormData(prev => ({ ...prev, ...parsed }));
+                addToast('info', 'Draft recovered', 'We restored previously entered data.');
+            } catch (e) {}
+        }
+    }, []);
+
+    // Auto-save B2B onboarding draft on change (excluding sensitive password info)
+    useEffect(() => {
+        const draft = {
+            companyName: formData.companyName,
+            contactName: formData.contactName,
+            country: formData.country,
+            city: formData.city,
+            phone: formData.phone,
+            website: formData.website,
+            productionTypes: formData.productionTypes,
+            maxSheetSize: formData.maxSheetSize,
+            presses: formData.presses,
+            typicalJobs: formData.typicalJobs,
+            monthlyVolume: formData.monthlyVolume,
+            utilization: formData.utilization,
+            integrationLevel: formData.integrationLevel,
+            standards: formData.standards,
+            certifications: formData.certifications,
+            qaModules: formData.qaModules,
+            qaCustomDetails: formData.qaCustomDetails,
+            selectedPlan: formData.selectedPlan,
+            billingInterval: formData.billingInterval,
+        };
+        localStorage.setItem('printhouse_onboarding_draft', JSON.stringify(draft));
+    }, [
+        formData.companyName, formData.contactName, formData.country, formData.city,
+        formData.phone, formData.website, formData.productionTypes, formData.maxSheetSize,
+        formData.presses, formData.typicalJobs, formData.monthlyVolume, formData.utilization,
+        formData.integrationLevel, formData.standards, formData.certifications,
+        formData.qaModules, formData.qaCustomDetails, formData.selectedPlan, formData.billingInterval
+    ]);
+
     // ── Validations per step ──────────────────────────────────────────────────
     const validateStep1 = (): boolean => {
         if (!formData.termsAccepted) {
@@ -519,6 +630,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     };
 
     const validateStep5 = (): boolean => {
+        if (!formData.selectedPlan) {
+            addToast('warning', 'Plan Selection Required', 'Please select a subscription plan.');
+            return false;
+        }
         if (!formData.integrationLevel) {
             addToast('warning', 'Integration Protocol', 'Please select an integration protocol.');
             return false;
@@ -527,10 +642,6 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     };
 
     const validateStep6 = (): boolean => {
-        if (!formData.selectedPlan) {
-            addToast('warning', 'Plan Selection Required', 'Please select a subscription plan.');
-            return false;
-        }
         return true;
     };
 
@@ -711,7 +822,31 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
     const strength = checkPasswordStrength(formData.password);
 
-    // ── Success Screen ─────────────────────────────────────────────────────────
+    const renderReviewSummary = () => (
+        <div style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: dark ? '#fff' : '#0f172a' }}>Review your setup</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#71717a' }}>Selected Plan:</span>
+                    <span style={{ fontWeight: 600, color: dark ? '#fff' : '#0f172a' }}>{formData.selectedPlan.toUpperCase()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#71717a' }}>Billing Cycle:</span>
+                    <span style={{ fontWeight: 600, color: dark ? '#fff' : '#0f172a' }}>{formData.billingInterval === 'annual' ? 'Annual (Save 20%)' : 'Monthly'}</span>
+                </div>
+                
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(234, 179, 8, 0.1)', borderRadius: '8px', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                    <p style={{ fontSize: '13px', color: '#eab308', margin: 0 }}>
+                        {formData.selectedPlan === 'trial' || formData.selectedPlan === 'starter'
+                            ? "Your 14-day free evaluation starts immediately upon registration. Full platform access included." 
+                            : "Your subscription billing cycle starts immediately. Enterprise-grade routing & support active."}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+
     // ── Success Screen ─────────────────────────────────────────────────────────
     if (step === 8) {
         return (
@@ -763,7 +898,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     {/* Stepper Card */}
                     <div style={glassCard}>
                         {/* Step indicator */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '28px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
                             {[1, 2, 3, 4, 5, 6, 7].map(i => (
                                 <React.Fragment key={i}>
                                     <div style={stepDot(i)}>{i}</div>
@@ -772,14 +907,47 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                             ))}
                         </div>
 
+                        {/* Progress Bar & Estimated Time */}
+                        <div style={{ marginBottom: '24px' }}>
+                            <div style={{ 
+                                height: '4px', 
+                                background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                borderRadius: '4px',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{ 
+                                    width: `${(() => {
+                                        const stepPercent = { 1: 14, 2: 28, 3: 42, 4: 57, 5: 71, 6: 85, 7: 100, 8: 100 };
+                                        return stepPercent[step] || 0;
+                                    })()}%`, 
+                                    height: '100%', 
+                                    background: '#dc0000',
+                                    transition: 'width 0.3s ease'
+                                }} />
+                            </div>
+                            <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                marginTop: '8px',
+                                fontSize: '11px',
+                                color: dark ? '#71717a' : '#64748b'
+                            }}>
+                                <span>Progress {(() => {
+                                    const stepPercent = { 1: 14, 2: 28, 3: 42, 4: 57, 5: 71, 6: 85, 7: 100, 8: 100 };
+                                    return stepPercent[step] || 0;
+                                })()}%</span>
+                                <span>Estimated time: {step === 1 ? '3 min left' : step <= 3 ? '2 min left' : '1 min left'}</span>
+                            </div>
+                        </div>
+
                         <div style={{ marginBottom: '24px' }}>
                             <h2 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
                                 {step === 1 && 'Step 1: Partner Terms'}
                                 {step === 2 && 'Step 2: Company Identity'}
                                 {step === 3 && 'Step 3: Node Capabilities'}
                                 {step === 4 && 'Step 4: Machinery & Volume'}
-                                {step === 5 && 'Step 5: Integration Standard'}
-                                {step === 6 && 'Step 6: Plan Selection'}
+                                {step === 5 && 'Step 5: Plan & Compliance'}
+                                {step === 6 && 'Step 6: Review Qualification'}
                                 {step === 7 && 'Step 7: Administrator Credentials'}
                             </h2>
                             <p style={{ margin: 0, fontSize: '13px', color: dark ? '#71717a' : '#64748b' }}>
@@ -787,8 +955,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 {step === 2 && 'Basic identifiers of your facility.'}
                                 {step === 3 && 'Machine output dimensions and capability nodes.'}
                                 {step === 4 && 'Identify baseline machinery and monthly capacity.'}
-                                {step === 5 && 'Select the automated routing integration depth.'}
-                                {step === 6 && 'Select your PrintPrice OS subscription level.'}
+                                {step === 5 && 'Select subscription plan & integration standard.'}
+                                {step === 6 && 'Verify all B2B data before establishing your master admin account.'}
                                 {step === 7 && 'Establish the master administrative account.'}
                             </p>
                         </div>
@@ -861,7 +1029,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                         {step === 2 && (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <AuthInput
+                                    <ValidatedInput
                                         id="reg-company"
                                         label="Company Name *"
                                         type="text"
@@ -870,9 +1038,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         onChange={set('companyName')}
                                         icon={BuildingOfficeIcon as any}
                                         error={fieldErrors.companyName}
+                                        validator={val => val.trim().length > 0}
                                     />
                                 </div>
-                                <AuthInput
+                                <ValidatedInput
                                     id="reg-contact"
                                     label="Contact Name *"
                                     type="text"
@@ -881,32 +1050,39 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     onChange={set('contactName')}
                                     icon={BuildingOfficeIcon as any}
                                     error={fieldErrors.contactName}
-                                
+                                    validator={val => val.trim().length > 0}
                                 />
                                 <div>
                                     <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
                                         Country *
                                     </label>
-                                    <input
-                                        id="reg-country"
-                                        list="country-options"
-                                        placeholder="Type to search country..."
-                                        value={COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}
-                                        onChange={(e) => {
-                                            const label = e.target.value;
-                                            const found = COUNTRIES.find(c => c.label.toLowerCase() === label.toLowerCase() || c.code.toLowerCase() === label.toLowerCase());
-                                            setFormData(p => ({ ...p, country: found ? found.code : label }));
-                                        }}
-                                        style={{
-                                            width: '100%', padding: '11px 14px',
-                                            background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                                            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
-                                            color: dark ? '#f4f4f5' : '#0f172a',
-                                            fontSize: '14px', fontWeight: 500, outline: 'none',
-                                            fontFamily: "'Manrope', system-ui, sans-serif",
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="reg-country"
+                                            list="country-options"
+                                            placeholder="Type to search country..."
+                                            value={COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}
+                                            onChange={(e) => {
+                                                const label = e.target.value;
+                                                const found = COUNTRIES.find(c => c.label.toLowerCase() === label.toLowerCase() || c.code.toLowerCase() === label.toLowerCase());
+                                                setFormData(p => ({ ...p, country: found ? found.code : label }));
+                                            }}
+                                            style={{
+                                                width: '100%', padding: '11px 14px',
+                                                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                                                border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
+                                                color: dark ? '#f4f4f5' : '#0f172a',
+                                                fontSize: '14px', fontWeight: 500, outline: 'none',
+                                                fontFamily: "'Manrope', system-ui, sans-serif",
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                        {COUNTRIES.some(c => c.code.toLowerCase() === formData.country.toLowerCase()) && (
+                                            <div style={{ position: 'absolute', right: '14px', top: '14px', pointerEvents: 'none', zIndex: 10 }}>
+                                                <CheckCircleIcon style={{ width: '16px', height: '16px', color: '#10b981' }} />
+                                            </div>
+                                        )}
+                                    </div>
                                     <datalist id="country-options">
                                         {COUNTRIES.map((c) => (
                                             <option key={c.code} value={c.label} />
@@ -914,7 +1090,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     </datalist>
                                     {fieldErrors.country && <span style={{ fontSize: '11px', color: '#ef4444', textAlign: 'left', display: 'block', marginTop: '4px' }}>{fieldErrors.country}</span>}
                                 </div>
-                                <AuthInput
+                                <ValidatedInput
                                     id="reg-city"
                                     label="City *"
                                     type="text"
@@ -923,8 +1099,9 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     onChange={set('city')}
                                     icon={MapPinIcon as any}
                                     error={fieldErrors.city}
+                                    validator={val => val.trim().length > 0}
                                 />
-                                <AuthInput
+                                <ValidatedInput
                                     id="reg-phone"
                                     label="Phone (Optional)"
                                     type="tel"
@@ -932,9 +1109,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     value={formData.phone}
                                     onChange={set('phone')}
                                     icon={PhoneIcon as any}
+                                    validator={val => val.trim().length > 0}
                                 />
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <AuthInput
+                                    <ValidatedInput
                                         id="reg-website"
                                         label="Website (Optional)"
                                         type="url"
@@ -943,6 +1121,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         onChange={set('website')}
                                         icon={GlobeAltIcon as any}
                                         error={fieldErrors.website}
+                                        validator={val => val.trim() === '' || /^https?:\/\//.test(val.trim())}
                                     />
                                 </div>
 
@@ -983,15 +1162,26 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <AuthInput
+                                    <label style={{
+                                        fontSize: '10px', fontWeight: 800,
+                                        color: dark ? '#52525b' : '#94a3b8',
+                                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                                        fontFamily: "'Manrope', system-ui, sans-serif",
+                                        display: 'block', marginBottom: '6px'
+                                    }}>
+                                        Max Supported Sheet Size *
+                                        <InfoTooltip text="Used to route jobs that fit your presses. Reduces waste by 23% on average." />
+                                    </label>
+                                    <ValidatedInput
                                         id="reg-maxsheet"
-                                        label="Max Supported Sheet Size *"
+                                        label=""
                                         type="text"
                                         placeholder="e.g. 720 x 1020 mm"
                                         value={formData.maxSheetSize}
                                         onChange={set('maxSheetSize')}
                                         icon={AdjustmentsHorizontalIcon as any}
                                         error={fieldErrors.maxSheetSize}
+                                        validator={val => val.trim().length > 0}
                                     />
                                     <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
                                         💡 Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
@@ -1305,79 +1495,253 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ── STEP 5: COMPLIANCE & INTEGRATION ─────────────────── */}
+                        {/* ── STEP 5: PLAN & COMPLIANCE ────────────────────────── */}
                         {step === 5 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {/* Part A: Plan Selection */}
                                 <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
-                                        Integration Standard *
+                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
+                                        Subscription Plan *
                                     </label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {B2B_INTEGRATIONS.map(opt => {
-                                            const active = formData.integrationLevel === opt.title;
-                                            return (
-                                                <button
-                                                    key={opt.title}
-                                                    type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, integrationLevel: opt.title }))}
-                                                    style={{
-                                                        padding: '12px',
-                                                        textAlign: 'left',
-                                                        background: active ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.05)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)'),
-                                                        border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
-                                                        cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <span style={{ fontWeight: 800, fontSize: '13px', color: dark ? '#f4f4f5' : '#0f172a' }}>{opt.title}</span>
-                                                        <span style={{ fontSize: '9px', color: '#dc0000', fontWeight: 900 }}>{opt.badge}</span>
-                                                    </div>
-                                                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b' }}>{opt.desc}</p>
-                                                </button>
-                                            );
-                                        })}
+                                    
+                                    {/* Monthly / Annual Toggle Switch */}
+                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'monthly' ? 800 : 500, color: formData.billingInterval === 'monthly' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b') }}>
+                                            Monthly Billing
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(p => ({ ...p, billingInterval: p.billingInterval === 'monthly' ? 'annual' : 'monthly' }))}
+                                            style={{
+                                                width: '50px',
+                                                height: '26px',
+                                                background: '#dc0000',
+                                                borderRadius: '9999px',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                position: 'relative',
+                                                padding: '3px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: formData.billingInterval === 'annual' ? 'flex-end' : 'flex-start',
+                                                transition: 'all 0.25s ease'
+                                            }}
+                                        >
+                                            <div style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                                        </button>
+                                        <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'annual' ? 800 : 500, color: formData.billingInterval === 'annual' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b'), display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            Annual Billing
+                                            <span style={{ background: 'rgba(220,0,0,0.15)', color: '#dc0000', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(220,0,0,0.25)' }}>
+                                                SAVE 20%
+                                            </span>
+                                        </span>
+                                    </div>
+
+                                    {/* Plan Cards */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                                        {/* Starter Plan (14-DAY FREE TRIAL) */}
+                                        <div
+                                            onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
+                                            style={{
+                                                padding: '16px 12px',
+                                                background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                cursor: 'pointer',
+                                                borderRadius: '6px',
+                                                transition: 'all 0.25s ease',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                minHeight: '280px',
+                                                textAlign: 'center',
+                                            }}
+                                        >
+                                            <div>
+                                                <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
+                                                <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 10 Jobs + 10 AI Scans</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 15 HD generated copies</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Base BPE Form (AI Chat disabled)</li>
+                                                </ul>
+                                            </div>
+                                            <div style={{ marginTop: '10px' }}>
+                                                <div>
+                                                    <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
+                                                    <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}> / 14 days</span>
+                                                </div>
+                                                <p style={{ margin: '4px 0 0', fontSize: '8px', color: dark ? '#71717a' : '#64748b', fontStyle: 'italic', lineHeight: '1.1' }}>
+                                                    Requires plan selection after 14 days to maintain node activity.
+                                                </p>
+                                                <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                    {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Growth Plan */}
+                                        <div
+                                            onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
+                                            style={{
+                                                padding: '16px 12px',
+                                                background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                cursor: 'pointer',
+                                                borderRadius: '6px',
+                                                transition: 'all 0.25s ease',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                minHeight: '280px',
+                                                textAlign: 'center',
+                                                position: 'relative',
+                                            }}
+                                        >
+                                            <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Recommended
+                                            </div>
+                                            <div>
+                                                <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
+                                                <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 100 Jobs + 100 AI Scans</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 150 HD generated / mo</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> 1,000 AI Sales Chat Credits</li>
+                                                </ul>
+                                            </div>
+                                            <div style={{ marginTop: '10px' }}>
+                                                <div>
+                                                    <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                        ${formData.billingInterval === 'annual' ? '159' : '199'}
+                                                    </span>
+                                                    <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
+                                                </div>
+                                                <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                    {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Enterprise Plan */}
+                                        <div
+                                            onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
+                                            style={{
+                                                padding: '16px 12px',
+                                                background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                cursor: 'pointer',
+                                                borderRadius: '6px',
+                                                transition: 'all 0.25s ease',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                minHeight: '280px',
+                                                textAlign: 'center',
+                                            }}
+                                        >
+                                            <div>
+                                                <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
+                                                <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> Unlimited Jobs + AI Scans</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 500 HD generated / mo</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Featured 1st position rotation</li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> White-Label Subdomain & BYOK AI</li>
+                                                </ul>
+                                            </div>
+                                            <div style={{ marginTop: '10px' }}>
+                                                <div>
+                                                    <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                        ${formData.billingInterval === 'annual' ? '399' : '499'}
+                                                    </span>
+                                                    <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
+                                                </div>
+                                                <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                    {formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: '10px', 
-                                        cursor: 'pointer',
-                                    }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={formData.standards}
-                                            onChange={(e) => setFormData(p => ({ ...p, standards: e.target.checked }))}
-                                            style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
-                                        />
-                                        <span style={{ fontWeight: 700, fontSize: '12px', color: dark ? '#e2e8f0' : '#334155' }}>We follow ISO print standards and FOGRA/GRACoL certifications.</span>
-                                    </label>
-                                </div>
-
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
-                                        Certifications
-                                    </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                                        {B2B_CERTIFICATIONS.map(cert => {
-                                            const active = formData.certifications.includes(cert);
-                                            return (
-                                                <button
-                                                    key={cert}
-                                                    type="button"
-                                                    onClick={() => toggleCertification(cert)}
-                                                    style={badgeBtnStyle(active, dark)}
-                                                >
-                                                    {cert}
-                                                </button>
-                                            );
-                                        })}
+                                {/* Part B: Compliance & Integration */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, paddingTop: '20px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
+                                            Integration Standard *
+                                        </label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {B2B_INTEGRATIONS.map(opt => {
+                                                const active = formData.integrationLevel === opt.title;
+                                                return (
+                                                    <button
+                                                        key={opt.title}
+                                                        type="button"
+                                                        onClick={() => setFormData(p => ({ ...p, integrationLevel: opt.title }))}
+                                                        style={{
+                                                            padding: '12px',
+                                                            textAlign: 'left',
+                                                            background: active ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.05)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)'),
+                                                            border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
+                                                            cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontWeight: 800, fontSize: '13px', color: dark ? '#f4f4f5' : '#0f172a' }}>{opt.title}</span>
+                                                            <span style={{ fontSize: '9px', color: '#dc0000', fontWeight: 900 }}>{opt.badge}</span>
+                                                        </div>
+                                                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b' }}>{opt.desc}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
-                                        💡 Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
-                                    </p>
+
+                                    <div>
+                                        <label style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '10px', 
+                                            cursor: 'pointer',
+                                        }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={formData.standards}
+                                                onChange={(e) => setFormData(p => ({ ...p, standards: e.target.checked }))}
+                                                style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '12px', color: dark ? '#e2e8f0' : '#334155' }}>We follow ISO print standards and FOGRA/GRACoL certifications.</span>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
+                                            Certifications
+                                            <InfoTooltip text="Higher QA standards automatically unlock access to premium corporate buyers." />
+                                        </label>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                            {B2B_CERTIFICATIONS.map(cert => {
+                                                const active = formData.certifications.includes(cert);
+                                                return (
+                                                    <button
+                                                        key={cert}
+                                                        type="button"
+                                                        onClick={() => toggleCertification(cert)}
+                                                        style={badgeBtnStyle(active, dark)}
+                                                    >
+                                                        {cert}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                            💡 Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
@@ -1392,169 +1756,44 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ── STEP 6: PLAN SELECTION ───────────────────────────── */}
+                        {/* ── STEP 6: REVIEW SUMMARY ───────────────────────────── */}
                         {step === 6 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {/* Monthly / Annual Toggle Switch */}
-                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'monthly' ? 800 : 500, color: formData.billingInterval === 'monthly' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b') }}>
-                                        Monthly Billing
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(p => ({ ...p, billingInterval: p.billingInterval === 'monthly' ? 'annual' : 'monthly' }))}
-                                        style={{
-                                            width: '50px',
-                                            height: '26px',
-                                            background: '#dc0000',
-                                            borderRadius: '9999px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            position: 'relative',
-                                            padding: '3px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: formData.billingInterval === 'annual' ? 'flex-end' : 'flex-start',
-                                            transition: 'all 0.25s ease'
-                                        }}
-                                    >
-                                        <div style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-                                    </button>
-                                    <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'annual' ? 800 : 500, color: formData.billingInterval === 'annual' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b'), display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        Annual Billing
-                                        <span style={{ background: 'rgba(220,0,0,0.15)', color: '#dc0000', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(220,0,0,0.25)' }}>
-                                            SAVE 20%
-                                        </span>
-                                    </span>
-                                </div>
+                                {renderReviewSummary()}
 
-                                {/* Plan Cards */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                                    {/* Starter Plan (14-DAY FREE TRIAL) */}
-                                    <div
-                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
-                                        style={{
-                                            padding: '16px 12px',
-                                            background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                            border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                            cursor: 'pointer',
-                                            borderRadius: '6px',
-                                            transition: 'all 0.25s ease',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            minHeight: '280px',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        <div>
-                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
-                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
-                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 10 Jobs + 10 AI Scans</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 15 HD generated copies</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Base BPE Form (AI Chat disabled)</li>
-                                            </ul>
-                                        </div>
-                                        <div style={{ marginTop: '10px' }}>
-                                            <div>
-                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
-                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}> / 14 days</span>
-                                            </div>
-                                            <p style={{ margin: '4px 0 0', fontSize: '8px', color: dark ? '#71717a' : '#64748b', fontStyle: 'italic', lineHeight: '1.1' }}>
-                                                Requires plan selection after 14 days to maintain node activity.
-                                            </p>
-                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
-                                                {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
-                                            </div>
-                                        </div>
+                                <div style={{ 
+                                    background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                    padding: '20px',
+                                    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px',
+                                    textAlign: 'left'
+                                }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Company Name:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.companyName}</span>
                                     </div>
-
-                                    {/* Growth Plan */}
-                                    <div
-                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
-                                        style={{
-                                            padding: '16px 12px',
-                                            background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                            border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                            cursor: 'pointer',
-                                            borderRadius: '6px',
-                                            transition: 'all 0.25s ease',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            minHeight: '280px',
-                                            textAlign: 'center',
-                                            position: 'relative',
-                                        }}
-                                    >
-                                        <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                            Recommended
-                                        </div>
-                                        <div>
-                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
-                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
-                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 100 Jobs + 100 AI Scans</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 150 HD generated / mo</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> 1,000 AI Sales Chat Credits</li>
-                                            </ul>
-                                        </div>
-                                        <div style={{ marginTop: '10px' }}>
-                                            <div>
-                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
-                                                    ${formData.billingInterval === 'annual' ? '159' : '199'}
-                                                </span>
-                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
-                                            </div>
-                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
-                                                {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
-                                            </div>
-                                        </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Location:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.city}, {COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}</span>
                                     </div>
-
-                                    {/* Enterprise Plan */}
-                                    <div
-                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
-                                        style={{
-                                            padding: '16px 12px',
-                                            background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                            border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                            cursor: 'pointer',
-                                            borderRadius: '6px',
-                                            transition: 'all 0.25s ease',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            minHeight: '280px',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        <div>
-                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
-                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
-                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> Unlimited Jobs + AI Scans</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 500 HD generated / mo</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Featured 1st position rotation</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> White-Label Subdomain & BYOK AI</li>
-                                            </ul>
-                                        </div>
-                                        <div style={{ marginTop: '10px' }}>
-                                            <div>
-                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
-                                                    ${formData.billingInterval === 'annual' ? '399' : '499'}
-                                                </span>
-                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
-                                            </div>
-                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
-                                                {formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
-                                            </div>
-                                        </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Capabilities:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.productionTypes.join(', ')}</span>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Machinery:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.presses.map(p => `${p.name} (Qty: ${p.quantity})`).join('; ')}</span>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Plan Selection:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a', textTransform: 'capitalize' }}>{formData.selectedPlan} ({formData.billingInterval})</span>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Integration Level:</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.integrationLevel}</span>
                                     </div>
                                 </div>
 
@@ -1562,7 +1801,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-6" type="button" onClick={next}>
-                                            <span>Continue</span>
+                                            <span>Proceed to Administrator Setup</span>
                                             <ArrowRightIcon style={{ width: 16, height: 16 }} />
                                         </AuthButton>
                                     </div>
