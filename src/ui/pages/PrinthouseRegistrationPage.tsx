@@ -820,7 +820,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        padding: '36px',
+        padding: '48px 40px',
         boxShadow: isFocused 
             ? (dark ? '0 40px 80px rgba(0,0,0,0.8)' : '0 40px 80px rgba(0,0,0,0.2)')
             : (dark ? '0 32px 64px rgba(0,0,0,0.6)' : '0 32px 64px rgba(0,0,0,0.10)'),
@@ -1232,6 +1232,37 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     </p>
                                 </div>
 
+                                {/* Minimalist Data Flow Illustration */}
+                                <div style={{ 
+                                    marginTop: '8px', 
+                                    padding: '16px', 
+                                    background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', 
+                                    border: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, 
+                                    borderRadius: '8px', 
+                                    textAlign: 'center' 
+                                }}>
+                                    <span style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>
+                                        Real-time B2B Orchestration Pipeline
+                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                        <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`, borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>
+                                            Capability Node
+                                        </div>
+                                        <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
+                                            <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" strokeDasharray="3 3" />
+                                        </svg>
+                                        <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: '1px solid #dc0000', borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: '#dc0000' }}>
+                                            PrintPrice OS
+                                        </div>
+                                        <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
+                                            <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" />
+                                        </svg>
+                                        <div style={{ padding: '6px 10px', background: '#dc0000', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                                            JDF Router
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                                     <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
                                     <div style={{ flex: 1 }}>
@@ -1602,13 +1633,14 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             }}
                                         >
                                             <div>
-                                                <Sprout size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
+                                                <Sprout size={24} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
+                                                <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '12px 0' }} />
                                                 <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> 10 Jobs + 10 AI Scans</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 15 HD generated copies</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> Base BPE Form</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>10</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>10</code> AI Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>15</code> HD generated copies</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> Base BPE Form</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1648,14 +1680,15 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 Recommended
                                             </div>
                                             <div>
-                                                <TrendingUp size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
+                                                <TrendingUp size={24} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
+                                                <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '12px 0' }} />
                                                 <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Control Plane:</strong> Unlimited orders</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> 100 Jobs + 100 Scans</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 150 HD / mo</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1,000 Chat Credits</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Control Plane:</strong> Unlimited orders</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>100</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>100</code> Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>150</code> HD / mo</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>1,000</code> Chat Credits</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1690,14 +1723,15 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             }}
                                         >
                                             <div>
-                                                <Factory size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
+                                                <Factory size={24} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
+                                                <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '12px 0' }} />
                                                 <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 500 HD / mo</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1st position rotation</span></li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '10px' }}>500</code> HD / mo</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1st position rotation</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '4px', flexShrink: 0 }} /><span><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1770,7 +1804,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             Certifications
                                             <InfoTooltip text="Higher QA standards automatically unlock access to premium corporate buyers." />
                                         </label>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', marginBottom: '8px' }}>
                                             {B2B_CERTIFICATIONS.map(cert => {
                                                 const active = formData.certifications.includes(cert);
                                                 return (
@@ -1778,10 +1812,40 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                         key={cert}
                                                         type="button"
                                                         onClick={() => toggleCertification(cert)}
-                                                        style={badgeBtnStyle(active, dark)}
+                                                        style={{
+                                                            padding: '8px 12px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            borderRadius: '20px',
+                                                            border: active 
+                                                                ? '1px solid #dc0000' 
+                                                                : (dark ? '1px dashed rgba(255,255,255,0.15)' : '1px dashed rgba(0,0,0,0.15)'),
+                                                            background: active 
+                                                                ? (dark ? 'rgba(220,0,0,0.12)' : 'rgba(220,0,0,0.05)') 
+                                                                : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                            color: active ? '#dc0000' : (dark ? '#a1a1aa' : '#475569'),
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '6px',
+                                                            boxShadow: active 
+                                                                ? (dark ? '0 0 10px rgba(220,0,0,0.3)' : '0 0 10px rgba(220,0,0,0.1)') 
+                                                                : 'none',
+                                                            outline: 'none',
+                                                            fontFamily: "'Manrope', system-ui, sans-serif"
+                                                        }}
                                                     >
-                                                        {active && <ShieldCheck size={14} strokeWidth={1.5} style={{ marginRight: '4px', color: '#dc0000', display: 'inline-block', verticalAlign: 'middle' }} />}
-                                                        {cert}
+                                                        <ShieldCheck 
+                                                            size={14} 
+                                                            strokeWidth={1.5} 
+                                                            color={active ? '#dc0000' : (dark ? '#52525b' : '#94a3b8')} 
+                                                            fill={active ? '#dc0000' : 'none'} 
+                                                            fillOpacity={0.2} 
+                                                            style={{ flexShrink: 0 }} 
+                                                        />
+                                                        <span>{cert}</span>
                                                     </button>
                                                 );
                                             })}

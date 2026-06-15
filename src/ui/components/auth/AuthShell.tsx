@@ -156,7 +156,7 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        padding: '32px',
+        padding: '44px 36px',
         boxShadow: isFocused 
             ? (dark ? '0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 40px 80px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.9)')
             : (dark ? '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 32px 64px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)'),
