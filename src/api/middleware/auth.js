@@ -32,7 +32,7 @@ function isInternalControlToken(req) {
  * Primary Authentication Middleware.
  * Enforces JWT validation and populates req.user.
  */
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
     
     // Support bypass if already authenticated by Fastify hook
@@ -47,6 +47,15 @@ function requireAdmin(req, res, next) {
                     audience: JWT_AUDIENCE,
                     issuer: JWT_ISSUER
                 });
+                
+                const tenantGuard = require('../services/tenantGuard');
+                const db = require('../services/mysqlClient');
+                let features = {};
+                if (decoded.tenant_id) {
+                    const [tenant] = await db.query('SELECT plan, metadata_json FROM tenants WHERE id = ?', [decoded.tenant_id]).catch(() => []);
+                    if (tenant) features = tenantGuard.resolveFeatures(tenant);
+                }
+
                 req.user = {
                     id: decoded.sub,
                     email: decoded.email,
@@ -54,6 +63,7 @@ function requireAdmin(req, res, next) {
                     tenantId: decoded.tenant_id,
                     printhouseId: decoded.printhouse_id,
                     scopes: decoded.scopes || [],
+                    features: features,
                     authMode: 'JWT_TICKET',
                     issuedAt: decoded.iat,
                     expiresAt: decoded.exp
@@ -79,6 +89,13 @@ function requireAdmin(req, res, next) {
             email: 'admin@printprice.pro',
             role: 'SUPER_ADMIN',
             tenantId: 'ppos-production',
+            features: {
+                DASHBOARD_ACCESS: true,
+                API_ACCESS: true,
+                AUTO_ROUTING: true,
+                AI_MOCKUPS: true,
+                AI_CHAT: true
+            },
             authMode: 'BREAK_GLASS'
         };
         return next();
@@ -103,7 +120,14 @@ function requireAdmin(req, res, next) {
             email: 'preflight-worker@system.local',
             role: 'SYSTEM',
             appRole: 'SYSTEM',
-            tenantId: 'ppos-production-worker'
+            tenantId: 'ppos-production-worker',
+            features: {
+                DASHBOARD_ACCESS: true,
+                API_ACCESS: true,
+                AUTO_ROUTING: true,
+                AI_MOCKUPS: true,
+                AI_CHAT: true
+            }
         };
 
         console.log('[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED]', {
@@ -123,6 +147,15 @@ function requireAdmin(req, res, next) {
             issuer: JWT_ISSUER
         });
 
+        // Resolve Tenant features dynamically
+        const tenantGuard = require('../services/tenantGuard');
+        const db = require('../services/mysqlClient');
+        let features = {};
+        if (decoded.tenant_id) {
+            const [tenant] = await db.query('SELECT plan, metadata_json FROM tenants WHERE id = ?', [decoded.tenant_id]).catch(() => []);
+            if (tenant) features = tenantGuard.resolveFeatures(tenant);
+        }
+
         // 2. Map Industrial Identity
         req.user = {
             id: decoded.sub,
@@ -131,6 +164,7 @@ function requireAdmin(req, res, next) {
             tenantId: decoded.tenant_id,
             printhouseId: decoded.printhouse_id,
             scopes: decoded.scopes || [],
+            features: features,
             authMode: 'JWT',
             issuedAt: decoded.iat,
             expiresAt: decoded.exp
