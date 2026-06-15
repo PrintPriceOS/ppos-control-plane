@@ -19,19 +19,46 @@ class PrinthouseService {
             throw new Error('User with this email already exists');
         }
 
+        // Extract pricing and visibility details from B2B qualification metadata
+        const qualification = metadata?.qualification || {};
+        const selectedPlan = (qualification.selectedPlan || 'starter').toUpperCase(); // STARTER / GROWTH / ENTERPRISE
+        const billingInterval = qualification.billingInterval || 'monthly';
+
+        // Budgeter Visibility Priority: HIGH (enterprise), STANDARD (growth), LOW (trial/starter)
+        let budgeterPriority = 'LOW';
+        if (selectedPlan === 'ENTERPRISE') {
+            budgeterPriority = 'HIGH';
+        } else if (selectedPlan === 'GROWTH') {
+            budgeterPriority = 'STANDARD';
+        }
+
+        // AI Credits Allocation: STARTER (Trial): 10, GROWTH: 100, ENTERPRISE: unlimited (null)
+        let aiCreditsAllocation = 10;
+        if (selectedPlan === 'GROWTH') {
+            aiCreditsAllocation = 100;
+        } else if (selectedPlan === 'ENTERPRISE') {
+            aiCreditsAllocation = null; // Unlimited
+        }
+
+        // Inject computed properties into metadata JSON
+        if (metadata) {
+            metadata.ai_credits_allocation = aiCreditsAllocation;
+            metadata.budgeter_priority = budgeterPriority;
+        }
+
         const connection = await db.getConnection();
         await connection.beginTransaction();
 
         try {
-            // 2. Create Tenant (Printhouse Mode)
+            // 2. Create Tenant (Printhouse Mode) - store selectedPlan in the 'plan' column
             const tenantId = `ph-${uuidv4().substring(0, 8)}`;
             const metadataStr = metadata ? JSON.stringify(metadata) : null;
             await connection.query(
                 'INSERT INTO tenants (id, name, type, status, plan, metadata_json) VALUES (?, ?, ?, ?, ?, ?)',
-                [tenantId, companyName, 'PRINTHOUSE', 'ACTIVE', 'FREE', metadataStr]
+                [tenantId, companyName, 'PRINTHOUSE', 'ACTIVE', selectedPlan, metadataStr]
             );
 
-            // 3. Create Printer Node (Node Record)
+            // 3. Create Printer Node (Node Record) with budgeter_priority (stored in metadata or column if exists; assuming metadata first or fallback)
             // Initial status: pending_review (Marketplace locked)
             const printhouseId = `node-${uuidv4().substring(0, 8)}`;
             await connection.query(
@@ -45,15 +72,18 @@ class PrinthouseService {
             await connection.query(
                 `INSERT INTO printhouse_capabilities (printhouse_id, tenant_id, supported_countries)
                  VALUES (?, ?, ?)`,
-                [printhouseId, tenantId, JSON.stringify([country || 'ES'])]
+                 [printhouseId, tenantId, JSON.stringify([country || 'ES'])]
             );
 
-            // 5. Create Trial License (30 days)
-            const licenseKey = `TRIAL-${uuidv4().substring(0, 12).toUpperCase()}`;
+            // 5. Create Trial License (expires in 14 days for STARTER, otherwise 30 days / custom cycle)
+            // SubscriptionGuard Check in Dashboard:
+            // TODO: If tenant.plan === 'STARTER' and NOW() > license.expires_at, block access and trigger the Stripe upgrade modal.
+            const trialDays = selectedPlan === 'STARTER' ? 14 : 30;
+            const licenseKey = `${selectedPlan}-${uuidv4().substring(0, 12).toUpperCase()}`;
             await connection.query(
                 `INSERT INTO licenses (tenant_id, printhouse_id, license_key, status, expires_at)
-                 VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
-                [tenantId, printhouseId, licenseKey, 'trial']
+                 VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
+                [tenantId, printhouseId, licenseKey, 'trial', trialDays]
             );
 
             // 6. Create Admin User

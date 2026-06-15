@@ -1452,8 +1452,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
                                             <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
                                             <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Up to 50 automated orders</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> 10 AI Scans included</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 10 Jobs + 10 AI Scans</li>
                                                 <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 15 HD generated copies</li>
                                                 <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Base BPE Form (AI Chat disabled)</li>
                                             </ul>
@@ -1461,7 +1460,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         <div style={{ marginTop: '10px' }}>
                                             <div>
                                                 <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
-                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}> / for 14 days</span>
+                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}> / 14 days</span>
                                             </div>
                                             <p style={{ margin: '4px 0 0', fontSize: '8px', color: dark ? '#71717a' : '#64748b', fontStyle: 'italic', lineHeight: '1.1' }}>
                                                 Requires plan selection after 14 days to maintain node activity.
@@ -1498,10 +1497,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
                                             <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
                                             <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders & dispatch</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> 100 AI Scans / mo</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 100 Jobs + 100 AI Scans</li>
                                                 <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 150 HD generated / mo</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> +1,000 AI Sales Chat Credits / mo</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> 1,000 AI Sales Chat Credits</li>
                                             </ul>
                                         </div>
                                         <div style={{ marginTop: '10px' }}>
@@ -1539,10 +1538,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
                                             <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
                                             <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> JDF/JMF Direct Routing to DFE</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> Unlimited AI Scans</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> Full White-Labeling (Custom Domains)</li>
-                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>AI Limits:</strong> BYOK (Bring Your Own Key) for unlimited AI</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> Unlimited Jobs + AI Scans</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 500 HD generated / mo</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Featured 1st position rotation</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> White-Label Subdomain & BYOK AI</li>
                                             </ul>
                                         </div>
                                         <div style={{ marginTop: '10px' }}>
