@@ -65,9 +65,9 @@ export const LoginPage: React.FC = () => {
     const validate = (): boolean => {
         const errors: typeof fieldError = {};
         const cleanEmail = email.trim().toLowerCase();
-        if (!cleanEmail) errors.email = 'El email es obligatorio';
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.email = 'Formato de email inválido';
-        if (!password) errors.password = 'La contraseña es obligatoria';
+        if (!cleanEmail) errors.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.email = 'Invalid email format';
+        if (!password) errors.password = 'Password is required';
         setFieldErr(errors);
         return Object.keys(errors).length === 0;
     };
@@ -92,26 +92,26 @@ export const LoginPage: React.FC = () => {
             const data = await response.json().catch(() => ({}));
 
             if (response.status === 401) {
-                addToast('error', 'Credenciales inválidas', 'Verifica tu email y contraseña e inténtalo de nuevo.');
+                addToast('error', 'Invalid credentials', 'Please check your email and password and try again.');
                 return;
             }
             if (!response.ok) {
-                addToast('error', 'Error de autenticación', data?.error || `Error del servidor (${response.status}). Inténtalo de nuevo.`);
+                addToast('error', 'Authentication error', data?.error || `Server error (${response.status}). Please try again.`);
                 return;
             }
 
             if (!data.token || !data.user) {
-                addToast('error', 'Respuesta inesperada', 'El servidor no devolvió un token válido.');
+                addToast('error', 'Unexpected response', 'The server did not return a valid session.');
                 return;
             }
 
             setAuthToken(data.token);
             setAuthUser(data.user);
 
-            addToast('success', '¡Acceso autorizado!', 'Redirigiendo al panel de control…');
+            addToast('success', 'Access authorized!', 'Redirecting to control panel…');
             setTimeout(() => navigate(redirectTo, { replace: true }), 800);
         } catch (err: any) {
-            addToast('error', 'Error de conexión', 'No se puede alcanzar el servidor. Comprueba tu conexión.');
+            addToast('error', 'Connection error', 'Cannot reach the server. Please check your internet connection.');
         } finally {
             setLoading(false);
         }
@@ -131,14 +131,14 @@ export const LoginPage: React.FC = () => {
                             color: dark ? '#f4f4f5' : '#0f172a',
                             fontFamily: "'Manrope', system-ui, sans-serif",
                         }}>
-                            Autenticación Requerida
+                            Authentication Required
                         </h2>
                     </div>
                     <p style={{
                         margin: 0, fontSize: '13px', color: dark ? '#71717a' : '#64748b',
                         fontFamily: "'Manrope', system-ui, sans-serif",
                     }}>
-                        Accede al panel usando tus credenciales de operador.
+                        Log in using your operator credentials.
                     </p>
                 </div>
 
@@ -160,7 +160,7 @@ export const LoginPage: React.FC = () => {
 
                     <AuthInput
                         id="login-password"
-                        label="Contraseña"
+                        label="Password"
                         type={showPw ? 'text' : 'password'}
                         autoComplete="current-password"
                         placeholder="••••••••••••"
@@ -174,7 +174,7 @@ export const LoginPage: React.FC = () => {
                                 type="button"
                                 onClick={() => setShowPw((v) => !v)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }}
-                                aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                aria-label={showPw ? 'Hide password' : 'Show password'}
                             >
                                 {showPw
                                     ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
@@ -193,7 +193,7 @@ export const LoginPage: React.FC = () => {
                                 textDecoration: 'none', fontFamily: "'Manrope', system-ui, sans-serif",
                             }}
                         >
-                            ¿Olvidaste tu contraseña?
+                            Forgot your password?
                         </Link>
                     </div>
 
@@ -205,7 +205,7 @@ export const LoginPage: React.FC = () => {
                         accentColor="#dc0000"
                         style={{ marginTop: '8px' }}
                     >
-                        <span>Autorizar Acceso</span>
+                        <span>Authorize Access</span>
                         <ArrowRightIcon style={{ width: 16, height: 16 }} />
                     </AuthButton>
                 </form>
@@ -217,7 +217,7 @@ export const LoginPage: React.FC = () => {
                 }}>
                     <div style={{ flex: 1, height: 1, background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Manrope', system-ui, sans-serif" }}>
-                        Acceso Restringido
+                        Restricted Access
                     </span>
                     <div style={{ flex: 1, height: 1, background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />
                 </div>
@@ -227,7 +227,7 @@ export const LoginPage: React.FC = () => {
                     fontFamily: "'Manrope', system-ui, sans-serif",
                     margin: '10px 0 0',
                 }}>
-                    Solo para operadores autorizados del sistema
+                    Authorized operators only
                 </p>
             </AuthShell>
 

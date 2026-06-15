@@ -203,7 +203,7 @@ export const AuthShell: React.FC<AuthShellProps> = ({
                     PrintPrice OS v1.9.0 © {new Date().getFullYear()}
                     {' · '}
                     <a href="/printhouse/register" style={{ color: '#dc0000', textDecoration: 'none' }}>
-                        ¿Nueva imprenta? Regístrate
+                        New print house? Register
                     </a>
                 </p>
             </div>
@@ -340,7 +340,7 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
                     borderRadius: '50%',
                     animation: 'ppos-auth-spin 0.7s linear infinite',
                 }} />
-                <span>Procesando…</span>
+                <span>Processing…</span>
             </>
         ) : children}
     </button>

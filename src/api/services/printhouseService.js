@@ -12,7 +12,7 @@ class PrinthouseService {
      * Register a new Printhouse along with its tenant and admin user.
      * Endures "Fail-Loud" behavior and Atomic creation.
      */
-    async selfRegister({ companyName, contactName, email, password, country, city, phone, website }) {
+    async selfRegister({ companyName, contactName, email, password, country, city, phone, website, metadata }) {
         // 1. Validate if user exists
         const existingUser = await userService.findByEmail(email);
         if (existingUser) {
@@ -25,9 +25,10 @@ class PrinthouseService {
         try {
             // 2. Create Tenant (Printhouse Mode)
             const tenantId = `ph-${uuidv4().substring(0, 8)}`;
+            const metadataStr = metadata ? JSON.stringify(metadata) : null;
             await connection.query(
-                'INSERT INTO tenants (id, name, type, status, plan) VALUES (?, ?, ?, ?, ?)',
-                [tenantId, companyName, 'PRINTHOUSE', 'ACTIVE', 'FREE']
+                'INSERT INTO tenants (id, name, type, status, plan, metadata_json) VALUES (?, ?, ?, ?, ?, ?)',
+                [tenantId, companyName, 'PRINTHOUSE', 'ACTIVE', 'FREE', metadataStr]
             );
 
             // 3. Create Printer Node (Node Record)
@@ -63,6 +64,45 @@ class PrinthouseService {
                 password, 
                 printhouseId
             );
+
+            // 7. Auto-Seed Machinery from B2B Stepper templates if present
+            if (metadata && metadata.qualification && Array.isArray(metadata.qualification.presses)) {
+                try {
+                    const printhouseCapabilityService = require('./printhouseCapabilityService');
+                    const { MACHINE_TEMPLATES } = require('../routes/printhouseCapabilities');
+                    
+                    const actorContext = { tenantId, userId: user.id, role: 'PRINTHOUSE_ADMIN' };
+                    
+                    for (const selection of metadata.qualification.presses) {
+                        const template = MACHINE_TEMPLATES.find(t => t.id === selection.templateId);
+                        if (template) {
+                            const quantity = parseInt(selection.quantity, 10) || 1;
+                            for (let i = 1; i <= quantity; i++) {
+                                await printhouseCapabilityService.createMachine(printhouseId, {
+                                    machine_name: `${template.manufacturer} ${template.model} #${i}`,
+                                    machine_type: `${template.machine_type}_PRESS`,
+                                    manufacturer: template.manufacturer,
+                                    model: template.model,
+                                    status: 'ACTIVE',
+                                    max_sheet_width_mm: template.max_sheet_width_mm,
+                                    max_sheet_height_mm: template.max_sheet_height_mm,
+                                    min_sheet_width_mm: template.min_sheet_width_mm,
+                                    min_sheet_height_mm: template.min_sheet_height_mm,
+                                    max_print_width_mm: template.max_print_width_mm,
+                                    max_print_height_mm: template.max_print_height_mm,
+                                    max_tac_percent: template.max_tac_percent,
+                                    supports_pdfx: template.supports_pdfx,
+                                    supports_spot_uv: template.supports_spot_uv,
+                                    supports_white_ink: template.supports_white_ink,
+                                    metadata_json: { seeded_from_template: template.id }
+                                }, actorContext);
+                            }
+                        }
+                    }
+                } catch (seedErr) {
+                    console.error('[PRINTHOUSE-AUTO-SEED-ERR]', seedErr);
+                }
+            }
 
             await connection.commit();
 

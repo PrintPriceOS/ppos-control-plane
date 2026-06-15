@@ -86,12 +86,12 @@ const PRICING_TIERS: PricingTier[] = [
     planId: 'plan_starter',
     label: 'Starter',
     price: '€0',
-    period: '/mes',
-    description: 'Ideal para empezar',
+    period: '/month',
+    description: 'Ideal to start with',
     features: [
-      'Preflight básico',
-      'Hasta 500 trabajos/mes',
-      'Soporte por email',
+      'Basic preflight',
+      'Up to 500 jobs/month',
+      'Email support',
     ],
     highlighted: false,
   },
@@ -99,15 +99,15 @@ const PRICING_TIERS: PricingTier[] = [
     planId: 'plan_growth',
     label: 'Growth',
     price: '€149',
-    period: '/mes',
-    description: 'Para imprentas en crecimiento',
+    period: '/month',
+    description: 'For growing print houses',
     features: [
-      'Todo en Starter',
-      'Observability avanzada',
-      'Inteligencia de precios',
-      'Branding personalizado',
-      'Analíticas avanzadas',
-      'Hasta 5.000 trabajos/mes',
+      'Everything in Starter',
+      'Advanced observability',
+      'Pricing intelligence',
+      'Custom branding',
+      'Advanced analytics',
+      'Up to 5,000 jobs/month',
     ],
     highlighted: true,
   },
@@ -115,28 +115,28 @@ const PRICING_TIERS: PricingTier[] = [
     planId: 'plan_enterprise',
     label: 'Enterprise',
     price: '€499',
-    period: '/mes',
-    description: 'Para operaciones industriales',
+    period: '/month',
+    description: 'For industrial operations',
     features: [
-      'Todo en Growth',
-      'Federación multi-nodo',
-      'Automatización IA',
-      'Soporte prioritario 24/7',
-      'Trabajos ilimitados',
-      'SLA garantizado',
+      'Everything in Growth',
+      'Multi-node federation',
+      'AI automation',
+      '24/7 priority support',
+      'Unlimited jobs',
+      'Guaranteed SLA',
     ],
     highlighted: false,
   },
 ];
 
 const FEATURE_LABELS: Record<SubscriptionFeature, string> = {
-  observability:         'Observability Avanzada',
-  custom_branding:       'Branding Personalizado',
-  pricing_intelligence:  'Inteligencia de Precios',
-  federation:            'Federación Multi-Nodo',
-  automation:            'Automatización IA',
-  advanced_analytics:    'Analíticas Avanzadas',
-  priority_support:      'Soporte Prioritario',
+  observability:         'Advanced Observability',
+  custom_branding:       'Custom Branding',
+  pricing_intelligence:  'Pricing Intelligence',
+  federation:            'Multi-Node Federation',
+  automation:            'AI Automation',
+  advanced_analytics:    'Advanced Analytics',
+  priority_support:      'Priority Support',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,11 +199,11 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ feature, uiTokens, currentP
       const msg = err?.message || '';
       if (msg === 'NO_STRIPE_KEY' || msg === 'STRIPE_LOAD_FAILED') {
         setUpgradeError(
-          'El servicio de pago no está disponible en este momento. Por favor contacta a support@printprice.pro'
+          'Payment service is not available at this moment. Please contact support@printprice.pro'
         );
       } else {
         setUpgradeError(
-          `Error al iniciar el pago: ${msg}. Inténtalo de nuevo o contacta soporte.`
+          `Error starting payment: ${msg}. Try again or contact support.`
         );
       }
     } finally {
@@ -236,10 +236,10 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ feature, uiTokens, currentP
             </svg>
           </div>
           <div>
-            <h2 style={styles.title}>Función Premium Requerida</h2>
+            <h2 style={styles.title}>Premium Feature Required</h2>
             <p style={styles.subtitle}>
               <strong style={{ color: accentColor }}>{FEATURE_LABELS[feature]}</strong>
-              {' '}no está incluida en tu plan actual (<em>{currentPlan}</em>).
+              {' '}is not included in your current plan (<em>{currentPlan}</em>).
             </p>
           </div>
         </div>
@@ -272,7 +272,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ feature, uiTokens, currentP
               >
                 {isHighlighted && (
                   <div style={{ ...styles.popularBadge, backgroundColor: accentColor }}>
-                    ★ Más Popular
+                    ★ Most Popular
                   </div>
                 )}
 
@@ -313,12 +313,12 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ feature, uiTokens, currentP
                   {isLoading ? (
                     <span style={styles.btnInner}>
                       <span style={styles.spinner} />
-                      Redirigiendo…
+                      Redirecting…
                     </span>
                   ) : isCurrentPlan ? (
-                    'Plan Actual'
+                    'Current Plan'
                   ) : (
-                    `Actualizar a ${tier.label}`
+                    `Upgrade to ${tier.label}`
                   )}
                 </button>
               </div>
@@ -328,9 +328,9 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ feature, uiTokens, currentP
 
         {/* Footer note */}
         <p style={styles.footerNote}>
-          Todos los planes incluyen facturación segura mediante Stripe. Cancela en cualquier momento.
+          All plans include secure billing with Stripe. Cancel at any time.
           <br />
-          ¿Preguntas? <a href="mailto:support@printprice.pro" style={{ color: accentColor }}>support@printprice.pro</a>
+          Questions? <a href="mailto:support@printprice.pro" style={{ color: accentColor }}>support@printprice.pro</a>
         </p>
       </div>
     </div>
@@ -348,8 +348,8 @@ const ReadOnlyBanner: React.FC = () => (
       <circle cx="12" cy="12" r="3"/>
     </svg>
     <span>
-      <strong>Modo solo lectura</strong> — No se pudo verificar tu suscripción.
-      Las acciones están deshabilitadas temporalmente. <a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>Recargar sesión</a>
+      <strong>Read-only mode</strong> — Could not verify subscription.
+      Actions are temporarily disabled. <a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>Reload session</a>
     </span>
   </div>
 );
