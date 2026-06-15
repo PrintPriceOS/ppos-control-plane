@@ -1614,101 +1614,101 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
                                     {/* Plan Cards */}
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                                        {/* Starter Plan (14-DAY FREE TRIAL) */}
-                                        <div
-                                            onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
-                                            style={{
-                                                padding: '20px 16px',
-                                                background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                cursor: 'pointer',
-                                                borderRadius: '6px',
-                                                transition: 'all 0.25s ease',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                minHeight: '340px',
-                                                textAlign: 'center',
-                                            }}
-                                        >
-                                            <div>
-                                                <Sprout size={28} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '10px' }} />
-                                                <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
-                                                <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.3' }}>"Full platform evaluation grace period."</p>
-                                                <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
-                                                <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>10</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>10</code> AI Scans</span></li>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>15</code> HD generated copies</span></li>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> Base BPE Form</span></li>
-                                                </ul>
-                                            </div>
-                                            <div style={{ marginTop: '14px' }}>
-                                                <div>
-                                                    <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
-                                                    <span style={{ fontSize: '12px', color: dark ? '#71717a' : '#64748b' }}> / 14 days</span>
-                                                </div>
-                                                <p style={{ margin: '6px 0 0', fontSize: '10px', color: dark ? '#71717a' : '#64748b', fontStyle: 'italic', lineHeight: '1.2' }}>
-                                                    Requires plan selection after 14 days to maintain node activity.
-                                                </p>
-                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
-                                                    {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
-                                                </div>
-                                            </div>
-                                        </div>
+                                         {/* Starter Plan (14-DAY FREE TRIAL) */}
+                                         <div
+                                             onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
+                                             style={{
+                                                 padding: '24px 16px',
+                                                 background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                 border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                 cursor: 'pointer',
+                                                 borderRadius: '6px',
+                                                 transition: 'all 0.25s ease',
+                                                 display: 'flex',
+                                                 flexDirection: 'column',
+                                                 alignItems: 'center',
+                                                 justifyContent: 'space-between',
+                                                 minHeight: '380px',
+                                                 textAlign: 'center',
+                                             }}
+                                         >
+                                             <div style={{ width: '100%' }}>
+                                                 <Sprout size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
+                                                 <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
+                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Full platform evaluation grace period."</p>
+                                                 <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
+                                                 <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> AI Scans</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>15</code> HD generated copies</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> Base BPE Form</span></li>
+                                                 </ul>
+                                             </div>
+                                             <div style={{ marginTop: '14px' }}>
+                                                 <div>
+                                                     <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
+                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}> / 14 days</span>
+                                                 </div>
+                                                 <p style={{ margin: '6px 0 0', fontSize: '10px', color: dark ? '#a1a1aa' : '#000000', fontStyle: 'italic', lineHeight: '1.2' }}>
+                                                     Requires plan selection after 14 days to maintain node activity.
+                                                 </p>
+                                                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
+                                                     {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
+                                                 </div>
+                                             </div>
+                                         </div>
 
-                                        {/* Growth Plan */}
-                                        <div
-                                            onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
-                                            style={{
-                                                padding: '20px 16px',
-                                                background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                cursor: 'pointer',
-                                                borderRadius: '6px',
-                                                transition: 'all 0.25s ease',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                minHeight: '340px',
-                                                textAlign: 'center',
-                                                position: 'relative',
-                                            }}
-                                        >
-                                            <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '10px', fontWeight: 900, padding: '2px 10px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
-                                                Recommended
-                                            </div>
-                                            <div>
-                                                <TrendingUp size={28} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '10px' }} />
-                                                <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
-                                                <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.3' }}>"Automated sales & workflow scaling."</p>
-                                                <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
-                                                <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Control Plane:</strong> Unlimited orders</span></li>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>100</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>100</code> Scans</span></li>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>150</code> HD / mo</span></li>
-                                                    <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>1,000</code> Chat Credits</span></li>
-                                                </ul>
-                                            </div>
-                                            <div style={{ marginTop: '14px' }}>
-                                                <div>
-                                                    <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
-                                                        ${formData.billingInterval === 'annual' ? '159' : '199'}
-                                                    </span>
-                                                    <span style={{ fontSize: '12px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
-                                                </div>
-                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
-                                                    {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
-                                                </div>
-                                            </div>
-                                        </div>
+                                         {/* Growth Plan */}
+                                         <div
+                                             onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
+                                             style={{
+                                                 padding: '24px 16px',
+                                                 background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                 border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                 cursor: 'pointer',
+                                                 borderRadius: '6px',
+                                                 transition: 'all 0.25s ease',
+                                                 display: 'flex',
+                                                 flexDirection: 'column',
+                                                 alignItems: 'center',
+                                                 justifyContent: 'space-between',
+                                                 minHeight: '380px',
+                                                 textAlign: 'center',
+                                                 position: 'relative',
+                                             }}
+                                         >
+                                             <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '10px', fontWeight: 900, padding: '2px 10px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
+                                                 Recommended
+                                             </div>
+                                             <div style={{ width: '100%' }}>
+                                                 <TrendingUp size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
+                                                 <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
+                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Automated sales & workflow scaling."</p>
+                                                 <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
+                                                 <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Control Plane:</strong> Unlimited orders</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Scans</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>150</code> HD / mo</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>1,000</code> Chat Credits</span></li>
+                                                 </ul>
+                                             </div>
+                                             <div style={{ marginTop: '14px' }}>
+                                                 <div>
+                                                     <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                         ${formData.billingInterval === 'annual' ? '159' : '199'}
+                                                     </span>
+                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
+                                                 </div>
+                                                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
+                                                     {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
+                                                 </div>
+                                             </div>
+                                         </div>
 
                                          {/* Enterprise Plan */}
                                          <div
                                              onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
                                              style={{
-                                                 padding: '20px 16px',
+                                                 padding: '24px 16px',
                                                  background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
                                                  border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
                                                  cursor: 'pointer',
@@ -1718,20 +1718,20 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                  flexDirection: 'column',
                                                  alignItems: 'center',
                                                  justifyContent: 'space-between',
-                                                 minHeight: '340px',
+                                                 minHeight: '380px',
                                                  textAlign: 'center',
                                              }}
                                          >
-                                             <div>
-                                                 <Factory size={28} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginBottom: '10px' }} />
+                                             <div style={{ width: '100%' }}>
+                                                 <Factory size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
                                                  <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
-                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.3' }}>"Industrial scale & White-Label deployment."</p>
+                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Industrial scale & White-Label deployment."</p>
                                                  <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
                                                  <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>500</code> HD / mo</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1st position rotation</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#a1a1aa' : '#475569', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>500</code> HD / mo</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> 1st position rotation</span></li>
+                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
                                                  </ul>
                                              </div>
                                              <div style={{ marginTop: '14px' }}>
@@ -1739,7 +1739,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                      <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
                                                          ${formData.billingInterval === 'annual' ? '399' : '499'}
                                                      </span>
-                                                     <span style={{ fontSize: '12px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
+                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
                                                  </div>
                                                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
                                                      ${formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
@@ -1749,7 +1749,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                      </div>
                                  </div>
 
-                                {/* Part B: Compliance & Integration */}
+{/* Part B: Compliance & Integration */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, paddingTop: '20px' }}>
                                     <div>
                                         <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
