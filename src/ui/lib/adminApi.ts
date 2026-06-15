@@ -113,7 +113,20 @@ function getFallbackForPath(path: string): any {
         base.profiles = [];
         base.readiness = { eligible: false, blockers: [] };
         base.audit = [];
+        // Subscription endpoint fallback — default to starter plan so SubscriptionGuard degrades gracefully
+        if (cleanPath.includes('/subscription')) {
+            base.subscription = { plan_type: 'starter', billing_status: 'active', features: [], ui_tokens: {} };
+        }
         base.source_status = "PRINTHOUSE_CAPABILITIES_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/billing')) {
+        // Billing endpoints: safe defaults so PaywallModal can show a support message instead of crashing
+        base.ok = false;
+        base.sessionId = null;
+        base.url = null;
+        base.subscription = { plan_type: 'starter', billing_status: 'active', features: [], ui_tokens: {} };
+        base.source_status = "BILLING_UNAVAILABLE";
         return base;
     }
     

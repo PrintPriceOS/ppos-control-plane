@@ -262,6 +262,21 @@ const start = async () => {
         
         // 3. Mount Centralized Express Middleware & Routes
         try {
+            // ─── CRITICAL: Stripe Webhook must receive the RAW body buffer ───────────
+            // express.json() parses the body into a JS object; once consumed, the raw
+            // bytes are gone and stripe.webhooks.constructEvent() WILL THROW 'No signatures
+            // found matching the expected signature for payload'.
+            //
+            // Solution: mount the webhook path with express.raw() BEFORE express.json()
+            // so Stripe's signature verification gets the untouched Buffer.
+            //
+            // This must be registered BEFORE fastify.use(express.json()) below.
+            // ─────────────────────────────────────────────────────────────────────────
+            fastify.use(
+                '/api/admin/billing/webhook',
+                require('express').raw({ type: 'application/json', limit: '2mb' })
+            );
+
             fastify.use(require('express').json());
             fastify.use(require('express').urlencoded({ extended: true }));
             

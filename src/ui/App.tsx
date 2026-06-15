@@ -75,6 +75,7 @@ import { GlobalConflicts } from './pages/global/GlobalConflicts';
 import { AdminHelpPage } from './pages/admin-help/AdminHelpPage';
 import { GlobalSettingsPage } from './pages/os/GlobalSettingsPage';
 import { LoginPage } from './pages/LoginPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
 import { PrinthouseOnboardingPage } from './pages/printhouse/PrinthouseOnboardingPage';
 import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
@@ -94,6 +95,8 @@ export const App: React.FC = () => {
             <Route path="/legacy-dashboard" element={<Navigate to="/dashboard" replace />} />
 
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ForgotPasswordPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
             

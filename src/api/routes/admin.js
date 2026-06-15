@@ -176,6 +176,7 @@ const adminTenantGovernanceRouter = require('./adminTenantGovernance');
 const adminTenantPilotRouter = require('./adminTenantPilot');
 const adminTenantBillingRouter = require('./adminTenantBilling');
 const adminProductionMonitoringRouter = require('./adminProductionMonitoring');
+const adminBillingRouter = require('./adminBilling');
 
 // Financial Operations Routers
 const adminFinancialOperationsComplianceReporting = require('./adminFinancialOperationsComplianceReporting');
@@ -217,6 +218,7 @@ router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffR
 router.use('/tenant-governance', adminTenantGovernanceRouter);
 router.use('/tenant-pilots', adminTenantPilotRouter);
 router.use('/tenant-billing', adminTenantBillingRouter);
+router.use('/billing', adminBillingRouter);           // Stripe Paywall Billing
 router.use('/production-monitoring', adminProductionMonitoringRouter);
 
 // Mount Financial Operations Sub-routers
