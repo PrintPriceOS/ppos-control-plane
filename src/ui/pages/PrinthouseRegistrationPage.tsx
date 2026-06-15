@@ -526,11 +526,19 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     const dark = isDark();
 
     const cardRef = useRef<HTMLDivElement>(null);
+    const [isFocused, setIsFocused] = useState(false);
     const [tiltStyle, setTiltStyle] = useState<CSSProperties>({
         transition: 'transform 0.2s ease-out'
     });
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isFocused) {
+            setTiltStyle({
+                transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+                transition: 'transform 0.2s ease-out'
+            });
+            return;
+        }
         const cardEl = cardRef.current;
         if (!cardEl) return;
         const rect = cardEl.getBoundingClientRect();
@@ -840,6 +848,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         boxShadow: dark
             ? '0 32px 64px rgba(0,0,0,0.6)'
             : '0 32px 64px rgba(0,0,0,0.10)',
+        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'subpixel-antialiased',
+        transformStyle: 'flat',
     };
 
     const stepDot = (n: number): CSSProperties => ({
@@ -936,7 +948,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     </div>
 
                     {/* Stepper Card */}
-                    <div style={{ perspective: '1000px', position: 'relative', zIndex: 1 }}>
+                    <div style={{ perspective: '1000px', position: 'relative', zIndex: 1 }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
                         <div 
                             ref={cardRef}
                             onMouseMove={handleMouseMove}

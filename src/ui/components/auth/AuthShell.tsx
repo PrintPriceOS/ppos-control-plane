@@ -162,14 +162,26 @@ export const AuthShell: React.FC<AuthShellProps> = ({
             : '0 32px 64px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
         // Note: border-radius is forced to 0 by global CSS — we override with style here
         borderRadius: '0px',
+        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'subpixel-antialiased',
+        transformStyle: 'flat',
     };
 
     const cardRef = React.useRef<HTMLDivElement>(null);
+    const [isFocused, setIsFocused] = React.useState(false);
     const [tiltStyle, setTiltStyle] = React.useState<CSSProperties>({
         transition: 'transform 0.2s ease-out'
     });
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isFocused) {
+            setTiltStyle({
+                transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+                transition: 'transform 0.2s ease-out'
+            });
+            return;
+        }
         const cardEl = cardRef.current;
         if (!cardEl) return;
         const rect = cardEl.getBoundingClientRect();
@@ -231,7 +243,7 @@ export const AuthShell: React.FC<AuthShellProps> = ({
                 </div>
 
                 {/* Glass Card */}
-                <div style={{ perspective: '1000px' }}>
+                <div style={{ perspective: '1000px' }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
                     <div 
                         ref={cardRef}
                         onMouseMove={handleMouseMove}
@@ -276,16 +288,18 @@ export const AuthInput: React.FC<AuthInputProps> = ({ label, icon: Icon, error, 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={{
-                fontSize: '10px', fontWeight: 800,
-                color: dark ? '#52525b' : '#94a3b8',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: dark ? '#ffffff' : '#000000',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
                 fontFamily: "'Manrope', system-ui, sans-serif",
             }}>
                 {label}
             </label>
             <div style={{ position: 'relative' }}>
                 <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                    <Icon style={{ width: 16, height: 16, color: dark ? '#52525b' : '#94a3b8' }} />
+                    <Icon style={{ width: 16, height: 16, color: dark ? '#a1a1aa' : '#475569' }} />
                 </div>
                 <input
                     {...props}
@@ -300,8 +314,8 @@ export const AuthInput: React.FC<AuthInputProps> = ({ label, icon: Icon, error, 
                             ? 'rgba(239,68,68,0.5)'
                             : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'
                         }`,
-                        color: dark ? '#f4f4f5' : '#0f172a',
-                        fontSize: '14px',
+                        color: dark ? '#ffffff' : '#000000',
+                        fontSize: '15px',
                         fontWeight: 500,
                         outline: 'none',
                         transition: 'border-color 0.15s ease',
