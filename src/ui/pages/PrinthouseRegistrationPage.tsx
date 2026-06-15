@@ -59,19 +59,255 @@ function checkPasswordStrength(pw: string): StrengthResult {
 }
 
 const COUNTRIES = [
-    { code: 'US', label: 'United States' },
-    { code: 'ES', label: 'Spain' },
-    { code: 'MX', label: 'Mexico' },
+    { code: 'AF', label: 'Afghanistan' },
+    { code: 'AX', label: 'Åland Islands' },
+    { code: 'AL', label: 'Albania' },
+    { code: 'DZ', label: 'Algeria' },
+    { code: 'AS', label: 'American Samoa' },
+    { code: 'AD', label: 'Andorra' },
+    { code: 'AO', label: 'Angola' },
+    { code: 'AI', label: 'Anguilla' },
+    { code: 'AQ', label: 'Antarctica' },
+    { code: 'AG', label: 'Antigua and Barbuda' },
     { code: 'AR', label: 'Argentina' },
-    { code: 'CO', label: 'Colombia' },
+    { code: 'AM', label: 'Armenia' },
+    { code: 'AW', label: 'Aruba' },
+    { code: 'AU', label: 'Australia' },
+    { code: 'AT', label: 'Austria' },
+    { code: 'AZ', label: 'Azerbaijan' },
+    { code: 'BS', label: 'Bahamas' },
+    { code: 'BH', label: 'Bahrain' },
+    { code: 'BD', label: 'Bangladesh' },
+    { code: 'BB', label: 'Barbados' },
+    { code: 'BY', label: 'Belarus' },
+    { code: 'BE', label: 'Belgium' },
+    { code: 'BZ', label: 'Belize' },
+    { code: 'BJ', label: 'Benin' },
+    { code: 'BM', label: 'Bermuda' },
+    { code: 'BT', label: 'Bhutan' },
+    { code: 'BO', label: 'Bolivia' },
+    { code: 'BQ', label: 'Bonaire, Sint Eustatius and Saba' },
+    { code: 'BA', label: 'Bosnia and Herzegovina' },
+    { code: 'BW', label: 'Botswana' },
+    { code: 'BV', label: 'Bouvet Island' },
+    { code: 'BR', label: 'Brazil' },
+    { code: 'IO', label: 'British Indian Ocean Territory' },
+    { code: 'BN', label: 'Brunei Darussalam' },
+    { code: 'BG', label: 'Bulgaria' },
+    { code: 'BF', label: 'Burkina Faso' },
+    { code: 'BI', label: 'Burundi' },
+    { code: 'CV', label: 'Cabo Verde' },
+    { code: 'KH', label: 'Cambodia' },
+    { code: 'CM', label: 'Cameroon' },
+    { code: 'CA', label: 'Canada' },
+    { code: 'KY', label: 'Cayman Islands' },
+    { code: 'CF', label: 'Central African Republic' },
+    { code: 'TD', label: 'Chad' },
     { code: 'CL', label: 'Chile' },
-    { code: 'PE', label: 'Peru' },
-    { code: 'DE', label: 'Germany' },
+    { code: 'CN', label: 'China' },
+    { code: 'CX', label: 'Christmas Island' },
+    { code: 'CC', label: 'Cocos (Keeling) Islands' },
+    { code: 'CO', label: 'Colombia' },
+    { code: 'KM', label: 'Comoros' },
+    { code: 'CD', label: 'Congo, Democratic Republic of the' },
+    { code: 'CG', label: 'Congo, Republic of the' },
+    { code: 'CK', label: 'Cook Islands' },
+    { code: 'CR', label: 'Costa Rica' },
+    { code: 'CI', label: "Côte d'Ivoire" },
+    { code: 'HR', label: 'Croatia' },
+    { code: 'CU', label: 'Cuba' },
+    { code: 'CW', label: 'Curaçao' },
+    { code: 'CY', label: 'Cyprus' },
+    { code: 'CZ', label: 'Czechia' },
+    { code: 'DK', label: 'Denmark' },
+    { code: 'DJ', label: 'Djibouti' },
+    { code: 'DM', label: 'Dominica' },
+    { code: 'DO', label: 'Dominican Republic' },
+    { code: 'EC', label: 'Ecuador' },
+    { code: 'EG', label: 'Egypt' },
+    { code: 'SV', label: 'El Salvador' },
+    { code: 'GQ', label: 'Equatorial Guinea' },
+    { code: 'ER', label: 'Eritrea' },
+    { code: 'EE', label: 'Estonia' },
+    { code: 'SZ', label: 'Eswatini' },
+    { code: 'ET', label: 'Ethiopia' },
+    { code: 'FK', label: 'Falkland Islands' },
+    { code: 'FO', label: 'Faroe Islands' },
+    { code: 'FJ', label: 'Fiji' },
+    { code: 'FI', label: 'Finland' },
     { code: 'FR', label: 'France' },
+    { code: 'GF', label: 'French Guiana' },
+    { code: 'PF', label: 'French Polynesia' },
+    { code: 'TF', label: 'French Southern Territories' },
+    { code: 'GA', label: 'Gabon' },
+    { code: 'GM', label: 'Gambia' },
+    { code: 'GE', label: 'Georgia' },
+    { code: 'DE', label: 'Germany' },
+    { code: 'GH', label: 'Ghana' },
+    { code: 'GI', label: 'Gibraltar' },
+    { code: 'GR', label: 'Greece' },
+    { code: 'GL', label: 'Greenland' },
+    { code: 'GD', label: 'Grenada' },
+    { code: 'GP', label: 'Guadeloupe' },
+    { code: 'GU', label: 'Guam' },
+    { code: 'GT', label: 'Guatemala' },
+    { code: 'GG', label: 'Guernsey' },
+    { code: 'GN', label: 'Guinea' },
+    { code: 'GW', label: 'Guinea-Bissau' },
+    { code: 'GY', label: 'Guyana' },
+    { code: 'HT', label: 'Haiti' },
+    { code: 'HM', label: 'Heard Island and McDonald Islands' },
+    { code: 'VA', label: 'Holy See' },
+    { code: 'HN', label: 'Honduras' },
+    { code: 'HK', label: 'Hong Kong' },
+    { code: 'HU', label: 'Hungary' },
+    { code: 'IS', label: 'Iceland' },
+    { code: 'IN', label: 'India' },
+    { code: 'ID', label: 'Indonesia' },
+    { code: 'IR', label: 'Iran' },
+    { code: 'IQ', label: 'Iraq' },
+    { code: 'IE', label: 'Ireland' },
+    { code: 'IM', label: 'Isle of Man' },
+    { code: 'IL', label: 'Israel' },
     { code: 'IT', label: 'Italy' },
+    { code: 'JM', label: 'Jamaica' },
+    { code: 'JP', label: 'Japan' },
+    { code: 'JE', label: 'Jersey' },
+    { code: 'JO', label: 'Jordan' },
+    { code: 'KZ', label: 'Kazakhstan' },
+    { code: 'KE', label: 'Kenya' },
+    { code: 'KI', label: 'Kiribati' },
+    { code: 'KP', label: 'Korea, Democratic People\'s Republic of' },
+    { code: 'KR', label: 'Korea, Republic of' },
+    { code: 'KW', label: 'Kuwait' },
+    { code: 'KG', label: 'Kyrgyzstan' },
+    { code: 'LA', label: 'Lao People\'s Democratic Republic' },
+    { code: 'LV', label: 'Latvia' },
+    { code: 'LB', label: 'Lebanon' },
+    { code: 'LS', label: 'Lesotho' },
+    { code: 'LR', label: 'Liberia' },
+    { code: 'LY', label: 'Libya' },
+    { code: 'LI', label: 'Liechtenstein' },
+    { code: 'LT', label: 'Lithuania' },
+    { code: 'LU', label: 'Luxembourg' },
+    { code: 'MO', label: 'Macao' },
+    { code: 'MG', label: 'Madagascar' },
+    { code: 'MW', label: 'Malawi' },
+    { code: 'MY', label: 'Malaysia' },
+    { code: 'MV', label: 'Maldives' },
+    { code: 'ML', label: 'Mali' },
+    { code: 'MT', label: 'Malta' },
+    { code: 'MH', label: 'Marshall Islands' },
+    { code: 'MQ', label: 'Martinique' },
+    { code: 'MR', label: 'Mauritania' },
+    { code: 'MU', label: 'Mauritius' },
+    { code: 'YT', label: 'Mayotte' },
+    { code: 'MX', label: 'Mexico' },
+    { code: 'FM', label: 'Micronesia' },
+    { code: 'MD', label: 'Moldova' },
+    { code: 'MC', label: 'Monaco' },
+    { code: 'MN', label: 'Mongolia' },
+    { code: 'ME', label: 'Montenegro' },
+    { code: 'MS', label: 'Montserrat' },
+    { code: 'MA', label: 'Morocco' },
+    { code: 'MZ', label: 'Mozambique' },
+    { code: 'MM', label: 'Myanmar' },
+    { code: 'NA', label: 'Namibia' },
+    { code: 'NR', label: 'Nauru' },
+    { code: 'NP', label: 'Nepal' },
+    { code: 'NL', label: 'Netherlands' },
+    { code: 'NC', label: 'New Caledonia' },
+    { code: 'NZ', label: 'New Zealand' },
+    { code: 'NI', label: 'Nicaragua' },
+    { code: 'NE', label: 'Niger' },
+    { code: 'NG', label: 'Nigeria' },
+    { code: 'NU', label: 'Niue' },
+    { code: 'NF', label: 'Norfolk Island' },
+    { code: 'MK', label: 'North Macedonia' },
+    { code: 'MP', label: 'Northern Mariana Islands' },
+    { code: 'NO', label: 'Norway' },
+    { code: 'OM', label: 'Oman' },
+    { code: 'PK', label: 'Pakistan' },
+    { code: 'PW', label: 'Palau' },
+    { code: 'PS', label: 'Palestine, State of' },
+    { code: 'PA', label: 'Panama' },
+    { code: 'PG', label: 'Papua New Guinea' },
+    { code: 'PY', label: 'Paraguay' },
+    { code: 'PE', label: 'Peru' },
+    { code: 'PH', label: 'Philippines' },
+    { code: 'PN', label: 'Pitcairn' },
+    { code: 'PL', label: 'Poland' },
     { code: 'PT', label: 'Portugal' },
+    { code: 'PR', label: 'Puerto Rico' },
+    { code: 'QA', label: 'Qatar' },
+    { code: 'RE', label: 'Réunion' },
+    { code: 'RO', label: 'Romania' },
+    { code: 'RU', label: 'Russian Federation' },
+    { code: 'RW', label: 'Rwanda' },
+    { code: 'BL', label: 'Saint Barthélemy' },
+    { code: 'SH', label: 'Saint Helena' },
+    { code: 'KN', label: 'Saint Kitts and Nevis' },
+    { code: 'LC', label: 'Saint Lucia' },
+    { code: 'MF', label: 'Saint Martin' },
+    { code: 'PM', label: 'Saint Pierre and Miquelon' },
+    { code: 'VC', label: 'Saint Vincent and the Grenadines' },
+    { code: 'WS', label: 'Samoa' },
+    { code: 'SM', label: 'San Marino' },
+    { code: 'ST', label: 'Sao Tome and Principe' },
+    { code: 'SA', label: 'Saudi Arabia' },
+    { code: 'SN', label: 'Senegal' },
+    { code: 'RS', label: 'Serbia' },
+    { code: 'SC', label: 'Seychelles' },
+    { code: 'SL', label: 'Sierra Leone' },
+    { code: 'SG', label: 'Singapore' },
+    { code: 'SX', label: 'Sint Maarten' },
+    { code: 'SK', label: 'Slovakia' },
+    { code: 'SI', label: 'Slovenia' },
+    { code: 'SB', label: 'Solomon Islands' },
+    { code: 'SO', label: 'Somalia' },
+    { code: 'ZA', label: 'South Africa' },
+    { code: 'GS', label: 'South Georgia and the South Sandwich Islands' },
+    { code: 'SS', label: 'South Sudan' },
+    { code: 'ES', label: 'Spain' },
+    { code: 'LK', label: 'Sri Lanka' },
+    { code: 'SD', label: 'Sudan' },
+    { code: 'SR', label: 'Suriname' },
+    { code: 'SJ', label: 'Svalbard and Jan Mayen' },
+    { code: 'SE', label: 'Sweden' },
+    { code: 'CH', label: 'Switzerland' },
+    { code: 'SY', label: 'Syrian Arab Republic' },
+    { code: 'TW', label: 'Taiwan' },
+    { code: 'TJ', label: 'Tajikistan' },
+    { code: 'TZ', label: 'Tanzania, United Republic of' },
+    { code: 'TH', label: 'Thailand' },
+    { code: 'TL', label: 'Timor-Leste' },
+    { code: 'TG', label: 'Togo' },
+    { code: 'TK', label: 'Tokelau' },
+    { code: 'TO', label: 'Tonga' },
+    { code: 'TT', label: 'Trinidad and Tobago' },
+    { code: 'TN', label: 'Tunisia' },
+    { code: 'TR', label: 'Türkiye' },
+    { code: 'TM', label: 'Turkmenistan' },
+    { code: 'TC', label: 'Turks and Caicos Islands' },
+    { code: 'TV', label: 'Tuvalu' },
+    { code: 'UG', label: 'Uganda' },
+    { code: 'UA', label: 'Ukraine' },
+    { code: 'AE', label: 'United Arab Emirates' },
     { code: 'GB', label: 'United Kingdom' },
-    { code: 'OTHER', label: 'Other' },
+    { code: 'UM', label: 'United States Minor Outlying Islands' },
+    { code: 'US', label: 'United States' },
+    { code: 'UY', label: 'Uruguay' },
+    { code: 'UZ', label: 'Uzbekistan' },
+    { code: 'VU', label: 'Vanuatu' },
+    { code: 'VE', label: 'Venezuela' },
+    { code: 'VN', label: 'Viet Nam' },
+    { code: 'VG', label: 'Virgin Islands, British' },
+    { code: 'VI', label: 'Virgin Islands, U.S.' },
+    { code: 'WF', label: 'Wallis and Futuna' },
+    { code: 'EH', label: 'Western Sahara' },
+    { code: 'YE', label: 'Yemen' },
+    { code: 'ZM', label: 'Zambia' },
+    { code: 'ZW', label: 'Zimbabwe' }
 ];
 
 const B2B_PRODUCTION_TYPES = [
@@ -154,6 +390,8 @@ interface FormData {
     certifications: string[];
     qaModules: string[];
     qaCustomDetails: string;
+    selectedPlan: string;
+    billingInterval: 'monthly' | 'annual';
 }
 
 function isDark() {
@@ -166,14 +404,14 @@ function isDark() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PrinthouseRegistrationPage: React.FC = () => {
-    // Steps: 1: Legal Terms, 2: Company, 3: Capabilities, 4: Machinery & Capacity, 5: Compliance & QA, 6: Admin Credentials, 7: Success
-    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7>(1);
+    // Steps: 1: Legal Terms, 2: Company, 3: Capabilities, 4: Machinery & Capacity, 5: Compliance & QA, 6: Plan Selection, 7: Admin Credentials, 8: Success
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(1);
     const [formData, setFormData] = useState<FormData>({
         termsAccepted: false,
         termsReviewed: false,
         companyName: '',
         contactName: '',
-        country: 'US',
+        country: '',
         city: '',
         phone: '',
         website: '',
@@ -191,6 +429,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         certifications: [],
         qaModules: [],
         qaCustomDetails: '',
+        selectedPlan: 'starter',
+        billingInterval: 'monthly',
     });
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormData, string>>>({});
     const [showPw, setShowPw]   = useState(false);
@@ -199,6 +439,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
     // Step 4 selector state
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+    const [customModel, setCustomModel] = useState<string>('');
     const [machineQuantity, setMachineQuantity] = useState<number>(1);
 
     const termsContainerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +477,11 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         const errs: Partial<Record<keyof FormData, string>> = {};
         if (!formData.companyName.trim()) errs.companyName = 'Company name is required';
         if (!formData.contactName.trim()) errs.contactName = 'Contact name is required';
+        if (!formData.country.trim()) errs.country = 'Country is required';
+        else {
+            const exists = COUNTRIES.some(c => c.code.toLowerCase() === formData.country.toLowerCase());
+            if (!exists) errs.country = 'Invalid country selection';
+        }
         if (!formData.city.trim()) errs.city = 'City is required';
         if (formData.website && !/^https?:\/\//.test(formData.website.trim())) {
             errs.website = 'URL must start with http:// or https://';
@@ -281,6 +527,14 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     };
 
     const validateStep6 = (): boolean => {
+        if (!formData.selectedPlan) {
+            addToast('warning', 'Plan Selection Required', 'Please select a subscription plan.');
+            return false;
+        }
+        return true;
+    };
+
+    const validateStep7 = (): boolean => {
         const errs: Partial<Record<keyof FormData, string>> = {};
         const cleanEmail = formData.email.trim().toLowerCase();
         if (!cleanEmail) errs.email = 'Email is required';
@@ -300,6 +554,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         else if (step === 3 && validateStep3()) setStep(4);
         else if (step === 4 && validateStep4()) setStep(5);
         else if (step === 5 && validateStep5()) setStep(6);
+        else if (step === 6 && validateStep6()) setStep(7);
     };
 
     const back = () => {
@@ -310,7 +565,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     // ── Submit ────────────────────────────────────────────────────────────────
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateStep6()) return;
+        if (!validateStep7()) return;
 
         setLoading(true);
         try {
@@ -339,6 +594,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                         certifications: formData.certifications,
                         qaModules: formData.qaModules,
                         qaCustomDetails: formData.qaCustomDetails.trim(),
+                        selectedPlan: formData.selectedPlan,
+                        billingInterval: formData.billingInterval,
                     }
                 }
             };
@@ -455,7 +712,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     const strength = checkPasswordStrength(formData.password);
 
     // ── Success Screen ─────────────────────────────────────────────────────────
-    if (step === 7) {
+    // ── Success Screen ─────────────────────────────────────────────────────────
+    if (step === 8) {
         return (
             <>
                 <div style={backdrop}>
@@ -506,10 +764,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     <div style={glassCard}>
                         {/* Step indicator */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '28px' }}>
-                            {[1, 2, 3, 4, 5, 6].map(i => (
+                            {[1, 2, 3, 4, 5, 6, 7].map(i => (
                                 <React.Fragment key={i}>
                                     <div style={stepDot(i)}>{i}</div>
-                                    {i < 6 && <div style={{ ...stepLine, background: step >= i + 1 ? '#dc0000' : dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />}
+                                    {i < 7 && <div style={{ ...stepLine, background: step >= i + 1 ? '#dc0000' : dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />}
                                 </React.Fragment>
                             ))}
                         </div>
@@ -521,7 +779,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 {step === 3 && 'Step 3: Node Capabilities'}
                                 {step === 4 && 'Step 4: Machinery & Volume'}
                                 {step === 5 && 'Step 5: Integration Standard'}
-                                {step === 6 && 'Step 6: Administrator Credentials'}
+                                {step === 6 && 'Step 6: Plan Selection'}
+                                {step === 7 && 'Step 7: Administrator Credentials'}
                             </h2>
                             <p style={{ margin: 0, fontSize: '13px', color: dark ? '#71717a' : '#64748b' }}>
                                 {step === 1 && 'Review and accept the legal B2B operating terms.'}
@@ -529,7 +788,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 {step === 3 && 'Machine output dimensions and capability nodes.'}
                                 {step === 4 && 'Identify baseline machinery and monthly capacity.'}
                                 {step === 5 && 'Select the automated routing integration depth.'}
-                                {step === 6 && 'Establish the master administrative account.'}
+                                {step === 6 && 'Select your PrintPrice OS subscription level.'}
+                                {step === 7 && 'Establish the master administrative account.'}
                             </p>
                         </div>
 
@@ -561,6 +821,9 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <p><strong>6. Non-Circumvention:</strong> Partners agree not to bypass PrintPrice Pro to transact directly with platform-sourced publishers.</p>
                                 </div>
 
+                                <p style={{ fontSize: '12.5px', color: dark ? '#a1a1aa' : '#64748b', fontStyle: 'italic', margin: '18px 0 0', opacity: 0.9, textAlign: 'left', lineHeight: '1.4' }}>
+                                    💡 <strong>Start your 14-day free trial.</strong> Full access to all feature nodes. No credit card required upfront.
+                                </p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <label style={{ 
                                         display: 'flex', 
@@ -582,6 +845,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         * Please scroll to the bottom of the terms container to enable acceptance.
                                     </span>
                                 </div>
+
+
 
                                 <div style={{ marginTop: '24px' }}>
                                     <AuthButton id="reg-next-1" type="button" onClick={next} disabled={!formData.termsAccepted}>
@@ -616,15 +881,22 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     onChange={set('contactName')}
                                     icon={BuildingOfficeIcon as any}
                                     error={fieldErrors.contactName}
+                                
                                 />
                                 <div>
                                     <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
                                         Country *
                                     </label>
-                                    <select
+                                    <input
                                         id="reg-country"
-                                        value={formData.country}
-                                        onChange={set('country')}
+                                        list="country-options"
+                                        placeholder="Type to search country..."
+                                        value={COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}
+                                        onChange={(e) => {
+                                            const label = e.target.value;
+                                            const found = COUNTRIES.find(c => c.label.toLowerCase() === label.toLowerCase() || c.code.toLowerCase() === label.toLowerCase());
+                                            setFormData(p => ({ ...p, country: found ? found.code : label }));
+                                        }}
                                         style={{
                                             width: '100%', padding: '11px 14px',
                                             background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
@@ -632,10 +904,15 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             color: dark ? '#f4f4f5' : '#0f172a',
                                             fontSize: '14px', fontWeight: 500, outline: 'none',
                                             fontFamily: "'Manrope', system-ui, sans-serif",
+                                            boxSizing: 'border-box'
                                         }}
-                                    >
-                                        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                                    </select>
+                                    />
+                                    <datalist id="country-options">
+                                        {COUNTRIES.map((c) => (
+                                            <option key={c.code} value={c.label} />
+                                        ))}
+                                    </datalist>
+                                    {fieldErrors.country && <span style={{ fontSize: '11px', color: '#ef4444', textAlign: 'left', display: 'block', marginTop: '4px' }}>{fieldErrors.country}</span>}
                                 </div>
                                 <AuthInput
                                     id="reg-city"
@@ -705,16 +982,21 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <AuthInput
-                                    id="reg-maxsheet"
-                                    label="Max Supported Sheet Size *"
-                                    type="text"
-                                    placeholder="e.g. 720 x 1020 mm"
-                                    value={formData.maxSheetSize}
-                                    onChange={set('maxSheetSize')}
-                                    icon={AdjustmentsHorizontalIcon as any}
-                                    error={fieldErrors.maxSheetSize}
-                                />
+                                <div>
+                                    <AuthInput
+                                        id="reg-maxsheet"
+                                        label="Max Supported Sheet Size *"
+                                        type="text"
+                                        placeholder="e.g. 720 x 1020 mm"
+                                        value={formData.maxSheetSize}
+                                        onChange={set('maxSheetSize')}
+                                        icon={AdjustmentsHorizontalIcon as any}
+                                        error={fieldErrors.maxSheetSize}
+                                    />
+                                    <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                        💡 Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
+                                    </p>
+                                </div>
 
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                                     <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
@@ -742,7 +1024,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             <select
                                                 id="reg-presses-selector"
                                                 value={selectedTemplateId}
-                                                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                                onChange={(e) => {
+                                                    setSelectedTemplateId(e.target.value);
+                                                    setCustomModel('');
+                                                }}
                                                 style={selectStyle(dark)}
                                             >
                                                 <option value="">-- Select Machine Template --</option>
@@ -766,10 +1051,28 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                         <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
                                                     ))}
                                                 </optgroup>
+                                                <optgroup label="Custom Equipment" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                    <option value="other">Other (Custom Machine)</option>
+                                                </optgroup>
                                             </select>
+                                            {selectedTemplateId === 'other' && (
+                                                <div style={{ marginTop: '8px' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Specify machine model (e.g. Heidelberg Speedmaster SM 52)"
+                                                        value={customModel}
+                                                        onChange={(e) => setCustomModel(e.target.value)}
+                                                        style={{
+                                                            ...selectStyle(dark),
+                                                            border: fieldErrors.presses ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+                                                            boxSizing: 'border-box'
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8' }}>QTY</span>
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-start', paddingTop: '1px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', marginTop: '12px' }}>QTY</span>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -786,21 +1089,43 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                     addToast('error', 'Selection Required', 'Please choose a template from the list.');
                                                     return;
                                                 }
-                                                const template = COMMON_MACHINE_TEMPLATES.find(t => t.id === selectedTemplateId);
+                                                
+                                                const isOther = selectedTemplateId === 'other';
+                                                if (isOther && !customModel.trim()) {
+                                                    addToast('error', 'Specify Model', 'Please specify the machine model.');
+                                                    return;
+                                                }
+                                                
+                                                const template = isOther
+                                                    ? { id: 'other', manufacturer: 'Custom', model: customModel.trim(), category: 'Custom' as any }
+                                                    : COMMON_MACHINE_TEMPLATES.find(t => t.id === selectedTemplateId);
+                                                
                                                 if (!template) return;
                                                 
+                                                const name = isOther ? customModel.trim() : `${template.manufacturer} ${template.model}`;
+                                                
                                                 // Check if already added
-                                                const exists = formData.presses.some(p => p.templateId === selectedTemplateId);
+                                                const exists = formData.presses.some(p => p.name.toLowerCase() === name.toLowerCase());
                                                 if (exists) {
-                                                    addToast('warning', 'Already Added', `${template.manufacturer} ${template.model} is already added. Adjust quantity inside the list.`);
+                                                    addToast('warning', 'Already Added', `${name} is already added. Adjust quantity inside the list.`);
                                                     return;
                                                 }
                                                 
                                                 setFormData(p => ({
                                                     ...p,
-                                                    presses: [...p.presses, { templateId: template.id, quantity: machineQuantity, name: `${template.manufacturer} ${template.model}` }]
+                                                    presses: [
+                                                        ...p.presses,
+                                                        {
+                                                            templateId: template.id,
+                                                            quantity: machineQuantity,
+                                                            name,
+                                                            model: name,
+                                                            qty: machineQuantity
+                                                        }
+                                                    ]
                                                 }));
                                                 setSelectedTemplateId('');
+                                                setCustomModel('');
                                                 setMachineQuantity(1);
                                             }}
                                             style={{
@@ -1035,7 +1360,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
                                         Certifications
                                     </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                                         {B2B_CERTIFICATIONS.map(cert => {
                                             const active = formData.certifications.includes(cert);
                                             return (
@@ -1050,6 +1375,9 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                             );
                                         })}
                                     </div>
+                                    <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                        💡 Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
+                                    </p>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
@@ -1064,8 +1392,187 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ── STEP 6: ADMIN ACCOUNT ────────────────────────────── */}
+                        {/* ── STEP 6: PLAN SELECTION ───────────────────────────── */}
                         {step === 6 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {/* Monthly / Annual Toggle Switch */}
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'monthly' ? 800 : 500, color: formData.billingInterval === 'monthly' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b') }}>
+                                        Monthly Billing
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(p => ({ ...p, billingInterval: p.billingInterval === 'monthly' ? 'annual' : 'monthly' }))}
+                                        style={{
+                                            width: '50px',
+                                            height: '26px',
+                                            background: '#dc0000',
+                                            borderRadius: '9999px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            position: 'relative',
+                                            padding: '3px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: formData.billingInterval === 'annual' ? 'flex-end' : 'flex-start',
+                                            transition: 'all 0.25s ease'
+                                        }}
+                                    >
+                                        <div style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                                    </button>
+                                    <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'annual' ? 800 : 500, color: formData.billingInterval === 'annual' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b'), display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        Annual Billing
+                                        <span style={{ background: 'rgba(220,0,0,0.15)', color: '#dc0000', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(220,0,0,0.25)' }}>
+                                            SAVE 20%
+                                        </span>
+                                    </span>
+                                </div>
+
+                                {/* Plan Cards */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                    {/* Starter Plan (14-DAY FREE TRIAL) */}
+                                    <div
+                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
+                                        style={{
+                                            padding: '16px 12px',
+                                            background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                            border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                            cursor: 'pointer',
+                                            borderRadius: '6px',
+                                            transition: 'all 0.25s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            minHeight: '280px',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <div>
+                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
+                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
+                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Up to 50 automated orders</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> 10 AI Scans included</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 15 HD generated copies</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Base BPE Form (AI Chat disabled)</li>
+                                            </ul>
+                                        </div>
+                                        <div style={{ marginTop: '10px' }}>
+                                            <div>
+                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
+                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}> / for 14 days</span>
+                                            </div>
+                                            <p style={{ margin: '4px 0 0', fontSize: '8px', color: dark ? '#71717a' : '#64748b', fontStyle: 'italic', lineHeight: '1.1' }}>
+                                                Requires plan selection after 14 days to maintain node activity.
+                                            </p>
+                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Growth Plan */}
+                                    <div
+                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
+                                        style={{
+                                            padding: '16px 12px',
+                                            background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                            border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                            cursor: 'pointer',
+                                            borderRadius: '6px',
+                                            transition: 'all 0.25s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            minHeight: '280px',
+                                            textAlign: 'center',
+                                            position: 'relative',
+                                        }}
+                                    >
+                                        <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            Recommended
+                                        </div>
+                                        <div>
+                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
+                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
+                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders & dispatch</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> 100 AI Scans / mo</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 150 HD generated / mo</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> +1,000 AI Sales Chat Credits / mo</li>
+                                            </ul>
+                                        </div>
+                                        <div style={{ marginTop: '10px' }}>
+                                            <div>
+                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                    ${formData.billingInterval === 'annual' ? '159' : '199'}
+                                                </span>
+                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
+                                            </div>
+                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Enterprise Plan */}
+                                    <div
+                                        onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
+                                        style={{
+                                            padding: '16px 12px',
+                                            background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                            border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                            cursor: 'pointer',
+                                            borderRadius: '6px',
+                                            transition: 'all 0.25s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            minHeight: '280px',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <div>
+                                            <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
+                                            <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
+                                            <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> JDF/JMF Direct Routing to DFE</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight BFF:</strong> Unlimited AI Scans</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> Full White-Labeling (Custom Domains)</li>
+                                                <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>AI Limits:</strong> BYOK (Bring Your Own Key) for unlimited AI</li>
+                                            </ul>
+                                        </div>
+                                        <div style={{ marginTop: '10px' }}>
+                                            <div>
+                                                <span style={{ fontSize: '20px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                    ${formData.billingInterval === 'annual' ? '399' : '499'}
+                                                </span>
+                                                <span style={{ fontSize: '10px', color: dark ? '#71717a' : '#64748b' }}>/ mo</span>
+                                            </div>
+                                            <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '6px' }}>
+                                                {formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                    <div style={{ flex: 1 }}>
+                                        <AuthButton id="reg-next-6" type="button" onClick={next}>
+                                            <span>Continue</span>
+                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                        </AuthButton>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── STEP 7: ADMIN ACCOUNT ────────────────────────────── */}
+                        {step === 7 && (
                             <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <AuthInput
                                     id="reg-email"
