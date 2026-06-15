@@ -401,14 +401,12 @@ const B2B_INTEGRATIONS = [
 ];
 
 const SUPPORTED_SHEET_SIZES = [
-    { value: 'A4', label: 'A4 (210 x 297 mm)' },
-    { value: 'A3', label: 'A3 (297 x 420 mm)' },
-    { value: 'SRA3', label: 'SRA3 (320 x 450 mm)' },
-    { value: 'A2', label: 'A2 (420 x 594 mm)' },
-    { value: 'SRA2', label: 'SRA2 (450 x 640 mm)' },
-    { value: 'B3', label: 'B3 (353 x 500 mm)' },
-    { value: 'B2', label: 'B2 (500 x 707 mm)' },
-    { value: 'B1', label: 'B1 (707 x 1000 mm)' }
+    { value: '70x100', label: '70 x 100 cm (B1 Full Sheet)' },
+    { value: '65x92', label: '65 x 92 cm (B2+ Sheet)' },
+    { value: '50x70', label: '50 x 70 cm (B2 Sheet)' },
+    { value: '45x64', label: '45 x 64 cm (B3 Sheet)' },
+    { value: '35x50', label: '35 x 50 cm (B4 Sheet)' },
+    { value: 'custom', label: 'Custom Large Format (> B1)' }
 ];
 
 interface MachineTemplate {
@@ -527,37 +525,6 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
     const cardRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);
-    const [tiltStyle, setTiltStyle] = useState<CSSProperties>({
-        transition: 'transform 0.2s ease-out'
-    });
-
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isFocused) {
-            setTiltStyle({
-                transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
-                transition: 'transform 0.2s ease-out'
-            });
-            return;
-        }
-        const cardEl = cardRef.current;
-        if (!cardEl) return;
-        const rect = cardEl.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        const rX = -(y / (rect.height / 2)) * 0.5;
-        const rY = (x / (rect.width / 2)) * 0.5;
-        setTiltStyle({
-            transform: `perspective(1000px) rotateX(${rX}deg) rotateY(${rY}deg)`,
-            transition: 'transform 0.1s ease-out'
-        });
-    };
-
-    const handleMouseLeave = () => {
-        setTiltStyle({
-            transform: `perspective(1000px) rotateX(0deg) rotateY(0deg)`,
-            transition: 'transform 0.2s ease-out'
-        });
-    };
 
     const set = (key: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const val = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
@@ -845,13 +812,11 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         padding: '36px',
-        boxShadow: dark
-            ? '0 32px 64px rgba(0,0,0,0.6)'
-            : '0 32px 64px rgba(0,0,0,0.10)',
-        WebkitBackfaceVisibility: 'hidden',
-        backfaceVisibility: 'hidden',
-        WebkitFontSmoothing: 'subpixel-antialiased',
-        transformStyle: 'flat',
+        boxShadow: isFocused 
+            ? (dark ? '0 40px 80px rgba(0,0,0,0.8)' : '0 40px 80px rgba(0,0,0,0.2)')
+            : (dark ? '0 32px 64px rgba(0,0,0,0.6)' : '0 32px 64px rgba(0,0,0,0.10)'),
+        transform: isFocused ? 'scale(1.01)' : 'scale(1)',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     };
 
     const stepDot = (n: number): CSSProperties => ({
@@ -948,12 +913,10 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     </div>
 
                     {/* Stepper Card */}
-                    <div style={{ perspective: '1000px', position: 'relative', zIndex: 1 }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
+                    <div style={{ position: 'relative', zIndex: 1 }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
                         <div 
                             ref={cardRef}
-                            onMouseMove={handleMouseMove}
-                            onMouseLeave={handleMouseLeave}
-                            style={{ ...glassCard, ...tiltStyle }}
+                            style={glassCard}
                         >
                         {/* Step indicator */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>

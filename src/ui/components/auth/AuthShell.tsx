@@ -157,50 +157,17 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         padding: '32px',
-        boxShadow: dark
-            ? '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)'
-            : '0 32px 64px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
-        // Note: border-radius is forced to 0 by global CSS — we override with style here
+        boxShadow: isFocused 
+            ? (dark ? '0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 40px 80px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.9)')
+            : (dark ? '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 32px 64px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)'),
         borderRadius: '0px',
-        WebkitBackfaceVisibility: 'hidden',
-        backfaceVisibility: 'hidden',
-        WebkitFontSmoothing: 'subpixel-antialiased',
-        transformStyle: 'flat',
+        transform: isFocused ? 'scale(1.01)' : 'scale(1)',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     };
 
     const cardRef = React.useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = React.useState(false);
-    const [tiltStyle, setTiltStyle] = React.useState<CSSProperties>({
-        transition: 'transform 0.2s ease-out'
-    });
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isFocused) {
-            setTiltStyle({
-                transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
-                transition: 'transform 0.2s ease-out'
-            });
-            return;
-        }
-        const cardEl = cardRef.current;
-        if (!cardEl) return;
-        const rect = cardEl.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        const rX = -(y / (rect.height / 2)) * 0.5;
-        const rY = (x / (rect.width / 2)) * 0.5;
-        setTiltStyle({
-            transform: `perspective(1000px) rotateX(${rX}deg) rotateY(${rY}deg)`,
-            transition: 'transform 0.1s ease-out'
-        });
-    };
-
-    const handleMouseLeave = () => {
-        setTiltStyle({
-            transform: `perspective(1000px) rotateX(0deg) rotateY(0deg)`,
-            transition: 'transform 0.2s ease-out'
-        });
-    };
 
     return (
         <div style={backdrop}>
@@ -243,12 +210,10 @@ export const AuthShell: React.FC<AuthShellProps> = ({
                 </div>
 
                 {/* Glass Card */}
-                <div style={{ perspective: '1000px' }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
+                <div onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
                     <div 
                         ref={cardRef}
-                        onMouseMove={handleMouseMove}
-                        onMouseLeave={handleMouseLeave}
-                        style={{ ...glassCard, ...tiltStyle }}
+                        style={glassCard}
                     >
                         {children}
                     </div>
