@@ -9,27 +9,32 @@
 import React, { useState, useCallback, useEffect, useRef, CSSProperties } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    BuildingOfficeIcon,
-    EnvelopeIcon,
-    LockClosedIcon,
-    GlobeAltIcon,
-    PhoneIcon,
-    ArrowRightIcon,
-    ArrowLeftIcon,
-    CheckCircleIcon,
-    EyeIcon,
-    EyeSlashIcon,
-    MapPinIcon,
-    DocumentTextIcon,
-    SparklesIcon,
-    AdjustmentsHorizontalIcon,
-    ScaleIcon,
-    ChartBarIcon,
-    CpuChipIcon,
-    TrashIcon,
-    PlusIcon,
-    QuestionMarkCircleIcon,
-} from '@heroicons/react/24/outline';
+    Building2,
+    Mail,
+    Lock,
+    Globe,
+    Phone,
+    ArrowRight,
+    ArrowLeft,
+    CheckCircle,
+    Eye,
+    EyeOff,
+    MapPin,
+    FileText,
+    Sparkles,
+    Sliders,
+    Scale,
+    BarChart,
+    Cpu,
+    Trash2,
+    Plus,
+    HelpCircle,
+    ShieldCheck,
+    CheckSquare,
+    Sprout,
+    TrendingUp,
+    Factory
+} from 'lucide-react';
 import { setAuthToken, setAuthUser } from '../lib/authStore';
 import { AuthInput, AuthButton, MotionBackground } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
@@ -43,8 +48,10 @@ const InfoTooltip: React.FC<{ text: string }> = ({ text }) => {
     const [show, setShow] = useState(false);
     return (
         <div style={{ position: 'relative', display: 'inline-block', marginLeft: '6px' }}>
-            <QuestionMarkCircleIcon 
-                style={{ width: '15px', height: '15px', cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
+            <HelpCircle 
+                size={15}
+                strokeWidth={1.5}
+                style={{ cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
                 onMouseEnter={() => setShow(true)}
                 onMouseLeave={() => setShow(false)}
             />
@@ -96,7 +103,7 @@ const ValidatedInput: React.FC<{
             <AuthInput {...props} value={value} />
             {isValid && (
                 <div style={{ position: 'absolute', right: props.rightSlot ? '40px' : '14px', top: '35px', pointerEvents: 'none', zIndex: 10 }}>
-                    <CheckCircleIcon style={{ width: '16px', height: '16px', color: '#10b981' }} />
+                    <CheckCircle size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
                 </div>
             )}
         </div>
@@ -871,7 +878,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     <div style={{ ...cardWrap, maxWidth: 440 }}>
                         <div style={{ textAlign: 'center' }}>
                             <div style={{ width: 72, height: 72, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                                <CheckCircleIcon style={{ width: 40, height: 40, color: '#10b981' }} />
+                                <CheckCircle size={40} strokeWidth={1.5} style={{ color: '#10b981' }} />
                             </div>
                             <PrintPriceLogo className="w-10 h-10 mx-auto mb-4" />
                             <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
@@ -1042,7 +1049,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 <div style={{ marginTop: '24px' }}>
                                     <AuthButton id="reg-next-1" type="button" onClick={next} disabled={!formData.termsAccepted}>
                                         <span>Accept & Continue</span>
-                                        <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                        <ArrowRight size={16} strokeWidth={1.5} />
                                     </AuthButton>
                                 </div>
                             </div>
@@ -1059,7 +1066,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         placeholder="Garciaprint Ltd"
                                         value={formData.companyName}
                                         onChange={set('companyName')}
-                                        icon={BuildingOfficeIcon as any}
+                                        icon={Building2 as any}
                                         error={fieldErrors.companyName}
                                         validator={val => val.trim().length > 0}
                                     />
@@ -1071,7 +1078,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     placeholder="John Garcia"
                                     value={formData.contactName}
                                     onChange={set('contactName')}
-                                    icon={BuildingOfficeIcon as any}
+                                    icon={Building2 as any}
                                     error={fieldErrors.contactName}
                                     validator={val => val.trim().length > 0}
                                 />
@@ -1102,7 +1109,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         />
                                         {COUNTRIES.some(c => c.code.toLowerCase() === formData.country.toLowerCase()) && (
                                             <div style={{ position: 'absolute', right: '14px', top: '14px', pointerEvents: 'none', zIndex: 10 }}>
-                                                <CheckCircleIcon style={{ width: '16px', height: '16px', color: '#10b981' }} />
+                                                <CheckCircle size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
                                             </div>
                                         )}
                                     </div>
@@ -1120,7 +1127,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     placeholder="London"
                                     value={formData.city}
                                     onChange={set('city')}
-                                    icon={MapPinIcon as any}
+                                    icon={MapPin as any}
                                     error={fieldErrors.city}
                                     validator={val => val.trim().length > 0}
                                 />
@@ -1131,7 +1138,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     placeholder="+44 20 7946 0192"
                                     value={formData.phone}
                                     onChange={set('phone')}
-                                    icon={PhoneIcon as any}
+                                    icon={Phone as any}
                                     validator={val => val.trim().length > 0}
                                 />
                                 <div style={{ gridColumn: '1 / -1' }}>
@@ -1142,18 +1149,18 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         placeholder="https://garciaprint.com"
                                         value={formData.website}
                                         onChange={set('website')}
-                                        icon={GlobeAltIcon as any}
+                                        icon={Globe as any}
                                         error={fieldErrors.website}
                                         validator={val => val.trim() === '' || /^https?:\/\//.test(val.trim())}
                                     />
                                 </div>
-
+ 
                                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', marginTop: '12px' }}>
                                     <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-2" type="button" onClick={next}>
                                             <span>Continue</span>
-                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                            <ArrowRight size={16} strokeWidth={1.5} />
                                         </AuthButton>
                                     </div>
                                 </div>
@@ -1177,6 +1184,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                     onClick={() => toggleProductionType(type)}
                                                     style={badgeBtnStyle(active, dark)}
                                                 >
+                                                    {active && <CheckSquare size={14} strokeWidth={1.5} style={{ marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }} />}
                                                     {type}
                                                 </button>
                                             );
@@ -1229,7 +1237,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-3" type="button" onClick={next}>
                                             <span>Continue</span>
-                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                            <ArrowRight size={16} strokeWidth={1.5} />
                                         </AuthButton>
                                     </div>
                                 </div>
@@ -1368,11 +1376,11 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 fontFamily: "'Manrope', system-ui, sans-serif",
                                             }}
                                         >
-                                            <PlusIcon style={{ width: 16, height: 16 }} />
+                                            <Plus size={16} strokeWidth={1.5} />
                                             Add
                                         </button>
                                     </div>
-
+ 
                                     {/* Selected Machines List */}
                                     {formData.presses.length > 0 ? (
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '8px' }}>
@@ -1400,7 +1408,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                                 justifyContent: 'center',
                                                                 borderRadius: '4px',
                                                             }}>
-                                                                <CpuChipIcon style={{ width: 16, height: 16, color: '#dc0000' }} />
+                                                                <Cpu size={16} strokeWidth={1.5} style={{ color: '#dc0000' }} />
                                                             </div>
                                                             <div style={{ textAlign: 'left' }}>
                                                                 <div style={{ fontSize: '13px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
@@ -1455,7 +1463,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                                     color: dark ? '#a1a1aa' : '#64748b',
                                                                 }}
                                                             >
-                                                                <TrashIcon style={{ width: 16, height: 16 }} />
+                                                                <Trash2 size={16} strokeWidth={1.5} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -1524,7 +1532,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-4" type="button" onClick={next}>
                                             <span>Continue</span>
-                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                            <ArrowRight size={16} strokeWidth={1.5} />
                                         </AuthButton>
                                     </div>
                                 </div>
@@ -1589,17 +1597,18 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 flexDirection: 'column',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                minHeight: '280px',
+                                                minHeight: '300px',
                                                 textAlign: 'center',
                                             }}
                                         >
                                             <div>
+                                                <Sprout size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Full platform evaluation grace period."</p>
-                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 10 Jobs + 10 AI Scans</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 15 HD generated copies</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Base BPE Form (AI Chat disabled)</li>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> 10 Jobs + 10 AI Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 15 HD generated copies</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> Base BPE Form</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1630,22 +1639,23 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 flexDirection: 'column',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                minHeight: '280px',
+                                                minHeight: '300px',
                                                 textAlign: 'center',
                                                 position: 'relative',
                                             }}
                                         >
-                                            <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
                                                 Recommended
                                             </div>
                                             <div>
+                                                <TrendingUp size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Automated sales & workflow scaling."</p>
-                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Control Plane:</strong> Unlimited orders</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> 100 Jobs + 100 AI Scans</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 150 HD generated / mo</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> 1,000 AI Sales Chat Credits</li>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Control Plane:</strong> Unlimited orders</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> 100 Jobs + 100 Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 150 HD / mo</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1,000 Chat Credits</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1675,18 +1685,19 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 flexDirection: 'column',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                minHeight: '280px',
+                                                minHeight: '300px',
                                                 textAlign: 'center',
                                             }}
                                         >
                                             <div>
+                                                <Factory size={24} strokeWidth={1.5} style={{ color: '#dc0000', marginBottom: '8px' }} />
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
                                                 <p style={{ margin: '0 0 10px', fontSize: '10px', fontWeight: 700, color: dark ? '#a1a1aa' : '#475569', lineHeight: '1.2' }}>"Industrial scale & White-Label deployment."</p>
-                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%' }}>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Preflight:</strong> Unlimited Jobs + AI Scans</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Mockups:</strong> 500 HD generated / mo</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Budgeter:</strong> Featured 1st position rotation</li>
-                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', marginBottom: '4px' }}>• <strong>Ecosystem:</strong> White-Label Subdomain & BYOK AI</li>
+                                                <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Mockups:</strong> 500 HD / mo</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Budgeter:</strong> 1st position rotation</span></li>
+                                                    <li style={{ fontSize: '9px', color: dark ? '#71717a' : '#64748b', display: 'flex', alignItems: 'center' }}><ShieldCheck size={12} strokeWidth={1.5} style={{ color: '#dc0000', marginRight: '4px', flexShrink: 0 }} /><span><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
                                                 </ul>
                                             </div>
                                             <div style={{ marginTop: '10px' }}>
@@ -1769,6 +1780,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                         onClick={() => toggleCertification(cert)}
                                                         style={badgeBtnStyle(active, dark)}
                                                     >
+                                                        {active && <ShieldCheck size={14} strokeWidth={1.5} style={{ marginRight: '4px', color: '#dc0000', display: 'inline-block', verticalAlign: 'middle' }} />}
                                                         {cert}
                                                     </button>
                                                 );
@@ -1785,7 +1797,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-5" type="button" onClick={next}>
                                             <span>Continue</span>
-                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                            <ArrowRight size={16} strokeWidth={1.5} />
                                         </AuthButton>
                                     </div>
                                 </div>
@@ -1838,7 +1850,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-next-6" type="button" onClick={next}>
                                             <span>Proceed to Administrator Setup</span>
-                                            <ArrowRightIcon style={{ width: 16, height: 16 }} />
+                                            <ArrowRight size={16} strokeWidth={1.5} />
                                         </AuthButton>
                                     </div>
                                 </div>
@@ -1857,7 +1869,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     placeholder="admin@garciaprint.com"
                                     value={formData.email}
                                     onChange={set('email')}
-                                    icon={EnvelopeIcon as any}
+                                    icon={Mail as any}
                                     error={fieldErrors.email}
                                     disabled={loading}
                                 />
@@ -1871,12 +1883,12 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         placeholder="Minimum 8 characters"
                                         value={formData.password}
                                         onChange={set('password')}
-                                        icon={LockClosedIcon as any}
+                                        icon={Lock as any}
                                         error={fieldErrors.password}
                                         disabled={loading}
                                         rightSlot={
                                             <button type="button" onClick={() => setShowPw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle password visibility">
-                                                {showPw ? <EyeSlashIcon style={{ width: 16, height: 16 }} /> : <EyeIcon style={{ width: 16, height: 16 }} />}
+                                                {showPw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                                             </button>
                                         }
                                     />
@@ -1908,12 +1920,12 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     placeholder="Confirm password"
                                     value={formData.confirmPassword}
                                     onChange={set('confirmPassword')}
-                                    icon={LockClosedIcon as any}
+                                    icon={Lock as any}
                                     error={fieldErrors.confirmPassword}
                                     disabled={loading}
                                     rightSlot={
                                         <button type="button" onClick={() => setShowCpw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle confirm password visibility">
-                                            {showCpw ? <EyeSlashIcon style={{ width: 16, height: 16 }} /> : <EyeIcon style={{ width: 16, height: 16 }} />}
+                                            {showCpw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                                         </button>
                                     }
                                 />
@@ -1925,12 +1937,12 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         disabled={loading}
                                         style={backBtnStyle(dark)}
                                     >
-                                        <ArrowLeftIcon style={{ width: 14, height: 14 }} />
+                                        <ArrowLeft size={14} strokeWidth={1.5} />
                                         Back
                                     </button>
                                     <div style={{ flex: 1 }}>
                                         <AuthButton id="reg-submit" type="submit" loading={loading} disabled={loading}>
-                                            <CheckCircleIcon style={{ width: 16, height: 16 }} />
+                                            <CheckCircle size={16} strokeWidth={1.5} />
                                             <span>Complete Registration</span>
                                         </AuthButton>
                                     </div>
