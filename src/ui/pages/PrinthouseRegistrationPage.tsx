@@ -44,27 +44,29 @@ const InfoTooltip: React.FC<{ text: string }> = ({ text }) => {
     return (
         <div style={{ position: 'relative', display: 'inline-block', marginLeft: '6px' }}>
             <QuestionMarkCircleIcon 
-                style={{ width: '14px', height: '14px', cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
+                style={{ width: '15px', height: '15px', cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
                 onMouseEnter={() => setShow(true)}
                 onMouseLeave={() => setShow(false)}
             />
             {show && (
                 <div style={{
                     position: 'absolute',
-                    bottom: '100%',
+                    bottom: '120%',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    background: '#1f2937',
-                    color: '#fff',
-                    fontSize: '11px',
-                    padding: '6px 10px',
+                    background: '#09090b',
+                    color: '#ffffff',
+                    border: '1px solid #dc0000',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    padding: '8px 12px',
                     borderRadius: '6px',
                     whiteSpace: 'normal',
-                    width: '180px',
-                    zIndex: 1000,
-                    marginBottom: '6px',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-                    lineHeight: '1.3'
+                    width: '200px',
+                    zIndex: 9999,
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5)',
+                    lineHeight: '1.4',
+                    textAlign: 'left'
                 }}>
                     {text}
                 </div>
