@@ -400,6 +400,17 @@ const B2B_INTEGRATIONS = [
     { title: 'Fully automated routing', badge: 'ORCHESTRATED', desc: 'Zero manual touch. Files routed directly to your DFE.' }
 ];
 
+const SUPPORTED_SHEET_SIZES = [
+    { value: 'A4', label: 'A4 (210 x 297 mm)' },
+    { value: 'A3', label: 'A3 (297 x 420 mm)' },
+    { value: 'SRA3', label: 'SRA3 (320 x 450 mm)' },
+    { value: 'A2', label: 'A2 (420 x 594 mm)' },
+    { value: 'SRA2', label: 'SRA2 (450 x 640 mm)' },
+    { value: 'B3', label: 'B3 (353 x 500 mm)' },
+    { value: 'B2', label: 'B2 (500 x 707 mm)' },
+    { value: 'B1', label: 'B1 (707 x 1000 mm)' }
+];
+
 interface MachineTemplate {
     id: string;
     manufacturer: string;
@@ -828,11 +839,11 @@ export const PrinthouseRegistrationPage: React.FC = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#71717a' }}>Selected Plan:</span>
+                    <span style={{ color: dark ? '#ffffff' : '#000000' }}>Selected Plan:</span>
                     <span style={{ fontWeight: 600, color: dark ? '#fff' : '#0f172a' }}>{formData.selectedPlan.toUpperCase()}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#71717a' }}>Billing Cycle:</span>
+                    <span style={{ color: dark ? '#ffffff' : '#000000' }}>Billing Cycle:</span>
                     <span style={{ fontWeight: 600, color: dark ? '#fff' : '#0f172a' }}>{formData.billingInterval === 'annual' ? 'Annual (Save 20%)' : 'Monthly'}</span>
                 </div>
                 
@@ -950,7 +961,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                 {step === 6 && 'Step 6: Review Qualification'}
                                 {step === 7 && 'Step 7: Administrator Credentials'}
                             </h2>
-                            <p style={{ margin: 0, fontSize: '13px', color: dark ? '#71717a' : '#64748b' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: dark ? '#ffffff' : '#000000' }}>
                                 {step === 1 && 'Review and accept the legal B2B operating terms.'}
                                 {step === 2 && 'Basic identifiers of your facility.'}
                                 {step === 3 && 'Machine output dimensions and capability nodes.'}
@@ -976,7 +987,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         marginBottom: '20px',
                                         fontSize: '12px',
                                         lineHeight: '1.6',
-                                        color: dark ? '#a1a1aa' : '#475569',
+                                        color: dark ? '#ffffff' : '#000000',
                                     }}
                                 >
                                     <h4 style={{ color: dark ? '#f4f4f5' : '#0f172a', fontWeight: 800, marginBottom: '8px' }}>B2B Print Node Terms</h4>
@@ -989,8 +1000,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     <p><strong>6. Non-Circumvention:</strong> Partners agree not to bypass PrintPrice Pro to transact directly with platform-sourced publishers.</p>
                                 </div>
 
-                                <p style={{ fontSize: '12.5px', color: dark ? '#a1a1aa' : '#64748b', fontStyle: 'italic', margin: '18px 0 0', opacity: 0.9, textAlign: 'left', lineHeight: '1.4' }}>
-                                    💡 <strong>Start your 14-day free trial.</strong> Full access to all feature nodes. No credit card required upfront.
+                                <p style={{ fontSize: '12.5px', color: dark ? '#ffffff' : '#000000', fontStyle: 'italic', margin: '18px 0 0', opacity: 0.9, textAlign: 'left', lineHeight: '1.4' }}>
+                                    <strong>Start your 14-day free trial.</strong> Full access to all feature nodes. No credit card required upfront.
                                 </p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <label style={{ 
@@ -1172,19 +1183,32 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                         Max Supported Sheet Size *
                                         <InfoTooltip text="Used to route jobs that fit your presses. Reduces waste by 23% on average." />
                                     </label>
-                                    <ValidatedInput
-                                        id="reg-maxsheet"
-                                        label=""
-                                        type="text"
-                                        placeholder="e.g. 720 x 1020 mm"
-                                        value={formData.maxSheetSize}
-                                        onChange={set('maxSheetSize')}
-                                        icon={AdjustmentsHorizontalIcon as any}
-                                        error={fieldErrors.maxSheetSize}
-                                        validator={val => val.trim().length > 0}
-                                    />
-                                    <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
-                                        💡 Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
+                                                                    <div style={{ position: 'relative' }}>
+                                        <select
+                                            id="reg-maxsheet"
+                                            value={formData.maxSheetSize}
+                                            onChange={set('maxSheetSize')}
+                                            style={{
+                                                ...selectStyle(dark),
+                                                border: fieldErrors.maxSheetSize ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
+                                                boxSizing: 'border-box'
+                                            }}
+                                        >
+                                            <option value="">-- Select Sheet Size Variable --</option>
+                                            {SUPPORTED_SHEET_SIZES.map(opt => (
+                                                <option key={opt.value} value={opt.value} style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {fieldErrors.maxSheetSize && (
+                                            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#ef4444', textAlign: 'left' }}>
+                                                {fieldErrors.maxSheetSize}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                        Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
                                     </p>
                                 </div>
 
@@ -1738,8 +1762,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                                 );
                                             })}
                                         </div>
-                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
-                                            💡 Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
+                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                            Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
                                         </p>
                                     </div>
                                 </div>
@@ -1772,27 +1796,27 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                                     textAlign: 'left'
                                 }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Company Name:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Company Name:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.companyName}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Location:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Location:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.city}, {COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Capabilities:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Capabilities:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.productionTypes.join(', ')}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Machinery:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Machinery:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.presses.map(p => `${p.name} (Qty: ${p.quantity})`).join('; ')}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Plan Selection:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Plan Selection:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a', textTransform: 'capitalize' }}>{formData.selectedPlan} ({formData.billingInterval})</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase' }}>Integration Level:</span>
+                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Integration Level:</span>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.integrationLevel}</span>
                                     </div>
                                 </div>
