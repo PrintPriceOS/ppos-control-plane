@@ -33,13 +33,7 @@ export default defineConfig({
           if (id.includes('node_modules/axios') || id.includes('node_modules/swr') || id.includes('node_modules/zustand')) {
             return 'vendor-data';
           }
-          // Admin pages — separate from shared hooks to avoid circular refs
-          if (id.includes('/pages/admin/ProductionDispatch') || id.includes('/pages/admin/ProductionNode')) {
-            return 'admin-intelligence';
-          }
-          if (id.includes('/pages/admin/')) {
-            return 'admin-core';
-          }
+
         },
       },
     },
