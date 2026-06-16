@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../services/mysqlClient');
 const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
+const printhouseService = require('../services/printhouseService');
 
 const router = express.Router();
 
@@ -78,6 +79,35 @@ router.post('/capabilities', requireApprovedPrinthouse, async (req, res) => {
     } catch (err) {
         console.error('[PRINTHOUSES] Error updating capabilities:', err);
         res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/printhouses/provision — Full admin-provisioned partner creation (7-step form data)
+// This is the admin-mode equivalent of /api/auth/printhouse/register.
+// Status is set ACTIVE immediately; no auto-login JWT returned.
+router.post('/provision', async (req, res) => {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) {
+        return res.status(403).json({ ok: false, error: 'Only Super Admins can provision partners' });
+    }
+
+    const { companyName, email, password } = req.body;
+    if (!companyName || !email || !password) {
+        return res.status(400).json({ ok: false, error: 'Company name, email and password are required' });
+    }
+
+    try {
+        const adminId = context.userId || context.email || 'unknown-admin';
+        const result = await printhouseService.adminProvision(req.body, adminId);
+
+        return res.status(201).json({
+            ok: true,
+            message: `Partner "${companyName}" provisioned successfully.`,
+            ...result
+        });
+    } catch (err) {
+        console.error('[ADMIN-PROVISION-ERROR]', err);
+        return res.status(400).json({ ok: false, error: err.message });
     }
 });
 

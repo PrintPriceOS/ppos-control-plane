@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Printhouse } from '../../types/printhouseCapabilities';
 import { listPrinthouses, createPrinthouse } from '../../api/printhouseCapabilitiesClient';
 import { PrinthouseList } from './PrinthouseList';
 import { PrinthouseDetailDrawer } from './PrinthouseDetailDrawer';
-import { BuildingStorefrontIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BuildingStorefrontIcon, XMarkIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 import { getUserRole } from '../../lib/authStore';
 
 export const PrinthouseOnboardingPage: React.FC = () => {
+    const navigate = useNavigate();
     const [printhouses, setPrinthouses] = useState<Printhouse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedPrinthouse, setSelectedPrinthouse] = useState<Printhouse | null>(null);
     
-    // Register Printhouse Modal State
+    // Quick Draft Modal State (lightweight alternative to full form)
     const [showRegisterModal, setShowRegisterModal] = useState(false);
     const [newName, setNewName] = useState('');
     const [newTenantId, setNewTenantId] = useState('');
@@ -104,7 +106,7 @@ export const PrinthouseOnboardingPage: React.FC = () => {
                 isLoading={loading}
                 onSelectPrinthouse={setSelectedPrinthouse}
                 onRefresh={loadPrinthouses}
-                onCreateNew={() => setShowRegisterModal(true)}
+                onCreateNew={() => navigate('/admin/printhouse-onboarding/new')}
                 isSuperAdmin={isSuperAdmin}
             />
 

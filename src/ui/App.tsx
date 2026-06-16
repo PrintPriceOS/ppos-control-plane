@@ -113,6 +113,7 @@ export const App: React.FC = () => {
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
                 <Route path="/admin/printhouse-onboarding" element={<PrinthouseOnboardingPage />} />
+                <Route path="/admin/printhouse-onboarding/new" element={<PrinthouseRegistrationPage adminMode />} />
                 <Route path="/admin/observability" element={<OnboardingObservability />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
                 <Route path="/orders" element={<OrdersPage />} />

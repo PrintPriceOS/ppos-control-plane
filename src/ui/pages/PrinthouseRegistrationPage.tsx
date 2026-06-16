@@ -488,9 +488,10 @@ function isDark() {
 // PrinthouseRegistrationPage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const PrinthouseRegistrationPage: React.FC = () => {
+export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ adminMode = false }) => {
     // Steps: 1: Legal Terms, 2: Company, 3: Capabilities, 4: Machinery & Capacity, 5: Compliance & QA, 6: Plan Selection, 7: Admin Credentials, 8: Success
-    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(1);
+    // In adminMode: step 1 (T&C) is skipped — start at 2
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(adminMode ? 2 : 1);
     const [formData, setFormData] = useState<FormData>({
         termsAccepted: false,
         termsReviewed: false,
@@ -691,7 +692,9 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
     const back = () => {
         setFieldErrors({});
-        setStep(prev => Math.max(prev - 1, 1) as any);
+        // In adminMode step 2 is the first visible step
+        const minStep = adminMode ? 2 : 1;
+        setStep(prev => Math.max(prev - 1, minStep) as any);
     };
 
     // ── Submit ────────────────────────────────────────────────────────────────
@@ -726,7 +729,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                 website: formData.website.trim() || undefined,
                 metadata: {
                     b2b_onboarding: true,
-                    terms_accepted_at: new Date().toISOString(),
+                    terms_accepted_at: adminMode ? null : new Date().toISOString(),
+                    admin_provisioned: adminMode,
                     qualification: {
                         integrationLevel: computedIntegrationLevel,
                         productionCapabilities: formData.productionTypes,
@@ -749,16 +753,20 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                 }
             };
 
-            /**
-             * HANDSHAKE WITH BACKEND PROVISIONING:
-             * The backend 'printhouseService.js' must interpret the 'selectedPlan' to automatically provision:
-             * - AI Budgeter access levels.
-             * - Marketplace 'budgeter_priority' status (High for Enterprise, Standard for Growth, Hidden for Starter).
-             * - Webhook/JDF routing permissions based on the 'integrationLevel'.
-             */
-            const response = await fetch('/api/auth/printhouse/register', {
+            // Route: adminMode → protected admin endpoint, self-register → public auth endpoint
+            const endpoint = adminMode
+                ? '/api/admin/printhouses/provision'
+                : '/api/auth/printhouse/register';
+
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (adminMode) {
+                const token = localStorage.getItem('token') || localStorage.getItem('ppos_token');
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 credentials: 'include',
                 body: JSON.stringify(payload),
             });
@@ -766,9 +774,17 @@ export const PrinthouseRegistrationPage: React.FC = () => {
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                addToast('error', 'Registration error', data?.error || `Error ${response.status}. Please try again.`);
+                addToast('error', 'Error', data?.error || `Error ${response.status}. Please try again.`);
                 return;
             }
+
+            if (adminMode) {
+                // Admin mode: show success screen without auto-login
+                setStep(8);
+                return;
+            }
+
+            // Self-register mode: auto-login
             if (!data.token || !data.user) {
                 addToast('error', 'Unexpected response', 'The server did not return a valid session.');
                 return;
@@ -776,7 +792,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
             setAuthToken(data.token);
             setAuthUser(data.user);
-            setStep(7);
+            setStep(8);
 
             localStorage.removeItem('printhouse_onboarding_draft');
 
@@ -900,22 +916,43 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     if (step === 8) {
         return (
             <>
-                <div style={backdrop}>
+                <div style={adminMode ? { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' } : backdrop}>
                     <div style={{ ...cardWrap, maxWidth: 440 }}>
                         <div style={{ textAlign: 'center' }}>
                             <div style={{ width: 72, height: 72, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                                 <CheckCircle size={40} strokeWidth={1.5} style={{ color: '#10b981' }} />
                             </div>
-                            <PrintPriceLogo className="w-10 h-10 mx-auto mb-4" />
+                            {!adminMode && <PrintPriceLogo className="w-10 h-10 mx-auto mb-4" />}
                             <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
-                                Onboarding Complete!
+                                {adminMode ? 'Partner Provisioned!' : 'Onboarding Complete!'}
                             </h1>
                             <p style={{ margin: '0 0 4px', fontSize: '14px', color: dark ? '#71717a' : '#64748b' }}>
-                                Your print house has been qualified and registered.
+                                {adminMode
+                                    ? `${formData.companyName} has been registered and activated. Credentials have been set.`
+                                    : 'Your print house has been qualified and registered.'}
                             </p>
-                            <p style={{ margin: 0, fontSize: '13px', color: dark ? '#52525b' : '#94a3b8' }}>
-                                Activating node & redirecting to dashboard…
+                            <p style={{ margin: '0 0 20px', fontSize: '13px', color: dark ? '#52525b' : '#94a3b8' }}>
+                                {adminMode
+                                    ? 'The partner can now log in using the credentials you provided.'
+                                    : 'Activating node & redirecting to dashboard…'}
                             </p>
+                            {adminMode && (
+                                <button
+                                    onClick={() => navigate('/admin/printhouse-onboarding')}
+                                    style={{
+                                        padding: '10px 24px',
+                                        background: '#10b981',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    ← Back to Onboarding List
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
