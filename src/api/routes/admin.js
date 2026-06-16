@@ -215,42 +215,7 @@ router.use('/marketplace', marketplaceAdminRouter);
 router.use('/audit', require('./auditExplorerAdmin'));
 router.use('/jobs', require('./jobsAdmin'));
 
-router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
-router.use('/connect', connectAdminRouter);
-router.use('/network', require('./networkOpsAdmin'));
-router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
-router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
-router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
-router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
-router.use('/tenant-governance', adminTenantGovernanceRouter);
-router.use('/tenant-pilots', adminTenantPilotRouter);
-router.use('/tenant-billing', adminTenantBillingRouter);
-router.use('/billing', adminBillingRouter);           // Stripe Paywall Billing
-router.use('/production-monitoring', adminProductionMonitoringRouter);
-
-// Mount Financial Operations Sub-routers
-router.use('/', adminFinancialOperationsComplianceReporting);
-router.use('/', adminFinancialOperationsDataRetentionPrivacy);
-router.use('/', adminFinancialOperationsFinalReleaseCandidate);
-router.use('/', adminFinancialOperationsGoLiveSimulation);
-router.use('/', adminFinancialOperationsPartnerSandbox);
-router.use('/', adminFinancialOperationsPilotMode);
-router.use('/', adminFinancialOperationsPreProductionRunbook);
-router.use('/', adminFinancialOperationsProductionActivationReview);
-router.use('/', adminFinancialOperationsProductionHardening);
-router.use('/', adminFinancialOperationsProviderContractSla);
-router.use('/', adminFinancialOperationsProviderCredentialVault);
-router.use('/', adminFinancialOperationsProviderEventReconciliation);
-router.use('/', adminFinancialOperationsProviderFailureRetry);
-router.use('/', adminFinancialOperationsProviderSandbox);
-router.use('/', adminFinancialOperationsProviderSettlementFiles);
-router.use('/', adminFinancialOperationsProviderWebhookSandbox);
-router.use('/', adminFinancialOperationsReadiness);
-router.use('/', adminFinancialOperationsReleaseGates);
-router.use('/', adminFinancialReconciliation);
-router.use('/', adminGovernedInvoices);
-router.use('/', adminPartnerSettlement);
-router.use('/', adminTaxVatReadiness);
+// Moved Financial Operations and Root catch-alls to the bottom of the router mounts
 
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
@@ -326,6 +291,50 @@ function rangeToInterval(range) {
     default: return "INTERVAL 1 DAY";
   }
 }
+
+// ---------------------------------------------------------
+// RE-MOUNT Root Sub-routers and Financial Operations AT THE BOTTOM
+// These use '/' as base path, which can act as catch-alls and swallow other routes
+// if placed too high in the middleware chain.
+// ---------------------------------------------------------
+router.use('/connect', connectAdminRouter);
+router.use('/network', require('./networkOpsAdmin'));
+router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
+router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
+router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
+router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
+router.use('/tenant-governance', adminTenantGovernanceRouter);
+router.use('/tenant-pilots', adminTenantPilotRouter);
+router.use('/tenant-billing', adminTenantBillingRouter);
+router.use('/billing', adminBillingRouter);           // Stripe Paywall Billing
+router.use('/production-monitoring', adminProductionMonitoringRouter);
+
+router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
+
+// Mount Financial Operations Sub-routers
+router.use('/', adminFinancialOperationsComplianceReporting);
+router.use('/', adminFinancialOperationsDataRetentionPrivacy);
+router.use('/', adminFinancialOperationsFinalReleaseCandidate);
+router.use('/', adminFinancialOperationsGoLiveSimulation);
+router.use('/', adminFinancialOperationsPartnerSandbox);
+router.use('/', adminFinancialOperationsPilotMode);
+router.use('/', adminFinancialOperationsPreProductionRunbook);
+router.use('/', adminFinancialOperationsProductionActivationReview);
+router.use('/', adminFinancialOperationsProductionHardening);
+router.use('/', adminFinancialOperationsProviderContractSla);
+router.use('/', adminFinancialOperationsProviderCredentialVault);
+router.use('/', adminFinancialOperationsProviderEventReconciliation);
+router.use('/', adminFinancialOperationsProviderFailureRetry);
+router.use('/', adminFinancialOperationsProviderSandbox);
+router.use('/', adminFinancialOperationsProviderSettlementFiles);
+router.use('/', adminFinancialOperationsProviderWebhookSandbox);
+router.use('/', adminFinancialOperationsReadiness);
+router.use('/', adminFinancialOperationsReleaseGates);
+router.use('/', adminFinancialReconciliation);
+router.use('/', adminGovernedInvoices);
+router.use('/', adminPartnerSettlement);
+router.use('/', adminTaxVatReadiness);
+
 
 // GET /api/admin/metrics/overview?range=24h
 router.get("/metrics/overview", async (req, res) => {
