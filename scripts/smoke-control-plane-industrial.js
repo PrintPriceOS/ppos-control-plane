@@ -24,10 +24,10 @@ async function runTests() {
     const endpoints = [
         { name: 'Metrics Overview', url: '/api/admin/metrics/overview' },
         { name: 'Audit Log', url: '/api/admin/audit' },
-        { name: 'Artifact Registry', url: '/api/admin/orchestration/artifacts' },
-        { name: 'Worker Fleet', url: '/api/admin/orchestration/workers' },
-        { name: 'Operational Incidents', url: '/api/admin/orchestration/incidents' },
-        { name: 'Lifecycle Policies', url: '/api/admin/orchestration/lifecycle' },
+        { name: 'Artifact Registry', url: '/api/admin/artifacts' },
+        { name: 'Worker Fleet', url: '/api/admin/workers' },
+        { name: 'Operational Incidents', url: '/api/admin/production-monitoring/incidents' },
+        { name: 'Lifecycle Policies', url: '/api/admin/orchestration/lifecycle/process', method: 'post' },
         { name: 'Industrial Telemetry', url: '/api/admin/telemetry/industrial' }
     ];
 
@@ -37,7 +37,10 @@ async function runTests() {
     for (const ep of endpoints) {
         try {
             const start = Date.now();
-            const res = await client.get(ep.url);
+            const res = ep.method === 'post' 
+                ? await client.post(ep.url, {})
+                : await client.get(ep.url);
+            
             const duration = Date.now() - start;
 
             if (res.status === 200 && res.data.ok !== false) {
