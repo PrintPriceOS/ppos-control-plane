@@ -1,53 +1,31 @@
 // hooks/useAdminData.ts
-import { useEffect, useMemo, useState, useCallback } from "react";
+import useSWR from 'swr';
 
 type Status = "idle" | "loading" | "success" | "error" | "refetching";
 
 export function useAdminQuery<T>(key: string, fetcher: () => Promise<T>, refetchIntervalMs?: number) {
-    const [status, setStatus] = useState<Status>("idle");
-    const [data, setData] = useState<T | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [tick, setTick] = useState(0);
+    const safeInterval = refetchIntervalMs && refetchIntervalMs < 1000 ? 5000 : refetchIntervalMs || 0;
 
-    const memoKey = useMemo(() => key, [key]);
-
-    useEffect(() => {
-        if (refetchIntervalMs && refetchIntervalMs > 0) {
-            // Safety guard: prevent browser-killing 1ms loops
-            const safeInterval = refetchIntervalMs < 1000 ? 5000 : refetchIntervalMs;
-            const timer = setInterval(() => setTick(t => t + 1), safeInterval);
-            return () => clearInterval(timer);
+    const { data, error, isLoading, isValidating, mutate } = useSWR<T>(
+        key,
+        fetcher,
+        {
+            refreshInterval: safeInterval,
+            revalidateOnFocus: true,
+            errorRetryCount: 3
         }
-    }, [refetchIntervalMs]);
+    );
 
-    useEffect(() => {
-        let alive = true;
-        if (!data) {
-            setStatus("loading");
-        } else {
-            // Keep status as success to prevent flicker, but we can still fetch in background
-            setStatus("success");
-        }
-        setError(null);
+    let status: Status = "idle";
+    if (isLoading && !data) status = "loading";
+    else if (error) status = "error";
+    else if (isValidating && data) status = "refetching";
+    else if (data) status = "success";
 
-        fetcher()
-            .then((d) => {
-                if (!alive) return;
-                setData(d);
-                setStatus("success");
-            })
-            .catch((e) => {
-                if (!alive) return;
-                setError(e?.message || String(e));
-                setStatus("error");
-            });
-
-        return () => {
-            alive = false;
-        };
-    }, [memoKey, tick]);
-
-    const refetch = useCallback(() => setTick(t => t + 1), []);
-
-    return { status, data, error, refetch };
+    return {
+        status,
+        data: data || null,
+        error: error?.message || error || null,
+        refetch: mutate
+    };
 }

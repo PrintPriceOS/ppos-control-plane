@@ -204,19 +204,12 @@ const adminTaxVatReadiness = require('./adminTaxVatReadiness');
 
 
 /**
- * Mount Sub-routers (Top Priority)
+ * Mount Sub-routers (Core)
  */
-router.use('/printhouses', printhousesAdminRouter);
-router.use('/notifications', require('./adminNotifications'));
-router.use('/machines', require('./machinesAdmin'));
-router.use('/materials', require('./materialsAdmin'));
-router.use('/routing', routingAdminRouter);
-router.use('/marketplace', marketplaceAdminRouter);
-router.use('/audit', require('./auditExplorerAdmin'));
-router.use('/jobs', require('./jobsAdmin'));
 
 // Moved Financial Operations and Root catch-alls to the bottom of the router mounts
 
+router.use('/routing', routingAdminRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
 router.use('/civilization', civilizationAdminRouter);
@@ -834,26 +827,27 @@ router.use('/production-monitoring', adminProductionMonitoringRouter);
 
 router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
 
-// Mount Financial Operations Sub-routers
-router.use('/', adminFinancialOperationsComplianceReporting);
-router.use('/', adminFinancialOperationsDataRetentionPrivacy);
-router.use('/', adminFinancialOperationsFinalReleaseCandidate);
-router.use('/', adminFinancialOperationsGoLiveSimulation);
-router.use('/', adminFinancialOperationsPartnerSandbox);
-router.use('/', adminFinancialOperationsPilotMode);
-router.use('/', adminFinancialOperationsPreProductionRunbook);
-router.use('/', adminFinancialOperationsProductionActivationReview);
-router.use('/', adminFinancialOperationsProductionHardening);
-router.use('/', adminFinancialOperationsProviderContractSla);
-router.use('/', adminFinancialOperationsProviderCredentialVault);
-router.use('/', adminFinancialOperationsProviderEventReconciliation);
-router.use('/', adminFinancialOperationsProviderFailureRetry);
-router.use('/', adminFinancialOperationsProviderSandbox);
-router.use('/', adminFinancialOperationsProviderSettlementFiles);
-router.use('/', adminFinancialOperationsProviderWebhookSandbox);
-router.use('/', adminFinancialOperationsReadiness);
-router.use('/', adminFinancialOperationsReleaseGates);
-router.use('/', adminFinancialReconciliation);
+// Mount Financial Operations Sub-routers under /financial-operations
+router.use('/financial-operations', adminFinancialOperationsComplianceReporting);
+router.use('/financial-operations', adminFinancialOperationsDataRetentionPrivacy);
+router.use('/financial-operations', adminFinancialOperationsFinalReleaseCandidate);
+router.use('/financial-operations', adminFinancialOperationsGoLiveSimulation);
+router.use('/financial-operations', adminFinancialOperationsPartnerSandbox);
+router.use('/financial-operations', adminFinancialOperationsPilotMode);
+router.use('/financial-operations', adminFinancialOperationsPreProductionRunbook);
+router.use('/financial-operations', adminFinancialOperationsProductionActivationReview);
+router.use('/financial-operations', adminFinancialOperationsProductionHardening);
+router.use('/financial-operations', adminFinancialOperationsProviderContractSla);
+router.use('/financial-operations', adminFinancialOperationsProviderCredentialVault);
+router.use('/financial-operations', adminFinancialOperationsProviderEventReconciliation);
+router.use('/financial-operations', adminFinancialOperationsProviderFailureRetry);
+router.use('/financial-operations', adminFinancialOperationsProviderSandbox);
+router.use('/financial-operations', adminFinancialOperationsProviderSettlementFiles);
+router.use('/financial-operations', adminFinancialOperationsProviderWebhookSandbox);
+router.use('/financial-operations', adminFinancialOperationsReadiness);
+router.use('/financial-operations', adminFinancialOperationsReleaseGates);
+
+router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
 router.use('/', adminPartnerSettlement);
 router.use('/', adminTaxVatReadiness);

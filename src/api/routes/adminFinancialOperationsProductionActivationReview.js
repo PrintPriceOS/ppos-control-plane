@@ -21,7 +21,7 @@ const getActor = (req) => {
  * GET /financial-operations/production-activation-review/reviews
  * List all production activation gates.
  */
-router.get('/financial-operations/production-activation-review/reviews', async (req, res) => {
+router.get('/production-activation-review/reviews', async (req, res) => {
     try {
         const rows = await db.query('SELECT * FROM financial_operations_production_activation_gates ORDER BY created_at DESC');
         const formatted = rows.map(row => ({
@@ -54,7 +54,7 @@ router.get('/financial-operations/production-activation-review/reviews', async (
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId
  * Get details of a specific gate.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const rows = await db.query(
@@ -95,7 +95,7 @@ router.get('/financial-operations/production-activation-review/reviews/:activati
  * POST /financial-operations/production-activation-review/reviews
  * Create a new gate.
  */
-router.post('/financial-operations/production-activation-review/reviews', async (req, res) => {
+router.post('/production-activation-review/reviews', async (req, res) => {
     try {
         const actor = getActor(req);
         const result = await gateService.createGate(req.body, actor);
@@ -112,7 +112,7 @@ router.post('/financial-operations/production-activation-review/reviews', async 
  * POST /financial-operations/production-activation-review/reviews/:activationReviewId/evaluate
  * Evaluate eligibility & checks for a gate.
  */
-router.post('/financial-operations/production-activation-review/reviews/:activationReviewId/evaluate', async (req, res) => {
+router.post('/production-activation-review/reviews/:activationReviewId/evaluate', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const actor = getActor(req);
@@ -130,7 +130,7 @@ router.post('/financial-operations/production-activation-review/reviews/:activat
  * POST /financial-operations/production-activation-review/reviews/:activationReviewId/go-no-go
  * Cast go-no-go review decision (approve, reject, revoke).
  */
-router.post('/financial-operations/production-activation-review/reviews/:activationReviewId/go-no-go', async (req, res) => {
+router.post('/production-activation-review/reviews/:activationReviewId/go-no-go', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const actor = getActor(req);
@@ -160,7 +160,7 @@ router.post('/financial-operations/production-activation-review/reviews/:activat
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId/checks
  * Get check statuses for a gate.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId/checks', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId/checks', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const rows = await db.query(
@@ -177,7 +177,7 @@ router.get('/financial-operations/production-activation-review/reviews/:activati
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId/findings
  * Get findings related to a gate.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId/findings', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId/findings', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const rows = await db.query(
@@ -198,7 +198,7 @@ router.get('/financial-operations/production-activation-review/reviews/:activati
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId/evidence-pack
  * Export evidence json.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId/evidence-pack', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId/evidence-pack', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const rows = await db.query(
@@ -219,7 +219,7 @@ router.get('/financial-operations/production-activation-review/reviews/:activati
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId/audit
  * Get audit logs/events for a gate.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId/audit', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId/audit', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const rows = await db.query(
@@ -240,7 +240,7 @@ router.get('/financial-operations/production-activation-review/reviews/:activati
  * GET /financial-operations/production-activation-review/reviews/:activationReviewId/export-preview
  * Get export preview.
  */
-router.get('/financial-operations/production-activation-review/reviews/:activationReviewId/export-preview', async (req, res) => {
+router.get('/production-activation-review/reviews/:activationReviewId/export-preview', async (req, res) => {
     try {
         const gateId = req.params.activationReviewId;
         const gateRows = await db.query(
