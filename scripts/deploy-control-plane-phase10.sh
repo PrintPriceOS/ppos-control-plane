@@ -31,8 +31,8 @@ tar -czf "backups/dist_backup_$(date +%Y%m%d_%H%M%S).tar.gz" dist/ 2>/dev/null |
 # 3. Pull Latest Changes
 echo "[DEPLOY] Fetching latest from phase-10-intelligence-layer..."
 git fetch origin
-git checkout phase-10-intelligence-layer
-git pull origin phase-10-intelligence-layer
+git checkout phase-39.2-tenant-management-console
+git pull origin phase-39.2-tenant-management-console
 
 # 4. Install Dependencies
 echo "[DEPLOY] Installing dependencies..."
