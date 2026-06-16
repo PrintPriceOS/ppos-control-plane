@@ -35,8 +35,8 @@ git checkout phase-39.2-tenant-management-console
 git pull origin phase-39.2-tenant-management-console
 
 # 4. Install Dependencies
-echo "[DEPLOY] Installing dependencies..."
-npm ci
+echo "[DEPLOY] Installing dependencies (including dev for build)..."
+npm ci --include=dev
 
 # 5. Production Build
 echo "[DEPLOY] Building frontend..."
