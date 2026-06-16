@@ -151,6 +151,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         gap: '24px',
     };
 
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [isFocused, setIsFocused] = React.useState(false);
+
     const glassCard: CSSProperties = {
         background: dark ? 'rgba(9,9,11,0.60)' : 'rgba(255,255,255,0.92)',
         border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
@@ -165,8 +168,6 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     };
 
-    const cardRef = React.useRef<HTMLDivElement>(null);
-    const [isFocused, setIsFocused] = React.useState(false);
 
 
     return (
