@@ -752,18 +752,7 @@ router.post("/help/analytics", async (req, res) => {
   }
 });
 
-/**
- * PHASE 21.1: Notification Management
- */
 
-    const queue = require("../services/queue");
-    await queue.notificationQueue.add('deliver', { notificationId: req.params.id });
-
-    res.json({ ok: true, message: "Notification re-enqueued for delivery." });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
 
 // POST /api/admin/notifications/:id/cancel
 router.post("/notifications/:id/cancel", async (req, res) => {

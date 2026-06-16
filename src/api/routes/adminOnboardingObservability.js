@@ -3,11 +3,11 @@ const router = express.Router();
 const onboardingObservabilityService = require('../services/onboardingObservabilityService');
 
 // Middleware for auth
-const { ensureAuthenticated, ensureSuperAdmin } = require('../middleware/auth');
+const { requireAdmin, requireRole } = require('../middleware/auth');
 
 // Protect all routes
-router.use(ensureAuthenticated);
-router.use(ensureSuperAdmin);
+router.use(requireAdmin);
+router.use(requireRole('SUPER_ADMIN'));
 
 /**
  * GET /api/admin/observability/radar
