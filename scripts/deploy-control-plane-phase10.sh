@@ -93,6 +93,7 @@ fi
 # 9. Final Smoke Test
 echo "[DEPLOY] Running post-deploy smoke tests..."
 sleep 5
+export PPOS_CONTROL_URL=http://localhost:8081
 if ! node scripts/smoke-control-plane-industrial.js; then
     echo "[CRITICAL] Post-deploy smoke test FAILED."
     echo "[ROLLBACK] Please refer to docs/rollback-phase10-industrial.md"
