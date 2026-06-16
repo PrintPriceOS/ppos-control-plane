@@ -25,7 +25,7 @@ async function runTests() {
         { name: 'Metrics Overview', url: '/api/admin/metrics/overview' },
         { name: 'Audit Log', url: '/api/admin/audit' },
         { name: 'Artifact Registry', url: '/api/admin/artifacts' },
-        { name: 'Worker Fleet', url: '/api/admin/workers' },
+        { name: 'Worker Fleet', url: '/api/admin/workers/fleet' },
         { name: 'Operational Incidents', url: '/api/admin/production-monitoring/incidents' },
         { name: 'Lifecycle Policies', url: '/api/admin/orchestration/lifecycle/process', method: 'post' },
         { name: 'Industrial Telemetry', url: '/api/admin/telemetry/industrial' }

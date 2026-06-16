@@ -134,7 +134,55 @@ class ArtifactRegistryService {
     }
 
     /**
+     * List artifacts with optional filters.
+     * Used by lifecycle manager for bulk transitions.
+     */
+    async listArtifacts({ limit = 100, storageTier, tenantId } = {}) {
+        let query = 'SELECT * FROM preflight_artifacts WHERE deleted_at IS NULL';
+        const params = [];
+
+        if (storageTier) {
+            query += ' AND storage_tier = ?';
+            params.push(storageTier);
+        }
+        if (tenantId) {
+            query += ' AND tenant_id = ?';
+            params.push(tenantId);
+        }
+
+        query += ' ORDER BY created_at ASC LIMIT ?';
+        params.push(limit);
+
+        return db.query(query, params);
+    }
+
+    /**
+     * Update artifact fields (used by lifecycle transitions).
+     */
+    async updateArtifact(id, fields) {
+        const allowedFields = ['storage_tier', 'retention_policy'];
+        const setClauses = [];
+        const params = [];
+
+        for (const [key, value] of Object.entries(fields)) {
+            if (allowedFields.includes(key)) {
+                setClauses.push(`${key} = ?`);
+                params.push(value);
+            }
+        }
+
+        if (setClauses.length === 0) return;
+
+        params.push(id);
+        await db.query(
+            `UPDATE preflight_artifacts SET ${setClauses.join(', ')} WHERE id = ?`,
+            params
+        );
+    }
+
+    /**
      * Mark an artifact as deleted (soft delete).
+     * Alias: softDeleteArtifact for backward compatibility.
      */
     async softDelete(id, reason) {
         logger.warn({
@@ -146,9 +194,14 @@ class ArtifactRegistryService {
         await db.query(`
             UPDATE preflight_artifacts 
             SET deleted_at = CURRENT_TIMESTAMP, 
-                metadata_json = JSON_MERGE_PATCH(metadata_json, ?)
+                metadata_json = JSON_MERGE_PATCH(COALESCE(metadata_json, '{}'), ?)
             WHERE id = ?
         `, [JSON.stringify({ deletion_reason: reason }), id]);
+    }
+
+    /** Alias for lifecycle manager compatibility */
+    async softDeleteArtifact(id) {
+        return this.softDelete(id, 'RETENTION_EXPIRED');
     }
 }
 
