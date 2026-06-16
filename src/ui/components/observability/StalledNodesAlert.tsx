@@ -15,7 +15,9 @@ interface StalledNodesAlertProps {
     onRemind?: () => void;
 }
 
-export const StalledNodesAlert: React.FC<StalledNodesAlertProps> = ({ data = [], isLoading, onRemind }) => {
+export const StalledNodesAlert: React.FC<StalledNodesAlertProps> = ({ data, isLoading, onRemind }) => {
+    // Normalize null/undefined to empty array to avoid .length crashes during loading
+    const nodes = data ?? [];
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     
     const [sendingId, setSendingId] = useState<string | null>(null);
@@ -72,11 +74,11 @@ export const StalledNodesAlert: React.FC<StalledNodesAlertProps> = ({ data = [],
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {isLoading && data.length === 0 ? (
+                {isLoading && nodes.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Loading stalled nodes...</div>
-                ) : data.length === 0 ? (
+                ) : nodes.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No stalled nodes found. Excellent!</div>
-                ) : data.map(node => (
+                ) : nodes.map(node => (
                     <div key={node.id} style={{
                         padding: '16px',
                         background: isDark ? 'rgba(245, 158, 11, 0.05)' : 'rgba(245, 158, 11, 0.1)',

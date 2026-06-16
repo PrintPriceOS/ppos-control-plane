@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users, Filter, Webhook, ShieldCheck } from 'lucide-react';
+import { Users, Filter, Webhook, ShieldCheck, Loader2 } from 'lucide-react';
 
 interface FunnelData {
   stage: string;
