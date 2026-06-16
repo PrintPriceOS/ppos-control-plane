@@ -1,15 +1,40 @@
 import React from 'react';
 import { FunnelHeatmap } from '../../components/observability/FunnelHeatmap';
 import { StalledNodesAlert } from '../../components/observability/StalledNodesAlert';
-import { Target, Activity } from 'lucide-react';
+import { Target, Activity, Loader2 } from 'lucide-react';
+import { useAdminQuery } from '../../hooks/useAdminData';
+
+const fetchRadar = async () => {
+    const res = await fetch('/api/admin/observability/radar', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+    if (!res.ok) throw new Error('Failed');
+    return (await res.json()).metrics;
+};
+
+const fetchFunnel = async () => {
+    const res = await fetch('/api/admin/observability/funnel', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+    if (!res.ok) throw new Error('Failed');
+    return (await res.json()).funnel;
+};
+
+const fetchStalled = async () => {
+    const res = await fetch('/api/admin/observability/stalled', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+    if (!res.ok) throw new Error('Failed');
+    return (await res.json()).stalled;
+};
 
 export const OnboardingObservability: React.FC = () => {
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
-    // Mock KPIs
-    const capturedOrders = 8420;
-    const reboundedOrders = 315;
-    const captureRate = ((capturedOrders / (capturedOrders + reboundedOrders)) * 100).toFixed(1);
+    const radarQuery = useAdminQuery('onboarding:radar', fetchRadar, 15000);
+    const funnelQuery = useAdminQuery('onboarding:funnel', fetchFunnel, 30000);
+    const stalledQuery = useAdminQuery('onboarding:stalled', fetchStalled, 15000);
+
+    const radarLoading = radarQuery.status === 'loading';
+    const capturedOrders = radarQuery.data?.capturedOrders || 0;
+    const reboundedOrders = radarQuery.data?.reboundedOrders || 0;
+    const captureRate = capturedOrders + reboundedOrders > 0 
+        ? ((capturedOrders / (capturedOrders + reboundedOrders)) * 100).toFixed(1)
+        : '0.0';
 
     return (
         <div style={{
@@ -49,14 +74,18 @@ export const OnboardingObservability: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
                         <div>
                             <span style={{ fontSize: '12px', color: isDark ? '#a1a1aa' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Capture Rate</span>
-                            <div style={{ fontSize: '36px', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>{captureRate}%</div>
+                            {radarLoading ? (
+                                <Loader2 size={24} className="animate-spin text-emerald-500 mt-2" />
+                            ) : (
+                                <div style={{ fontSize: '36px', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>{captureRate}%</div>
+                            )}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#e4e4e7' : '#1e293b' }}>
-                                {capturedOrders.toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 400, color: isDark ? '#a1a1aa' : '#64748b' }}>Captured</span>
+                                {radarLoading ? '-' : capturedOrders.toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 400, color: isDark ? '#a1a1aa' : '#64748b' }}>Captured</span>
                             </div>
                             <div style={{ fontSize: '14px', fontWeight: 600, color: '#dc0000' }}>
-                                {reboundedOrders.toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 400, color: isDark ? '#a1a1aa' : '#64748b' }}>Rebounded</span>
+                                {radarLoading ? '-' : reboundedOrders.toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 400, color: isDark ? '#a1a1aa' : '#64748b' }}>Rebounded</span>
                             </div>
                         </div>
                     </div>
@@ -93,8 +122,15 @@ export const OnboardingObservability: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-                <FunnelHeatmap />
-                <StalledNodesAlert />
+                <FunnelHeatmap 
+                    data={funnelQuery.data} 
+                    isLoading={funnelQuery.status === 'loading'} 
+                />
+                <StalledNodesAlert 
+                    data={stalledQuery.data} 
+                    isLoading={stalledQuery.status === 'loading'} 
+                    onRemind={stalledQuery.refetch}
+                />
             </div>
         </div>
     );
