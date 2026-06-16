@@ -80,6 +80,9 @@ import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
 import { PrinthouseOnboardingPage } from './pages/printhouse/PrinthouseOnboardingPage';
 import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
+import { ActivationGuard } from './components/auth/ActivationGuard';
+import { ActivationHub } from './pages/connect/ActivationHub';
+import { OnboardingObservability } from './pages/admin/OnboardingObservability';
 import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
 import { TenantPilotReadinessPage } from './pages/pilot/TenantPilotReadinessPage';
 
@@ -102,13 +105,15 @@ export const App: React.FC = () => {
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<CommandCenterPage />} />
+                <Route path="/dashboard" element={<ActivationGuard><CommandCenterPage /></ActivationGuard>} />
+                <Route path="/activation-hub" element={<ActivationHub />} />
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
                 <Route path="/audit" element={<div className="p-8"><AuditExplorerPage /></div>} />
                 <Route path="/usage" element={<UsageQuotasPage />} />
                 <Route path="/printhouses" element={<PrinthousesPage />} />
                 <Route path="/admin/printhouse-onboarding" element={<PrinthouseOnboardingPage />} />
+                <Route path="/admin/observability" element={<OnboardingObservability />} />
                 <Route path="/printhouses/:id" element={<PrinthouseDetailPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
 

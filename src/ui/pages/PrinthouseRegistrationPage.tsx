@@ -48,7 +48,7 @@ const InfoTooltip: React.FC<{ text: string }> = ({ text }) => {
     const [show, setShow] = useState(false);
     return (
         <div style={{ position: 'relative', display: 'inline-block', marginLeft: '6px' }}>
-            <HelpCircle 
+            <HelpCircle
                 size={15}
                 strokeWidth={1.5}
                 style={{ cursor: 'help', color: '#dc0000', display: 'inline', verticalAlign: 'middle' }}
@@ -118,18 +118,18 @@ interface StrengthResult { score: 0 | 1 | 2 | 3 | 4; label: string; color: strin
 
 function checkPasswordStrength(pw: string): StrengthResult {
     let score = 0;
-    if (pw.length >= 8)  score++;
+    if (pw.length >= 8) score++;
     if (pw.length >= 12) score++;
     if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
     if (/\d/.test(pw)) score++;
     if (/[^A-Za-z0-9]/.test(pw)) score++;
     const clamped = Math.min(score, 4) as 0 | 1 | 2 | 3 | 4;
     const map: Record<0 | 1 | 2 | 3 | 4, { label: string; color: string }> = {
-        0: { label: 'Very weak',  color: '#ef4444' },
-        1: { label: 'Weak',       color: '#f97316' },
-        2: { label: 'Medium',     color: '#eab308' },
-        3: { label: 'Strong',     color: '#22c55e' },
-        4: { label: 'Very strong',color: '#10b981' },
+        0: { label: 'Very weak', color: '#ef4444' },
+        1: { label: 'Weak', color: '#f97316' },
+        2: { label: 'Medium', color: '#eab308' },
+        3: { label: 'Strong', color: '#22c55e' },
+        4: { label: 'Very strong', color: '#10b981' },
     };
     return { score: clamped, ...map[clamped] };
 }
@@ -518,7 +518,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         billingInterval: 'monthly',
     });
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormData, string>>>({});
-    const [showPw, setShowPw]   = useState(false);
+    const [showPw, setShowPw] = useState(false);
     const [showCpw, setShowCpw] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -545,7 +545,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const target = e.currentTarget;
         if (formData.termsReviewed) return;
-        
+
         const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 20;
         if (isAtBottom) {
             setFormData(prev => ({ ...prev, termsReviewed: true }));
@@ -560,7 +560,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                 const parsed = JSON.parse(saved);
                 setFormData(prev => ({ ...prev, ...parsed }));
                 addToast('info', 'Draft recovered', 'We restored previously entered data.');
-            } catch (e) {}
+            } catch (e) { }
         }
     }, []);
 
@@ -699,8 +699,21 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         e.preventDefault();
         if (!validateStep7()) return;
 
+        if (formData.presses.length === 0) {
+            addToast('error', 'Missing Data', 'Step 4: Machine inventory is empty. Please add at least one press.');
+            return;
+        }
+        if (!formData.selectedPlan || !['starter', 'growth', 'enterprise'].includes(formData.selectedPlan)) {
+            addToast('error', 'Missing Data', 'Step 6: Invalid plan selected. Please select a valid subscription plan.');
+            return;
+        }
+
         setLoading(true);
         try {
+            let computedIntegrationLevel = 'Dashboard Only';
+            if (formData.selectedPlan === 'growth') computedIntegrationLevel = 'API-ready';
+            else if (formData.selectedPlan === 'enterprise') computedIntegrationLevel = 'Fully automated routing';
+
             // Bundle B2B qualification responses inside a structured metadata object
             const payload = {
                 companyName: formData.companyName.trim(),
@@ -715,13 +728,17 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     b2b_onboarding: true,
                     terms_accepted_at: new Date().toISOString(),
                     qualification: {
-                        productionTypes: formData.productionTypes,
+                        integrationLevel: computedIntegrationLevel,
+                        productionCapabilities: formData.productionTypes,
+                        machineInventory: formData.presses.map(p => ({
+                            templateId: p.templateId,
+                            quantity: p.quantity,
+                            name: p.name
+                        })),
                         maxSheetSize: formData.maxSheetSize.trim(),
-                        presses: formData.presses,
                         typicalJobs: formData.typicalJobs.trim(),
                         monthlyVolume: formData.monthlyVolume,
                         utilization: formData.utilization,
-                        integrationLevel: formData.integrationLevel,
                         compliance_iso_standards: formData.standards,
                         certifications: formData.certifications,
                         qaModules: formData.qaModules,
@@ -732,6 +749,13 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                 }
             };
 
+            /**
+             * HANDSHAKE WITH BACKEND PROVISIONING:
+             * The backend 'printhouseService.js' must interpret the 'selectedPlan' to automatically provision:
+             * - AI Budgeter access levels.
+             * - Marketplace 'budgeter_priority' status (High for Enterprise, Standard for Growth, Hidden for Starter).
+             * - Webhook/JDF routing permissions based on the 'integrationLevel'.
+             */
             const response = await fetch('/api/auth/printhouse/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -753,6 +777,8 @@ export const PrinthouseRegistrationPage: React.FC = () => {
             setAuthToken(data.token);
             setAuthUser(data.user);
             setStep(7);
+
+            localStorage.removeItem('printhouse_onboarding_draft');
 
             // Redirect trial user to dashboard where the PaywallModal or SubscriptionGuard will prompt them if needed
             setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
@@ -821,7 +847,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         padding: '48px 40px',
-        boxShadow: isFocused 
+        boxShadow: isFocused
             ? (dark ? '0 40px 80px rgba(0,0,0,0.8)' : '0 40px 80px rgba(0,0,0,0.2)')
             : (dark ? '0 32px 64px rgba(0,0,0,0.6)' : '0 32px 64px rgba(0,0,0,0.10)'),
         transform: isFocused ? 'scale(1.01)' : 'scale(1)',
@@ -848,7 +874,7 @@ export const PrinthouseRegistrationPage: React.FC = () => {
     const renderReviewSummary = () => (
         <div style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: dark ? '#fff' : '#0f172a' }}>Review your setup</h2>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: dark ? '#ffffff' : '#000000' }}>Selected Plan:</span>
@@ -858,11 +884,11 @@ export const PrinthouseRegistrationPage: React.FC = () => {
                     <span style={{ color: dark ? '#ffffff' : '#000000' }}>Billing Cycle:</span>
                     <span style={{ fontWeight: 600, color: dark ? '#fff' : '#0f172a' }}>{formData.billingInterval === 'annual' ? 'Annual (Save 20%)' : 'Monthly'}</span>
                 </div>
-                
+
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(234, 179, 8, 0.1)', borderRadius: '8px', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
                     <p style={{ fontSize: '13px', color: '#eab308', margin: 0 }}>
                         {formData.selectedPlan === 'trial' || formData.selectedPlan === 'starter'
-                            ? "Your 14-day free evaluation starts immediately upon registration. Full platform access included." 
+                            ? "Your 14-day free evaluation starts immediately upon registration. Full platform access included."
                             : "Your subscription billing cycle starts immediately. Enterprise-grade routing & support active."}
                     </p>
                 </div>
@@ -923,1098 +949,1098 @@ export const PrinthouseRegistrationPage: React.FC = () => {
 
                     {/* Stepper Card */}
                     <div style={{ position: 'relative', zIndex: 1 }} onFocusCapture={() => setIsFocused(true)} onBlurCapture={() => setIsFocused(false)}>
-                        <div 
+                        <div
                             ref={cardRef}
                             style={glassCard}
                         >
-                        {/* Step indicator */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
-                            {[1, 2, 3, 4, 5, 6, 7].map(i => (
-                                <React.Fragment key={i}>
-                                    <div style={stepDot(i)}>{i}</div>
-                                    {i < 7 && <div style={{ ...stepLine, background: step >= i + 1 ? '#dc0000' : dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />}
-                                </React.Fragment>
-                            ))}
-                        </div>
+                            {/* Step indicator */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
+                                {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                                    <React.Fragment key={i}>
+                                        <div style={stepDot(i)}>{i}</div>
+                                        {i < 7 && <div style={{ ...stepLine, background: step >= i + 1 ? '#dc0000' : dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)' }} />}
+                                    </React.Fragment>
+                                ))}
+                            </div>
 
-                        {/* Progress Bar & Estimated Time */}
-                        <div style={{ marginBottom: '24px' }}>
-                            <div style={{ 
-                                height: '4px', 
-                                background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                                borderRadius: '4px',
-                                overflow: 'hidden'
-                            }}>
-                                <div style={{ 
-                                    width: `${(() => {
+                            {/* Progress Bar & Estimated Time */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <div style={{
+                                    height: '4px',
+                                    background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        width: `${(() => {
+                                            const stepPercent = { 1: 14, 2: 28, 3: 42, 4: 57, 5: 71, 6: 85, 7: 100, 8: 100 };
+                                            return stepPercent[step] || 0;
+                                        })()}%`,
+                                        height: '100%',
+                                        background: '#dc0000',
+                                        transition: 'width 0.3s ease'
+                                    }} />
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    marginTop: '8px',
+                                    fontSize: '11px',
+                                    color: dark ? '#71717a' : '#64748b'
+                                }}>
+                                    <span>Progress {(() => {
                                         const stepPercent = { 1: 14, 2: 28, 3: 42, 4: 57, 5: 71, 6: 85, 7: 100, 8: 100 };
                                         return stepPercent[step] || 0;
-                                    })()}%`, 
-                                    height: '100%', 
-                                    background: '#dc0000',
-                                    transition: 'width 0.3s ease'
-                                }} />
-                            </div>
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                marginTop: '8px',
-                                fontSize: '11px',
-                                color: dark ? '#71717a' : '#64748b'
-                            }}>
-                                <span>Progress {(() => {
-                                    const stepPercent = { 1: 14, 2: 28, 3: 42, 4: 57, 5: 71, 6: 85, 7: 100, 8: 100 };
-                                    return stepPercent[step] || 0;
-                                })()}%</span>
-                                <span>Estimated time: {step === 1 ? '3 min left' : step <= 3 ? '2 min left' : '1 min left'}</span>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '24px' }}>
-                            <h2 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
-                                {step === 1 && 'Step 1: Partner Terms'}
-                                {step === 2 && 'Step 2: Company Identity'}
-                                {step === 3 && 'Step 3: Node Capabilities'}
-                                {step === 4 && 'Step 4: Machinery & Volume'}
-                                {step === 5 && 'Step 5: Plan & Compliance'}
-                                {step === 6 && 'Step 6: Review Qualification'}
-                                {step === 7 && 'Step 7: Administrator Credentials'}
-                            </h2>
-                            <p style={{ margin: 0, fontSize: '13px', color: dark ? '#ffffff' : '#000000' }}>
-                                {step === 1 && 'Review and accept the legal B2B operating terms.'}
-                                {step === 2 && 'Basic identifiers of your facility.'}
-                                {step === 3 && 'Machine output dimensions and capability nodes.'}
-                                {step === 4 && 'Identify baseline machinery and monthly capacity.'}
-                                {step === 5 && 'Select subscription plan & integration standard.'}
-                                {step === 6 && 'Verify all B2B data before establishing your master admin account.'}
-                                {step === 7 && 'Establish the master administrative account.'}
-                            </p>
-                        </div>
-
-                        {/* ── STEP 1: TERMS ────────────────────────────────────── */}
-                        {step === 1 && (
-                            <div>
-                                <div 
-                                    ref={termsContainerRef}
-                                    onScroll={handleTermsScroll}
-                                    style={{
-                                        height: '240px',
-                                        overflowY: 'auto',
-                                        padding: '16px',
-                                        background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                                        border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
-                                        marginBottom: '20px',
-                                        fontSize: '12px',
-                                        lineHeight: '1.6',
-                                        color: dark ? '#ffffff' : '#000000',
-                                    }}
-                                >
-                                    <h4 style={{ color: dark ? '#f4f4f5' : '#0f172a', fontWeight: 800, marginBottom: '8px' }}>B2B Print Node Terms</h4>
-                                    <p style={{ fontSize: '10px', opacity: 0.6 }}>Last updated: 2026-03-25</p>
-                                    <p><strong>1. Scope:</strong> These Partner Terms govern the commercial relationship between Print Price Pro and B2B print houses joining the PrintPrice OS network.</p>
-                                    <p><strong>2. Nature of the Relationship:</strong> PrintPrice Pro operates an orchestration system connecting validated demand with qualified partners. No joint venture or employment relationship is created.</p>
-                                    <p><strong>3. Admission and Qualification:</strong> Admission is subject to technical verification of capabilities, equipment, quality control modules, and compliance registry.</p>
-                                    <p><strong>4. Partner Obligations:</strong> Partners must maintain accurate capacity levels, execute jobs to spec, secure customer files, and avoid platform bypass.</p>
-                                    <p><strong>5. Quality and SLA:</strong> Production must strictly conform to color, binding, and finishing specs. Defective jobs require remediation or reprints.</p>
-                                    <p><strong>6. Non-Circumvention:</strong> Partners agree not to bypass PrintPrice Pro to transact directly with platform-sourced publishers.</p>
+                                    })()}%</span>
+                                    <span>Estimated time: {step === 1 ? '3 min left' : step <= 3 ? '2 min left' : '1 min left'}</span>
                                 </div>
+                            </div>
 
-                                <p style={{ fontSize: '12.5px', color: dark ? '#ffffff' : '#000000', fontStyle: 'italic', margin: '18px 0 0', opacity: 0.9, textAlign: 'left', lineHeight: '1.4' }}>
-                                    <strong>Start your 14-day free trial.</strong> Full access to all feature nodes. No credit card required upfront.
+                            <div style={{ marginBottom: '24px' }}>
+                                <h2 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
+                                    {step === 1 && 'Step 1: Partner Terms'}
+                                    {step === 2 && 'Step 2: Company Identity'}
+                                    {step === 3 && 'Step 3: Node Capabilities'}
+                                    {step === 4 && 'Step 4: Machinery & Volume'}
+                                    {step === 5 && 'Step 5: Plan & Compliance'}
+                                    {step === 6 && 'Step 6: Review Qualification'}
+                                    {step === 7 && 'Step 7: Administrator Credentials'}
+                                </h2>
+                                <p style={{ margin: 0, fontSize: '13px', color: dark ? '#ffffff' : '#000000' }}>
+                                    {step === 1 && 'Review and accept the legal B2B operating terms.'}
+                                    {step === 2 && 'Basic identifiers of your facility.'}
+                                    {step === 3 && 'Machine output dimensions and capability nodes.'}
+                                    {step === 4 && 'Identify baseline machinery and monthly capacity.'}
+                                    {step === 5 && 'Select subscription plan & integration standard.'}
+                                    {step === 6 && 'Verify all B2B data before establishing your master admin account.'}
+                                    {step === 7 && 'Establish the master administrative account.'}
                                 </p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <label style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: '10px', 
-                                        cursor: formData.termsReviewed ? 'pointer' : 'not-allowed',
-                                        opacity: formData.termsReviewed ? 1 : 0.5
-                                    }}>
-                                        <input 
-                                            type="checkbox" 
-                                            disabled={!formData.termsReviewed}
-                                            checked={formData.termsAccepted}
-                                            onChange={(e) => setFormData(p => ({ ...p, termsAccepted: e.target.checked }))}
-                                            style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
-                                        />
-                                        <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#e2e8f0' : '#334155' }}>I accept the Partner Operating Terms</span>
-                                    </label>
-                                    <span style={{ fontSize: '11px', color: '#dc0000', display: !formData.termsReviewed ? 'block' : 'none' }}>
-                                        * Please scroll to the bottom of the terms container to enable acceptance.
-                                    </span>
-                                </div>
-
-
-
-                                <div style={{ marginTop: '24px' }}>
-                                    <AuthButton id="reg-next-1" type="button" onClick={next} disabled={!formData.termsAccepted}>
-                                        <span>Accept & Continue</span>
-                                        <ArrowRight size={16} strokeWidth={1.5} />
-                                    </AuthButton>
-                                </div>
                             </div>
-                        )}
 
-                        {/* ── STEP 2: COMPANY IDENTITY ─────────────────────────── */}
-                        {step === 2 && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                <div style={{ gridColumn: '1 / -1' }}>
+                            {/* ── STEP 1: TERMS ────────────────────────────────────── */}
+                            {step === 1 && (
+                                <div>
+                                    <div
+                                        ref={termsContainerRef}
+                                        onScroll={handleTermsScroll}
+                                        style={{
+                                            height: '240px',
+                                            overflowY: 'auto',
+                                            padding: '16px',
+                                            background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+                                            marginBottom: '20px',
+                                            fontSize: '12px',
+                                            lineHeight: '1.6',
+                                            color: dark ? '#ffffff' : '#000000',
+                                        }}
+                                    >
+                                        <h4 style={{ color: dark ? '#f4f4f5' : '#0f172a', fontWeight: 800, marginBottom: '8px' }}>B2B Print Node Terms</h4>
+                                        <p style={{ fontSize: '10px', opacity: 0.6 }}>Last updated: 2026-03-25</p>
+                                        <p><strong>1. Scope:</strong> These Partner Terms govern the commercial relationship between Print Price Pro and B2B print houses joining the PrintPrice OS network.</p>
+                                        <p><strong>2. Nature of the Relationship:</strong> PrintPrice Pro operates an orchestration system connecting validated demand with qualified partners. No joint venture or employment relationship is created.</p>
+                                        <p><strong>3. Admission and Qualification:</strong> Admission is subject to technical verification of capabilities, equipment, quality control modules, and compliance registry.</p>
+                                        <p><strong>4. Partner Obligations:</strong> Partners must maintain accurate capacity levels, execute jobs to spec, secure customer files, and avoid platform bypass.</p>
+                                        <p><strong>5. Quality and SLA:</strong> Production must strictly conform to color, binding, and finishing specs. Defective jobs require remediation or reprints.</p>
+                                        <p><strong>6. Non-Circumvention:</strong> Partners agree not to bypass PrintPrice Pro to transact directly with platform-sourced publishers.</p>
+                                    </div>
+
+                                    <p style={{ fontSize: '12.5px', color: dark ? '#ffffff' : '#000000', fontStyle: 'italic', margin: '18px 0 0', opacity: 0.9, textAlign: 'left', lineHeight: '1.4' }}>
+                                        <strong>Start your 14-day free trial.</strong> Full access to all feature nodes. No credit card required upfront.
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            cursor: formData.termsReviewed ? 'pointer' : 'not-allowed',
+                                            opacity: formData.termsReviewed ? 1 : 0.5
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                disabled={!formData.termsReviewed}
+                                                checked={formData.termsAccepted}
+                                                onChange={(e) => setFormData(p => ({ ...p, termsAccepted: e.target.checked }))}
+                                                style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '13px', color: dark ? '#e2e8f0' : '#334155' }}>I accept the Partner Operating Terms</span>
+                                        </label>
+                                        <span style={{ fontSize: '11px', color: '#dc0000', display: !formData.termsReviewed ? 'block' : 'none' }}>
+                                            * Please scroll to the bottom of the terms container to enable acceptance.
+                                        </span>
+                                    </div>
+
+
+
+                                    <div style={{ marginTop: '24px' }}>
+                                        <AuthButton id="reg-next-1" type="button" onClick={next} disabled={!formData.termsAccepted}>
+                                            <span>Accept & Continue</span>
+                                            <ArrowRight size={16} strokeWidth={1.5} />
+                                        </AuthButton>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── STEP 2: COMPANY IDENTITY ─────────────────────────── */}
+                            {step === 2 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <ValidatedInput
+                                            id="reg-company"
+                                            label="Company Name *"
+                                            type="text"
+                                            placeholder="Garciaprint Ltd"
+                                            value={formData.companyName}
+                                            onChange={set('companyName')}
+                                            icon={Building2 as any}
+                                            error={fieldErrors.companyName}
+                                            validator={val => val.trim().length > 0}
+                                        />
+                                    </div>
                                     <ValidatedInput
-                                        id="reg-company"
-                                        label="Company Name *"
+                                        id="reg-contact"
+                                        label="Contact Name *"
                                         type="text"
-                                        placeholder="Garciaprint Ltd"
-                                        value={formData.companyName}
-                                        onChange={set('companyName')}
+                                        placeholder="John Garcia"
+                                        value={formData.contactName}
+                                        onChange={set('contactName')}
                                         icon={Building2 as any}
-                                        error={fieldErrors.companyName}
+                                        error={fieldErrors.contactName}
                                         validator={val => val.trim().length > 0}
                                     />
-                                </div>
-                                <ValidatedInput
-                                    id="reg-contact"
-                                    label="Contact Name *"
-                                    type="text"
-                                    placeholder="John Garcia"
-                                    value={formData.contactName}
-                                    onChange={set('contactName')}
-                                    icon={Building2 as any}
-                                    error={fieldErrors.contactName}
-                                    validator={val => val.trim().length > 0}
-                                />
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
-                                        Country *
-                                    </label>
-                                    <div style={{ position: 'relative' }}>
-                                        <input
-                                            id="reg-country"
-                                            list="country-options"
-                                            placeholder="Type to search country..."
-                                            value={COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}
-                                            onChange={(e) => {
-                                                const label = e.target.value;
-                                                const found = COUNTRIES.find(c => c.label.toLowerCase() === label.toLowerCase() || c.code.toLowerCase() === label.toLowerCase());
-                                                setFormData(p => ({ ...p, country: found ? found.code : label }));
-                                            }}
-                                            style={{
-                                                width: '100%', padding: '11px 14px',
-                                                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                                                border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
-                                                color: dark ? '#f4f4f5' : '#0f172a',
-                                                fontSize: '14px', fontWeight: 500, outline: 'none',
-                                                fontFamily: "'Manrope', system-ui, sans-serif",
-                                                boxSizing: 'border-box'
-                                            }}
-                                        />
-                                        {COUNTRIES.some(c => c.code.toLowerCase() === formData.country.toLowerCase()) && (
-                                            <div style={{ position: 'absolute', right: '14px', top: '14px', pointerEvents: 'none', zIndex: 10 }}>
-                                                <CheckCircle size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <datalist id="country-options">
-                                        {COUNTRIES.map((c) => (
-                                            <option key={c.code} value={c.label} />
-                                        ))}
-                                    </datalist>
-                                    {fieldErrors.country && <span style={{ fontSize: '11px', color: '#ef4444', textAlign: 'left', display: 'block', marginTop: '4px' }}>{fieldErrors.country}</span>}
-                                </div>
-                                <ValidatedInput
-                                    id="reg-city"
-                                    label="City *"
-                                    type="text"
-                                    placeholder="London"
-                                    value={formData.city}
-                                    onChange={set('city')}
-                                    icon={MapPin as any}
-                                    error={fieldErrors.city}
-                                    validator={val => val.trim().length > 0}
-                                />
-                                <ValidatedInput
-                                    id="reg-phone"
-                                    label="Phone (Optional)"
-                                    type="tel"
-                                    placeholder="+44 20 7946 0192"
-                                    value={formData.phone}
-                                    onChange={set('phone')}
-                                    icon={Phone as any}
-                                    validator={val => val.trim().length > 0}
-                                />
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <ValidatedInput
-                                        id="reg-website"
-                                        label="Website (Optional)"
-                                        type="url"
-                                        placeholder="https://garciaprint.com"
-                                        value={formData.website}
-                                        onChange={set('website')}
-                                        icon={Globe as any}
-                                        error={fieldErrors.website}
-                                        validator={val => val.trim() === '' || /^https?:\/\//.test(val.trim())}
-                                    />
-                                </div>
- 
-                                <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', marginTop: '12px' }}>
-                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-next-2" type="button" onClick={next}>
-                                            <span>Continue</span>
-                                            <ArrowRight size={16} strokeWidth={1.5} />
-                                        </AuthButton>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── STEP 3: CAPABILITIES ─────────────────────────────── */}
-                        {step === 3 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
-                                        Production Capabilities (Select all that apply) *
-                                    </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                        {B2B_PRODUCTION_TYPES.map(type => {
-                                            const active = formData.productionTypes.includes(type);
-                                            return (
-                                                <button
-                                                    key={type}
-                                                    type="button"
-                                                    onClick={() => toggleProductionType(type)}
-                                                    style={badgeBtnStyle(active, dark)}
-                                                >
-                                                    {active && <CheckSquare size={14} strokeWidth={1.5} style={{ marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }} />}
-                                                    {type}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label style={{
-                                        fontSize: '10px', fontWeight: 800,
-                                        color: dark ? '#52525b' : '#94a3b8',
-                                        textTransform: 'uppercase', letterSpacing: '0.08em',
-                                        fontFamily: "'Manrope', system-ui, sans-serif",
-                                        display: 'block', marginBottom: '6px'
-                                    }}>
-                                        Max Supported Sheet Size *
-                                        <InfoTooltip text="Used to route jobs that fit your presses. Reduces waste by 23% on average." />
-                                    </label>
-                                                                    <div style={{ position: 'relative' }}>
-                                        <select
-                                            id="reg-maxsheet"
-                                            value={formData.maxSheetSize}
-                                            onChange={set('maxSheetSize')}
-                                            style={{
-                                                ...selectStyle(dark),
-                                                border: fieldErrors.maxSheetSize ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
-                                                boxSizing: 'border-box'
-                                            }}
-                                        >
-                                            <option value="">-- Select Sheet Size Variable --</option>
-                                            {SUPPORTED_SHEET_SIZES.map(opt => (
-                                                <option key={opt.value} value={opt.value} style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {fieldErrors.maxSheetSize && (
-                                            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#ef4444', textAlign: 'left' }}>
-                                                {fieldErrors.maxSheetSize}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
-                                        Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
-                                    </p>
-                                </div>
-
-                                {/* Minimalist Data Flow Illustration */}
-                                <div style={{ 
-                                    marginTop: '8px', 
-                                    padding: '16px', 
-                                    background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', 
-                                    border: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, 
-                                    borderRadius: '8px', 
-                                    textAlign: 'center' 
-                                }}>
-                                    <span style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>
-                                        Real-time B2B Orchestration Pipeline
-                                    </span>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`, borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>
-                                            Capability Node
-                                        </div>
-                                        <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
-                                            <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" strokeDasharray="3 3" />
-                                        </svg>
-                                        <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: '1px solid #dc0000', borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: '#dc0000' }}>
-                                            PrintPrice OS
-                                        </div>
-                                        <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
-                                            <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" />
-                                        </svg>
-                                        <div style={{ padding: '6px 10px', background: '#dc0000', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
-                                            JDF Router
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-next-3" type="button" onClick={next}>
-                                            <span>Continue</span>
-                                            <ArrowRight size={16} strokeWidth={1.5} />
-                                        </AuthButton>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── STEP 4: MACHINERY & CAPACITY ─────────────────────── */}
-                        {step === 4 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
-                                        Primary Presses & Finishing Machinery *
-                                    </label>
-                                    
-                                    {/* Selector Row */}
-                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <select
-                                                id="reg-presses-selector"
-                                                value={selectedTemplateId}
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
+                                            Country *
+                                        </label>
+                                        <div style={{ position: 'relative' }}>
+                                            <input
+                                                id="reg-country"
+                                                list="country-options"
+                                                placeholder="Type to search country..."
+                                                value={COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}
                                                 onChange={(e) => {
-                                                    setSelectedTemplateId(e.target.value);
-                                                    setCustomModel('');
+                                                    const label = e.target.value;
+                                                    const found = COUNTRIES.find(c => c.label.toLowerCase() === label.toLowerCase() || c.code.toLowerCase() === label.toLowerCase());
+                                                    setFormData(p => ({ ...p, country: found ? found.code : label }));
                                                 }}
-                                                style={selectStyle(dark)}
-                                            >
-                                                <option value="">-- Select Machine Template --</option>
-                                                <optgroup label="Offset Presses" style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Offset').map(t => (
-                                                        <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
-                                                    ))}
-                                                </optgroup>
-                                                <optgroup label="Digital Presses" style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Digital').map(t => (
-                                                        <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
-                                                    ))}
-                                                </optgroup>
-                                                <optgroup label="Large Format" style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Large Format').map(t => (
-                                                        <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
-                                                    ))}
-                                                </optgroup>
-                                                <optgroup label="Finishing Machinery" style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Finishing').map(t => (
-                                                        <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
-                                                    ))}
-                                                </optgroup>
-                                                <optgroup label="Custom Equipment" style={{ background: dark ? '#18181b' : '#fff' }}>
-                                                    <option value="other">Other (Custom Machine)</option>
-                                                </optgroup>
-                                            </select>
-                                            {selectedTemplateId === 'other' && (
-                                                <div style={{ marginTop: '8px' }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Specify machine model (e.g. Heidelberg Speedmaster SM 52)"
-                                                        value={customModel}
-                                                        onChange={(e) => setCustomModel(e.target.value)}
-                                                        style={{
-                                                            ...selectStyle(dark),
-                                                            border: fieldErrors.presses ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
-                                                            boxSizing: 'border-box'
-                                                        }}
-                                                    />
+                                                style={{
+                                                    width: '100%', padding: '11px 14px',
+                                                    background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                                                    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
+                                                    color: dark ? '#f4f4f5' : '#0f172a',
+                                                    fontSize: '14px', fontWeight: 500, outline: 'none',
+                                                    fontFamily: "'Manrope', system-ui, sans-serif",
+                                                    boxSizing: 'border-box'
+                                                }}
+                                            />
+                                            {COUNTRIES.some(c => c.code.toLowerCase() === formData.country.toLowerCase()) && (
+                                                <div style={{ position: 'absolute', right: '14px', top: '14px', pointerEvents: 'none', zIndex: 10 }}>
+                                                    <CheckCircle size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
                                                 </div>
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-start', paddingTop: '1px' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', marginTop: '12px' }}>QTY</span>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="50"
-                                                value={machineQuantity}
-                                                onChange={(e) => setMachineQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                                                style={{ ...selectStyle(dark), width: '64px', textAlign: 'center', padding: '11px 8px' }}
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!selectedTemplateId) {
-                                                    addToast('error', 'Selection Required', 'Please choose a template from the list.');
-                                                    return;
-                                                }
-                                                
-                                                const isOther = selectedTemplateId === 'other';
-                                                if (isOther && !customModel.trim()) {
-                                                    addToast('error', 'Specify Model', 'Please specify the machine model.');
-                                                    return;
-                                                }
-                                                
-                                                const template = isOther
-                                                    ? { id: 'other', manufacturer: 'Custom', model: customModel.trim(), category: 'Custom' as any }
-                                                    : COMMON_MACHINE_TEMPLATES.find(t => t.id === selectedTemplateId);
-                                                
-                                                if (!template) return;
-                                                
-                                                const name = isOther ? customModel.trim() : `${template.manufacturer} ${template.model}`;
-                                                
-                                                // Check if already added
-                                                const exists = formData.presses.some(p => p.name.toLowerCase() === name.toLowerCase());
-                                                if (exists) {
-                                                    addToast('warning', 'Already Added', `${name} is already added. Adjust quantity inside the list.`);
-                                                    return;
-                                                }
-                                                
-                                                setFormData(p => ({
-                                                    ...p,
-                                                    presses: [
-                                                        ...p.presses,
-                                                        {
-                                                            templateId: template.id,
-                                                            quantity: machineQuantity,
-                                                            name,
-                                                            model: name,
-                                                            qty: machineQuantity
-                                                        }
-                                                    ]
-                                                }));
-                                                setSelectedTemplateId('');
-                                                setCustomModel('');
-                                                setMachineQuantity(1);
-                                            }}
-                                            style={{
-                                                padding: '11px 16px',
-                                                background: '#dc0000',
-                                                color: '#fff',
-                                                border: 'none',
-                                                fontWeight: 800,
-                                                fontSize: '13px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                fontFamily: "'Manrope', system-ui, sans-serif",
-                                            }}
-                                        >
-                                            <Plus size={16} strokeWidth={1.5} />
-                                            Add
-                                        </button>
+                                        <datalist id="country-options">
+                                            {COUNTRIES.map((c) => (
+                                                <option key={c.code} value={c.label} />
+                                            ))}
+                                        </datalist>
+                                        {fieldErrors.country && <span style={{ fontSize: '11px', color: '#ef4444', textAlign: 'left', display: 'block', marginTop: '4px' }}>{fieldErrors.country}</span>}
                                     </div>
- 
-                                    {/* Selected Machines List */}
-                                    {formData.presses.length > 0 ? (
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '8px' }}>
-                                            {formData.presses.map((item) => {
-                                                const template = COMMON_MACHINE_TEMPLATES.find(t => t.id === item.templateId);
+                                    <ValidatedInput
+                                        id="reg-city"
+                                        label="City *"
+                                        type="text"
+                                        placeholder="London"
+                                        value={formData.city}
+                                        onChange={set('city')}
+                                        icon={MapPin as any}
+                                        error={fieldErrors.city}
+                                        validator={val => val.trim().length > 0}
+                                    />
+                                    <ValidatedInput
+                                        id="reg-phone"
+                                        label="Phone (Optional)"
+                                        type="tel"
+                                        placeholder="+44 20 7946 0192"
+                                        value={formData.phone}
+                                        onChange={set('phone')}
+                                        icon={Phone as any}
+                                        validator={val => val.trim().length > 0}
+                                    />
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <ValidatedInput
+                                            id="reg-website"
+                                            label="Website (Optional)"
+                                            type="url"
+                                            placeholder="https://garciaprint.com"
+                                            value={formData.website}
+                                            onChange={set('website')}
+                                            icon={Globe as any}
+                                            error={fieldErrors.website}
+                                            validator={val => val.trim() === '' || /^https?:\/\//.test(val.trim())}
+                                        />
+                                    </div>
+
+                                    <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                        <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-next-2" type="button" onClick={next}>
+                                                <span>Continue</span>
+                                                <ArrowRight size={16} strokeWidth={1.5} />
+                                            </AuthButton>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── STEP 3: CAPABILITIES ─────────────────────────────── */}
+                            {step === 3 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
+                                            Production Capabilities (Select all that apply) *
+                                        </label>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                            {B2B_PRODUCTION_TYPES.map(type => {
+                                                const active = formData.productionTypes.includes(type);
                                                 return (
-                                                    <div key={item.templateId} style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                                                        border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                        borderRadius: '4px',
-                                                        backdropFilter: 'blur(8px)',
-                                                    }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <div style={{
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                background: dark ? 'rgba(220,0,0,0.15)' : 'rgba(220,0,0,0.08)',
-                                                                border: '1px solid rgba(220,0,0,0.2)',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                borderRadius: '4px',
-                                                            }}>
-                                                                <Cpu size={16} strokeWidth={1.5} style={{ color: '#dc0000' }} />
-                                                            </div>
-                                                            <div style={{ textAlign: 'left' }}>
-                                                                <div style={{ fontSize: '13px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
-                                                                    {item.name}
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => toggleProductionType(type)}
+                                                        style={badgeBtnStyle(active, dark)}
+                                                    >
+                                                        {active && <CheckSquare size={14} strokeWidth={1.5} style={{ marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }} />}
+                                                        {type}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{
+                                            fontSize: '10px', fontWeight: 800,
+                                            color: dark ? '#52525b' : '#94a3b8',
+                                            textTransform: 'uppercase', letterSpacing: '0.08em',
+                                            fontFamily: "'Manrope', system-ui, sans-serif",
+                                            display: 'block', marginBottom: '6px'
+                                        }}>
+                                            Max Supported Sheet Size *
+                                            <InfoTooltip text="Used to route jobs that fit your presses. Reduces waste by 23% on average." />
+                                        </label>
+                                        <div style={{ position: 'relative' }}>
+                                            <select
+                                                id="reg-maxsheet"
+                                                value={formData.maxSheetSize}
+                                                onChange={set('maxSheetSize')}
+                                                style={{
+                                                    ...selectStyle(dark),
+                                                    border: fieldErrors.maxSheetSize ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)'}`,
+                                                    boxSizing: 'border-box'
+                                                }}
+                                            >
+                                                <option value="">-- Select Sheet Size Variable --</option>
+                                                {SUPPORTED_SHEET_SIZES.map(opt => (
+                                                    <option key={opt.value} value={opt.value} style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {fieldErrors.maxSheetSize && (
+                                                <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#ef4444', textAlign: 'left' }}>
+                                                    {fieldErrors.maxSheetSize}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <p style={{ margin: '4.5px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                            Allows our AI to route mathematically perfect jobs to your presses, minimizing paper waste.
+                                        </p>
+                                    </div>
+
+                                    {/* Minimalist Data Flow Illustration */}
+                                    <div style={{
+                                        marginTop: '8px',
+                                        padding: '16px',
+                                        background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                        border: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
+                                        borderRadius: '8px',
+                                        textAlign: 'center'
+                                    }}>
+                                        <span style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#71717a' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>
+                                            Real-time B2B Orchestration Pipeline
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                            <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`, borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>
+                                                Capability Node
+                                            </div>
+                                            <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
+                                                <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" strokeDasharray="3 3" />
+                                            </svg>
+                                            <div style={{ padding: '6px 10px', background: dark ? '#18181b' : '#fff', border: '1px solid #dc0000', borderRadius: '4px', fontSize: '10px', fontWeight: 700, color: '#dc0000' }}>
+                                                PrintPrice OS
+                                            </div>
+                                            <svg width="24" height="12" viewBox="0 0 24 12" fill="none" style={{ flexShrink: 0 }}>
+                                                <path d="M0 6H18M18 6L13 2M18 6L13 10" stroke="#dc0000" strokeWidth="1.5" />
+                                            </svg>
+                                            <div style={{ padding: '6px 10px', background: '#dc0000', color: '#fff', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                                                JDF Router
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                        <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-next-3" type="button" onClick={next}>
+                                                <span>Continue</span>
+                                                <ArrowRight size={16} strokeWidth={1.5} />
+                                            </AuthButton>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── STEP 4: MACHINERY & CAPACITY ─────────────────────── */}
+                            {step === 4 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
+                                            Primary Presses & Finishing Machinery *
+                                        </label>
+
+                                        {/* Selector Row */}
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <select
+                                                    id="reg-presses-selector"
+                                                    value={selectedTemplateId}
+                                                    onChange={(e) => {
+                                                        setSelectedTemplateId(e.target.value);
+                                                        setCustomModel('');
+                                                    }}
+                                                    style={selectStyle(dark)}
+                                                >
+                                                    <option value="">-- Select Machine Template --</option>
+                                                    <optgroup label="Offset Presses" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Offset').map(t => (
+                                                            <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                    <optgroup label="Digital Presses" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Digital').map(t => (
+                                                            <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                    <optgroup label="Large Format" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Large Format').map(t => (
+                                                            <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                    <optgroup label="Finishing Machinery" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        {COMMON_MACHINE_TEMPLATES.filter(t => t.category === 'Finishing').map(t => (
+                                                            <option key={t.id} value={t.id}>{t.manufacturer} {t.model}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                    <optgroup label="Custom Equipment" style={{ background: dark ? '#18181b' : '#fff' }}>
+                                                        <option value="other">Other (Custom Machine)</option>
+                                                    </optgroup>
+                                                </select>
+                                                {selectedTemplateId === 'other' && (
+                                                    <div style={{ marginTop: '8px' }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Specify machine model (e.g. Heidelberg Speedmaster SM 52)"
+                                                            value={customModel}
+                                                            onChange={(e) => setCustomModel(e.target.value)}
+                                                            style={{
+                                                                ...selectStyle(dark),
+                                                                border: fieldErrors.presses ? '1px solid #ef4444' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+                                                                boxSizing: 'border-box'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-start', paddingTop: '1px' }}>
+                                                <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', marginTop: '12px' }}>QTY</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="50"
+                                                    value={machineQuantity}
+                                                    onChange={(e) => setMachineQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                                    style={{ ...selectStyle(dark), width: '64px', textAlign: 'center', padding: '11px 8px' }}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!selectedTemplateId) {
+                                                        addToast('error', 'Selection Required', 'Please choose a template from the list.');
+                                                        return;
+                                                    }
+
+                                                    const isOther = selectedTemplateId === 'other';
+                                                    if (isOther && !customModel.trim()) {
+                                                        addToast('error', 'Specify Model', 'Please specify the machine model.');
+                                                        return;
+                                                    }
+
+                                                    const template = isOther
+                                                        ? { id: 'other', manufacturer: 'Custom', model: customModel.trim(), category: 'Custom' as any }
+                                                        : COMMON_MACHINE_TEMPLATES.find(t => t.id === selectedTemplateId);
+
+                                                    if (!template) return;
+
+                                                    const name = isOther ? customModel.trim() : `${template.manufacturer} ${template.model}`;
+
+                                                    // Check if already added
+                                                    const exists = formData.presses.some(p => p.name.toLowerCase() === name.toLowerCase());
+                                                    if (exists) {
+                                                        addToast('warning', 'Already Added', `${name} is already added. Adjust quantity inside the list.`);
+                                                        return;
+                                                    }
+
+                                                    setFormData(p => ({
+                                                        ...p,
+                                                        presses: [
+                                                            ...p.presses,
+                                                            {
+                                                                templateId: template.id,
+                                                                quantity: machineQuantity,
+                                                                name,
+                                                                model: name,
+                                                                qty: machineQuantity
+                                                            }
+                                                        ]
+                                                    }));
+                                                    setSelectedTemplateId('');
+                                                    setCustomModel('');
+                                                    setMachineQuantity(1);
+                                                }}
+                                                style={{
+                                                    padding: '11px 16px',
+                                                    background: '#dc0000',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    fontWeight: 800,
+                                                    fontSize: '13px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    fontFamily: "'Manrope', system-ui, sans-serif",
+                                                }}
+                                            >
+                                                <Plus size={16} strokeWidth={1.5} />
+                                                Add
+                                            </button>
+                                        </div>
+
+                                        {/* Selected Machines List */}
+                                        {formData.presses.length > 0 ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '8px' }}>
+                                                {formData.presses.map((item) => {
+                                                    const template = COMMON_MACHINE_TEMPLATES.find(t => t.id === item.templateId);
+                                                    return (
+                                                        <div key={item.templateId} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            padding: '12px 16px',
+                                                            background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                                                            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                            borderRadius: '4px',
+                                                            backdropFilter: 'blur(8px)',
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                <div style={{
+                                                                    width: '32px',
+                                                                    height: '32px',
+                                                                    background: dark ? 'rgba(220,0,0,0.15)' : 'rgba(220,0,0,0.08)',
+                                                                    border: '1px solid rgba(220,0,0,0.2)',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    borderRadius: '4px',
+                                                                }}>
+                                                                    <Cpu size={16} strokeWidth={1.5} style={{ color: '#dc0000' }} />
                                                                 </div>
-                                                                <div style={{ fontSize: '10px', fontWeight: 700, color: '#dc0000', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
-                                                                    {template?.category || 'Machine'}
+                                                                <div style={{ textAlign: 'left' }}>
+                                                                    <div style={{ fontSize: '13px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
+                                                                        {item.name}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#dc0000', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                                                                        {template?.category || 'Machine'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#94a3b8', textTransform: 'uppercase' }}>Qty:</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min="1"
-                                                                    max="50"
-                                                                    value={item.quantity}
-                                                                    onChange={(e) => {
-                                                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#71717a' : '#94a3b8', textTransform: 'uppercase' }}>Qty:</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        max="50"
+                                                                        value={item.quantity}
+                                                                        onChange={(e) => {
+                                                                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                                            setFormData(p => ({
+                                                                                ...p,
+                                                                                presses: p.presses.map(m => m.templateId === item.templateId ? { ...m, quantity: val } : m)
+                                                                            }));
+                                                                        }}
+                                                                        style={{
+                                                                            width: '50px',
+                                                                            padding: '4px',
+                                                                            fontSize: '12px',
+                                                                            fontWeight: 700,
+                                                                            textAlign: 'center',
+                                                                            background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                                                            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+                                                                            color: dark ? '#f4f4f5' : '#0f172a',
+                                                                            outline: 'none',
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
                                                                         setFormData(p => ({
                                                                             ...p,
-                                                                            presses: p.presses.map(m => m.templateId === item.templateId ? { ...m, quantity: val } : m)
+                                                                            presses: p.presses.filter(m => m.templateId !== item.templateId)
                                                                         }));
                                                                     }}
                                                                     style={{
-                                                                        width: '50px',
+                                                                        background: 'none',
+                                                                        border: 'none',
+                                                                        cursor: 'pointer',
                                                                         padding: '4px',
-                                                                        fontSize: '12px',
-                                                                        fontWeight: 700,
-                                                                        textAlign: 'center',
-                                                                        background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                                                                        border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
-                                                                        color: dark ? '#f4f4f5' : '#0f172a',
-                                                                        outline: 'none',
+                                                                        color: dark ? '#a1a1aa' : '#64748b',
                                                                     }}
-                                                                />
+                                                                >
+                                                                    <Trash2 size={16} strokeWidth={1.5} />
+                                                                </button>
                                                             </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setFormData(p => ({
-                                                                        ...p,
-                                                                        presses: p.presses.filter(m => m.templateId !== item.templateId)
-                                                                    }));
-                                                                }}
-                                                                style={{
-                                                                    background: 'none',
-                                                                    border: 'none',
-                                                                    cursor: 'pointer',
-                                                                    padding: '4px',
-                                                                    color: dark ? '#a1a1aa' : '#64748b',
-                                                                }}
-                                                            >
-                                                                <Trash2 size={16} strokeWidth={1.5} />
-                                                            </button>
                                                         </div>
-                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p style={{ margin: '0 0 12px', fontSize: '12px', color: dark ? '#52525b' : '#94a3b8', fontStyle: 'italic', textAlign: 'left' }}>
+                                                No machines added yet. Select a template and click "Add".
+                                            </p>
+                                        )}
+                                        {fieldErrors.presses && <span style={{ fontSize: '11px', color: '#ef4444' }}>{fieldErrors.presses}</span>}
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
+                                            Monthly Production Volume *
+                                        </label>
+                                        <select
+                                            id="reg-volume"
+                                            value={formData.monthlyVolume}
+                                            onChange={set('monthlyVolume')}
+                                            style={selectStyle(dark)}
+                                        >
+                                            <option value="">Select volume range...</option>
+                                            <option value="< 10k copies">&lt; 10,000 copies</option>
+                                            <option value="10k – 50k copies">10,000 – 50,000 copies</option>
+                                            <option value="50k – 200k copies">50,000 – 200,000 copies</option>
+                                            <option value="200k+ copies">200,000+ copies</option>
+                                        </select>
+                                        {fieldErrors.monthlyVolume && <span style={{ fontSize: '11px', color: '#ef4444' }}>{fieldErrors.monthlyVolume}</span>}
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
+                                            System Utilization *
+                                        </label>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            {['Low', 'Medium', 'High'].map(util => {
+                                                const active = formData.utilization === util;
+                                                return (
+                                                    <button
+                                                        key={util}
+                                                        type="button"
+                                                        onClick={() => setFormData(p => ({ ...p, utilization: util }))}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '10px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 700,
+                                                            background: active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                                                            color: active ? '#fff' : (dark ? '#a1a1aa' : '#475569'),
+                                                            border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {util}
+                                                    </button>
                                                 );
                                             })}
                                         </div>
-                                    ) : (
-                                        <p style={{ margin: '0 0 12px', fontSize: '12px', color: dark ? '#52525b' : '#94a3b8', fontStyle: 'italic', textAlign: 'left' }}>
-                                            No machines added yet. Select a template and click "Add".
-                                        </p>
-                                    )}
-                                    {fieldErrors.presses && <span style={{ fontSize: '11px', color: '#ef4444' }}>{fieldErrors.presses}</span>}
-                                </div>
+                                    </div>
 
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
-                                        Monthly Production Volume *
-                                    </label>
-                                    <select
-                                        id="reg-volume"
-                                        value={formData.monthlyVolume}
-                                        onChange={set('monthlyVolume')}
-                                        style={selectStyle(dark)}
-                                    >
-                                        <option value="">Select volume range...</option>
-                                        <option value="< 10k copies">&lt; 10,000 copies</option>
-                                        <option value="10k – 50k copies">10,000 – 50,000 copies</option>
-                                        <option value="50k – 200k copies">50,000 – 200,000 copies</option>
-                                        <option value="200k+ copies">200,000+ copies</option>
-                                    </select>
-                                    {fieldErrors.monthlyVolume && <span style={{ fontSize: '11px', color: '#ef4444' }}>{fieldErrors.monthlyVolume}</span>}
-                                </div>
-
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
-                                        System Utilization *
-                                    </label>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        {['Low', 'Medium', 'High'].map(util => {
-                                            const active = formData.utilization === util;
-                                            return (
-                                                <button
-                                                    key={util}
-                                                    type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, utilization: util }))}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '10px',
-                                                        fontSize: '12px',
-                                                        fontWeight: 700,
-                                                        background: active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                                                        color: active ? '#fff' : (dark ? '#a1a1aa' : '#475569'),
-                                                        border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    {util}
-                                                </button>
-                                            );
-                                        })}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                        <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-next-4" type="button" onClick={next}>
+                                                <span>Continue</span>
+                                                <ArrowRight size={16} strokeWidth={1.5} />
+                                            </AuthButton>
+                                        </div>
                                     </div>
                                 </div>
+                            )}
 
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-next-4" type="button" onClick={next}>
-                                            <span>Continue</span>
-                                            <ArrowRight size={16} strokeWidth={1.5} />
-                                        </AuthButton>
+                            {/* ── STEP 5: PLAN & COMPLIANCE ────────────────────────── */}
+                            {step === 5 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    {/* Part A: Plan Selection */}
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
+                                            Subscription Plan *
+                                        </label>
+
+                                        {/* Monthly / Annual Toggle Switch */}
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'monthly' ? 800 : 500, color: formData.billingInterval === 'monthly' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b') }}>
+                                                Monthly Billing
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(p => ({ ...p, billingInterval: p.billingInterval === 'monthly' ? 'annual' : 'monthly' }))}
+                                                style={{
+                                                    width: '50px',
+                                                    height: '26px',
+                                                    background: '#dc0000',
+                                                    borderRadius: '9999px',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    position: 'relative',
+                                                    padding: '3px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: formData.billingInterval === 'annual' ? 'flex-end' : 'flex-start',
+                                                    transition: 'all 0.25s ease'
+                                                }}
+                                            >
+                                                <div style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                                            </button>
+                                            <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'annual' ? 800 : 500, color: formData.billingInterval === 'annual' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b'), display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                Annual Billing
+                                                <span style={{ background: 'rgba(220,0,0,0.15)', color: '#dc0000', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(220,0,0,0.25)' }}>
+                                                    SAVE 20%
+                                                </span>
+                                            </span>
+                                        </div>
+
+                                        {/* Plan Cards */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                                            {/* Starter Plan (14-DAY FREE TRIAL) */}
+                                            <div
+                                                onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
+                                                style={{
+                                                    padding: '24px 16px',
+                                                    background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                    border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                    cursor: 'pointer',
+                                                    borderRadius: '6px',
+                                                    transition: 'all 0.25s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    minHeight: '380px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                <div style={{ width: '100%' }}>
+                                                    <Sprout size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
+                                                    <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
+                                                    <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Full platform evaluation grace period."</p>
+                                                    <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
+                                                    <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> AI Scans</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>15</code> HD generated copies</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> Base BPE Form</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div style={{ marginTop: '14px' }}>
+                                                    <div>
+                                                        <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
+                                                        <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}> / 14 days</span>
+                                                    </div>
+                                                    <p style={{ margin: '6px 0 0', fontSize: '10px', color: dark ? '#a1a1aa' : '#000000', fontStyle: 'italic', lineHeight: '1.2' }}>
+                                                        Requires plan selection after 14 days to maintain node activity.
+                                                    </p>
+                                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
+                                                        {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Growth Plan */}
+                                            <div
+                                                onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
+                                                style={{
+                                                    padding: '24px 16px',
+                                                    background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                    border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                    cursor: 'pointer',
+                                                    borderRadius: '6px',
+                                                    transition: 'all 0.25s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    minHeight: '380px',
+                                                    textAlign: 'center',
+                                                    position: 'relative',
+                                                }}
+                                            >
+                                                <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '10px', fontWeight: 900, padding: '2px 10px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
+                                                    Recommended
+                                                </div>
+                                                <div style={{ width: '100%' }}>
+                                                    <TrendingUp size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
+                                                    <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
+                                                    <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Automated sales & workflow scaling."</p>
+                                                    <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
+                                                    <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Control Plane:</strong> Unlimited orders</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Scans</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>150</code> HD / mo</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>1,000</code> Chat Credits</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div style={{ marginTop: '14px' }}>
+                                                    <div>
+                                                        <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                            ${formData.billingInterval === 'annual' ? '159' : '199'}
+                                                        </span>
+                                                        <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
+                                                        {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Enterprise Plan */}
+                                            <div
+                                                onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
+                                                style={{
+                                                    padding: '24px 16px',
+                                                    background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                    border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                                    cursor: 'pointer',
+                                                    borderRadius: '6px',
+                                                    transition: 'all 0.25s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    minHeight: '380px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                <div style={{ width: '100%' }}>
+                                                    <Factory size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
+                                                    <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
+                                                    <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Industrial scale & White-Label deployment."</p>
+                                                    <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
+                                                    <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>500</code> HD / mo</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> 1st position rotation</span></li>
+                                                        <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div style={{ marginTop: '14px' }}>
+                                                    <div>
+                                                        <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
+                                                            ${formData.billingInterval === 'annual' ? '399' : '499'}
+                                                        </span>
+                                                        <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
+                                                        ${formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        )}
 
-                        {/* ── STEP 5: PLAN & COMPLIANCE ────────────────────────── */}
-                        {step === 5 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {/* Part A: Plan Selection */}
-                                <div>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
-                                        Subscription Plan *
-                                    </label>
-                                    
-                                    {/* Monthly / Annual Toggle Switch */}
-                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                                        <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'monthly' ? 800 : 500, color: formData.billingInterval === 'monthly' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b') }}>
-                                            Monthly Billing
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(p => ({ ...p, billingInterval: p.billingInterval === 'monthly' ? 'annual' : 'monthly' }))}
-                                            style={{
-                                                width: '50px',
-                                                height: '26px',
-                                                background: '#dc0000',
-                                                borderRadius: '9999px',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                position: 'relative',
-                                                padding: '3px',
+                                    {/* Part B: Compliance & Integration */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, paddingTop: '20px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
+                                                Integration Standard *
+                                            </label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {B2B_INTEGRATIONS.map(opt => {
+                                                    const active = formData.integrationLevel === opt.title;
+                                                    return (
+                                                        <button
+                                                            key={opt.title}
+                                                            type="button"
+                                                            onClick={() => setFormData(p => ({ ...p, integrationLevel: opt.title }))}
+                                                            style={{
+                                                                padding: '12px',
+                                                                textAlign: 'left',
+                                                                background: active ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.05)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)'),
+                                                                border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span style={{ fontWeight: 800, fontSize: '13px', color: dark ? '#f4f4f5' : '#0f172a' }}>{opt.title}</span>
+                                                                <span style={{ fontSize: '9px', color: '#dc0000', fontWeight: 900 }}>{opt.badge}</span>
+                                                            </div>
+                                                            <p style={{ margin: '4px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b' }}>{opt.desc}</p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                justifyContent: formData.billingInterval === 'annual' ? 'flex-end' : 'flex-start',
-                                                transition: 'all 0.25s ease'
-                                            }}
-                                        >
-                                            <div style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-                                        </button>
-                                        <span style={{ fontSize: '13px', fontWeight: formData.billingInterval === 'annual' ? 800 : 500, color: formData.billingInterval === 'annual' ? (dark ? '#fff' : '#0f172a') : (dark ? '#71717a' : '#64748b'), display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            Annual Billing
-                                            <span style={{ background: 'rgba(220,0,0,0.15)', color: '#dc0000', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(220,0,0,0.25)' }}>
-                                                SAVE 20%
-                                            </span>
-                                        </span>
-                                    </div>
+                                                gap: '10px',
+                                                cursor: 'pointer',
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.standards}
+                                                    onChange={(e) => setFormData(p => ({ ...p, standards: e.target.checked }))}
+                                                    style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
+                                                />
+                                                <span style={{ fontWeight: 700, fontSize: '12px', color: dark ? '#e2e8f0' : '#334155' }}>We follow ISO print standards and FOGRA/GRACoL certifications.</span>
+                                            </label>
+                                        </div>
 
-                                    {/* Plan Cards */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                                         {/* Starter Plan (14-DAY FREE TRIAL) */}
-                                         <div
-                                             onClick={() => setFormData(p => ({ ...p, selectedPlan: 'starter' }))}
-                                             style={{
-                                                 padding: '24px 16px',
-                                                 background: formData.selectedPlan === 'starter' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                 border: formData.selectedPlan === 'starter' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                 cursor: 'pointer',
-                                                 borderRadius: '6px',
-                                                 transition: 'all 0.25s ease',
-                                                 display: 'flex',
-                                                 flexDirection: 'column',
-                                                 alignItems: 'center',
-                                                 justifyContent: 'space-between',
-                                                 minHeight: '380px',
-                                                 textAlign: 'center',
-                                             }}
-                                         >
-                                             <div style={{ width: '100%' }}>
-                                                 <Sprout size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
-                                                 <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>14-DAY FREE TRIAL</h3>
-                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Full platform evaluation grace period."</p>
-                                                 <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
-                                                 <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>10</code> AI Scans</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>15</code> HD generated copies</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> Base BPE Form</span></li>
-                                                 </ul>
-                                             </div>
-                                             <div style={{ marginTop: '14px' }}>
-                                                 <div>
-                                                     <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>$0</span>
-                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}> / 14 days</span>
-                                                 </div>
-                                                 <p style={{ margin: '6px 0 0', fontSize: '10px', color: dark ? '#a1a1aa' : '#000000', fontStyle: 'italic', lineHeight: '1.2' }}>
-                                                     Requires plan selection after 14 days to maintain node activity.
-                                                 </p>
-                                                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
-                                                     {formData.selectedPlan === 'starter' ? 'Selected' : 'Choose Trial'}
-                                                 </div>
-                                             </div>
-                                         </div>
-
-                                         {/* Growth Plan */}
-                                         <div
-                                             onClick={() => setFormData(p => ({ ...p, selectedPlan: 'growth' }))}
-                                             style={{
-                                                 padding: '24px 16px',
-                                                 background: formData.selectedPlan === 'growth' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                 border: formData.selectedPlan === 'growth' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                 cursor: 'pointer',
-                                                 borderRadius: '6px',
-                                                 transition: 'all 0.25s ease',
-                                                 display: 'flex',
-                                                 flexDirection: 'column',
-                                                 alignItems: 'center',
-                                                 justifyContent: 'space-between',
-                                                 minHeight: '380px',
-                                                 textAlign: 'center',
-                                                 position: 'relative',
-                                             }}
-                                         >
-                                             <div style={{ position: 'absolute', top: '-10px', background: '#dc0000', color: '#fff', fontSize: '10px', fontWeight: 900, padding: '2px 10px', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
-                                                 Recommended
-                                             </div>
-                                             <div style={{ width: '100%' }}>
-                                                 <TrendingUp size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
-                                                 <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Growth</h3>
-                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Automated sales & workflow scaling."</p>
-                                                 <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
-                                                 <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Control Plane:</strong> Unlimited orders</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Jobs + <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>100</code> Scans</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>150</code> HD / mo</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>1,000</code> Chat Credits</span></li>
-                                                 </ul>
-                                             </div>
-                                             <div style={{ marginTop: '14px' }}>
-                                                 <div>
-                                                     <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
-                                                         ${formData.billingInterval === 'annual' ? '159' : '199'}
-                                                     </span>
-                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
-                                                 </div>
-                                                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
-                                                     {formData.selectedPlan === 'growth' ? 'Selected' : 'Choose Growth'}
-                                                 </div>
-                                             </div>
-                                         </div>
-
-                                         {/* Enterprise Plan */}
-                                         <div
-                                             onClick={() => setFormData(p => ({ ...p, selectedPlan: 'enterprise' }))}
-                                             style={{
-                                                 padding: '24px 16px',
-                                                 background: formData.selectedPlan === 'enterprise' ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.04)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                 border: formData.selectedPlan === 'enterprise' ? '2px solid #dc0000' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                                 cursor: 'pointer',
-                                                 borderRadius: '6px',
-                                                 transition: 'all 0.25s ease',
-                                                 display: 'flex',
-                                                 flexDirection: 'column',
-                                                 alignItems: 'center',
-                                                 justifyContent: 'space-between',
-                                                 minHeight: '380px',
-                                                 textAlign: 'center',
-                                             }}
-                                         >
-                                             <div style={{ width: '100%' }}>
-                                                 <Factory size={40} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ display: 'block', margin: '0 auto 12px' }} />
-                                                 <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>Enterprise</h3>
-                                                 <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: dark ? '#e4e4e7' : '#000000', lineHeight: '1.3' }}>"Industrial scale & White-Label deployment."</p>
-                                                 <hr style={{ border: 'none', borderTop: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', width: '100%', margin: '14px 0' }} />
-                                                 <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', textAlign: 'left', width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Preflight:</strong> Unlimited Jobs + Scans</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Mockups:</strong> <code style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', color: dark ? '#fff' : '#000' }}>500</code> HD / mo</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Budgeter:</strong> 1st position rotation</span></li>
-                                                     <li style={{ fontSize: '11px', color: dark ? '#e4e4e7' : '#000000', display: 'flex', alignItems: 'center' }}><ShieldCheck size={14} strokeWidth={1.5} color="#dc0000" fill="#71717a" fillOpacity={0.25} style={{ marginRight: '6px', flexShrink: 0 }} /><span style={{ color: dark ? '#e4e4e7' : '#000000' }}><strong>Ecosystem:</strong> White-Label Subdomain</span></li>
-                                                 </ul>
-                                             </div>
-                                             <div style={{ marginTop: '14px' }}>
-                                                 <div>
-                                                     <span style={{ fontSize: '24px', fontWeight: 900, color: dark ? '#fff' : '#0f172a' }}>
-                                                         ${formData.billingInterval === 'annual' ? '399' : '499'}
-                                                     </span>
-                                                     <span style={{ fontSize: '12px', color: dark ? '#e4e4e7' : '#000000' }}>/ mo</span>
-                                                 </div>
-                                                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#dc0000', textTransform: 'uppercase', marginTop: '8px' }}>
-                                                     ${formData.selectedPlan === 'enterprise' ? 'Selected' : 'Choose Enterprise'}
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-
-{/* Part B: Compliance & Integration */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, paddingTop: '20px' }}>
-                                    <div>
-                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
-                                            Integration Standard *
-                                        </label>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {B2B_INTEGRATIONS.map(opt => {
-                                                const active = formData.integrationLevel === opt.title;
-                                                return (
-                                                    <button
-                                                        key={opt.title}
-                                                        type="button"
-                                                        onClick={() => setFormData(p => ({ ...p, integrationLevel: opt.title }))}
-                                                        style={{
-                                                            padding: '12px',
-                                                            textAlign: 'left',
-                                                            background: active ? (dark ? 'rgba(220,0,0,0.1)' : 'rgba(220,0,0,0.05)') : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)'),
-                                                            border: `1px solid ${active ? '#dc0000' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)')}`,
-                                                            cursor: 'pointer',
-                                                        }}
-                                                    >
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <span style={{ fontWeight: 800, fontSize: '13px', color: dark ? '#f4f4f5' : '#0f172a' }}>{opt.title}</span>
-                                                            <span style={{ fontSize: '9px', color: '#dc0000', fontWeight: 900 }}>{opt.badge}</span>
-                                                        </div>
-                                                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: dark ? '#71717a' : '#64748b' }}>{opt.desc}</p>
-                                                    </button>
-                                                );
-                                            })}
+                                        <div>
+                                            <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
+                                                Certifications
+                                                <InfoTooltip text="Higher QA standards automatically unlock access to premium corporate buyers." />
+                                            </label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', marginBottom: '8px' }}>
+                                                {B2B_CERTIFICATIONS.map(cert => {
+                                                    const active = formData.certifications.includes(cert);
+                                                    return (
+                                                        <button
+                                                            key={cert}
+                                                            type="button"
+                                                            onClick={() => toggleCertification(cert)}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                fontSize: '11px',
+                                                                fontWeight: 700,
+                                                                borderRadius: '20px',
+                                                                border: active
+                                                                    ? '1px solid #dc0000'
+                                                                    : (dark ? '1px dashed rgba(255,255,255,0.15)' : '1px dashed rgba(0,0,0,0.15)'),
+                                                                background: active
+                                                                    ? (dark ? 'rgba(220,0,0,0.12)' : 'rgba(220,0,0,0.05)')
+                                                                    : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
+                                                                color: active ? '#dc0000' : (dark ? '#a1a1aa' : '#475569'),
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s ease',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                gap: '6px',
+                                                                boxShadow: active
+                                                                    ? (dark ? '0 0 10px rgba(220,0,0,0.3)' : '0 0 10px rgba(220,0,0,0.1)')
+                                                                    : 'none',
+                                                                outline: 'none',
+                                                                fontFamily: "'Manrope', system-ui, sans-serif"
+                                                            }}
+                                                        >
+                                                            <ShieldCheck
+                                                                size={14}
+                                                                strokeWidth={1.5}
+                                                                color={active ? '#dc0000' : (dark ? '#52525b' : '#94a3b8')}
+                                                                fill={active ? '#dc0000' : 'none'}
+                                                                fillOpacity={0.2}
+                                                                style={{ flexShrink: 0 }}
+                                                            />
+                                                            <span>{cert}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
+                                                Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
+                                            </p>
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: '10px', 
-                                            cursor: 'pointer',
-                                        }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={formData.standards}
-                                                onChange={(e) => setFormData(p => ({ ...p, standards: e.target.checked }))}
-                                                style={{ width: '18px', height: '18px', accentColor: '#dc0000' }}
-                                            />
-                                            <span style={{ fontWeight: 700, fontSize: '12px', color: dark ? '#e2e8f0' : '#334155' }}>We follow ISO print standards and FOGRA/GRACoL certifications.</span>
-                                        </label>
-                                    </div>
-
-                                    <div>
-                                        <label style={{ fontSize: '10px', fontWeight: 800, color: dark ? '#52525b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
-                                            Certifications
-                                            <InfoTooltip text="Higher QA standards automatically unlock access to premium corporate buyers." />
-                                        </label>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', marginBottom: '8px' }}>
-                                            {B2B_CERTIFICATIONS.map(cert => {
-                                                const active = formData.certifications.includes(cert);
-                                                return (
-                                                    <button
-                                                        key={cert}
-                                                        type="button"
-                                                        onClick={() => toggleCertification(cert)}
-                                                        style={{
-                                                            padding: '8px 12px',
-                                                            fontSize: '11px',
-                                                            fontWeight: 700,
-                                                            borderRadius: '20px',
-                                                            border: active 
-                                                                ? '1px solid #dc0000' 
-                                                                : (dark ? '1px dashed rgba(255,255,255,0.15)' : '1px dashed rgba(0,0,0,0.15)'),
-                                                            background: active 
-                                                                ? (dark ? 'rgba(220,0,0,0.12)' : 'rgba(220,0,0,0.05)') 
-                                                                : (dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                                                            color: active ? '#dc0000' : (dark ? '#a1a1aa' : '#475569'),
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            gap: '6px',
-                                                            boxShadow: active 
-                                                                ? (dark ? '0 0 10px rgba(220,0,0,0.3)' : '0 0 10px rgba(220,0,0,0.1)') 
-                                                                : 'none',
-                                                            outline: 'none',
-                                                            fontFamily: "'Manrope', system-ui, sans-serif"
-                                                        }}
-                                                    >
-                                                        <ShieldCheck 
-                                                            size={14} 
-                                                            strokeWidth={1.5} 
-                                                            color={active ? '#dc0000' : (dark ? '#52525b' : '#94a3b8')} 
-                                                            fill={active ? '#dc0000' : 'none'} 
-                                                            fillOpacity={0.2} 
-                                                            style={{ flexShrink: 0 }} 
-                                                        />
-                                                        <span>{cert}</span>
-                                                    </button>
-                                                );
-                                            })}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                        <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-next-5" type="button" onClick={next}>
+                                                <span>Continue</span>
+                                                <ArrowRight size={16} strokeWidth={1.5} />
+                                            </AuthButton>
                                         </div>
-                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: dark ? '#ffffff' : '#000000', textAlign: 'left', lineHeight: '1.4', opacity: 0.85 }}>
-                                            Higher QA standards automatically unlock access to premium corporate buyers in the PrintPrice network.
-                                        </p>
                                     </div>
                                 </div>
+                            )}
 
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-next-5" type="button" onClick={next}>
-                                            <span>Continue</span>
-                                            <ArrowRight size={16} strokeWidth={1.5} />
-                                        </AuthButton>
+                            {/* ── STEP 6: REVIEW SUMMARY ───────────────────────────── */}
+                            {step === 6 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    {renderReviewSummary()}
+
+                                    <div style={{
+                                        background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                        padding: '20px',
+                                        border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '12px',
+                                        textAlign: 'left'
+                                    }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Company Name:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.companyName}</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Location:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.city}, {COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Capabilities:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.productionTypes.join(', ')}</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Machinery:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.presses.map(p => `${p.name} (Qty: ${p.quantity})`).join('; ')}</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Plan Selection:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a', textTransform: 'capitalize' }}>{formData.selectedPlan} ({formData.billingInterval})</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Integration Level:</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.integrationLevel}</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                                        <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-next-6" type="button" onClick={next}>
+                                                <span>Proceed to Administrator Setup</span>
+                                                <ArrowRight size={16} strokeWidth={1.5} />
+                                            </AuthButton>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* ── STEP 6: REVIEW SUMMARY ───────────────────────────── */}
-                        {step === 6 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {renderReviewSummary()}
-
-                                <div style={{ 
-                                    background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                                    padding: '20px',
-                                    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '12px',
-                                    textAlign: 'left'
-                                }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Company Name:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.companyName}</span>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Location:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.city}, {COUNTRIES.find(c => c.code === formData.country)?.label || formData.country}</span>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Capabilities:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.productionTypes.join(', ')}</span>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Machinery:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.presses.map(p => `${p.name} (Qty: ${p.quantity})`).join('; ')}</span>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`, paddingBottom: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Plan Selection:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a', textTransform: 'capitalize' }}>{formData.selectedPlan} ({formData.billingInterval})</span>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 800, color: dark ? '#ffffff' : '#000000', textTransform: 'uppercase' }}>Integration Level:</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: dark ? '#f4f4f5' : '#0f172a' }}>{formData.integrationLevel}</span>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                                    <button type="button" onClick={back} style={backBtnStyle(dark)}>Back</button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-next-6" type="button" onClick={next}>
-                                            <span>Proceed to Administrator Setup</span>
-                                            <ArrowRight size={16} strokeWidth={1.5} />
-                                        </AuthButton>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── STEP 7: ADMIN ACCOUNT ────────────────────────────── */}
-                        {step === 7 && (
-                            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <AuthInput
-                                    id="reg-email"
-                                    label="Administrator Email *"
-                                    type="email"
-                                    autoFocus
-                                    autoComplete="email"
-                                    placeholder="admin@garciaprint.com"
-                                    value={formData.email}
-                                    onChange={set('email')}
-                                    icon={Mail as any}
-                                    error={fieldErrors.email}
-                                    disabled={loading}
-                                />
-
-                                <div>
+                            {/* ── STEP 7: ADMIN ACCOUNT ────────────────────────────── */}
+                            {step === 7 && (
+                                <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <AuthInput
-                                        id="reg-password"
-                                        label="Password *"
-                                        type={showPw ? 'text' : 'password'}
+                                        id="reg-email"
+                                        label="Administrator Email *"
+                                        type="email"
+                                        autoFocus
+                                        autoComplete="email"
+                                        placeholder="admin@garciaprint.com"
+                                        value={formData.email}
+                                        onChange={set('email')}
+                                        icon={Mail as any}
+                                        error={fieldErrors.email}
+                                        disabled={loading}
+                                    />
+
+                                    <div>
+                                        <AuthInput
+                                            id="reg-password"
+                                            label="Password *"
+                                            type={showPw ? 'text' : 'password'}
+                                            autoComplete="new-password"
+                                            placeholder="Minimum 8 characters"
+                                            value={formData.password}
+                                            onChange={set('password')}
+                                            icon={Lock as any}
+                                            error={fieldErrors.password}
+                                            disabled={loading}
+                                            rightSlot={
+                                                <button type="button" onClick={() => setShowPw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle password visibility">
+                                                    {showPw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                                                </button>
+                                            }
+                                        />
+
+                                        {/* Password strength meter */}
+                                        {formData.password.length > 0 && (
+                                            <div style={{ marginTop: '8px' }}>
+                                                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                                                    {[0, 1, 2, 3].map((i) => (
+                                                        <div key={i} style={{
+                                                            flex: 1, height: 3,
+                                                            background: i < strength.score ? strength.color : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                                            transition: 'background 0.2s ease',
+                                                        }} />
+                                                    ))}
+                                                </div>
+                                                <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: strength.color, fontFamily: "'Manrope', system-ui, sans-serif" }}>
+                                                    Strength: {strength.label}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <AuthInput
+                                        id="reg-confirm-password"
+                                        label="Confirm Password *"
+                                        type={showCpw ? 'text' : 'password'}
                                         autoComplete="new-password"
-                                        placeholder="Minimum 8 characters"
-                                        value={formData.password}
-                                        onChange={set('password')}
+                                        placeholder="Confirm password"
+                                        value={formData.confirmPassword}
+                                        onChange={set('confirmPassword')}
                                         icon={Lock as any}
-                                        error={fieldErrors.password}
+                                        error={fieldErrors.confirmPassword}
                                         disabled={loading}
                                         rightSlot={
-                                            <button type="button" onClick={() => setShowPw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle password visibility">
-                                                {showPw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                                            <button type="button" onClick={() => setShowCpw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle confirm password visibility">
+                                                {showCpw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                                             </button>
                                         }
                                     />
 
-                                    {/* Password strength meter */}
-                                    {formData.password.length > 0 && (
-                                        <div style={{ marginTop: '8px' }}>
-                                            <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                                                {[0, 1, 2, 3].map((i) => (
-                                                    <div key={i} style={{
-                                                        flex: 1, height: 3,
-                                                        background: i < strength.score ? strength.color : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                                                        transition: 'background 0.2s ease',
-                                                    }} />
-                                                ))}
-                                            </div>
-                                            <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: strength.color, fontFamily: "'Manrope', system-ui, sans-serif" }}>
-                                                Strength: {strength.label}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <AuthInput
-                                    id="reg-confirm-password"
-                                    label="Confirm Password *"
-                                    type={showCpw ? 'text' : 'password'}
-                                    autoComplete="new-password"
-                                    placeholder="Confirm password"
-                                    value={formData.confirmPassword}
-                                    onChange={set('confirmPassword')}
-                                    icon={Lock as any}
-                                    error={fieldErrors.confirmPassword}
-                                    disabled={loading}
-                                    rightSlot={
-                                        <button type="button" onClick={() => setShowCpw((v) => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: dark ? '#52525b' : '#94a3b8' }} aria-label="Toggle confirm password visibility">
-                                            {showCpw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={back}
+                                            disabled={loading}
+                                            style={backBtnStyle(dark)}
+                                        >
+                                            <ArrowLeft size={14} strokeWidth={1.5} />
+                                            Back
                                         </button>
-                                    }
-                                />
-
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                                    <button
-                                        type="button"
-                                        onClick={back}
-                                        disabled={loading}
-                                        style={backBtnStyle(dark)}
-                                    >
-                                        <ArrowLeft size={14} strokeWidth={1.5} />
-                                        Back
-                                    </button>
-                                    <div style={{ flex: 1 }}>
-                                        <AuthButton id="reg-submit" type="submit" loading={loading} disabled={loading}>
-                                            <CheckCircle size={16} strokeWidth={1.5} />
-                                            <span>Complete Registration</span>
-                                        </AuthButton>
+                                        <div style={{ flex: 1 }}>
+                                            <AuthButton id="reg-submit" type="submit" loading={loading} disabled={loading}>
+                                                <CheckCircle size={16} strokeWidth={1.5} />
+                                                <span>Complete Registration</span>
+                                            </AuthButton>
+                                        </div>
                                     </div>
-                                </div>
-                            </form>
-                        )}
+                                </form>
+                            )}
+                        </div>
                     </div>
-                </div>
 
                     {/* Footer */}
                     <p style={{ textAlign: 'center', fontSize: '12px', color: dark ? '#3f3f46' : '#94a3b8', fontWeight: 600, margin: 0 }}>

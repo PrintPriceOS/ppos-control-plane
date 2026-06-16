@@ -25,6 +25,7 @@ export const navigationConfig: NavItem[] = [
     // Printhouse Operational Views
     { id: 'printhouses', label: 'Printhouses', path: '/printhouses', icon: 'PrinterIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'printhouse-onboarding', label: 'Printhouse Onboarding', path: '/admin/printhouse-onboarding', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'onboarding-observability', label: 'Onboarding Observability', path: '/admin/observability', icon: 'ChartBarSquareIcon', roles: ['SUPER_ADMIN'] },
     { id: 'jobs', label: 'Incoming Jobs', path: '/jobs', icon: 'InboxIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     { id: 'preflight', label: 'Preflight Service', path: '/preflight/jobs', icon: 'DocumentCheckIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
     { id: 'manufacturing', label: 'Manufacturing Queue', path: '/manufacturing', icon: 'CpuChipIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },

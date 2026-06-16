@@ -22,6 +22,7 @@ class PrinthouseService {
         // Extract pricing and visibility details from B2B qualification metadata
         const qualification = metadata?.qualification || {};
         const selectedPlan = (qualification.selectedPlan || 'starter').toUpperCase(); // STARTER / GROWTH / ENTERPRISE
+        const integrationLevel = qualification.integrationLevel || 'Dashboard Only';
         const billingInterval = qualification.billingInterval || 'monthly';
 
         // Budgeter Visibility Priority: HIGH (enterprise), STANDARD (growth), LOW (trial/starter)
@@ -40,10 +41,35 @@ class PrinthouseService {
             aiCreditsAllocation = null; // Unlimited
         }
 
+        // Orchestration Permissions (JDF/JMF) based on selectedPlan
+        let orchestrationPermissions = [];
+        if (selectedPlan === 'ENTERPRISE' || selectedPlan === 'GROWTH') {
+            orchestrationPermissions = ['JDF', 'JMF'];
+        }
+
+        // Webhook Provisioning based on integrationLevel
+        let webhooksEnabled = false;
+        let provisionedEndpoints = [];
+        if (integrationLevel === 'Fully automated routing' || integrationLevel === 'API-ready') {
+            webhooksEnabled = true;
+            provisionedEndpoints = [
+                { type: 'ORDER_CREATED', url: 'pending_configuration', status: 'INACTIVE' },
+                { type: 'JOB_STATE_CHANGED', url: 'pending_configuration', status: 'INACTIVE' }
+            ];
+            if (integrationLevel === 'Fully automated routing') {
+                // Add specific automated routing endpoint for direct machine instructions
+                provisionedEndpoints.push({ type: 'JDF_TICKET_DELIVERY', url: 'pending_configuration', status: 'INACTIVE' });
+            }
+        }
+
         // Inject computed properties into metadata JSON
         if (metadata) {
             metadata.ai_credits_allocation = aiCreditsAllocation;
             metadata.budgeter_priority = budgeterPriority;
+            metadata.orchestration_permissions = orchestrationPermissions;
+            if (webhooksEnabled) {
+                metadata.webhooks = provisionedEndpoints;
+            }
         }
 
         const connection = await db.getConnection();

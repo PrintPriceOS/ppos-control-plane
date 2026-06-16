@@ -35,6 +35,7 @@ import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole } from "../../lib/authStore";
 import { safeArray, toDisplayText } from '../../lib/display';
 import { COLORS } from '../../design-system/tokens';
+import { LiveOrdersFeed } from '../../components/dashboard/LiveOrdersFeed';
 
 // --- UTILS ---
 
@@ -617,6 +618,13 @@ export const CommandCenterPage: React.FC = () => {
              </div>
           </TacticalPanel>
         </div>
+
+        {/* LIVE ORDERS FEED (PRINTHOUSE ADMINS ONLY) */}
+        {role === 'PRINTHOUSE_ADMIN' && (
+          <div className="lg:col-span-3">
+            <LiveOrdersFeed />
+          </div>
+        )}
 
         {/* MAP */}
         <div className="lg:col-span-3">
