@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
-# PrintPrice OS Control Plane — Deployment Script (Phase 10)
+# PrintPrice OS Control Plane — Deployment Script (Phase 10 & 39)
 # 
 # Safe deployment for Plesk/Passenger/PM2 environments.
 # -----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ cd "$APP_DIR"
 LOG_FILE="deploy_$(date +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-echo "[DEPLOY] Starting Phase 10 Industrial Operations Deployment..."
+echo "[DEPLOY] Starting Phase 39 Control Plane Deployment..."
 echo "[DEPLOY] Timestamp: $(date)"
 echo "[DEPLOY] App Dir: $APP_DIR"
 
@@ -23,64 +23,75 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-# 2. Backup Current State
-echo "[DEPLOY] Backing up current dist/ and config..."
-mkdir -p backups
-tar -czf "backups/dist_backup_$(date +%Y%m%d_%H%M%S).tar.gz" dist/ 2>/dev/null || true
+# 2. Cleanup local state
+echo "[DEPLOY] Restoring package-lock.json and stashing local changes..."
+git restore package-lock.json || true
+git stash push -m "pre-deploy-control-plane-$(date +%Y%m%d-%H%M%S)" || true
 
 # 3. Pull Latest Changes
-echo "[DEPLOY] Fetching latest from phase-10-intelligence-layer..."
+echo "[DEPLOY] Fetching latest from phase-39.2-tenant-management-console..."
 git fetch origin
 git checkout phase-39.2-tenant-management-console
 git pull origin phase-39.2-tenant-management-console
 
 # 4. Install Dependencies
 echo "[DEPLOY] Installing dependencies (including dev for build)..."
-npm ci --include=dev
+npm install --include=dev
 
-# 5. Production Build
+# 5. Recreate shared-infra symlink
+echo "[DEPLOY] Recreating shared-infra symlink..."
+mkdir -p node_modules/@ppos
+rm -rf node_modules/@ppos/shared-infra
+ln -s /opt/printprice-os/ppos-shared-infra node_modules/@ppos/shared-infra
+
+# 6. Production Build
 echo "[DEPLOY] Building frontend..."
+rm -rf dist
 if ! npm run build; then
     echo "[ERROR] Frontend build failed. Aborting."
     exit 1
 fi
 
-# 6. Schema Verification & Migration
-echo "[DEPLOY] Verifying database schema..."
-if ! node scripts/verify-industrial-schema.js; then
-    echo "[WARN] Schema verification failed. Attempting to apply migrations..."
-    # In a real environment, we would prompt or use a migration tool.
-    # Here we point to the SQL file.
-    echo "[INFO] Please execute: mysql -h \$PPOS_DB_HOST -u \$PPOS_DB_USER -p \$PPOS_DB_NAME < docs/migrations/phase10_industrial_operations.sql"
-    # For automation safety, we don't auto-run the SQL unless PPOS_AUTO_MIGRATE=true
-    if [ "${PPOS_AUTO_MIGRATE:-false}" = "true" ]; then
-        echo "[DEPLOY] Executing auto-migration..."
-        # Simplified execution for example
-        mysql -h "$PPOS_DB_HOST" -u "$PPOS_DB_USER" -p"$PPOS_DB_PASSWORD" "$PPOS_DB_NAME" < docs/migrations/phase10_industrial_operations.sql
-    fi
-fi
+# 7. Publish Frontend to Plesk
+echo "[DEPLOY] Publishing frontend assets to Plesk/httpdocs..."
+rsync -av --delete dist/ /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/
 
-# 7. Smoke Test (Pre-Restart)
-# We can't really smoke test the new backend until it's running, 
-# but we can check if the build artifacts exist.
-if [ ! -f "dist/index.html" ]; then
-    echo "[ERROR] dist/index.html missing after build. Aborting."
-    exit 1
-fi
+echo "[DEPLOY] Restoring SPA .htaccess fallback..."
+cat > /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/.htaccess <<'EOF'
+<IfModule mod_passenger.c>
+  PassengerEnabled off
+</IfModule>
 
-# 8. PM2 Restart
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ /index.html [L]
+</IfModule>
+EOF
+
+echo "[DEPLOY] Reloading web servers..."
+systemctl reload nginx || true
+systemctl reload apache2 || true
+
+# 8. PM2 Restart Backend
 echo "[DEPLOY] Restarting PM2 process..."
+# Export explicit port mapping for the production environment
+export PORT=8081
+export PPOS_CONTROL_PORT=8081
+
 if command -v pm2 &> /dev/null; then
-    pm2 restart ecosystem.config.js || pm2 restart ppos-control-plane
+    pm2 restart ppos-control-plane --update-env
+    pm2 save
 else
-    echo "[WARN] PM2 not found. Please restart the process manually (e.g., touch tmp/restart.txt for Passenger)."
-    mkdir -p tmp
-    touch tmp/restart.txt
+    echo "[WARN] PM2 not found. Please restart the process manually."
 fi
 
 # 9. Final Smoke Test
 echo "[DEPLOY] Running post-deploy smoke tests..."
-# Wait for boot
 sleep 5
 if ! node scripts/smoke-control-plane-industrial.js; then
     echo "[CRITICAL] Post-deploy smoke test FAILED."
@@ -88,5 +99,5 @@ if ! node scripts/smoke-control-plane-industrial.js; then
     exit 1
 fi
 
-echo "[DEPLOY] SUCCESS. Phase 10 Industrial Operations is LIVE."
+echo "[DEPLOY] SUCCESS. Control Plane is LIVE."
 echo "[DEPLOY] Log: $LOG_FILE"
