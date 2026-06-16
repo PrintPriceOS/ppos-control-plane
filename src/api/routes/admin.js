@@ -206,12 +206,19 @@ const adminTaxVatReadiness = require('./adminTaxVatReadiness');
 /**
  * Mount Sub-routers (Top Priority)
  */
+router.use('/printhouses', printhousesAdminRouter);
+router.use('/notifications', require('./adminNotifications'));
+router.use('/machines', require('./machinesAdmin'));
+router.use('/materials', require('./materialsAdmin'));
+router.use('/routing', routingAdminRouter);
+router.use('/marketplace', marketplaceAdminRouter);
+router.use('/audit', require('./auditExplorerAdmin'));
+router.use('/jobs', require('./jobsAdmin'));
+
 router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
 router.use('/connect', connectAdminRouter);
-
 router.use('/network', require('./networkOpsAdmin'));
 router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
-router.use('/routing', routingAdminRouter);
 router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
 router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
 router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
