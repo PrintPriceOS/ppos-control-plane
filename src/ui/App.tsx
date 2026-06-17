@@ -96,6 +96,7 @@ import { ProductionDeploymentReadiness } from './pages/deployment/ProductionDepl
 import { ProductionDeploymentDryRun } from './pages/deployment/ProductionDeploymentDryRun';
 import { ProductionIncidentReadiness } from './pages/operations/ProductionIncidentReadiness';
 import { SecurityComplianceHardening } from './pages/prelaunch/SecurityComplianceHardening';
+import { FinalPreproductionReleaseCandidate } from './pages/preproduction/FinalPreproductionReleaseCandidate';
 
 export const App: React.FC = () => {
     return (
@@ -140,6 +141,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/deployment/dry-run" element={<ProductionDeploymentDryRun />} />
                 <Route path="/admin/operations/incident-readiness" element={<ProductionIncidentReadiness />} />
                 <Route path="/admin/prelaunch/security-compliance" element={<SecurityComplianceHardening />} />
+                <Route path="/admin/preproduction/release-candidate" element={<FinalPreproductionReleaseCandidate />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

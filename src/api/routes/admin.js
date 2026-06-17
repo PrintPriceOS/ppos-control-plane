@@ -208,6 +208,7 @@ const productionDeploymentReadinessChecklistAdmin = require('./productionDeploym
 const productionDeploymentDryRunAdmin = require('./productionDeploymentDryRunAdmin');
 const productionObservabilityIncidentReadinessAdmin = require('./productionObservabilityIncidentReadinessAdmin');
 const prelaunchSecurityComplianceHardeningAdmin = require('./prelaunchSecurityComplianceHardeningAdmin');
+const finalPreproductionReleaseCandidateAdmin = require('./finalPreproductionReleaseCandidateAdmin');
 
 
 /**
@@ -860,6 +861,7 @@ router.use('/deployment/readiness', productionDeploymentReadinessChecklistAdmin)
 router.use('/deployment/dry-run', productionDeploymentDryRunAdmin);
 router.use('/operations/incident-readiness', productionObservabilityIncidentReadinessAdmin);
 router.use('/prelaunch/security-compliance', prelaunchSecurityComplianceHardeningAdmin);
+router.use('/preproduction/release-candidate', finalPreproductionReleaseCandidateAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
