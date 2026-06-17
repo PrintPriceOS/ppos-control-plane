@@ -113,7 +113,7 @@ class AutonomousRerouteService {
 
       // Phase 34: Immutable Evidence Ledger - Record Autonomous Reroute
       try {
-        const evidenceLedger = require('../ProductionEvidenceLedgerService');
+        const evidenceLedger = require('../ManufacturingEvidenceLedgerService');
         await evidenceLedger.appendEvidence({
           dispatch_id: newDispatchId,
           node_id: bestAlternative.id,

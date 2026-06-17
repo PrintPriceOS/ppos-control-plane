@@ -1,7 +1,7 @@
 {
     "name": "@ppos/control-plane",
     "version": "1.0.0",
-    "description": "PrintPrice OS — Control Plane (Phase 34: Live Federation Activation)",
+    "description": "PrintPrice OS — Control Plane (Phase 113: Controlled Financial Operations Production Activation Gate)",
     "main": "server.js",
     "private": true,
     "scripts": {

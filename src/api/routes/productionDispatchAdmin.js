@@ -583,7 +583,7 @@ router.post('/:id/rollback', requireAdmin, async (req, res) => {
  */
 router.get('/:id/evidence', requireAdmin, async (req, res) => {
     try {
-        const evidenceLedger = require('../services/ProductionEvidenceLedgerService');
+        const evidenceLedger = require('../services/ManufacturingEvidenceLedgerService');
         const evidence = await evidenceLedger.getEvidence(req.params.id);
         res.json({ ok: true, evidence });
     } catch (err) {

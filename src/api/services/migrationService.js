@@ -29,12 +29,17 @@ class MigrationService {
         await db.query(`
             CREATE TABLE IF NOT EXISTS schema_versions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                version VARCHAR(50) NOT NULL UNIQUE,
+                version VARCHAR(255) NOT NULL UNIQUE,
                 description TEXT,
                 applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 checksum VARCHAR(64) NOT NULL
             )
         `);
+        try {
+            await db.query("ALTER TABLE schema_versions MODIFY COLUMN version VARCHAR(255) NOT NULL");
+        } catch (err) {
+            logger.warn({ event: 'migration_alter_failed', message: err.message });
+        }
     }
 
     /**
@@ -49,13 +54,21 @@ class MigrationService {
             .filter(f => f.endsWith('.sql'))
             .sort();
 
-        const applied = await db.query('SELECT version, checksum FROM schema_versions');
-        const appliedMap = new Map(applied.map(m => [m.version, m.checksum]));
+        const applied = await db.query('SELECT version, description, checksum FROM schema_versions');
+        const appliedMap = new Map();
+        
+        for (const m of applied) {
+            appliedMap.set(m.version, m.checksum);
+            if (m.description) {
+                const descVersion = m.description.replace(/\.sql$/, '');
+                appliedMap.set(descVersion, m.checksum);
+            }
+        }
 
         let appliedCount = 0;
 
         for (const file of files) {
-            const version = file.split('_')[0];
+            const version = file.replace(/\.sql$/, '');
             const content = fs.readFileSync(path.join(this.migrationsPath, file), 'utf8');
             const checksum = this.getChecksum(content);
 

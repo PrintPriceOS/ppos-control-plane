@@ -281,6 +281,7 @@ const start = async () => {
             fastify.use(require('express').urlencoded({ extended: true }));
             
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
+            fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
@@ -300,6 +301,8 @@ const start = async () => {
             fastify.all('/api/auth/*', apiNotFoundFallback);
             fastify.all('/api/admin', apiNotFoundFallback);
             fastify.all('/api/admin/*', apiNotFoundFallback);
+            fastify.all('/api/admin/financials/activation', apiNotFoundFallback);
+            fastify.all('/api/admin/financials/activation/*', apiNotFoundFallback);
             fastify.all('/api/printhouse', apiNotFoundFallback);
             fastify.all('/api/printhouse/*', apiNotFoundFallback);
             fastify.all('/api/v2/analytics', apiNotFoundFallback);

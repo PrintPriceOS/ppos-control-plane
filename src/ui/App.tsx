@@ -89,6 +89,7 @@ import { TenantPilotReadinessPage } from './pages/pilot/TenantPilotReadinessPage
 import { BillingUsageDashboardPage } from './pages/billing/BillingUsageDashboardPage';
 import { ProductionMonitoringDashboardPage } from './pages/production-monitoring/ProductionMonitoringDashboardPage';
 import FinancialOperationsProductionActivationReviewPage from './pages/financial-operations-production-activation-review/FinancialOperationsProductionActivationReviewPage';
+import { ProductionActivationGate } from './pages/financial-operations-production-activation/ProductionActivationGate';
 
 export const App: React.FC = () => {
     return (
@@ -126,6 +127,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/tenant-pilots" element={<TenantPilotReadinessPage />} />
                 <Route path="/admin/production-activation" element={<FinancialOperationsProductionActivationReviewPage />} />
                 <Route path="/admin/production-activation/:id" element={<FinancialOperationsProductionActivationReviewPage />} />
+                <Route path="/admin/production-activation-gate" element={<ProductionActivationGate />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

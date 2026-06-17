@@ -5,7 +5,7 @@ import { SafeHtmlMarkdown } from './SafeHtmlMarkdown';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { t, useLocale } from '../i18n';
 import { getIssueHint } from '../profiles/defaultProfile';
-import { formatBytes } from '../components/PreflightDropzone'; // Importar formatBytes
+import { formatBytes } from './PreflightDropzone'; // Importar formatBytes
 
 type ModelInfo = { name: string; supportedGenerationMethods?: string[] };
 
