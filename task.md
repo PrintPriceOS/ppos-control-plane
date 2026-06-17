@@ -99,4 +99,48 @@ npm run build: ✓ built in 10.34s
 
 ---
 
-## Next: Phase 114D — Controlled Production Activation Dry Run E2E Regression
+## Phase 114D — Controlled Production Activation Dry Run E2E Regression
+**STATUS: VALIDATED**
+
+### Files
+- `scripts/smoke_phase114d_end_to_end_production_activation_dry_run_regression.js` — created
+
+### Smoke Results
+```
+Phase 114D E2E Regression Results: PASS: 102 | FAIL: 0
+```
+
+### Build
+```
+npm run build: ✓ built in 10.34s
+```
+
+### Lifecycle Validated
+- readiness → READY_FOR_DRY_RUN
+- createDryRun → dry_run_id assigned, all safety flags confirmed
+- executeDryRun → DRY_RUN_PASSED, simulated steps with dry_run_only: true
+- listDryRunSteps → non-empty array
+- buildDryRunEvidencePack → safety_invariants confirmed
+- simulateRollback → rollback_simulated_only: true, all rollback steps dry_run_only: true
+- getDryRunAuditTimeline → contains DRY_RUN_CREATED, DRY_RUN_READINESS_EVALUATED, DRY_RUN_EXECUTED, DRY_RUN_EVIDENCE_PACK_BUILT, ROLLBACK_SIMULATED
+
+### Safety Scan
+- 14 forbidden patterns checked in service file: 0 violations
+- 10 forbidden patterns checked in route file: 0 violations
+
+### Safety Confirmation
+- FULL_PUBLIC: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_RECORD_MUTATION: NOT_ENABLED
+- DRY_RUN_ONLY: ACTIVE
+- ROLLBACK_SIMULATION: ACTIVE (simulated only)
+
+---
+
+## Next: Phase 114E — Controlled Production Activation Dry Run Evidence Pack

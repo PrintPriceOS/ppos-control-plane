@@ -145,3 +145,75 @@ UI displays prominently:
 > "This is a dry-run only. No production activation, live provider connectivity, payment execution, refund execution, payout execution, tax/accounting submission, provider submission, or source record mutation will occur."
 
 ### Phase 114C Status: VALIDATED
+
+---
+
+## Phase 114D — Controlled Production Activation Dry Run E2E Regression
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `scripts/smoke_phase114d_end_to_end_production_activation_dry_run_regression.js` | E2E regression smoke |
+
+### Smoke Results
+
+```
+Phase 114D E2E Regression Results: PASS: 102 | FAIL: 0
+```
+
+### Build Results
+
+```
+npm run build: ✓ built in 10.34s
+```
+
+### Lifecycle Validated
+
+Full dry-run lifecycle exercised end-to-end:
+
+```
+readiness → READY_FOR_DRY_RUN
+createDryRun → dry_run_id assigned, all 9 safety flags confirmed
+executeDryRun → DRY_RUN_PASSED, all simulated steps dry_run_only: true
+listDryRunSteps → non-empty array returned
+buildDryRunEvidencePack → safety_invariants block confirmed, audit_summary present
+simulateRollback → rollback_simulated_only: true, all rollback steps dry_run_only: true
+getDryRunAuditTimeline → 5 expected audit events confirmed
+```
+
+### Audit Trail Confirmed
+
+| Event | Present |
+|-------|---------|
+| DRY_RUN_CREATED | ✅ |
+| DRY_RUN_READINESS_EVALUATED | ✅ |
+| DRY_RUN_EXECUTED | ✅ |
+| DRY_RUN_EVIDENCE_PACK_BUILT | ✅ |
+| ROLLBACK_SIMULATED | ✅ |
+
+### Static Safety Scan
+
+- 14 forbidden patterns scanned in service file — 0 violations
+- 10 forbidden patterns scanned in route file — 0 violations
+
+Patterns checked include: `charge(`, `refund(`, `payout(`, `capture(`, `submitTax`, `submitVat`, `sendToProvider`, `externalSubmission: true`, `sourceMutation: true`, `fullPublicEnabled: true`, `liveProviderConnectivityEnabled: true`, `paymentExecutionEnabled: true`
+
+### Safety Confirmation
+
+All execution flags confirmed disabled throughout the full lifecycle:
+
+```
+PRODUCTION_ACTIVATION: NOT_ENABLED
+FULL_PUBLIC: NOT_ENABLED
+LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+PAYMENT_EXECUTION: NOT_ENABLED
+REFUND_EXECUTION: NOT_ENABLED
+PAYOUT_EXECUTION: NOT_ENABLED
+EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+SOURCE_RECORD_MUTATION: NOT_ENABLED
+```
+
+### Phase 114D Status: VALIDATED
