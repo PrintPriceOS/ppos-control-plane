@@ -202,6 +202,7 @@ const adminGovernedInvoices = require('./adminGovernedInvoices');
 const adminPartnerSettlement = require('./adminPartnerSettlement');
 const adminTaxVatReadiness = require('./adminTaxVatReadiness');
 const adminProductionActivationGateRouter = require('./financialOperationsProductionActivationAdmin');
+const financialOperationsProductionActivationDryRunAdmin = require('./financialOperationsProductionActivationDryRunAdmin');
 
 
 /**
@@ -848,6 +849,7 @@ router.use('/financial-operations', adminFinancialOperationsProviderWebhookSandb
 router.use('/financial-operations', adminFinancialOperationsReadiness);
 router.use('/financial-operations', adminFinancialOperationsReleaseGates);
 router.use('/financials/activation', adminProductionActivationGateRouter);
+router.use('/financials/activation-dry-run', financialOperationsProductionActivationDryRunAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);

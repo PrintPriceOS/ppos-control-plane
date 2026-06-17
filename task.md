@@ -53,4 +53,50 @@ npm run build: ✓ built in 17.17s
 
 ---
 
-## Next: Phase 114C — Controlled Production Activation Dry Run Admin API & UI
+## Phase 114C — Controlled Production Activation Dry Run Admin API & UI
+**STATUS: VALIDATED**
+
+### Files
+- `src/api/routes/financialOperationsProductionActivationDryRunAdmin.js` — created
+- `src/ui/types/financialOperationsProductionActivationDryRun.ts` — created
+- `src/ui/api/financialOperationsProductionActivationDryRunClient.ts` — created
+- `src/ui/pages/financial-operations-production-activation/ProductionActivationDryRun.tsx` — created
+- `scripts/smoke_phase114c_production_activation_dry_run_admin_api_ui.js` — created
+
+### Registration
+- `src/api/routes/admin.js` — imports and mounts dry-run router at `/financials/activation-dry-run`
+- `src/ui/App.tsx` — registers `/admin/production-activation-dry-run` route
+
+### Endpoints
+- GET  /api/admin/financials/activation-dry-run/readiness
+- POST /api/admin/financials/activation-dry-run/create
+- POST /api/admin/financials/activation-dry-run/execute
+- POST /api/admin/financials/activation-dry-run/simulate-rollback
+- GET  /api/admin/financials/activation-dry-run/steps
+- GET  /api/admin/financials/activation-dry-run/audit-timeline
+- GET  /api/admin/financials/activation-dry-run/evidence-pack
+
+### Smoke Results
+```
+Phase 114C Smoke Results: PASS: 86 | FAIL: 0
+```
+
+### Build
+```
+npm run build: ✓ built in 10.34s
+```
+
+### Safety Confirmation
+- FULL_PUBLIC: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION: NOT_ENABLED
+- DRY_RUN_ONLY: ACTIVE
+- UI displays explicit safety notice to operators
+
+---
+
+## Next: Phase 114D — Controlled Production Activation Dry Run E2E Regression
