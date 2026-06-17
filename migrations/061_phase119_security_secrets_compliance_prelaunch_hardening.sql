@@ -1,0 +1,78 @@
+-- Phase 119: Security / Secrets / Compliance Pre-Launch Hardening
+-- review_only: true. No production activation. No external submission. No secret exposure.
+
+CREATE TABLE IF NOT EXISTS prelaunch_security_checks (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  check_id VARCHAR(64) NOT NULL UNIQUE,
+  check_name VARCHAR(128) NOT NULL,
+  category VARCHAR(64) NOT NULL COMMENT 'ENV_EXPOSURE, ADMIN_ROUTE_PROTECTION, SECRET_LEAKAGE, REDACTION, ROLE_BOUNDARY, COMPLIANCE_GUARDRAIL',
+  description TEXT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING, PASS, FAIL, WARNING',
+  result_json TEXT NULL,
+  checked_at TIMESTAMP NULL,
+  checked_by VARCHAR(128) NULL,
+  review_only TINYINT(1) NOT NULL DEFAULT 1,
+  external_submission_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  source_mutation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  production_activation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS prelaunch_security_findings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  finding_id VARCHAR(64) NOT NULL UNIQUE,
+  check_id VARCHAR(64) NOT NULL,
+  category VARCHAR(64) NOT NULL COMMENT 'SECRET_EXPOSURE, ROUTE_UNPROTECTED, REDACTION_MISSING, ROLE_VIOLATION, COMPLIANCE_BREACH',
+  severity VARCHAR(32) NOT NULL DEFAULT 'MEDIUM' COMMENT 'LOW, MEDIUM, HIGH, CRITICAL',
+  description TEXT NOT NULL,
+  remediation TEXT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN, RESOLVED, WONT_FIX',
+  resolved_by VARCHAR(128) NULL,
+  resolved_at TIMESTAMP NULL,
+  created_by VARCHAR(128) NULL,
+  review_only TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_check_id (check_id),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS prelaunch_security_audits (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  audit_id VARCHAR(64) NOT NULL UNIQUE,
+  check_id VARCHAR(64) NULL,
+  finding_id VARCHAR(64) NULL,
+  event_type VARCHAR(64) NOT NULL COMMENT 'SCAN_STARTED, SCAN_COMPLETED, FINDING_RECORDED, FINDING_RESOLVED, EVIDENCE_PACK_BUILT',
+  actor VARCHAR(128) NULL,
+  metadata_json TEXT NULL,
+  review_only TINYINT(1) NOT NULL DEFAULT 1,
+  external_submission_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  source_mutation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_check_id (check_id),
+  INDEX idx_event_type (event_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS prelaunch_compliance_guardrail_results (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  result_id VARCHAR(64) NOT NULL UNIQUE,
+  guardrail_name VARCHAR(128) NOT NULL,
+  category VARCHAR(64) NOT NULL COMMENT 'PRODUCTION_GATE, FINANCIAL_EXECUTION, EXTERNAL_SUBMISSION, SOURCE_MUTATION, FULL_PUBLIC',
+  status VARCHAR(32) NOT NULL DEFAULT 'ENFORCED' COMMENT 'ENFORCED, VIOLATED, WARNING',
+  detail TEXT NULL,
+  evaluated_at TIMESTAMP NULL,
+  evaluated_by VARCHAR(128) NULL,
+  review_only TINYINT(1) NOT NULL DEFAULT 1,
+  production_activation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  payment_execution_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  refund_execution_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  payout_execution_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  external_submission_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  source_mutation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  full_public_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  live_provider_connectivity_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_category (category),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
