@@ -217,3 +217,60 @@ SOURCE_RECORD_MUTATION: NOT_ENABLED
 ```
 
 ### Phase 114D Status: VALIDATED
+
+---
+
+## Phase 114E — Controlled Production Activation Dry Run Evidence Pack
+
+### Commands Run
+
+```
+node --check scripts/smoke_phase114e_controlled_production_activation_dry_run_acceptance_pack.js
+node scripts/smoke_phase114e_controlled_production_activation_dry_run_acceptance_pack.js
+npm run build
+```
+
+### Files Created
+
+- `scripts/smoke_phase114e_controlled_production_activation_dry_run_acceptance_pack.js`
+- `docs/phase114_controlled_production_activation_dry_run_acceptance_pack.md`
+
+### Acceptance Pack Results
+
+| Check | Result |
+|---|---|
+| Phase 114B smoke exists | ✅ |
+| Phase 114C smoke exists | ✅ |
+| Phase 114D smoke exists | ✅ |
+| Migration 056 exists | ✅ |
+| Service file + 7 methods | ✅ |
+| Route file + 7 endpoints | ✅ |
+| UI client / types / page | ✅ |
+| App.tsx route registered | ✅ |
+| Dry-run safety markers in service | ✅ |
+| rollback_simulated_only: true | ✅ |
+| Forbidden patterns: 0 violations | ✅ |
+| DB schema safety columns | ✅ |
+| Full lifecycle validated | ✅ |
+| Documentation (task.md + walkthrough.md) | ✅ |
+
+### Final Status
+
+```
+PRINTPRICE OS — PHASE 114 CONTROLLED PRODUCTION ACTIVATION DRY RUN
+STATUS: VALIDATED
+DRY_RUN_MODE: ACTIVE
+ROLLBACK_SIMULATION: ACTIVE
+PRODUCTION_ACTIVATION: NOT_ENABLED
+FULL_PUBLIC: NOT_ENABLED
+LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+PAYMENT_EXECUTION: NOT_ENABLED
+REFUND_EXECUTION: NOT_ENABLED
+PAYOUT_EXECUTION: NOT_ENABLED
+EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+SOURCE_RECORD_MUTATION: NOT_ENABLED
+```
+
+### Phase 114E Status: VALIDATED
