@@ -94,6 +94,7 @@ import { ProductionActivationDryRun } from './pages/financial-operations-product
 import { OperationalReadinessBoard } from './pages/pre-production/OperationalReadinessBoard';
 import { ProductionDeploymentReadiness } from './pages/deployment/ProductionDeploymentReadiness';
 import { ProductionDeploymentDryRun } from './pages/deployment/ProductionDeploymentDryRun';
+import { ProductionIncidentReadiness } from './pages/operations/ProductionIncidentReadiness';
 
 export const App: React.FC = () => {
     return (
@@ -136,6 +137,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/pre-production/readiness-board" element={<OperationalReadinessBoard />} />
                 <Route path="/admin/deployment/readiness" element={<ProductionDeploymentReadiness />} />
                 <Route path="/admin/deployment/dry-run" element={<ProductionDeploymentDryRun />} />
+                <Route path="/admin/operations/incident-readiness" element={<ProductionIncidentReadiness />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

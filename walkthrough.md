@@ -337,3 +337,138 @@ All sub-phases (115A-D) complete. Phase 115 Pre-Production Operational Readiness
 ---
 
 ## Next: Phase 116 -- Production Deployment Readiness Checklist
+
+---
+
+## Phase 116 — Production Deployment Readiness Checklist
+
+### Date: 2026-06-17
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| migrations/058_phase116_production_deployment_readiness_checklist.sql | Schema |
+| src/api/services/productionDeploymentReadinessChecklistService.js | Service layer |
+| src/api/routes/productionDeploymentReadinessChecklistAdmin.js | Admin API |
+| src/ui/types/productionDeploymentReadinessChecklist.ts | UI types |
+| src/ui/api/productionDeploymentReadinessChecklistClient.ts | UI client |
+| src/ui/pages/deployment/ProductionDeploymentReadiness.tsx | UI page |
+| scripts/smoke_phase116a–d | Smoke tests |
+
+### Validation Results
+
+| Check | Result |
+|---|---|
+| smoke_phase116a (schema) | PASS |
+| smoke_phase116b (service) | PASS |
+| smoke_phase116c (admin API/UI) | PASS |
+| smoke_phase116d (acceptance pack) | PASS |
+| npm run build | PASS |
+
+### Safety Confirmation
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- CHECKLIST_ONLY: ACTIVE
+
+### Phase 116 Status: VALIDATED
+
+---
+
+## Phase 117 — Production Deployment Dry Run / Rollback Drill
+
+### Date: 2026-06-17
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| migrations/059_phase117_production_deployment_dry_run_rollback_drill.sql | Schema |
+| src/api/services/productionDeploymentDryRunRollbackDrillService.js | Service layer |
+| src/api/routes/productionDeploymentDryRunAdmin.js | Admin API |
+| src/ui/types/productionDeploymentDryRun.ts | UI types |
+| src/ui/api/productionDeploymentDryRunClient.ts | UI client |
+| src/ui/pages/deployment/ProductionDeploymentDryRun.tsx | UI page |
+| scripts/smoke_phase117a–d | Smoke tests |
+
+### Validation Results
+
+| Check | Result |
+|---|---|
+| smoke_phase117a–d | PASS |
+| npm run build | PASS |
+
+### Safety Confirmation
+- REAL_DEPLOYMENT: NOT_EXECUTED
+- SERVICE_RESTART: NOT_EXECUTED
+- ROLLBACK_EXECUTED: false
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+
+### Phase 117 Status: VALIDATED
+
+---
+
+## Phase 118 — Production Observability & Incident Readiness
+
+### Date: 2026-06-17
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| migrations/060_phase118_production_observability_incident_readiness.sql | Schema (4 tables) |
+| src/api/services/productionObservabilityIncidentReadinessService.js | Service layer (6 methods) |
+| src/api/routes/productionObservabilityIncidentReadinessAdmin.js | Admin API (6 endpoints) |
+| src/ui/types/productionObservabilityIncidentReadiness.ts | UI types |
+| src/ui/api/productionObservabilityIncidentReadinessClient.ts | UI client (6 methods) |
+| src/ui/pages/operations/ProductionIncidentReadiness.tsx | UI page |
+| scripts/smoke_phase118a_observability_incident_schema.js | Schema smoke |
+| scripts/smoke_phase118b_observability_incident_service.js | Service smoke |
+| scripts/smoke_phase118c_observability_incident_admin_api_ui.js | API/UI smoke |
+| scripts/smoke_phase118d_observability_incident_acceptance_pack.js | Acceptance pack |
+
+### Incident Categories Covered
+
+- API_DOWN
+- DB_CONNECTION_FAILURE
+- REDIS_CONNECTION_FAILURE
+- PAYMENT_PROVIDER_FAILURE_SIMULATED
+- PREFLIGHT_SERVICE_DEGRADED
+- QUEUE_BACKLOG
+- HIGH_ERROR_RATE
+- SECURITY_ALERT
+- DATA_EXPORT_BLOCKED
+- ROLLBACK_REQUIRED
+
+### Validation Commands
+
+```bash
+node scripts/smoke_phase118a_observability_incident_schema.js
+node scripts/smoke_phase118b_observability_incident_service.js
+node scripts/smoke_phase118c_observability_incident_admin_api_ui.js
+node scripts/smoke_phase118d_observability_incident_acceptance_pack.js
+npm run build
+```
+
+### Validation Results
+
+| Check | Result |
+|---|---|
+| smoke_phase118a (schema) | PASS 18 \| FAIL 0 |
+| smoke_phase118b (service) | PASS 74 \| FAIL 0 |
+| smoke_phase118c (admin API/UI) | PASS 47 \| FAIL 0 |
+| smoke_phase118d (acceptance pack) | PASS 65 \| FAIL 0 |
+| npm run build | PASS |
+
+### Safety Confirmation
+- SIMULATION_MODE: ACTIVE
+- REAL_ALERT_DISPATCH: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- FULL_PUBLIC: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_RECORD_MUTATION: NOT_ENABLED
+
+### Phase 118 Status: VALIDATED

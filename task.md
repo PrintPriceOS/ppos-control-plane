@@ -202,3 +202,44 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - smoke_phase115d: PASS 43 | FAIL 0
 - npm run build: PASS
 - Safety: PRODUCTION_ACTIVATION NOT_ENABLED, REVIEW_ONLY_MODE ACTIVE
+
+---
+
+## Phase 116 — Production Deployment Readiness Checklist
+**STATUS: VALIDATED**
+- Migration 058 created (production_deployment_readiness_checks, results, findings, audits tables)
+- Service productionDeploymentReadinessChecklistService.js created
+- Route productionDeploymentReadinessChecklistAdmin.js mounted at /api/admin/deployment/readiness
+- UI page ProductionDeploymentReadiness.tsx, route /admin/deployment/readiness registered
+- smoke_phase116a–d: all PASS
+- npm run build: PASS
+- Safety: PRODUCTION_ACTIVATION NOT_ENABLED, CHECKLIST_ONLY
+
+---
+
+## Phase 117 — Production Deployment Dry Run / Rollback Drill
+**STATUS: VALIDATED**
+- Migration 059 created (production_deployment_dry_runs, steps, rollback_drills, audits tables)
+- Service productionDeploymentDryRunRollbackDrillService.js created
+- Route productionDeploymentDryRunAdmin.js mounted at /api/admin/deployment/dry-run
+- UI page ProductionDeploymentDryRun.tsx, route /admin/deployment/dry-run registered
+- smoke_phase117a–d: all PASS
+- npm run build: PASS
+- Safety: REAL_DEPLOYMENT NOT_EXECUTED, SERVICE_RESTART NOT_EXECUTED, ROLLBACK NOT_EXECUTED
+
+---
+
+## Phase 118 — Production Observability & Incident Readiness
+**STATUS: VALIDATED**
+- Migration 060 created (production_observability_checks, incident_readiness_runs, incident_simulations, incident_audits)
+- Service productionObservabilityIncidentReadinessService.js created with 6 methods
+- Route productionObservabilityIncidentReadinessAdmin.js mounted at /api/admin/operations/incident-readiness
+- UI types, client, and page (ProductionIncidentReadiness.tsx) created
+- Route /admin/operations/incident-readiness registered in App.tsx
+- 10 incident categories: API_DOWN, DB_CONNECTION_FAILURE, REDIS_CONNECTION_FAILURE, PAYMENT_PROVIDER_FAILURE_SIMULATED, PREFLIGHT_SERVICE_DEGRADED, QUEUE_BACKLOG, HIGH_ERROR_RATE, SECURITY_ALERT, DATA_EXPORT_BLOCKED, ROLLBACK_REQUIRED
+- smoke_phase118a: PASS 18 | FAIL 0
+- smoke_phase118b: PASS 74 | FAIL 0
+- smoke_phase118c: PASS 47 | FAIL 0
+- smoke_phase118d: PASS 65 | FAIL 0
+- npm run build: PASS
+- Safety: SIMULATION_ONLY, REAL_ALERT_DISPATCH NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED
