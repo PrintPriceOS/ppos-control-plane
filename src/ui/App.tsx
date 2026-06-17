@@ -93,6 +93,7 @@ import { ProductionActivationGate } from './pages/financial-operations-productio
 import { ProductionActivationDryRun } from './pages/financial-operations-production-activation/ProductionActivationDryRun';
 import { OperationalReadinessBoard } from './pages/pre-production/OperationalReadinessBoard';
 import { ProductionDeploymentReadiness } from './pages/deployment/ProductionDeploymentReadiness';
+import { ProductionDeploymentDryRun } from './pages/deployment/ProductionDeploymentDryRun';
 
 export const App: React.FC = () => {
     return (
@@ -134,6 +135,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/production-activation-dry-run" element={<ProductionActivationDryRun />} />
                 <Route path="/admin/pre-production/readiness-board" element={<OperationalReadinessBoard />} />
                 <Route path="/admin/deployment/readiness" element={<ProductionDeploymentReadiness />} />
+                <Route path="/admin/deployment/dry-run" element={<ProductionDeploymentDryRun />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

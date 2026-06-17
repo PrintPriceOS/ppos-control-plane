@@ -205,6 +205,7 @@ const adminProductionActivationGateRouter = require('./financialOperationsProduc
 const financialOperationsProductionActivationDryRunAdmin = require('./financialOperationsProductionActivationDryRunAdmin');
 const preProductionOperationalReadinessBoardAdmin = require('./preProductionOperationalReadinessBoardAdmin');
 const productionDeploymentReadinessChecklistAdmin = require('./productionDeploymentReadinessChecklistAdmin');
+const productionDeploymentDryRunAdmin = require('./productionDeploymentDryRunAdmin');
 
 
 /**
@@ -854,6 +855,7 @@ router.use('/financials/activation', adminProductionActivationGateRouter);
 router.use('/financials/activation-dry-run', financialOperationsProductionActivationDryRunAdmin);
 router.use('/pre-production/readiness-board', preProductionOperationalReadinessBoardAdmin);
 router.use('/deployment/readiness', productionDeploymentReadinessChecklistAdmin);
+router.use('/deployment/dry-run', productionDeploymentDryRunAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
