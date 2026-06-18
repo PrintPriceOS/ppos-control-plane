@@ -99,6 +99,7 @@ import { SecurityComplianceHardening } from './pages/prelaunch/SecurityComplianc
 import { FinalPreproductionReleaseCandidate } from './pages/preproduction/FinalPreproductionReleaseCandidate';
 import { ControlledProductionPilotActivation } from './pages/production/ControlledProductionPilotActivation';
 import { InternalOrderLifecyclePilot } from './pages/production/InternalOrderLifecyclePilot';
+import { InternalOrderLifecycleRuntimeVerification } from './pages/production/InternalOrderLifecycleRuntimeVerification';
 
 export const App: React.FC = () => {
     return (
@@ -146,6 +147,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/preproduction/release-candidate" element={<FinalPreproductionReleaseCandidate />} />
                 <Route path="/admin/production/pilot-activation" element={<ControlledProductionPilotActivation />} />
                 <Route path="/admin/production/internal-order-lifecycle-pilot" element={<InternalOrderLifecyclePilot />} />
+                <Route path="/admin/production/internal-order-lifecycle-runtime-verification" element={<InternalOrderLifecycleRuntimeVerification />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

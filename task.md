@@ -335,3 +335,19 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - npm run build: PASS
 - Documentation: docs/phase122_1_internal_order_lifecycle_pilot_hardening.md
 - Safety: PILOT_ONLY, INTERNAL_ORDER_LIFECYCLE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, DB_PERSISTENCE HARDENED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE
+
+## Phase 122.2 — Production Runtime Verification / Restart Recovery Drill
+**STATUS: VALIDATED**
+- Migration 066 created with 3 tables: runtime_verification_runs, runtime_verification_checks, runtime_verification_audits
+- Service internalOrderLifecycleRuntimeVerificationService.js created with 10 methods
+- Route internalOrderLifecycleRuntimeVerificationAdmin.js mounted at /api/admin/production/internal-order-lifecycle-runtime-verification
+- UI types, client, and page created at /admin/production/internal-order-lifecycle-runtime-verification
+- Route registered in App.tsx
+- Manual restart drill documentation: docs/phase122_2_runtime_restart_recovery_manual_drill.md
+- Documentation: docs/phase122_2_internal_order_lifecycle_runtime_verification.md
+- smoke_phase122_2a: PASS
+- smoke_phase122_2b: PASS
+- smoke_phase122_2c: PASS
+- smoke_phase122_2d: PASS
+- npm run build: PASS
+- Safety: PILOT_ONLY, RUNTIME_VERIFICATION_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, SERVICE_RESTART NOT_EXECUTED, REAL_RESTART NOT_EXECUTED, MEMORY_FALLBACK NOT_PRODUCTION_VALID

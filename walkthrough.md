@@ -788,3 +788,77 @@ npm run build
 - EVIDENCE_INTEGRITY: ACTIVE (SHA-256)
 
 ### Phase 122.1 Status: VALIDATED
+
+---
+
+## Phase 122.2 — Production Runtime Verification / Restart Recovery Drill
+
+### Date: 2026-06-18
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `migrations/066_phase122_2_internal_order_lifecycle_runtime_verification.sql` | DB tables for verification runs, checks, audits with indexes and foreign keys |
+| `src/api/services/internalOrderLifecycleRuntimeVerificationService.js` | Runtime verification service with 10 methods |
+| `src/api/routes/internalOrderLifecycleRuntimeVerificationAdmin.js` | Admin API with 10 endpoints |
+| `src/ui/types/internalOrderLifecycleRuntimeVerification.ts` | TypeScript type definitions |
+| `src/ui/api/internalOrderLifecycleRuntimeVerificationClient.ts` | Frontend API client with 10 functions |
+| `src/ui/pages/production/InternalOrderLifecycleRuntimeVerification.tsx` | Admin UI page |
+| `docs/phase122_2_runtime_restart_recovery_manual_drill.md` | Step-by-step manual restart drill instructions |
+| `docs/phase122_2_internal_order_lifecycle_runtime_verification.md` | Phase documentation |
+| `scripts/smoke_phase122_2a_runtime_verification_schema.js` | Schema smoke test |
+| `scripts/smoke_phase122_2b_runtime_verification_service.js` | Service smoke test |
+| `scripts/smoke_phase122_2c_runtime_verification_admin_api_ui.js` | Admin API & UI smoke test |
+| `scripts/smoke_phase122_2d_runtime_verification_acceptance_pack.js` | Acceptance pack smoke test |
+
+### Files Modified
+
+- `src/api/routes/admin.js` — added import and mount at `/production/internal-order-lifecycle-runtime-verification`
+- `src/ui/App.tsx` — added import and route `/admin/production/internal-order-lifecycle-runtime-verification`
+- `task.md` — added Phase 122.2 entry
+- `walkthrough.md` — added Phase 122.2 walkthrough
+
+### Service Architecture
+
+`InternalOrderLifecycleRuntimeVerificationService` provides:
+- `createRuntimeVerificationRun()` — creates a verification run linked to a pilot run
+- `verifyDbReadThrough()` — validates DB read-through from in-memory cache
+- `verifyMemoryEmptyRecovery()` — simulates empty memory and attempts DB recovery
+- `verifyAuditTimelineRecovery()` — validates audit events are recoverable from DB
+- `verifyEvidencePackRecovery()` — validates evidence packs are recoverable from DB
+- `verifyAllowlistFailClosedRuntime()` — validates tenant allowlist fail-closed at runtime
+- `verifyBlockerFindingRuntime()` — validates blocker finding enforcement at runtime
+- `getVerificationAuditTimeline()` — retrieves verification audit timeline
+- `buildRuntimeVerificationEvidencePack()` — builds evidence pack with integrity hash
+- `getReadiness()` — checks Phase 122.1 readiness, migration status, DB availability
+
+### Audit Events Generated
+
+- `RUNTIME_VERIFICATION_RUN_CREATED`
+- `RUNTIME_CHECK_DB_READ_THROUGH`
+- `RUNTIME_CHECK_MEMORY_EMPTY_RECOVERY`
+- `RUNTIME_CHECK_AUDIT_TIMELINE_RECOVERY`
+- `RUNTIME_CHECK_EVIDENCE_PACK_RECOVERY`
+- `RUNTIME_CHECK_ALLOWLIST_FAIL_CLOSED_RUNTIME`
+- `RUNTIME_CHECK_BLOCKER_FINDING_RUNTIME`
+- `RUNTIME_VERIFICATION_EVIDENCE_PACK_BUILT`
+
+### Safety Confirmation
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- SERVICE_RESTART_EXECUTED: NO (manual only)
+- REAL_RESTART_EXECUTED: NO (manual only)
+- MEMORY_FALLBACK_PRODUCTION_VALID: NO
+
+### Phase 122.2 Status: VALIDATED
