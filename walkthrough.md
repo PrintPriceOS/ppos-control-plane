@@ -948,3 +948,81 @@ npm run build
 - EVIDENCE_INTEGRITY: ACTIVE
 
 ### Phase 123 Status: VALIDATED
+
+---
+
+## Phase 124 — Controlled Printhouse Handoff / File Package Pilot
+
+Phase 124 creates a governed handoff package workflow for approved founding printhouse pilot participants. An approved founding printhouse can receive a controlled, redacted, audited handoff package for an internal pilot order.
+
+### What Was Created
+
+| File | Purpose |
+|---|---|
+| migrations/068_phase124_controlled_printhouse_handoff_file_package_pilot.sql | 7 tables with safety defaults, indexes, and foreign keys |
+| src/api/services/controlledPrinthouseHandoffPackageService.js | Service with 13 methods for handoff package lifecycle |
+| src/api/routes/controlledPrinthouseHandoffPackageAdmin.js | Admin API with 12 endpoints |
+| src/ui/types/controlledPrinthouseHandoffPackage.ts | TypeScript interfaces |
+| src/ui/api/controlledPrinthouseHandoffPackageClient.ts | Frontend API client |
+| src/ui/pages/production/ControlledPrinthouseHandoffPackage.tsx | Admin UI page |
+| docs/phase124_controlled_printhouse_handoff_file_package_pilot.md | Phase documentation |
+| scripts/smoke_phase124a_printhouse_handoff_package_schema.js | Schema validation smoke test |
+| scripts/smoke_phase124b_printhouse_handoff_package_service.js | Service methods and safety smoke test |
+| scripts/smoke_phase124c_printhouse_handoff_package_admin_api_ui.js | API/UI file validation smoke test |
+| scripts/smoke_phase124d_printhouse_handoff_package_e2e_regression.js | E2E flow + regression smoke test |
+| scripts/smoke_phase124e_printhouse_handoff_package_acceptance_pack.js | Acceptance pack smoke test |
+
+### What Was Modified
+
+| File | Change |
+|---|---|
+| src/api/routes/admin.js | Mounted controlledPrinthouseHandoffPackageAdmin at /production/printhouse-handoff-package |
+| src/ui/App.tsx | Added import and route for ControlledPrinthouseHandoffPackage |
+| task.md | Added Phase 124 entry |
+| walkthrough.md | Added Phase 124 walkthrough |
+
+### Key Design Decisions
+
+1. **File Access Governance**: Access grants are scoped to participant_id, printhouse_tenant_id, pilot_order_id, handoff_package_id. All grants must have expiration. No permanent public URLs. Download audit always required.
+2. **Participant Approval Required**: Handoff packages can only be created for Phase 123 APPROVED_FOR_CONTROLLED_PILOT participants.
+3. **Blocker Finding Enforcement**: Unresolved blocker findings prevent package acceptance.
+4. **Accept/Reject Workflow**: Printhouses can accept or reject handoff packages. Both actions are audited.
+5. **Access Revocation**: File access grants can be revoked at any time.
+6. **Tenant Allowlist Fail-Closed**: Printhouse tenant must be in PILOT_TENANT_ALLOWLIST.
+
+### Package Statuses
+
+DRAFT → READY_FOR_REVIEW → IN_REVIEW → ACCEPTED_BY_PRINTHOUSE / REJECTED_BY_PRINTHOUSE / CHANGES_REQUIRED / SUSPENDED / COMPLETED
+
+### Safety Flags (All NOT_ENABLED)
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- PRODUCTION_DISPATCH: NOT_ENABLED
+- AUTOMATIC_PRODUCTION_DISPATCH: NOT_ENABLED
+- UNRESTRICTED_FILE_ACCESS: NOT_ENABLED
+- PERMANENT_PUBLIC_URL: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- TENANT_ALLOWLIST: FAIL_CLOSED
+- BLOCKER_ENFORCEMENT: ACTIVE
+- EVIDENCE_INTEGRITY: ACTIVE
+- FILE_ACCESS_GOVERNANCE: ACTIVE
+
+### Smoke Test Results
+
+- smoke_phase124a: PASS 100 | FAIL 0
+- smoke_phase124b: PASS 53 | FAIL 0
+- smoke_phase124c: PASS 85 | FAIL 0
+- smoke_phase124d: PASS 36 | FAIL 0
+- smoke_phase124e: PASS 89 | FAIL 0
+- npm run build: PASS
+
+### Phase 124 Status: VALIDATED

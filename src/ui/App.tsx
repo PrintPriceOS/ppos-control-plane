@@ -101,6 +101,7 @@ import { ControlledProductionPilotActivation } from './pages/production/Controll
 import { InternalOrderLifecyclePilot } from './pages/production/InternalOrderLifecyclePilot';
 import { InternalOrderLifecycleRuntimeVerification } from './pages/production/InternalOrderLifecycleRuntimeVerification';
 import { FoundingPrinthousePilotGate } from './pages/production/FoundingPrinthousePilotGate';
+import { ControlledPrinthouseHandoffPackage } from './pages/production/ControlledPrinthouseHandoffPackage';
 
 export const App: React.FC = () => {
     return (
@@ -150,6 +151,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/production/internal-order-lifecycle-pilot" element={<InternalOrderLifecyclePilot />} />
                 <Route path="/admin/production/internal-order-lifecycle-runtime-verification" element={<InternalOrderLifecycleRuntimeVerification />} />
                 <Route path="/admin/production/founding-printhouse-pilot" element={<FoundingPrinthousePilotGate />} />
+                <Route path="/admin/production/printhouse-handoff-package" element={<ControlledPrinthouseHandoffPackage />} />
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

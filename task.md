@@ -372,3 +372,28 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - npm run build: PASS
 - Documentation: docs/phase123_founding_printhouse_pilot_gate.md
 - Safety: PILOT_ONLY, FOUNDING_PRINTHOUSE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, AUTOMATIC_PRODUCTION_DISPATCH NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE
+
+## Phase 124 — Controlled Printhouse Handoff / File Package Pilot
+**STATUS: VALIDATED**
+- Migration 068 created with 7 tables: handoff_packages, package_files, reviews, access_grants, findings, audits, evidence_packs
+- Service controlledPrinthouseHandoffPackageService.js created with 13 methods
+- Route controlledPrinthouseHandoffPackageAdmin.js mounted at /api/admin/production/printhouse-handoff-package
+- UI types, client, and page created at /admin/production/printhouse-handoff-package
+- Route registered in App.tsx
+- Handoff package requires Phase 123 approved participant
+- File access grants are scoped, expiring, and revocable
+- Access grants require expiration date (no permanent access)
+- Blocker finding enforcement blocks package acceptance
+- Evidence pack with SHA-256 integrity hash, schema version 124.0, redaction classification
+- No raw internal file paths exposed in UI
+- No permanent public URLs
+- Download audit requirement always enabled
+- smoke_phase124a: PASS 100 | FAIL 0
+- smoke_phase124b: PASS 53 | FAIL 0
+- smoke_phase124c: PASS 85 | FAIL 0
+- smoke_phase124d: PASS 36 | FAIL 0
+- smoke_phase124e: PASS 89 | FAIL 0
+- Phase 123 regression: prior phase files intact
+- npm run build: PASS
+- Documentation: docs/phase124_controlled_printhouse_handoff_file_package_pilot.md
+- Safety: PILOT_ONLY, FOUNDING_PRINTHOUSE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, PRODUCTION_DISPATCH NOT_ENABLED, UNRESTRICTED_FILE_ACCESS NOT_ENABLED, PERMANENT_PUBLIC_URL NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, AUTOMATIC_PRODUCTION_DISPATCH NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE, FILE_ACCESS_GOVERNANCE ACTIVE
