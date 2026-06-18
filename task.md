@@ -397,3 +397,22 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - npm run build: PASS
 - Documentation: docs/phase124_controlled_printhouse_handoff_file_package_pilot.md
 - Safety: PILOT_ONLY, FOUNDING_PRINTHOUSE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, PRODUCTION_DISPATCH NOT_ENABLED, UNRESTRICTED_FILE_ACCESS NOT_ENABLED, PERMANENT_PUBLIC_URL NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, AUTOMATIC_PRODUCTION_DISPATCH NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE, FILE_ACCESS_GOVERNANCE ACTIVE
+
+## Phase 125 — Sandbox Commercial / Invoice / Payment Handoff Pilot
+**STATUS: VALIDATED**
+- Migration 069 created with 8 tables: pilot_runs, invoice_previews, payment_simulations, settlement_previews, printhouse_confirmations, findings, audits, evidence_packs
+- Service sandboxCommercialPilotService.js created with 12 methods
+- Route sandboxCommercialPilotAdmin.js mounted at /api/admin/production/sandbox-commercial-pilot
+- UI types, client, and page created at /admin/production/sandbox-commercial-pilot
+- Route registered in App.tsx
+- Invoice previews are preview-only (invoicePreviewOnly: true, invoiceIssued: false)
+- Payment intents are simulation-only (paymentSimulationOnly: true, paymentExecutionEnabled: false)
+- Refund scenarios are simulation-only (refundExecutionEnabled: false)
+- Payout scenarios are simulation-only (payoutExecutionEnabled: false)
+- Settlement previews are preview-only (payoutPreviewOnly: true)
+- No real money moves in any operation
+- No provider contacted (provider_contacted: false in all simulations)
+- Evidence pack with SHA-256 integrity hash, schema version 125.0, redaction classification
+- Redaction includes raw_payment_credentials, raw_provider_keys, raw_bank_account_data
+- Documentation: docs/phase125_sandbox_commercial_invoice_payment_handoff_pilot.md
+- Safety: SANDBOX_ONLY, PILOT_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, PROVIDER_LIVE_CAPTURE NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, INVOICE_ISSUED NOT_ENABLED, INVOICE_PREVIEW_ONLY ACTIVE, PAYMENT_SIMULATION_ONLY ACTIVE, PAYOUT_PREVIEW_ONLY ACTIVE

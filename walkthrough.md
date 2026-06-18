@@ -1026,3 +1026,66 @@ DRAFT → READY_FOR_REVIEW → IN_REVIEW → ACCEPTED_BY_PRINTHOUSE / REJECTED_B
 - npm run build: PASS
 
 ### Phase 124 Status: VALIDATED
+
+---
+
+## Phase 125 — Sandbox Commercial / Invoice / Payment Handoff Pilot
+
+Phase 125 introduces sandbox-only commercial readiness for pilot orders: invoice preview, payment intent simulation, refund/payout scenario simulation, settlement readiness preview, and financial evidence — without moving real money.
+
+### What Was Created
+
+| File | Purpose |
+|---|---|
+| migrations/069_phase125_sandbox_commercial_invoice_payment_handoff_pilot.sql | 8 tables with safety defaults, indexes, and foreign keys |
+| src/api/services/sandboxCommercialPilotService.js | Service with 12 methods for sandbox commercial operations |
+| src/api/routes/sandboxCommercialPilotAdmin.js | Admin API with 12 endpoints |
+| src/ui/types/sandboxCommercialPilot.ts | TypeScript interfaces |
+| src/ui/api/sandboxCommercialPilotClient.ts | Frontend API client |
+| src/ui/pages/production/SandboxCommercialPilot.tsx | Admin UI page |
+| docs/phase125_sandbox_commercial_invoice_payment_handoff_pilot.md | Phase documentation |
+| scripts/smoke_phase125a_sandbox_commercial_pilot_schema.js | Schema validation smoke test |
+| scripts/smoke_phase125b_sandbox_commercial_pilot_service.js | Service methods and safety smoke test |
+| scripts/smoke_phase125c_sandbox_commercial_pilot_admin_api_ui.js | API/UI file validation smoke test |
+| scripts/smoke_phase125d_sandbox_commercial_pilot_e2e_regression.js | E2E flow + regression smoke test |
+| scripts/smoke_phase125e_sandbox_commercial_pilot_acceptance_pack.js | Acceptance pack smoke test |
+
+### What Was Modified
+
+| File | Change |
+|---|---|
+| src/api/routes/admin.js | Mounted sandboxCommercialPilotAdmin at /production/sandbox-commercial-pilot |
+| src/ui/App.tsx | Added import and route for SandboxCommercialPilot |
+| task.md | Added Phase 125 entry |
+| walkthrough.md | Added Phase 125 walkthrough |
+
+### Key Design Decisions
+
+1. **Invoice Preview Only**: All invoices are preview-only. `invoicePreviewOnly: true`, `invoiceIssued: false`, `sourceMutation: false`.
+2. **Payment Simulation Only**: All payment intents are simulated. No real charge/capture executed. No live provider connectivity.
+3. **Refund/Payout Simulation**: Both refund and payout scenarios are simulation-only. No real money moves.
+4. **Settlement Preview Only**: Settlement previews show breakdown (printhouse payout, platform fee) but do not release any payout.
+5. **Printhouse Confirmation**: Printhouse can confirm commercial terms in sandbox mode.
+6. **Evidence Pack**: Includes invoice/payment/settlement summaries confirming all operations are sandbox-only. Integrity hash and redaction classification included.
+7. **Redaction Extended**: Adds `raw_payment_credentials`, `raw_provider_keys`, `raw_bank_account_data` to redaction list.
+
+### Safety Flags (All NOT_ENABLED)
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- PROVIDER_LIVE_CAPTURE: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- INVOICE_ISSUED: NOT_ENABLED
+- INVOICE_PREVIEW_ONLY: ACTIVE
+- PAYMENT_SIMULATION_ONLY: ACTIVE
+- PAYOUT_PREVIEW_ONLY: ACTIVE
+
+### Phase 125 Status: VALIDATED
