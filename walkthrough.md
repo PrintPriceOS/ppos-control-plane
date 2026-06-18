@@ -649,3 +649,54 @@ Create a controlled, tenant-scoped pilot activation layer for restricted interna
 - SOURCE_RECORD_MUTATION: NOT_ENABLED
 
 ### Phase 121 Status: VALIDATED
+
+## Phase 122 — Internal Order Lifecycle Pilot
+
+### Date: 2026-06-18
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `migrations/064_phase122_internal_order_lifecycle_pilot.sql` | 7 tables for internal order lifecycle pilot |
+| `src/api/services/internalOrderLifecyclePilotService.js` | Service layer with 11 methods |
+| `src/api/routes/internalOrderLifecyclePilotAdmin.js` | Admin API with 11 endpoints |
+| `src/ui/types/internalOrderLifecyclePilot.ts` | TypeScript types |
+| `src/ui/api/internalOrderLifecyclePilotClient.ts` | UI API client |
+| `src/ui/pages/production/InternalOrderLifecyclePilot.tsx` | UI page |
+| `scripts/smoke_phase122a_internal_order_lifecycle_pilot_schema.js` | Schema smoke test |
+| `scripts/smoke_phase122b_internal_order_lifecycle_pilot_service.js` | Service smoke test |
+| `scripts/smoke_phase122c_internal_order_lifecycle_pilot_admin_api_ui.js` | Admin API & UI smoke test |
+| `scripts/smoke_phase122d_internal_order_lifecycle_pilot_e2e_regression.js` | E2E regression smoke test |
+| `scripts/smoke_phase122e_internal_order_lifecycle_pilot_acceptance_pack.js` | Acceptance pack |
+| `docs/phase122_internal_order_lifecycle_pilot.md` | Documentation |
+
+### Validation Commands
+
+```bash
+node --check src/api/services/internalOrderLifecyclePilotService.js
+node --check src/api/routes/internalOrderLifecyclePilotAdmin.js
+node scripts/smoke_phase122a_internal_order_lifecycle_pilot_schema.js
+node scripts/smoke_phase122b_internal_order_lifecycle_pilot_service.js
+node scripts/smoke_phase122c_internal_order_lifecycle_pilot_admin_api_ui.js
+node scripts/smoke_phase122d_internal_order_lifecycle_pilot_e2e_regression.js
+node scripts/smoke_phase122e_internal_order_lifecycle_pilot_acceptance_pack.js
+npm run build
+```
+
+### Safety Confirmation
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_RECORD_MUTATION_OUTSIDE_PILOT_SCOPE: NOT_ENABLED
+- ROLLBACK_SIMULATION: ACTIVE
+- EVIDENCE_PACK: ACTIVE
+
+### Phase 122 Status: VALIDATED

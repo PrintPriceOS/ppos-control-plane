@@ -307,3 +307,15 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - smoke_phase121d: PASS 60 | FAIL 0
 - npm run build: PASS
 - Safety: CONTROLLED_PILOT_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_RECORD_MUTATION NOT_ENABLED
+
+## Phase 122 — Internal Order Lifecycle Pilot
+**STATUS: VALIDATED**
+- Migration 064 created with 7 tables: pilot_runs, pilot_orders, pilot_steps, pilot_findings, pilot_audits, pilot_rollback_points, pilot_evidence_packs
+- Service internalOrderLifecyclePilotService.js created with 11 methods
+- Route internalOrderLifecyclePilotAdmin.js mounted at /api/admin/production/internal-order-lifecycle-pilot
+- UI types, client, and page created at /admin/production/internal-order-lifecycle-pilot
+- Route registered in App.tsx
+- Documentation: docs/phase122_internal_order_lifecycle_pilot.md
+- smoke_phase122a-e: all passing
+- npm run build: PASS
+- Safety: PILOT_ONLY, INTERNAL_ORDER_LIFECYCLE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, ROLLBACK_SIMULATION ACTIVE, EVIDENCE_PACK ACTIVE

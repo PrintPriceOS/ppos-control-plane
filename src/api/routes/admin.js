@@ -210,6 +210,7 @@ const productionObservabilityIncidentReadinessAdmin = require('./productionObser
 const prelaunchSecurityComplianceHardeningAdmin = require('./prelaunchSecurityComplianceHardeningAdmin');
 const finalPreproductionReleaseCandidateAdmin = require('./finalPreproductionReleaseCandidateAdmin');
 const controlledProductionPilotActivationAdmin = require('./controlledProductionPilotActivationAdmin');
+const internalOrderLifecyclePilotAdmin = require('./internalOrderLifecyclePilotAdmin');
 
 
 /**
@@ -864,6 +865,7 @@ router.use('/operations/incident-readiness', productionObservabilityIncidentRead
 router.use('/prelaunch/security-compliance', prelaunchSecurityComplianceHardeningAdmin);
 router.use('/preproduction/release-candidate', finalPreproductionReleaseCandidateAdmin);
 router.use('/production/pilot-activation', controlledProductionPilotActivationAdmin);
+router.use('/production/internal-order-lifecycle-pilot', internalOrderLifecyclePilotAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
