@@ -1,5 +1,8 @@
 'use strict';
 
+// Phase 120.1: Load env bootstrap for acceptance environment validation
+try { require('./smoke_bootstrap_env'); } catch (e) { /* env bootstrap optional for static checks */ }
+
 const fs = require('fs');
 const path = require('path');
 

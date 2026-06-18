@@ -264,7 +264,7 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 
 ---
 
-## Phase 120 � Final Pre-Production Release Candidate
+## Phase 120 � Final Pre-Production Release Candidate
 **STATUS: VALIDATED**
 - Migration 062 created (final_preproduction_release_candidates, final_preproduction_release_candidate_checks, final_preproduction_release_candidate_findings, final_preproduction_release_candidate_audits)
 - Service finalPreproductionReleaseCandidateService.js created with 6 methods (createReleaseCandidate, aggregateReadinessEvidence, evaluateReleaseCandidate, recordFinding, resolveFinding, buildFinalEvidencePack)
@@ -278,3 +278,16 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - smoke_phase120d: VALIDATED
 - npm run build: PASS
 - Safety: REVIEW_ONLY, PRODUCTION_DEPLOYMENT NOT_EXECUTED, PRODUCTION_ACTIVATION NOT_ENABLED, SOURCE_RECORD_MUTATION NOT_ENABLED
+
+---
+
+## Phase 120.1 — Migration Integrity & Acceptance Env Repair
+**STATUS: VALIDATED**
+- Diagnostic script: diagnose_migration_integrity_drift.js created (read-only, never mutates DB)
+- Guarded repair script: repair_phase120_1_migration_015_checksum.js created (requires ALLOW_MIGRATION_CHECKSUM_REPAIR=true)
+- Migration version collision guard: smoke_phase120_1_migration_version_collision_guard.js — PASS
+- Env bootstrap: smoke_bootstrap_env.js created, Phase 113G updated to reference it
+- Env bootstrap smoke: smoke_phase120_1_acceptance_env_bootstrap.js — PASS
+- Final acceptance: smoke_phase120_1_migration_integrity_acceptance.js — PASS
+- npm run build: PASS
+- Safety: PRODUCTION_ACTIVATION NOT_ENABLED, FULL_PUBLIC NOT_ENABLED, SOURCE_RECORD_MUTATION NOT_ENABLED

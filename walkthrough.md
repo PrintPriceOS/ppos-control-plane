@@ -529,7 +529,7 @@ npm run build
 
 ---
 
-## Phase 120 � Final Pre-Production Release Candidate
+## Phase 120 � Final Pre-Production Release Candidate
 
 ### Files Created
 - `migrations/062_phase120_final_preproduction_release_candidate.sql`
@@ -564,3 +564,44 @@ npm run build
 - SOURCE_RECORD_MUTATION: NOT_ENABLED
 
 ### Phase 120 Status: VALIDATED
+
+---
+
+## Phase 120.1 — Migration Integrity & Acceptance Env Repair
+
+### Purpose
+Repair production deployment integrity before controlled pilot activation. Fixes migration checksum drift for `015_stripe_webhook_events_idempotency.sql` and hardens migration version collision detection.
+
+### Problem
+- Migration runner failed with `CHECKSUM MISMATCH for migration 015_stripe_webhook_events_idempotency.sql`
+- `schema_versions` contained both `015_stripe_webhook_events_idempotency` and `015 / 015_phase76_printhouse_capabilities.sql`
+- Phase 113G lacked env bootstrap when run standalone
+
+### Artifacts
+- `scripts/diagnose_migration_integrity_drift.js` — Read-only checksum drift diagnostic
+- `scripts/repair_phase120_1_migration_015_checksum.js` — Guarded single-row checksum repair
+- `scripts/smoke_phase120_1_migration_version_collision_guard.js` — Version collision guard
+- `scripts/smoke_bootstrap_env.js` — Shared env bootstrap helper
+- `scripts/smoke_phase120_1_acceptance_env_bootstrap.js` — Env bootstrap smoke
+- `scripts/smoke_phase120_1_migration_integrity_acceptance.js` — Final acceptance smoke
+- `docs/phase120_1_migration_integrity_acceptance_env_repair.md` — Phase documentation
+
+### Smoke Test Results
+| Test | Result |
+|------|--------|
+| smoke_phase120_1_migration_version_collision_guard | PASS |
+| smoke_phase120_1_acceptance_env_bootstrap | PASS |
+| smoke_phase120_1_migration_integrity_acceptance | VALIDATED |
+| npm run build | PASS |
+
+### Safety Confirmation
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- FULL_PUBLIC: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_SUBMISSIONS: NOT_ENABLED
+- SOURCE_RECORD_MUTATION: NOT_ENABLED
+
+### Phase 120.1 Status: VALIDATED
