@@ -605,3 +605,47 @@ Repair production deployment integrity before controlled pilot activation. Fixes
 - SOURCE_RECORD_MUTATION: NOT_ENABLED
 
 ### Phase 120.1 Status: VALIDATED
+
+---
+
+## Phase 121 — Controlled Production Pilot Activation Gate
+
+**Date:** 2026-06-18
+
+### Purpose
+Create a controlled, tenant-scoped pilot activation layer for restricted internal or founding-printhouse tenants while keeping FULL_PUBLIC disabled.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `migrations/063_phase121_controlled_production_pilot_activation_gate.sql` | Schema (6 tables) |
+| `src/api/services/controlledProductionPilotActivationService.js` | Service (11 methods) |
+| `src/api/routes/controlledProductionPilotActivationAdmin.js` | Admin API (11 endpoints) |
+| `src/ui/types/controlledProductionPilotActivation.ts` | TypeScript interfaces |
+| `src/ui/api/controlledProductionPilotActivationClient.ts` | Frontend API client |
+| `src/ui/pages/production/ControlledProductionPilotActivation.tsx` | UI page |
+| `docs/phase121_controlled_production_pilot_activation_gate.md` | Phase documentation |
+
+### Validation
+
+| Test | Result |
+|------|--------|
+| smoke_phase121a (schema) | PASS 30 / FAIL 0 |
+| smoke_phase121b (service) | PASS 56 / FAIL 0 |
+| smoke_phase121c (admin API & UI) | PASS 49 / FAIL 0 |
+| smoke_phase121d (acceptance pack) | PASS 60 / FAIL 0 |
+| npm run build | PASS |
+
+### Safety Confirmation
+- CONTROLLED_PILOT_ONLY: ENABLED
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE: NOT_ENABLED
+- UNRESTRICTED_LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_RECORD_MUTATION: NOT_ENABLED
+
+### Phase 121 Status: VALIDATED

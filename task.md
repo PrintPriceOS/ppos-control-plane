@@ -291,3 +291,19 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - Final acceptance: smoke_phase120_1_migration_integrity_acceptance.js — PASS
 - npm run build: PASS
 - Safety: PRODUCTION_ACTIVATION NOT_ENABLED, FULL_PUBLIC NOT_ENABLED, SOURCE_RECORD_MUTATION NOT_ENABLED
+
+---
+
+## Phase 121 — Controlled Production Pilot Activation Gate
+**STATUS: VALIDATED**
+- Migration 063 created with 6 tables: pilot_runs, pilot_tenants, pilot_checks, pilot_findings, pilot_audits, pilot_rollback_points
+- Service controlledProductionPilotActivationService.js created with 11 methods
+- Route controlledProductionPilotActivationAdmin.js mounted at /api/admin/production/pilot-activation
+- UI types, client, and page created at /admin/production/pilot-activation
+- Route registered in App.tsx
+- smoke_phase121a: PASS 30 | FAIL 0
+- smoke_phase121b: PASS 56 | FAIL 0
+- smoke_phase121c: PASS 49 | FAIL 0
+- smoke_phase121d: PASS 60 | FAIL 0
+- npm run build: PASS
+- Safety: CONTROLLED_PILOT_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_RECORD_MUTATION NOT_ENABLED
