@@ -215,6 +215,7 @@ const internalOrderLifecycleRuntimeVerificationAdmin = require('./internalOrderL
 const foundingPrinthousePilotGateAdmin = require('./foundingPrinthousePilotGateAdmin');
 const controlledPrinthouseHandoffPackageAdmin = require('./controlledPrinthouseHandoffPackageAdmin');
 const sandboxCommercialPilotAdmin = require('./sandboxCommercialPilotAdmin');
+const pilotEvidenceReviewGoNoGoAdmin = require('./pilotEvidenceReviewGoNoGoAdmin');
 
 
 /**
@@ -874,6 +875,7 @@ router.use('/production/internal-order-lifecycle-runtime-verification', internal
 router.use('/production/founding-printhouse-pilot', foundingPrinthousePilotGateAdmin);
 router.use('/production/printhouse-handoff-package', controlledPrinthouseHandoffPackageAdmin);
 router.use('/production/sandbox-commercial-pilot', sandboxCommercialPilotAdmin);
+router.use('/production/pilot-evidence-review', pilotEvidenceReviewGoNoGoAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);

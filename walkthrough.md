@@ -1089,3 +1089,75 @@ Phase 125 introduces sandbox-only commercial readiness for pilot orders: invoice
 - PAYOUT_PREVIEW_ONLY: ACTIVE
 
 ### Phase 125 Status: VALIDATED
+
+---
+
+## Phase 126 — Pilot Evidence Review & Go/No-Go for Limited Beta
+
+### Goal
+
+Aggregate evidence from Phases 122.1–125 and produce a formal Go/No-Go decision for a future limited beta. This phase does NOT enable limited beta automatically. It creates a review board and decision record.
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| migrations/070_phase126_pilot_evidence_review_go_no_go.sql | 6 tables: boards, checks, findings, decisions, audits, evidence packs |
+| src/api/services/pilotEvidenceReviewGoNoGoService.js | Service with 9 methods |
+| src/api/routes/pilotEvidenceReviewGoNoGoAdmin.js | Admin API mounted at /production/pilot-evidence-review |
+| src/ui/types/pilotEvidenceReviewGoNoGo.ts | TypeScript interfaces |
+| src/ui/api/pilotEvidenceReviewGoNoGoClient.ts | API client |
+| src/ui/pages/production/PilotEvidenceReviewGoNoGo.tsx | Admin UI page |
+| docs/phase126_pilot_evidence_review_go_no_go.md | Documentation |
+| scripts/smoke_phase126a_pilot_evidence_review_schema.js | Schema smoke test |
+| scripts/smoke_phase126b_pilot_evidence_review_service.js | Service smoke test |
+| scripts/smoke_phase126c_pilot_evidence_review_admin_api_ui.js | API/UI smoke test |
+| scripts/smoke_phase126d_pilot_evidence_review_e2e_regression.js | E2E regression smoke test |
+| scripts/smoke_phase126e_pilot_evidence_review_acceptance_pack.js | Acceptance pack |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| src/api/routes/admin.js | Import and mount pilotEvidenceReviewGoNoGoAdmin |
+| src/ui/App.tsx | Import and route PilotEvidenceReviewGoNoGo |
+| task.md | Added Phase 126 validation |
+| walkthrough.md | Added Phase 126 walkthrough |
+
+### Key Design Decisions
+
+1. **Decision Only**: GO_FOR_LIMITED_BETA_PREPARATION does NOT enable beta automatically. `betaEnabled: false`, `productionActivationEnabled: false`.
+2. **15 Required Evidence Checks**: Covers all phases 122.1–125 plus operational requirements (migration runner, npm build, DB backup, tenant allowlist, file access, no real payments/provider/public).
+3. **Blocker Enforcement**: Unresolved findings with `blocks_go_decision: true` prevent GO_FOR_LIMITED_BETA_PREPARATION decision.
+4. **Evidence Pack**: SHA-256 integrity hash, schema version 126.0, redaction classification INTERNAL_ONLY.
+5. **All Actions Audited**: Every action writes an audit event with safety snapshot.
+6. **Decision Statuses**: DRAFT, IN_REVIEW, CHANGES_REQUIRED, GO_FOR_LIMITED_BETA_PREPARATION, NO_GO, DEFERRED.
+7. **Redaction**: Includes raw_payment_credentials, raw_provider_keys, raw_bank_account_data, raw_customer_data, secrets, internal_file_paths.
+
+### Safety Flags (All NOT_ENABLED)
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- BETA_ENABLED: NOT_ENABLED
+
+### Smoke Test Results
+
+| Test | Passed | Failed |
+|---|---|---|
+| smoke_phase126a (Schema) | 64 | 0 |
+| smoke_phase126b (Service) | 41 | 0 |
+| smoke_phase126c (Admin API/UI) | 48 | 0 |
+| smoke_phase126d (E2E Regression) | 65 | 0 |
+| smoke_phase126e (Acceptance Pack) | 109 | 0 |
+| **Total** | **327** | **0** |
+
+### Phase 126 Status: VALIDATED

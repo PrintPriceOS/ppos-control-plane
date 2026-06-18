@@ -416,3 +416,25 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - Redaction includes raw_payment_credentials, raw_provider_keys, raw_bank_account_data
 - Documentation: docs/phase125_sandbox_commercial_invoice_payment_handoff_pilot.md
 - Safety: SANDBOX_ONLY, PILOT_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, PROVIDER_LIVE_CAPTURE NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, INVOICE_ISSUED NOT_ENABLED, INVOICE_PREVIEW_ONLY ACTIVE, PAYMENT_SIMULATION_ONLY ACTIVE, PAYOUT_PREVIEW_ONLY ACTIVE
+
+## Phase 126 — Pilot Evidence Review & Go/No-Go for Limited Beta
+**STATUS: VALIDATED**
+- Migration 070 created with 6 tables: review_boards, review_checks, review_findings, go_no_go_decisions, review_audits, review_packs
+- Service pilotEvidenceReviewGoNoGoService.js created with 9 methods (createReviewBoard, aggregatePilotEvidence, evaluateLimitedBetaReadiness, recordReviewFinding, resolveReviewFinding, submitGoNoGoDecision, buildPilotReviewEvidencePack, getPilotReviewAuditTimeline, getReadiness)
+- Route pilotEvidenceReviewGoNoGoAdmin.js mounted at /api/admin/production/pilot-evidence-review
+- UI types, client, and page created at /admin/production/pilot-evidence-review
+- Route registered in App.tsx
+- 15 required evidence checks covering phases 122.1–125 and operational requirements
+- Decision statuses: DRAFT, IN_REVIEW, CHANGES_REQUIRED, GO_FOR_LIMITED_BETA_PREPARATION, NO_GO, DEFERRED
+- Unresolved blocker findings prevent GO_FOR_LIMITED_BETA_PREPARATION decision
+- GO decision does NOT enable beta automatically (betaEnabled: false, productionActivationEnabled: false)
+- Evidence pack with SHA-256 integrity hash, schema version 126.0, redaction classification INTERNAL_ONLY
+- All actions audited with safety snapshots
+- smoke_phase126a: PASS 64 | FAIL 0
+- smoke_phase126b: PASS 41 | FAIL 0
+- smoke_phase126c: PASS 48 | FAIL 0
+- smoke_phase126d: PASS 65 | FAIL 0
+- smoke_phase126e: PASS 109 | FAIL 0
+- npm run build: PASS
+- Documentation: docs/phase126_pilot_evidence_review_go_no_go.md
+- Safety: PILOT_ONLY, REVIEW_ONLY, DECISION_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, SOURCE_MUTATION NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, BETA_ENABLED NOT_ENABLED
