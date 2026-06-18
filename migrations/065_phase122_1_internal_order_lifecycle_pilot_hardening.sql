@@ -3,47 +3,47 @@
 -- Foreign keys are used where safe (InnoDB, all tables in same schema).
 
 -- Indexes on internal_order_lifecycle_pilot_runs
-CREATE INDEX IF NOT EXISTS idx_iolp_runs_tenant_id ON internal_order_lifecycle_pilot_runs (tenant_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_runs_status ON internal_order_lifecycle_pilot_runs (status);
-CREATE INDEX IF NOT EXISTS idx_iolp_runs_created_at ON internal_order_lifecycle_pilot_runs (created_at);
+CREATE INDEX idx_iolp_runs_tenant_id ON internal_order_lifecycle_pilot_runs (tenant_id);
+CREATE INDEX idx_iolp_runs_status ON internal_order_lifecycle_pilot_runs (status);
+CREATE INDEX idx_iolp_runs_created_at ON internal_order_lifecycle_pilot_runs (created_at);
 
 -- Indexes on internal_order_lifecycle_pilot_orders
-CREATE INDEX IF NOT EXISTS idx_iolp_orders_pilot_run_id ON internal_order_lifecycle_pilot_orders (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_orders_tenant_id ON internal_order_lifecycle_pilot_orders (tenant_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_orders_order_status ON internal_order_lifecycle_pilot_orders (order_status);
-CREATE INDEX IF NOT EXISTS idx_iolp_orders_created_at ON internal_order_lifecycle_pilot_orders (created_at);
+CREATE INDEX idx_iolp_orders_pilot_run_id ON internal_order_lifecycle_pilot_orders (pilot_run_id);
+CREATE INDEX idx_iolp_orders_tenant_id ON internal_order_lifecycle_pilot_orders (tenant_id);
+CREATE INDEX idx_iolp_orders_order_status ON internal_order_lifecycle_pilot_orders (order_status);
+CREATE INDEX idx_iolp_orders_created_at ON internal_order_lifecycle_pilot_orders (created_at);
 
 -- Indexes on internal_order_lifecycle_pilot_steps
-CREATE INDEX IF NOT EXISTS idx_iolp_steps_pilot_run_id ON internal_order_lifecycle_pilot_steps (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_steps_pilot_order_id ON internal_order_lifecycle_pilot_steps (pilot_order_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_steps_step_key ON internal_order_lifecycle_pilot_steps (step_key);
-CREATE INDEX IF NOT EXISTS idx_iolp_steps_step_status ON internal_order_lifecycle_pilot_steps (step_status);
-CREATE INDEX IF NOT EXISTS idx_iolp_steps_created_at ON internal_order_lifecycle_pilot_steps (created_at);
+CREATE INDEX idx_iolp_steps_pilot_run_id ON internal_order_lifecycle_pilot_steps (pilot_run_id);
+CREATE INDEX idx_iolp_steps_pilot_order_id ON internal_order_lifecycle_pilot_steps (pilot_order_id);
+CREATE INDEX idx_iolp_steps_step_key ON internal_order_lifecycle_pilot_steps (step_key);
+CREATE INDEX idx_iolp_steps_step_status ON internal_order_lifecycle_pilot_steps (step_status);
+CREATE INDEX idx_iolp_steps_created_at ON internal_order_lifecycle_pilot_steps (created_at);
 
 -- Indexes on internal_order_lifecycle_pilot_findings
-CREATE INDEX IF NOT EXISTS idx_iolp_findings_pilot_run_id ON internal_order_lifecycle_pilot_findings (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_findings_pilot_order_id ON internal_order_lifecycle_pilot_findings (pilot_order_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_findings_finding_status ON internal_order_lifecycle_pilot_findings (finding_status);
-CREATE INDEX IF NOT EXISTS idx_iolp_findings_blocks_lifecycle ON internal_order_lifecycle_pilot_findings (blocks_lifecycle);
-CREATE INDEX IF NOT EXISTS idx_iolp_findings_severity ON internal_order_lifecycle_pilot_findings (severity);
+CREATE INDEX idx_iolp_findings_pilot_run_id ON internal_order_lifecycle_pilot_findings (pilot_run_id);
+CREATE INDEX idx_iolp_findings_pilot_order_id ON internal_order_lifecycle_pilot_findings (pilot_order_id);
+CREATE INDEX idx_iolp_findings_finding_status ON internal_order_lifecycle_pilot_findings (finding_status);
+CREATE INDEX idx_iolp_findings_blocks_lifecycle ON internal_order_lifecycle_pilot_findings (blocks_lifecycle);
+CREATE INDEX idx_iolp_findings_severity ON internal_order_lifecycle_pilot_findings (severity);
 
 -- Indexes on internal_order_lifecycle_pilot_audits
-CREATE INDEX IF NOT EXISTS idx_iolp_audits_pilot_run_id ON internal_order_lifecycle_pilot_audits (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_audits_pilot_order_id ON internal_order_lifecycle_pilot_audits (pilot_order_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_audits_event_type ON internal_order_lifecycle_pilot_audits (event_type);
-CREATE INDEX IF NOT EXISTS idx_iolp_audits_created_at ON internal_order_lifecycle_pilot_audits (created_at);
+CREATE INDEX idx_iolp_audits_pilot_run_id ON internal_order_lifecycle_pilot_audits (pilot_run_id);
+CREATE INDEX idx_iolp_audits_pilot_order_id ON internal_order_lifecycle_pilot_audits (pilot_order_id);
+CREATE INDEX idx_iolp_audits_event_type ON internal_order_lifecycle_pilot_audits (event_type);
+CREATE INDEX idx_iolp_audits_created_at ON internal_order_lifecycle_pilot_audits (created_at);
 
 -- Indexes on internal_order_lifecycle_pilot_rollback_points
-CREATE INDEX IF NOT EXISTS idx_iolp_rollback_pilot_run_id ON internal_order_lifecycle_pilot_rollback_points (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_rollback_pilot_order_id ON internal_order_lifecycle_pilot_rollback_points (pilot_order_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_rollback_status ON internal_order_lifecycle_pilot_rollback_points (rollback_point_status);
-CREATE INDEX IF NOT EXISTS idx_iolp_rollback_created_at ON internal_order_lifecycle_pilot_rollback_points (created_at);
+CREATE INDEX idx_iolp_rollback_pilot_run_id ON internal_order_lifecycle_pilot_rollback_points (pilot_run_id);
+CREATE INDEX idx_iolp_rollback_pilot_order_id ON internal_order_lifecycle_pilot_rollback_points (pilot_order_id);
+CREATE INDEX idx_iolp_rollback_status ON internal_order_lifecycle_pilot_rollback_points (rollback_point_status);
+CREATE INDEX idx_iolp_rollback_created_at ON internal_order_lifecycle_pilot_rollback_points (created_at);
 
 -- Indexes on internal_order_lifecycle_pilot_evidence_packs
-CREATE INDEX IF NOT EXISTS idx_iolp_evidence_pilot_run_id ON internal_order_lifecycle_pilot_evidence_packs (pilot_run_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_evidence_pilot_order_id ON internal_order_lifecycle_pilot_evidence_packs (pilot_order_id);
-CREATE INDEX IF NOT EXISTS idx_iolp_evidence_status ON internal_order_lifecycle_pilot_evidence_packs (evidence_status);
-CREATE INDEX IF NOT EXISTS idx_iolp_evidence_generated_at ON internal_order_lifecycle_pilot_evidence_packs (generated_at);
+CREATE INDEX idx_iolp_evidence_pilot_run_id ON internal_order_lifecycle_pilot_evidence_packs (pilot_run_id);
+CREATE INDEX idx_iolp_evidence_pilot_order_id ON internal_order_lifecycle_pilot_evidence_packs (pilot_order_id);
+CREATE INDEX idx_iolp_evidence_status ON internal_order_lifecycle_pilot_evidence_packs (evidence_status);
+CREATE INDEX idx_iolp_evidence_generated_at ON internal_order_lifecycle_pilot_evidence_packs (generated_at);
 
 -- Foreign keys (InnoDB, same schema — safe to add)
 -- Orders → Runs
