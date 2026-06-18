@@ -862,3 +862,89 @@ npm run build
 - MEMORY_FALLBACK_PRODUCTION_VALID: NO
 
 ### Phase 122.2 Status: VALIDATED
+
+## Phase 123 — Founding Printhouse Pilot Gate
+
+### Date: 2026-06-18
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| migrations/067_phase123_founding_printhouse_pilot_gate.sql | 7 tables with safety defaults, indexes, and foreign keys |
+| src/api/services/foundingPrinthousePilotGateService.js | Service with 13 methods for pilot program/participant/order management |
+| src/api/routes/foundingPrinthousePilotGateAdmin.js | Admin API with 12 endpoints |
+| src/ui/types/foundingPrinthousePilotGate.ts | TypeScript types for programs, participants, findings, audits |
+| src/ui/api/foundingPrinthousePilotGateClient.ts | Frontend API client |
+| src/ui/pages/production/FoundingPrinthousePilotGate.tsx | Admin UI page with safety invariant display |
+| docs/phase123_founding_printhouse_pilot_gate.md | Phase documentation |
+| scripts/smoke_phase123a_founding_printhouse_pilot_schema.js | Schema validation smoke test |
+| scripts/smoke_phase123b_founding_printhouse_pilot_service.js | Service methods and safety smoke test |
+| scripts/smoke_phase123c_founding_printhouse_pilot_admin_api_ui.js | API/UI file validation smoke test |
+| scripts/smoke_phase123d_founding_printhouse_pilot_e2e_regression.js | E2E flow + regression smoke test |
+| scripts/smoke_phase123e_founding_printhouse_pilot_acceptance_pack.js | Acceptance pack smoke test |
+
+### Files Modified
+
+- src/api/routes/admin.js — added import and mount at /production/founding-printhouse-pilot
+- src/ui/App.tsx — added import and route /admin/production/founding-printhouse-pilot
+- task.md — added Phase 123 entry
+- walkthrough.md — added Phase 123 walkthrough
+
+### Service Architecture
+
+- `createPilotProgram()` — creates pilot program (tenant allowlist enforced)
+- `registerFoundingPrinthouse()` — registers printhouse participant (allowlist enforced)
+- `evaluateParticipantReadiness()` — checks Phase 122.1/122.2 evidence, allowlist, approval, findings
+- `approveParticipantForPilot()` — approves participant (blocked by unresolved blocker findings)
+- `suspendParticipant()` — suspends a participant
+- `linkInternalPilotOrder()` — links internal pilot order (requires APPROVED_FOR_CONTROLLED_PILOT)
+- `evaluateOrderHandoffReadiness()` — evaluates handoff readiness (blocked by unresolved findings)
+- `submitPrinthouseReview()` — records a review
+- `recordPilotFinding()` — records a finding (can block handoff)
+- `resolvePilotFinding()` — resolves a finding
+- `buildPrinthousePilotEvidencePack()` — builds evidence pack with integrity hash and redaction
+- `getPrinthousePilotAuditTimeline()` — retrieves audit timeline
+- `getReadiness()` — checks overall readiness including prior phase evidence
+
+### Audit Events Generated
+
+- `PILOT_PROGRAM_CREATED`
+- `FOUNDING_PRINTHOUSE_REGISTERED`
+- `PARTICIPANT_APPROVED_FOR_CONTROLLED_PILOT`
+- `PARTICIPANT_SUSPENDED`
+- `INTERNAL_PILOT_ORDER_LINKED`
+- `ORDER_HANDOFF_READINESS_EVALUATED`
+- `PRINTHOUSE_REVIEW_SUBMITTED`
+- `PILOT_FINDING_RECORDED`
+- `PILOT_FINDING_RESOLVED`
+- `PRINTHOUSE_PILOT_EVIDENCE_PACK_BUILT`
+
+### Validation Results
+
+- smoke_phase123a: PASS 79 | FAIL 0
+- smoke_phase123b: PASS 50 | FAIL 0
+- smoke_phase123c: PASS 74 | FAIL 0
+- smoke_phase123d: PASS 26 | FAIL 0
+- smoke_phase123e: PASS 65 | FAIL 0
+- npm run build: PASS
+
+### Safety Confirmation
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE: NOT_ENABLED
+- PRODUCTION_ACTIVATION: NOT_ENABLED
+- AUTOMATIC_PRODUCTION_DISPATCH: NOT_ENABLED
+- TENANT_ALLOWLIST: FAIL_CLOSED
+- BLOCKER_ENFORCEMENT: ACTIVE
+- EVIDENCE_INTEGRITY: ACTIVE
+
+### Phase 123 Status: VALIDATED

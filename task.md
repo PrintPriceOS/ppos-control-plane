@@ -351,3 +351,24 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - smoke_phase122_2d: PASS
 - npm run build: PASS
 - Safety: PILOT_ONLY, RUNTIME_VERIFICATION_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, SERVICE_RESTART NOT_EXECUTED, REAL_RESTART NOT_EXECUTED, MEMORY_FALLBACK NOT_PRODUCTION_VALID
+
+## Phase 123 — Founding Printhouse Pilot Gate
+**STATUS: VALIDATED**
+- Migration 067 created with 7 tables: pilot_programs, participants, order_links, reviews, findings, audits, evidence_packs
+- Service foundingPrinthousePilotGateService.js created with 13 methods
+- Route foundingPrinthousePilotGateAdmin.js mounted at /api/admin/production/founding-printhouse-pilot
+- UI types, client, and page created at /admin/production/founding-printhouse-pilot
+- Route registered in App.tsx
+- Tenant allowlist fail-closed enforced for program creation, registration, and approval
+- Blocker finding enforcement blocks participant approval and order handoff readiness
+- Order linking requires APPROVED_FOR_CONTROLLED_PILOT status
+- Evidence pack with SHA-256 integrity hash, schema version 123.0, redaction classification
+- smoke_phase123a: PASS 79 | FAIL 0
+- smoke_phase123b: PASS 50 | FAIL 0
+- smoke_phase123c: PASS 74 | FAIL 0
+- smoke_phase123d: PASS 26 | FAIL 0
+- smoke_phase123e: PASS 65 | FAIL 0
+- Phase 122 regression: prior phase files intact
+- npm run build: PASS
+- Documentation: docs/phase123_founding_printhouse_pilot_gate.md
+- Safety: PILOT_ONLY, FOUNDING_PRINTHOUSE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, PRODUCTION_ACTIVATION NOT_ENABLED, AUTOMATIC_PRODUCTION_DISPATCH NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE

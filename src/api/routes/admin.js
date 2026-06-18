@@ -212,6 +212,7 @@ const finalPreproductionReleaseCandidateAdmin = require('./finalPreproductionRel
 const controlledProductionPilotActivationAdmin = require('./controlledProductionPilotActivationAdmin');
 const internalOrderLifecyclePilotAdmin = require('./internalOrderLifecyclePilotAdmin');
 const internalOrderLifecycleRuntimeVerificationAdmin = require('./internalOrderLifecycleRuntimeVerificationAdmin');
+const foundingPrinthousePilotGateAdmin = require('./foundingPrinthousePilotGateAdmin');
 
 
 /**
@@ -868,6 +869,7 @@ router.use('/preproduction/release-candidate', finalPreproductionReleaseCandidat
 router.use('/production/pilot-activation', controlledProductionPilotActivationAdmin);
 router.use('/production/internal-order-lifecycle-pilot', internalOrderLifecyclePilotAdmin);
 router.use('/production/internal-order-lifecycle-runtime-verification', internalOrderLifecycleRuntimeVerificationAdmin);
+router.use('/production/founding-printhouse-pilot', foundingPrinthousePilotGateAdmin);
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
