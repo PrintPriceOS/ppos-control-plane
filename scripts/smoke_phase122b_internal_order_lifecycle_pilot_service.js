@@ -67,6 +67,11 @@ if (fs.existsSync(servicePath)) {
   check('sourceMutationOutsidePilotScope: false', src.includes('sourceMutationOutsidePilotScope: false'));
 
   // Functional tests with in-memory fallback
+  // Phase 122.1: set test mode so tenant allowlist allows all tenants in smoke
+  process.env.NODE_ENV = 'test';
+  process.env.ALLOW_DB_FALLBACK_FOR_SMOKE = 'true';
+
+  delete require.cache[require.resolve(servicePath)];
   const Svc = require(servicePath);
   const svc = new Svc();
 

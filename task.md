@@ -319,3 +319,19 @@ All sub-phases (114A–E) complete. Phase 114 Controlled Production Activation D
 - smoke_phase122a-e: all passing
 - npm run build: PASS
 - Safety: PILOT_ONLY, INTERNAL_ORDER_LIFECYCLE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, ROLLBACK_SIMULATION ACTIVE, EVIDENCE_PACK ACTIVE
+
+## Phase 122.1 — Internal Order Lifecycle Pilot Operational Hardening
+**STATUS: VALIDATED**
+- Migration 065 created with indexes on all 7 Phase 122 tables and foreign keys to pilot_runs
+- Service hardened: fail-closed tenant allowlist, DB read-through, explicit persistence markers, blocker enforcement, pilot_run_id existence enforcement, prior phase evidence verification, evidence integrity hash + schema version + redaction
+- Phase 122 smoke tests updated for fail-closed allowlist compatibility
+- smoke_phase122_1a: PASS 51 | FAIL 0
+- smoke_phase122_1b: PASS 45 | FAIL 0
+- smoke_phase122_1c: PASS 13 | FAIL 0
+- smoke_phase122_1d: PASS 12 | FAIL 0
+- smoke_phase122_1e: PASS 41 | FAIL 0
+- smoke_phase122_1f: PASS 76 | FAIL 0
+- Phase 122 regression: smoke_phase122a-e all passing
+- npm run build: PASS
+- Documentation: docs/phase122_1_internal_order_lifecycle_pilot_hardening.md
+- Safety: PILOT_ONLY, INTERNAL_ORDER_LIFECYCLE_ONLY, FULL_PUBLIC NOT_ENABLED, OPEN_MARKETPLACE_ACCESS NOT_ENABLED, LIVE_PROVIDER_CONNECTIVITY NOT_ENABLED, PAYMENT_EXECUTION NOT_ENABLED, REFUND_EXECUTION NOT_ENABLED, PAYOUT_EXECUTION NOT_ENABLED, EXTERNAL_TAX_SUBMISSION NOT_ENABLED, EXTERNAL_ACCOUNTING_SUBMISSION NOT_ENABLED, PROVIDER_EXTERNAL_SUBMISSION NOT_ENABLED, SOURCE_MUTATION_OUTSIDE_PILOT_SCOPE NOT_ENABLED, TENANT_ALLOWLIST FAIL_CLOSED, DB_PERSISTENCE HARDENED, BLOCKER_ENFORCEMENT ACTIVE, EVIDENCE_INTEGRITY ACTIVE

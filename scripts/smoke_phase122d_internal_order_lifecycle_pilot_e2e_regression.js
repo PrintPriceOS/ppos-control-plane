@@ -16,6 +16,10 @@ function check(label, condition) {
   }
 }
 
+// Phase 122.1: set test mode so tenant allowlist allows all tenants in smoke
+process.env.NODE_ENV = 'test';
+process.env.ALLOW_DB_FALLBACK_FOR_SMOKE = 'true';
+
 console.log('\n=== Phase 122D — Internal Order Lifecycle Pilot E2E Regression ===\n');
 
 const Svc = require(path.join(__dirname, '../src/api/services/internalOrderLifecyclePilotService.js'));

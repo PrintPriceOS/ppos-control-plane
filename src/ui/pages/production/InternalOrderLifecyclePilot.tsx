@@ -24,10 +24,16 @@ export function InternalOrderLifecyclePilot() {
   const [pilotOrderId, setPilotOrderId] = useState('');
   const [findingKey, setFindingKey] = useState('');
   const [findingSeverity, setFindingSeverity] = useState('INFO');
+  const [blocksLifecycle, setBlocksLifecycle] = useState(false);
   const [findingId, setFindingId] = useState('');
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  const persistenceMode = result?.persistenceMode as string | undefined;
+  const persistenceStatus = result?.persistenceStatus as string | undefined;
+  const tenantAllowlistFailClosed = result?.tenantAllowlistFailClosed as boolean | undefined;
+  const priorPhaseEvidenceStatus = result?.priorPhaseEvidenceStatus as string | undefined;
 
   const run = useCallback(async (label: string, fn: () => Promise<Record<string, unknown>>) => {
     setLoading(true);
@@ -88,8 +94,8 @@ export function InternalOrderLifecyclePilot() {
 
   const handleRecordFinding = useCallback(() =>
     run('Record Finding', () =>
-      recordInternalOrderLifecycleFinding({ pilot_run_id: pilotRunId, finding_key: findingKey, severity: findingSeverity })
-    ), [run, pilotRunId, findingKey, findingSeverity]);
+      recordInternalOrderLifecycleFinding({ pilot_run_id: pilotRunId, finding_key: findingKey, severity: findingSeverity, blocks_lifecycle: blocksLifecycle })
+    ), [run, pilotRunId, findingKey, findingSeverity, blocksLifecycle]);
 
   const handleResolveFinding = useCallback(() =>
     run('Resolve Finding', () =>
@@ -118,6 +124,35 @@ export function InternalOrderLifecyclePilot() {
       <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <strong>Controlled Internal Pilot</strong>
         <p style={{ margin: '8px 0 0' }}>{SAFETY_NOTICE}</p>
+      </div>
+
+      {/* Persistence & Hardening Status */}
+      <div style={{ background: '#e2e3e5', borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        <h3>Hardening Status (Phase 122.1)</h3>
+        <table style={{ width: '100%', fontSize: 13 }}>
+          <tbody>
+            <tr>
+              <td>Persistence Mode</td>
+              <td><strong>{persistenceMode || '—'}</strong></td>
+            </tr>
+            <tr>
+              <td>Persistence Status</td>
+              <td><strong style={{ color: persistenceStatus === 'PERSISTED' ? '#28a745' : persistenceStatus === 'FALLBACK_ONLY' ? '#ffc107' : persistenceStatus === 'FAILED' ? '#dc3545' : undefined }}>
+                {persistenceStatus || '—'}
+              </strong></td>
+            </tr>
+            <tr>
+              <td>Tenant Allowlist Fail-Closed</td>
+              <td><strong>{tenantAllowlistFailClosed === true ? 'YES (fail-closed)' : tenantAllowlistFailClosed === false ? 'NO (allowlist present or test mode)' : '—'}</strong></td>
+            </tr>
+            <tr>
+              <td>Prior Phase Evidence</td>
+              <td><strong style={{ color: priorPhaseEvidenceStatus === 'VERIFIED' ? '#28a745' : priorPhaseEvidenceStatus === 'PRIOR_PHASE_EVIDENCE_UNVERIFIED' ? '#ffc107' : undefined }}>
+                {priorPhaseEvidenceStatus || '—'}
+              </strong></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div style={{ background: '#f8f9fa', borderRadius: 8, padding: 16, marginBottom: 24 }}>
@@ -167,7 +202,7 @@ export function InternalOrderLifecyclePilot() {
       </div>
 
       <h3>Findings</h3>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'end' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'end', flexWrap: 'wrap' }}>
         <div>
           <label>Finding Key</label><br />
           <input value={findingKey} onChange={e => setFindingKey(e.target.value)} placeholder="finding_key" style={{ padding: 6 }} />
@@ -179,6 +214,12 @@ export function InternalOrderLifecyclePilot() {
             <option value="WARNING">WARNING</option>
             <option value="BLOCKER">BLOCKER</option>
           </select>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" checked={blocksLifecycle} onChange={e => setBlocksLifecycle(e.target.checked)} />
+            {' '}Blocks Lifecycle
+          </label>
         </div>
         <button onClick={handleRecordFinding} disabled={loading || !pilotRunId}>Record Finding</button>
         <div>

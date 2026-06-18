@@ -700,3 +700,91 @@ npm run build
 - EVIDENCE_PACK: ACTIVE
 
 ### Phase 122 Status: VALIDATED
+
+---
+
+## Phase 122.1 — Internal Order Lifecycle Pilot Operational Hardening
+
+**Date:** 2026-06-18
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `migrations/065_phase122_1_internal_order_lifecycle_pilot_hardening.sql` | Operational indexes and foreign keys for all Phase 122 tables |
+| `scripts/smoke_phase122_1a_internal_order_lifecycle_hardening_schema.js` | Schema hardening smoke test |
+| `scripts/smoke_phase122_1b_internal_order_lifecycle_persistence_and_allowlist.js` | Persistence and tenant allowlist smoke test |
+| `scripts/smoke_phase122_1c_internal_order_lifecycle_blocker_enforcement.js` | Blocker findings enforcement smoke test |
+| `scripts/smoke_phase122_1d_internal_order_lifecycle_prior_phase_evidence.js` | Prior phase evidence verification smoke test |
+| `scripts/smoke_phase122_1e_internal_order_lifecycle_evidence_redaction.js` | Evidence integrity and redaction smoke test |
+| `scripts/smoke_phase122_1f_internal_order_lifecycle_hardening_acceptance_pack.js` | Full acceptance pack |
+| `docs/phase122_1_internal_order_lifecycle_pilot_hardening.md` | Phase 122.1 documentation |
+
+### Files Modified
+
+| File | Changes |
+|---|---|
+| `src/api/services/internalOrderLifecyclePilotService.js` | Fail-closed tenant allowlist, DB read-through methods, explicit persistence markers, blocker enforcement, pilot_run_id existence enforcement, prior phase evidence verification via schema_versions, evidence integrity hash + schema version + redaction |
+| `src/api/routes/internalOrderLifecyclePilotAdmin.js` | Passes through persistence and hardening markers from service |
+| `src/ui/pages/production/InternalOrderLifecyclePilot.tsx` | Shows persistence status, tenant allowlist fail-closed, prior phase evidence status, blocks_lifecycle checkbox |
+| `scripts/smoke_phase122b_internal_order_lifecycle_pilot_service.js` | Added NODE_ENV=test for fail-closed allowlist compatibility |
+| `scripts/smoke_phase122d_internal_order_lifecycle_pilot_e2e_regression.js` | Added NODE_ENV=test for fail-closed allowlist compatibility |
+| `scripts/smoke_phase122e_internal_order_lifecycle_pilot_acceptance_pack.js` | Added NODE_ENV=test for fail-closed allowlist compatibility |
+| `task.md` | Added Phase 122.1 entry |
+| `walkthrough.md` | Added Phase 122.1 walkthrough |
+
+### Hardening Summary
+
+1. **Migration 065**: 30 indexes across 7 tables + 6 foreign keys (ON DELETE RESTRICT)
+2. **Tenant allowlist fail-closed**: Empty PILOT_TENANT_ALLOWLIST blocks all tenants in production; open only with NODE_ENV=test or ALLOW_UNSCOPED_PILOT_TENANTS_FOR_TESTS=true
+3. **DB read-through**: 7 methods (getPilotRunById, getPilotOrderById, listFindingsFromDb, listStepsFromDb, listAuditTimelineFromDb, listRollbackPointsFromDb, getEvidencePackFromDb)
+4. **No silent DB failures**: All catch (_) {} replaced with _dbWrite() returning persistence status; critical writes throw in production
+5. **Persistence markers**: persistenceMode (DB | MEMORY_FALLBACK), persistenceStatus (PERSISTED | FALLBACK_ONLY | FAILED)
+6. **Pilot run existence enforcement**: createInternalPilotOrder and executeInternalOrderLifecycle fail for nonexistent pilot_run_id
+7. **Blocker enforcement**: executeInternalOrderLifecycle returns BLOCKED_BY_FINDINGS when unresolved blocker findings exist; audit event INTERNAL_ORDER_LIFECYCLE_BLOCKED_BY_FINDINGS recorded
+8. **Prior phase evidence verification**: Checks schema_versions for migrations 063/064 instead of hardcoding true; returns PRIOR_PHASE_EVIDENCE_UNVERIFIED when unavailable
+9. **Evidence integrity**: SHA-256 hash, schema version 122.1, redaction classification (INTERNAL_ONLY)
+10. **Evidence redaction**: Sensitive fields (internal_customer_reference, raw customer data, file package URLs, preflight artifacts, invoice data, secrets, passwords, tokens, API keys, credentials) redacted in preview
+
+### Validation Commands
+
+```bash
+node --check src/api/services/internalOrderLifecyclePilotService.js
+node --check src/api/routes/internalOrderLifecyclePilotAdmin.js
+node scripts/smoke_phase122_1a_internal_order_lifecycle_hardening_schema.js
+node scripts/smoke_phase122_1b_internal_order_lifecycle_persistence_and_allowlist.js
+node scripts/smoke_phase122_1c_internal_order_lifecycle_blocker_enforcement.js
+node scripts/smoke_phase122_1d_internal_order_lifecycle_prior_phase_evidence.js
+node scripts/smoke_phase122_1e_internal_order_lifecycle_evidence_redaction.js
+node scripts/smoke_phase122_1f_internal_order_lifecycle_hardening_acceptance_pack.js
+npm run build
+```
+
+### Smoke Results
+
+- smoke_phase122_1a: PASS 51 | FAIL 0
+- smoke_phase122_1b: PASS 45 | FAIL 0
+- smoke_phase122_1c: PASS 13 | FAIL 0
+- smoke_phase122_1d: PASS 12 | FAIL 0
+- smoke_phase122_1e: PASS 41 | FAIL 0
+- smoke_phase122_1f: PASS 76 | FAIL 0
+- Phase 122 regression (122A-E): all passing
+
+### Safety Confirmation
+
+- FULL_PUBLIC: NOT_ENABLED
+- OPEN_MARKETPLACE_ACCESS: NOT_ENABLED
+- LIVE_PROVIDER_CONNECTIVITY: NOT_ENABLED
+- PAYMENT_EXECUTION: NOT_ENABLED
+- REFUND_EXECUTION: NOT_ENABLED
+- PAYOUT_EXECUTION: NOT_ENABLED
+- EXTERNAL_TAX_SUBMISSION: NOT_ENABLED
+- EXTERNAL_ACCOUNTING_SUBMISSION: NOT_ENABLED
+- PROVIDER_EXTERNAL_SUBMISSION: NOT_ENABLED
+- SOURCE_RECORD_MUTATION_OUTSIDE_PILOT_SCOPE: NOT_ENABLED
+- TENANT_ALLOWLIST: FAIL_CLOSED (production)
+- DB_PERSISTENCE: HARDENED (no silent failures)
+- BLOCKER_ENFORCEMENT: ACTIVE
+- EVIDENCE_INTEGRITY: ACTIVE (SHA-256)
+
+### Phase 122.1 Status: VALIDATED
