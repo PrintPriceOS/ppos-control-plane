@@ -139,7 +139,7 @@ for (const m of requiredMethods) {
   const findingResult = await svc.recordBetaFinding({
     gate_id: gateId,
     finding_type: 'BLOCKER',
-    blocks_beta_preparation: true,
+    blocks_readiness: true,
     severity: 'CRITICAL',
     summary: 'Blocker finding',
     created_by: 'smoke'
@@ -148,6 +148,8 @@ for (const m of requiredMethods) {
 
   readiness = await svc.evaluateLimitedBetaPreparationReadiness({ gate_id: gateId });
   assert(readiness.readiness_status === 'BLOCKED', 'Gate is BLOCKED by blocker findings');
+  assert(readiness.blockerFindings && readiness.blockerFindings.length > 0, 'blockerFindings length > 0');
+  assert(readiness.reason === 'UNRESOLVED_BLOCKER_FINDINGS', 'reason = UNRESOLVED_BLOCKER_FINDINGS');
 
   // Resolve Blocker Finding
   await svc.resolveBetaFinding({

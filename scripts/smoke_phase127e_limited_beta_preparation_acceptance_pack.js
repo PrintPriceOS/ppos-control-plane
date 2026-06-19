@@ -22,6 +22,7 @@ const requiredFiles = [
   'src/ui/api/limitedBetaPreparationGateClient.ts',
   'src/ui/pages/beta/LimitedBetaPreparationGate.tsx',
   'docs/phase127_limited_beta_preparation_gate.md',
+  'scripts/smoke_phase127_0_1_blocker_finding_enforcement.js',
 ];
 for (const f of requiredFiles) {
   assert(fs.existsSync(path.join(__dirname, '..', f)), `File exists: ${f}`);

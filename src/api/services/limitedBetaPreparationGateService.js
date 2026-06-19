@@ -53,6 +53,31 @@ function _hash(data) {
   return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
 }
 
+function _isFindingBlocking(f) {
+  let details = {};
+  if (f.details_json) {
+    try {
+      details = typeof f.details_json === 'string' ? JSON.parse(f.details_json) : f.details_json;
+    } catch (e) {}
+  }
+  const status = String(f.finding_status || f.status || '').toUpperCase();
+  const isUnresolved = ['OPEN', 'UNRESOLVED', 'ACTIVE'].includes(status);
+  if (!isUnresolved) return false;
+
+  const blocksReadiness = f.blocks_readiness === true || f.blocks_readiness === 1 || details.blocks_readiness === true || details.blocks_readiness === 1;
+  const blocksBeta = f.blocks_beta_preparation === true || f.blocks_beta_preparation === 1 || details.blocks_beta_preparation === true || details.blocks_beta_preparation === 1;
+  const blocksGo = f.blocks_go_decision === true || f.blocks_go_decision === 1 || details.blocks_go_decision === true || details.blocks_go_decision === 1;
+  const blocksLifecycle = f.blocks_lifecycle === true || f.blocks_lifecycle === 1 || details.blocks_lifecycle === true || details.blocks_lifecycle === 1;
+  const isSeverityBlocker = String(f.severity || '').toUpperCase() === 'BLOCKER';
+  
+  const isSeverityCritical = String(f.severity || '').toUpperCase() === 'CRITICAL';
+  const hasAnyExplicitBlockerFlag = blocksReadiness || blocksBeta || blocksGo || blocksLifecycle;
+  const isSeverityCriticalWithBlocker = isSeverityCritical && hasAnyExplicitBlockerFlag;
+
+  return blocksReadiness || blocksBeta || blocksGo || blocksLifecycle || isSeverityBlocker || isSeverityCriticalWithBlocker;
+}
+
+
 class LimitedBetaPreparationGateService {
   constructor() {
     this._gates = new Map();
@@ -477,14 +502,42 @@ class LimitedBetaPreparationGateService {
     // Checks
     const unresolvedFindings = [];
     for (const [, f] of this._findings) {
-      if (f.gate_id === gateId && f.finding_status !== 'RESOLVED' && f.blocks_beta_preparation) {
+      if (f.gate_id === gateId && _isFindingBlocking(f)) {
         unresolvedFindings.push(f);
       }
     }
     const dbFindings = await this._dbRead(
-      "SELECT * FROM limited_beta_findings WHERE gate_id = ? AND finding_status != 'RESOLVED' AND blocks_beta_preparation = 1", [gateId]
+      "SELECT * FROM limited_beta_findings WHERE gate_id = ?", [gateId]
     );
-    const blockerCount = dbFindings ? dbFindings.length : unresolvedFindings.length;
+
+    const allFindings = [];
+    if (dbFindings && Array.isArray(dbFindings)) {
+      for (const f of dbFindings) {
+        let details = {};
+        try {
+          details = typeof f.details_json === 'string' ? JSON.parse(f.details_json) : (f.details_json || {});
+        } catch (e) {}
+        const parsed = {
+          ...f,
+          blocks_readiness: f.blocks_readiness || details.blocks_readiness,
+          blocks_beta_preparation: f.blocks_beta_preparation || details.blocks_beta_preparation,
+          blocks_go_decision: f.blocks_go_decision || details.blocks_go_decision,
+          blocks_lifecycle: f.blocks_lifecycle || details.blocks_lifecycle,
+        };
+        allFindings.push(parsed);
+      }
+    }
+
+    const seenIds = new Set(allFindings.map(f => f.finding_id));
+    for (const f of unresolvedFindings) {
+      if (!seenIds.has(f.finding_id)) {
+        allFindings.push(f);
+        seenIds.add(f.finding_id);
+      }
+    }
+
+    const blockers = allFindings.filter(f => _isFindingBlocking(f));
+    const blockerCount = blockers.length;
 
     const escalation = this._escalations.get(gateId) || null;
     const dbEsc = await this._dbRead("SELECT * FROM limited_beta_support_escalations WHERE gate_id = ?", [gateId]);
@@ -499,9 +552,13 @@ class LimitedBetaPreparationGateService {
     const readiness_status = allPassed ? 'READY' : 'BLOCKED';
     const reason = !phase126_1_verified ? 'PHASE_126_1_EVIDENCE_MISSING_OR_DEGRADED' : (blockerCount > 0 ? 'UNRESOLVED_BLOCKER_FINDINGS' : 'CONFIGURATION_INCOMPLETE');
 
-    await this._writeAudit(gateId, 'BETA_PREPARATION_READINESS_EVALUATED', { readiness_status, reason }, 'system');
+    if (readiness_status === 'BLOCKED' && blockerCount > 0) {
+      await this._writeAudit(gateId, 'LIMITED_BETA_PREPARATION_BLOCKED_BY_FINDINGS', { blockerCount }, 'system');
+    } else {
+      await this._writeAudit(gateId, 'BETA_PREPARATION_READINESS_EVALUATED', { readiness_status, reason }, 'system');
+    }
 
-    return {
+    const response = {
       gate_id: gateId,
       readiness_status,
       reason: allPassed ? null : reason,
@@ -515,6 +572,16 @@ class LimitedBetaPreparationGateService {
       safety: SAFETY_MARKERS,
       safety_message: SAFETY_MESSAGE,
     };
+
+    if (blockerCount > 0) {
+      response.blockerFindings = blockers;
+      response.betaRuntimeEnabled = false;
+      response.fullPublicEnabled = false;
+      response.openMarketplaceEnabled = false;
+      response.paymentExecutionEnabled = false;
+    }
+
+    return response;
   }
 
   async recordBetaFinding(params) {
@@ -522,6 +589,16 @@ class LimitedBetaPreparationGateService {
     if (!gate_id) throw new Error('gate_id is required');
 
     const findingId = _id('lbf');
+    const extraFlags = {
+      blocks_readiness: params.blocks_readiness,
+      blocks_go_decision: params.blocks_go_decision,
+      blocks_lifecycle: params.blocks_lifecycle,
+    };
+    const mergedDetails = {
+      ...(details_json || {}),
+      ...extraFlags
+    };
+
     const finding = {
       finding_id: findingId,
       gate_id,
@@ -530,12 +607,13 @@ class LimitedBetaPreparationGateService {
       blocks_beta_preparation: blocks_beta_preparation ? 1 : 0,
       severity: severity || 'LOW',
       summary: summary || null,
-      details_json: details_json || null,
+      details_json: mergedDetails,
       resolved_at: null,
       resolved_by: null,
       created_by: created_by || 'system',
       created_at: new Date().toISOString(),
       updated_at: null,
+      ...extraFlags
     };
     this._findings.set(findingId, finding);
 
@@ -548,6 +626,7 @@ class LimitedBetaPreparationGateService {
     const persistence = this._validateDbWriteResult(dbResult);
 
     await this._writeAudit(gate_id, 'BETA_FINDING_RECORDED', { finding_id: findingId }, created_by);
+
 
     return { finding, ...persistence, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
   }

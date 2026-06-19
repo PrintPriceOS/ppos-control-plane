@@ -40,3 +40,10 @@ A gate cannot be marked `READY` unless:
 3. No unresolved blocker findings exist in `limited_beta_findings`.
 4. Support escalation paths and incident rollback plans are registered.
 5. Cohort participants are explicitly approved only after their terms acceptances and role boundaries are recorded.
+
+## Blocker Findings Enforcement (Phase 127.0.1 Repair)
+
+To prevent premature promotion to beta staging, the readiness evaluator implements strict blocker finding checks across both database-backed and in-memory findings:
+- **Filtering**: A finding blocks readiness if status is `OPEN`, `UNRESOLVED`, or `ACTIVE` and any explicit block flag is set (e.g. `blocks_readiness`, `blocks_beta_preparation`, `blocks_go_decision`, `blocks_lifecycle`) or severity is `BLOCKER` or `CRITICAL` with blocker flags.
+- **Fail-closed audit**: When readiness is blocked by unresolved blockers, the event `LIMITED_BETA_PREPARATION_BLOCKED_BY_FINDINGS` is recorded in the audit trail.
+
