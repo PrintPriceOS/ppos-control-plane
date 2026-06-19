@@ -8,6 +8,8 @@ function assert(condition, label) {
   else { failed++; console.error(`  FAIL: ${label}`); }
 }
 
+console.log('=== Smoke 126.1a: Schema & Migration 071 Verification ===\n');
+
 process.env.NODE_ENV = 'test';
 process.env.ALLOW_SCHEMA_SMOKE_FALLBACK = 'true';
 
@@ -30,23 +32,42 @@ const isFallbackAllowed = process.env.ALLOW_SCHEMA_SMOKE_FALLBACK === 'true' || 
   let migrationApplied = false;
   let checksTableHasNewColumns = false;
   let boardsTableHasTruthColumn = false;
+  let decisionsTableHasTruthColumn = false;
+  let packsTableHasTruthColumn = false;
+  let packsTableHasPersistenceStatus = false;
 
   try {
-    const schemaExists = await db.query("SELECT version FROM schema_versions WHERE version = '071'", []);
+    const schemaExists = await db.query(
+      "SELECT version FROM schema_versions WHERE version LIKE '071_phase126_1%' OR description LIKE '071_phase126_1%'", 
+      []
+    );
     realDbConnected = true;
     migrationApplied = schemaExists && schemaExists.length > 0;
 
-    const columnsCheck = await db.query(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pilot_evidence_review_checks' AND COLUMN_NAME = 'evidence_source_type'",
+    // Retrieve all columns in database for required tables
+    const columns = await db.query(
+      `SELECT COLUMN_NAME, TABLE_NAME 
+       FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME IN ('pilot_evidence_review_checks', 'pilot_evidence_review_boards', 'pilot_evidence_go_no_go_decisions', 'pilot_evidence_review_packs')`,
       []
     );
-    checksTableHasNewColumns = columnsCheck && columnsCheck.length > 0;
 
-    const columnsBoard = await db.query(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pilot_evidence_review_boards' AND COLUMN_NAME = 'runtime_truth_status'",
-      []
-    );
-    boardsTableHasTruthColumn = columnsBoard && columnsBoard.length > 0;
+    const checksCols = columns.filter(c => c.TABLE_NAME === 'pilot_evidence_review_checks').map(c => c.COLUMN_NAME);
+    const boardsCols = columns.filter(c => c.TABLE_NAME === 'pilot_evidence_review_boards').map(c => c.COLUMN_NAME);
+    const decisionsCols = columns.filter(c => c.TABLE_NAME === 'pilot_evidence_go_no_go_decisions').map(c => c.COLUMN_NAME);
+    const packsCols = columns.filter(c => c.TABLE_NAME === 'pilot_evidence_review_packs').map(c => c.COLUMN_NAME);
+
+    checksTableHasNewColumns = [
+      'evidence_source_type', 'evidence_source_reference', 'evidence_integrity_hash',
+      'verified_from_db', 'verified_from_acceptance_pack', 'verified_from_schema_versions', 'runtime_truth_status'
+    ].every(col => checksCols.includes(col));
+
+    boardsTableHasTruthColumn = boardsCols.includes('runtime_truth_status');
+    decisionsTableHasTruthColumn = decisionsCols.includes('runtime_truth_status');
+    packsTableHasTruthColumn = packsCols.includes('runtime_truth_status');
+    packsTableHasPersistenceStatus = packsCols.includes('persistence_status');
+
   } catch (err) {
     console.error("  Database check failed:", err.message);
     if (!isFallbackAllowed) {
@@ -56,11 +77,13 @@ const isFallbackAllowed = process.env.ALLOW_SCHEMA_SMOKE_FALLBACK === 'true' || 
   }
 
   if (realDbConnected) {
-    assert(migrationApplied, "Migration 071 is applied in the database");
-    assert(checksTableHasNewColumns, "pilot_evidence_review_checks table has evidence_source_type column");
+    assert(migrationApplied, "Migration 071 (full version check) is applied in the database");
+    assert(checksTableHasNewColumns, "pilot_evidence_review_checks table has all 7 new columns");
     assert(boardsTableHasTruthColumn, "pilot_evidence_review_boards table has runtime_truth_status column");
+    assert(decisionsTableHasTruthColumn, "pilot_evidence_go_no_go_decisions table has runtime_truth_status column");
+    assert(packsTableHasTruthColumn, "pilot_evidence_review_packs table has runtime_truth_status column");
+    assert(packsTableHasPersistenceStatus, "pilot_evidence_review_packs table has persistence_status column");
   } else {
-    // If not connected to real DB, verify if fallback is allowed
     assert(isFallbackAllowed, "Mock schema verification fallback is allowed in this environment");
   }
 

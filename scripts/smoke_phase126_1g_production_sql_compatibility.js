@@ -11,11 +11,14 @@ function assert(condition, label) {
   else { failed++; console.error(`  FAIL: ${label}`); }
 }
 
+console.log('=== Smoke 126.1g: SQL Compatibility & Migration Verification ===\n');
+
 process.env.NODE_ENV = 'test';
 process.env.ALLOW_SCHEMA_SMOKE_FALLBACK = 'true';
 
 require('dotenv').config();
 const db = require('../src/api/services/mysqlClient');
+const { redactDatabaseUrl } = require('./smoke_secret_redaction');
 
 // 1. Static file check for unsupported syntax in 071
 const migrationPath = path.join(__dirname, '../migrations/071_phase126_1_pilot_evidence_persistence_runtime_truth.sql');
@@ -30,8 +33,9 @@ const hasDbConfig = !!(process.env.MYSQL_HOST || process.env.DATABASE_URL);
 (async () => {
   if (hasDbConfig) {
     try {
-      const dbUrl = process.env.DATABASE_URL || 'localhost';
-      console.log(`  Connecting to DB: ${dbUrl}`);
+      const rawDbUrl = process.env.DATABASE_URL || `mysql://${process.env.MYSQL_USER}:${process.env.MYSQL_PASSWORD}@${process.env.MYSQL_HOST}:${process.env.MYSQL_PORT || 3306}/${process.env.MYSQL_DATABASE}`;
+      const redactedUrl = redactDatabaseUrl(rawDbUrl);
+      console.log(`  Connecting to DB: ${redactedUrl}`);
       
       const columns = await db.query(
         `SELECT COLUMN_NAME, TABLE_NAME 

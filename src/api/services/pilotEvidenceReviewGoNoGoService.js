@@ -355,13 +355,13 @@ class PilotEvidenceReviewGoNoGoService {
     // Real DB-backed verification logic
     // 1. Verify schema_versions has migrations 065 to 071
     let schemaVersionsSnapshot = [];
-    const schemaRows = await this._dbRead(
-      "SELECT version FROM schema_versions WHERE version IN ('065', '066', '067', '068', '069', '070', '071') ORDER BY version ASC", []
-    );
+    const schemaRows = await this._dbRead("SELECT version FROM schema_versions ORDER BY version ASC", []);
     if (schemaRows) {
       schemaVersionsSnapshot = schemaRows.map(r => String(r.version));
     }
-    const migrationsClean = ['065', '066', '067', '068', '069', '070', '071'].every(v => schemaVersionsSnapshot.includes(v));
+    const migrationsClean = ['065', '066', '067', '068', '069', '070', '071'].every(v => 
+      schemaVersionsSnapshot.some(sv => sv.startsWith(v))
+    );
 
     // 2. Verify Phase 122.1 evidence pack exists
     let phase122_1_exists = false;

@@ -26,7 +26,7 @@ const svc = new PilotEvidenceReviewGoNoGoService();
       return [
         { version: '065' }, { version: '066' }, { version: '067' },
         { version: '068' }, { version: '069' }, { version: '070' },
-        { version: '071' }
+        { version: '071_phase126_1_pilot_evidence_persistence_runtime_truth' }
       ];
     }
     if (sql.includes("SELECT evidence_pack_id FROM internal_order_lifecycle_pilot_evidence_packs")) {
@@ -79,6 +79,27 @@ const svc = new PilotEvidenceReviewGoNoGoService();
 
   // Restore DB read
   svc._dbRead = originalRead;
+
+  // Execute sub-smoke scripts and check for secret leaks
+  const cp = require('child_process');
+  const { assertNoSecretLeak } = require('./smoke_secret_redaction');
+
+  try {
+    const outA = cp.execSync('node scripts/smoke_phase126_1a_pilot_evidence_persistence_schema.js', { env: process.env }).toString();
+    assert(outA.includes('0 failed'), "126.1a passes under E2E verification");
+    assertNoSecretLeak(outA);
+
+    const outG = cp.execSync('node scripts/smoke_phase126_1g_production_sql_compatibility.js', { env: process.env }).toString();
+    assert(outG.includes('0 failed'), "126.1g passes under E2E verification");
+    assertNoSecretLeak(outG);
+
+    const outH = cp.execSync('node scripts/smoke_phase126_1h_secret_redaction_regression.js', { env: process.env }).toString();
+    assert(outH.includes('0 failed'), "126.1h passes under E2E verification");
+    assertNoSecretLeak(outH);
+  } catch (err) {
+    console.error("Sub-smoke script failure:", err.stdout ? err.stdout.toString() : err.message);
+    assert(false, "Sub-smoke scripts (1a, 1g, 1h) executed and passed");
+  }
 
   console.log(`\nSmoke 126.1f: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
