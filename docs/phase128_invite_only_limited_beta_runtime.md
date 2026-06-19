@@ -15,6 +15,10 @@ Implement an invite-only limited beta runtime system that is DB-backed, restart-
 
 These rules are enforced at the service level, admin routes, and in the schema via migration `074`.
 
+> [!IMPORTANT]
+> Phase 128 is not production-valid unless smoke_phase128a verifies migration 074, runtime tables, columns, indexes and safety defaults against the real DB.
+
+
 ## Schema Verification (Migration `074`)
 The following 11 tables have been added:
 1. `limited_beta_runtime_sessions`
