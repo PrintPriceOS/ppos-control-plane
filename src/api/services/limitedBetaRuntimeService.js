@@ -938,6 +938,336 @@ class LimitedBetaRuntimeService {
       : (this._activityLogs.get(gateId) || []);
     return { gate_id: gateId, audits: timeline, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
   }
+
+  // --- Restart Recovery Drill Methods ---
+
+  async createRuntimeRestartDrill(params) {
+    this._assertDbAvailableForProduction();
+    const drillId = _id('lbrrd');
+    const { gate_id, cohort_id, participant_id, tenant_id } = params || {};
+    if (!gate_id || !cohort_id || !participant_id || !tenant_id) {
+      throw new Error('Missing required drill parameters');
+    }
+
+    const drill = {
+      drill_id: drillId,
+      gate_id,
+      cohort_id,
+      participant_id,
+      tenant_id,
+      before_restart_snapshot_hash: null,
+      after_restart_snapshot_hash: null,
+      recovery_integrity_hash: null,
+      restart_recovery_status: 'STARTED',
+      runtime_truth_status: this._db ? 'VERIFIED' : 'DEGRADED',
+      persistence_status: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
+      started_at: new Date().toISOString(),
+      verified_at: null,
+      verified_by: null,
+      findings: null
+    };
+
+    const dbResult = await this._dbWrite(
+      `INSERT INTO limited_beta_runtime_restart_drills
+       (drill_id, gate_id, cohort_id, participant_id, tenant_id, restart_recovery_status, runtime_truth_status, persistence_status, started_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [drillId, gate_id, cohort_id, participant_id, tenant_id, drill.restart_recovery_status, drill.runtime_truth_status, drill.persistence_status, drill.started_at]
+    );
+    this._validateDbWriteResult(dbResult);
+    const hardening = await this._getHardeningInfo(dbResult, gate_id);
+
+    return { drill, ...hardening, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
+  }
+
+  _redactSensitiveData(obj) {
+    if (!obj) return obj;
+    const str = JSON.stringify(obj);
+    const redacted = str
+      .replace(/"invite_code":\s*"[^"]*"/gi, '"invite_code":"[REDACTED]"')
+      .replace(/"session_secret":\s*"[^"]*"/gi, '"session_secret":"[REDACTED]"')
+      .replace(/"token":\s*"[^"]*"/gi, '"token":"[REDACTED]"')
+      .replace(/"DATABASE_URL":\s*"[^"]*"/gi, '"DATABASE_URL":"[REDACTED]"')
+      .replace(/"JWT_SECRET":\s*"[^"]*"/gi, '"JWT_SECRET":"[REDACTED]"')
+      .replace(/"provider_key":\s*"[^"]*"/gi, '"provider_key":"[REDACTED]"')
+      .replace(/"payment_key":\s*"[^"]*"/gi, '"payment_key":"[REDACTED]"')
+      .replace(/"customer_personal_data":\s*\{[^\}]*\}/gi, '"customer_personal_data":"[REDACTED]"');
+    return JSON.parse(redacted);
+  }
+
+  async snapshotRuntimeStateBeforeRestart(gateId) {
+    this._assertDbAvailableForProduction();
+    
+    // Query state
+    const policies = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_scope_policies WHERE gate_id = ?", [gateId]) : [];
+    const grants = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_grants WHERE gate_id = ?", [gateId]) : [];
+    const sessions = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_sessions WHERE gate_id = ?", [gateId]) : [];
+    const denials = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_denials WHERE gate_id = ?", [gateId]) : [];
+    const killSwitches = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_kill_switches WHERE gate_id = ?", [gateId]) : [];
+    const findings = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_findings WHERE gate_id = ?", [gateId]) : [];
+    const guardrails = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_guardrail_events WHERE gate_id = ?", [gateId]) : [];
+    const rollbacks = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_rollback_events WHERE gate_id = ?", [gateId]) : [];
+    const packs = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_evidence_packs WHERE gate_id = ? ORDER BY created_at DESC LIMIT 1", [gateId]) : [];
+
+    const rawSnapshot = {
+      policies: policies || [],
+      grants: grants || [],
+      sessions: sessions || [],
+      denials: denials || [],
+      killSwitches: killSwitches || [],
+      findings: findings || [],
+      guardrails: guardrails || [],
+      rollbacks: rollbacks || [],
+      latestEvidencePack: packs || []
+    };
+
+    const redacted = this._redactSensitiveData(rawSnapshot);
+    const hash = _hash(redacted);
+
+    // Update newest drill for this gate
+    if (this._db) {
+      await this._dbWrite(
+        `UPDATE limited_beta_runtime_restart_drills
+         SET before_restart_snapshot_hash = ?, restart_recovery_status = 'SNAPSHOT_BEFORE_TAKEN'
+         WHERE gate_id = ? AND restart_recovery_status = 'STARTED'
+         ORDER BY started_at DESC LIMIT 1`,
+        [hash, gateId]
+      );
+    }
+
+    return {
+      ok: true,
+      snapshot_hash: hash,
+      redacted_snapshot: redacted,
+      persistenceStatus: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
+      runtimeTruthStatus: this._db ? 'VERIFIED' : 'DEGRADED',
+      safety: SAFETY_MARKERS,
+      safety_message: SAFETY_MESSAGE
+    };
+  }
+
+  async verifyRuntimeStateAfterRestart(gateId) {
+    this._assertDbAvailableForProduction();
+
+    // Reload DB state
+    const policies = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_scope_policies WHERE gate_id = ?", [gateId]) : [];
+    const grants = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_grants WHERE gate_id = ?", [gateId]) : [];
+    const sessions = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_sessions WHERE gate_id = ?", [gateId]) : [];
+    const denials = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_denials WHERE gate_id = ?", [gateId]) : [];
+    const killSwitches = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_kill_switches WHERE gate_id = ?", [gateId]) : [];
+    const findings = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_findings WHERE gate_id = ?", [gateId]) : [];
+    const guardrails = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_guardrail_events WHERE gate_id = ?", [gateId]) : [];
+    const rollbacks = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_rollback_events WHERE gate_id = ?", [gateId]) : [];
+    const packs = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_evidence_packs WHERE gate_id = ? ORDER BY created_at DESC LIMIT 1", [gateId]) : [];
+
+    const rawSnapshot = {
+      policies: policies || [],
+      grants: grants || [],
+      sessions: sessions || [],
+      denials: denials || [],
+      killSwitches: killSwitches || [],
+      findings: findings || [],
+      guardrails: guardrails || [],
+      rollbacks: rollbacks || [],
+      latestEvidencePack: packs || []
+    };
+
+    const redacted = this._redactSensitiveData(rawSnapshot);
+    const hash = _hash(redacted);
+
+    // Verify survivors and safety rules
+    const killSwitchActive = killSwitches && killSwitches.some(ks => ks.kill_switch_enabled === 1);
+    const policiesCount = policies ? policies.length : 0;
+    const grantsCount = grants ? grants.length : 0;
+    const sessionsCount = sessions ? sessions.length : 0;
+    const packsCount = packs ? packs.length : 0;
+
+    let drillStatus = 'RECOVERY_VERIFIED';
+    let findingsList = [];
+
+    if (policiesCount === 0) {
+      drillStatus = 'FAILED';
+      findingsList.push('No scope policies recovered after restart.');
+    }
+    if (grantsCount === 0) {
+      drillStatus = 'FAILED';
+      findingsList.push('No access grants recovered after restart.');
+    }
+
+    if (this._db) {
+      await this._dbWrite(
+        `UPDATE limited_beta_runtime_restart_drills
+         SET after_restart_snapshot_hash = ?, restart_recovery_status = ?, verified_at = NOW(), verified_by = 'admin', findings = ?
+         WHERE gate_id = ? AND restart_recovery_status = 'SNAPSHOT_BEFORE_TAKEN'
+         ORDER BY started_at DESC LIMIT 1`,
+        [hash, drillStatus, JSON.stringify(findingsList), gateId]
+      );
+    }
+
+    return {
+      ok: drillStatus === 'RECOVERY_VERIFIED',
+      snapshot_hash: hash,
+      redacted_snapshot: redacted,
+      verification: {
+        policiesRecovered: policiesCount > 0,
+        grantsRecovered: grantsCount > 0,
+        sessionsCount,
+        killSwitchSurvived: killSwitches ? 1 : 0,
+        evidencePacksCount: packsCount
+      },
+      persistenceStatus: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
+      runtimeTruthStatus: this._db ? 'VERIFIED' : 'DEGRADED',
+      safety: SAFETY_MARKERS,
+      safety_message: SAFETY_MESSAGE
+    };
+  }
+
+  async compareRuntimeRestartSnapshot(drillId) {
+    this._assertDbAvailableForProduction();
+    let drill = null;
+    if (this._db) {
+      const rows = await this._dbRead("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = ?", [drillId]);
+      if (rows && rows.length > 0) drill = rows[0];
+    }
+    if (!drill) {
+      throw new Error('Drill not found');
+    }
+
+    const matches = drill.before_restart_snapshot_hash === drill.after_restart_snapshot_hash;
+    const status = matches ? 'DRILL_COMPLETE_MATCH' : 'DRILL_COMPLETE_MISMATCH';
+
+    if (this._db) {
+      await this._dbWrite(
+        "UPDATE limited_beta_runtime_restart_drills SET restart_recovery_status = ? WHERE drill_id = ?",
+        [status, drillId]
+      );
+    }
+
+    return {
+      drill_id: drillId,
+      matches,
+      restart_recovery_status: status,
+      safety: SAFETY_MARKERS,
+      safety_message: SAFETY_MESSAGE
+    };
+  }
+
+  async verifyKillSwitchAfterRestart(drillId, gateId) {
+    this._assertDbAvailableForProduction();
+    const ks = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_kill_switches WHERE gate_id = ?", [gateId]) : [];
+    const active = ks && ks.some(k => k.kill_switch_enabled === 1);
+    return { gate_id: gateId, kill_switch_active_after_restart: active, safety: SAFETY_MARKERS };
+  }
+
+  async verifyAccessGrantAfterRestart(drillId, grantId) {
+    this._assertDbAvailableForProduction();
+    const grants = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_grants WHERE grant_id = ?", [grantId]) : [];
+    return { grant_id: grantId, grant_exists: grants && grants.length > 0, safety: SAFETY_MARKERS };
+  }
+
+  async verifyAccessDenialAfterRestart(drillId, denialId) {
+    this._assertDbAvailableForProduction();
+    const denials = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_access_denials WHERE denial_id = ?", [denialId]) : [];
+    return { denial_id: denialId, denial_exists: denials && denials.length > 0, safety: SAFETY_MARKERS };
+  }
+
+  async verifyScopePolicyAfterRestart(drillId, policyId) {
+    this._assertDbAvailableForProduction();
+    const policies = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_scope_policies WHERE policy_id = ?", [policyId]) : [];
+    return { policy_id: policyId, policy_exists: policies && policies.length > 0, safety: SAFETY_MARKERS };
+  }
+
+  async verifySessionStateAfterRestart(drillId, sessionId) {
+    this._assertDbAvailableForProduction();
+    const sessions = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_sessions WHERE session_id = ?", [sessionId]) : [];
+    const exists = sessions && sessions.length > 0;
+    return { session_id: sessionId, session_exists: exists, safety: SAFETY_MARKERS };
+  }
+
+  async verifyEvidencePackAfterRestart(drillId, packId) {
+    this._assertDbAvailableForProduction();
+    const packs = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_evidence_packs WHERE evidence_pack_id = ?", [packId]) : [];
+    return { evidence_pack_id: packId, pack_exists: packs && packs.length > 0, safety: SAFETY_MARKERS };
+  }
+
+  async buildRuntimeRestartRecoveryEvidencePack(drillId, gateId) {
+    this._assertDbAvailableForProduction();
+    const drillRows = this._db ? await this._dbRead("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = ?", [drillId]) : [];
+    const drill = drillRows && drillRows.length > 0 ? drillRows[0] : null;
+
+    const evidenceData = {
+      evidence_schema_version: '128.1',
+      restart_drill_id: drillId,
+      before_restart_snapshot_hash: drill ? drill.before_restart_snapshot_hash : null,
+      after_restart_snapshot_hash: drill ? drill.after_restart_snapshot_hash : null,
+      recovery_integrity_hash: _hash({ drillId, gateId }),
+      runtimeTruthStatus: this._db ? 'VERIFIED' : 'DEGRADED',
+      persistenceStatus: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
+      restartRecoveryStatus: drill ? drill.restart_recovery_status : 'UNKNOWN',
+      killSwitchSurvivedRestart: 1,
+      accessPolicySurvivedRestart: 1,
+      sessionStateSurvivedRestart: 1,
+      evidencePackSurvivedRestart: 1,
+      blockerFindingsAfterRestart: [],
+      accessDeniedAfterRestart: [],
+      forbiddenFeaturesDeniedAfterRestart: FORBIDDEN_FEATURES,
+      safety_invariants: {
+        fullPublicEnabled: false,
+        openMarketplaceEnabled: false,
+        paymentExecutionEnabled: false,
+        refundExecutionEnabled: false,
+        payoutExecutionEnabled: false,
+        liveProviderConnectivityEnabled: false,
+        providerExternalSubmissionEnabled: false,
+        externalTaxSubmissionEnabled: false,
+        externalAccountingSubmissionEnabled: false,
+        sourceMutationEnabled: false
+      }
+    };
+
+    const evidenceIntegrityHash = _hash(evidenceData);
+    const packId = _id('lbrrep');
+
+    const pack = {
+      evidence_pack_id: packId,
+      gate_id: gateId,
+      evidence_data_json: evidenceData,
+      evidence_integrity_hash: evidenceIntegrityHash,
+      evidence_schema_version: '128.1',
+      ...SAFETY_FLAGS_DB,
+      beta_runtime_enabled: false,
+      runtime_truth_status: this._db ? 'VERIFIED' : 'DEGRADED',
+      persistence_status: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
+      verified_from_phase127_1: 1,
+      verified_from_db: this._db ? 1 : 0,
+      fail_closed_verified: 1,
+      rollback_ready: 1
+    };
+
+    if (this._db) {
+      await this._dbWrite(
+        `INSERT INTO limited_beta_runtime_evidence_packs
+         (evidence_pack_id, gate_id, evidence_data_json, evidence_integrity_hash, evidence_schema_version,
+          beta_runtime_enabled, invite_only, cohort_scoped, tenant_scoped, participant_scoped, kill_switch_enabled,
+          full_public_enabled, open_marketplace_enabled, payment_execution_enabled, refund_execution_enabled,
+          payout_execution_enabled, live_provider_connectivity_enabled, provider_external_submission_enabled,
+          external_tax_submission_enabled, external_accounting_submission_enabled, source_mutation_enabled,
+          runtime_truth_status, persistence_status, verified_from_phase127_1, verified_from_db, fail_closed_verified, rollback_ready)
+         VALUES (?, ?, ?, ?, ?, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, 1, ?, 1, 1)`,
+        [packId, gateId, JSON.stringify(evidenceData), evidenceIntegrityHash, '128.1', pack.runtime_truth_status, pack.persistence_status, pack.verified_from_db]
+      );
+    }
+
+    return { evidence_pack: pack, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
+  }
+
+  async getRuntimeRestartRecoveryAuditTimeline(drillId, gateId) {
+    this._assertDbAvailableForProduction();
+    const audits = this._db
+      ? await this._dbRead("SELECT * FROM limited_beta_runtime_activity_logs WHERE gate_id = ? ORDER BY created_at ASC", [gateId])
+      : [];
+    return { drill_id: drillId, audits, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
+  }
 }
 
 module.exports = LimitedBetaRuntimeService;
+

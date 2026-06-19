@@ -218,4 +218,76 @@ router.get('/evidence-pack', async (req, res) => {
   }
 });
 
+router.post('/restart-drill/create', async (req, res) => {
+  try {
+    const result = await svc.createRuntimeRestartDrill(req.body);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.post('/restart-drill/snapshot-before', async (req, res) => {
+  try {
+    const result = await svc.snapshotRuntimeStateBeforeRestart(req.body.gate_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.post('/restart-drill/verify-after', async (req, res) => {
+  try {
+    const result = await svc.verifyRuntimeStateAfterRestart(req.body.gate_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.post('/restart-drill/compare', async (req, res) => {
+  try {
+    const result = await svc.compareRuntimeRestartSnapshot(req.body.drill_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.post('/restart-drill/verify-kill-switch', async (req, res) => {
+  try {
+    const result = await svc.verifyKillSwitchAfterRestart(req.body.drill_id, req.body.gate_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.post('/restart-drill/verify-access', async (req, res) => {
+  try {
+    const result = await svc.verifyAccessGrantAfterRestart(req.body.drill_id, req.body.grant_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.get('/restart-drill/audit-timeline', async (req, res) => {
+  try {
+    const result = await svc.getRuntimeRestartRecoveryAuditTimeline(req.query.drill_id, req.query.gate_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
+router.get('/restart-drill/evidence-pack', async (req, res) => {
+  try {
+    const result = await svc.buildRuntimeRestartRecoveryEvidencePack(req.query.drill_id, req.query.gate_id);
+    res.json(safeResponse(result));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, safety: SAFETY_MARKERS });
+  }
+});
+
 module.exports = router;

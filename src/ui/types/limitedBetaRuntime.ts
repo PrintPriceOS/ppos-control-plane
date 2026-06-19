@@ -33,6 +33,16 @@ export interface LimitedBetaRuntimeSession {
   verified_from_db: number;
   fail_closed_verified: number;
   rollback_ready: number;
+  restart_recovery_status?: string | null;
+  last_verified_after_restart_at?: string | null;
+  recovered_from_db?: number;
+  memory_state_detected?: number;
+  restart_safe?: number;
+  kill_switch_survived_restart?: number;
+  access_policy_survived_restart?: number;
+  session_state_survived_restart?: number;
+  evidence_pack_survived_restart?: number;
+  recovery_integrity_hash?: string | null;
 }
 
 export interface LimitedBetaRuntimeAccessGrant {
@@ -92,4 +102,22 @@ export interface LimitedBetaRuntimeFinding {
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+}
+
+export interface LimitedBetaRuntimeRestartDrill {
+  drill_id: string;
+  gate_id: string;
+  cohort_id: string;
+  participant_id: string;
+  tenant_id: string;
+  before_restart_snapshot_hash: string | null;
+  after_restart_snapshot_hash: string | null;
+  recovery_integrity_hash: string | null;
+  restart_recovery_status: string;
+  runtime_truth_status: string;
+  persistence_status: string;
+  started_at: string;
+  verified_at: string | null;
+  verified_by: string | null;
+  findings: string | null;
 }

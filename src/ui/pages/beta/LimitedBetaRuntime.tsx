@@ -18,11 +18,22 @@ import {
   recordRuntimeFinding,
   resolveRuntimeFinding,
   getRuntimeAuditTimeline,
-  getRuntimeEvidencePack
+  getRuntimeEvidencePack,
+  createRuntimeRestartDrill,
+  snapshotRuntimeStateBeforeRestart,
+  verifyRuntimeStateAfterRestart,
+  compareRuntimeRestartSnapshot,
+  verifyKillSwitchAfterRestart,
+  verifyAccessGrantAfterRestart,
+  getRuntimeRestartRecoveryAuditTimeline,
+  getRuntimeRestartRecoveryEvidencePack
 } from '../../api/limitedBetaRuntimeClient';
 
 const UI_WARNING =
   'Invite-Only Limited Beta Runtime. This does not enable FULL_PUBLIC, open marketplace access, payment execution, refund execution, payout execution, provider external submission, tax/accounting submission, or uncontrolled source mutation.';
+
+const DRILL_WARNING =
+  'Restart Recovery Drill only. This does not enable FULL_PUBLIC, open marketplace, payment execution, provider submission, tax/accounting submission, or uncontrolled source mutation.';
 
 export function LimitedBetaRuntime() {
   const [gateId, setGateId] = useState('');
@@ -30,6 +41,7 @@ export function LimitedBetaRuntime() {
   const [grantId, setGrantId] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [findingId, setFindingId] = useState('');
+  const [drillId, setDrillId] = useState('');
   
   // Scopes and fields
   const [policyName, setPolicyName] = useState('Scope A');
@@ -233,21 +245,83 @@ export function LimitedBetaRuntime() {
     return run('Get Evidence Pack', () => getRuntimeEvidencePack({ gate_id: gateId }));
   }, [run, gateId]);
 
+  // --- Restart Recovery Handlers ---
+
+  const handleCreateRestartDrill = useCallback(async () => {
+    const r = await run('Create Restart Drill', () =>
+      createRuntimeRestartDrill({
+        gate_id: gateId,
+        cohort_id: cohortId,
+        participant_id: participantId,
+        tenant_id: tenantId
+      })
+    );
+    if (r && r.drill) {
+      const d = r.drill as Record<string, unknown>;
+      if (d.drill_id) setDrillId(String(d.drill_id));
+    }
+  }, [run, gateId, cohortId, participantId, tenantId]);
+
+  const handleSnapshotBefore = useCallback(() => {
+    return run('Snapshot Before Restart', () => snapshotRuntimeStateBeforeRestart({ gate_id: gateId }));
+  }, [run, gateId]);
+
+  const handleVerifyAfter = useCallback(() => {
+    return run('Verify After Restart', () => verifyRuntimeStateAfterRestart({ gate_id: gateId }));
+  }, [run, gateId]);
+
+  const handleCompareSnapshot = useCallback(() => {
+    return run('Compare Snapshot', () => compareRuntimeRestartSnapshot({ drill_id: drillId }));
+  }, [run, drillId]);
+
+  const handleVerifyKillSwitch = useCallback(() => {
+    return run('Verify Kill Switch', () => verifyKillSwitchAfterRestart({ drill_id: drillId, gate_id: gateId }));
+  }, [run, drillId, gateId]);
+
+  const handleVerifyAccess = useCallback(() => {
+    return run('Verify Access Recovery', () => verifyAccessGrantAfterRestart({ drill_id: drillId, grant_id: grantId }));
+  }, [run, drillId, grantId]);
+
+  const handleGetRestartTimeline = useCallback(() => {
+    return run('Get Restart Timeline', () => getRuntimeRestartRecoveryAuditTimeline({ drill_id: drillId, gate_id: gateId }));
+  }, [run, drillId, gateId]);
+
+  const handleGetRestartEvidence = useCallback(() => {
+    return run('Get Restart Evidence Pack', () => getRuntimeRestartRecoveryEvidencePack({ drill_id: drillId, gate_id: gateId }));
+  }, [run, drillId, gateId]);
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'sans-serif', color: '#333' }}>
       <h1 style={{ fontSize: 28, marginBottom: 8, borderBottom: '2px solid #eaeaea', paddingBottom: 12 }}>
-        Phase 128 — Invite-Only Limited Beta Runtime Console
+        Phase 128.1 — Invite-Only Limited Beta Runtime & Restart Recovery Console
       </h1>
 
       <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', color: '#721c24', borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <strong>⚠️ Safety Warning:</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.5 }}>{UI_WARNING}</p>
+        <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.5, fontWeight: 'bold' }}>{DRILL_WARNING}</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
         <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Hardened Status Registry</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Hardened Status & Restart Recovery Registry</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>RESTART DRILL STATUS</span>
+              <strong>{result?.restartRecoveryStatus || result?.restart_recovery_status || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>RECOVERY HASH</span>
+              <strong style={{ fontSize: 10, wordBreak: 'break-all' }}>{result?.recovery_integrity_hash || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>BEFORE SNAPSHOT HASH</span>
+              <strong style={{ fontSize: 10, wordBreak: 'break-all' }}>{result?.before_restart_snapshot_hash || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>AFTER SNAPSHOT HASH</span>
+              <strong style={{ fontSize: 10, wordBreak: 'break-all' }}>{result?.after_restart_snapshot_hash || 'N/A'}</strong>
+            </div>
             <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
               <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>PERSISTENCE STATUS</span>
               <strong>{result?.persistenceStatus || 'N/A'}</strong>
@@ -255,14 +329,6 @@ export function LimitedBetaRuntime() {
             <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
               <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>RUNTIME TRUTH STATUS</span>
               <strong>{result?.runtimeTruthStatus || 'N/A'}</strong>
-            </div>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>127.1 EVIDENCE</span>
-              <strong>{result?.phase127_1_evidence_status || 'N/A'}</strong>
-            </div>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>FAIL-CLOSED VERIFIED</span>
-              <strong style={{ color: '#28a745' }}>ACTIVE</strong>
             </div>
           </div>
         </div>
@@ -282,7 +348,35 @@ export function LimitedBetaRuntime() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
         <div>
-          <h2 style={{ fontSize: 20, marginBottom: 16 }}>Actions &amp; Orchestration</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 16 }}>Actions &amp; Restart Recovery Orchestration</h2>
+
+          {/* Restart Recovery Drill Panel */}
+          <div style={{ background: '#e9ecef', border: '2px dashed #6c757d', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+            <h4 style={{ margin: '0 0 12px 0', color: '#495057' }}>🔄 Restart Recovery Drill Panel</h4>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+              <button onClick={handleCreateRestartDrill} disabled={loading || !gateId} style={{ padding: '8px 16px', background: '#495057', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Create Drill
+              </button>
+              <input value={drillId} onChange={e => setDrillId(e.target.value)} placeholder="Drill ID (lbrrd_...)" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={handleSnapshotBefore} disabled={loading || !gateId} style={{ padding: '8px 16px', background: '#343a40', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Snapshot Before
+              </button>
+              <button onClick={handleVerifyAfter} disabled={loading || !gateId} style={{ padding: '8px 16px', background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Verify After
+              </button>
+              <button onClick={handleCompareSnapshot} disabled={loading || !drillId} style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Compare Snapshots
+              </button>
+              <button onClick={handleVerifyKillSwitch} disabled={loading || !drillId || !gateId} style={{ padding: '8px 16px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Verify Kill Switch
+              </button>
+              <button onClick={handleVerifyAccess} disabled={loading || !drillId || !grantId} style={{ padding: '8px 16px', background: '#6f42c1', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                Verify Access
+              </button>
+            </div>
+          </div>
 
           {/* 1. Gate Readiness & Enablement */}
           <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
@@ -409,6 +503,12 @@ export function LimitedBetaRuntime() {
             <button onClick={handleGetEvidencePack} disabled={loading || !gateId} style={{ width: '100%', padding: '12px', background: '#20c997', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
               Build Evidence Pack
             </button>
+            <button onClick={handleGetRestartTimeline} disabled={loading || !drillId || !gateId} style={{ width: '100%', padding: '12px', background: '#495057', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
+              Get Restart Timeline
+            </button>
+            <button onClick={handleGetRestartEvidence} disabled={loading || !drillId || !gateId} style={{ width: '100%', padding: '12px', background: '#fd7e14', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
+              Build Restart Evidence Pack
+            </button>
           </div>
 
           <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, minHeight: 300 }}>
@@ -423,6 +523,7 @@ export function LimitedBetaRuntime() {
               {result && (
                 <>
                   <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #eaeaea' }}>
+                    <strong>Drill ID:</strong> {String(drillId || 'None')}<br />
                     <strong>Session ID:</strong> {String(sessionId || 'None')}<br />
                     <strong>Policy ID:</strong> {String(policyId || 'None')}<br />
                     <strong>Grant ID:</strong> {String(grantId || 'None')}<br />

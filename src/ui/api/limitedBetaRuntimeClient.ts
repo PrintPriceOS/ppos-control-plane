@@ -84,3 +84,43 @@ export async function getRuntimeEvidencePack(params: { gate_id: string }) {
   qs.set('gate_id', params.gate_id);
   return adminFetch(`${BASE}/evidence-pack?${qs.toString()}`);
 }
+
+// --- Restart Recovery API Methods ---
+
+export async function createRuntimeRestartDrill(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/create`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function snapshotRuntimeStateBeforeRestart(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/snapshot-before`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function verifyRuntimeStateAfterRestart(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/verify-after`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function compareRuntimeRestartSnapshot(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/compare`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function verifyKillSwitchAfterRestart(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/verify-kill-switch`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function verifyAccessGrantAfterRestart(payload: Record<string, unknown>) {
+  return adminFetch(`${BASE}/restart-drill/verify-access`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function getRuntimeRestartRecoveryAuditTimeline(params: { drill_id: string; gate_id: string }) {
+  const qs = new URLSearchParams();
+  qs.set('drill_id', params.drill_id);
+  qs.set('gate_id', params.gate_id);
+  return adminFetch(`${BASE}/restart-drill/audit-timeline?${qs.toString()}`);
+}
+
+export async function getRuntimeRestartRecoveryEvidencePack(params: { drill_id: string; gate_id: string }) {
+  const qs = new URLSearchParams();
+  qs.set('drill_id', params.drill_id);
+  qs.set('gate_id', params.gate_id);
+  return adminFetch(`${BASE}/restart-drill/evidence-pack?${qs.toString()}`);
+}
