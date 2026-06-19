@@ -104,6 +104,8 @@ import { FoundingPrinthousePilotGate } from './pages/production/FoundingPrinthou
 import { ControlledPrinthouseHandoffPackage } from './pages/production/ControlledPrinthouseHandoffPackage';
 import { SandboxCommercialPilot } from './pages/production/SandboxCommercialPilot';
 import { PilotEvidenceReviewGoNoGo } from './pages/production/PilotEvidenceReviewGoNoGo';
+import { LimitedBetaPreparationGate } from './pages/beta/LimitedBetaPreparationGate';
+
 
 export const App: React.FC = () => {
     return (
@@ -156,6 +158,8 @@ export const App: React.FC = () => {
                 <Route path="/admin/production/printhouse-handoff-package" element={<ControlledPrinthouseHandoffPackage />} />
                 <Route path="/admin/production/sandbox-commercial-pilot" element={<SandboxCommercialPilot />} />
                 <Route path="/admin/production/pilot-evidence-review" element={<PilotEvidenceReviewGoNoGo />} />
+                <Route path="/admin/beta/preparation-gate" element={<LimitedBetaPreparationGate />} />
+
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
                 <Route path="/admin/production-monitoring" element={<ProductionMonitoringDashboardPage />} />
 

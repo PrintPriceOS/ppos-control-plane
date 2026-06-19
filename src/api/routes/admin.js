@@ -216,6 +216,8 @@ const foundingPrinthousePilotGateAdmin = require('./foundingPrinthousePilotGateA
 const controlledPrinthouseHandoffPackageAdmin = require('./controlledPrinthouseHandoffPackageAdmin');
 const sandboxCommercialPilotAdmin = require('./sandboxCommercialPilotAdmin');
 const pilotEvidenceReviewGoNoGoAdmin = require('./pilotEvidenceReviewGoNoGoAdmin');
+const limitedBetaPreparationGateAdmin = require('./limitedBetaPreparationGateAdmin');
+
 
 
 /**
@@ -876,6 +878,8 @@ router.use('/production/founding-printhouse-pilot', foundingPrinthousePilotGateA
 router.use('/production/printhouse-handoff-package', controlledPrinthouseHandoffPackageAdmin);
 router.use('/production/sandbox-commercial-pilot', sandboxCommercialPilotAdmin);
 router.use('/production/pilot-evidence-review', pilotEvidenceReviewGoNoGoAdmin);
+router.use('/beta/preparation-gate', limitedBetaPreparationGateAdmin);
+
 
 router.use('/financial-reconciliation', adminFinancialReconciliation);
 router.use('/', adminGovernedInvoices);
