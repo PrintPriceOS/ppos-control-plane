@@ -203,6 +203,19 @@ export function PilotEvidenceReviewGoNoGo() {
       )}
 
       {result && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, background: '#e2e3e5', padding: 12, borderRadius: 6, fontSize: 13 }}>
+          <div>
+            <strong>Persistence Mode:</strong> {String((result as any).persistenceMode || 'N/A')}<br />
+            <strong>Persistence Status:</strong> {String((result as any).persistenceStatus || 'N/A')}<br />
+          </div>
+          <div>
+            <strong>Runtime Truth Status:</strong> {String((result as any).runtimeTruthStatus || 'N/A')}<br />
+            <strong>Evidence Integrity Hash:</strong> {String((result as any).evidence_pack?.evidence_hash || (result as any).evidence_hash || 'N/A')}
+          </div>
+        </div>
+      )}
+
+      {result && (
         <div style={{ background: '#f8f9fa', borderRadius: 8, padding: 16 }}>
           <h3>Result</h3>
           <pre style={{ fontSize: 12, maxHeight: 500, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
@@ -213,3 +226,4 @@ export function PilotEvidenceReviewGoNoGo() {
     </div>
   );
 }
+

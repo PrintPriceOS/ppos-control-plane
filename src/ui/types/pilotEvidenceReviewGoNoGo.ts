@@ -37,6 +37,7 @@ export interface PilotEvidenceReviewBoard {
   external_tax_submission_enabled: boolean;
   external_accounting_submission_enabled: boolean;
   source_mutation_enabled: boolean;
+  runtime_truth_status?: string;
   created_by: string | null;
   created_at: string;
   updated_at: string | null;
@@ -55,6 +56,13 @@ export interface PilotEvidenceReviewCheck {
   verified_by: string | null;
   created_at: string;
   updated_at: string | null;
+  evidence_source_type?: string | null;
+  evidence_source_reference?: string | null;
+  evidence_integrity_hash?: string | null;
+  verified_from_db?: boolean;
+  verified_from_acceptance_pack?: boolean;
+  verified_from_schema_versions?: boolean;
+  runtime_truth_status?: string;
 }
 
 export interface PilotEvidenceReviewFinding {
@@ -95,6 +103,7 @@ export interface PilotEvidenceGoNoGoDecision {
   externalTaxSubmissionEnabled: boolean;
   externalAccountingSubmissionEnabled: boolean;
   sourceMutationEnabled: boolean;
+  runtime_truth_status?: string;
   decided_by: string | null;
   decided_at: string | null;
   created_at: string;
@@ -121,6 +130,9 @@ export interface PilotEvidenceReviewPack {
   evidence_hash: string | null;
   evidence_schema_version: string;
   redaction_classification: string;
+  runtime_truth_status?: string;
+  persistence_status?: string | null;
   generated_at: string;
   generated_by: string | null;
 }
+
