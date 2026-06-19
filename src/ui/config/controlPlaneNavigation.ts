@@ -42,6 +42,8 @@ export const navigationConfig: NavItem[] = [
     { id: 'billing-usage', label: 'Billing & Plans', path: '/admin/billing-usage', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'production-monitoring', label: 'Production Monitoring', path: '/admin/production-monitoring', icon: 'SignalIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-runtime', label: 'Limited Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+
 
     // System / Admin
     { id: 'tenants', label: 'Tenant Management', path: '/tenants', icon: 'BuildingOfficeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
