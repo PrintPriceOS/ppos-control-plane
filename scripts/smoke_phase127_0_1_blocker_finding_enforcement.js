@@ -21,18 +21,27 @@ const LimitedBetaPreparationGateService = require('../src/api/services/limitedBe
 
   // Mock DB query to return verified Phase 126.1 evidence, and empty SELECTs otherwise
   let mockDbFindings = [];
+  let hasEscalation = false;
+  let hasRollback = false;
+
   svc._db = {
     query: async (sql, params) => {
+      if (sql.includes('schema_versions')) {
+        return [{ version: '071_phase126_1_pilot_evidence_persistence_runtime_truth' }];
+      }
       if (sql.includes('pilot_evidence_go_no_go_decisions')) {
-        return [[{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED' }]];
+        return [{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED', persistence_status: 'PERSISTED' }];
       }
       if (sql.includes('SELECT * FROM limited_beta_findings')) {
-        return [mockDbFindings];
+        return mockDbFindings;
       }
-      if (sql.trim().toUpperCase().startsWith('SELECT')) {
-        return [[]];
+      if (sql.includes('SELECT * FROM limited_beta_support_escalations')) {
+        return hasEscalation ? [{ escalation_id: 'se-1' }] : [];
       }
-      return [[{ affectedRows: 1 }]];
+      if (sql.includes('SELECT * FROM limited_beta_incident_rollback_plans')) {
+        return hasRollback ? [{ plan_id: 'rp-1' }] : [];
+      }
+      return [];
     }
   };
 
@@ -45,11 +54,13 @@ const LimitedBetaPreparationGateService = require('../src/api/services/limitedBe
     path_name: 'Support Line',
     contact_details_json: { email: 'ops@printprice.com' }
   });
+  hasEscalation = true;
 
   await svc.recordIncidentRollbackPlan({
     gate_id: gateId,
     rollback_steps_json: ['disable_runtime']
   });
+  hasRollback = true;
 
   // Verify initially ready
   let readiness = await svc.evaluateLimitedBetaPreparationReadiness({ gate_id: gateId });

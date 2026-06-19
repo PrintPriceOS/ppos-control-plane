@@ -100,16 +100,25 @@ for (const f of sourceFiles) {
 
 // --- Full lifecycle acceptance test ---
 (async () => {
+  let hasEscalation = false;
+  let hasRollback = false;
+
   // Mock DB query to return verified Phase 126.1 evidence
   svc._db = {
     query: async (sql, params) => {
+      if (sql.includes('schema_versions')) {
+        return [{ version: '071_phase126_1_pilot_evidence_persistence_runtime_truth' }];
+      }
       if (sql.includes('pilot_evidence_go_no_go_decisions')) {
-        return [[{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED' }]];
+        return [{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED', persistence_status: 'PERSISTED' }];
       }
-      if (sql.trim().toUpperCase().startsWith('SELECT')) {
-        return [[]];
+      if (sql.includes('SELECT * FROM limited_beta_support_escalations')) {
+        return hasEscalation ? [{ escalation_id: 'se-1' }] : [];
       }
-      return [[{ affectedRows: 1 }]];
+      if (sql.includes('SELECT * FROM limited_beta_incident_rollback_plans')) {
+        return hasRollback ? [{ plan_id: 'rp-1' }] : [];
+      }
+      return [];
     }
   };
 
@@ -152,11 +161,14 @@ for (const f of sourceFiles) {
     contact_details_json: { email: 'ops@printprice.com' },
     created_by: 'acceptance'
   });
+  hasEscalation = true;
+
   await svc.recordIncidentRollbackPlan({
     gate_id: gateId,
     rollback_steps_json: ['disable_runtime'],
     created_by: 'acceptance'
   });
+  hasRollback = true;
 
   const readyResult = await svc.evaluateLimitedBetaPreparationReadiness({ gate_id: gateId });
   assert(readyResult.readiness_status === 'READY', 'Acceptance: gate is ready');
@@ -164,7 +176,7 @@ for (const f of sourceFiles) {
   const evidenceResult = await svc.buildLimitedBetaEvidencePack({ gate_id: gateId, generated_by: 'acceptance' });
   assert(evidenceResult.evidence_pack, 'Acceptance: evidence pack generated');
   assert(evidenceResult.evidence_pack.evidence_hash, 'Acceptance: evidence pack has hash');
-  assert(evidenceResult.evidence_pack.evidence_schema_version === '127.0', 'Acceptance: schema version 127.0');
+  assert(evidenceResult.evidence_pack.evidence_schema_version === '127.1', 'Acceptance: schema version 127.1');
 
   const epData = evidenceResult.evidence_pack.evidence_data_json;
   assert(epData.safety_invariants, 'Acceptance: evidence pack contains safety invariants');

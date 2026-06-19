@@ -29,16 +29,40 @@ for (const m of requiredMethods) {
 }
 
 (async () => {
-  // Mock DB query interface to simulate positive Phase 126.1 and 126.1.3 verified state
+  let mockBoundary = null;
+  let mockTerms = null;
+  let mockFindings = [];
+  let hasEscalation = false;
+  let hasRollback = false;
+
+  // Mock DB query interface returning flat rows
   svc._db = {
     query: async (sql, params) => {
+      if (sql.includes('schema_versions')) {
+        return [{ version: '071_phase126_1_pilot_evidence_persistence_runtime_truth' }];
+      }
       if (sql.includes('pilot_evidence_go_no_go_decisions')) {
-        return [[{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED' }]];
+        return [{ decision_outcome: 'GO_FOR_LIMITED_BETA_PREPARATION', runtime_truth_status: 'VERIFIED', persistence_status: 'PERSISTED' }];
       }
-      if (sql.trim().toUpperCase().startsWith('SELECT')) {
-        return [[]];
+      if (sql.includes('SELECT * FROM limited_beta_role_boundaries')) {
+        return mockBoundary ? [mockBoundary] : [];
       }
-      return [[{ affectedRows: 1 }]];
+      if (sql.includes('SELECT * FROM limited_beta_terms_acceptances')) {
+        return mockTerms ? [mockTerms] : [];
+      }
+      if (sql.includes('SELECT * FROM limited_beta_invite_codes')) {
+        return [{ invite_id: 'i-1', cohort_id: cohortId, revoked: 0, expires_at: null }];
+      }
+      if (sql.includes('SELECT * FROM limited_beta_support_escalations')) {
+        return hasEscalation ? [{ escalation_id: 'se-1' }] : [];
+      }
+      if (sql.includes('SELECT * FROM limited_beta_incident_rollback_plans')) {
+        return hasRollback ? [{ plan_id: 'rp-1' }] : [];
+      }
+      if (sql.includes('SELECT * FROM limited_beta_findings')) {
+        return mockFindings;
+      }
+      return [];
     }
   };
 
@@ -85,7 +109,7 @@ for (const m of requiredMethods) {
     created_by: 'smoke'
   });
   assert(inviteResult.invite, 'issueInviteCode returns invite');
-  assert(inviteResult.invite.invite_code === 'SMOKE-BETA-CODE', 'invite code matches');
+  assert(inviteResult.invite.invite_code === '[REDACTED]', 'invite code matches');
   const inviteId = inviteResult.invite.invite_id;
 
   const revokeResult = await svc.revokeInviteCode({
@@ -99,6 +123,11 @@ for (const m of requiredMethods) {
   assert(eligibility.eligible === false, 'participant not eligible initially (needs boundary and terms)');
 
   // Define boundary
+  mockBoundary = {
+    participant_id: participantId,
+    allowed_actions_json: ['read_dashboard'],
+    restricted_actions_json: ['payout']
+  };
   await svc.defineRoleBoundary({
     participant_id: participantId,
     allowed_actions_json: ['read_dashboard'],
@@ -107,6 +136,11 @@ for (const m of requiredMethods) {
   });
 
   // External participant also needs terms acceptance
+  mockTerms = {
+    participant_id: participantId,
+    terms_version: '1.0',
+    accepted_by: 'user-1'
+  };
   await svc.recordTermsAcceptance({
     participant_id: participantId,
     terms_version: '1.0',
@@ -118,6 +152,7 @@ for (const m of requiredMethods) {
   assert(eligibility.participant.participant_status === 'APPROVED_FOR_LIMITED_BETA_PREPARATION', 'participant is approved');
 
   // 6. Support Escalation & Incident Rollback Plans
+  hasEscalation = true;
   await svc.recordSupportEscalationPath({
     gate_id: gateId,
     path_name: 'Escalation Path A',
@@ -125,6 +160,7 @@ for (const m of requiredMethods) {
     created_by: 'smoke'
   });
 
+  hasRollback = true;
   await svc.recordIncidentRollbackPlan({
     gate_id: gateId,
     rollback_steps_json: ['disable_runtime'],
@@ -146,6 +182,16 @@ for (const m of requiredMethods) {
   });
   const findingId = findingResult.finding.finding_id;
 
+  mockFindings = [{
+    finding_id: findingId,
+    gate_id: gateId,
+    finding_type: 'BLOCKER',
+    finding_status: 'OPEN',
+    blocks_readiness: 1,
+    severity: 'CRITICAL',
+    summary: 'Blocker finding'
+  }];
+
   readiness = await svc.evaluateLimitedBetaPreparationReadiness({ gate_id: gateId });
   assert(readiness.readiness_status === 'BLOCKED', 'Gate is BLOCKED by blocker findings');
   assert(readiness.blockerFindings && readiness.blockerFindings.length > 0, 'blockerFindings length > 0');
@@ -156,6 +202,7 @@ for (const m of requiredMethods) {
     finding_id: findingId,
     resolved_by: 'smoke'
   });
+  mockFindings = [];
 
   readiness = await svc.evaluateLimitedBetaPreparationReadiness({ gate_id: gateId });
   assert(readiness.readiness_status === 'READY', 'Gate is READY again after resolving blockers');

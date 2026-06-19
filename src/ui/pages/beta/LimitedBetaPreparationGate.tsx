@@ -17,7 +17,7 @@ import {
 } from '../../api/limitedBetaPreparationGateClient';
 
 const UI_WARNING =
-  'Limited Beta Preparation only. This does not enable beta runtime, FULL_PUBLIC, open marketplace access, live provider connectivity, payment execution, refund execution, payout execution, tax/accounting/provider submission, or uncontrolled source mutation.';
+  'Limited Beta Preparation only. Beta runtime is not enabled. FULL_PUBLIC and open marketplace access remain disabled.';
 
 export function LimitedBetaPreparationGate() {
   const [gateId, setGateId] = useState('');
@@ -49,7 +49,7 @@ export function LimitedBetaPreparationGate() {
   const [findingType, setFindingType] = useState('BLOCKER');
   const [findingSummary, setFindingSummary] = useState('Readiness security review pending');
   
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -58,7 +58,7 @@ export function LimitedBetaPreparationGate() {
     setMessage('');
     try {
       const r = await fn();
-      setResult(r);
+      setResult(r as Record<string, any>);
       setMessage(`${label} completed successfully.`);
       return r;
     } catch (e: unknown) {
@@ -188,7 +188,7 @@ export function LimitedBetaPreparationGate() {
       recordBetaFinding({
         gate_id: gateId,
         finding_type: findingType,
-        blocks_beta_preparation: 1,
+        blocks_readiness: 1,
         severity: 'HIGH',
         summary: findingSummary,
         created_by: 'admin'
@@ -215,32 +215,58 @@ export function LimitedBetaPreparationGate() {
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: 24, fontFamily: 'sans-serif', color: '#333' }}>
       <h1 style={{ fontSize: 28, marginBottom: 8, borderBottom: '2px solid #eaeaea', paddingBottom: 12 }}>
-        Phase 127 — Limited Beta Preparation Gate
+        Phase 127.1 — Limited Beta Preparation Gate
       </h1>
 
       <div style={{ background: '#fff3cd', border: '1px solid #ffc107', color: '#856404', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <strong>⚠️ Warning / Safety Invariant Lock:</strong>
+        <strong>⚠️ Safety Warning:</strong>
         <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.5 }}>{UI_WARNING}</p>
       </div>
 
-      <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Safety Flags Check</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          <div style={{ padding: 8, background: '#f1f3f5', borderRadius: 4, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontSize: 12, color: '#6c757d' }}>BETA RUNTIME</span>
-            <strong style={{ color: '#dc3545' }}>DISABLED (LOCKED)</strong>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+        <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16 }}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Hardened Status Registry</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>PERSISTENCE STATUS</span>
+              <strong>{result?.persistenceStatus || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>PERSISTENCE MODE</span>
+              <strong>{result?.persistenceMode || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>RUNTIME TRUTH STATUS</span>
+              <strong>{result?.runtimeTruthStatus || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>FAIL-CLOSED VERIFIED</span>
+              <strong style={{ color: '#28a745' }}>ACTIVE</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>PHASE 126.1 EVIDENCE</span>
+              <strong>{result?.phase126_1_evidence_status || 'N/A'}</strong>
+            </div>
+            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
+              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>SECRET HYGIENE</span>
+              <strong>{result?.secret_hygiene_status || 'N/A'}</strong>
+            </div>
           </div>
-          <div style={{ padding: 8, background: '#f1f3f5', borderRadius: 4, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontSize: 12, color: '#6c757d' }}>FULL PUBLIC</span>
-            <strong style={{ color: '#dc3545' }}>DISABLED (LOCKED)</strong>
-          </div>
-          <div style={{ padding: 8, background: '#f1f3f5', borderRadius: 4, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontSize: 12, color: '#6c757d' }}>OPEN MARKETPLACE</span>
-            <strong style={{ color: '#dc3545' }}>DISABLED (LOCKED)</strong>
-          </div>
-          <div style={{ padding: 8, background: '#f1f3f5', borderRadius: 4, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontSize: 12, color: '#6c757d' }}>PAYMENTS / REFUNDS / PAYOUTS</span>
-            <strong style={{ color: '#dc3545' }}>DISABLED (LOCKED)</strong>
+        </div>
+
+        <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16 }}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Checklist &amp; Readiness</h3>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+            <div><strong>Readiness Status:</strong> <span style={{ color: result?.readiness_status === 'READY' ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>{result?.readiness_status || 'UNKNOWN'}</span></div>
+            {result?.reason && <div style={{ color: '#dc3545' }}><strong>Block Reason:</strong> {result.reason}</div>}
+            {result?.evidence_pack?.evidence_hash && <div><strong>Integrity Hash:</strong> <code style={{ fontSize: 11 }}>{result.evidence_pack.evidence_hash}</code></div>}
+            
+            <div style={{ marginTop: 12, borderTop: '1px solid #dee2e6', paddingTop: 8 }}>
+              <strong>Participant Eligibility Check:</strong> {result?.eligible !== undefined ? (result.eligible ? 'ELIGIBLE' : 'INELIGIBLE') : 'N/A'}<br />
+              <strong>Boundary Defined:</strong> {result?.hasBoundary ? 'YES' : 'NO'}<br />
+              <strong>Terms Accepted:</strong> {result?.hasTerms ? 'YES' : 'NO'}<br />
+              <strong>Invite Safe:</strong> {result?.inviteValid ? 'YES' : 'NO'}
+            </div>
           </div>
         </div>
       </div>

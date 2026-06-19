@@ -34,6 +34,11 @@ export interface LimitedBetaPreparationGate {
   created_by: string | null;
   created_at: string;
   updated_at: string | null;
+  persistenceMode?: string;
+  persistenceStatus?: string;
+  runtimeTruthStatus?: string;
+  phase126_1_evidence_status?: string;
+  secret_hygiene_status?: string;
 }
 
 export interface LimitedBetaCohort {

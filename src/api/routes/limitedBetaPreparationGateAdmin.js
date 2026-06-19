@@ -31,7 +31,20 @@ const SAFETY_MESSAGE =
   'This does NOT enable beta runtime, FULL_PUBLIC, open marketplace, live provider connectivity, payment, refund, payout, tax/accounting/provider submission, or uncontrolled source mutation.';
 
 function safeResponse(data) {
-  return { ok: true, ...data, safety: SAFETY_MARKERS, safety_message: SAFETY_MESSAGE };
+  return {
+    ok: true,
+    persistenceMode: data.persistenceMode || 'MEMORY_FALLBACK',
+    persistenceStatus: data.persistenceStatus || 'FALLBACK_ONLY',
+    runtimeTruthStatus: data.runtimeTruthStatus || 'DEGRADED',
+    betaRuntimeEnabled: false,
+    fullPublicEnabled: false,
+    openMarketplaceEnabled: false,
+    paymentExecutionEnabled: false,
+    sourceMutationEnabled: false,
+    ...data,
+    safety: SAFETY_MARKERS,
+    safety_message: SAFETY_MESSAGE
+  };
 }
 
 router.get('/readiness', async (req, res) => {
