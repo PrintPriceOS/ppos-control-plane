@@ -2,6 +2,9 @@
 
 This documentation describes the hardening of the Pilot Evidence Review Board and Go/No-Go decision process.
 
+> [!IMPORTANT]
+> **Production Readiness Note**: Phase 126.1 is not considered production-valid unless migration 071 applies successfully through `run-migrations-manual.js` and schema smoke verifies the real database.
+
 ## Background
 
 Phase 126 originally relied on in-memory Maps and manual evidence aggregation. For production readiness, Phase 126.1 implements:
@@ -17,6 +20,10 @@ The table structures added in migration `071` are:
 2. `pilot_evidence_review_boards`: Added `runtime_truth_status`.
 3. `pilot_evidence_go_no_go_decisions`: Added `runtime_truth_status`.
 4. `pilot_evidence_review_packs`: Added `runtime_truth_status` and `persistence_status`.
+
+## Node-based compatibility schema patch
+
+For production environments where migration runner capability is restricted, the schema patch script [patch_phase126_1_schema_mysql_compat.js](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/scripts/patch_phase126_1_schema_mysql_compat.js) checks database metadata dynamically and creates columns safely without dropping or mutating data.
 
 ## Verification Rules
 
