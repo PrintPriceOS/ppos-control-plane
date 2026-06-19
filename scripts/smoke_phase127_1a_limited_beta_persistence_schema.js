@@ -1,5 +1,7 @@
 'use strict';
 
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
 
@@ -11,15 +13,29 @@ function assert(condition, label) {
   else { failed++; console.error(`  FAIL: ${label}`); }
 }
 
-console.log('=== Smoke 127.1a: Schema & Migration 073 Verification ===\n');
+function isProductionLikeEnvironment() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const hasDbUrl = !!process.env.DATABASE_URL;
+  const inOptPath = process.cwd().includes('/opt/printprice-os') || process.cwd().includes('\\opt\\printprice-os');
+  const isCiProd = process.env.CI_PRODUCTION_SMOKE === 'true';
+  return isProd || hasDbUrl || inOptPath || isCiProd;
+}
 
-process.env.NODE_ENV = 'test';
-process.env.ALLOW_SCHEMA_SMOKE_FALLBACK = 'true';
+function redactConnectionString(str) {
+  if (!str) return str;
+  return str.replace(/mysql:\/\/([^:]+):([^@]+)@/g, 'mysql://$1:[REDACTED]@');
+}
+
+console.log('=== Smoke 127.1a: Schema & Migration 073 Verification ===\n');
 
 const db = require('../src/api/services/mysqlClient');
 const hasDbConfig = !!(process.env.MYSQL_HOST || process.env.DATABASE_URL);
-const isProdLike = process.env.NODE_ENV !== 'test';
+const isProductionLike = isProductionLikeEnvironment();
 const isFallbackAllowed = process.env.ALLOW_SCHEMA_SMOKE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
+
+if (process.env.DATABASE_URL) {
+  console.log(`Connecting to database: ${redactConnectionString(process.env.DATABASE_URL)}`);
+}
 
 const migrationPath = path.join(__dirname, '..', 'migrations', '073_phase127_1_limited_beta_preparation_persistence_truth.sql');
 const migrationExists = fs.existsSync(migrationPath);
@@ -59,20 +75,18 @@ assert(migrationExists, 'Migration 073 file exists');
     }
   }
 
-  if (isProdLike && !isFallbackAllowed) {
-    if (!hasDbConfig) {
-      console.error("  FAIL: running in production-like environment but database config is missing");
-      process.exit(1);
-    }
-  }
-
   let realDbConnected = false;
   let migrationApplied = false;
   let gatesTableHardened = false;
   let invitesTableHardened = false;
   let findingsTableHardened = false;
+  let indexesHardened = false;
 
   try {
+    if (!hasDbConfig) {
+      throw new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
+    }
+
     const schemaExists = await db.query(
       "SELECT version FROM schema_versions WHERE version LIKE '%073_phase127_1%' OR description LIKE '%073_phase127_1%'",
       []
@@ -101,10 +115,21 @@ assert(migrationExists, 'Migration 073 file exists');
     invitesTableHardened = ['invite_hash', 'expires_at', 'invite_status'].every(col => inviteCols.includes(col));
     findingsTableHardened = ['blocks_readiness'].every(col => findingCols.includes(col));
 
+    const indexes = await db.query(
+      `SELECT INDEX_NAME, TABLE_NAME 
+       FROM INFORMATION_SCHEMA.STATISTICS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME IN ('limited_beta_preparation_gates', 'limited_beta_invite_codes', 'limited_beta_findings')`,
+      []
+    );
+    const indexNames = indexes.map(i => i.INDEX_NAME);
+    indexesHardened = ['idx_lbpg_gate_id', 'idx_lbic_invite_hash', 'idx_lbf_gate_id'].every(idx => indexNames.includes(idx));
+
   } catch (err) {
-    console.error("  Database check failed:", err.message);
-    if (!isFallbackAllowed) {
-      console.error("  FAIL: Database connection or check failed in production-like mode.");
+    const redactedErr = redactConnectionString(err.message);
+    console.error("  Database check failed:", redactedErr);
+    if (isProductionLike && !isFallbackAllowed) {
+      console.error("  FAIL: Real DB schema verification required in production-like mode");
       process.exit(1);
     }
   }
@@ -114,7 +139,12 @@ assert(migrationExists, 'Migration 073 file exists');
     assert(gatesTableHardened, "limited_beta_preparation_gates table has new columns");
     assert(invitesTableHardened, "limited_beta_invite_codes table has invite_hash");
     assert(findingsTableHardened, "limited_beta_findings table has blocks_readiness column");
+    assert(indexesHardened, "Required Phase 127.1 indexes exist in STATISTICS");
   } else {
+    if (isProductionLike && !isFallbackAllowed) {
+      console.error("  FAIL: Real DB schema verification required in production-like mode");
+      process.exit(1);
+    }
     assert(isFallbackAllowed, "Mock schema verification fallback is allowed in this environment");
   }
 
@@ -123,6 +153,7 @@ assert(migrationExists, 'Migration 073 file exists');
   await db.closePool();
   process.exit(0);
 })().catch(err => {
-  console.error("FATAL ERROR in 127.1a:", err);
+  const redactedErr = redactConnectionString(err.message);
+  console.error("FATAL ERROR in 127.1a:", redactedErr);
   process.exit(1);
 });

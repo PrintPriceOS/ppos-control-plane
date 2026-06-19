@@ -27,3 +27,7 @@ Verification was done via 6 custom smoke tests and regression tests:
 - `smoke_phase127_1d_limited_beta_fail_closed_rules.js` (Verify fail-closed DB locks, invite expiry/revocation, support/rollback requirements, and blockers).
 - `smoke_phase127_1e_limited_beta_admin_api_ui_hardening.js` (Verify route payloads, UI page labels, and secret redaction warnings).
 - `smoke_phase127_1f_limited_beta_persistence_acceptance_pack.js` (Validate all smokes, build success, and assert evidence version is `127.1`).
+
+> [!IMPORTANT]
+> Phase 127.1 is not production-valid unless smoke_phase127_1a verifies migration 073, columns, indexes and tables against the real DB.
+

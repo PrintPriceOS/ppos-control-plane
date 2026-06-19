@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const cp = require('child_process');
 
 let passed = 0;
 let failed = 0;
@@ -53,7 +54,70 @@ for (const f of sourceFiles) {
   }
 }
 
-// 3. Lifecycle acceptance validation with 127.1 schema check
+// 3. Spawning 127.1a to verify real DB verification and fallback blocking rules
+console.log('\n--- Verifying Schema Smoke (127.1a) Subprocess Invariants ---');
+
+const schemaSmokeFile = path.join(__dirname, 'smoke_phase127_1a_limited_beta_persistence_schema.js');
+const schemaSmokeContent = fs.readFileSync(schemaSmokeFile, 'utf8');
+
+assert(schemaSmokeContent.includes('schema_versions'), "127.1a checks schema_versions");
+assert(schemaSmokeContent.includes('INFORMATION_SCHEMA.COLUMNS'), "127.1a checks INFORMATION_SCHEMA.COLUMNS");
+assert(schemaSmokeContent.includes('INFORMATION_SCHEMA.STATISTICS'), "127.1a checks INFORMATION_SCHEMA.STATISTICS");
+
+// Test 127.1a fails closed in production-like mode without DB or fallback allowed
+try {
+  cp.execSync('node scripts/smoke_phase127_1a_limited_beta_persistence_schema.js', {
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      DATABASE_URL: '',
+      MYSQL_HOST: '',
+      ALLOW_SCHEMA_SMOKE_FALLBACK: 'false'
+    },
+    stdio: 'pipe'
+  });
+  assert(false, "127.1a must fail in production-like mode without DB or fallback");
+} catch (err) {
+  const output = err.stdout?.toString() + err.stderr?.toString();
+  assert(output.includes("Real DB schema verification required in production-like mode"), "127.1a correctly fails closed and outputs required error message");
+}
+
+// Test 127.1a allows fallback in test environment
+try {
+  const stdout = cp.execSync('node scripts/smoke_phase127_1a_limited_beta_persistence_schema.js', {
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+      ALLOW_SCHEMA_SMOKE_FALLBACK: 'true',
+      DATABASE_URL: '',
+      MYSQL_HOST: ''
+    }
+  }).toString();
+  assert(stdout.includes("Mock schema verification fallback is allowed in this environment"), "127.1a allows fallback when ALLOW_SCHEMA_SMOKE_FALLBACK is true");
+} catch (err) {
+  assert(false, "127.1a should pass in test mode with fallback allowed");
+}
+
+// Test real DB verification if DATABASE_URL is configured
+if (process.env.DATABASE_URL) {
+  try {
+    const stdout = cp.execSync('node scripts/smoke_phase127_1a_limited_beta_persistence_schema.js', {
+      env: {
+        ...process.env,
+        ALLOW_SCHEMA_SMOKE_FALLBACK: 'false'
+      }
+    }).toString();
+    assert(stdout.includes("Migration 073 is applied in the database"), "127.1a verifies migration 073 in real DB");
+    assert(stdout.includes("limited_beta_preparation_gates table has new columns"), "127.1a verifies real DB columns in INFORMATION_SCHEMA");
+    assert(!stdout.includes("Mock schema verification fallback is allowed"), "127.1a does not output fallback statement when real DB connects");
+  } catch (err) {
+    console.error("  Error running 127.1a with real DB:", err.stdout?.toString() || err.message);
+    failed++;
+  }
+}
+
+// 4. Lifecycle acceptance validation with 127.1 schema check
+console.log('\n--- Running Service Layer Lifecycle Acceptance Check ---');
 process.env.NODE_ENV = 'test';
 process.env.ALLOW_DB_FALLBACK_FOR_SMOKE = 'true';
 
@@ -61,7 +125,6 @@ const LimitedBetaPreparationGateService = require('../src/api/services/limitedBe
 const svc = new LimitedBetaPreparationGateService();
 
 (async () => {
-  // Mock DB query to return verified Phase 126.1 evidence & support/rollback info
   svc._db = {
     query: async (sql, params) => {
       if (sql.includes('schema_versions')) {
