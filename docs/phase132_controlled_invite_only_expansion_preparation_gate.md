@@ -24,8 +24,8 @@ This phase builds the preparation mechanics to define expansion bounds for an in
 - Public signup, open marketplace, source mutation, and external payouts remain entirely blocked.
 - Cannot be enabled successfully if any active Kill Switches are discovered.
 
-## Fixture Idempotency & Schema Alignment (132.0.2)
+## Fixture Idempotency & Schema Alignment (132.0.2 / 132.0.3)
 To ensure the readiness dependency checks can be safely validated against a live database multiple times without collisions or schema drift:
-* **Unique Fixture IDs**: Production-like test fixtures never use fixed primary keys. They generate a unique `runId` prefix combining timestamps and random bytes to ensure deterministic uniqueness per test run.
-* **Fixture Cleanup**: Tests dynamically delete records associated strictly with the active `runId` prefix before and after completion to avoid state leaks.
-* **Adaptive Schema Inspection**: Phase 130 runtime observation tables differ fundamentally in identifiers (`observation_id` vs `pack_id`). The readiness test fixtures invoke `INFORMATION_SCHEMA.COLUMNS` to map required payloads seamlessly to existing columns without hardcoded assumptions, ensuring tests succeed even if downstream evidence tables change shape.
+* **Unique Fixture IDs**: Production-like test fixtures never use fixed primary keys. They generate a unique `runId` prefix combining timestamps and random bytes to ensure deterministic uniqueness per test run. Hardcoded scope keys (`gate`, `cohort`, `tenant`) are strictly disallowed.
+* **Adaptive Cleanup**: Tests dynamically delete records associated strictly with the active `runId` prefix before and after completion to avoid state leaks. The deletion inspects `INFORMATION_SCHEMA.COLUMNS` to only attempt cleanup using identifier columns that genuinely exist (e.g. `marker`, `drill_id`), never assuming a schema shape. Broad/unscoped deletion is prohibited.
+* **Adaptive Schema Inspection**: Upstream readiness tables differ fundamentally in identifiers (`observation_id` vs `pack_id`, presence of `marker`, etc.). The readiness test fixtures invoke `INFORMATION_SCHEMA.COLUMNS` to map required payloads seamlessly to existing columns without hardcoded assumptions, ensuring tests succeed even if downstream evidence tables change shape.

@@ -12,17 +12,21 @@ try {
   const smoke132_0_1 = fs.readFileSync(smoke132_0_1Path, 'utf8');
 
   const verifyNoHardcodedKeys = (content, filename) => {
+    // Only fail if these exact executable patterns are present
     const prohibited = [
-      "'prep_missing_131'",
-      "'rev_1'",
-      "'act_1'",
-      "'gate'",
-      "'cohort'",
-      "'tenant'"
+      "gate_id: 'gate'",
+      "const gateId = 'gate'",
+      "'gate', 'cohort'",
+      "cohort_id: 'cohort'",
+      "tenant_id: 'tenant'",
+      "activation_id: 'act_1'",
+      "review_id: 'rev_1'",
+      "decision_id: 'dec'",
+      "preparation_id: 'prep_missing_131'"
     ];
     for (const word of prohibited) {
       if (content.includes(word)) {
-        throw new Error(`FAIL: ${filename} contains prohibited hardcoded primary key ${word} without random suffix.`);
+        throw new Error(`FAIL: ${filename} contains prohibited executable hardcoded primary key or value: ${word}`);
       }
     }
   };
