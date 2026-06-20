@@ -21,7 +21,7 @@ console.log('=== Phase 136 Runtime Activity Observation Acceptance Pack (136H) =
 
   try {
     await db.query("SELECT 1");
-    console.log('Database is reachable. Running sub-smokes in production-like mode.\n');
+    console.log('Database is reachable.\n');
   } catch (e) {
     hasDb = false;
     if (isForceReal) {
@@ -29,7 +29,7 @@ console.log('=== Phase 136 Runtime Activity Observation Acceptance Pack (136H) =
       console.error('FAIL: Real DB is required but connection failed: ' + e.message);
       process.exit(1);
     }
-    console.log('Database connection refused/failed. Overriding environment to force mock/fallback mode across all sub-smokes.\n');
+    console.log('Database connection refused/failed. Mock/fallback mode enabled.\n');
     process.env.NODE_ENV = 'development';
     delete process.env.DATABASE_URL;
     process.env.DATABASE_URL = '';
@@ -45,14 +45,12 @@ console.log('=== Phase 136 Runtime Activity Observation Acceptance Pack (136H) =
     'smoke_phase136e_runtime_activity_observation_guardrails.js',
     'smoke_phase136f_runtime_activity_admin_api_ui.js',
     'smoke_phase136g_runtime_activity_evidence_pack.js',
-    // Run Phase 135H as dependency if DB is reachable
     ...(hasDb ? ['smoke_phase135h_runtime_session_acceptance_pack.js'] : [])
   ];
 
   const failedSmokes = [];
 
   for (const script of smokes) {
-    console.log(`Running ${script}...`);
     const childEnv = {
       ...process.env,
       FORCE_REAL_DB_SMOKE: process.env.FORCE_REAL_DB_SMOKE,
@@ -68,22 +66,13 @@ console.log('=== Phase 136 Runtime Activity Observation Acceptance Pack (136H) =
     }
     const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: childEnv });
 
-    if (res.stdout) console.log(res.stdout);
-    if (res.stderr) console.error(res.stderr);
-
     if (res.status === 0) {
       assert(true, `${script} passed`);
     } else {
       assert(false, `${script} failed with exit code ${res.status}`);
-      let reason = `exit code ${res.status}`;
-      const failLines = (res.stdout + res.stderr).split('\n').filter(l => l.includes('FAIL:'));
-      if (failLines.length > 0) {
-        reason = failLines.map(l => l.trim().replace('FAIL:', '').trim()).join(' | ');
-      } else {
-        const errLines = (res.stderr || '').split('\n').filter(l => l.trim().length > 0);
-        if (errLines.length > 0) reason = errLines[0];
-      }
-      failedSmokes.push({ script, reason });
+      if (res.stdout) console.log(res.stdout);
+      if (res.stderr) console.error(res.stderr);
+      failedSmokes.push({ script, reason: `Exit code ${res.status}` });
     }
   }
 
@@ -134,13 +123,6 @@ console.log('=== Phase 136 Runtime Activity Observation Acceptance Pack (136H) =
   if (db && db.closePool) await db.closePool();
 
   if (failed > 0 || failedSmokes.length > 0) {
-    if (failedSmokes.length > 0) {
-      console.error('\nFAILED_SUBSMOKES:');
-      for (const f of failedSmokes) {
-        console.error(`* ${f.script}: ${f.reason}`);
-      }
-    }
-    console.error('\nFATAL: Phase 136 Acceptance Pack Failed.');
     process.exit(1);
   } else {
     console.log('\nSUCCESS: Phase 136 Acceptance Pack Passed.');
