@@ -28,7 +28,8 @@ const requiredFiles = [
   'scripts/smoke_phase129d_controlled_beta_activation_access_limits.js',
   'scripts/smoke_phase129e_controlled_beta_activation_kill_switch_incident.js',
   'scripts/smoke_phase129f_controlled_beta_activation_admin_api_ui.js',
-  'scripts/smoke_phase129g_controlled_beta_activation_evidence_pack.js'
+  'scripts/smoke_phase129g_controlled_beta_activation_evidence_pack.js',
+  'scripts/smoke_phase129_0_1_controlled_beta_readiness_repair.js'
 ];
 for (const f of requiredFiles) {
   assert(fs.existsSync(path.join(__dirname, '..', f)), `File exists: ${f}`);
@@ -126,7 +127,8 @@ const smokes = [
   'smoke_phase129d_controlled_beta_activation_access_limits.js',
   'smoke_phase129e_controlled_beta_activation_kill_switch_incident.js',
   'smoke_phase129f_controlled_beta_activation_admin_api_ui.js',
-  'smoke_phase129g_controlled_beta_activation_evidence_pack.js'
+  'smoke_phase129g_controlled_beta_activation_evidence_pack.js',
+  'smoke_phase129_0_1_controlled_beta_readiness_repair.js'
 ];
 
 function runScript(scriptName) {

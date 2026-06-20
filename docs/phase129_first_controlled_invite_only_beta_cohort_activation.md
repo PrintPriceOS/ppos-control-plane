@@ -32,15 +32,15 @@ Migration 076 defines 11 tables backing the controlled activation state:
 
 ## Service Layer (`ControlledBetaCohortActivationService`)
 The service layer exposes 25 governance methods, including:
-- `evaluateControlledCohortActivationReadiness()`: Checks for migration 075 (Phase 128.1), restart drill recovery matching, and limited beta preparation gate evidence.
-- `activateControlledCohort()`: Enables scoped runtime access.
+- `evaluateControlledCohortActivationReadiness()`: Performs a rigorous 19-point check before allowing activation. This includes verifying Phase 128.1 and 127.1 production evidence, binding status (gate, cohort, tenant), approved participants, scoped allowed features, defined session limits, configured monitoring, provisions for support/rollback, active kill switches, and enforcing all safety invariants. Returns `BLOCKED` with detailed reasons if any prerequisite is unmet.
+- `activateControlledCohort()`: Enables scoped runtime access if readiness is `READY`.
 - `pauseControlledCohort()`: Pauses cohort activation.
 - `recordActivationIncidentEvent()`: Auto-pauses on critical/blocker incidents.
 - `triggerActivationKillSwitch()`: Admin kill-switch trigger that pauses cohort execution.
 - `buildControlledActivationEvidencePack()`: Signs the current activation evidence with SHA-256.
 
 ## Verification & Acceptance Smoke Tests
-Eight automated smoke tests validate this module:
+Nine automated smoke tests validate this module:
 1. `smoke_phase129a_controlled_beta_activation_schema.js` (Checks schema/tables/columns)
 2. `smoke_phase129b_controlled_beta_activation_service.js` (Checks service methods)
 3. `smoke_phase129c_controlled_beta_activation_readiness.js` (Checks readiness block/go criteria)
@@ -48,4 +48,5 @@ Eight automated smoke tests validate this module:
 5. `smoke_phase129e_controlled_beta_activation_kill_switch_incident.js` (Checks kill-switch and auto-pausing)
 6. `smoke_phase129f_controlled_beta_activation_admin_api_ui.js` (Checks router endpoints)
 7. `smoke_phase129g_controlled_beta_activation_evidence_pack.js` (Checks evidence pack integrity)
-8. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)
+8. `smoke_phase129_0_1_controlled_beta_readiness_repair.js` (Regression checks for full 19-point readiness structure repair)
+9. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)

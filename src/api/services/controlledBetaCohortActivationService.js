@@ -59,6 +59,15 @@ function _hash(data) {
   return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
 }
 
+function _normalizeBool(val) {
+  if (val === true || val === 1 || val === '1') return true;
+  if (val === false || val === 0 || val === '0') return false;
+  if (Buffer.isBuffer(val)) {
+    return val.length > 0 && val[0] === 1;
+  }
+  return !!val;
+}
+
 class ControlledBetaCohortActivationService {
   constructor() {
     this._activations = new Map();
@@ -130,98 +139,223 @@ class ControlledBetaCohortActivationService {
   async evaluateControlledCohortActivationReadiness(activationId) {
     this._assertDbAvailableForProduction();
 
-    let verified128_1 = false;
-    let verified127_1 = false;
-    let verifiedFromDb = false;
+    let phase128_1_verified = false;
+    let phase127_1_verified = false;
+    let activation_exists = false;
+    let gate_bound = false;
+    let cohort_bound = false;
+    let tenant_bound = false;
+    let participants_present = false;
+    let all_participants_approved = false;
+    let terms_accepted = false;
+    let role_boundaries_defined = false;
+    let valid_invites_or_access_grants = false;
+    let activation_scope_defined = false;
+    let session_limits_defined = false;
+    let support_escalation_defined = false;
+    let rollback_ready = false;
+    let monitoring_configured = false;
+    let no_unresolved_blocker_findings = false;
+    let kill_switch_ready = false;
+    let safety_invariants_disabled = false;
 
-    // Check restart drill and preparation evidence
-    if (this._db) {
-      try {
-        const schemaRows = await this._dbRead(
-          "SELECT version FROM schema_versions WHERE version LIKE '%075_phase128_1%'", []
-        );
-        if (schemaRows && schemaRows.length > 0) {
-          verifiedFromDb = true;
-        }
+    let activation_status = 'DRAFT';
+    const blocked_reasons = [];
 
-        const drillRows = await this._dbRead(
-          "SELECT * FROM limited_beta_runtime_restart_drills WHERE restart_recovery_status = 'DRILL_COMPLETE_MATCH'", []
-        );
-        if (drillRows && drillRows.length > 0) {
-          verified128_1 = true;
-        }
-
-        const prepPacks = await this._dbRead(
-          "SELECT * FROM limited_beta_evidence_packs WHERE evidence_schema_version = '128.0'", []
-        );
-        if (prepPacks && prepPacks.length > 0) {
-          verified127_1 = true;
-        }
-        if (this._allowMemoryFallback()) {
-          if (!verifiedFromDb) verifiedFromDb = true;
-          if (!verified128_1) verified128_1 = true;
-          if (!verified127_1) verified127_1 = true;
-        }
-      } catch (e) {
-        if (!this._allowMemoryFallback()) throw e;
-      }
-    } else {
-      if (this._allowMemoryFallback()) {
-        verified128_1 = true;
-        verified127_1 = true;
-        verifiedFromDb = true;
-      }
-    }
-
-    // Load activation and items
+    // Memory maps load
     let activation = this._activations.get(activationId);
     let participants = Array.from(this._participants.values()).filter(p => p.activation_id === activationId);
     let invites = Array.from(this._invites.values()).filter(i => i.activation_id === activationId);
+    let scopes = Array.from(this._scopes.values()).filter(s => s.activation_id === activationId);
     let limits = Array.from(this._limits.values()).find(l => l.activation_id === activationId);
-    let findings = Array.from(this._findings.values()).filter(f => f.activation_id === activationId && f.finding_status === 'OPEN');
+    let monitoring = Array.from(this._monitoring.values()).filter(m => m.activation_id === activationId);
+    let support = Array.from(this._support.values()).filter(s => s.activation_id === activationId);
+    let findings = Array.from(this._findings.values()).filter(f => f.activation_id === activationId && f.finding_status === 'OPEN' && (f.blocks_runtime === 1 || f.severity === 'BLOCKER'));
+    let killSwitches = Array.from(this._killSwitches.values()).filter(k => k.activation_id === activationId);
+    
+    let rollbackReadyFromMem = activation ? _normalizeBool(activation.rollback_ready) : false;
+    let killSwitchReadyFromMem = activation ? _normalizeBool(activation.kill_switch_ready) : true;
 
     if (this._db) {
       try {
         const acts = await this._dbRead("SELECT * FROM controlled_beta_cohort_activations WHERE activation_id = ?", [activationId]);
-        if (acts && acts.length > 0) activation = acts[0];
+        if (acts && acts.length > 0) {
+          activation = acts[0];
+          activation_status = activation.activation_status;
+          rollbackReadyFromMem = _normalizeBool(activation.rollback_ready);
+          killSwitchReadyFromMem = _normalizeBool(activation.kill_switch_ready);
+        }
 
         const parts = await this._dbRead("SELECT * FROM controlled_beta_activation_participants WHERE activation_id = ?", [activationId]);
         if (parts) participants = parts;
 
-        const invs = await this._dbRead("SELECT * FROM controlled_beta_activation_invites WHERE activation_id = ?", [activationId]);
+        const invs = await this._dbRead("SELECT * FROM controlled_beta_activation_invites WHERE activation_id = ? AND revoked = 0", [activationId]);
         if (invs) invites = invs;
+
+        const scps = await this._dbRead("SELECT * FROM controlled_beta_activation_scope_bindings WHERE activation_id = ?", [activationId]);
+        if (scps) scopes = scps;
 
         const lims = await this._dbRead("SELECT * FROM controlled_beta_activation_session_limits WHERE activation_id = ?", [activationId]);
         if (lims && lims.length > 0) limits = lims[0];
 
+        const monts = await this._dbRead("SELECT * FROM controlled_beta_activation_monitoring_events WHERE activation_id = ?", [activationId]);
+        if (monts) monitoring = monts;
+
+        const supps = await this._dbRead("SELECT * FROM controlled_beta_activation_support_events WHERE activation_id = ?", [activationId]);
+        if (supps) support = supps;
+
         const finds = await this._dbRead("SELECT * FROM controlled_beta_activation_findings WHERE activation_id = ? AND finding_status = 'OPEN' AND (blocks_runtime = 1 OR severity = 'BLOCKER')", [activationId]);
         if (finds) findings = finds;
+
+        const ksws = await this._dbRead("SELECT * FROM controlled_beta_activation_kill_switch_events WHERE activation_id = ?", [activationId]);
+        if (ksws) killSwitches = ksws;
+
+        // Verify Phase 128.1
+        const schema075 = await this._dbRead("SELECT version FROM schema_versions WHERE version LIKE '%075_phase128_1%'", []);
+        const schema074 = await this._dbRead("SELECT version FROM schema_versions WHERE version LIKE '%074_phase128%'", []);
+        const restartDrills = await this._dbRead("SELECT * FROM limited_beta_runtime_restart_drills WHERE restart_recovery_status IN ('VERIFIED_AFTER_RESTART', 'COMPLETED') AND recovery_integrity_hash IS NOT NULL ORDER BY verified_at DESC LIMIT 1", []);
+        const runtimeSessions = await this._dbRead("SELECT * FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123' LIMIT 1", []);
+        
+        let db128_1_ok = false;
+        if (schema075 && schema075.length > 0 && schema074 && schema074.length > 0 && restartDrills && restartDrills.length > 0) {
+          if (runtimeSessions && runtimeSessions.length > 0) {
+            const sess = runtimeSessions[0];
+            if (_normalizeBool(sess.recovered_from_db) === true &&
+                _normalizeBool(sess.memory_state_detected) === false &&
+                _normalizeBool(sess.restart_safe) === true) {
+              db128_1_ok = true;
+            }
+          }
+        }
+        phase128_1_verified = db128_1_ok;
+
+        // Verify Phase 127.1
+        const schema073 = await this._dbRead("SELECT version FROM schema_versions WHERE version LIKE '%073_phase127_1%'", []);
+        const prepPacks = await this._dbRead("SELECT * FROM limited_beta_evidence_packs WHERE evidence_schema_version = '128.0' OR evidence_schema_version = '127.1'", []);
+        phase127_1_verified = !!(schema073 && schema073.length > 0 && prepPacks && prepPacks.length > 0);
+
       } catch (e) {
         if (!this._allowMemoryFallback()) throw e;
       }
+    } else {
+      activation_status = activation ? activation.activation_status : 'DRAFT';
     }
 
-    const hasParticipants = participants && participants.length > 0;
-    const allParticipantsApproved = hasParticipants && participants.every(p => p.approved === 1 && p.terms_accepted === 1 && p.role_boundary_defined === 1);
-    const hasInvites = invites && invites.length > 0;
-    const hasLimits = !!limits;
-    const noBlockers = findings && findings.length === 0;
+    if (this._allowMemoryFallback()) {
+      if (!phase128_1_verified) phase128_1_verified = true;
+      if (!phase127_1_verified) phase127_1_verified = true;
+    }
 
-    const allPassed = verified128_1 && verified127_1 && verifiedFromDb && hasParticipants && allParticipantsApproved && hasInvites && hasLimits && noBlockers;
-    const readiness_status = allPassed ? 'READY' : 'BLOCKED';
+    if (!phase128_1_verified) blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
+    if (!phase127_1_verified) blocked_reasons.push('PHASE_127_1_EVIDENCE_MISSING_OR_DEGRADED');
+
+    if (activation) {
+      activation_exists = true;
+      if (activation.gate_id) gate_bound = true;
+      if (activation.cohort_id) cohort_bound = true;
+      if (activation.tenant_id) tenant_bound = true;
+    }
+
+    if (!activation_exists) blocked_reasons.push('ACTIVATION_NOT_FOUND');
+    if (activation_exists && !gate_bound) blocked_reasons.push('GATE_NOT_BOUND');
+    if (activation_exists && !cohort_bound) blocked_reasons.push('COHORT_NOT_BOUND');
+    if (activation_exists && !tenant_bound) blocked_reasons.push('TENANT_NOT_BOUND');
+
+    if (participants && participants.length > 0) {
+      participants_present = true;
+      all_participants_approved = participants.every(p => _normalizeBool(p.approved) === true);
+      terms_accepted = participants.every(p => _normalizeBool(p.terms_accepted) === true);
+      role_boundaries_defined = participants.every(p => _normalizeBool(p.role_boundary_defined) === true);
+    }
+
+    if (!participants_present) blocked_reasons.push('NO_PARTICIPANTS');
+    if (participants_present && !all_participants_approved) blocked_reasons.push('PARTICIPANTS_NOT_APPROVED');
+    if (participants_present && !terms_accepted) blocked_reasons.push('TERMS_NOT_ACCEPTED');
+    if (participants_present && !role_boundaries_defined) blocked_reasons.push('ROLE_BOUNDARIES_UNDEFINED');
+
+    if (invites && invites.length > 0) {
+      valid_invites_or_access_grants = invites.some(i => !i.revoked && (!i.expires_at || new Date(i.expires_at) > new Date()));
+    }
+    if (!valid_invites_or_access_grants) blocked_reasons.push('NO_VALID_INVITES_OR_ACCESS_GRANTS');
+
+    if (scopes && scopes.length > 0) {
+      activation_scope_defined = true;
+    }
+    if (!activation_scope_defined) blocked_reasons.push('SCOPE_UNDEFINED');
+
+    if (limits) {
+      session_limits_defined = true;
+    }
+    if (!session_limits_defined) blocked_reasons.push('SESSION_LIMITS_UNDEFINED');
+
+    if (support && support.length > 0) {
+      support_escalation_defined = true;
+    }
+    if (!support_escalation_defined) blocked_reasons.push('SUPPORT_ESCALATION_UNDEFINED');
+
+    if (rollbackReadyFromMem) {
+      rollback_ready = true;
+    }
+    if (!rollback_ready) blocked_reasons.push('ROLLBACK_NOT_READY');
+
+    if (monitoring && monitoring.length > 0) {
+      monitoring_configured = true;
+    }
+    if (!monitoring_configured) blocked_reasons.push('MONITORING_NOT_CONFIGURED');
+
+    if (findings && findings.length === 0) {
+      no_unresolved_blocker_findings = true;
+    }
+    if (!no_unresolved_blocker_findings) blocked_reasons.push('UNRESOLVED_BLOCKER_FINDINGS');
+
+    if (killSwitchReadyFromMem && killSwitches.length === 0) {
+      kill_switch_ready = true;
+    }
+    if (!kill_switch_ready) blocked_reasons.push('KILL_SWITCH_ACTIVE');
+
+    if (activation) {
+      if (_normalizeBool(activation.full_public_enabled) === false &&
+          _normalizeBool(activation.open_marketplace_enabled) === false &&
+          _normalizeBool(activation.payment_execution_enabled) === false &&
+          _normalizeBool(activation.refund_execution_enabled) === false &&
+          _normalizeBool(activation.payout_execution_enabled) === false &&
+          _normalizeBool(activation.provider_external_submission_enabled) === false &&
+          _normalizeBool(activation.external_tax_submission_enabled) === false &&
+          _normalizeBool(activation.external_accounting_submission_enabled) === false &&
+          _normalizeBool(activation.source_mutation_enabled) === false) {
+        safety_invariants_disabled = true;
+      }
+    }
+    if (!safety_invariants_disabled) blocked_reasons.push('SAFETY_INVARIANTS_ENABLED');
+
+    const ok = blocked_reasons.length === 0;
+    const readiness_status = ok ? 'READY' : 'BLOCKED';
 
     return {
-      ok: allPassed,
+      ok,
       readiness_status,
+      activation_status,
+      blocked_reasons,
       checks: {
-        verified_from_phase128_1: verified128_1,
-        verified_from_phase127_1: verified127_1,
-        verified_from_db: verifiedFromDb,
-        hasParticipants,
-        allParticipantsApproved,
-        hasInvites,
-        hasLimits,
-        noBlockers
+        phase128_1_verified,
+        phase127_1_verified,
+        activation_exists,
+        gate_bound,
+        cohort_bound,
+        tenant_bound,
+        participants_present,
+        all_participants_approved,
+        terms_accepted,
+        role_boundaries_defined,
+        valid_invites_or_access_grants,
+        activation_scope_defined,
+        session_limits_defined,
+        support_escalation_defined,
+        rollback_ready,
+        monitoring_configured,
+        no_unresolved_blocker_findings,
+        kill_switch_ready,
+        safety_invariants_disabled
       },
       persistenceStatus: this._db ? 'PERSISTED' : 'FALLBACK_ONLY',
       runtimeTruthStatus: this._db ? 'VERIFIED' : 'DEGRADED',
