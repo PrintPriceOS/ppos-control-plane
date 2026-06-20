@@ -152,9 +152,36 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
     }
   };
 
-  const setupGate = async (prepId, revId, actId, runId) => {
+  const insertExpansionPreparationGateAdaptive = async (prepId, revId, actId, runId) => {
     if (isProdLike) {
-      await db.query("INSERT INTO controlled_beta_expansion_preparation_gates (preparation_id, review_id, decision_id, activation_id, gate_id, cohort_id, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?)", [prepId, revId, `${runId}_dec`, actId, `${runId}_gate`, `${runId}_cohort`, `${runId}_tenant`]);
+      const cols = await getTableColumns('controlled_beta_expansion_preparation_gates');
+      const row = {};
+      if (cols.includes('preparation_id')) row.preparation_id = prepId;
+      if (cols.includes('review_id')) row.review_id = revId;
+      if (cols.includes('decision_id')) row.decision_id = `${runId}_dec`;
+      if (cols.includes('activation_id')) row.activation_id = actId;
+      if (cols.includes('gate_id')) row.gate_id = `${runId}_gate`;
+      if (cols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
+      if (cols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
+
+      if (cols.includes('preparation_status')) row.preparation_status = 'PREPARATION_OPEN';
+      else if (cols.includes('gate_status')) row.gate_status = 'OPEN';
+      else if (cols.includes('status')) row.status = 'DRAFT';
+
+      if (cols.includes('invite_only')) row.invite_only = 1;
+      if (cols.includes('cohort_scoped')) row.cohort_scoped = 1;
+      if (cols.includes('tenant_scoped')) row.tenant_scoped = 1;
+      if (cols.includes('participant_scoped')) row.participant_scoped = 1;
+      if (cols.includes('manual_approval_required')) row.manual_approval_required = 1;
+      
+      if (cols.includes('auto_expansion_enabled')) row.auto_expansion_enabled = 0;
+      if (cols.includes('invite_sending_enabled')) row.invite_sending_enabled = 0;
+      if (cols.includes('active_invite_creation_enabled')) row.active_invite_creation_enabled = 0;
+      if (cols.includes('participant_auto_add_enabled')) row.participant_auto_add_enabled = 0;
+      if (cols.includes('scope_auto_broaden_enabled')) row.scope_auto_broaden_enabled = 0;
+
+      const { q, vals } = await buildInsertForExistingColumns('controlled_beta_expansion_preparation_gates', row);
+      await db.query(q, vals);
     } else {
       svc.setMockState('gates', prepId, { activation_id: actId, manual_approval_required: 1, invite_only: 1 });
     }
@@ -201,9 +228,18 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   await cleanupFixtureRows(runId);
 
+  // Test 0: missing gate
+  await runTest('missing expansion preparation gate', async () => {
+    // Deliberately do not insert gate
+  }, async () => {
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_gate`, `${runId}_rev_missing_gate`);
+    assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when gate is missing');
+    assert(read.blocked_reasons.includes('PREPARATION_NOT_FOUND'), 'readiness BLOCKED with PREPARATION_NOT_FOUND');
+  });
+
   // Test 1: approved Phase 131 decision missing
   await runTest('approved Phase 131 decision missing', async () => {
-    await setupGate(`${runId}_prep_missing_131`, `${runId}_rev_1`, `${runId}_act_1`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_131`, `${runId}_rev_1`, `${runId}_act_1`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_1`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_1`);
     await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_131`);
@@ -215,7 +251,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 1b: Phase 131 decision missing hash
   await runTest('Phase 131 decision present but hash missing', async () => {
-    await setupGate(`${runId}_prep_missing_hash`, `${runId}_rev_1b`, `${runId}_act_1b`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_hash`, `${runId}_rev_1b`, `${runId}_act_1b`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_1b`, `${runId}_act_1b`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     // Deliberately do not insert Phase 131 evidence pack hash
     await insertPhase130EvidenceAdaptive(`${runId}_act_1b`);
@@ -229,7 +265,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 2: Phase 130 evidence missing
   await runTest('Phase 130 evidence missing', async () => {
-    await setupGate(`${runId}_prep_missing_130`, `${runId}_rev_2`, `${runId}_act_2`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_130`, `${runId}_rev_2`, `${runId}_act_2`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_2`, `${runId}_act_2`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_2`, `${runId}_act_2`, runId);
     await insertPhase129EvidenceAdaptive(`${runId}_act_2`);
@@ -242,7 +278,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 3: Phase 129 evidence missing
   await runTest('Phase 129 evidence missing', async () => {
-    await setupGate(`${runId}_prep_missing_129`, `${runId}_rev_3`, `${runId}_act_3`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_129`, `${runId}_rev_3`, `${runId}_act_3`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_3`, `${runId}_act_3`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_3`, `${runId}_act_3`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_3`);
@@ -255,7 +291,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 4: Phase 128.1 evidence missing
   await runTest('Phase 128.1 evidence missing', async () => {
-    await setupGate(`${runId}_prep_missing_128`, `${runId}_rev_4`, `${runId}_act_4`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_128`, `${runId}_rev_4`, `${runId}_act_4`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_4`, `${runId}_act_4`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_4`, `${runId}_act_4`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_4`);
@@ -269,7 +305,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 5: Phase 131 decision exists but does not allow expansion
   await runTest('Phase 131 bad decision', async () => {
-    await setupGate(`${runId}_prep_bad_decision`, `${runId}_rev_5`, `${runId}_act_5`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_bad_decision`, `${runId}_rev_5`, `${runId}_act_5`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_5`, `${runId}_act_5`, 'APPROVED', 'REJECT_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_5`, `${runId}_act_5`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_5`);
@@ -283,7 +319,7 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   // Test 6: Positive readiness
   await runTest('Full Readiness', async () => {
-    await setupGate(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
+    await insertExpansionPreparationGateAdaptive(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
     await insertPhase131DecisionAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_ready`);

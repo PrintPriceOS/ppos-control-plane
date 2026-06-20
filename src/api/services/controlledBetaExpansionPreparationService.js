@@ -35,6 +35,32 @@ class ControlledBetaExpansionPreparationService {
     return desiredColumns.filter(c => cols.includes(c));
   }
 
+  async findExpansionPreparationGateAdaptive(preparationId, reviewId) {
+    const tableName = 'controlled_beta_expansion_preparation_gates';
+    const cols = await this.getTableColumns(tableName);
+    if (cols.length === 0) return null;
+
+    let q = `SELECT * FROM ${tableName} WHERE 1=1`;
+    const vals = [];
+    let mapped = false;
+
+    if (cols.includes('preparation_id') && preparationId) {
+      q += ' AND preparation_id = ?';
+      vals.push(preparationId);
+      mapped = true;
+    } else if (cols.includes('review_id') && reviewId) {
+      q += ' AND review_id = ?';
+      vals.push(reviewId);
+      mapped = true;
+    }
+    
+    if (mapped) {
+      const rows = await db.query(q, vals);
+      if (rows && rows.length > 0) return rows[0];
+    }
+    return null;
+  }
+
   async findApprovedPhase131DecisionAdaptive(reviewId, activationId) {
     const tableName = 'controlled_beta_operational_exit_decisions';
     const cols = await this.getTableColumns(tableName);
@@ -245,12 +271,13 @@ class ControlledBetaExpansionPreparationService {
         phase129Packs = this._mockState.phase129.get(p.activation_id) || [];
         phase128Packs = this._mockState.phase128_1.get('default') || [];
       } else {
-        const q = "SELECT activation_id, gate_id, cohort_id, tenant_id, preparation_status, manual_approval_required, auto_expansion_enabled, invite_sending_enabled, active_invite_creation_enabled, participant_auto_add_enabled, scope_auto_broaden_enabled, full_public_enabled, open_marketplace_enabled, public_beta_enabled FROM controlled_beta_expansion_preparation_gates WHERE preparation_id = ? AND review_id = ?";
-        const rows = await db.query(q, [preparationId, reviewId]);
-        if (rows && rows.length > 0) {
-          const p = rows[0];
+        p = await this.findExpansionPreparationGateAdaptive(preparationId, reviewId);
+        
+        if (p) {
+          // If gate exists, fall back to activation ID parsing or generic fallback if missing
+          const actId = p.activation_id || 'act_fallback';
           
-          phase131Decisions = await this.findApprovedPhase131DecisionAdaptive(reviewId, p.activation_id);
+          phase131Decisions = await this.findApprovedPhase131DecisionAdaptive(reviewId, actId);
           
           // Attach hash from fallback tables if missing
           if (phase131Decisions && phase131Decisions.length > 0) {
@@ -258,7 +285,7 @@ class ControlledBetaExpansionPreparationService {
               if (!d.evidence_integrity_hash) {
                 d.evidence_integrity_hash = await this.findPhase131DecisionEvidenceHashAdaptive({
                   reviewId: reviewId,
-                  activationId: p.activation_id,
+                  activationId: actId,
                   decisionId: d.decision_id
                 });
               }
@@ -266,10 +293,10 @@ class ControlledBetaExpansionPreparationService {
           }
           
           const phase130Query = "SELECT evidence_integrity_hash FROM controlled_beta_runtime_monitoring_evidence_packs WHERE activation_id = ?";
-          phase130Packs = await db.query(phase130Query, [p.activation_id]);
+          phase130Packs = await db.query(phase130Query, [actId]);
           
           const phase129Query = "SELECT evidence_integrity_hash FROM controlled_beta_activation_evidence_packs WHERE activation_id = ?";
-          phase129Packs = await db.query(phase129Query, [p.activation_id]);
+          phase129Packs = await db.query(phase129Query, [actId]);
           
           phase128Packs = await this.findPhase128RestartEvidenceAdaptive({});
         }
