@@ -129,23 +129,60 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
       if (cols.length === 0) return;
       const row = {};
       const payload = {
-         recovered_from_db: 1,
-         memory_state_detected: 0,
-         restart_safe: 1,
-         status: 'VERIFIED_AFTER_RESTART',
-         hash: 'hash',
-         preparation_id: prepId,
-         review_id: revId,
-         decision_id: `${runId}_dec`,
-         activation_id: actId,
-         gate_id: `${runId}_gate`,
-         cohort_id: `${runId}_cohort`,
-         tenant_id: `${runId}_tenant`
+        restart_recovery_status: 'VERIFIED_AFTER_RESTART',
+        recovered_from_db: true,
+        db_recovered: true,
+        persistence_recovered: true,
+        memory_state_detected: false,
+        memory_fallback_detected: false,
+        restart_safe: true,
+        recovery_safe: true,
+        restart_recovery_safe: true,
+        recovery_integrity_hash: 'hash',
+        evidence_integrity_hash: 'hash',
+        context: {
+          preparation_id: prepId,
+          review_id: revId,
+          decision_id: `${runId}_dec`,
+          activation_id: actId,
+          gate_id: `${runId}_gate`,
+          cohort_id: `${runId}_cohort`,
+          tenant_id: `${runId}_tenant`
+        },
+        restart: {
+          restart_recovery_status: 'VERIFIED_AFTER_RESTART',
+          recovered_from_db: true,
+          db_recovered: true,
+          persistence_recovered: true,
+          memory_state_detected: false,
+          memory_fallback_detected: false,
+          restart_safe: true,
+          recovery_safe: true,
+          restart_recovery_safe: true,
+          recovery_integrity_hash: 'hash'
+        },
+        recovery: {
+          restart_recovery_status: 'VERIFIED_AFTER_RESTART',
+          recovered_from_db: true,
+          db_recovered: true,
+          persistence_recovered: true,
+          memory_state_detected: false,
+          memory_fallback_detected: false,
+          restart_safe: true,
+          recovery_safe: true,
+          restart_recovery_safe: true,
+          recovery_integrity_hash: 'hash'
+        }
       };
       
       if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; }
+      if (cols.includes('db_recovered')) { row.db_recovered = 1; }
+      if (cols.includes('persistence_recovered')) { row.persistence_recovered = 1; }
       if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; }
+      if (cols.includes('memory_fallback_detected')) { row.memory_fallback_detected = 0; }
       if (cols.includes('restart_safe')) { row.restart_safe = 1; }
+      if (cols.includes('recovery_safe')) { row.recovery_safe = 1; }
+      if (cols.includes('restart_recovery_safe')) { row.restart_recovery_safe = 1; }
       
       const idCols = ['drill_id', 'restart_drill_id', 'id', 'marker'];
       for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = prepId + '_drill'; }
@@ -163,7 +200,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
       if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; }
 
       const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload'].find(c => cols.includes(c));
-      if (payloadCol && Object.keys(payload).length > 0) {
+      if (payloadCol) {
          row[payloadCol] = JSON.stringify(payload);
       }
 
@@ -182,11 +219,11 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
         inserted_columns: Object.keys(row),
         inserted_payload_keys: payloadCol ? Object.keys(payload) : [],
         context_used: { activation_id: actId, gate_id: `${runId}_gate`, cohort_id: `${runId}_cohort`, tenant_id: `${runId}_tenant`, preparation_id: prepId, review_id: revId, decision_id: `${runId}_dec` },
-        status_signal_written: !!(row.restart_recovery_status || row.recovery_status || row.status || (payloadCol && payload.status)),
-        recovered_from_db_written: !!(row.recovered_from_db || (payloadCol && payload.recovered_from_db)),
-        memory_state_detected_written: !!(('memory_state_detected' in row) || (payloadCol && ('memory_state_detected' in payload))),
-        restart_safe_written: !!(row.restart_safe || (payloadCol && payload.restart_safe)),
-        hash_written: !!(row.recovery_integrity_hash || row.evidence_integrity_hash || (payloadCol && payload.hash))
+        status_signal_written: !!(row.restart_recovery_status || row.recovery_status || row.status || (payloadCol && (payload.status || payload.restart_recovery_status))),
+        recovered_from_db_written: !!(row.recovered_from_db || row.db_recovered || row.persistence_recovered || (payloadCol && (payload.recovered_from_db || payload.db_recovered || payload.persistence_recovered))),
+        memory_state_detected_written: !!(('memory_state_detected' in row) || ('memory_fallback_detected' in row) || (payloadCol && (('memory_state_detected' in payload) || ('memory_fallback_detected' in payload)))),
+        restart_safe_written: !!(row.restart_safe || row.recovery_safe || row.restart_recovery_safe || (payloadCol && (payload.restart_safe || payload.recovery_safe || payload.restart_recovery_safe))),
+        hash_written: !!(row.recovery_integrity_hash || row.evidence_integrity_hash || row.integrity_hash || (payloadCol && (payload.recovery_integrity_hash || payload.evidence_integrity_hash || payload.integrity_hash)))
       };
     } else {
       svc.setMockState('phase128_1', 'default', [{ restart_safe: 1, recovered_from_db: 1, memory_state_detected: 0 }]);

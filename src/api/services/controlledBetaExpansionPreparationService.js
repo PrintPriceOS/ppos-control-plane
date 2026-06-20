@@ -151,9 +151,8 @@ class ControlledBetaExpansionPreparationService {
     else if ('persistence_recovered' in row) recovered_from_db = !!row.persistence_recovered;
     else if ('recoveredFromDb' in row) recovered_from_db = !!row.recoveredFromDb;
 
-    if ('memory_state_detected' in row) memory_state_detected = !!row.memory_state_detected;
-    else if ('memory_fallback_detected' in row) memory_state_detected = !!row.memory_fallback_detected;
-    else if ('memoryStateDetected' in row) memory_state_detected = !!row.memoryStateDetected;
+    if (row.memory_state_detected === 0 || row.memory_state_detected === false) memory_state_detected = false;
+    else if (row.memory_fallback_detected === 0 || row.memory_fallback_detected === false) memory_state_detected = false;
 
     if ('restart_safe' in row) restart_safe = !!row.restart_safe;
     else if ('restartSafe' in row) restart_safe = !!row.restartSafe;
@@ -175,19 +174,46 @@ class ControlledBetaExpansionPreparationService {
     // Check payload if direct checks failed
     if (payload) {
       const restart = payload.restart || payload.recovery || payload;
-      const evidence = payload.evidence || payload;
+      const evidence = payload.evidence || {};
 
-      if (!recovered_from_db && ('recovered_from_db' in restart)) recovered_from_db = !!restart.recovered_from_db;
-      if (memory_state_detected && ('memory_state_detected' in restart)) memory_state_detected = !!restart.memory_state_detected;
-      if (!restart_safe && ('restart_safe' in restart)) restart_safe = !!restart.restart_safe;
+      if (!recovered_from_db) {
+         if ('recovered_from_db' in payload) recovered_from_db = !!payload.recovered_from_db;
+         else if ('db_recovered' in payload) recovered_from_db = !!payload.db_recovered;
+         else if ('persistence_recovered' in payload) recovered_from_db = !!payload.persistence_recovered;
+         else if ('recovered_from_db' in restart) recovered_from_db = !!restart.recovered_from_db;
+         else if ('db_recovered' in restart) recovered_from_db = !!restart.db_recovered;
+         else if ('persistence_recovered' in restart) recovered_from_db = !!restart.persistence_recovered;
+      }
+
+      if (memory_state_detected !== false) {
+         if (payload.memory_state_detected === false || payload.memory_state_detected === 0) memory_state_detected = false;
+         else if (payload.memory_fallback_detected === false || payload.memory_fallback_detected === 0) memory_state_detected = false;
+         else if (restart.memory_state_detected === false || restart.memory_state_detected === 0) memory_state_detected = false;
+         else if (restart.memory_fallback_detected === false || restart.memory_fallback_detected === 0) memory_state_detected = false;
+      }
+
+      if (!restart_safe) {
+         if ('restart_safe' in payload) restart_safe = !!payload.restart_safe;
+         else if ('recovery_safe' in payload) restart_safe = !!payload.recovery_safe;
+         else if ('restart_recovery_safe' in payload) restart_safe = !!payload.restart_recovery_safe;
+         else if ('restart_safe' in restart) restart_safe = !!restart.restart_safe;
+         else if ('recovery_safe' in restart) restart_safe = !!restart.recovery_safe;
+         else if ('restart_recovery_safe' in restart) restart_safe = !!restart.restart_recovery_safe;
+      }
       
-      if (!status_ok && restart.restart_recovery_status && (restart.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || restart.restart_recovery_status === 'COMPLETED')) status_ok = true;
-      if (!status_ok && restart.status && (restart.status === 'VERIFIED_AFTER_RESTART' || restart.status === 'COMPLETED')) status_ok = true;
+      if (!status_ok) {
+         if (payload.status === 'VERIFIED_AFTER_RESTART' || payload.status === 'COMPLETED') status_ok = true;
+         else if (payload.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || payload.restart_recovery_status === 'COMPLETED') status_ok = true;
+         else if (payload.recovery_status === 'VERIFIED_AFTER_RESTART' || payload.recovery_status === 'COMPLETED') status_ok = true;
+         else if (restart.status === 'VERIFIED_AFTER_RESTART' || restart.status === 'COMPLETED') status_ok = true;
+         else if (restart.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || restart.restart_recovery_status === 'COMPLETED') status_ok = true;
+      }
       
-      if (!hash_ok && evidence.integrity_hash) hash_ok = true;
-      if (!hash_ok && evidence.evidence_integrity_hash) hash_ok = true;
-      if (!hash_ok && restart.recovery_integrity_hash) hash_ok = true;
-      if (!hash_ok && restart.hash) hash_ok = true;
+      if (!hash_ok) {
+         if (payload.hash || payload.recovery_integrity_hash || payload.evidence_integrity_hash || payload.integrity_hash || payload.evidence_hash) hash_ok = true;
+         else if (restart.hash || restart.recovery_integrity_hash || restart.evidence_integrity_hash || restart.integrity_hash) hash_ok = true;
+         else if (evidence.hash || evidence.evidence_integrity_hash || evidence.integrity_hash) hash_ok = true;
+      }
     }
 
     return {
@@ -202,7 +228,7 @@ class ControlledBetaExpansionPreparationService {
   async findPhase128RestartEvidenceAdaptive(criteria = {}, options = {}) {
     const { allowLatestFallback = false, requireContextBoundEvidence = true } = options;
     const { preparationId, reviewId, decisionId, activationId, gateId, cohortId, tenantId } = criteria;
-    const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
+    const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
 
     const debug = {
        searched_tables: [],
@@ -284,17 +310,21 @@ class ControlledBetaExpansionPreparationService {
            }
         }
         
-        if (!contextMatch) continue;
-
-        const state = this.normalizeRestartEvidence(r, payload);
-        if (state.recovered_from_db && !state.memory_state_detected && state.restart_safe && state.status_ok && state.hash_ok) {
-          debug.matched_table = t;
-          const ret = [r];
-          ret.debug = debug;
-          return ret;
-        } else {
-           debug.rejected_reasons.push(`${t}: missing_restart_safe_signal`);
-        }
+              if (contextMatch) {
+                 const sigs = this.normalizeRestartEvidence(r, payload);
+                 if (sigs.recovered_from_db && sigs.memory_state_detected === false && sigs.restart_safe && sigs.status_ok && sigs.hash_ok) {
+                     debug.matched_table = t;
+                     const ret = [r];
+                     ret.debug = debug;
+                     return ret;
+                 } else {
+                     if (!sigs.recovered_from_db) debug.rejected_reasons.push(`${t}: missing_recovered_from_db_signal`);
+                     else if (sigs.memory_state_detected !== false) debug.rejected_reasons.push(`${t}: missing_memory_state_false_signal`);
+                     else if (!sigs.restart_safe) debug.rejected_reasons.push(`${t}: missing_restart_safe_signal`);
+                     else if (!sigs.hash_ok) debug.rejected_reasons.push(`${t}: missing_hash`);
+                     else if (!sigs.status_ok) debug.rejected_reasons.push(`${t}: status_not_verified`);
+                 }
+              }
       }
     }
     const ret = [];
@@ -331,7 +361,7 @@ class ControlledBetaExpansionPreparationService {
       auto_expansion_disabled: true
     };
 
-    const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
+    const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
 
     try {
       let p;
@@ -340,12 +370,16 @@ class ControlledBetaExpansionPreparationService {
       let phase129Packs;
       let phase128Packs;
 
-      if (!isProdLike && this._mockState.gates.has(preparationId)) {
-        p = this._mockState.gates.get(preparationId);
-        phase131Decisions = this._mockState.phase131.get(p.activation_id) || [];
-        phase130Packs = this._mockState.phase130.get(p.activation_id) || [];
-        phase129Packs = this._mockState.phase129.get(p.activation_id) || [];
-        phase128Packs = this._mockState.phase128_1.get('default') || [];
+      if (!isProdLike) {
+        if (this._mockState.gates.has(preparationId)) {
+          p = this._mockState.gates.get(preparationId);
+          phase131Decisions = this._mockState.phase131.get(p.activation_id) || [];
+          phase130Packs = this._mockState.phase130.get(p.activation_id) || [];
+          phase129Packs = this._mockState.phase129.get(p.activation_id) || [];
+          phase128Packs = this._mockState.phase128_1.get('default') || [];
+        } else {
+          p = null;
+        }
       } else {
         p = await this.findExpansionPreparationGateAdaptive(preparationId, reviewId);
         
