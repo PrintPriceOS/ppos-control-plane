@@ -223,6 +223,7 @@ const controlledBetaRuntimeObservationAdmin = require('./controlledBetaRuntimeOb
 const controlledBetaOperationalReviewAdmin = require('./controlledBetaOperationalReviewAdmin');
 const controlledBetaExpansionPreparationAdmin = require('./controlledBetaExpansionPreparationAdmin');
 const controlledBetaInviteIssuanceAdmin = require('./controlledBetaInviteIssuanceAdmin');
+const controlledBetaInviteAcceptanceAdmin = require('./controlledBetaInviteAcceptanceAdmin');
 
 
 
@@ -237,6 +238,7 @@ router.use('/beta/runtime-observation', controlledBetaRuntimeObservationAdmin);
 router.use('/beta/operational-review', controlledBetaOperationalReviewAdmin);
 router.use('/beta/expansion-preparation', controlledBetaExpansionPreparationAdmin);
 router.use('/beta/invite-issuance', controlledBetaInviteIssuanceAdmin);
+router.use('/beta/invite-acceptance', controlledBetaInviteAcceptanceAdmin);
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
