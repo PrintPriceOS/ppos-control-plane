@@ -17,3 +17,10 @@ This phase governs the transition out of the initial controlled beta cohort, all
 - No automatic execution, automatic invitations, or participant scaling is allowed.
 - Public signup, open marketplace, source mutation, and external payouts remain entirely blocked.
 - Cannot be enabled successfully if any active Kill Switches are discovered.
+
+## Environment Loading
+- DB-backed smokes must self-load dotenv (`require('dotenv').config()`).
+- `131H` aggregator must run DB-backed sub-smokes with dotenv preloaded via `-r dotenv/config`.
+- Production-like mode fails closed when DB config is missing.
+- No memory-only review state may pass production validation.
+- Approval remains recommendation/decision-only and does not execute expansion.

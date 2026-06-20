@@ -1,7 +1,10 @@
 'use strict';
 
+require('dotenv').config();
 const ControlledBetaOperationalReviewService = require('../src/api/services/controlledBetaOperationalReviewService');
 const db = require('../src/api/services/mysqlClient');
+
+const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
 
 let passed = 0;
 let failed = 0;
@@ -14,6 +17,11 @@ function assert(condition, label) {
 console.log('=== Smoke 131D: Exit Criteria Scoring ===\n');
 
 (async () => {
+  if (isProdLike && !process.env.DATABASE_URL && !process.env.MYSQL_HOST) {
+    throw new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
+  }
+  assert(process.env.DATABASE_URL || process.env.MYSQL_HOST || !isProdLike, 'DATABASE_URL or MYSQL_* config is visible before DB service calls');
+
   const svc = new ControlledBetaOperationalReviewService();
   
   const ex = await svc.evaluateExitCriteria('rev_1', 'act_1');

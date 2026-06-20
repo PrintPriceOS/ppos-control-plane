@@ -1,9 +1,12 @@
 'use strict';
 
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const ControlledBetaOperationalReviewService = require('../src/api/services/controlledBetaOperationalReviewService');
 const db = require('../src/api/services/mysqlClient');
+
+const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
 
 let passed = 0;
 let failed = 0;
@@ -16,6 +19,11 @@ function assert(condition, label) {
 console.log('=== Smoke 131B: Operational Review Service ===\n');
 
 (async () => {
+  if (isProdLike && !process.env.DATABASE_URL && !process.env.MYSQL_HOST) {
+    throw new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
+  }
+  assert(process.env.DATABASE_URL || process.env.MYSQL_HOST || !isProdLike, 'DATABASE_URL or MYSQL_* config is visible before DB service calls');
+
   const serviceFile = path.join(__dirname, '../src/api/services/controlledBetaOperationalReviewService.js');
   assert(fs.existsSync(serviceFile), 'service file exists');
 

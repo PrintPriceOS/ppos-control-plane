@@ -21,6 +21,7 @@ const smokes = [
   'smoke_phase131f_operational_review_admin_api_ui.js',
   'smoke_phase131g_operational_review_evidence_pack.js',
   'smoke_phase131_0_1_acceptance_failure_diagnostics.js',
+  'smoke_phase131_0_2_db_env_loading.js',
   'smoke_phase130h_runtime_observation_acceptance_pack.js'
 ];
 
@@ -28,7 +29,7 @@ const failedSmokes = [];
 
 for (const script of smokes) {
   console.log(`Running ${script}...`);
-  const res = spawnSync('node', [`scripts/${script}`], { encoding: 'utf-8' });
+  const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: { ...process.env } });
   
   // Print output so it's still visible
   if (res.stdout) console.log(res.stdout);
