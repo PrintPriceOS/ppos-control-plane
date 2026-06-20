@@ -10,6 +10,10 @@ This phase builds the preparation mechanics to define expansion bounds for an in
 - Evidence hashing tying the preparation pipeline definitively to the Phase 131 decision hash.
 
 ## Governance and Exit Criteria Model
+- **Upstream Evidence Dependency**: Expansion preparation inherently requires:
+  - An explicitly `APPROVED` Phase 131 operational review decision that expressly allows expansion.
+  - Phase 130 runtime observation evidence connected directly to the current activation.
+  - Phase 129 and 128.1 activation/persistence evidence providing foundational context.
 - **Safety**: Decisions must be recorded safely (`invite_sending_enabled` defaults to `0`, `active_invite_creation_enabled` defaults to `0`, `scope_auto_broaden_enabled` defaults to `0`).
 - **Data Integrity**: Enforces strict `DRAFT` status rules on created expansion bounds and candidates. Uses `INFORMATION_SCHEMA` and `schema_versions` checks natively.
 - **Decision Engine**: No decision actually initiates expansion or configuration changes. Approval simply signals "Expansion Bound Prepared", meaning later execution tasks have a strictly calculated roadmap authorized by Phase 131.

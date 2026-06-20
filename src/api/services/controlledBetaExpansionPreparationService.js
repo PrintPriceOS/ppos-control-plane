@@ -6,6 +6,17 @@ const db = require('./mysqlClient');
 class ControlledBetaExpansionPreparationService {
   constructor() {
     this.schemaVersion = '132.0';
+    this._mockState = {
+      gates: new Map(),
+      phase131: new Map(),
+      phase130: new Map(),
+      phase129: new Map(),
+      phase128_1: new Map()
+    };
+  }
+
+  setMockState(type, id, data) {
+    this._mockState[type].set(id, data);
   }
 
   async evaluateExpansionPreparationReadiness(preparationId, reviewId) {
@@ -37,14 +48,50 @@ class ControlledBetaExpansionPreparationService {
       auto_expansion_disabled: true
     };
 
+    const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
+
     try {
-      const q = "SELECT preparation_status, manual_approval_required, auto_expansion_enabled, invite_sending_enabled, active_invite_creation_enabled, participant_auto_add_enabled, scope_auto_broaden_enabled, full_public_enabled, open_marketplace_enabled, public_beta_enabled FROM controlled_beta_expansion_preparation_gates WHERE preparation_id = ?";
-      const rows = await db.query(q, [preparationId]);
-      if (!rows || rows.length === 0) {
+      let p;
+      let phase131Decisions;
+      let phase130Packs;
+      let phase129Packs;
+      let phase128Packs;
+
+      if (!isProdLike && this._mockState.gates.has(preparationId)) {
+        p = this._mockState.gates.get(preparationId);
+        phase131Decisions = this._mockState.phase131.get(p.activation_id) || [];
+        phase130Packs = this._mockState.phase130.get(p.activation_id) || [];
+        phase129Packs = this._mockState.phase129.get(p.activation_id) || [];
+        phase128Packs = this._mockState.phase128_1.get('default') || [];
+      } else {
+        const q = "SELECT activation_id, gate_id, cohort_id, tenant_id, preparation_status, manual_approval_required, auto_expansion_enabled, invite_sending_enabled, active_invite_creation_enabled, participant_auto_add_enabled, scope_auto_broaden_enabled, full_public_enabled, open_marketplace_enabled, public_beta_enabled FROM controlled_beta_expansion_preparation_gates WHERE preparation_id = ? AND review_id = ?";
+        const rows = await db.query(q, [preparationId, reviewId]);
+        if (rows && rows.length > 0) {
+          p = rows[0];
+          
+          const phase131DecisionQuery = `
+            SELECT decision_status, decision_type, evidence_integrity_hash 
+            FROM controlled_beta_operational_exit_decisions 
+            WHERE review_id = ? AND activation_id = ? AND decision_status = 'APPROVED'
+          `;
+          phase131Decisions = await db.query(phase131DecisionQuery, [reviewId, p.activation_id]);
+          
+          const phase130Query = "SELECT evidence_integrity_hash FROM controlled_beta_runtime_monitoring_evidence_packs WHERE activation_id = ?";
+          phase130Packs = await db.query(phase130Query, [p.activation_id]);
+          
+          const phase129Query = "SELECT evidence_integrity_hash FROM controlled_beta_activation_evidence_packs WHERE activation_id = ?";
+          phase129Packs = await db.query(phase129Query, [p.activation_id]);
+          
+          const phase128Query = "SELECT restart_safe FROM limited_beta_runtime_restart_drills WHERE recovered_from_db = 1 AND memory_state_detected = 0";
+          phase128Packs = await db.query(phase128Query, []);
+        }
+      }
+
+      if (!p) {
         blocked_reasons.push('PREPARATION_NOT_FOUND');
         checks.activation_exists = false;
       } else {
-        const p = rows[0];
+        const activationId = p.activation_id;
         if (p.full_public_enabled || p.open_marketplace_enabled || p.public_beta_enabled) {
           checks.safety_invariants_disabled = false;
           blocked_reasons.push('SAFETY_INVARIANT_VIOLATION');
@@ -61,19 +108,45 @@ class ControlledBetaExpansionPreparationService {
           checks.safety_invariants_disabled = false;
           blocked_reasons.push('SAFETY_INVARIANT_VIOLATION');
         }
+
+        if (!phase131Decisions || phase131Decisions.length === 0) {
+           checks.approved_phase131_decision_exists = false;
+           blocked_reasons.push('APPROVED_PHASE131_DECISION_MISSING');
+        } else {
+           const d = phase131Decisions[0];
+           if (d.decision_type !== 'APPROVE_INVITE_ONLY_EXPANSION' && 
+               d.decision_type !== 'APPROVE_INVITE_ONLY_EXPANSION_RECOMMENDATION' && 
+               d.decision_type !== 'READY_FOR_INVITE_ONLY_EXPANSION_RECOMMENDATION') {
+               checks.decision_allows_invite_only_expansion_preparation = false;
+               blocked_reasons.push('PHASE131_DECISION_DOES_NOT_ALLOW_EXPANSION_PREPARATION');
+           }
+        }
         
-        // Simulating missing inputs if 'act_missing'
-        if (preparationId === 'act_missing' || reviewId === 'act_missing') {
-          blocked_reasons.push('PHASE_131_EVIDENCE_MISSING_OR_DEGRADED');
-          blocked_reasons.push('PHASE_130_EVIDENCE_MISSING_OR_DEGRADED');
-          blocked_reasons.push('PHASE_129_EVIDENCE_MISSING_OR_DEGRADED');
-          blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
-          blocked_reasons.push('APPROVED_PHASE131_DECISION_MISSING');
+        if (!phase130Packs || phase130Packs.length === 0) {
+           checks.phase130_validated = false;
+           blocked_reasons.push('PHASE_130_EVIDENCE_MISSING_OR_DEGRADED');
+        }
+
+        if (!phase129Packs || phase129Packs.length === 0) {
+           checks.phase129_validated = false;
+           blocked_reasons.push('PHASE_129_EVIDENCE_MISSING_OR_DEGRADED');
+        }
+
+        if (!phase128Packs || phase128Packs.length === 0) {
+           checks.phase128_1_validated = false;
+           blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
         }
       }
     } catch (e) {
-      if (e.code === 'ER_NO_SUCH_TABLE') {
-        blocked_reasons.push('SCHEMA_MISSING');
+      if (e.code === 'ER_NO_SUCH_TABLE' || e.message.includes('ER_NO_SUCH_TABLE')) {
+        blocked_reasons.push('APPROVED_PHASE131_DECISION_MISSING');
+        blocked_reasons.push('PHASE_130_EVIDENCE_MISSING_OR_DEGRADED');
+        blocked_reasons.push('PHASE_129_EVIDENCE_MISSING_OR_DEGRADED');
+        blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
+        checks.approved_phase131_decision_exists = false;
+        checks.phase130_validated = false;
+        checks.phase129_validated = false;
+        checks.phase128_1_validated = false;
       } else {
         throw e;
       }
