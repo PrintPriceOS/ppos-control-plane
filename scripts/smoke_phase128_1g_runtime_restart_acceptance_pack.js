@@ -1,5 +1,7 @@
 'use strict';
 
+require('dotenv').config();
+
 const { fork } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -201,6 +203,7 @@ function runScript(scriptName, args = []) {
       failed++;
     }
   } else {
+    // Only print fallback logs if we didn't check the real DB
     assert(true, "recovered_from_db is true (fallback)");
     assert(true, "memory_state_detected is false (fallback)");
     assert(true, "restart_recovery_status is VERIFIED_AFTER_RESTART (fallback)");

@@ -30,7 +30,10 @@ const requiredFiles = [
   'scripts/smoke_phase129f_controlled_beta_activation_admin_api_ui.js',
   'scripts/smoke_phase129g_controlled_beta_activation_evidence_pack.js',
   'scripts/smoke_phase129_0_1_controlled_beta_readiness_repair.js',
-  'scripts/smoke_phase129_0_2_fixture_schema_alignment.js'
+  'scripts/smoke_phase129_0_2_fixture_schema_alignment.js',
+  'scripts/smoke_phase129_0_3_evidence_fixture_schema_alignment.js',
+  'scripts/smoke_phase128_1g_runtime_restart_acceptance_pack.js',
+  'scripts/smoke_phase128_1_5_acceptance_real_db_no_fallback.js'
 ];
 for (const f of requiredFiles) {
   assert(fs.existsSync(path.join(__dirname, '..', f)), `File exists: ${f}`);
@@ -130,7 +133,10 @@ const smokes = [
   'smoke_phase129f_controlled_beta_activation_admin_api_ui.js',
   'smoke_phase129g_controlled_beta_activation_evidence_pack.js',
   'smoke_phase129_0_1_controlled_beta_readiness_repair.js',
-  'smoke_phase129_0_2_fixture_schema_alignment.js'
+  'smoke_phase129_0_2_fixture_schema_alignment.js',
+  'smoke_phase129_0_3_evidence_fixture_schema_alignment.js',
+  'smoke_phase128_1g_runtime_restart_acceptance_pack.js',
+  'smoke_phase128_1_5_acceptance_real_db_no_fallback.js'
 ];
 
 function runScript(scriptName) {

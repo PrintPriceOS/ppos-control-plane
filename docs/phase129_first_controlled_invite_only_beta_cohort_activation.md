@@ -50,9 +50,14 @@ Nine automated smoke tests validate this module:
 7. `smoke_phase129g_controlled_beta_activation_evidence_pack.js` (Checks evidence pack integrity)
 8. `smoke_phase129_0_1_controlled_beta_readiness_repair.js` (Regression checks for full 19-point readiness structure repair)
 9. `smoke_phase129_0_2_fixture_schema_alignment.js` (Checks fixture idempotency and schema alignment)
-10. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)
+10. `smoke_phase129_0_3_evidence_fixture_schema_alignment.js` (Checks evidence schema adaptivity)
+11. `smoke_phase128_1_5_acceptance_real_db_no_fallback.js` (Checks 128.1g regression in DB mode)
+12. `smoke_phase128_1g_runtime_restart_acceptance_pack.js` (Regression of Phase 128.1 acceptance)
+13. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)
 
 ## Test Fixture Guidelines
 - All test fixtures must be idempotent (using generated UUIDs or timestamps) to prevent duplicate key errors during repeated smoke runs.
 - Synthetic Phase 128.1 evidence is strictly disabled by default to force validation against actual production resilience metrics. It requires `ALLOW_PHASE129_SYNTHETIC_EVIDENCE=true` to be explicitly set.
 - All fixtures must read `INFORMATION_SCHEMA.COLUMNS` to adapt dynamically to real DB structures and avoid fatal unknown column errors during inserts.
+- The `limited_beta_evidence_packs` schema may vary across environments; the evidence fixture must be strictly schema-adaptive and gracefully fallback if `evidence_integrity_hash` or other late-phase columns are missing.
+- Phase 128.1 acceptance (`128.1g`) must be demonstrably clean without fallback bypasses before Phase 129 validation can close.
