@@ -11,9 +11,14 @@ router.get('/health', async (req, res) => {
     try {
         const redisInfo = connection.status; // 'ready', 'connect', 'reconnecting', etc.
         const redisLatency = await connection.ping();
+        const uptimeSeconds = Math.floor(process.uptime());
+        const startTime = Date.now() - (uptimeSeconds * 1000);
         
         res.json({
             ok: redisInfo === 'ready',
+            uptime_seconds: uptimeSeconds,
+            startTime: startTime,
+            pid: process.pid,
             dependencies: {
                 redis: {
                     status: redisInfo,

@@ -106,6 +106,7 @@ import { SandboxCommercialPilot } from './pages/production/SandboxCommercialPilo
 import { PilotEvidenceReviewGoNoGo } from './pages/production/PilotEvidenceReviewGoNoGo';
 import { LimitedBetaPreparationGate } from './pages/beta/LimitedBetaPreparationGate';
 import { LimitedBetaRuntime } from './pages/beta/LimitedBetaRuntime';
+import { ControlledBetaCohortActivation } from './pages/beta/ControlledBetaCohortActivation';
 
 
 
@@ -162,6 +163,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/production/pilot-evidence-review" element={<PilotEvidenceReviewGoNoGo />} />
                 <Route path="/admin/beta/preparation-gate" element={<LimitedBetaPreparationGate />} />
                 <Route path="/admin/beta/runtime" element={<LimitedBetaRuntime />} />
+                <Route path="/admin/beta/cohort-activation" element={<ControlledBetaCohortActivation />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />

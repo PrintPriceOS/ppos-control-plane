@@ -218,6 +218,7 @@ const sandboxCommercialPilotAdmin = require('./sandboxCommercialPilotAdmin');
 const pilotEvidenceReviewGoNoGoAdmin = require('./pilotEvidenceReviewGoNoGoAdmin');
 const limitedBetaPreparationGateAdmin = require('./limitedBetaPreparationGateAdmin');
 const limitedBetaRuntimeAdmin = require('./limitedBetaRuntimeAdmin');
+const controlledBetaCohortActivationAdmin = require('./controlledBetaCohortActivationAdmin');
 
 
 
@@ -882,6 +883,7 @@ router.use('/production/sandbox-commercial-pilot', sandboxCommercialPilotAdmin);
 router.use('/production/pilot-evidence-review', pilotEvidenceReviewGoNoGoAdmin);
 router.use('/beta/preparation-gate', limitedBetaPreparationGateAdmin);
 router.use('/beta/runtime', limitedBetaRuntimeAdmin);
+router.use('/beta/cohort-activation', controlledBetaCohortActivationAdmin);
 
 
 

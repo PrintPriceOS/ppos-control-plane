@@ -13,8 +13,14 @@ node -r dotenv/config scripts/run-migrations-manual.js
 node scripts/smoke_phase128_1a_runtime_restart_schema.js
 node scripts/smoke_phase128_1b_runtime_snapshot_service.js
 
+# Initialize drill marker before restart:
+node scripts/smoke_phase128_1h_real_pm2_restart_drill_marker.js --before
+
 # Operator action:
 pm2 restart ppos-control-plane
+
+# Verify process start time and PID after restart:
+node scripts/smoke_phase128_1h_real_pm2_restart_drill_marker.js --after
 
 node scripts/smoke_phase128_1c_runtime_after_restart_recovery.js
 node scripts/smoke_phase128_1d_runtime_kill_switch_restart_survival.js
