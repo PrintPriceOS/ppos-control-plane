@@ -46,6 +46,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'beta-cohort-activation', label: 'Beta Cohort Activation', path: '/admin/beta/cohort-activation', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-invite-issuance', label: 'Beta Invite Issuance', path: '/admin/beta/invite-issuance', icon: 'EnvelopeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-invite-acceptance', label: 'Beta Invite Acceptance', path: '/admin/beta/invite-acceptance', icon: 'EnvelopeOpenIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-runtime-sessions', label: 'Beta Runtime Sessions', path: '/admin/beta/runtime-sessions', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 
 
     // System / Admin

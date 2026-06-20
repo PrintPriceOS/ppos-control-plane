@@ -109,6 +109,7 @@ import { LimitedBetaRuntime } from './pages/beta/LimitedBetaRuntime';
 import { ControlledBetaCohortActivation } from './pages/beta/ControlledBetaCohortActivation';
 import { ControlledBetaInviteIssuance } from './pages/beta/ControlledBetaInviteIssuance';
 import { ControlledBetaInviteAcceptance } from './pages/beta/ControlledBetaInviteAcceptance';
+import { ControlledBetaRuntimeSession } from './pages/beta/ControlledBetaRuntimeSession';
 
 
 
@@ -168,6 +169,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/cohort-activation" element={<ControlledBetaCohortActivation />} />
                 <Route path="/admin/beta/invite-issuance" element={<ControlledBetaInviteIssuance />} />
                 <Route path="/admin/beta/invite-acceptance" element={<ControlledBetaInviteAcceptance />} />
+                <Route path="/admin/beta/runtime-sessions" element={<ControlledBetaRuntimeSession />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
