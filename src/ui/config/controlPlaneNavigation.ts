@@ -44,6 +44,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-runtime', label: 'Limited Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-cohort-activation', label: 'Beta Cohort Activation', path: '/admin/beta/cohort-activation', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-invite-issuance', label: 'Beta Invite Issuance', path: '/admin/beta/invite-issuance', icon: 'EnvelopeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 
 
     // System / Admin

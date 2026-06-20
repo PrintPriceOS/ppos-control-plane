@@ -107,6 +107,7 @@ import { PilotEvidenceReviewGoNoGo } from './pages/production/PilotEvidenceRevie
 import { LimitedBetaPreparationGate } from './pages/beta/LimitedBetaPreparationGate';
 import { LimitedBetaRuntime } from './pages/beta/LimitedBetaRuntime';
 import { ControlledBetaCohortActivation } from './pages/beta/ControlledBetaCohortActivation';
+import { ControlledBetaInviteIssuance } from './pages/beta/ControlledBetaInviteIssuance';
 
 
 
@@ -164,6 +165,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/preparation-gate" element={<LimitedBetaPreparationGate />} />
                 <Route path="/admin/beta/runtime" element={<LimitedBetaRuntime />} />
                 <Route path="/admin/beta/cohort-activation" element={<ControlledBetaCohortActivation />} />
+                <Route path="/admin/beta/invite-issuance" element={<ControlledBetaInviteIssuance />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
