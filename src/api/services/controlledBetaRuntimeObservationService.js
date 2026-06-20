@@ -281,34 +281,34 @@ class ControlledBetaRuntimeObservationService {
     };
 
     try {
-      const [incidents] = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_incident_observations WHERE activation_id = ?", [activationId]);
-      if (incidents[0].c > 0) {
+      const incidents = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_incident_observations WHERE activation_id = ?", [activationId]);
+      if (incidents.length > 0 && incidents[0].c > 0) {
         summary.incidentCount = incidents[0].c;
         health = 'DEGRADED';
       }
 
-      const [killswitches] = await db.query("SELECT event_type FROM controlled_beta_runtime_kill_switch_observations WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 1", [activationId]);
+      const killswitches = await db.query("SELECT event_type FROM controlled_beta_runtime_kill_switch_observations WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 1", [activationId]);
       if (killswitches.length > 0 && killswitches[0].event_type === 'KILL_SWITCH_TRIGGERED_OBSERVED') {
         summary.killSwitchState = 'TRIGGERED';
         health = 'KILL_SWITCH_ACTIVE';
       }
 
-      const [forbidden] = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_guardrail_observations WHERE activation_id = ? AND event_type = 'FORBIDDEN_FEATURE_ATTEMPT_OBSERVED'", [activationId]);
-      if (forbidden[0].c > 0) {
+      const forbidden = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_guardrail_observations WHERE activation_id = ? AND event_type = 'FORBIDDEN_FEATURE_ATTEMPT_OBSERVED'", [activationId]);
+      if (forbidden.length > 0 && forbidden[0].c > 0) {
         summary.forbiddenFeatureAttemptCount = forbidden[0].c;
         if (health !== 'KILL_SWITCH_ACTIVE') health = 'BLOCKED';
       }
 
-      const [findings] = await db.query(`
+      const findings = await db.query(`
         SELECT SUM(CASE WHEN event_type = 'MONITORING_FINDING_CREATED' THEN 1 ELSE -1 END) as open_count
         FROM controlled_beta_runtime_monitoring_findings WHERE activation_id = ?
       `, [activationId]);
-      if (findings[0] && findings[0].open_count > 0) {
+      if (findings.length > 0 && findings[0] && findings[0].open_count > 0) {
         summary.unresolvedFindingsCount = parseInt(findings[0].open_count);
       }
 
-      const [sla] = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_sla_observations WHERE activation_id = ?", [activationId]);
-      if (sla[0].c > 0) {
+      const sla = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_sla_observations WHERE activation_id = ?", [activationId]);
+      if (sla.length > 0 && sla[0].c > 0) {
         summary.slaWarnings = sla[0].c;
       }
       
@@ -316,7 +316,9 @@ class ControlledBetaRuntimeObservationService {
       summary.runtimeRiskScore = risk.risk_score;
 
     } catch (e) {
-      // Ignored for tests missing DB
+      if (e.code !== 'ER_NO_SUCH_TABLE') {
+        throw e;
+      }
     }
 
     return { health, summary };
@@ -336,7 +338,7 @@ class ControlledBetaRuntimeObservationService {
     const recommended_actions = [];
 
     try {
-      const [incidents] = await db.query("SELECT observation_severity FROM controlled_beta_runtime_incident_observations WHERE activation_id = ?", [activationId]);
+      const incidents = await db.query("SELECT observation_severity FROM controlled_beta_runtime_incident_observations WHERE activation_id = ?", [activationId]);
       for (const inc of incidents) {
         if (inc.observation_severity === 'CRITICAL') {
           risk_score += 40;
@@ -346,34 +348,38 @@ class ControlledBetaRuntimeObservationService {
         }
       }
 
-      const [killswitches] = await db.query("SELECT event_type FROM controlled_beta_runtime_kill_switch_observations WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 1", [activationId]);
+      const killswitches = await db.query("SELECT event_type FROM controlled_beta_runtime_kill_switch_observations WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 1", [activationId]);
       if (killswitches.length > 0 && killswitches[0].event_type === 'KILL_SWITCH_TRIGGERED_OBSERVED') {
         risk_score += 50;
         risk_factors.push('kill switch active');
         recommended_actions.push('Investigate kill switch trigger');
       }
 
-      const [forbidden] = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_guardrail_observations WHERE activation_id = ? AND event_type = 'FORBIDDEN_FEATURE_ATTEMPT_OBSERVED'", [activationId]);
-      if (forbidden[0].c > 0) {
+      const forbidden = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_guardrail_observations WHERE activation_id = ? AND event_type = 'FORBIDDEN_FEATURE_ATTEMPT_OBSERVED'", [activationId]);
+      if (forbidden.length > 0 && forbidden[0].c > 0) {
         risk_score += 50;
         risk_factors.push('forbidden feature attempts');
       }
 
-      const [findings] = await db.query(`
+      const findings = await db.query(`
         SELECT SUM(CASE WHEN event_type = 'MONITORING_FINDING_CREATED' THEN 1 ELSE -1 END) as open_count
         FROM controlled_beta_runtime_monitoring_findings WHERE activation_id = ?
       `, [activationId]);
-      if (findings[0] && findings[0].open_count > 0) {
+      if (findings.length > 0 && findings[0] && findings[0].open_count > 0) {
         risk_score += 20;
         risk_factors.push('unresolved blocker finding');
       }
       
-      const [sla] = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_sla_observations WHERE activation_id = ?", [activationId]);
-      if (sla[0].c > 0) {
+      const sla = await db.query("SELECT COUNT(*) as c FROM controlled_beta_runtime_sla_observations WHERE activation_id = ?", [activationId]);
+      if (sla.length > 0 && sla[0].c > 0) {
         risk_score += 10;
         risk_factors.push('SLA breach');
       }
-    } catch (e) {}
+    } catch (e) {
+      if (e.code !== 'ER_NO_SUCH_TABLE') {
+        throw e; // Bubble up real DB errors, ignore missing tables for mock environments
+      }
+    }
 
     if (risk_score > 100) risk_score = 100;
 
@@ -421,7 +427,7 @@ class ControlledBetaRuntimeObservationService {
 
   async getRuntimeMonitoringAuditTimeline(activationId) {
     try {
-      const [rows] = await db.query("SELECT * FROM controlled_beta_runtime_monitoring_audits WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 100", [activationId]);
+      const rows = await db.query("SELECT * FROM controlled_beta_runtime_monitoring_audits WHERE activation_id = ? ORDER BY observed_at DESC LIMIT 100", [activationId]);
       return rows;
     } catch (e) {
       return [];

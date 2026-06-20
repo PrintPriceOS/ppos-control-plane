@@ -23,6 +23,7 @@ const smokes = [
   'smoke_phase130e_runtime_observation_incident_killswitch_risk.js',
   'smoke_phase130f_runtime_observation_admin_api_ui.js',
   'smoke_phase130g_runtime_observation_evidence_pack.js',
+  'smoke_phase130_0_1_schema_risk_repair.js',
   'smoke_phase129h_controlled_beta_activation_acceptance_pack.js'
 ];
 

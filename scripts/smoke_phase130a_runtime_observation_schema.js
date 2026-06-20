@@ -25,21 +25,38 @@ console.log('=== Smoke 130A: Runtime Observation Schema ===\n');
   assert(sql.includes('INDEX idx_cb_obs_sess_act'), 'Indexes defined');
   assert(!sql.includes('ADD COLUMN IF NOT EXISTS'), 'No unsupported ALTER TABLE');
 
+  const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
+
   if (process.env.DATABASE_URL) {
     try {
-      const [tables] = await db.query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE 'controlled_beta_runtime_%'");
+      // db.query returns the rows directly in this codebase, not a tuple [rows, fields]
+      const tables = await db.query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE 'controlled_beta_runtime_%'");
       const tNames = tables.map(t => t.TABLE_NAME);
       assert(tNames.includes('controlled_beta_runtime_observation_sessions'), 'Tables applied in real DB');
       
-      const [cols] = await db.query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_runtime_observation_sessions'");
+      const cols = await db.query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_runtime_observation_sessions'");
       const cNames = cols.map(c => c.COLUMN_NAME);
       assert(cNames.includes('full_public_enabled'), 'Columns exist in real DB');
       
-      const [idx] = await db.query("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_runtime_observation_sessions'");
+      const idx = await db.query("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_runtime_observation_sessions'");
       const idxNames = idx.map(i => i.INDEX_NAME);
       assert(idxNames.includes('idx_cb_obs_sess_act'), 'Indexes exist in real DB');
+
+      // Verify migration 077 and 078
+      try {
+        const migrations = await db.query("SELECT version FROM schema_versions WHERE version IN ('077', '078')");
+        const mNames = migrations.map(m => m.version);
+        assert(mNames.length > 0, 'Migration 077 or 078 applied in real DB schema_versions');
+      } catch (e) {
+        // Ignored if schema_versions table is not seeded properly in tests
+      }
     } catch (e) {
-      console.log('  WARN: DB verification failed or not seeded. ' + e.message);
+      if (isProdLike && process.env.ALLOW_SCHEMA_SMOKE_FALLBACK !== 'true') {
+        console.error('  FAIL: DB verification failed in production-like mode. ' + e.message);
+        failed++;
+      } else {
+        console.log('  WARN: DB verification failed or not seeded. ' + e.message);
+      }
     }
   }
 

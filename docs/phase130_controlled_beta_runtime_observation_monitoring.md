@@ -5,14 +5,14 @@ Phase 130 introduces a robust, DB-backed observation framework tailored for the 
 
 ## Architecture
 
-### 1. Database Schema (Migration 077)
+### 1. Database Schema (Migration 077 and 078)
 We created 14 new tables to persistently store the observation telemetry:
 - **Sessions & Events:** Tracking participant presence and interactions.
 - **Health Snapshots:** Rolling aggregates of the cohort state.
 - **Guardrails & Incidents:** Monitoring forbidden feature attempts, SLA warnings, kill-switch activations, and incidents.
 - **Evidence & Findings:** Providing audit trails and resolution paths for observation findings.
 
-All tables include robust safety constraints with defaulting to disabled (e.g. `full_public_enabled = 0`).
+All tables include robust safety constraints with defaulting to disabled (e.g. `full_public_enabled = 0`). Migration 078 specifically aligns the `event_type` column requirement into the `sessions` table.
 
 ### 2. Service Layer
 The `ControlledBetaRuntimeObservationService` provides the core logic:
