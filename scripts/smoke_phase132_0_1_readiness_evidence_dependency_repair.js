@@ -126,19 +126,36 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
   const insertPhase128EvidenceAdaptive = async (prepId) => {
     if (isProdLike) {
       const cols = await getTableColumns('limited_beta_runtime_restart_drills');
-      const row = { recovered_from_db: 1, memory_state_detected: 0, restart_safe: 1 };
+      if (cols.length === 0) return;
+      const row = {};
+      const payload = {
+         recovered_from_db: 1,
+         memory_state_detected: 0,
+         restart_safe: 1,
+         status: 'VERIFIED_AFTER_RESTART',
+         hash: 'hash'
+      };
+      
+      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; delete payload.recovered_from_db; }
+      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; delete payload.memory_state_detected; }
+      if (cols.includes('restart_safe')) { row.restart_safe = 1; delete payload.restart_safe; }
       
       const idCols = ['drill_id', 'restart_drill_id', 'id', 'marker'];
       for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = prepId + '_drill'; }
       
-      if (cols.includes('restart_recovery_status')) row.restart_recovery_status = 'VERIFIED_AFTER_RESTART';
-      if (cols.includes('recovery_integrity_hash')) row.recovery_integrity_hash = 'hash';
-      if (cols.includes('evidence_integrity_hash')) row.evidence_integrity_hash = 'hash';
+      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; delete payload.status; }
+      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; delete payload.hash; }
+      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; delete payload.hash; }
+
+      const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload'].find(c => cols.includes(c));
+      if (payloadCol && Object.keys(payload).length > 0) {
+         row[payloadCol] = JSON.stringify(payload);
+      }
 
       const { q, vals } = await buildInsertForExistingColumns('limited_beta_runtime_restart_drills', row);
       await db.query(q, vals);
     } else {
-      svc.setMockState('phase128_1', 'default', [{ restart_safe: 1 }]);
+      svc.setMockState('phase128_1', 'default', [{ restart_safe: 1, recovered_from_db: 1, memory_state_detected: 0 }]);
     }
   };
 
