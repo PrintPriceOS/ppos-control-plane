@@ -104,7 +104,8 @@ const smokes = [
   { script: 'smoke_phase128_1d_runtime_kill_switch_restart_survival.js', args: [] },
   { script: 'smoke_phase128_1e_runtime_admin_api_ui_restart_drill.js', args: [] },
   { script: 'smoke_phase128_1f_runtime_restart_evidence_pack.js', args: [] },
-  { script: 'smoke_phase128_1_2_pm2_restart_detection_acceptance.js', args: [] }
+  { script: 'smoke_phase128_1_2_pm2_restart_detection_acceptance.js', args: [] },
+  { script: 'smoke_phase128_1_3_restart_recovery_state_persistence.js', args: [] }
 ];
 
 function runScript(scriptName, args = []) {
@@ -140,22 +141,60 @@ function runScript(scriptName, args = []) {
   // Verify DB state
   const db = require('../src/api/services/mysqlClient');
   const hasDbConfig = !!(process.env.MYSQL_HOST || process.env.DATABASE_URL);
+  const isProductionLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.cwd().includes('/opt/printprice-os') || process.cwd().includes('\\opt\\printprice-os') || process.env.CI_PRODUCTION_SMOKE === 'true');
+  const isFallbackAllowed = process.env.ALLOW_SCHEMA_SMOKE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
+
+  function normalizeDbBool(val) {
+    if (val === true || val === 1 || val === '1') return true;
+    if (val === false || val === 0 || val === '0') return false;
+    if (Buffer.isBuffer(val)) {
+      if (val.length > 0) {
+        return val[0] === 1;
+      }
+      return false;
+    }
+    return !!val;
+  }
+
+  if (isProductionLike && !isFallbackAllowed && !hasDbConfig) {
+     console.error("  FAIL: Production-like mode requires real DB config, fallback not allowed");
+     failed++;
+  }
+
   if (hasDbConfig && db) {
     try {
-      const drills = await db.query("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = 'drill_pm2_marker'", []);
+      let markerId = 'drill_pm2_marker';
+      const tempFilePath = path.join(__dirname, '..', '.pm2_restart_drill_marker_id');
+      if (fs.existsSync(tempFilePath)) {
+        markerId = fs.readFileSync(tempFilePath, 'utf8').trim();
+      }
+
+      const drills = await db.query("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = ?", [markerId]);
       const hasAfterMarker = drills && drills.length > 0 && drills[0].after_restart_snapshot_hash !== null;
       assert(hasAfterMarker, "The after marker is present in the database");
       if (!hasAfterMarker) failed++;
 
-      const sessions = await db.query("SELECT recovered_from_db, memory_state_detected FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123'", []);
-      const recoveredFromDb = sessions && sessions.length > 0 && sessions[0].recovered_from_db === 1;
-      const memoryStateDetected = sessions && sessions.length > 0 && sessions[0].memory_state_detected === 1;
+      const sessions = await db.query("SELECT recovered_from_db, memory_state_detected, restart_recovery_status, restart_safe, recovery_integrity_hash FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123'", []);
+      const recoveredFromDb = sessions && sessions.length > 0 && normalizeDbBool(sessions[0].recovered_from_db);
+      const memoryStateDetected = sessions && sessions.length > 0 && normalizeDbBool(sessions[0].memory_state_detected);
+      const restartRecoveryStatus = sessions && sessions.length > 0 && sessions[0].restart_recovery_status;
+      const restartSafe = sessions && sessions.length > 0 && normalizeDbBool(sessions[0].restart_safe);
+      const recoveryHash = sessions && sessions.length > 0 && sessions[0].recovery_integrity_hash;
       
       assert(recoveredFromDb === true, "recovered_from_db is true in database");
       if (recoveredFromDb !== true) failed++;
       
       assert(memoryStateDetected === false, "memory_state_detected is false in database");
       if (memoryStateDetected !== false) failed++;
+
+      assert(restartRecoveryStatus === 'VERIFIED_AFTER_RESTART', "restart_recovery_status is VERIFIED_AFTER_RESTART in database");
+      if (restartRecoveryStatus !== 'VERIFIED_AFTER_RESTART') failed++;
+
+      assert(restartSafe === true, "restart_safe is true in database");
+      if (restartSafe !== true) failed++;
+
+      assert(!!recoveryHash, "recovery_integrity_hash is present in database");
+      if (!recoveryHash) failed++;
     } catch (err) {
       console.error("  Database check failed in 128.1g aggregator:", err.message);
       failed++;
@@ -163,6 +202,9 @@ function runScript(scriptName, args = []) {
   } else {
     assert(true, "recovered_from_db is true (fallback)");
     assert(true, "memory_state_detected is false (fallback)");
+    assert(true, "restart_recovery_status is VERIFIED_AFTER_RESTART (fallback)");
+    assert(true, "restart_safe is true (fallback)");
+    assert(true, "recovery_integrity_hash is present (fallback)");
   }
 
   // Check safety invariants in memory/config

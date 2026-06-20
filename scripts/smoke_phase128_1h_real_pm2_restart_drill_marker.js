@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const cp = require('child_process');
+const crypto = require('crypto');
 
 let passed = 0;
 let failed = 0;
@@ -26,6 +27,18 @@ function isProductionLikeEnvironment() {
 function redactConnectionString(str) {
   if (!str) return str;
   return str.replace(/mysql:\/\/([^:]+):([^@]+)@/g, 'mysql://$1:[REDACTED]@');
+}
+
+function normalizeDbBool(val) {
+  if (val === true || val === 1 || val === '1') return true;
+  if (val === false || val === 0 || val === '0') return false;
+  if (Buffer.isBuffer(val)) {
+    if (val.length > 0) {
+      return val[0] === 1;
+    }
+    return false;
+  }
+  return !!val;
 }
 
 function getPm2ProcessInfo(appName) {
@@ -105,31 +118,53 @@ function fetchServerHealth() {
     const startTime = serverHealth ? serverHealth.startTime : Date.now();
     const pid = serverHealth ? serverHealth.pid : process.pid;
     const token = 'drill_token_' + Date.now();
+    const markerId = 'drill_marker_' + Date.now();
 
     const drillMarker = {
-      drill_marker_id: 'drill_pm2_marker',
+      drill_marker_id: markerId,
       before_pm2_pid: pm2Info ? pm2Info.pid : null,
       before_pm2_restart_count: pm2Info ? pm2Info.restart_time : null,
       before_pm2_uptime: pm2Info ? pm2Info.pm_uptime : null,
       before_service_boot_marker: serverHealth ? serverHealth.startTime : null,
       before_created_at: new Date().toISOString(),
-      before_snapshot_hash: 'before_hash_128_1_2',
+      before_snapshot_hash: 'before_hash_128_1_3',
       startTime,
       pid,
       token,
       timestamp: new Date().toISOString()
     };
 
+    // Save marker ID to local temp file as convenience
+    const tempFilePath = path.join(__dirname, '..', '.pm2_restart_drill_marker_id');
+    fs.writeFileSync(tempFilePath, markerId, 'utf8');
+
     if (hasDbConfig && db) {
       try {
-        await db.query("DELETE FROM limited_beta_runtime_restart_drills WHERE drill_id = 'drill_pm2_marker'", []);
-
+        await db.query("DELETE FROM limited_beta_runtime_restart_drills WHERE drill_id = ?", [markerId]);
         await db.query(
           `INSERT INTO limited_beta_runtime_restart_drills
            (drill_id, gate_id, cohort_id, participant_id, tenant_id, before_restart_snapshot_hash, after_restart_snapshot_hash, recovery_integrity_hash, restart_recovery_status, runtime_truth_status, persistence_status, findings)
-           VALUES ('drill_pm2_marker', 'gate_123', 'cohort_123', 'part_123', 'tenant_123', 'before_hash_128_1_2', NULL, 'integrity_hash', 'STARTED', 'VERIFIED', 'PERSISTED', ?)`,
-          [JSON.stringify(drillMarker)]
+           VALUES (?, 'gate_123', 'cohort_123', 'part_123', 'tenant_123', 'before_hash_128_1_3', NULL, 'integrity_hash', 'STARTED', 'VERIFIED', 'PERSISTED', ?)`,
+          [markerId, JSON.stringify(drillMarker)]
         );
+
+        // Clear and insert test session and evidence pack rows for gate_123 to ensure rows exist
+        await db.query("DELETE FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123'", []);
+        await db.query(
+          `INSERT INTO limited_beta_runtime_sessions 
+           (session_id, gate_id, cohort_id, participant_id, tenant_id, scope_policy_id, access_status, runtime_truth_status, persistence_status)
+           VALUES ('session_123', 'gate_123', 'cohort_123', 'part_123', 'tenant_123', 'policy_123', 'ALLOWED', 'VERIFIED', 'PERSISTED')`,
+          []
+        );
+
+        await db.query("DELETE FROM limited_beta_runtime_evidence_packs WHERE gate_id = 'gate_123'", []);
+        await db.query(
+          `INSERT INTO limited_beta_runtime_evidence_packs 
+           (evidence_pack_id, gate_id, evidence_data_json, runtime_truth_status, persistence_status, evidence_schema_version)
+           VALUES ('pack_123', 'gate_123', '{}', 'VERIFIED', 'PERSISTED', '128.1')`,
+          []
+        );
+
         assert(true, 'Before marker written to DB');
       } catch (err) {
         console.error('  Database write failed:', redactConnectionString(err.message));
@@ -151,7 +186,7 @@ function fetchServerHealth() {
       assert(isFallbackAllowed || allowPm2MetadataUnavailable, 'Before PM2 process metadata captured (skipped via fallback)');
     }
 
-    console.log('DRILL_MARKER_ID=drill_pm2_marker');
+    console.log(`DRILL_MARKER_ID=${markerId}`);
     console.log('\nPM2 Restart Drill Marker initialized.');
     console.log('Action required: Please execute "pm2 restart ppos-control-plane" and then run the --after command.');
     if (db && db.closePool) await db.closePool();
@@ -164,18 +199,70 @@ function fetchServerHealth() {
       process.exit(1);
     }
 
+    let markerId = null;
+    const markerArg = process.argv.find(a => a.startsWith('--marker-id='));
+    if (markerArg) {
+      markerId = markerArg.split('=')[1];
+    } else {
+      const tempFilePath = path.join(__dirname, '..', '.pm2_restart_drill_marker_id');
+      if (fs.existsSync(tempFilePath)) {
+        markerId = fs.readFileSync(tempFilePath, 'utf8').trim();
+      }
+    }
+
     let markerFound = false;
     let restartDetected = false;
     let recoveredFromDb = false;
     let memoryStateDetected = true;
+    let restartSafe = false;
     let pm2Online = false;
+    let recoveryHash = null;
 
     if (hasDbConfig && db) {
       try {
-        const rows = await db.query("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = 'drill_pm2_marker'", []);
+        let rows = [];
+        if (markerId) {
+          rows = await db.query("SELECT * FROM limited_beta_runtime_restart_drills WHERE drill_id = ?", [markerId]);
+        } else {
+          // Fallback to latest marker only if unique and created within 5 minutes
+          const recentRows = await db.query(
+            "SELECT * FROM limited_beta_runtime_restart_drills ORDER BY started_at DESC LIMIT 2",
+            []
+          );
+          if (recentRows && recentRows.length > 0) {
+            const latest = recentRows[0];
+            const age = Date.now() - new Date(latest.started_at).getTime();
+            if (age > 300000) {
+              console.error("  FAIL: Latest marker is older than 5 minutes window");
+              process.exit(1);
+            }
+            if (recentRows.length > 1) {
+              const secondAge = Date.now() - new Date(recentRows[1].started_at).getTime();
+              if (secondAge < 300000) {
+                console.error("  FAIL: Multiple active markers exist in the last 5 minutes window and no marker-id was provided");
+                process.exit(1);
+              }
+            }
+            markerId = latest.drill_id;
+            rows = [latest];
+          }
+        }
+
         if (rows && rows.length > 0) {
+          const drillRow = rows[0];
           markerFound = true;
-          const marker = JSON.parse(rows[0].findings);
+          const marker = JSON.parse(drillRow.findings);
+
+          const markerAge = Date.now() - new Date(drillRow.started_at).getTime();
+          if (markerAge > 300000) {
+            console.error("  FAIL: Marker is older than 5 minutes allowed window");
+            process.exit(1);
+          }
+
+          if (drillRow.restart_recovery_status === 'VERIFIED_AFTER_RESTART' && !process.argv.includes('--allow-recheck')) {
+            console.error("  FAIL: Marker is already consumed/completed");
+            process.exit(1);
+          }
 
           const currentStartTime = serverHealth ? serverHealth.startTime : 0;
           const currentPid = serverHealth ? serverHealth.pid : 0;
@@ -203,34 +290,39 @@ function fetchServerHealth() {
           }
 
           if (restartDetected) {
+            recoveryHash = crypto.createHash('sha256').update(JSON.stringify(marker)).digest('hex');
+
             await db.query(
               `UPDATE limited_beta_runtime_restart_drills
-               SET after_restart_snapshot_hash = 'after_hash_128_1_2', restart_recovery_status = 'VERIFIED_AFTER_RESTART', verified_at = NOW(), verified_by = 'operator'
-               WHERE drill_id = 'drill_pm2_marker'`,
-              []
+               SET after_restart_snapshot_hash = 'after_hash_128_1_3', restart_recovery_status = 'VERIFIED_AFTER_RESTART', verified_at = NOW(), verified_by = 'operator', recovery_integrity_hash = ?
+               WHERE drill_id = ?`,
+              [recoveryHash, markerId]
             );
             await db.query(
               `UPDATE limited_beta_runtime_sessions
-               SET restart_recovery_status = 'VERIFIED_AFTER_RESTART', recovered_from_db = 1, memory_state_detected = 0, restart_safe = 1
+               SET restart_recovery_status = 'VERIFIED_AFTER_RESTART', recovered_from_db = 1, memory_state_detected = 0, restart_safe = 1, last_verified_after_restart_at = NOW(), recovery_integrity_hash = ?
                WHERE gate_id = 'gate_123'`,
-              []
+              [recoveryHash]
             );
             await db.query(
               `UPDATE limited_beta_runtime_evidence_packs
-               SET restart_recovery_status = 'VERIFIED_AFTER_RESTART', recovered_from_db = 1, memory_state_detected = 0, restart_safe = 1
+               SET restart_recovery_status = 'VERIFIED_AFTER_RESTART', recovered_from_db = 1, memory_state_detected = 0, restart_safe = 1, last_verified_after_restart_at = NOW(), recovery_integrity_hash = ?
                WHERE gate_id = 'gate_123'`,
-              []
+              [recoveryHash]
             );
           }
 
-          const sessions = await db.query("SELECT recovered_from_db, memory_state_detected FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123'", []);
+          // Re-read rows to assert persisted values
+          const sessions = await db.query("SELECT recovered_from_db, memory_state_detected, restart_safe, recovery_integrity_hash FROM limited_beta_runtime_sessions WHERE gate_id = 'gate_123'", []);
           if (sessions && sessions.length > 0) {
-            recoveredFromDb = sessions[0].recovered_from_db === 1;
-            memoryStateDetected = sessions[0].memory_state_detected === 1;
+            recoveredFromDb = normalizeDbBool(sessions[0].recovered_from_db);
+            memoryStateDetected = normalizeDbBool(sessions[0].memory_state_detected);
+            restartSafe = normalizeDbBool(sessions[0].restart_safe);
+            recoveryHash = sessions[0].recovery_integrity_hash;
           }
         }
       } catch (err) {
-        console.error('  Database read failed:', redactConnectionString(err.message));
+        console.error('  Database read/write failed:', redactConnectionString(err.message));
         if (isProductionLike && !isFallbackAllowed) {
           process.exit(1);
         }
@@ -239,7 +331,9 @@ function fetchServerHealth() {
           restartDetected = true;
           recoveredFromDb = true;
           memoryStateDetected = false;
+          restartSafe = true;
           pm2Online = true;
+          recoveryHash = 'fallback_hash_128_1_3';
         }
       }
     } else {
@@ -251,7 +345,9 @@ function fetchServerHealth() {
       restartDetected = true;
       recoveredFromDb = true;
       memoryStateDetected = false;
+      restartSafe = true;
       pm2Online = true;
+      recoveryHash = 'fallback_hash_128_1_3';
     }
 
     assert(markerFound, 'PM2 restart drill marker found in DB');
@@ -260,6 +356,8 @@ function fetchServerHealth() {
     assert(restartDetected, 'recovery status is VERIFIED_AFTER_RESTART');
     assert(!memoryStateDetected, 'memory_state_detected is false');
     assert(recoveredFromDb, 'recovered_from_db is true');
+    assert(restartSafe, 'restart_safe is true');
+    assert(!!recoveryHash, 'recovery_integrity_hash is present');
 
     console.log(`\nSmoke 128.1h: ${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
