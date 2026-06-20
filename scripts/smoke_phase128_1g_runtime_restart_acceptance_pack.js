@@ -98,14 +98,15 @@ if (process.env.DATABASE_URL) {
 console.log('\n--- Running Remaining Sub-Smoke Tests ---');
 const smokes = [
   { script: 'smoke_phase128_1_1_real_db_restart_schema_required.js', args: [] },
-  { script: 'smoke_phase128_1h_real_pm2_restart_drill_marker.js', args: ['--after', '--allow-pm2-metadata-unavailable'] },
+  { script: 'smoke_phase128_1h_real_pm2_restart_drill_marker.js', args: ['--verify-completed', '--allow-pm2-metadata-unavailable'] },
   { script: 'smoke_phase128_1b_runtime_snapshot_service.js', args: [] },
   { script: 'smoke_phase128_1c_runtime_after_restart_recovery.js', args: [] },
   { script: 'smoke_phase128_1d_runtime_kill_switch_restart_survival.js', args: [] },
   { script: 'smoke_phase128_1e_runtime_admin_api_ui_restart_drill.js', args: [] },
   { script: 'smoke_phase128_1f_runtime_restart_evidence_pack.js', args: [] },
   { script: 'smoke_phase128_1_2_pm2_restart_detection_acceptance.js', args: [] },
-  { script: 'smoke_phase128_1_3_restart_recovery_state_persistence.js', args: [] }
+  { script: 'smoke_phase128_1_3_restart_recovery_state_persistence.js', args: [] },
+  { script: 'smoke_phase128_1_4_restart_acceptance_aggregator_finalization.js', args: [] }
 ];
 
 function runScript(scriptName, args = []) {
