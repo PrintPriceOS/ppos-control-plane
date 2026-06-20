@@ -1,5 +1,7 @@
 'use strict';
 
+process.env.DB_UNREACHABLE = 'true';
+
 const service = require('../src/api/services/controlledBetaRuntimeSessionService');
 const inviteAcceptanceService = require('../src/api/services/controlledBetaInviteAcceptanceService');
 
