@@ -191,7 +191,11 @@ class ControlledBetaExpansionPreparationService {
     };
   }
 
-  async findPhase128RestartEvidenceAdaptive(criteria) {
+  async findPhase128RestartEvidenceAdaptive(criteria = {}, options = {}) {
+    const { allowLatestFallback = false, requireContextBoundEvidence = true } = options;
+    const { preparationId, reviewId, decisionId, activationId, gateId, cohortId, tenantId } = criteria;
+    const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
+
     const candidateTables = [
       'limited_beta_runtime_restart_drills',
       'limited_beta_runtime_restart_evidence_packs',
@@ -205,7 +209,25 @@ class ControlledBetaExpansionPreparationService {
       if (cols.length === 0) continue;
 
       let q = `SELECT * FROM ${t} WHERE 1=1`;
-      const rows = await db.query(q, []);
+      const vals = [];
+      let mapped = false;
+
+      if (requireContextBoundEvidence) {
+        if (activationId && cols.includes('activation_id')) { q += ' AND activation_id = ?'; vals.push(activationId); mapped = true; }
+        if (gateId && cols.includes('gate_id')) { q += ' AND gate_id = ?'; vals.push(gateId); mapped = true; }
+        if (cohortId && cols.includes('cohort_id')) { q += ' AND cohort_id = ?'; vals.push(cohortId); mapped = true; }
+        if (tenantId && cols.includes('tenant_id')) { q += ' AND tenant_id = ?'; vals.push(tenantId); mapped = true; }
+        if (reviewId && cols.includes('review_id')) { q += ' AND review_id = ?'; vals.push(reviewId); mapped = true; }
+        if (decisionId && cols.includes('decision_id')) { q += ' AND decision_id = ?'; vals.push(decisionId); mapped = true; }
+        if (preparationId && cols.includes('preparation_id')) { q += ' AND preparation_id = ?'; vals.push(preparationId); mapped = true; }
+      }
+
+      if (!mapped && requireContextBoundEvidence && isProdLike && !allowLatestFallback) {
+         // If we cannot map to context, and fallback is disallowed, skip this table
+         continue;
+      }
+
+      const rows = await db.query(q, vals);
 
       for (const r of rows) {
         let payload = null;
@@ -298,7 +320,10 @@ class ControlledBetaExpansionPreparationService {
           const phase129Query = "SELECT evidence_integrity_hash FROM controlled_beta_activation_evidence_packs WHERE activation_id = ?";
           phase129Packs = await db.query(phase129Query, [actId]);
           
-          phase128Packs = await this.findPhase128RestartEvidenceAdaptive({});
+          phase128Packs = await this.findPhase128RestartEvidenceAdaptive(
+            { activationId: actId, gateId: p.gate_id, cohortId: p.cohort_id, tenantId: p.tenant_id, reviewId: reviewId, preparationId: preparationId },
+            { allowLatestFallback: false, requireContextBoundEvidence: true }
+          );
         }
       }
 
