@@ -52,7 +52,20 @@ console.log('=== Phase 133 Invite Issuance Acceptance Pack (133H) ===\n');
 
   for (const script of smokes) {
     console.log(`Running ${script}...`);
-    const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: { ...process.env } });
+    const childEnv = {
+      ...process.env,
+      FORCE_REAL_DB_SMOKE: process.env.FORCE_REAL_DB_SMOKE,
+      ALLOW_SCHEMA_SMOKE_FALLBACK: process.env.ALLOW_SCHEMA_SMOKE_FALLBACK,
+      ALLOW_SMOKE_FALLBACK: process.env.ALLOW_SMOKE_FALLBACK,
+      NODE_ENV: process.env.NODE_ENV
+    };
+    if (!hasDb) {
+      childEnv.NODE_ENV = 'development';
+      childEnv.DB_UNREACHABLE = 'true';
+      childEnv.ALLOW_SCHEMA_SMOKE_FALLBACK = 'true';
+      childEnv.DATABASE_URL = '';
+    }
+    const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: childEnv });
     
     if (res.stdout) console.log(res.stdout);
     if (res.stderr) console.error(res.stderr);

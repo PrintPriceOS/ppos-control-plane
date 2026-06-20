@@ -58,7 +58,14 @@ const failedSmokes = [];
 
 for (const script of smokes) {
   console.log(`Running ${script}...`);
-  const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: { ...process.env } });
+  const childEnv = {
+    ...process.env,
+    FORCE_REAL_DB_SMOKE: process.env.FORCE_REAL_DB_SMOKE,
+    ALLOW_SCHEMA_SMOKE_FALLBACK: process.env.ALLOW_SCHEMA_SMOKE_FALLBACK,
+    ALLOW_SMOKE_FALLBACK: process.env.ALLOW_SMOKE_FALLBACK,
+    NODE_ENV: process.env.NODE_ENV
+  };
+  const res = spawnSync(process.execPath, ['-r', 'dotenv/config', `scripts/${script}`], { encoding: 'utf-8', env: childEnv });
   
   // Print output so it's still visible
   if (res.stdout) console.log(res.stdout);
