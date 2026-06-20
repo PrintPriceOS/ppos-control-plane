@@ -28,6 +28,7 @@ const smokes = [
   'smoke_phase132_0_6_preparation_gate_binding_readiness_order.js',
   'smoke_phase132_0_7_phase128_context_isolation.js',
   'smoke_phase132_0_8_phase128_positive_context_evidence.js',
+  'smoke_phase132_0_9_readiness_smoke_variable_scope.js',
   'smoke_phase131h_operational_review_acceptance_pack.js'
 ];
 

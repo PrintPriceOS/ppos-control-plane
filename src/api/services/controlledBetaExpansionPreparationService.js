@@ -422,13 +422,13 @@ class ControlledBetaExpansionPreparationService {
         }
 
         if (!phase128Packs || phase128Packs.length === 0) {
-           result.blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
-           result.checks.phase128_1_validated = false;
+           blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
+           checks.phase128_1_validated = false;
            if (phase128Packs && phase128Packs.debug) {
-               result.phase128_1_evidence_resolution_debug = phase128Packs.debug;
+               checks.phase128_1_evidence_resolution_debug = phase128Packs.debug;
            }
         } else {
-           result.checks.phase128_1_validated = true;
+           checks.phase128_1_validated = true;
         }
       }
     } catch (e) {
