@@ -126,12 +126,19 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
          memory_state_detected: 0,
          restart_safe: 1,
          status: 'VERIFIED_AFTER_RESTART',
-         hash: 'hash'
+         hash: 'hash',
+         preparation_id: prepId,
+         review_id: revId,
+         decision_id: `${runId}_dec`,
+         activation_id: actId,
+         gate_id: `${runId}_gate`,
+         cohort_id: `${runId}_cohort`,
+         tenant_id: `${runId}_tenant`
       };
       
-      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; delete payload.recovered_from_db; }
-      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; delete payload.memory_state_detected; }
-      if (cols.includes('restart_safe')) { row.restart_safe = 1; delete payload.restart_safe; }
+      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; }
+      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; }
+      if (cols.includes('restart_safe')) { row.restart_safe = 1; }
       
       const idCols = ['drill_id', 'restart_drill_id', 'id', 'marker'];
       for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = prepId + '_drill'; }
@@ -144,9 +151,9 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
       if (cols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
       if (cols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
 
-      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; delete payload.status; }
-      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; delete payload.hash; }
-      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; delete payload.hash; }
+      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; }
+      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; }
+      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; }
 
       const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload'].find(c => cols.includes(c));
       if (payloadCol && Object.keys(payload).length > 0) {

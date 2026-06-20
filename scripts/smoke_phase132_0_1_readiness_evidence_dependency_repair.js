@@ -123,7 +123,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     }
   };
 
-  const insertPhase128EvidenceAdaptive = async (prepId) => {
+  const insertPhase128EvidenceAdaptive = async (prepId, revId, actId, runId) => {
     if (isProdLike) {
       const cols = await getTableColumns('limited_beta_runtime_restart_drills');
       if (cols.length === 0) return;
@@ -133,19 +133,34 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
          memory_state_detected: 0,
          restart_safe: 1,
          status: 'VERIFIED_AFTER_RESTART',
-         hash: 'hash'
+         hash: 'hash',
+         preparation_id: prepId,
+         review_id: revId,
+         decision_id: `${runId}_dec`,
+         activation_id: actId,
+         gate_id: `${runId}_gate`,
+         cohort_id: `${runId}_cohort`,
+         tenant_id: `${runId}_tenant`
       };
       
-      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; delete payload.recovered_from_db; }
-      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; delete payload.memory_state_detected; }
-      if (cols.includes('restart_safe')) { row.restart_safe = 1; delete payload.restart_safe; }
+      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; }
+      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; }
+      if (cols.includes('restart_safe')) { row.restart_safe = 1; }
       
       const idCols = ['drill_id', 'restart_drill_id', 'id', 'marker'];
       for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = prepId + '_drill'; }
       
-      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; delete payload.status; }
-      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; delete payload.hash; }
-      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; delete payload.hash; }
+      if (cols.includes('preparation_id')) row.preparation_id = prepId;
+      if (cols.includes('review_id')) row.review_id = revId;
+      if (cols.includes('decision_id')) row.decision_id = `${runId}_dec`;
+      if (cols.includes('activation_id')) row.activation_id = actId;
+      if (cols.includes('gate_id')) row.gate_id = `${runId}_gate`;
+      if (cols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
+      if (cols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
+
+      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; }
+      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; }
+      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; }
 
       const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload'].find(c => cols.includes(c));
       if (payloadCol && Object.keys(payload).length > 0) {
@@ -249,7 +264,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_131`, `${runId}_rev_1`, `${runId}_act_1`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_1`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_1`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_131`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_131`, `${runId}_rev_1`, `${runId}_act_1`, runId);
   }, async () => {
     const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_131`, `${runId}_rev_1`);
     assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when approved Phase 131 decision missing');
@@ -263,7 +278,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     // Deliberately do not insert Phase 131 evidence pack hash
     await insertPhase130EvidenceAdaptive(`${runId}_act_1b`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_1b`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_hash`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_hash`, `${runId}_rev_1b`, `${runId}_act_1b`, runId);
   }, async () => {
     const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_hash`, `${runId}_rev_1b`);
     assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when Phase 131 evidence hash is missing');
@@ -276,7 +291,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     await insertPhase131DecisionAdaptive(`${runId}_rev_2`, `${runId}_act_2`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_2`, `${runId}_act_2`, runId);
     await insertPhase129EvidenceAdaptive(`${runId}_act_2`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_130`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_130`, `${runId}_rev_2`, `${runId}_act_2`, runId);
   }, async () => {
     const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_130`, `${runId}_rev_2`);
     assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when Phase 130 evidence missing');
@@ -289,7 +304,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     await insertPhase131DecisionAdaptive(`${runId}_rev_3`, `${runId}_act_3`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_3`, `${runId}_act_3`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_3`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_129`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_129`, `${runId}_rev_3`, `${runId}_act_3`, runId);
   }, async () => {
     const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_129`, `${runId}_rev_3`);
     assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when Phase 129 evidence missing');
@@ -298,14 +313,14 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
 
   // Test 4: Phase 128.1 evidence missing
   await runTest('Phase 128.1 evidence missing', async () => {
-    await insertExpansionPreparationGateAdaptive(`${runId}_prep_missing_128`, `${runId}_rev_4`, `${runId}_act_4`, runId);
-    await insertPhase131DecisionAdaptive(`${runId}_rev_4`, `${runId}_act_4`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
-    await insertPhase131EvidencePackAdaptive(`${runId}_rev_4`, `${runId}_act_4`, runId);
-    await insertPhase130EvidenceAdaptive(`${runId}_act_4`);
-    await insertPhase129EvidenceAdaptive(`${runId}_act_4`);
+    await insertExpansionPreparationGateAdaptive(`${runId}_missing1281_prep`, `${runId}_missing1281_review`, `${runId}_missing1281_activation`, `${runId}_missing1281`);
+    await insertPhase131DecisionAdaptive(`${runId}_missing1281_review`, `${runId}_missing1281_activation`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', `${runId}_missing1281`);
+    await insertPhase131EvidencePackAdaptive(`${runId}_missing1281_review`, `${runId}_missing1281_activation`, `${runId}_missing1281`);
+    await insertPhase130EvidenceAdaptive(`${runId}_missing1281_activation`);
+    await insertPhase129EvidenceAdaptive(`${runId}_missing1281_activation`);
     if (!isProdLike) svc._mockState.phase128_1.delete('default');
   }, async () => {
-    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_128`, `${runId}_rev_4`);
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_missing1281_prep`, `${runId}_missing1281_review`);
     assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when Phase 128.1 evidence missing');
     assert(read.blocked_reasons.includes('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED'), 'readiness BLOCKED when Phase 128.1 evidence missing');
   });
@@ -317,7 +332,7 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_ready`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_ready`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_ready`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
   }, async () => {
     const readReady = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_ready`, `${runId}_rev_ready`);
     // If we are strictly testing the mock states or DB is up, it should pass

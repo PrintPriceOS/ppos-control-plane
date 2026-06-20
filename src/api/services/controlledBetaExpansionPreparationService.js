@@ -196,6 +196,12 @@ class ControlledBetaExpansionPreparationService {
     const { preparationId, reviewId, decisionId, activationId, gateId, cohortId, tenantId } = criteria;
     const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true';
 
+    const debug = {
+       searched_tables: [],
+       matched_table: null,
+       rejected_reasons: []
+    };
+
     const candidateTables = [
       'limited_beta_runtime_restart_drills',
       'limited_beta_runtime_restart_evidence_packs',
@@ -207,24 +213,31 @@ class ControlledBetaExpansionPreparationService {
     for (const t of candidateTables) {
       const cols = await this.getTableColumns(t);
       if (cols.length === 0) continue;
+      
+      debug.searched_tables.push(t);
 
       let q = `SELECT * FROM ${t} WHERE 1=1`;
       const vals = [];
-      let mapped = false;
+      let mappedToCols = false;
 
       if (requireContextBoundEvidence) {
-        if (activationId && cols.includes('activation_id')) { q += ' AND activation_id = ?'; vals.push(activationId); mapped = true; }
-        if (gateId && cols.includes('gate_id')) { q += ' AND gate_id = ?'; vals.push(gateId); mapped = true; }
-        if (cohortId && cols.includes('cohort_id')) { q += ' AND cohort_id = ?'; vals.push(cohortId); mapped = true; }
-        if (tenantId && cols.includes('tenant_id')) { q += ' AND tenant_id = ?'; vals.push(tenantId); mapped = true; }
-        if (reviewId && cols.includes('review_id')) { q += ' AND review_id = ?'; vals.push(reviewId); mapped = true; }
-        if (decisionId && cols.includes('decision_id')) { q += ' AND decision_id = ?'; vals.push(decisionId); mapped = true; }
-        if (preparationId && cols.includes('preparation_id')) { q += ' AND preparation_id = ?'; vals.push(preparationId); mapped = true; }
+        if (activationId && cols.includes('activation_id')) { q += ' AND activation_id = ?'; vals.push(activationId); mappedToCols = true; }
+        if (gateId && cols.includes('gate_id')) { q += ' AND gate_id = ?'; vals.push(gateId); mappedToCols = true; }
+        if (cohortId && cols.includes('cohort_id')) { q += ' AND cohort_id = ?'; vals.push(cohortId); mappedToCols = true; }
+        if (tenantId && cols.includes('tenant_id')) { q += ' AND tenant_id = ?'; vals.push(tenantId); mappedToCols = true; }
+        if (reviewId && cols.includes('review_id')) { q += ' AND review_id = ?'; vals.push(reviewId); mappedToCols = true; }
+        if (decisionId && cols.includes('decision_id')) { q += ' AND decision_id = ?'; vals.push(decisionId); mappedToCols = true; }
+        if (preparationId && cols.includes('preparation_id')) { q += ' AND preparation_id = ?'; vals.push(preparationId); mappedToCols = true; }
       }
 
-      if (!mapped && requireContextBoundEvidence && isProdLike && !allowLatestFallback) {
-         // If we cannot map to context, and fallback is disallowed, skip this table
-         continue;
+      if (!mappedToCols && requireContextBoundEvidence && isProdLike && !allowLatestFallback) {
+         debug.rejected_reasons.push(`${t}: scope_columns_absent_without_payload_context (pre-query)`);
+         continue; // We'll rely on fetching and checking payload context if we had a way to filter, but we don't. Wait, we should fetch all and check payload!
+      }
+      
+      // If we couldn't map to columns, we must fetch all rows and check payload context
+      if (!mappedToCols && requireContextBoundEvidence && isProdLike) {
+         q = `SELECT * FROM ${t} ORDER BY created_at DESC LIMIT 100`; // Just fetch recent to check payload
       }
 
       const rows = await db.query(q, vals);
@@ -239,13 +252,45 @@ class ControlledBetaExpansionPreparationService {
              payload = {};
           }
         }
+        
+        let contextMatch = true;
+        if (requireContextBoundEvidence && isProdLike) {
+           if (!mappedToCols) {
+              if (!payload) {
+                 contextMatch = false;
+                 debug.rejected_reasons.push(`${t}: missing_payload_for_context_match`);
+              } else {
+                 if (activationId && payload.activation_id !== activationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: activation_id_mismatch`); }
+                 else if (gateId && payload.gate_id !== gateId) { contextMatch = false; debug.rejected_reasons.push(`${t}: gate_id_mismatch`); }
+                 else if (cohortId && payload.cohort_id !== cohortId) { contextMatch = false; debug.rejected_reasons.push(`${t}: cohort_id_mismatch`); }
+                 else if (tenantId && payload.tenant_id !== tenantId) { contextMatch = false; debug.rejected_reasons.push(`${t}: tenant_id_mismatch`); }
+                 else if (reviewId && payload.review_id !== reviewId) { contextMatch = false; debug.rejected_reasons.push(`${t}: review_id_mismatch`); }
+                 else if (preparationId && payload.preparation_id !== preparationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: preparation_id_mismatch`); }
+                 
+                 if (contextMatch && !payload.activation_id && !payload.gate_id && !payload.cohort_id && !payload.tenant_id && !payload.review_id && !payload.preparation_id) {
+                     contextMatch = false;
+                     debug.rejected_reasons.push(`${t}: scope_columns_absent_without_payload_context`);
+                 }
+              }
+           }
+        }
+        
+        if (!contextMatch) continue;
+
         const state = this.normalizeRestartEvidence(r, payload);
         if (state.recovered_from_db && !state.memory_state_detected && state.restart_safe && state.status_ok && state.hash_ok) {
-          return [r];
+          debug.matched_table = t;
+          const ret = [r];
+          ret.debug = debug;
+          return ret;
+        } else {
+           debug.rejected_reasons.push(`${t}: missing_restart_safe_signal`);
         }
       }
     }
-    return [];
+    const ret = [];
+    ret.debug = debug;
+    return ret;
   }
 
   async evaluateExpansionPreparationReadiness(preparationId, reviewId) {
@@ -377,8 +422,13 @@ class ControlledBetaExpansionPreparationService {
         }
 
         if (!phase128Packs || phase128Packs.length === 0) {
-           checks.phase128_1_validated = false;
-           blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
+           result.blocked_reasons.push('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
+           result.checks.phase128_1_validated = false;
+           if (phase128Packs && phase128Packs.debug) {
+               result.phase128_1_evidence_resolution_debug = phase128Packs.debug;
+           }
+        } else {
+           result.checks.phase128_1_validated = true;
         }
       }
     } catch (e) {
