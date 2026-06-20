@@ -49,4 +49,10 @@ Nine automated smoke tests validate this module:
 6. `smoke_phase129f_controlled_beta_activation_admin_api_ui.js` (Checks router endpoints)
 7. `smoke_phase129g_controlled_beta_activation_evidence_pack.js` (Checks evidence pack integrity)
 8. `smoke_phase129_0_1_controlled_beta_readiness_repair.js` (Regression checks for full 19-point readiness structure repair)
-9. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)
+9. `smoke_phase129_0_2_fixture_schema_alignment.js` (Checks fixture idempotency and schema alignment)
+10. `smoke_phase129h_controlled_beta_activation_acceptance_pack.js` (Aggregator pack verifying build and secrets hygiene)
+
+## Test Fixture Guidelines
+- All test fixtures must be idempotent (using generated UUIDs or timestamps) to prevent duplicate key errors during repeated smoke runs.
+- Synthetic Phase 128.1 evidence is strictly disabled by default to force validation against actual production resilience metrics. It requires `ALLOW_PHASE129_SYNTHETIC_EVIDENCE=true` to be explicitly set.
+- All fixtures must read `INFORMATION_SCHEMA.COLUMNS` to adapt dynamically to real DB structures and avoid fatal unknown column errors during inserts.

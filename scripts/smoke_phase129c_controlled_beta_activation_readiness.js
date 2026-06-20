@@ -28,11 +28,13 @@ console.log('=== Smoke 129c: Controlled Beta Cohort Activation Readiness Verific
     fixture = new Phase129ControlledBetaFixture(process.env.DATABASE_URL);
   }
 
+  const testPrefix = `129c_${Date.now()}`;
+
   // Create new activation
   const resCreate = await svc.createControlledCohortActivation({
-    gate_id: 'lbpg_test_gate_129',
-    cohort_id: 'cohort_test_129',
-    tenant_id: 'tenant_test_129'
+    gate_id: `lbpg_test_gate_${testPrefix}`,
+    cohort_id: `cohort_test_${testPrefix}`,
+    tenant_id: `tenant_test_${testPrefix}`
   });
   const actId = resCreate.activation.activation_id;
 
@@ -48,9 +50,10 @@ console.log('=== Smoke 129c: Controlled Beta Cohort Activation Readiness Verific
   });
 
   // Add approved participant
+  const participantId = `part_ready_${testPrefix}`;
   await svc.addActivationParticipant({
     activation_id: actId,
-    participant_id: 'part_ready_129',
+    participant_id: participantId,
     approved: true,
     terms_accepted: true,
     role_boundary_defined: true
@@ -59,7 +62,7 @@ console.log('=== Smoke 129c: Controlled Beta Cohort Activation Readiness Verific
   // Issue invite
   await svc.issueActivationInvite({
     activation_id: actId,
-    participant_id: 'part_ready_129'
+    participant_id: participantId
   });
 
   // Define scope
@@ -83,7 +86,7 @@ console.log('=== Smoke 129c: Controlled Beta Cohort Activation Readiness Verific
 
   // Setup Prerequisites using the DB fixture
   if (fixture) {
-    await fixture.setupPrerequisites(actId);
+    await fixture.setupPrerequisites(actId, testPrefix);
   }
 
   // 2. Readiness should now be READY (in memory/test fallback mode or with schema matching)
@@ -113,7 +116,7 @@ console.log('=== Smoke 129c: Controlled Beta Cohort Activation Readiness Verific
 
   console.log(`\nSmoke 129c: ${passed} passed, ${failed} failed`);
   if (fixture) {
-    await fixture.cleanupPrerequisites();
+    await fixture.cleanupPhase129Fixture(testPrefix);
     await fixture.close();
   }
   if (svc._db && svc._db.closePool) await svc._db.closePool();

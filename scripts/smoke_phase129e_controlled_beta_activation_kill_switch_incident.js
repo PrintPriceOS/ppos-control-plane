@@ -28,23 +28,26 @@ console.log('=== Smoke 129e: Controlled Beta Cohort Activation Kill Switch & Inc
     fixture = new Phase129ControlledBetaFixture(process.env.DATABASE_URL);
   }
 
+  const testPrefix = `129e_${Date.now()}`;
+
   const resCreate = await svc.createControlledCohortActivation({
-    gate_id: 'lbpg_test_gate_129',
-    cohort_id: 'cohort_test_129',
-    tenant_id: 'tenant_test_129'
+    gate_id: `lbpg_test_gate_${testPrefix}`,
+    cohort_id: `cohort_test_${testPrefix}`,
+    tenant_id: `tenant_test_${testPrefix}`
   });
   const actId = resCreate.activation.activation_id;
 
   // Define limits, participants and invites to satisfy readiness
+  const participantId = `part_kill_${testPrefix}`;
   await svc.defineSessionLimits({ activation_id: actId });
   await svc.addActivationParticipant({
     activation_id: actId,
-    participant_id: 'part_kill_129',
+    participant_id: participantId,
     approved: true,
     terms_accepted: true,
     role_boundary_defined: true
   });
-  await svc.issueActivationInvite({ activation_id: actId, participant_id: 'part_kill_129' });
+  await svc.issueActivationInvite({ activation_id: actId, participant_id: participantId });
 
   // Define scope
   await svc.defineActivationScope({
@@ -67,7 +70,7 @@ console.log('=== Smoke 129e: Controlled Beta Cohort Activation Kill Switch & Inc
 
   // Setup Prerequisites using the DB fixture
   if (fixture) {
-    await fixture.setupPrerequisites(actId);
+    await fixture.setupPrerequisites(actId, testPrefix);
   }
 
   // Activate
@@ -112,7 +115,7 @@ console.log('=== Smoke 129e: Controlled Beta Cohort Activation Kill Switch & Inc
 
   console.log(`\nSmoke 129e: ${passed} passed, ${failed} failed`);
   if (fixture) {
-    await fixture.cleanupPrerequisites();
+    await fixture.cleanupPhase129Fixture(testPrefix);
     await fixture.close();
   }
   if (svc._db && svc._db.closePool) await svc._db.closePool();

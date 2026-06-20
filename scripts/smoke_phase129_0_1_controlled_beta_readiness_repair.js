@@ -28,11 +28,13 @@ console.log('=== Smoke 129.0.1: Controlled Beta Activation Readiness Repair Veri
     fixture = new Phase129ControlledBetaFixture(process.env.DATABASE_URL);
   }
 
+  const testPrefix = `129_0_1_${Date.now()}`;
+
   // Create new activation
   const resCreate = await svc.createControlledCohortActivation({
-    gate_id: 'lbpg_repair_129',
-    cohort_id: 'cohort_repair_129',
-    tenant_id: 'tenant_repair_129'
+    gate_id: `lbpg_repair_${testPrefix}`,
+    cohort_id: `cohort_repair_${testPrefix}`,
+    tenant_id: `tenant_repair_${testPrefix}`
   });
   const actId = resCreate.activation.activation_id;
 
@@ -42,21 +44,22 @@ console.log('=== Smoke 129.0.1: Controlled Beta Activation Readiness Repair Veri
   assert(resBlocked.blocked_reasons.length > 0, 'Blocked reasons are correctly reported');
 
   // 2. Build Readiness
+  const participantId = `part_repair_${testPrefix}`;
   await svc.defineSessionLimits({ activation_id: actId, max_participants: 5 });
   await svc.addActivationParticipant({
     activation_id: actId,
-    participant_id: 'part_repair_129',
+    participant_id: participantId,
     approved: true,
     terms_accepted: true,
     role_boundary_defined: true
   });
-  await svc.issueActivationInvite({ activation_id: actId, participant_id: 'part_repair_129' });
+  await svc.issueActivationInvite({ activation_id: actId, participant_id: participantId });
   await svc.defineActivationScope({ activation_id: actId, allowed_features_json: { features: [] } });
   await svc.recordActivationMonitoringEvent({ activation_id: actId, event_type: 'SETUP', details: {} });
   await svc.recordActivationSupportEvent({ activation_id: actId, ticket_details: 'support configured' });
 
   if (fixture) {
-    await fixture.setupPrerequisites(actId);
+    await fixture.setupPrerequisites(actId, testPrefix);
   }
 
   // 3. Readiness should be READY
@@ -103,7 +106,7 @@ console.log('=== Smoke 129.0.1: Controlled Beta Activation Readiness Repair Veri
 
   console.log(`\nSmoke 129.0.1: ${passed} passed, ${failed} failed`);
   if (fixture) {
-    await fixture.cleanupPrerequisites();
+    await fixture.cleanupPhase129Fixture(testPrefix);
     await fixture.close();
   }
   if (svc._db && svc._db.closePool) await svc._db.closePool();

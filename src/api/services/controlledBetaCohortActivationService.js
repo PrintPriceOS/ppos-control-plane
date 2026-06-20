@@ -269,39 +269,39 @@ class ControlledBetaCohortActivationService {
     }
 
     if (!participants_present) blocked_reasons.push('NO_PARTICIPANTS');
-    if (participants_present && !all_participants_approved) blocked_reasons.push('PARTICIPANTS_NOT_APPROVED');
-    if (participants_present && !terms_accepted) blocked_reasons.push('TERMS_NOT_ACCEPTED');
-    if (participants_present && !role_boundaries_defined) blocked_reasons.push('ROLE_BOUNDARIES_UNDEFINED');
+    if (participants_present && !all_participants_approved) blocked_reasons.push('PARTICIPANT_APPROVAL_MISSING');
+    if (participants_present && !terms_accepted) blocked_reasons.push('TERMS_ACCEPTANCE_MISSING');
+    if (participants_present && !role_boundaries_defined) blocked_reasons.push('ROLE_BOUNDARY_MISSING');
 
     if (invites && invites.length > 0) {
       valid_invites_or_access_grants = invites.some(i => !i.revoked && (!i.expires_at || new Date(i.expires_at) > new Date()));
     }
-    if (!valid_invites_or_access_grants) blocked_reasons.push('NO_VALID_INVITES_OR_ACCESS_GRANTS');
+    if (!valid_invites_or_access_grants) blocked_reasons.push('VALID_INVITE_MISSING');
 
     if (scopes && scopes.length > 0) {
       activation_scope_defined = true;
     }
-    if (!activation_scope_defined) blocked_reasons.push('SCOPE_UNDEFINED');
+    if (!activation_scope_defined) blocked_reasons.push('ACTIVATION_SCOPE_MISSING');
 
     if (limits) {
       session_limits_defined = true;
     }
-    if (!session_limits_defined) blocked_reasons.push('SESSION_LIMITS_UNDEFINED');
+    if (!session_limits_defined) blocked_reasons.push('SESSION_LIMITS_MISSING');
 
     if (support && support.length > 0) {
       support_escalation_defined = true;
     }
-    if (!support_escalation_defined) blocked_reasons.push('SUPPORT_ESCALATION_UNDEFINED');
+    if (!support_escalation_defined) blocked_reasons.push('SUPPORT_ESCALATION_MISSING');
 
     if (rollbackReadyFromMem) {
       rollback_ready = true;
     }
-    if (!rollback_ready) blocked_reasons.push('ROLLBACK_NOT_READY');
+    if (!rollback_ready) blocked_reasons.push('ROLLBACK_READY_MISSING');
 
     if (monitoring && monitoring.length > 0) {
       monitoring_configured = true;
     }
-    if (!monitoring_configured) blocked_reasons.push('MONITORING_NOT_CONFIGURED');
+    if (!monitoring_configured) blocked_reasons.push('MONITORING_CONFIG_MISSING');
 
     if (findings && findings.length === 0) {
       no_unresolved_blocker_findings = true;
