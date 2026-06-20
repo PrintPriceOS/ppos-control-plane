@@ -21,6 +21,7 @@ const smokes = [
   'smoke_phase132f_expansion_preparation_admin_api_ui.js',
   'smoke_phase132g_expansion_preparation_evidence_pack.js',
   'smoke_phase132_0_1_readiness_evidence_dependency_repair.js',
+  'smoke_phase132_0_2_fixture_idempotency_schema_alignment.js',
   'smoke_phase131h_operational_review_acceptance_pack.js'
 ];
 

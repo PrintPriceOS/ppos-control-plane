@@ -30,23 +30,85 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     }
   }
 
+  const runId = `phase13201_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  
   const runTest = async (testName, setupFn, verifyFn) => {
+    await setupFn();
+    await verifyFn();
+  };
+
+  const cleanupFixtureRows = async (prefix) => {
     if (isProdLike) {
-      await setupFn();
-      await verifyFn();
-    } else {
-      await setupFn();
-      await verifyFn();
+      await db.query("DELETE FROM controlled_beta_expansion_preparation_gates WHERE preparation_id LIKE ?", [`${prefix}%`]);
+      await db.query("DELETE FROM controlled_beta_operational_exit_decisions WHERE review_id LIKE ?", [`${prefix}%`]);
+      await db.query("DELETE FROM controlled_beta_runtime_monitoring_evidence_packs WHERE activation_id LIKE ?", [`${prefix}%`]);
+      await db.query("DELETE FROM controlled_beta_activation_evidence_packs WHERE activation_id LIKE ?", [`${prefix}%`]);
+      await db.query("DELETE FROM limited_beta_runtime_restart_drills WHERE marker LIKE ?", [`${prefix}%`]);
     }
   };
 
-  const cleanup = async (prepId, actId, revId) => {
+  const getTableColumns = async (tableName) => {
+    const rows = await db.query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = DATABASE()", [tableName]);
+    return rows.map(r => r.COLUMN_NAME);
+  };
+
+  const buildInsertForExistingColumns = async (tableName, desiredRow) => {
+    const cols = await getTableColumns(tableName);
+    const finalRow = {};
+    for (const [k, v] of Object.entries(desiredRow)) {
+      if (cols.includes(k)) finalRow[k] = v;
+    }
+    const keys = Object.keys(finalRow);
+    const vals = Object.values(finalRow);
+    const placeholders = keys.map(() => '?').join(', ');
+    const q = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`;
+    return { q, vals };
+  };
+
+  const insertPhase130EvidenceAdaptive = async (actId) => {
     if (isProdLike) {
-      await db.query("DELETE FROM controlled_beta_expansion_preparation_gates WHERE preparation_id = ?", [prepId]);
-      await db.query("DELETE FROM controlled_beta_operational_exit_decisions WHERE review_id = ? AND activation_id = ?", [revId, actId]);
-      await db.query("DELETE FROM controlled_beta_runtime_monitoring_evidence_packs WHERE activation_id = ?", [actId]);
-      await db.query("DELETE FROM controlled_beta_activation_evidence_packs WHERE activation_id = ?", [actId]);
-      await db.query("DELETE FROM limited_beta_runtime_restart_drills WHERE marker = ?", [prepId]);
+      const cols = await getTableColumns('controlled_beta_runtime_monitoring_evidence_packs');
+      const row = { activation_id: actId, evidence_integrity_hash: 'hash' };
+      
+      const idCols = ['evidence_pack_id', 'pack_id', 'evidence_id', 'id', 'observation_id'];
+      for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = actId + '_obs'; }
+      
+      const payloadCols = ['evidence_payload', 'evidence_json', 'payload_json', 'evidence_data', 'pack_payload'];
+      for (const pCol of payloadCols) { if (cols.includes(pCol)) row[pCol] = '{}'; }
+      
+      const schemaCols = ['evidence_schema_version', 'schema_version'];
+      for (const sCol of schemaCols) { if (cols.includes(sCol)) row[sCol] = '130.0'; }
+      
+      const extraCols = ['gate_id', 'cohort_id', 'tenant_id', 'participant_id', 'session_id'];
+      for (const extraCol of extraCols) { if (cols.includes(extraCol)) row[extraCol] = 'x'; }
+
+      const extraCols2 = ['event_type', 'observation_status', 'observation_severity', 'observation_source', 'runtime_truth_status', 'persistence_status'];
+      for (const extraCol of extraCols2) { if (cols.includes(extraCol)) row[extraCol] = 'OK'; }
+      
+      const { q, vals } = await buildInsertForExistingColumns('controlled_beta_runtime_monitoring_evidence_packs', row);
+      await db.query(q, vals);
+    } else {
+      svc.setMockState('phase130', actId, [{ evidence_integrity_hash: 'h1' }]);
+    }
+  };
+
+  const insertPhase129EvidenceAdaptive = async (actId) => {
+    if (isProdLike) {
+      const cols = await getTableColumns('controlled_beta_activation_evidence_packs');
+      const row = { activation_id: actId, evidence_integrity_hash: 'hash' };
+      const idCols = ['evidence_pack_id', 'pack_id', 'evidence_id', 'id'];
+      for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = actId + '_pack'; }
+      const schemaCols = ['evidence_schema_version', 'schema_version'];
+      for (const sCol of schemaCols) { if (cols.includes(sCol)) row[sCol] = '129.0'; }
+      if (cols.includes('evidence_payload')) row.evidence_payload = '{}';
+      const extraCols = ['gate_id', 'cohort_id', 'tenant_id', 'participant_id'];
+      for (const extraCol of extraCols) { if (cols.includes(extraCol)) row[extraCol] = 'x'; }
+      if (cols.includes('evidence_status')) row.evidence_status = 'OK';
+
+      const { q, vals } = await buildInsertForExistingColumns('controlled_beta_activation_evidence_packs', row);
+      await db.query(q, vals);
+    } else {
+      svc.setMockState('phase129', actId, [{ evidence_integrity_hash: 'h2' }]);
     }
   };
 
@@ -60,103 +122,86 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
 
   const setup131 = async (revId, actId, status, type) => {
     if (isProdLike) {
-      await db.query("INSERT INTO controlled_beta_operational_exit_decisions (decision_id, review_id, activation_id, gate_id, cohort_id, tenant_id, decision_status, decision_type) VALUES ('dec1', ?, ?, 'gate', 'cohort', 'tenant', ?, ?)", [revId, actId, status, type]);
+      await db.query("INSERT INTO controlled_beta_operational_exit_decisions (decision_id, review_id, activation_id, gate_id, cohort_id, tenant_id, decision_status, decision_type) VALUES (?, ?, ?, 'gate', 'cohort', 'tenant', ?, ?)", [actId + '_dec', revId, actId, status, type]);
     } else {
       svc.setMockState('phase131', actId, [{ decision_status: status, decision_type: type }]);
     }
   };
 
-  const setup130 = async (actId) => {
-    if (isProdLike) {
-      await db.query("INSERT INTO controlled_beta_runtime_monitoring_evidence_packs (pack_id, activation_id, gate_id, cohort_id, tenant_id, evidence_schema_version, evidence_payload, evidence_integrity_hash) VALUES ('p130', ?, 'gate', 'cohort', 'tenant', '130.0', '{}', 'hash')", [actId]);
-    } else {
-      svc.setMockState('phase130', actId, [{ evidence_integrity_hash: 'h1' }]);
-    }
-  };
-
-  const setup129 = async (actId) => {
-    if (isProdLike) {
-      await db.query("INSERT INTO controlled_beta_activation_evidence_packs (pack_id, activation_id, gate_id, cohort_id, tenant_id, evidence_schema_version, evidence_payload, evidence_integrity_hash) VALUES ('p129', ?, 'gate', 'cohort', 'tenant', '129.0', '{}', 'hash')", [actId]);
-    } else {
-      svc.setMockState('phase129', actId, [{ evidence_integrity_hash: 'h2' }]);
-    }
-  };
-
   const setup128 = async (prepId) => {
     if (isProdLike) {
-      await db.query("INSERT INTO limited_beta_runtime_restart_drills (drill_id, marker, recovered_from_db, memory_state_detected, restart_safe) VALUES ('d128', ?, 1, 0, 1)", [prepId]);
+      await db.query("INSERT INTO limited_beta_runtime_restart_drills (drill_id, marker, recovered_from_db, memory_state_detected, restart_safe) VALUES (?, ?, 1, 0, 1)", [prepId + '_drill', prepId]);
     } else {
       svc.setMockState('phase128_1', 'default', [{ restart_safe: 1 }]);
     }
   };
 
+  await cleanupFixtureRows(runId);
+
   // Use the mock fallback mode safely to test isolated conditions if not prod
   await runTest('approved Phase 131 decision missing', async () => {
-    await setupGate('prep_missing_131', 'rev_1', 'act_1');
-    await setup130('act_1');
-    await setup129('act_1');
-    await setup128('prep_missing_131');
+    await setupGate(`${runId}_prep_missing_131`, `${runId}_rev_1`, `${runId}_act_1`);
+    await insertPhase130EvidenceAdaptive(`${runId}_act_1`);
+    await insertPhase129EvidenceAdaptive(`${runId}_act_1`);
+    await setup128(`${runId}_prep_missing_131`);
   }, async () => {
-    const read = await svc.evaluateExpansionPreparationReadiness('prep_missing_131', 'rev_1');
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_131`, `${runId}_rev_1`);
     assert(read.readiness_status === 'BLOCKED', 'evaluateExpansionPreparationReadiness blocks when approved Phase 131 decision is missing');
     assert(read.blocked_reasons.includes('APPROVED_PHASE131_DECISION_MISSING'), 'blocked_reasons includes APPROVED_PHASE131_DECISION_MISSING');
-    await cleanup('prep_missing_131', 'act_1', 'rev_1');
   });
 
   await runTest('Phase 130 evidence missing', async () => {
-    await setupGate('prep_missing_130', 'rev_2', 'act_2');
-    await setup131('rev_2', 'act_2', 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
-    await setup129('act_2');
-    await setup128('prep_missing_130');
+    await setupGate(`${runId}_prep_missing_130`, `${runId}_rev_2`, `${runId}_act_2`);
+    await setup131(`${runId}_rev_2`, `${runId}_act_2`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
+    await insertPhase129EvidenceAdaptive(`${runId}_act_2`);
+    await setup128(`${runId}_prep_missing_130`);
   }, async () => {
-    const read = await svc.evaluateExpansionPreparationReadiness('prep_missing_130', 'rev_2');
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_130`, `${runId}_rev_2`);
     assert(read.readiness_status === 'BLOCKED', 'evaluateExpansionPreparationReadiness blocks when Phase 130 evidence is missing');
     assert(read.blocked_reasons.includes('PHASE_130_EVIDENCE_MISSING_OR_DEGRADED'), 'blocked_reasons includes PHASE_130_EVIDENCE_MISSING_OR_DEGRADED');
-    await cleanup('prep_missing_130', 'act_2', 'rev_2');
   });
 
   await runTest('Phase 129 evidence missing', async () => {
-    await setupGate('prep_missing_129', 'rev_3', 'act_3');
-    await setup131('rev_3', 'act_3', 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
-    await setup130('act_3');
-    await setup128('prep_missing_129');
+    await setupGate(`${runId}_prep_missing_129`, `${runId}_rev_3`, `${runId}_act_3`);
+    await setup131(`${runId}_rev_3`, `${runId}_act_3`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
+    await insertPhase130EvidenceAdaptive(`${runId}_act_3`);
+    await setup128(`${runId}_prep_missing_129`);
   }, async () => {
-    const read = await svc.evaluateExpansionPreparationReadiness('prep_missing_129', 'rev_3');
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_129`, `${runId}_rev_3`);
     assert(read.readiness_status === 'BLOCKED', 'evaluateExpansionPreparationReadiness blocks when Phase 129 evidence is missing');
     assert(read.blocked_reasons.includes('PHASE_129_EVIDENCE_MISSING_OR_DEGRADED'), 'blocked_reasons includes PHASE_129_EVIDENCE_MISSING_OR_DEGRADED');
-    await cleanup('prep_missing_129', 'act_3', 'rev_3');
   });
 
   await runTest('Phase 128.1 evidence missing', async () => {
-    await setupGate('prep_missing_128', 'rev_4', 'act_4');
-    await setup131('rev_4', 'act_4', 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
-    await setup130('act_4');
-    await setup129('act_4');
+    await setupGate(`${runId}_prep_missing_128`, `${runId}_rev_4`, `${runId}_act_4`);
+    await setup131(`${runId}_rev_4`, `${runId}_act_4`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
+    await insertPhase130EvidenceAdaptive(`${runId}_act_4`);
+    await insertPhase129EvidenceAdaptive(`${runId}_act_4`);
     if (!isProdLike) svc._mockState.phase128_1.delete('default');
   }, async () => {
-    const read = await svc.evaluateExpansionPreparationReadiness('prep_missing_128', 'rev_4');
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_128`, `${runId}_rev_4`);
     assert(read.readiness_status === 'BLOCKED', 'evaluateExpansionPreparationReadiness blocks when Phase 128.1 evidence is missing');
     assert(read.blocked_reasons.includes('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED'), 'blocked_reasons includes PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED');
-    await cleanup('prep_missing_128', 'act_4', 'rev_4');
   });
 
   // Verify full readiness
   await runTest('Full Readiness', async () => {
-    await setupGate('prep_ready', 'rev_ready', 'act_ready');
-    await setup131('rev_ready', 'act_ready', 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
-    await setup130('act_ready');
-    await setup129('act_ready');
-    await setup128('prep_ready');
+    await setupGate(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`);
+    await setup131(`${runId}_rev_ready`, `${runId}_act_ready`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION');
+    await insertPhase130EvidenceAdaptive(`${runId}_act_ready`);
+    await insertPhase129EvidenceAdaptive(`${runId}_act_ready`);
+    await setup128(`${runId}_prep_ready`);
   }, async () => {
-    const readReady = await svc.evaluateExpansionPreparationReadiness('prep_ready', 'rev_ready');
+    const readReady = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_ready`, `${runId}_rev_ready`);
     // If we are strictly testing the mock states or DB is up, it should pass
     if (readReady.readiness_status === 'READY') {
       assert(readReady.readiness_status === 'READY', 'readiness READY only when approved Phase 131 decision and Phase 130/129/128.1 evidence are all present and context-bound');
     } else {
-      assert(false, 'readiness READY only when approved Phase 131 decision and Phase 130/129/128.1 evidence are all present and context-bound');
+      assert(false, 'readiness READY only when approved Phase 131 decision and Phase 130/129/128.1 evidence are all present and context-bound. Blocked reasons: ' + readReady.blocked_reasons.join(', '));
     }
-    await cleanup('prep_ready', 'act_ready', 'rev_ready');
   });
+
+  await cleanupFixtureRows(runId);
 
   assert(true, 'readiness does not pass from unrelated latest evidence');
   assert(true, 'safety invariants remain disabled');
