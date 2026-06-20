@@ -168,9 +168,29 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
       }
 
       const { q, vals } = await buildInsertForExistingColumns('limited_beta_runtime_restart_drills', row);
-      await db.query(q, vals);
+      let insertedId = null;
+      if (row.drill_id) insertedId = row.drill_id;
+      else if (row.restart_drill_id) insertedId = row.restart_drill_id;
+      else if (row.id) insertedId = row.id;
+      else if (row.marker) insertedId = row.marker;
+      
+      const res = await db.query(q, vals);
+
+      return {
+        table: 'limited_beta_runtime_restart_drills',
+        inserted_id: insertedId || res.insertId,
+        inserted_columns: Object.keys(row),
+        inserted_payload_keys: payloadCol ? Object.keys(payload) : [],
+        context_used: { activation_id: actId, gate_id: `${runId}_gate`, cohort_id: `${runId}_cohort`, tenant_id: `${runId}_tenant`, preparation_id: prepId, review_id: revId, decision_id: `${runId}_dec` },
+        status_signal_written: !!(row.restart_recovery_status || row.recovery_status || row.status || (payloadCol && payload.status)),
+        recovered_from_db_written: !!(row.recovered_from_db || (payloadCol && payload.recovered_from_db)),
+        memory_state_detected_written: !!(('memory_state_detected' in row) || (payloadCol && ('memory_state_detected' in payload))),
+        restart_safe_written: !!(row.restart_safe || (payloadCol && payload.restart_safe)),
+        hash_written: !!(row.recovery_integrity_hash || row.evidence_integrity_hash || (payloadCol && payload.hash))
+      };
     } else {
       svc.setMockState('phase128_1', 'default', [{ restart_safe: 1, recovered_from_db: 1, memory_state_detected: 0 }]);
+      return { mock: true, context_used: { activation_id: actId } };
     }
   };
 
@@ -332,13 +352,26 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     await insertPhase131EvidencePackAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_ready`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_ready`);
-    await insertPhase128EvidenceAdaptive(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
+    const inserted128 = await insertPhase128EvidenceAdaptive(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
+    
+    if (inserted128) {
+      assert(inserted128.context_used.activation_id === `${runId}_act_ready`, 'inserted Phase 128.1 evidence is context-bound');
+      if (!inserted128.mock) {
+        assert(inserted128.status_signal_written, 'restart recovery status was written');
+        assert(inserted128.recovered_from_db_written, 'recovered_from_db true was written');
+        assert(inserted128.memory_state_detected_written, 'memory_state_detected false was written');
+        assert(inserted128.restart_safe_written, 'restart_safe true or equivalent was written');
+        assert(inserted128.hash_written, 'hash was written');
+      }
+    }
   }, async () => {
     const readReady = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_ready`, `${runId}_rev_ready`);
-    // If we are strictly testing the mock states or DB is up, it should pass
     if (readReady.readiness_status === 'READY') {
       assert(readReady.readiness_status === 'READY', 'readiness READY only when approved Phase 131 decision and Phase 130/129/128.1 evidence are all present and context-bound');
     } else {
+      if (readReady.blocked_reasons.includes('PHASE_128_1_EVIDENCE_MISSING_OR_DEGRADED') && readReady.phase128_1_evidence_resolution_debug) {
+         console.log('Positive readiness failed. Safe debug info:', JSON.stringify(readReady.phase128_1_evidence_resolution_debug, null, 2));
+      }
       assert(false, 'readiness READY only when approved Phase 131 decision and Phase 130/129/128.1 evidence are all present and context-bound. Blocked reasons: ' + readReady.blocked_reasons.join(', '));
     }
   });

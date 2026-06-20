@@ -174,12 +174,20 @@ class ControlledBetaExpansionPreparationService {
 
     // Check payload if direct checks failed
     if (payload) {
-      if (!recovered_from_db && ('recovered_from_db' in payload)) recovered_from_db = !!payload.recovered_from_db;
-      if (memory_state_detected && ('memory_state_detected' in payload)) memory_state_detected = !!payload.memory_state_detected;
-      if (!restart_safe && ('restart_safe' in payload)) restart_safe = !!payload.restart_safe;
+      const restart = payload.restart || payload.recovery || payload;
+      const evidence = payload.evidence || payload;
+
+      if (!recovered_from_db && ('recovered_from_db' in restart)) recovered_from_db = !!restart.recovered_from_db;
+      if (memory_state_detected && ('memory_state_detected' in restart)) memory_state_detected = !!restart.memory_state_detected;
+      if (!restart_safe && ('restart_safe' in restart)) restart_safe = !!restart.restart_safe;
       
-      if (!status_ok && payload.status && (payload.status === 'VERIFIED_AFTER_RESTART' || payload.status === 'COMPLETED')) status_ok = true;
-      if (!hash_ok && payload.hash) hash_ok = true;
+      if (!status_ok && restart.restart_recovery_status && (restart.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || restart.restart_recovery_status === 'COMPLETED')) status_ok = true;
+      if (!status_ok && restart.status && (restart.status === 'VERIFIED_AFTER_RESTART' || restart.status === 'COMPLETED')) status_ok = true;
+      
+      if (!hash_ok && evidence.integrity_hash) hash_ok = true;
+      if (!hash_ok && evidence.evidence_integrity_hash) hash_ok = true;
+      if (!hash_ok && restart.recovery_integrity_hash) hash_ok = true;
+      if (!hash_ok && restart.hash) hash_ok = true;
     }
 
     return {
@@ -260,14 +268,15 @@ class ControlledBetaExpansionPreparationService {
                  contextMatch = false;
                  debug.rejected_reasons.push(`${t}: missing_payload_for_context_match`);
               } else {
-                 if (activationId && payload.activation_id !== activationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: activation_id_mismatch`); }
-                 else if (gateId && payload.gate_id !== gateId) { contextMatch = false; debug.rejected_reasons.push(`${t}: gate_id_mismatch`); }
-                 else if (cohortId && payload.cohort_id !== cohortId) { contextMatch = false; debug.rejected_reasons.push(`${t}: cohort_id_mismatch`); }
-                 else if (tenantId && payload.tenant_id !== tenantId) { contextMatch = false; debug.rejected_reasons.push(`${t}: tenant_id_mismatch`); }
-                 else if (reviewId && payload.review_id !== reviewId) { contextMatch = false; debug.rejected_reasons.push(`${t}: review_id_mismatch`); }
-                 else if (preparationId && payload.preparation_id !== preparationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: preparation_id_mismatch`); }
+                 const pCtx = payload.context || payload;
+                 if (activationId && pCtx.activation_id !== activationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: activation_id_mismatch`); }
+                 else if (gateId && pCtx.gate_id !== gateId) { contextMatch = false; debug.rejected_reasons.push(`${t}: gate_id_mismatch`); }
+                 else if (cohortId && pCtx.cohort_id !== cohortId) { contextMatch = false; debug.rejected_reasons.push(`${t}: cohort_id_mismatch`); }
+                 else if (tenantId && pCtx.tenant_id !== tenantId) { contextMatch = false; debug.rejected_reasons.push(`${t}: tenant_id_mismatch`); }
+                 else if (reviewId && pCtx.review_id !== reviewId) { contextMatch = false; debug.rejected_reasons.push(`${t}: review_id_mismatch`); }
+                 else if (preparationId && pCtx.preparation_id !== preparationId) { contextMatch = false; debug.rejected_reasons.push(`${t}: preparation_id_mismatch`); }
                  
-                 if (contextMatch && !payload.activation_id && !payload.gate_id && !payload.cohort_id && !payload.tenant_id && !payload.review_id && !payload.preparation_id) {
+                 if (contextMatch && !pCtx.activation_id && !pCtx.gate_id && !pCtx.cohort_id && !pCtx.tenant_id && !pCtx.review_id && !pCtx.preparation_id) {
                      contextMatch = false;
                      debug.rejected_reasons.push(`${t}: scope_columns_absent_without_payload_context`);
                  }
