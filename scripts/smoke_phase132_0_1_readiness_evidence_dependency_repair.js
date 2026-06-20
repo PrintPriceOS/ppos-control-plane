@@ -50,7 +50,8 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
   const cleanupFixtureRows = async (prefix) => {
     if (isProdLike) {
       await deleteByExistingPrefixColumn('controlled_beta_expansion_preparation_gates', ['preparation_id'], prefix);
-      await deleteByExistingPrefixColumn('controlled_beta_operational_exit_decisions', ['review_id'], prefix);
+      await deleteByExistingPrefixColumn('controlled_beta_operational_exit_decisions', ['review_id', 'decision_id'], prefix);
+      await deleteByExistingPrefixColumn('controlled_beta_operational_review_evidence_packs', ['activation_id', 'review_id', 'pack_id'], prefix);
       await deleteByExistingPrefixColumn('controlled_beta_runtime_monitoring_evidence_packs', ['activation_id'], prefix);
       await deleteByExistingPrefixColumn('controlled_beta_activation_evidence_packs', ['activation_id'], prefix);
       await deleteByExistingPrefixColumn('limited_beta_runtime_restart_drills', ['marker', 'drill_id', 'restart_drill_id', 'recovery_id', 'evidence_pack_id', 'id', 'activation_id', 'gate_id', 'cohort_id', 'tenant_id', 'created_by', 'notes'], prefix);
@@ -149,11 +150,42 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     }
   };
 
-  const setup131 = async (revId, actId, status, type, runId) => {
+  const insertPhase131DecisionAdaptive = async (revId, actId, status, type, runId) => {
     if (isProdLike) {
-      await db.query("INSERT INTO controlled_beta_operational_exit_decisions (decision_id, review_id, activation_id, gate_id, cohort_id, tenant_id, decision_status, decision_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [actId + '_dec', revId, actId, `${runId}_gate`, `${runId}_cohort`, `${runId}_tenant`, status, type]);
+      const cols = await getTableColumns('controlled_beta_operational_exit_decisions');
+      const row = { decision_status: status, decision_type: type };
+      
+      if (cols.includes('decision_id')) row.decision_id = actId + '_dec';
+      if (cols.includes('review_id')) row.review_id = revId;
+      if (cols.includes('activation_id')) row.activation_id = actId;
+      if (cols.includes('gate_id')) row.gate_id = `${runId}_gate`;
+      if (cols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
+      if (cols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
+
+      const { q, vals } = await buildInsertForExistingColumns('controlled_beta_operational_exit_decisions', row);
+      await db.query(q, vals);
     } else {
       svc.setMockState('phase131', actId, [{ decision_status: status, decision_type: type }]);
+    }
+  };
+
+  const insertPhase131EvidencePackAdaptive = async (revId, actId, runId) => {
+    if (isProdLike) {
+      const cols = await getTableColumns('controlled_beta_operational_review_evidence_packs');
+      if (cols.length === 0) return; // Skip if table doesn't exist
+      const row = { evidence_integrity_hash: 'hash' };
+      
+      if (cols.includes('pack_id')) row.pack_id = actId + '_pack131';
+      if (cols.includes('review_id')) row.review_id = revId;
+      if (cols.includes('activation_id')) row.activation_id = actId;
+      if (cols.includes('decision_id')) row.decision_id = actId + '_dec';
+      if (cols.includes('evidence_schema_version')) row.evidence_schema_version = '131.0';
+
+      const { q, vals } = await buildInsertForExistingColumns('controlled_beta_operational_review_evidence_packs', row);
+      await db.query(q, vals);
+    } else {
+      const state = svc._mockState.phase131.get(actId) || [];
+      if (state.length > 0) state[0].evidence_integrity_hash = 'hash';
     }
   };
 
@@ -171,9 +203,22 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
     assert(read.blocked_reasons.includes('APPROVED_PHASE131_DECISION_MISSING'), 'blocked_reasons includes APPROVED_PHASE131_DECISION_MISSING');
   });
 
+  await runTest('Phase 131 decision present but hash missing', async () => {
+    await setupGate(`${runId}_prep_missing_hash`, `${runId}_rev_1b`, `${runId}_act_1b`, runId);
+    await insertPhase131DecisionAdaptive(`${runId}_rev_1b`, `${runId}_act_1b`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase130EvidenceAdaptive(`${runId}_act_1b`);
+    await insertPhase129EvidenceAdaptive(`${runId}_act_1b`);
+    await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_hash`);
+  }, async () => {
+    const read = await svc.evaluateExpansionPreparationReadiness(`${runId}_prep_missing_hash`, `${runId}_rev_1b`);
+    assert(read.readiness_status === 'BLOCKED', 'readiness BLOCKED when Phase 131 evidence hash is missing');
+    assert(read.blocked_reasons.includes('PHASE_131_EVIDENCE_MISSING_OR_DEGRADED'), 'readiness BLOCKED when Phase 131 evidence hash is missing');
+  });
+
   await runTest('Phase 130 evidence missing', async () => {
     await setupGate(`${runId}_prep_missing_130`, `${runId}_rev_2`, `${runId}_act_2`, runId);
-    await setup131(`${runId}_rev_2`, `${runId}_act_2`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131DecisionAdaptive(`${runId}_rev_2`, `${runId}_act_2`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131EvidencePackAdaptive(`${runId}_rev_2`, `${runId}_act_2`, runId);
     await insertPhase129EvidenceAdaptive(`${runId}_act_2`);
     await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_130`);
   }, async () => {
@@ -184,7 +229,8 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
 
   await runTest('Phase 129 evidence missing', async () => {
     await setupGate(`${runId}_prep_missing_129`, `${runId}_rev_3`, `${runId}_act_3`, runId);
-    await setup131(`${runId}_rev_3`, `${runId}_act_3`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131DecisionAdaptive(`${runId}_rev_3`, `${runId}_act_3`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131EvidencePackAdaptive(`${runId}_rev_3`, `${runId}_act_3`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_3`);
     await insertPhase128EvidenceAdaptive(`${runId}_prep_missing_129`);
   }, async () => {
@@ -195,7 +241,8 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
 
   await runTest('Phase 128.1 evidence missing', async () => {
     await setupGate(`${runId}_prep_missing_128`, `${runId}_rev_4`, `${runId}_act_4`, runId);
-    await setup131(`${runId}_rev_4`, `${runId}_act_4`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131DecisionAdaptive(`${runId}_rev_4`, `${runId}_act_4`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131EvidencePackAdaptive(`${runId}_rev_4`, `${runId}_act_4`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_4`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_4`);
     if (!isProdLike) svc._mockState.phase128_1.delete('default');
@@ -208,7 +255,8 @@ console.log('=== Smoke 132.0.1: Readiness Evidence Dependency Repair ===\n');
   // Verify full readiness
   await runTest('Full Readiness', async () => {
     await setupGate(`${runId}_prep_ready`, `${runId}_rev_ready`, `${runId}_act_ready`, runId);
-    await setup131(`${runId}_rev_ready`, `${runId}_act_ready`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131DecisionAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, 'APPROVED', 'APPROVE_INVITE_ONLY_EXPANSION', runId);
+    await insertPhase131EvidencePackAdaptive(`${runId}_rev_ready`, `${runId}_act_ready`, runId);
     await insertPhase130EvidenceAdaptive(`${runId}_act_ready`);
     await insertPhase129EvidenceAdaptive(`${runId}_act_ready`);
     await insertPhase128EvidenceAdaptive(`${runId}_prep_ready`);

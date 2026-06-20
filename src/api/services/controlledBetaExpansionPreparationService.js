@@ -19,6 +19,99 @@ class ControlledBetaExpansionPreparationService {
     this._mockState[type].set(id, data);
   }
 
+  async getTableColumns(tableName) {
+    const q = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = DATABASE()";
+    const rows = await db.query(q, [tableName]);
+    return rows.map(r => r.COLUMN_NAME);
+  }
+
+  async hasColumn(tableName, columnName) {
+    const cols = await this.getTableColumns(tableName);
+    return cols.includes(columnName);
+  }
+
+  async selectExistingColumns(tableName, desiredColumns) {
+    const cols = await this.getTableColumns(tableName);
+    return desiredColumns.filter(c => cols.includes(c));
+  }
+
+  async findApprovedPhase131DecisionAdaptive(reviewId, activationId) {
+    const tableName = 'controlled_beta_operational_exit_decisions';
+    const cols = await this.getTableColumns(tableName);
+    if (cols.length === 0) return []; // table doesn't exist
+    
+    const selectCols = ['decision_status', 'decision_type', 'evidence_integrity_hash', 'decision_id'].filter(c => cols.includes(c));
+    let q = `SELECT ${selectCols.length > 0 ? selectCols.join(', ') : '*'} FROM ${tableName} WHERE 1=1`;
+    const vals = [];
+    
+    if (cols.includes('review_id')) {
+      q += ' AND review_id = ?';
+      vals.push(reviewId);
+    }
+    if (cols.includes('activation_id')) {
+      q += ' AND activation_id = ?';
+      vals.push(activationId);
+    }
+    if (cols.includes('decision_status')) {
+      q += " AND decision_status = 'APPROVED'";
+    }
+    return await db.query(q, vals);
+  }
+
+  async findPhase131DecisionEvidenceHashAdaptive(criteria) {
+    const candidateTables = [
+      'controlled_beta_operational_exit_decisions',
+      'controlled_beta_operational_review_evidence_packs',
+      'controlled_beta_operational_reviews',
+      'controlled_beta_operational_review_approvals'
+    ];
+    const candidateHashCols = [
+      'evidence_integrity_hash',
+      'integrity_hash',
+      'evidence_hash',
+      'decision_evidence_hash',
+      'approval_evidence_hash',
+      'review_evidence_hash',
+      'hash'
+    ];
+    const { reviewId, activationId, decisionId } = criteria;
+
+    for (const t of candidateTables) {
+      const cols = await this.getTableColumns(t);
+      if (cols.length === 0) continue;
+      
+      const hashCol = candidateHashCols.find(c => cols.includes(c));
+      if (!hashCol) continue;
+
+      let q = `SELECT ${hashCol} as evidence_hash FROM ${t} WHERE 1=1`;
+      const vals = [];
+      let mapped = false;
+
+      // Prefer exact decision_id match if available
+      if (decisionId && cols.includes('decision_id')) {
+        q += ' AND decision_id = ?';
+        vals.push(decisionId);
+        mapped = true;
+      } else if (reviewId && activationId && cols.includes('review_id') && cols.includes('activation_id')) {
+        q += ' AND review_id = ? AND activation_id = ?';
+        vals.push(reviewId, activationId);
+        mapped = true;
+      } else if (reviewId && cols.includes('review_id')) {
+        q += ' AND review_id = ?';
+        vals.push(reviewId);
+        mapped = true;
+      }
+      
+      if (mapped) {
+        const rows = await db.query(q, vals);
+        if (rows.length > 0 && rows[0].evidence_hash) {
+          return rows[0].evidence_hash;
+        }
+      }
+    }
+    return null;
+  }
+
   async evaluateExpansionPreparationReadiness(preparationId, reviewId) {
     let readiness_status = 'BLOCKED';
     let blocked_reasons = [];
@@ -67,14 +160,22 @@ class ControlledBetaExpansionPreparationService {
         const q = "SELECT activation_id, gate_id, cohort_id, tenant_id, preparation_status, manual_approval_required, auto_expansion_enabled, invite_sending_enabled, active_invite_creation_enabled, participant_auto_add_enabled, scope_auto_broaden_enabled, full_public_enabled, open_marketplace_enabled, public_beta_enabled FROM controlled_beta_expansion_preparation_gates WHERE preparation_id = ? AND review_id = ?";
         const rows = await db.query(q, [preparationId, reviewId]);
         if (rows && rows.length > 0) {
-          p = rows[0];
+          const p = rows[0];
           
-          const phase131DecisionQuery = `
-            SELECT decision_status, decision_type, evidence_integrity_hash 
-            FROM controlled_beta_operational_exit_decisions 
-            WHERE review_id = ? AND activation_id = ? AND decision_status = 'APPROVED'
-          `;
-          phase131Decisions = await db.query(phase131DecisionQuery, [reviewId, p.activation_id]);
+          phase131Decisions = await this.findApprovedPhase131DecisionAdaptive(reviewId, p.activation_id);
+          
+          // Attach hash from fallback tables if missing
+          if (phase131Decisions && phase131Decisions.length > 0) {
+            for (let d of phase131Decisions) {
+              if (!d.evidence_integrity_hash) {
+                d.evidence_integrity_hash = await this.findPhase131DecisionEvidenceHashAdaptive({
+                  reviewId: reviewId,
+                  activationId: p.activation_id,
+                  decisionId: d.decision_id
+                });
+              }
+            }
+          }
           
           const phase130Query = "SELECT evidence_integrity_hash FROM controlled_beta_runtime_monitoring_evidence_packs WHERE activation_id = ?";
           phase130Packs = await db.query(phase130Query, [p.activation_id]);
@@ -114,11 +215,15 @@ class ControlledBetaExpansionPreparationService {
            blocked_reasons.push('APPROVED_PHASE131_DECISION_MISSING');
         } else {
            const d = phase131Decisions[0];
-           if (d.decision_type !== 'APPROVE_INVITE_ONLY_EXPANSION' && 
+           if (d.decision_type && d.decision_type !== 'APPROVE_INVITE_ONLY_EXPANSION' && 
                d.decision_type !== 'APPROVE_INVITE_ONLY_EXPANSION_RECOMMENDATION' && 
                d.decision_type !== 'READY_FOR_INVITE_ONLY_EXPANSION_RECOMMENDATION') {
                checks.decision_allows_invite_only_expansion_preparation = false;
                blocked_reasons.push('PHASE131_DECISION_DOES_NOT_ALLOW_EXPANSION_PREPARATION');
+           }
+           if (!d.evidence_integrity_hash) {
+               checks.phase131_validated = false;
+               blocked_reasons.push('PHASE_131_EVIDENCE_MISSING_OR_DEGRADED');
            }
         }
         

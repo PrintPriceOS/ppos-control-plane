@@ -23,6 +23,7 @@ const smokes = [
   'smoke_phase132_0_1_readiness_evidence_dependency_repair.js',
   'smoke_phase132_0_2_fixture_idempotency_schema_alignment.js',
   'smoke_phase132_0_3_restart_cleanup_schema_alignment.js',
+  'smoke_phase132_0_4_phase131_decision_hash_schema_alignment.js',
   'smoke_phase131h_operational_review_acceptance_pack.js'
 ];
 
