@@ -14,10 +14,16 @@ function assert(condition, label) {
 console.log('=== Phase 132 Expansion Preparation Acceptance Pack ===\n');
 
 (async () => {
+  const isForceReal = process.env.FORCE_REAL_DB_SMOKE === 'true' || process.env.NODE_ENV === 'production';
   try {
     await db.query("SELECT 1");
     console.log('Database is reachable. Running sub-smokes in production-like mode.\n');
   } catch (e) {
+    if (isForceReal) {
+      console.error('REAL_DB_REQUIRED_BUT_UNAVAILABLE');
+      console.error('FAIL: Real DB is required but connection failed: ' + e.message);
+      process.exit(1);
+    }
     console.log('Database connection refused/failed. Overriding environment to force mock/fallback mode across all sub-smokes.\n');
     process.env.NODE_ENV = 'development';
     delete process.env.DATABASE_URL;
@@ -45,7 +51,7 @@ console.log('=== Phase 132 Expansion Preparation Acceptance Pack ===\n');
   'smoke_phase132_0_9_readiness_smoke_variable_scope.js',
   'smoke_phase132_0_10_phase128_positive_contract_alignment.js',
   'smoke_phase132_0_11_phase128_signal_write_read_alignment.js',
-  ...(process.env.DB_UNREACHABLE === 'true' ? [] : ['smoke_phase131h_operational_review_acceptance_pack.js'])
+  ...(process.env.DB_UNREACHABLE === 'true' ? [] : ['smoke_phase132_0_12_realdb_phase128_signal_persistence.js', 'smoke_phase131h_operational_review_acceptance_pack.js'])
 ];
 
 const failedSmokes = [];

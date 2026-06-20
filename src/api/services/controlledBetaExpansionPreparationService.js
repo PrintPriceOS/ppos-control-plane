@@ -139,25 +139,48 @@ class ControlledBetaExpansionPreparationService {
   }
 
   normalizeRestartEvidence(row, payload) {
+    // Legacy validations:
+    // payload.restart || payload.recovery || payload
+    // payload.recovered_from_db
+    // memory_state_detected === 0 || row.memory_state_detected === false
+
     let recovered_from_db = false;
     let memory_state_detected = true;
     let restart_safe = false;
     let status_ok = false;
     let hash_ok = false;
 
+    const toBool = (val) => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val === 1;
+      if (typeof val === 'string') {
+        const s = val.trim().toLowerCase();
+        return s === 'true' || s === '1';
+      }
+      if (Buffer.isBuffer(val)) {
+        const s = val.toString('utf8').trim().toLowerCase();
+        return s === 'true' || s === '1';
+      }
+      return !!val;
+    };
+
+    const isExplicitFalse = (val) => toBool(val) === false;
+
     // Check direct columns first
-    if ('recovered_from_db' in row) recovered_from_db = !!row.recovered_from_db;
-    else if ('db_recovered' in row) recovered_from_db = !!row.db_recovered;
-    else if ('persistence_recovered' in row) recovered_from_db = !!row.persistence_recovered;
-    else if ('recoveredFromDb' in row) recovered_from_db = !!row.recoveredFromDb;
+    if ('recovered_from_db' in row) recovered_from_db = toBool(row.recovered_from_db) === true;
+    else if ('db_recovered' in row) recovered_from_db = toBool(row.db_recovered) === true;
+    else if ('persistence_recovered' in row) recovered_from_db = toBool(row.persistence_recovered) === true;
+    else if ('recoveredFromDb' in row) recovered_from_db = toBool(row.recoveredFromDb) === true;
 
-    if (row.memory_state_detected === 0 || row.memory_state_detected === false) memory_state_detected = false;
-    else if (row.memory_fallback_detected === 0 || row.memory_fallback_detected === false) memory_state_detected = false;
+    if (isExplicitFalse(row.memory_state_detected) || isExplicitFalse(row.memory_fallback_detected)) {
+      memory_state_detected = false;
+    }
 
-    if ('restart_safe' in row) restart_safe = !!row.restart_safe;
-    else if ('restartSafe' in row) restart_safe = !!row.restartSafe;
-    else if ('recovery_safe' in row) restart_safe = !!row.recovery_safe;
-    else if ('restart_recovery_safe' in row) restart_safe = !!row.restart_recovery_safe;
+    if ('restart_safe' in row) restart_safe = toBool(row.restart_safe) === true;
+    else if ('restartSafe' in row) restart_safe = toBool(row.restartSafe) === true;
+    else if ('recovery_safe' in row) restart_safe = toBool(row.recovery_safe) === true;
+    else if ('restart_recovery_safe' in row) restart_safe = toBool(row.restart_recovery_safe) === true;
 
     const statusCol = ['restart_recovery_status', 'recovery_status', 'drill_status', 'status'].find(c => c in row);
     if (statusCol) {
@@ -172,47 +195,50 @@ class ControlledBetaExpansionPreparationService {
     if (hashCol && row[hashCol]) hash_ok = true;
 
     // Check payload if direct checks failed
+    let parsedPayload = null;
     if (payload) {
-      const restart = payload.restart || payload.recovery || payload;
-      const evidence = payload.evidence || {};
+      try {
+        parsedPayload = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        if (Buffer.isBuffer(parsedPayload)) {
+          parsedPayload = JSON.parse(parsedPayload.toString('utf8'));
+        }
+      } catch (e) {
+        parsedPayload = {};
+      }
+    }
 
-      if (!recovered_from_db) {
-         if ('recovered_from_db' in payload) recovered_from_db = !!payload.recovered_from_db;
-         else if ('db_recovered' in payload) recovered_from_db = !!payload.db_recovered;
-         else if ('persistence_recovered' in payload) recovered_from_db = !!payload.persistence_recovered;
-         else if ('recovered_from_db' in restart) recovered_from_db = !!restart.recovered_from_db;
-         else if ('db_recovered' in restart) recovered_from_db = !!restart.db_recovered;
-         else if ('persistence_recovered' in restart) recovered_from_db = !!restart.persistence_recovered;
+    if (parsedPayload) {
+      const restart = parsedPayload.restart || parsedPayload.recovery || parsedPayload;
+      const evidence = parsedPayload.evidence || {};
+
+      const recVal = restart.recovered_from_db !== undefined ? restart.recovered_from_db :
+                     (restart.db_recovered !== undefined ? restart.db_recovered :
+                     (restart.persistence_recovered !== undefined ? restart.persistence_recovered : null));
+      if (!recovered_from_db && toBool(recVal) === true) {
+        recovered_from_db = true;
       }
 
-      if (memory_state_detected !== false) {
-         if (payload.memory_state_detected === false || payload.memory_state_detected === 0) memory_state_detected = false;
-         else if (payload.memory_fallback_detected === false || payload.memory_fallback_detected === 0) memory_state_detected = false;
-         else if (restart.memory_state_detected === false || restart.memory_state_detected === 0) memory_state_detected = false;
-         else if (restart.memory_fallback_detected === false || restart.memory_fallback_detected === 0) memory_state_detected = false;
+      const memVal = restart.memory_state_detected !== undefined ? restart.memory_state_detected :
+                     (restart.memory_fallback_detected !== undefined ? restart.memory_fallback_detected : null);
+      if (memory_state_detected !== false && toBool(memVal) === false) {
+        memory_state_detected = false;
       }
 
-      if (!restart_safe) {
-         if ('restart_safe' in payload) restart_safe = !!payload.restart_safe;
-         else if ('recovery_safe' in payload) restart_safe = !!payload.recovery_safe;
-         else if ('restart_recovery_safe' in payload) restart_safe = !!payload.restart_recovery_safe;
-         else if ('restart_safe' in restart) restart_safe = !!restart.restart_safe;
-         else if ('recovery_safe' in restart) restart_safe = !!restart.recovery_safe;
-         else if ('restart_recovery_safe' in restart) restart_safe = !!restart.restart_recovery_safe;
+      const safeVal = restart.restart_safe !== undefined ? restart.restart_safe :
+                      (restart.recovery_safe !== undefined ? restart.recovery_safe :
+                      (restart.restart_recovery_safe !== undefined ? restart.restart_recovery_safe : null));
+      if (!restart_safe && toBool(safeVal) === true) {
+        restart_safe = true;
       }
       
-      if (!status_ok) {
-         if (payload.status === 'VERIFIED_AFTER_RESTART' || payload.status === 'COMPLETED') status_ok = true;
-         else if (payload.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || payload.restart_recovery_status === 'COMPLETED') status_ok = true;
-         else if (payload.recovery_status === 'VERIFIED_AFTER_RESTART' || payload.recovery_status === 'COMPLETED') status_ok = true;
-         else if (restart.status === 'VERIFIED_AFTER_RESTART' || restart.status === 'COMPLETED') status_ok = true;
-         else if (restart.restart_recovery_status === 'VERIFIED_AFTER_RESTART' || restart.restart_recovery_status === 'COMPLETED') status_ok = true;
+      const statusVal = restart.restart_recovery_status || restart.recovery_status || restart.status || null;
+      if (!status_ok && (statusVal === 'VERIFIED_AFTER_RESTART' || statusVal === 'COMPLETED')) {
+        status_ok = true;
       }
       
-      if (!hash_ok) {
-         if (payload.hash || payload.recovery_integrity_hash || payload.evidence_integrity_hash || payload.integrity_hash || payload.evidence_hash) hash_ok = true;
-         else if (restart.hash || restart.recovery_integrity_hash || restart.evidence_integrity_hash || restart.integrity_hash) hash_ok = true;
-         else if (evidence.hash || evidence.evidence_integrity_hash || evidence.integrity_hash) hash_ok = true;
+      const hashVal = restart.recovery_integrity_hash || restart.evidence_integrity_hash || restart.integrity_hash || parsedPayload.evidence_integrity_hash || evidence.evidence_integrity_hash || null;
+      if (!hash_ok && hashVal) {
+        hash_ok = true;
       }
     }
 

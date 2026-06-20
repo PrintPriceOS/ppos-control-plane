@@ -118,8 +118,37 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
 
   const insertPhase128EvidenceAdaptive = async (prepId, revId, actId, runId) => {
     if (isProdLike) {
-      const cols = await getTableColumns('limited_beta_runtime_restart_drills');
-      if (cols.length === 0) return;
+      const candidateTables = [
+        'limited_beta_runtime_restart_drills',
+        'limited_beta_runtime_restart_evidence_packs',
+        'limited_beta_runtime_evidence_packs',
+        'controlled_beta_runtime_restart_drills',
+        'controlled_beta_runtime_restart_evidence_packs'
+      ];
+      
+      let bestTable = null;
+      let bestCols = [];
+      for (const t of candidateTables) {
+        const tCols = await getTableColumns(t);
+        if (tCols.length > 0) {
+          const hasDirectCols = tCols.includes('recovered_from_db') || tCols.includes('restart_safe');
+          const hasPayloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload', 'evidence_data_json'].some(c => tCols.includes(c));
+          
+          console.log(`[SCHEMA DIAGNOSTIC] Table: ${t}, columns: [${tCols.join(', ')}], hasDirect: ${hasDirectCols}, hasPayload: ${hasPayloadCol}`);
+          
+          if (hasDirectCols || hasPayloadCol) {
+            if (!bestTable || hasDirectCols) {
+              bestTable = t;
+              bestCols = tCols;
+            }
+          }
+        }
+      }
+
+      if (!bestTable) {
+        throw new Error('FAIL: No suitable Phase 128.1 table found in database.');
+      }
+
       const row = {};
       const payload = {
         restart_recovery_status: 'VERIFIED_AFTER_RESTART',
@@ -167,56 +196,134 @@ console.log('=== Smoke 132C: Expansion Preparation Readiness ===\n');
           recovery_integrity_hash: 'hash'
         }
       };
-      
-      if (cols.includes('recovered_from_db')) { row.recovered_from_db = 1; }
-      if (cols.includes('db_recovered')) { row.db_recovered = 1; }
-      if (cols.includes('persistence_recovered')) { row.persistence_recovered = 1; }
-      if (cols.includes('memory_state_detected')) { row.memory_state_detected = 0; }
-      if (cols.includes('memory_fallback_detected')) { row.memory_fallback_detected = 0; }
-      if (cols.includes('restart_safe')) { row.restart_safe = 1; }
-      if (cols.includes('recovery_safe')) { row.recovery_safe = 1; }
-      if (cols.includes('restart_recovery_safe')) { row.restart_recovery_safe = 1; }
-      
-      const idCols = ['drill_id', 'restart_drill_id', 'id', 'marker'];
-      for (const idCol of idCols) { if (cols.includes(idCol)) row[idCol] = prepId + '_drill'; }
-      
-      if (cols.includes('preparation_id')) row.preparation_id = prepId;
-      if (cols.includes('review_id')) row.review_id = revId;
-      if (cols.includes('decision_id')) row.decision_id = `${runId}_dec`;
-      if (cols.includes('activation_id')) row.activation_id = actId;
-      if (cols.includes('gate_id')) row.gate_id = `${runId}_gate`;
-      if (cols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
-      if (cols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
 
-      if (cols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; }
-      if (cols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; }
-      if (cols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; }
+      if (bestCols.includes('recovered_from_db')) { row.recovered_from_db = 1; }
+      else if (bestCols.includes('db_recovered')) { row.db_recovered = 1; }
+      else if (bestCols.includes('persistence_recovered')) { row.persistence_recovered = 1; }
+      
+      if (bestCols.includes('memory_state_detected')) { row.memory_state_detected = 0; }
+      else if (bestCols.includes('memory_fallback_detected')) { row.memory_fallback_detected = 0; }
+      
+      if (bestCols.includes('restart_safe')) { row.restart_safe = 1; }
+      else if (bestCols.includes('recovery_safe')) { row.recovery_safe = 1; }
+      else if (bestCols.includes('restart_recovery_safe')) { row.restart_recovery_safe = 1; }
+      
+      if (bestCols.includes('restart_recovery_status')) { row.restart_recovery_status = 'VERIFIED_AFTER_RESTART'; }
+      if (bestCols.includes('recovery_integrity_hash')) { row.recovery_integrity_hash = 'hash'; }
+      if (bestCols.includes('evidence_integrity_hash')) { row.evidence_integrity_hash = 'hash'; }
 
-      const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload'].find(c => cols.includes(c));
-      if (payloadCol) {
-         row[payloadCol] = JSON.stringify(payload);
+      if (bestCols.includes('preparation_id')) row.preparation_id = prepId;
+      if (bestCols.includes('review_id')) row.review_id = revId;
+      if (bestCols.includes('decision_id')) row.decision_id = `${runId}_dec`;
+      if (bestCols.includes('activation_id')) row.activation_id = actId;
+      if (bestCols.includes('gate_id')) row.gate_id = `${runId}_gate`;
+      if (bestCols.includes('cohort_id')) row.cohort_id = `${runId}_cohort`;
+      if (bestCols.includes('tenant_id')) row.tenant_id = `${runId}_tenant`;
+
+      const idCol = ['evidence_pack_id', 'pack_id', 'drill_id', 'restart_drill_id', 'id', 'marker'].find(c => bestCols.includes(c));
+      const rowId = prepId + '_drill';
+      if (idCol) {
+        row[idCol] = rowId;
       }
 
-      const { q, vals } = await buildInsertForExistingColumns('limited_beta_runtime_restart_drills', row);
-      let insertedId = null;
-      if (row.drill_id) insertedId = row.drill_id;
-      else if (row.restart_drill_id) insertedId = row.restart_drill_id;
-      else if (row.id) insertedId = row.id;
-      else if (row.marker) insertedId = row.marker;
-      
+      const payloadCol = ['evidence_payload', 'evidence_json', 'payload_json', 'recovery_payload', 'evidence_data_json'].find(c => bestCols.includes(c));
+      if (payloadCol) {
+        row[payloadCol] = JSON.stringify(payload);
+      }
+
+      const { q, vals } = await buildInsertForExistingColumns(bestTable, row);
       const res = await db.query(q, vals);
 
+      // Re-read back and assert
+      let readRow = null;
+      if (idCol) {
+        const readRows = await db.query(`SELECT * FROM ${bestTable} WHERE ${idCol} = ?`, [rowId]);
+        if (readRows && readRows.length > 0) {
+          readRow = readRows[0];
+        }
+      }
+      if (!readRow) {
+        throw new Error(`FAIL: Could not re-read inserted row from ${bestTable}`);
+      }
+
+      let readPayload = null;
+      if (payloadCol && readRow[payloadCol]) {
+        try {
+          readPayload = typeof readRow[payloadCol] === 'string' ? JSON.parse(readRow[payloadCol]) : readRow[payloadCol];
+          if (Buffer.isBuffer(readPayload)) {
+            readPayload = JSON.parse(readPayload.toString('utf8'));
+          }
+        } catch (e) {
+          readPayload = {};
+        }
+      }
+
+      const toBool = (val) => {
+        if (val === undefined || val === null) return null;
+        if (typeof val === 'boolean') return val;
+        if (typeof val === 'number') return val === 1;
+        if (typeof val === 'string') {
+          const s = val.trim().toLowerCase();
+          return s === 'true' || s === '1';
+        }
+        return !!val;
+      };
+
+      let recovered_from_db_val = false;
+      let memory_state_detected_val = true;
+      let restart_safe_val = false;
+      let status_val = null;
+      let hash_val = null;
+
+      if ('recovered_from_db' in readRow) recovered_from_db_val = toBool(readRow.recovered_from_db) === true;
+      else if ('db_recovered' in readRow) recovered_from_db_val = toBool(readRow.db_recovered) === true;
+      else if ('persistence_recovered' in readRow) recovered_from_db_val = toBool(readRow.persistence_recovered) === true;
+      
+      if ('memory_state_detected' in readRow) memory_state_detected_val = toBool(readRow.memory_state_detected) === true;
+      else if ('memory_fallback_detected' in readRow) memory_state_detected_val = toBool(readRow.memory_fallback_detected) === true;
+
+      if ('restart_safe' in readRow) restart_safe_val = toBool(readRow.restart_safe) === true;
+      else if ('recovery_safe' in readRow) restart_safe_val = toBool(readRow.recovery_safe) === true;
+      else if ('restart_recovery_safe' in readRow) restart_safe_val = toBool(readRow.restart_recovery_safe) === true;
+
+      status_val = readRow.restart_recovery_status || readRow.recovery_status || readRow.status || null;
+      hash_val = readRow.recovery_integrity_hash || readRow.evidence_integrity_hash || readRow.integrity_hash || null;
+
+      if (readPayload) {
+        const restart = readPayload.restart || readPayload.recovery || readPayload;
+        if (!recovered_from_db_val) {
+          recovered_from_db_val = restart.recovered_from_db === true || restart.recovered_from_db === 1 || restart.recovered_from_db === 'true';
+        }
+        if (memory_state_detected_val !== false) {
+          memory_state_detected_val = restart.memory_state_detected === true || restart.memory_state_detected === 1 || restart.memory_state_detected === 'true';
+        }
+        if (!restart_safe_val) {
+          restart_safe_val = restart.restart_safe === true || restart.restart_safe === 1 || restart.restart_safe === 'true' ||
+                             restart.recovery_safe === true || restart.recovery_safe === 1 || restart.recovery_safe === 'true' ||
+                             restart.restart_recovery_safe === true || restart.restart_recovery_safe === 1 || restart.restart_recovery_safe === 'true';
+        }
+        if (!status_val) {
+          status_val = restart.restart_recovery_status || restart.recovery_status || restart.status || null;
+        }
+        if (!hash_val) {
+          hash_val = restart.recovery_integrity_hash || restart.evidence_integrity_hash || restart.integrity_hash || readPayload.evidence_integrity_hash || null;
+        }
+      }
+
+      const status_ok = status_val === 'VERIFIED_AFTER_RESTART' || status_val === 'COMPLETED';
+      const hash_ok = !!hash_val;
+
       return {
-        table: 'limited_beta_runtime_restart_drills',
-        inserted_id: insertedId || res.insertId,
+        table: bestTable,
+        inserted_id: rowId,
         inserted_columns: Object.keys(row),
-        inserted_payload_keys: payloadCol ? Object.keys(payload) : [],
+        inserted_payload_keys: readPayload ? Object.keys(readPayload) : [],
         context_used: { activation_id: actId, gate_id: `${runId}_gate`, cohort_id: `${runId}_cohort`, tenant_id: `${runId}_tenant`, preparation_id: prepId, review_id: revId, decision_id: `${runId}_dec` },
-        status_signal_written: !!(row.restart_recovery_status || row.recovery_status || row.status || (payloadCol && (payload.status || payload.restart_recovery_status))),
-        recovered_from_db_written: !!(row.recovered_from_db || row.db_recovered || row.persistence_recovered || (payloadCol && (payload.recovered_from_db || payload.db_recovered || payload.persistence_recovered))),
-        memory_state_detected_written: !!(('memory_state_detected' in row) || ('memory_fallback_detected' in row) || (payloadCol && (('memory_state_detected' in payload) || ('memory_fallback_detected' in payload)))),
-        restart_safe_written: !!(row.restart_safe || row.recovery_safe || row.restart_recovery_safe || (payloadCol && (payload.restart_safe || payload.recovery_safe || payload.restart_recovery_safe))),
-        hash_written: !!(row.recovery_integrity_hash || row.evidence_integrity_hash || row.integrity_hash || (payloadCol && (payload.recovery_integrity_hash || payload.evidence_integrity_hash || payload.integrity_hash)))
+        status_signal_written: status_ok,
+        recovered_from_db_written: recovered_from_db_val === true || recovered_from_db_val === 1,
+        memory_state_detected_written: memory_state_detected_val === false || memory_state_detected_val === 0,
+        restart_safe_written: restart_safe_val === true || restart_safe_val === 1,
+        hash_written: hash_ok
       };
     } else {
       svc.setMockState('phase128_1', 'default', [{ restart_safe: 1, recovered_from_db: 1, memory_state_detected: 0 }]);
