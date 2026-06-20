@@ -31,6 +31,7 @@ Phase 130 adheres strictly to the safety gates:
 - No public user registration.
 - No external marketplace integrations.
 - Fail-closed evaluation if the runtime schema is unavailable.
+- Strict requirement for both runtime DB schemas (via `INFORMATION_SCHEMA`) and `schema_versions` registry persistence to pass validation (`PHASE_130_MIGRATION_REGISTRY_MISSING`). A governed `repair_phase130_migration_registry.js` script safely bridges registry desyncs if the tables are perfectly instantiated but unregistered.
 
 ## Verification
 - **Smoke 130A:** Verifies schema installation and integrity.

@@ -24,6 +24,7 @@ const smokes = [
   'smoke_phase130f_runtime_observation_admin_api_ui.js',
   'smoke_phase130g_runtime_observation_evidence_pack.js',
   'smoke_phase130_0_1_schema_risk_repair.js',
+  'smoke_phase130_0_2_migration_registry_alignment.js',
   'smoke_phase129h_controlled_beta_activation_acceptance_pack.js'
 ];
 

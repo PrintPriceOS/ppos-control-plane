@@ -44,11 +44,22 @@ console.log('=== Smoke 130A: Runtime Observation Schema ===\n');
 
       // Verify migration 077 and 078
       try {
-        const migrations = await db.query("SELECT version FROM schema_versions WHERE version IN ('077', '078')");
-        const mNames = migrations.map(m => m.version);
-        assert(mNames.length > 0, 'Migration 077 or 078 applied in real DB schema_versions');
+        const migrations = await db.query("SELECT * FROM schema_versions ORDER BY applied_at DESC LIMIT 50");
+        const found = migrations.some(m => {
+          const v = String(m.version || m.migration || m.migration_name || m.name || m.filename || m.description || '');
+          return v.includes('077') || v.includes('078') || v.includes('phase130');
+        });
+        
+        if (found) {
+          assert(true, 'Migration 077 or 078 applied in real DB schema_versions');
+        } else {
+          assert(false, 'Migration 077 or 078 applied in real DB schema_versions');
+          const err = new Error('PHASE_130_MIGRATION_REGISTRY_MISSING: Checked columns (version, migration, migration_name, name, filename, description) for 077, 078, or phase130 in db: ' + process.env.MYSQL_DATABASE);
+          err.code = 'PHASE_130_MIGRATION_REGISTRY_MISSING';
+          throw err;
+        }
       } catch (e) {
-        // Ignored if schema_versions table is not seeded properly in tests
+        throw e;
       }
     } catch (e) {
       if (isProdLike && process.env.ALLOW_SCHEMA_SMOKE_FALLBACK !== 'true') {
