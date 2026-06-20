@@ -220,6 +220,7 @@ const limitedBetaPreparationGateAdmin = require('./limitedBetaPreparationGateAdm
 const limitedBetaRuntimeAdmin = require('./limitedBetaRuntimeAdmin');
 const controlledBetaCohortActivationAdmin = require('./controlledBetaCohortActivationAdmin');
 const controlledBetaRuntimeObservationAdmin = require('./controlledBetaRuntimeObservationAdmin');
+const controlledBetaOperationalReviewAdmin = require('./controlledBetaOperationalReviewAdmin');
 
 
 
@@ -231,6 +232,7 @@ const controlledBetaRuntimeObservationAdmin = require('./controlledBetaRuntimeOb
 // Moved Financial Operations and Root catch-alls to the bottom of the router mounts
 
 router.use('/beta/runtime-observation', controlledBetaRuntimeObservationAdmin);
+router.use('/beta/operational-review', controlledBetaOperationalReviewAdmin);
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
