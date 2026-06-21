@@ -251,6 +251,95 @@ router.use('/beta/runtime-reviews', controlledBetaRuntimeActivityReviewAdmin);
 router.use('/beta/cohort-interventions', controlledBetaCohortInterventionPreparationAdmin);
 router.use('/beta/cohort-intervention-approvals', controlledBetaCohortInterventionApprovalAdmin);
 router.use('/beta/cohort-intervention-executions', controlledBetaCohortInterventionExecutionAdmin);
+
+// Phase 141 — Restricted High-Risk Cohort Intervention Simulation Gate
+(() => {
+  const simulationBuilderSvc = require('../services/cohortInterventionSimulationBuilderService').serviceInstance || require('../services/cohortInterventionSimulationBuilderService');
+  const simulationImpactSvc = require('../services/cohortInterventionSimulationImpactAnalysisService').serviceInstance || require('../services/cohortInterventionSimulationImpactAnalysisService');
+  const simulationRollbackSvc = require('../services/cohortInterventionSimulationRollbackPreviewService').serviceInstance || require('../services/cohortInterventionSimulationRollbackPreviewService');
+  const simulationOperatorSvc = require('../services/cohortInterventionSimulationOperatorConfirmationService').serviceInstance || require('../services/cohortInterventionSimulationOperatorConfirmationService');
+  const simulationRunnerSvc = require('../services/cohortInterventionSimulationRunnerService').serviceInstance || require('../services/cohortInterventionSimulationRunnerService');
+  const simulationEvidenceSvc = require('../services/cohortInterventionSimulationEvidencePackService').serviceInstance || require('../services/cohortInterventionSimulationEvidencePackService');
+
+  // POST /api/admin/beta/cohort-intervention-simulations — create simulation from Phase 140 execution
+  router.post('/beta/cohort-intervention-simulations', resolveActorContext, async (req, res) => {
+    try {
+      const { execution_id, simulation_type } = req.body;
+      if (!execution_id || !simulation_type) {
+        return res.status(400).json({ error: 'execution_id and simulation_type are required' });
+      }
+      const result = await simulationBuilderSvc.createSimulation(execution_id, simulation_type, req.actorId || 'admin');
+      res.status(201).json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // GET /api/admin/beta/cohort-intervention-simulations/:id
+  router.get('/beta/cohort-intervention-simulations/:id', async (req, res) => {
+    try {
+      const simulation = await simulationBuilderSvc.getSimulation(req.params.id);
+      if (!simulation) return res.status(404).json({ error: 'Simulation not found' });
+      const steps = await simulationBuilderSvc.getSteps(req.params.id);
+      res.json({ ok: true, simulation, steps });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/impact-analysis
+  router.post('/beta/cohort-intervention-simulations/:id/impact-analysis', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationImpactSvc.generateImpactAnalysis(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/rollback-preview
+  router.post('/beta/cohort-intervention-simulations/:id/rollback-preview', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationRollbackSvc.generateRollbackPreview(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/operator-confirmation
+  router.post('/beta/cohort-intervention-simulations/:id/operator-confirmation', resolveActorContext, async (req, res) => {
+    try {
+      const { signatory_name, confirmation_phrase } = req.body;
+      const result = await simulationOperatorSvc.confirmSimulation(req.params.id, req.actorId || 'admin', signatory_name, confirmation_phrase);
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/run
+  router.post('/beta/cohort-intervention-simulations/:id/run', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationRunnerSvc.runSimulation(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // GET /api/admin/beta/cohort-intervention-simulations/:id/evidence
+  router.get('/beta/cohort-intervention-simulations/:id/evidence', async (req, res) => {
+    try {
+      const evidence = await simulationEvidenceSvc.getEvidence(req.params.id);
+      if (!evidence) return res.status(404).json({ error: 'Evidence not found' });
+      res.json({ ok: true, evidence });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+})();
+
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
