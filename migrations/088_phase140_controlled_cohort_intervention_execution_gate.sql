@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_executions (
     execution_findings_json JSON NOT NULL,
     lineage_hashes_json JSON NOT NULL,
     evidence_pack_hash VARCHAR(128) NULL,
+    requested_by VARCHAR(255) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     started_at DATETIME NULL,
@@ -39,6 +40,9 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_executions (
     INDEX idx_cbcie_approval (source_approval_id),
     INDEX idx_cbcie_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- For existing tables where the column might be missing
+ALTER TABLE controlled_beta_cohort_intervention_executions ADD COLUMN IF NOT EXISTS requested_by VARCHAR(255) NULL;
 
 CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_execution_steps (
     step_id VARCHAR(64) PRIMARY KEY,

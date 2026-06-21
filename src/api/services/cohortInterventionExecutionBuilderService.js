@@ -126,6 +126,7 @@ class CohortInterventionExecutionBuilderService {
       execution_findings_json: [],
       lineage_hashes_json: lineageHashes,
       evidence_pack_hash: null,
+      requested_by: actorId,
       created_at: new Date(),
       updated_at: new Date(),
       started_at: null,
