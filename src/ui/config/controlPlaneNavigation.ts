@@ -49,6 +49,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'beta-runtime-sessions', label: 'Beta Runtime Sessions', path: '/admin/beta/runtime-sessions', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-runtime-activity', label: 'Beta Activity Observation', path: '/admin/beta/runtime-activity', icon: 'EyeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-runtime-reviews', label: 'Beta Cohort Reviews', path: '/admin/beta/runtime-reviews', icon: 'DocumentMagnifyingGlassIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-cohort-interventions', label: 'Beta Cohort Interventions', path: '/admin/beta/cohort-interventions', icon: 'ExclamationTriangleIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
 
 
     // System / Admin

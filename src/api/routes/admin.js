@@ -227,6 +227,7 @@ const controlledBetaInviteAcceptanceAdmin = require('./controlledBetaInviteAccep
 const controlledBetaRuntimeSessionAdmin = require('./controlledBetaRuntimeSessionAdmin');
 const controlledBetaRuntimeActivityObservationAdmin = require('./controlledBetaRuntimeActivityObservationAdmin');
 const controlledBetaRuntimeActivityReviewAdmin = require('./controlledBetaRuntimeActivityReviewAdmin');
+const controlledBetaCohortInterventionPreparationAdmin = require('./controlledBetaCohortInterventionPreparationAdmin');
 
 
 
@@ -245,6 +246,7 @@ router.use('/beta/invite-acceptance', controlledBetaInviteAcceptanceAdmin);
 router.use('/beta/runtime-sessions', controlledBetaRuntimeSessionAdmin);
 router.use('/beta/runtime-activity', controlledBetaRuntimeActivityObservationAdmin);
 router.use('/beta/runtime-reviews', controlledBetaRuntimeActivityReviewAdmin);
+router.use('/beta/cohort-interventions', controlledBetaCohortInterventionPreparationAdmin);
 router.use('/routing', routingAdminRouter);
 router.use('/marketplace', marketplaceAdminRouter);
 router.use('/governance', governanceAdminRouter);
