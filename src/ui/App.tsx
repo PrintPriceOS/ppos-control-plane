@@ -113,6 +113,7 @@ import { ControlledBetaRuntimeSession } from './pages/beta/ControlledBetaRuntime
 import { ControlledBetaRuntimeActivityObservation } from './pages/beta/ControlledBetaRuntimeActivityObservation';
 import { ControlledBetaRuntimeActivityReview } from './pages/beta/ControlledBetaRuntimeActivityReview';
 import { ControlledBetaCohortInterventionPreparation } from './pages/beta/ControlledBetaCohortInterventionPreparation';
+import { ControlledBetaCohortInterventionApproval } from './pages/beta/ControlledBetaCohortInterventionApproval';
 
 
 
@@ -176,6 +177,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/runtime-activity" element={<ControlledBetaRuntimeActivityObservation />} />
                 <Route path="/admin/beta/runtime-reviews" element={<ControlledBetaRuntimeActivityReview />} />
                 <Route path="/admin/beta/cohort-interventions" element={<ControlledBetaCohortInterventionPreparation />} />
+                <Route path="/admin/beta/cohort-intervention-approvals" element={<ControlledBetaCohortInterventionApproval />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
