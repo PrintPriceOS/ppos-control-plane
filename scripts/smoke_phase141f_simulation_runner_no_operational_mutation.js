@@ -12,7 +12,7 @@ const runnerSvc = require('../src/api/services/cohortInterventionSimulationRunne
 
 async function tableExists(tableName) {
   try {
-    const [rows] = await db.query(
+    const rows = await db.query(
       'SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
       [tableName]
     );
@@ -27,7 +27,7 @@ async function snapshotTable(tableName, whereClause, params) {
     if (!await tableExists(tableName)) {
       return { table: tableName, exists: false, note: 'Table not present; no mutation surface detected.' };
     }
-    const [rows] = await db.query(`SELECT * FROM ${tableName} WHERE ${whereClause} LIMIT 10`, params);
+    const rows = await db.query(`SELECT * FROM ${tableName} WHERE ${whereClause} LIMIT 10`, params);
     return { table: tableName, exists: true, snapshot: JSON.stringify(rows) };
   } catch {
     return { table: tableName, exists: false, note: 'Query failed; treated as non-present.' };

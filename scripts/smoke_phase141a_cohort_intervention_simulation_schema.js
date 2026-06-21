@@ -23,7 +23,7 @@ const db = require('../src/api/services/mysqlClient');
       process.exit(0);
     }
 
-    const [rows] = await db.query(
+    const rows = await db.query(
       `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${REQUIRED_TABLES.map(() => '?').join(',')})`,
       REQUIRED_TABLES
     );
@@ -34,7 +34,7 @@ const db = require('../src/api/services/mysqlClient');
     }
 
     // Validate key columns on main table
-    const [cols] = await db.query(
+    const cols = await db.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_simulations'`
     );
     const colNames = cols.map(c => c.COLUMN_NAME);
@@ -44,7 +44,7 @@ const db = require('../src/api/services/mysqlClient');
     }
 
     // Validate impact_projection_json column on projection table
-    const [projCols] = await db.query(
+    const projCols = await db.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_simulation_impact_projections'`
     );
     const projColNames = projCols.map(c => c.COLUMN_NAME);
