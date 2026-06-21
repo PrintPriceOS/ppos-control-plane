@@ -57,12 +57,29 @@ const db = require('../src/api/services/mysqlClient');
     await rollbackService.createRollbackPlan(execution.execution_id, 'admin');
     await operatorConfirmationService.confirmExecution(execution.execution_id, 'admin', 'Operator Signature Name', 'CONFIRM_PHASE_140_CONTROLLED_EXECUTION');
 
-    // Before run, take snapshots of critical states if in production
+    // Before run, take snapshots of critical governance records to validate no-mutation (safety boundary)
+    // NOTE: controlled_beta_cohorts is NOT part of the Phase 137-140 schema chain; we validate
+    // immutability against real upstream governance tables instead.
     const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
-    let beforeCohort = null;
+    let beforeReview = null, beforePreparation = null, beforeApproval = null;
     if (isProdLike) {
-      const rows = await db.query("SELECT * FROM controlled_beta_cohorts WHERE cohort_id = ?", [cohortId]);
-      if (rows.length > 0) beforeCohort = rows[0];
+      const [reviewRows] = await db.query(
+        'SELECT * FROM controlled_beta_runtime_activity_reviews WHERE review_id = ?',
+        [review.review_id]
+      );
+      beforeReview = reviewRows || null;
+
+      const [prepRows] = await db.query(
+        'SELECT * FROM controlled_beta_cohort_intervention_preparations WHERE preparation_id = ?',
+        [preparation.preparation_id]
+      );
+      beforePreparation = prepRows || null;
+
+      const [approvalRows] = await db.query(
+        'SELECT * FROM controlled_beta_cohort_intervention_approvals WHERE approval_id = ?',
+        [approval.approval_id]
+      );
+      beforeApproval = approvalRows || null;
     }
 
     // Run execution
@@ -88,13 +105,39 @@ const db = require('../src/api/services/mysqlClient');
       }
     }
 
-    // Validate no hidden mutations
-    if (isProdLike && beforeCohort) {
-      const afterRows = await db.query("SELECT * FROM controlled_beta_cohorts WHERE cohort_id = ?", [cohortId]);
-      const afterCohort = afterRows[0];
-      if (beforeCohort.cohort_status !== afterCohort.cohort_status) {
-        console.error('FAIL: Cohort status mutated unexpectedly.');
-        process.exit(1);
+    // Validate no hidden mutations in upstream Phase 137-140 governance records
+    if (isProdLike && (beforeReview || beforePreparation || beforeApproval)) {
+      if (beforeReview) {
+        const [afterReviewRows] = await db.query(
+          'SELECT * FROM controlled_beta_runtime_activity_reviews WHERE review_id = ?',
+          [review.review_id]
+        );
+        if (JSON.stringify(beforeReview) !== JSON.stringify(afterReviewRows)) {
+          console.error('FAIL: Source Phase 137 review record was mutated unexpectedly.');
+          process.exit(1);
+        }
+      }
+
+      if (beforePreparation) {
+        const [afterPrepRows] = await db.query(
+          'SELECT * FROM controlled_beta_cohort_intervention_preparations WHERE preparation_id = ?',
+          [preparation.preparation_id]
+        );
+        if (JSON.stringify(beforePreparation) !== JSON.stringify(afterPrepRows)) {
+          console.error('FAIL: Source Phase 138 preparation record was mutated unexpectedly.');
+          process.exit(1);
+        }
+      }
+
+      if (beforeApproval) {
+        const [afterApprovalRows] = await db.query(
+          'SELECT * FROM controlled_beta_cohort_intervention_approvals WHERE approval_id = ?',
+          [approval.approval_id]
+        );
+        if (JSON.stringify(beforeApproval) !== JSON.stringify(afterApprovalRows)) {
+          console.error('FAIL: Source Phase 139 approval record was mutated unexpectedly.');
+          process.exit(1);
+        }
       }
     }
     console.log('  PASS: Verified no hidden critical state mutations occurred (safety boundary intact).');
