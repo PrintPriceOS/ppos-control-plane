@@ -238,6 +238,10 @@ class RuntimeActivityReviewDecisionService {
         "UPDATE controlled_beta_runtime_activity_reviews SET review_status = 'FINALIZED', reviewed_by = ?, finalized_at = NOW() WHERE review_id = ?",
         [actorId, reviewId]
       );
+      const updatedList = await db.query("SELECT * FROM controlled_beta_runtime_activity_reviews WHERE review_id = ?", [reviewId]);
+      if (updatedList.length > 0) {
+        review = updatedList[0];
+      }
     }
 
     await auditService.recordAuditEvent(reviewId, 'REVIEW_FINALIZED', actorId, { evidence_pack_hash: evidencePack.evidence_pack_hash });
