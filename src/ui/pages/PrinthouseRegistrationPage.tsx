@@ -35,7 +35,7 @@ import {
     TrendingUp,
     Factory
 } from 'lucide-react';
-import { setAuthToken, setAuthUser } from '../lib/authStore';
+import { getAuthToken, setAuthToken, setAuthUser } from '../lib/authStore';
 import { AuthInput, AuthButton, MotionBackground } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
@@ -760,7 +760,7 @@ export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ 
 
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (adminMode) {
-                const token = localStorage.getItem('token') || localStorage.getItem('ppos_token');
+                const token = getAuthToken();
                 if (token) headers['Authorization'] = `Bearer ${token}`;
             }
 
