@@ -15,13 +15,17 @@ router.get('/', async (req, res) => {
         if (!context.isSuperAdmin) {
             sql += ' AND tenant_id = ?';
             params.push(context.tenantId);
+
         }
 
         const rows = await db.query(sql, params);
         
+        const STATUS_DB_TO_UI = { 'ACTIVE': 'Active', 'PENDING': 'Under Maintenance', 'SUSPENDED': 'Inactive' };
+
         // Post-process JSON fields for UI compatibility
         const formatted = rows.map(row => ({
             ...row,
+            status: STATUS_DB_TO_UI[row.status] || row.status,
             signatures: typeof row.signatures === 'string' ? JSON.parse(row.signatures) : (row.signatures || []),
             limits: typeof row.limits === 'string' ? JSON.parse(row.limits) : (row.limits || {}),
             rates: typeof row.rates_json === 'string' ? JSON.parse(row.rates_json) : (row.rates_json || null),
@@ -114,7 +118,7 @@ router.post('/provision', async (req, res) => {
 // POST /api/admin/printhouses - Create new printhouse (Super Admin only)
 router.post('/', async (req, res) => {
     const context = resolveActorContext(req);
-    if (!context.isSuperAdmin) return res.status(403).json({ ok: false, error: 'Only Super Admins can create printhouses' });
+    if (!context.isSuperAdmin && !context.isPrinthouseUser) return res.status(403).json({ ok: false, error: 'Insufficient permissions' });
 
     const { 
         id, name, country, city, status, signatures, delivery_time, 
@@ -155,9 +159,14 @@ router.put('/:id', async (req, res) => {
     const context = resolveActorContext(req);
     const { id } = req.params;
 
-    // RBAC: Super Admin or the Printhouse Admin themselves
-    if (!context.isSuperAdmin && context.printhouseId !== id) {
-        return res.status(403).json({ ok: false, error: 'Unauthorized to update this printhouse' });
+    if (!context.isSuperAdmin) {
+        if (!context.isPrinthouseUser) {
+            return res.status(403).json({ ok: false, error: 'Insufficient permissions' });
+        }
+        const rows = await db.query('SELECT tenant_id FROM printer_nodes WHERE id = ?', [id]);
+        if (!rows.length || rows[0].tenant_id !== context.tenantId) {
+            return res.status(403).json({ ok: false, error: 'Cannot update printhouses outside your tenant' });
+        }
     }
 
     const { 
@@ -200,7 +209,15 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/admin/printhouses/:id - Delete printhouse (Super Admin only)
 router.delete('/:id', async (req, res) => {
     const context = resolveActorContext(req);
-    if (!context.isSuperAdmin) return res.status(403).json({ ok: false, error: 'Only Super Admins can delete printhouses' });
+    if (!context.isSuperAdmin) {
+        if (!context.isPrinthouseUser) {
+            return res.status(403).json({ ok: false, error: 'Insufficient permissions' });
+        }
+        const rows = await db.query('SELECT tenant_id FROM printer_nodes WHERE id = ?', [req.params.id]);
+        if (!rows.length || rows[0].tenant_id !== context.tenantId) {
+            return res.status(403).json({ ok: false, error: 'Cannot delete printhouses outside your tenant' });
+        }
+    }
 
     try {
         await db.query('DELETE FROM printer_nodes WHERE id = ?', [req.params.id]);
