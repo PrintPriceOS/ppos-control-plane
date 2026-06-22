@@ -72,7 +72,7 @@ class PrinthouseService {
             }
         }
 
-        const connection = await db.getConnection();
+        const connection = await db.getPool().getConnection();
         await connection.beginTransaction();
 
         try {
@@ -101,24 +101,21 @@ class PrinthouseService {
                  [printhouseId, tenantId, JSON.stringify([country || 'ES'])]
             );
 
-            // 5. Create Trial License (expires in 14 days for STARTER, otherwise 30 days / custom cycle)
-            // SubscriptionGuard Check in Dashboard:
-            // TODO: If tenant.plan === 'STARTER' and NOW() > license.expires_at, block access and trigger the Stripe upgrade modal.
-            const trialDays = selectedPlan === 'STARTER' ? 14 : 30;
-            const licenseKey = `${selectedPlan}-${uuidv4().substring(0, 12).toUpperCase()}`;
-            await connection.query(
-                `INSERT INTO licenses (tenant_id, printhouse_id, license_key, status, expires_at)
-                 VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-                [tenantId, printhouseId, licenseKey, 'trial', trialDays]
+            // 5. Create Admin User
+            const user = await userService.createUser(
+                email,
+                'PRINTHOUSE_ADMIN',
+                tenantId,
+                password,
+                printhouseId
             );
 
-            // 6. Create Admin User
-            const user = await userService.createUser(
-                email, 
-                'PRINTHOUSE_ADMIN', 
-                tenantId, 
-                password, 
-                printhouseId
+            // 6. Create Tenant License
+            const trialDays = selectedPlan === 'STARTER' ? 14 : 30;
+            await connection.query(
+                `INSERT INTO tenant_licenses (tenant_id, license_type, status, plan, expires_at)
+                 VALUES (?, 'PRINTER_OPERATIONS', 'ACTIVE', ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
+                [tenantId, selectedPlan, trialDays]
             );
 
             // 7. Auto-Seed Machinery from B2B Stepper templates if present
@@ -165,8 +162,7 @@ class PrinthouseService {
             return {
                 tenantId,
                 printhouseId,
-                user,
-                licenseKey
+                user
             };
         } catch (err) {
             await connection.rollback();
@@ -246,7 +242,7 @@ class PrinthouseService {
             if (webhooksEnabled) metadata.webhooks = provisionedEndpoints;
         }
 
-        const connection = await db.getConnection();
+        const connection = await db.getPool().getConnection();
         await connection.beginTransaction();
 
         try {
@@ -273,16 +269,16 @@ class PrinthouseService {
                 [printhouseId, tenantId, JSON.stringify([country || 'ES'])]
             );
 
-            // License — full cycle (not trial), duration based on plan
-            const licenseDays = selectedPlan === 'STARTER' ? 30 : selectedPlan === 'GROWTH' ? 365 : 3650;
-            const licenseKey = `${selectedPlan}-ADM-${require('uuid').v4().substring(0, 12).toUpperCase()}`;
-            await connection.query(
-                `INSERT INTO licenses (tenant_id, printhouse_id, license_key, status, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-                [tenantId, printhouseId, licenseKey, 'active', licenseDays]
-            );
-
             // Admin User for the partner
             const user = await userService.createUser(email, 'PRINTHOUSE_ADMIN', tenantId, password, printhouseId);
+
+            // Tenant License
+            const licenseDays = selectedPlan === 'STARTER' ? 30 : selectedPlan === 'GROWTH' ? 365 : 3650;
+            await connection.query(
+                `INSERT INTO tenant_licenses (tenant_id, license_type, status, plan, expires_at)
+                 VALUES (?, 'PRINTER_OPERATIONS', 'ACTIVE', ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
+                [tenantId, selectedPlan, licenseDays]
+            );
 
             // Auto-seed machinery from stepper templates
             if (metadata?.qualification && Array.isArray(metadata.qualification.presses)) {
@@ -344,8 +340,7 @@ class PrinthouseService {
             return {
                 tenantId,
                 printhouseId,
-                licenseKey,
-                welcomeEmailSent: false, // TODO: set to true when email service is active
+                welcomeEmailSent: false,
                 loginUrl: `${baseUrl}/login`
             };
         } catch (err) {
