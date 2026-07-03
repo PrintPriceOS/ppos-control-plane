@@ -11,10 +11,10 @@ const db = require('../src/api/services/mysqlClient');
     const REQUIRED_TABLES = [
       'controlled_beta_cohort_intervention_simulations',
       'controlled_beta_cohort_intervention_simulation_steps',
-      'controlled_beta_cohort_intervention_simulation_impact_projections',
-      'controlled_beta_cohort_intervention_simulation_results',
-      'controlled_beta_cohort_intervention_simulation_evidence',
-      'controlled_beta_cohort_intervention_simulation_audit_events'
+      'controlled_beta_cohort_intervention_sim_dry_runs',
+      'controlled_beta_cohort_intervention_sim_results',
+      'controlled_beta_cohort_intervention_sim_evidence',
+      'controlled_beta_cohort_intervention_sim_audit_events'
     ];
 
     if (!isProdLike) {
@@ -45,7 +45,7 @@ const db = require('../src/api/services/mysqlClient');
 
     // Validate impact_projection_json column on projection table
     const projCols = await db.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_simulation_impact_projections'`
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_sim_dry_runs'`
     );
     const projColNames = projCols.map(c => c.COLUMN_NAME);
     assert.ok(projColNames.includes('impact_projection_json'), "Column 'impact_projection_json' missing from projection table");
@@ -57,6 +57,6 @@ const db = require('../src/api/services/mysqlClient');
     console.error('FAIL in 141A:', e.message);
     process.exit(1);
   } finally {
-    if (isProdLike && db.end) await db.end().catch(() => {});
+    if (isProdLike && db.closePool) await db.closePool().catch(() => {});
   }
 })();

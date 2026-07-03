@@ -97,7 +97,7 @@ class CohortInterventionSimulationRunnerService {
       });
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_results
+        `INSERT INTO controlled_beta_cohort_intervention_sim_results
          (result_id, simulation_id, simulation_type, result_status, simulation_result_json, simulation_result_hash)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [resultId, simulationId, sim.simulation_type, 'SUCCESS', JSON.stringify(resultPayload), resultHash]

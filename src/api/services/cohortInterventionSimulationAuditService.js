@@ -10,7 +10,7 @@ class CohortInterventionSimulationAuditService {
 
     if (isProdLike) {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_audit_events
+        `INSERT INTO controlled_beta_cohort_intervention_sim_audit_events
          (audit_event_id, simulation_id, event_type, actor_id, details_json)
          VALUES (?, ?, ?, ?, ?)`,
         [auditEventId, simulationId, eventType, actorId, details ? JSON.stringify(details) : null]

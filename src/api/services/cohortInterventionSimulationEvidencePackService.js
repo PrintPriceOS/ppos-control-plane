@@ -58,7 +58,7 @@ class CohortInterventionSimulationEvidencePackService {
       });
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_evidence
+        `INSERT INTO controlled_beta_cohort_intervention_sim_evidence
          (evidence_id, simulation_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
@@ -76,7 +76,7 @@ class CohortInterventionSimulationEvidencePackService {
     if (!isProdLike) {
       return this._mockState.evidence.get(simulationId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_evidence WHERE simulation_id = ?', [simulationId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_evidence WHERE simulation_id = ?', [simulationId]);
       return list.length > 0 ? list[0] : null;
     }
   }

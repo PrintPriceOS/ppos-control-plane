@@ -13,7 +13,7 @@ class CohortInterventionSimulationRollbackPreviewService {
       simulation_type: type,
       note: 'SIMULATION_ONLY — this is a projected rollback path, not a real rollback plan',
       operational_tables_mutated: [],
-      simulation_tables_written: ['controlled_beta_cohort_intervention_simulation_impact_projections']
+      simulation_tables_written: ['controlled_beta_cohort_intervention_sim_dry_runs']
     };
 
     if (type === 'SIMULATE_COHORT_PAUSE') {

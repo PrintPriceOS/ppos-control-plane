@@ -53,7 +53,7 @@ async function setupSimulationFixture(status = 'SIMULATED', writeScopeClean = tr
     };
     const packHash = 'pack_hash_' + simId;
     await db.query(
-      `INSERT INTO controlled_beta_cohort_intervention_simulation_evidence
+      `INSERT INTO controlled_beta_cohort_intervention_sim_evidence
        (evidence_id, simulation_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
        VALUES (?, ?, '141.0', ?, ?, ?)`,
       ['sev_' + simId, simId, packHash, JSON.stringify(payload), JSON.stringify(lineage)]

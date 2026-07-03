@@ -59,9 +59,9 @@ async function createReviewDraft() {
     );
 
     // Setup Parent Simulation evidence pack in DB
-    await db.query('DELETE FROM controlled_beta_cohort_intervention_simulation_evidence WHERE simulation_id = ?', ['sim_test_wf']);
+    await db.query('DELETE FROM controlled_beta_cohort_intervention_sim_evidence WHERE simulation_id = ?', ['sim_test_wf']);
     await db.query(
-      `INSERT INTO controlled_beta_cohort_intervention_simulation_evidence
+      `INSERT INTO controlled_beta_cohort_intervention_sim_evidence
        (evidence_id, simulation_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
        VALUES (?, 'sim_test_wf', '141.0', 'ev_hash', '{}', '{}')`,
       ['sev_sim_test_wf']

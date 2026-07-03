@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_steps 
     INDEX idx_cbciss_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_impact_projections (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_dry_runs (
     projection_id VARCHAR(64) PRIMARY KEY,
     simulation_id VARCHAR(64) NOT NULL,
     simulation_type VARCHAR(128) NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_impact
     INDEX idx_cbcisip_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_results (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_results (
     result_id VARCHAR(64) PRIMARY KEY,
     simulation_id VARCHAR(64) NOT NULL,
     simulation_type VARCHAR(128) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_result
     INDEX idx_cbcisr_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_evidence (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_evidence (
     evidence_id VARCHAR(64) PRIMARY KEY,
     simulation_id VARCHAR(64) NOT NULL,
     evidence_schema_version VARCHAR(16) NOT NULL DEFAULT '141.0',
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_eviden
     INDEX idx_cbcise_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_audit_events (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_audit_events (
     audit_event_id VARCHAR(64) PRIMARY KEY,
     simulation_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(128) NOT NULL,

@@ -50,7 +50,7 @@ const SIMULATION_TYPES = [
       // Validate no operational tables are mutated
       const projection = result.impact_projection;
       assert.deepStrictEqual(projection.operational_tables_mutated, [], `No operational tables must be mutated for ${simType}`);
-      assert.ok(projection.simulation_tables_written.every(t => t.startsWith('controlled_beta_cohort_intervention_simulation')),
+      assert.ok(projection.simulation_tables_written.every(t => t.startsWith('controlled_beta_cohort_intervention_sim')),
         `Only Phase 141 simulation tables must be written for ${simType}`);
 
       // Validate step was marked complete

@@ -27,7 +27,7 @@ class CohortInterventionSimulationImpactAnalysisService {
           projected_intervention_scope: 'ALL_PARTICIPANTS_ALL_SESSIONS'
         },
         operational_tables_mutated: [],
-        simulation_tables_written: ['controlled_beta_cohort_intervention_simulation_impact_projections']
+        simulation_tables_written: ['controlled_beta_cohort_intervention_sim_dry_runs']
       };
     } else if (type === 'SIMULATE_PARTICIPANT_ACCESS_RESTRICTION') {
       return {
@@ -43,7 +43,7 @@ class CohortInterventionSimulationImpactAnalysisService {
           projected_intervention_scope: 'TARGETED_PARTICIPANTS'
         },
         operational_tables_mutated: [],
-        simulation_tables_written: ['controlled_beta_cohort_intervention_simulation_impact_projections']
+        simulation_tables_written: ['controlled_beta_cohort_intervention_sim_dry_runs']
       };
     } else if (type === 'SIMULATE_INVITE_REVOCATION') {
       return {
@@ -59,7 +59,7 @@ class CohortInterventionSimulationImpactAnalysisService {
           projected_intervention_scope: 'ALL_PENDING_INVITES'
         },
         operational_tables_mutated: [],
-        simulation_tables_written: ['controlled_beta_cohort_intervention_simulation_impact_projections']
+        simulation_tables_written: ['controlled_beta_cohort_intervention_sim_dry_runs']
       };
     } else if (type === 'SIMULATE_CONTROLLED_EXPANSION') {
       return {
@@ -75,7 +75,7 @@ class CohortInterventionSimulationImpactAnalysisService {
           projected_intervention_scope: 'COHORT_EXPANSION_ONLY'
         },
         operational_tables_mutated: [],
-        simulation_tables_written: ['controlled_beta_cohort_intervention_simulation_impact_projections']
+        simulation_tables_written: ['controlled_beta_cohort_intervention_sim_dry_runs']
       };
     } else {
       throw new Error(`UNSUPPORTED_SIMULATION_TYPE_IN_PHASE_141: ${type}`);
@@ -119,7 +119,7 @@ class CohortInterventionSimulationImpactAnalysisService {
       builderService._mockState.simulations.set(simulationId, record);
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_impact_projections
+        `INSERT INTO controlled_beta_cohort_intervention_sim_dry_runs
          (projection_id, simulation_id, simulation_type, impact_projection_json, impact_projection_hash)
          VALUES (?, ?, ?, ?, ?)`,
         [projectionId, simulationId, sim.simulation_type, JSON.stringify(projection), projectionHash]
@@ -146,7 +146,7 @@ class CohortInterventionSimulationImpactAnalysisService {
     if (!isProdLike) {
       return builderService._mockState.projections.get(simulationId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_impact_projections WHERE simulation_id = ?', [simulationId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_dry_runs WHERE simulation_id = ?', [simulationId]);
       return list.length > 0 ? list[0] : null;
     }
   }

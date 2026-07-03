@@ -70,9 +70,9 @@ async function createReviewDraft() {
     );
 
     // Setup Parent Simulation evidence pack in DB
-    await db.query('DELETE FROM controlled_beta_cohort_intervention_simulation_evidence WHERE simulation_id = ?', ['sim_test_evp']);
+    await db.query('DELETE FROM controlled_beta_cohort_intervention_sim_evidence WHERE simulation_id = ?', ['sim_test_evp']);
     await db.query(
-      `INSERT INTO controlled_beta_cohort_intervention_simulation_evidence
+      `INSERT INTO controlled_beta_cohort_intervention_sim_evidence
        (evidence_id, simulation_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
        VALUES (?, 'sim_test_evp', '141.0', 'ev_hash_evp', '{}', '{"phase140_source_execution_hash":"parent_exec_hash","phase139_source_approval_hash":"parent_approval_hash","phase138_source_preparation_hash":"parent_prep_hash","phase137_source_review_hash":"parent_rev_hash"}')`,
       ['sev_sim_test_evp']
