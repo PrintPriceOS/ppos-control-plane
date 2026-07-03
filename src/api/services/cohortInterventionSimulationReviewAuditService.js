@@ -31,7 +31,7 @@ class CohortInterventionSimulationReviewAuditService {
       this._mockState.auditEvents.get(reviewId).push(auditEvent);
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_review_audit_events
+        `INSERT INTO controlled_beta_cohort_intervention_sim_review_audit_events
          (audit_event_id, review_id, event_type, actor_id, details_json)
          VALUES (?, ?, ?, ?, ?)`,
         [auditEventId, reviewId, eventType, actorId, JSON.stringify(details)]
@@ -47,7 +47,7 @@ class CohortInterventionSimulationReviewAuditService {
       return this._mockState.auditEvents.get(reviewId) || [];
     } else {
       return await db.query(
-        `SELECT * FROM controlled_beta_cohort_intervention_simulation_review_audit_events
+        `SELECT * FROM controlled_beta_cohort_intervention_sim_review_audit_events
          WHERE review_id = ? ORDER BY created_at ASC`,
         [reviewId]
       );

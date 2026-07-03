@@ -44,7 +44,7 @@ class CohortInterventionSimulationReviewBuilderService {
     if (!isProdLike) {
       return this._mockState.reviews.get(reviewId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_reviews WHERE review_id = ?', [reviewId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_reviews WHERE review_id = ?', [reviewId]);
       return list.length > 0 ? list[0] : null;
     }
   }
@@ -54,7 +54,7 @@ class CohortInterventionSimulationReviewBuilderService {
     if (!isProdLike) {
       return Array.from(this._mockState.reviews.values());
     } else {
-      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_reviews ORDER BY created_at DESC');
+      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_reviews ORDER BY created_at DESC');
     }
   }
 
@@ -63,7 +63,7 @@ class CohortInterventionSimulationReviewBuilderService {
     if (!isProdLike) {
       return Array.from(this._mockState.reviews.values()).filter(r => r.cohort_id === cohortId);
     } else {
-      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_reviews WHERE cohort_id = ? ORDER BY created_at DESC', [cohortId]);
+      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_reviews WHERE cohort_id = ? ORDER BY created_at DESC', [cohortId]);
     }
   }
 
@@ -159,7 +159,7 @@ class CohortInterventionSimulationReviewBuilderService {
       this._mockState.reviews.set(reviewId, reviewRecord);
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_reviews
+        `INSERT INTO controlled_beta_cohort_intervention_sim_reviews
          (review_id, source_simulation_id, source_execution_id, cohort_id, tenant_id, simulation_type,
           review_status, risk_level, confidence_level, guardrail_status, write_scope_status,
           review_summary_json, impact_review_json, rollback_review_json, guardrail_review_json,

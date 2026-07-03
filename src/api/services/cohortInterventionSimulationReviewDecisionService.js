@@ -94,14 +94,14 @@ class CohortInterventionSimulationReviewDecisionService {
       reviewBuilderSvc._mockState.reviews.set(reviewId, record);
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_review_decisions
+        `INSERT INTO controlled_beta_cohort_intervention_sim_review_decisions
          (decision_id, review_id, decision, rationale, actor_id)
          VALUES (?, ?, ?, ?, ?)`,
         [decisionId, reviewId, decision, rationale, actorId]
       );
 
       await db.query(
-        `UPDATE controlled_beta_cohort_intervention_simulation_reviews
+        `UPDATE controlled_beta_cohort_intervention_sim_reviews
          SET review_decision = ?,
              review_status = ?,
              reviewed_by = ?,
@@ -145,7 +145,7 @@ class CohortInterventionSimulationReviewDecisionService {
       reviewBuilderSvc._mockState.reviews.set(reviewId, record);
     } else {
       await db.query(
-        `UPDATE controlled_beta_cohort_intervention_simulation_reviews
+        `UPDATE controlled_beta_cohort_intervention_sim_reviews
          SET review_status = 'FINALIZED',
              finalized_by = ?,
              finalized_at = NOW()
@@ -214,7 +214,7 @@ class CohortInterventionSimulationReviewDecisionService {
       reviewBuilderSvc._mockState.reviews.set(reviewId, record);
     } else {
       await db.query(
-        `UPDATE controlled_beta_cohort_intervention_simulation_reviews
+        `UPDATE controlled_beta_cohort_intervention_sim_reviews
          SET review_status = 'SUPERSEDED',
              superseded_at = NOW()
          WHERE review_id = ?`,
@@ -233,7 +233,7 @@ class CohortInterventionSimulationReviewDecisionService {
     if (!isProdLike) {
       return this._mockState.decisions.get(reviewId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_review_decisions WHERE review_id = ? ORDER BY created_at DESC LIMIT 1', [reviewId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_review_decisions WHERE review_id = ? ORDER BY created_at DESC LIMIT 1', [reviewId]);
       return list.length > 0 ? list[0] : null;
     }
   }

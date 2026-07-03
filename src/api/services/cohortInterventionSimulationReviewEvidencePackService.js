@@ -135,7 +135,7 @@ class CohortInterventionSimulationReviewEvidencePackService {
       reviewBuilderSvc._mockState.reviews.set(reviewId, record);
     } else {
       await db.query(
-        `INSERT INTO controlled_beta_cohort_intervention_simulation_review_evidence
+        `INSERT INTO controlled_beta_cohort_intervention_sim_review_evidence
          (evidence_id, review_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
@@ -145,7 +145,7 @@ class CohortInterventionSimulationReviewEvidencePackService {
       );
 
       await db.query(
-        `UPDATE controlled_beta_cohort_intervention_simulation_reviews
+        `UPDATE controlled_beta_cohort_intervention_sim_reviews
          SET review_result_hash = ?,
              evidence_pack_hash = ?
          WHERE review_id = ?`,
@@ -166,7 +166,7 @@ class CohortInterventionSimulationReviewEvidencePackService {
     if (!isProdLike) {
       return this._mockState.evidence.get(reviewId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_review_evidence WHERE review_id = ?', [reviewId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_review_evidence WHERE review_id = ?', [reviewId]);
       return list.length > 0 ? list[0] : null;
     }
   }

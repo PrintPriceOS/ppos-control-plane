@@ -9,11 +9,11 @@ const db = require('../src/api/services/mysqlClient');
 
   try {
     const REQUIRED_TABLES = [
-      'controlled_beta_cohort_intervention_simulation_reviews',
-      'controlled_beta_cohort_intervention_simulation_review_findings',
-      'controlled_beta_cohort_intervention_simulation_review_decisions',
-      'controlled_beta_cohort_intervention_simulation_review_evidence',
-      'controlled_beta_cohort_intervention_simulation_review_audit_events'
+      'controlled_beta_cohort_intervention_sim_reviews',
+      'controlled_beta_cohort_intervention_sim_review_findings',
+      'controlled_beta_cohort_intervention_sim_review_decisions',
+      'controlled_beta_cohort_intervention_sim_review_evidence',
+      'controlled_beta_cohort_intervention_sim_review_audit_events'
     ];
 
     if (!isProdLike) {
@@ -34,7 +34,7 @@ const db = require('../src/api/services/mysqlClient');
 
     // Validate key columns on main reviews table
     const cols = await db.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_simulation_reviews'`
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'controlled_beta_cohort_intervention_sim_reviews'`
     );
     const colNames = cols.map(c => c.COLUMN_NAME);
     for (const col of [
@@ -44,7 +44,7 @@ const db = require('../src/api/services/mysqlClient');
       'non_execution_attestation_json', 'write_scope_attestation_json'
     ]) {
       assert.ok(colNames.includes(col), `Column missing: ${col}`);
-      console.log(`  PASS: Column 'controlled_beta_cohort_intervention_simulation_reviews.${col}' exists.`);
+      console.log(`  PASS: Column 'controlled_beta_cohort_intervention_sim_reviews.${col}' exists.`);
     }
 
     console.log('\nSmoke 142A: Passed.');

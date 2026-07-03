@@ -160,7 +160,7 @@ router.get('/simulations/:simulationId/review-summary', async (req, res) => {
     if (!isProdLike) {
       review = Array.from(builderSvc._mockState.reviews.values()).find(r => r.source_simulation_id === req.params.simulationId);
     } else {
-      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_reviews WHERE source_simulation_id = ? LIMIT 1', [req.params.simulationId]);
+      const list = await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_reviews WHERE source_simulation_id = ? LIMIT 1', [req.params.simulationId]);
       if (list.length > 0) review = list[0];
     }
     res.json({ ok: true, review });

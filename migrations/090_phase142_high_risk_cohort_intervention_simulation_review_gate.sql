@@ -2,7 +2,7 @@
 -- Migration 090
 -- Safety invariant: review-only schema. Zero operational mutations or execution capability.
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_reviews (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_reviews (
     review_id VARCHAR(64) PRIMARY KEY,
     source_simulation_id VARCHAR(64) NOT NULL,
     source_execution_id VARCHAR(64) NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review
     INDEX idx_cbcisr_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review_findings (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_review_findings (
     finding_id VARCHAR(64) PRIMARY KEY,
     review_id VARCHAR(64) NOT NULL,
     finding_type VARCHAR(128) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review
     INDEX idx_cbcisrf_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review_decisions (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_review_decisions (
     decision_id VARCHAR(64) PRIMARY KEY,
     review_id VARCHAR(64) NOT NULL,
     decision VARCHAR(128) NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review
     INDEX idx_cbcisrd_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review_evidence (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_review_evidence (
     evidence_id VARCHAR(64) PRIMARY KEY,
     review_id VARCHAR(64) NOT NULL,
     evidence_schema_version VARCHAR(16) NOT NULL DEFAULT '142.0',
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review
     INDEX idx_cbcisre_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_simulation_review_audit_events (
+CREATE TABLE IF NOT EXISTS controlled_beta_cohort_intervention_sim_review_audit_events (
     audit_event_id VARCHAR(64) PRIMARY KEY,
     review_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(128) NOT NULL,

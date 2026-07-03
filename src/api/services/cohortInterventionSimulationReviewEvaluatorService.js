@@ -183,7 +183,7 @@ class CohortInterventionSimulationReviewEvaluatorService {
       reviewBuilderSvc._mockState.findings.set(reviewId, findings);
     } else {
       await db.query(
-        `UPDATE controlled_beta_cohort_intervention_simulation_reviews
+        `UPDATE controlled_beta_cohort_intervention_sim_reviews
          SET review_status = 'UNDER_REVIEW',
              projected_impact_score = ?,
              rollback_feasibility_score = ?,
@@ -208,11 +208,11 @@ class CohortInterventionSimulationReviewEvaluatorService {
       );
 
       // Clean existing findings and write new ones
-      await db.query('DELETE FROM controlled_beta_cohort_intervention_simulation_review_findings WHERE review_id = ?', [reviewId]);
+      await db.query('DELETE FROM controlled_beta_cohort_intervention_sim_review_findings WHERE review_id = ?', [reviewId]);
       for (const finding of findings) {
         const findingId = 'srf_' + crypto.randomBytes(8).toString('hex');
         await db.query(
-          `INSERT INTO controlled_beta_cohort_intervention_simulation_review_findings
+          `INSERT INTO controlled_beta_cohort_intervention_sim_review_findings
            (finding_id, review_id, finding_type, severity, description)
            VALUES (?, ?, ?, ?, ?)`,
           [findingId, reviewId, finding.finding_type, finding.severity, finding.description]
@@ -235,7 +235,7 @@ class CohortInterventionSimulationReviewEvaluatorService {
     if (!isProdLike) {
       return reviewBuilderSvc._mockState.findings.get(reviewId) || [];
     } else {
-      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_simulation_review_findings WHERE review_id = ?', [reviewId]);
+      return await db.query('SELECT * FROM controlled_beta_cohort_intervention_sim_review_findings WHERE review_id = ?', [reviewId]);
     }
   }
 }

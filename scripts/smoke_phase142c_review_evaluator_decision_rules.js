@@ -36,7 +36,7 @@ async function createReviewDraft() {
     reviewBuilder._mockState.reviews.set(reviewId, reviewRecord);
   } else {
     await db.query(
-      `INSERT INTO controlled_beta_cohort_intervention_simulation_reviews
+      `INSERT INTO controlled_beta_cohort_intervention_sim_reviews
        (review_id, source_simulation_id, source_execution_id, cohort_id, tenant_id, simulation_type,
         review_status, review_summary_json, impact_review_json, rollback_review_json, guardrail_review_json,
         write_scope_attestation_json, approval_readiness_json, review_blockers_json, non_execution_attestation_json,
@@ -95,7 +95,7 @@ async function createReviewDraft() {
       reviewBuilder._mockState.reviews.get(id5).simulation_type = 'SIMULATE_CONTROLLED_EXPANSION';
     } else {
       await db.query(
-        "UPDATE controlled_beta_cohort_intervention_simulation_reviews SET simulation_type = 'SIMULATE_CONTROLLED_EXPANSION' WHERE review_id = ?",
+        "UPDATE controlled_beta_cohort_intervention_sim_reviews SET simulation_type = 'SIMULATE_CONTROLLED_EXPANSION' WHERE review_id = ?",
         [id5]
       );
     }
