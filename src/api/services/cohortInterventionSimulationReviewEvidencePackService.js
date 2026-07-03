@@ -62,7 +62,15 @@ class CohortInterventionSimulationReviewEvidencePackService {
     const simPayload = typeof simEvidence.evidence_payload_json === 'string'
       ? JSON.parse(simEvidence.evidence_payload_json)
       : simEvidence.evidence_payload_json;
-    const parentChain = simPayload.lineage_hash_chain || {};
+    
+    let parentChain = {};
+    if (simEvidence.lineage_hash_chain_json) {
+      parentChain = typeof simEvidence.lineage_hash_chain_json === 'string'
+        ? JSON.parse(simEvidence.lineage_hash_chain_json)
+        : simEvidence.lineage_hash_chain_json;
+    } else if (simPayload && simPayload.lineage_hash_chain) {
+      parentChain = simPayload.lineage_hash_chain;
+    }
 
     const lineageHashChain = {
       phase142_review_id: reviewId,
