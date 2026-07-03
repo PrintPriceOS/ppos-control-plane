@@ -1,5 +1,8 @@
 'use strict';
 // Smoke 141D: Rollback Preview Generation
+// UNIT SMOKE: forces mock mode — validates service logic, not DB schema.
+// DB schema validation is covered by smoke 141A.
+process.env.DB_UNREACHABLE = 'true'; // Force mock mode — inject _mockState, no real DB needed
 
 const assert = require('assert');
 const rollbackSvc = require('../src/api/services/cohortInterventionSimulationRollbackPreviewService').serviceInstance || require('../src/api/services/cohortInterventionSimulationRollbackPreviewService');

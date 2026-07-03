@@ -1,5 +1,8 @@
 'use strict';
 // Smoke 141E: Operator Confirmation Validation
+// UNIT SMOKE: forces mock mode — validates service logic, not DB schema.
+// DB schema validation is covered by smoke 141A.
+process.env.DB_UNREACHABLE = 'true'; // Force mock mode — inject _mockState, no real DB needed
 
 const assert = require('assert');
 const confirmSvc = require('../src/api/services/cohortInterventionSimulationOperatorConfirmationService').serviceInstance || require('../src/api/services/cohortInterventionSimulationOperatorConfirmationService');

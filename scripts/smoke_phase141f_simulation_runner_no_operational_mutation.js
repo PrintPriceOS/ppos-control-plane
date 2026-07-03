@@ -1,9 +1,19 @@
 'use strict';
 // Smoke 141F: Simulation Runner — No Operational Mutation
 // Before/after snapshot of Phase 137-140 governance tables using tableExists() pattern.
+// UNIT SMOKE (for Phase 141 services): forces mock mode — validates simulation runner logic.
+// GOVERNANCE SNAPSHOT: uses real DB (when available) to verify no operational tables mutated.
 
 const assert = require('assert');
-const db = require('../src/api/services/mysqlClient');
+
+// Capture whether we are in prod-like mode BEFORE setting DB_UNREACHABLE
+// (so we can still do governance snapshots via raw db calls)
+const _govSnapshotEnabled = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
+const _db = _govSnapshotEnabled ? require('../src/api/services/mysqlClient') : null;
+
+// Force mock mode for Phase 141 services (mock ID injection via _mockState)
+process.env.DB_UNREACHABLE = 'true';
+
 const builderSvc = require('../src/api/services/cohortInterventionSimulationBuilderService').serviceInstance || require('../src/api/services/cohortInterventionSimulationBuilderService');
 const impactSvc = require('../src/api/services/cohortInterventionSimulationImpactAnalysisService').serviceInstance || require('../src/api/services/cohortInterventionSimulationImpactAnalysisService');
 const rollbackSvc = require('../src/api/services/cohortInterventionSimulationRollbackPreviewService').serviceInstance || require('../src/api/services/cohortInterventionSimulationRollbackPreviewService');

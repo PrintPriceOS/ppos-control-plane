@@ -1,6 +1,9 @@
 'use strict';
 // Smoke 141C: Impact Analysis per high-risk simulation type
 // Validates each of the 4 simulation types generates correct impact_projection_json
+// UNIT SMOKE: forces mock mode — validates service logic, not DB schema.
+// DB schema validation is covered by smoke 141A.
+process.env.DB_UNREACHABLE = 'true'; // Force mock mode — inject _mockState, no real DB needed
 
 const assert = require('assert');
 const impactSvc = require('../src/api/services/cohortInterventionSimulationImpactAnalysisService').serviceInstance || require('../src/api/services/cohortInterventionSimulationImpactAnalysisService');
