@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const db = require('./mysqlClient');
 const reviewBuilderSvc = require('./cohortInterventionSimulationReviewBuilderService').serviceInstance || require('./cohortInterventionSimulationReviewBuilderService');
 const auditService = require('./cohortInterventionSimulationReviewAuditService').serviceInstance || require('./cohortInterventionSimulationReviewAuditService');
