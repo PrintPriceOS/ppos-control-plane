@@ -1,5 +1,6 @@
 'use strict';
 // Smoke 141I: Evidence Pack v141.0 and Lineage Hash Chain
+process.env.DB_UNREACHABLE = 'true';
 
 const assert = require('assert');
 const builderSvc = require('../src/api/services/cohortInterventionSimulationBuilderService').serviceInstance || require('../src/api/services/cohortInterventionSimulationBuilderService');
