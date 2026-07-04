@@ -236,6 +236,7 @@ const controlledBetaCohortInterventionExecutionReadinessAdmin = require('./contr
 const controlledBetaCohortInterventionExecutionAuthorizationAdmin = require('./controlledBetaCohortInterventionExecutionAuthorizationAdmin');
 const controlledBetaCohortInterventionExecutionEnvelopeAdmin = require('./controlledBetaCohortInterventionExecutionEnvelopeAdmin');
 const controlledBetaCohortInterventionExecutionDispatcherAdmin = require('./controlledBetaCohortInterventionExecutionDispatcherAdmin');
+const controlledBetaCohortInterventionExecutionPlanAdmin = require('./controlledBetaCohortInterventionExecutionPlanAdmin');
 
 
 
@@ -263,6 +264,7 @@ router.use('/beta/cohort-intervention-readiness', controlledBetaCohortInterventi
 router.use('/beta/cohort-intervention-auth', controlledBetaCohortInterventionExecutionAuthorizationAdmin);
 router.use('/beta/cohort-intervention-envelope', controlledBetaCohortInterventionExecutionEnvelopeAdmin);
 router.use('/beta/cohort-intervention-dispatcher', controlledBetaCohortInterventionExecutionDispatcherAdmin);
+router.use('/beta/cohort-intervention-plan', controlledBetaCohortInterventionExecutionPlanAdmin);
 
 
 // Phase 141 — Restricted High-Risk Cohort Intervention Simulation Gate
