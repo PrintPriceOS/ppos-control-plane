@@ -129,7 +129,7 @@ class CohortInterventionExecutionDispatcherBuilderService {
         guardrail_review_json, dispatcher_rules_json, dispatcher_blockers_json, non_execution_attestation_json,
         write_scope_attestation_json, source_envelope_hash, source_envelope_evidence_pack_hash,
         execution_capability_status, dispatcher_execution_status, dry_run_execution_result, queue_dispatch_status, runtime_mutation_status, job_creation_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', ?, ?, ?, '{}', '{"missing_dispatcher_evaluation":true}', ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'DRY_RUN_ACTIVE_NOT_MUTATING', 'DRY_RUN_EXECUTED_NOT_MUTATED', 'SIMULATED_ONLY', 'ZERO_RUNTIME_MUTATION_CONFIRMED', 'NO_REAL_JOB_CREATED', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', ?, ?, ?, '{}', '{"missing_dispatcher_evaluation":true}', ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'DRY_RUN_ACTIVE_NOT_MUTATING', 'DRY_RUN_EXECUTED_NOT_MUTATED', 'SIMULATED_ONLY', 'ZERO_RUNTIME_MUTATION_CONFIRMED', 'NO_REAL_JOB_CREATED', ?, ?)`,
       [
         dispatcherId, envelope.envelope_id, envelope.source_auth_id, envelope.source_readiness_id, envelope.source_approval_id,
         envelope.source_prep_id, envelope.source_review_id, envelope.source_simulation_id, envelope.source_execution_id,
