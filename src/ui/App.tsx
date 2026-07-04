@@ -124,6 +124,7 @@ import { ControlledBetaCohortInterventionSimulationExecutionAuthorization } from
 import { ControlledBetaCohortInterventionSimulationExecutionEnvelope } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionEnvelope';
 import { ControlledBetaCohortInterventionSimulationExecutionDispatcher } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionDispatcher';
 import { ControlledBetaCohortInterventionSimulationExecutionPlan } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlan';
+import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationReadiness } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationReadiness';
 
 
 export const App: React.FC = () => {
@@ -197,6 +198,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/cohort-intervention-envelope" element={<ControlledBetaCohortInterventionSimulationExecutionEnvelope />} />
                 <Route path="/admin/beta/cohort-intervention-dispatcher" element={<ControlledBetaCohortInterventionSimulationExecutionDispatcher />} />
                 <Route path="/admin/beta/cohort-intervention-plan" element={<ControlledBetaCohortInterventionSimulationExecutionPlan />} />
+                <Route path="/admin/beta/cohort-intervention-activation-readiness" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationReadiness />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
