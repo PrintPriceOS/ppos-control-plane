@@ -238,6 +238,11 @@ async function setupTokenEnvAndTokenFinalApv(activationTokenEnvId, activationTok
       rollback_authority_verified: true
     }, 'admin');
 
+    const rec = await tokenFinalApvBuilder.getTokenFinalApv(apvId1);
+    const pEnv = await tokenEnvBuilder.getTokenEnv(rec.source_activation_token_env_id);
+    console.log('parentEnv:', JSON.stringify(pEnv, null, 2));
+    console.log('record:', JSON.stringify(rec, null, 2));
+
     const rules = await tokenFinalApvBuilder.getRules(apvId1);
     console.log('Evaluated rules list for apvId1:', JSON.stringify(rules, null, 2));
 
