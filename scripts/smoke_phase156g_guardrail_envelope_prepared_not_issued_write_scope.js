@@ -123,7 +123,10 @@ async function setupTokenEnvAttestation(activationTokenEnvId, writeScopeObj) {
         JSON.stringify(record.rollback_review_json),
         JSON.stringify(record.guardrail_review_json),
         JSON.stringify(nonExecution156),
-        JSON.stringify(writeScopeObj)
+        JSON.stringify(writeScopeObj),
+        record.source_activation_token_auth_hash,
+        record.source_token_material_hash,
+        record.source_freeze_package_hash
       ]
     );
   }
