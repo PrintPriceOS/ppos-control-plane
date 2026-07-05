@@ -143,7 +143,7 @@ class CohortInterventionExecutionPlanActivationDecisionBuilderService {
         guardrail_review_json, decision_rules_json, decision_blockers_json, non_execution_attestation_json,
         write_scope_attestation_json, source_activation_lock_hash, source_freeze_package_hash,
         execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status, job_creation_status, queue_dispatch_status, runtime_mutation_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', ?, ?, ?, '{}', '{"missing_decision_evaluation":true}', ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'GO_DECISION_FINALIZED_NOT_EXECUTED', 'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', ?, ?, ?, '{}', '{"missing_decision_evaluation":true}', ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'GO_DECISION_FINALIZED_NOT_EXECUTED', 'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED', ?, ?)`,
       [
         activationDecisionId, lock.activation_lock_id, lock.source_activation_auth_id, lock.source_activation_readiness_id, lock.source_plan_id, lock.source_dispatcher_id, lock.source_envelope_id, lock.source_auth_id, lock.source_readiness_id,
         lock.source_approval_id, lock.source_prep_id, lock.source_review_id, lock.source_simulation_id, lock.source_execution_id,
