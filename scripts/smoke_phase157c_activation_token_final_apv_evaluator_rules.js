@@ -238,6 +238,9 @@ async function setupTokenEnvAndTokenFinalApv(activationTokenEnvId, activationTok
       rollback_authority_verified: true
     }, 'admin');
 
+    const rules = await tokenFinalApvBuilder.getRules(apvId1);
+    console.log('Evaluated rules list for apvId1:', JSON.stringify(rules, null, 2));
+
     assert.strictEqual(passed.success, true);
     let record = await tokenFinalApvBuilder.getTokenFinalApv(apvId1);
     assert.strictEqual(record.activation_token_final_apv_status, 'EVALUATED');
