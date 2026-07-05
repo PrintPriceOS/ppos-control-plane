@@ -205,7 +205,13 @@ async function setupReadinessAndAuth(activationRdId, activationAuthId) {
         execution_capability_status, activation_execution_status, plan_executable_status, job_creation_status, queue_dispatch_status, runtime_mutation_status)
        VALUES (?, ?, 'pln_test_151d', 'dsp_test_151d', 'env_test_151d', 'ath_test_151d', 'rd_test_151d', 'apv_test_151d', 'prep_test_151d', 'rev_test_151d', 'sim_test_151d', 'exec_test_151d', 'cohort_test_151d', 'tenant_test_151d', 'SIMULATE_COHORT_PAUSE',
         'DRAFT', NULL, 'LOW', 'HIGH', 35.0, 80.0, 95.0, 'PENDING', 'PENDING', ?, '{}', '{}', '{}', '{}', '{}', '{"missing_authorization_evaluation":true}', ?, ?, 'rd_hash_151d', 'EXECUTION_NOT_ENABLED', 'AUTHORIZATION_FINALIZED_NOT_EXECUTED', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED')`,
-      [activationAuthId, activationRdId, JSON.stringify(nonExecution151), JSON.stringify(writeScope151)]
+      [
+        activationAuthId,
+        activationRdId,
+        JSON.stringify({ authorization_mode: 'ACTIVATION_AUTHORIZATION_ONLY', allow_real_activation: false }),
+        JSON.stringify(nonExecution151),
+        JSON.stringify(writeScope151)
+      ]
     );
   }
 }
