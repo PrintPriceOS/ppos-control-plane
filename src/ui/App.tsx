@@ -131,6 +131,7 @@ import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationDecisi
 import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationHandoff } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationHandoff';
 import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth';
 import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv';
+import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv';
 
 
 export const App: React.FC = () => {
@@ -211,6 +212,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/cohort-intervention-activation-handoff" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationHandoff />} />
                 <Route path="/admin/beta/cohort-intervention-activation-token-auth" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth />} />
                 <Route path="/admin/beta/cohort-intervention-activation-token-env" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv />} />
+                <Route path="/admin/beta/cohort-intervention-activation-token-final-apv" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
