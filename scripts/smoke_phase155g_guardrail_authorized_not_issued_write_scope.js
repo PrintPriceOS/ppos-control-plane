@@ -91,7 +91,7 @@ async function setupTokenAuthAttestation(activationTokenAuthId, writeScopeObj) {
         execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status, job_creation_status, queue_dispatch_status, runtime_mutation_status)
        VALUES (?, ?, 'dec_test_155g', 'lock_test_155g', 'auth_test_155g', 'rd_test_155g', 'pln_test_155g', 'dsp_test_155g', 'env_test_155g', 'ath_test_155g', 'rd_test_155g', 'apv_test_155g', 'prep_test_155g', 'rev_test_155g', 'sim_test_155g', 'exec_test_155g', 'cohort_test_155g', 'tenant_test_155g', 'SIMULATE_COHORT_PAUSE',
         'DRAFT', NULL, 'LOW', 'HIGH', 35.0, 80.0, 95.0, 'PENDING', 'PENDING', '{"token_auth_mode":"TOKEN_ISSUANCE_AUTHORIZATION_ONLY", "allow_token_issue":false}', '{}', '{}', '{}', '{}', '{}', '{"missing_token_auth_evaluation":true}', ?, ?, 'handoff_hash_155g', 'token_material_hash_155g', 'lock_hash_155g', 'EXECUTION_NOT_ENABLED', 'TOKEN_AUTH_FINALIZED_NOT_EXECUTED', 'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED')`,
-      [activationTokenAuthId, activationHandoffId, JSON.stringify(nonExecution155), JSON.stringify(writeScopeObj)]
+      [activationTokenAuthId, record.source_activation_handoff_id, JSON.stringify(nonExecution155), JSON.stringify(writeScopeObj)]
     );
   }
 }
