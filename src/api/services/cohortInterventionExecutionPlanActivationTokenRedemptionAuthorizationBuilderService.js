@@ -166,9 +166,8 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationBuild
         execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status,
         job_creation_status, queue_dispatch_status, runtime_mutation_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', '{}', '{}', '{}',
-               '{}', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_AUTH_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
-               'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED')`,
+               ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+               ?, ?, ?, ?, ?, ?, ? )`,
       [
         authId, activationTokenRedemptionReadinessId, record.source_activation_token_issuance_id,
         record.source_activation_token_preflight_id, record.source_activation_token_staging_id, record.source_activation_token_final_apv_id,
@@ -177,14 +176,20 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationBuild
         record.source_plan_id, record.source_dispatcher_id, record.source_envelope_id, record.source_auth_id,
         record.source_readiness_id, record.source_approval_id, record.source_prep_id, record.source_review_id,
         record.source_simulation_id, record.source_execution_id, record.cohort_id, record.tenant_id, record.simulation_type,
+        
+        'DRAFT', null,
         record.risk_level, record.confidence_level, record.projected_impact_score,
         record.rollback_feasibility_score, record.evidence_completeness_score,
-        JSON.stringify(authConfig),
+        'PENDING', 'PENDING',
+        JSON.stringify(authConfig), '{}', '{}', '{}', '{}', '{}',
         JSON.stringify({ missing_token_redemption_auth_evaluation: true }),
         JSON.stringify(nonExecution162), JSON.stringify(writeScope162), JSON.stringify(tokenRecord),
         record.source_activation_token_redemption_readiness_hash, record.source_activation_token_issuance_hash,
         record.source_activation_token_preflight_hash, record.source_activation_token_staging_hash,
-        record.source_token_material_hash, record.source_freeze_package_hash
+        record.source_token_material_hash, record.source_freeze_package_hash,
+        
+        'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_AUTH_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
+        'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED'
       ]
     );
 
