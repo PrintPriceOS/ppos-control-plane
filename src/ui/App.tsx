@@ -134,6 +134,7 @@ import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenE
 import { ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv } from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenStaging from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenStaging';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenPreflight from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenPreflight';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenIssuance from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenIssuance';
 
 
 export const App: React.FC = () => {
@@ -217,6 +218,7 @@ export const App: React.FC = () => {
                 <Route path="/admin/beta/cohort-intervention-activation-token-final-apv" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv />} />
                 <Route path="/admin/beta/cohort-intervention-activation-token-staging/:id" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenStaging />} />
                 <Route path="/admin/beta/cohort-intervention-activation-token-preflight/:id" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenPreflight />} />
+                <Route path="/admin/beta/cohort-intervention-activation-token-issuance/:id" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenIssuance />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
