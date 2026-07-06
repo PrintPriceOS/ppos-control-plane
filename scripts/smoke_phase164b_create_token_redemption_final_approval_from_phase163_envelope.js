@@ -216,13 +216,11 @@ async function setupFinalizedEnv(envId, authId, readinessId, issuanceId) {
       });
     } else {
       await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_env WHERE activation_token_redemption_env_id = ?', ['env_invalid']);
-      await db.query(
-        `INSERT INTO cb_cohort_intervention_activation_token_redempt_env
-         (activation_token_redemption_env_id, source_activation_token_redemption_auth_id, source_activation_token_redemption_readiness_id, source_activation_token_issuance_id, source_activation_token_preflight_id, source_activation_token_staging_id, source_activation_token_final_apv_id, source_activation_token_env_id, source_activation_handoff_id, source_activation_decision_id, source_activation_lock_id, source_activation_auth_id, source_activation_readiness_id, source_plan_id, source_dispatcher_id, source_envelope_id, source_auth_id, source_readiness_id, source_approval_id, source_prep_id,
-          activation_token_redemption_envelope_status, activation_execution_status)
-         VALUES ('env_invalid', 'auth_dummy', 'rd_dummy', 'iss_dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy',
-          'DRAFT', 'TOKEN_REDEMPTION_ENVELOPE_FINALIZED_NOT_REDEEMED_NOT_EXECUTED')`
-      );
+      const invalidEnv = await envBuilder.createTokenRedemptionEnvelopeDraft(authId, 'admin');
+      await envBuilder._internalUpdateTokenRedemptionEnvelope(invalidEnv.tokenRedemptionEnvelope.activation_token_redemption_env_id, {
+        activation_token_redemption_env_id: 'env_invalid', // override generated ID to keep test constant
+        activation_token_redemption_envelope_status: 'DRAFT'
+      });
     }
 
     await assert.rejects(
