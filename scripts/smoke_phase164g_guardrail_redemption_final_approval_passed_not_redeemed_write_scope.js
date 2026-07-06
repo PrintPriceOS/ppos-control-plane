@@ -192,45 +192,14 @@ async function setupFinalizedEnv(envId, authId, readinessId, issuanceId) {
       ]
     );
 
-    await db.query(
-      `INSERT INTO cb_cohort_intervention_activation_token_redempt_env
-       (activation_token_redemption_env_id, source_activation_token_redemption_auth_id, source_activation_token_redemption_readiness_id,
-        source_activation_token_issuance_id, source_activation_token_preflight_id, source_activation_token_staging_id,
-        source_activation_token_final_apv_id, source_activation_token_env_id, source_activation_handoff_id,
-        source_activation_decision_id, source_activation_lock_id, source_activation_auth_id, source_activation_readiness_id,
-        source_plan_id, source_dispatcher_id, source_envelope_id,
-        source_auth_id, source_readiness_id, source_approval_id, source_prep_id,
-        source_review_id, source_simulation_id, source_execution_id, cohort_id, tenant_id, simulation_type,
-        activation_token_redemption_envelope_status, activation_token_redemption_envelope_result,
-        risk_level, confidence_level, projected_impact_score, rollback_feasibility_score, evidence_completeness_score,
-        guardrail_status, write_scope_status, canary_envelope_json, token_redemption_envelope_summary_json,
-        impact_review_json, rollback_review_json, guardrail_review_json,
-        token_redemption_envelope_rules_json, token_redemption_envelope_blockers_json, non_execution_attestation_json,
-        write_scope_attestation_json, non_redeemable_token_record_json, source_activation_token_redemption_authorization_hash,
-        source_activation_token_redemption_readiness_hash, source_activation_token_issuance_hash, source_activation_token_preflight_hash,
-        source_activation_token_staging_hash, source_token_material_hash, source_freeze_package_hash,
-        activation_token_redemption_envelope_hash, execution_capability_status, activation_execution_status,
-        package_freeze_status, plan_executable_status, job_creation_status, queue_dispatch_status, runtime_mutation_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               'FINALIZED', 'REDEMPTION_ENVELOPE_PREPARED_NOT_REDEEMED',
-               ?, ?, ?, ?, ?,
-               'PASS', 'PASS', ?, '{}', '{}', '{}', '{}', '{}',
-               '{}', ?, ?, ?, ?, ?, ?, ?, 'env_hash_164g',
-               'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_ENVELOPE_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
-               'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED')`,
-      [
-        envId, authId, readinessId, issuanceId,
-        issuanceRecord.source_activation_token_preflight_id, issuanceRecord.source_activation_token_staging_id, issuanceRecord.source_activation_token_final_apv_id,
-        issuanceRecord.source_activation_token_env_id, issuanceRecord.source_activation_handoff_id, issuanceRecord.source_activation_decision_id,
-        issuanceRecord.source_activation_lock_id, issuanceRecord.source_activation_auth_id, issuanceRecord.source_activation_readiness_id,
-        issuanceRecord.source_plan_id, issuanceRecord.source_dispatcher_id, issuanceRecord.source_envelope_id, issuanceRecord.source_auth_id,
-        issuanceRecord.source_readiness_id, issuanceRecord.source_approval_id, issuanceRecord.source_prep_id, issuanceRecord.source_review_id,
-        issuanceRecord.source_simulation_id, issuanceRecord.source_execution_id, issuanceRecord.cohort_id, issuanceRecord.tenant_id, issuanceRecord.simulation_type,
-        issuanceRecord.risk_level, issuanceRecord.confidence_level, issuanceRecord.projected_impact_score, issuanceRecord.rollback_feasibility_score, issuanceRecord.evidence_completeness_score,
-        JSON.stringify(config), JSON.stringify(nonExecution), JSON.stringify(writeScope),
-        'ath_hash_164g', 'rdy_hash_164g', 'iss_hash_164g', 'pfl_hash_164g', 'stg_hash_164g', 'token_material_hash_164g', 'lock_hash_164g'
-      ]
-    );
+    // Create the finalized Phase 163 envelope using the real builder to keep SQL mappings in sync.
+    const createdEnv = await envBuilder.createTokenRedemptionEnvelopeDraft(authId, 'admin');
+    await envBuilder._internalUpdateTokenRedemptionEnvelope(createdEnv.tokenRedemptionEnvelope.activation_token_redemption_env_id, {
+      activation_token_redemption_env_id: envId, // override generated ID to keep test constant
+      activation_token_redemption_envelope_status: 'FINALIZED',
+      activation_token_redemption_envelope_result: 'REDEMPTION_ENVELOPE_PREPARED_NOT_REDEEMED',
+      activation_token_redemption_envelope_hash: 'env_hash_164g'
+    });
   }
 }
 
