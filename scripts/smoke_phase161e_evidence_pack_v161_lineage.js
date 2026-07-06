@@ -98,7 +98,7 @@ async function setupFinalizedIssuance(issuanceId) {
 
     if (isProdLike) {
       const rows = await db.query(
-        `SELECT * FROM cb_cohort_intervention_activation_token_redemption_readiness_evidence WHERE activation_token_redemption_readiness_id = ?`,
+        `SELECT * FROM cb_cohort_intervention_activation_token_redempt_readiness_ev WHERE activation_token_redemption_readiness_id = ?`,
         [readinessId]
       );
       assert.ok(rows && rows[0]);

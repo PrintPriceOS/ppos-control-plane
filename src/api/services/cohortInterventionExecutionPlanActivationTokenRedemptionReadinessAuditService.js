@@ -14,7 +14,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessAuditServ
     }
 
     await db.query(
-      `INSERT INTO cb_cohort_intervention_activation_token_redemption_readiness_audits 
+      `INSERT INTO cb_cohort_intervention_activation_token_redempt_readiness_audits 
        (audit_id, activation_token_redemption_readiness_id, action, actor_id, metadata_json) 
        VALUES (?, ?, ?, ?, ?)`,
       [auditId, activationTokenRedemptionReadinessId, action, actorId, JSON.stringify(payload)]

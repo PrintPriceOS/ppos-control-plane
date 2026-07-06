@@ -143,7 +143,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
     }
 
     await db.query(
-      `INSERT INTO cb_cohort_intervention_activation_token_redemption_readiness
+      `INSERT INTO cb_cohort_intervention_activation_token_redempt_readiness
        (activation_token_redemption_readiness_id, source_activation_token_issuance_id, source_activation_token_preflight_id,
         source_activation_token_staging_id, source_activation_token_final_apv_id, source_activation_token_env_id,
         source_activation_handoff_id, source_activation_decision_id, source_activation_lock_id,
@@ -159,7 +159,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
         source_activation_token_preflight_hash, source_activation_token_staging_hash, source_token_material_hash, source_freeze_package_hash,
         execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status,
         job_creation_status, queue_dispatch_status, runtime_mutation_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                'DRAFT', NULL, ?, ?, ?, ?, ?, 'PENDING', 'PENDING', ?, '{}', '{}', '{}', '{}',
                '{}', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_READINESS_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
                'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED', 'ZERO_RUNTIME_MUTATION_CONFIRMED')`,
@@ -188,20 +188,20 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
   async getTokenRedemptionReadiness(activationTokenRedemptionReadinessId) {
     const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
     if (!isProdLike) return this._mockState.tokenRedemptionReadiness.get(activationTokenRedemptionReadinessId) || null;
-    const rows = await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redemption_readiness WHERE activation_token_redemption_readiness_id = ?`, [activationTokenRedemptionReadinessId]);
+    const rows = await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redempt_readiness WHERE activation_token_redemption_readiness_id = ?`, [activationTokenRedemptionReadinessId]);
     return rows && rows[0] ? rows[0] : null;
   }
 
   async listTokenRedemptionReadinesses() {
     const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
     if (!isProdLike) return Array.from(this._mockState.tokenRedemptionReadiness.values());
-    return await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redemption_readiness ORDER BY created_at DESC`);
+    return await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redempt_readiness ORDER BY created_at DESC`);
   }
 
   async getRules(activationTokenRedemptionReadinessId) {
     const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
     if (!isProdLike) return this._mockState.rules.get(activationTokenRedemptionReadinessId) || [];
-    return await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redemption_readiness_rules WHERE activation_token_redemption_readiness_id = ? ORDER BY created_at ASC`, [activationTokenRedemptionReadinessId]);
+    return await db.query(`SELECT * FROM cb_cohort_intervention_activation_token_redempt_readiness_rules WHERE activation_token_redemption_readiness_id = ? ORDER BY created_at ASC`, [activationTokenRedemptionReadinessId]);
   }
 
   async updateTokenRedemptionReadiness(activationTokenRedemptionReadinessId, fields) {
@@ -226,7 +226,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
       bindings.push(typeof v === 'object' && v !== null ? JSON.stringify(v) : v);
     }
     bindings.push(activationTokenRedemptionReadinessId);
-    await db.query(`UPDATE cb_cohort_intervention_activation_token_redemption_readiness SET ${setClauses.join(', ')} WHERE activation_token_redemption_readiness_id = ?`, bindings);
+    await db.query(`UPDATE cb_cohort_intervention_activation_token_redempt_readiness SET ${setClauses.join(', ')} WHERE activation_token_redemption_readiness_id = ?`, bindings);
     return await this.getTokenRedemptionReadiness(activationTokenRedemptionReadinessId);
   }
 
@@ -248,7 +248,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
       bindings.push(typeof v === 'object' && v !== null ? JSON.stringify(v) : v);
     }
     bindings.push(activationTokenRedemptionReadinessId);
-    await db.query(`UPDATE cb_cohort_intervention_activation_token_redemption_readiness SET ${setClauses.join(', ')} WHERE activation_token_redemption_readiness_id = ?`, bindings);
+    await db.query(`UPDATE cb_cohort_intervention_activation_token_redempt_readiness SET ${setClauses.join(', ')} WHERE activation_token_redemption_readiness_id = ?`, bindings);
     return await this.getTokenRedemptionReadiness(activationTokenRedemptionReadinessId);
   }
 
@@ -265,7 +265,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderSe
     }
 
     await db.query(
-      `INSERT INTO cb_cohort_intervention_activation_token_redemption_readiness_rules 
+      `INSERT INTO cb_cohort_intervention_activation_token_redempt_readiness_rules 
        (rule_id, activation_token_redemption_readiness_id, check_type, severity, description) 
        VALUES (?, ?, ?, ?, ?)`,
       [ruleId, activationTokenRedemptionReadinessId, checkType, severity, description]

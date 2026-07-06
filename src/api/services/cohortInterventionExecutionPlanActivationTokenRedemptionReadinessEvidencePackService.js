@@ -64,7 +64,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionReadinessEvidenceP
 
     if (isProdLike) {
       await db.query(
-        `INSERT INTO cb_cohort_intervention_activation_token_redemption_readiness_evidence 
+        `INSERT INTO cb_cohort_intervention_activation_token_redempt_readiness_ev 
          (evidence_id, activation_token_redemption_readiness_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json) 
          VALUES (?, ?, '161.0', ?, ?, ?)`,
         [evidenceId, tokenReadinessRecord.activation_token_redemption_readiness_id, evidencePackHash,

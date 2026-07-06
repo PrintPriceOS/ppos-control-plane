@@ -1,7 +1,7 @@
 -- Migration: 112_phase161_controlled_high_risk_cohort_intervention_activation_token_redemption_readiness_gate
 -- Up
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_readiness (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_readiness (
   activation_token_redemption_readiness_id VARCHAR(64) NOT NULL PRIMARY KEY,
   source_activation_token_issuance_id VARCHAR(64) NOT NULL,
   source_activation_token_preflight_id VARCHAR(64) NOT NULL,
@@ -73,17 +73,17 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_re
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_readiness_rules (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_readiness_rules (
   rule_id VARCHAR(64) NOT NULL PRIMARY KEY,
   activation_token_redemption_readiness_id VARCHAR(64) NOT NULL,
   check_type VARCHAR(128) NOT NULL,
   severity VARCHAR(32) NOT NULL DEFAULT 'INFO',
   description TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_redemption_rules_id (activation_token_redemption_readiness_id)
+  INDEX idx_redempt_rules_id (activation_token_redemption_readiness_id)
 );
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_readiness_evidence (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_readiness_ev (
   evidence_id VARCHAR(64) NOT NULL PRIMARY KEY,
   activation_token_redemption_readiness_id VARCHAR(64) NOT NULL,
   evidence_schema_version VARCHAR(16) NOT NULL DEFAULT '161.0',
@@ -91,15 +91,15 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_re
   evidence_payload_json JSON NULL,
   lineage_hash_chain_json JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_redemption_evidence_id (activation_token_redemption_readiness_id)
+  INDEX idx_redempt_evidence_id (activation_token_redemption_readiness_id)
 );
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redemption_readiness_audits (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_readiness_audits (
   audit_id VARCHAR(64) NOT NULL PRIMARY KEY,
   activation_token_redemption_readiness_id VARCHAR(64) NOT NULL,
   action VARCHAR(128) NOT NULL,
   actor_id VARCHAR(128) NULL,
   metadata_json JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_redemption_audits_id (activation_token_redemption_readiness_id)
+  INDEX idx_redempt_audits_id (activation_token_redemption_readiness_id)
 );
