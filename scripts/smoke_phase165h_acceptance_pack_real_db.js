@@ -72,9 +72,10 @@ function runSmoke(scriptName, label) {
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
 
-  const status = failed === 0 ? 'PRODUCTION-VALIDATED' : 'BLOCKED';
-  const result = failed === 0 ? 'READY' : 'NOT READY';
-  const blockers = failed === 0 ? 'NONE' : results.filter(r => !r.passed).map(r => r.name).join(', ');
+  const isMock = REAL_DB === 'MOCK';
+  const status = failed === 0 ? (isMock ? 'MOCK-VALIDATED' : 'PRODUCTION-VALIDATED') : 'BLOCKED';
+  const result = failed === 0 ? (isMock ? 'READY IN MOCK' : 'READY') : 'NOT READY';
+  const blockers = failed === 0 ? (isMock ? 'REAL DB VALIDATION STILL REQUIRED' : 'NONE') : results.filter(r => !r.passed).map(r => r.name).join(', ');
 
   console.log('\n');
   console.log('================================================================================');
@@ -83,16 +84,20 @@ function runSmoke(scriptName, label) {
   console.log(`STATUS: ${status}`);
   console.log(`RESULT: ${result}`);
   console.log(`BLOCKERS: ${blockers}`);
-  console.log(`REAL DB VALIDATION: ${REAL_DB}`);
-  console.log(`ACCEPTANCE PACK: ${passed} passed, ${failed} failed`);
+  if (!isMock) {
+    console.log(`REAL DB VALIDATION: ${REAL_DB}`);
+    console.log(`ACCEPTANCE PACK: ${passed} passed, ${failed} failed`);
+  } else {
+    console.log(`MOCK ACCEPTANCE PACK: ${passed} passed, ${failed} failed`);
+  }
   console.log(`SAFETY BOUNDARY: PRESERVED`);
   console.log(`HIGH-RISK EXECUTION: NOT ENABLED`);
-  console.log(`TOKEN REDEMPTION LOCK: REDEMPTION_LOCK_FINALIZED_NOT_REDEEMED`);
+  console.log(`TOKEN REDEMPTION LOCK: LOCKED_NOT_REDEEMED`);
   console.log(`TOKEN STATUS: ISSUANCE_RECORDED_NOT_REDEEMABLE`);
-  console.log(`TOKEN REDEMPTION: REDEMPTION_LOCKED_NOT_REDEEMED`);
+  console.log(`TOKEN REDEMPTION: LOCKED_NOT_REDEEMED`);
   console.log(`TOKEN REDEEMABLE: NOT_REDEEMABLE`);
   console.log(`ACTIVATION EXECUTION STATUS: TOKEN_REDEMPTION_LOCK_FINALIZED_NOT_REDEEMED_NOT_EXECUTED`);
-  console.log(`REDEMPTION PACKAGE FREEZE STATUS: FROZEN_IMMUTABLE`);
+  console.log(`REDEMPTION PACKAGE FREEZE STATUS: REDEMPTION_PACKAGE_FROZEN_IMMUTABLE`);
   console.log(`PACKAGE FREEZE STATUS: FROZEN_IMMUTABLE`);
   console.log(`PLAN EXECUTABLE STATUS: NOT_EXECUTABLE`);
   console.log(`JOB CREATION: NO_REAL_JOB_CREATED`);
