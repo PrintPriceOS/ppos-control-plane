@@ -38,16 +38,16 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock 
   evidence_completeness_score DECIMAL(5,2) NOT NULL,
   guardrail_status VARCHAR(32) NOT NULL,
   write_scope_status VARCHAR(32) NOT NULL,
-  canary_envelope_json TEXT NOT NULL,
-  token_redemption_lock_summary_json TEXT NOT NULL,
-  impact_review_json TEXT NOT NULL,
-  rollback_review_json TEXT NOT NULL,
-  guardrail_review_json TEXT NOT NULL,
-  token_redemption_lock_rules_json TEXT NOT NULL,
-  token_redemption_lock_blockers_json TEXT NOT NULL,
-  non_execution_attestation_json TEXT NOT NULL,
-  write_scope_attestation_json TEXT NOT NULL,
-  non_redeemable_token_record_json TEXT NOT NULL,
+  canary_envelope_json LONGTEXT NOT NULL,
+  token_redemption_lock_summary_json LONGTEXT NOT NULL,
+  impact_review_json LONGTEXT NOT NULL,
+  rollback_review_json LONGTEXT NOT NULL,
+  guardrail_review_json LONGTEXT NOT NULL,
+  token_redemption_lock_rules_json LONGTEXT NOT NULL,
+  token_redemption_lock_blockers_json LONGTEXT NOT NULL,
+  non_execution_attestation_json LONGTEXT NOT NULL,
+  write_scope_attestation_json LONGTEXT NOT NULL,
+  non_redeemable_token_record_json LONGTEXT NOT NULL,
   source_activation_token_redemption_final_approval_hash VARCHAR(64) NOT NULL,
   source_activation_token_redemption_envelope_hash VARCHAR(64) NOT NULL,
   source_activation_token_redemption_authorization_hash VARCHAR(64) NOT NULL,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock 
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by VARCHAR(128) NOT NULL,
   updated_by VARCHAR(128) NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock_rules (
   rule_id VARCHAR(64) PRIMARY KEY,
@@ -83,23 +83,23 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock_
   severity VARCHAR(32) NOT NULL,
   description TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock_ev (
   evidence_id VARCHAR(64) PRIMARY KEY,
   activation_token_redemption_lock_id VARCHAR(64) NOT NULL,
   evidence_schema_version VARCHAR(16) NOT NULL,
   evidence_pack_hash VARCHAR(64) NOT NULL,
-  evidence_payload_json TEXT NOT NULL,
-  lineage_hash_chain_json TEXT NOT NULL,
+  evidence_payload_json LONGTEXT NOT NULL,
+  lineage_hash_chain_json LONGTEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_lock_audits (
   audit_id VARCHAR(64) PRIMARY KEY,
   activation_token_redemption_lock_id VARCHAR(64) NOT NULL,
   action_type VARCHAR(128) NOT NULL,
   actor_id VARCHAR(128) NOT NULL,
-  details_json TEXT NOT NULL,
+  details_json LONGTEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
