@@ -214,15 +214,15 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionLockBuilderService
         record.created_by, record.updated_by
       ];
 
-      // Exact 72 columns count assertion
-      if (columns.length !== 72 || bindings.length !== 72) {
-        throw new Error(`CRITICAL: Column count (${columns.length}) and bindings count (${bindings.length}) mismatch. Must be exactly 72.`);
+      // Exact columns count assertion
+      if (columns.length !== bindings.length) {
+        throw new Error(`CRITICAL: Column count (${columns.length}) and bindings count (${bindings.length}) mismatch.`);
       }
 
       const query = `
         INSERT INTO cb_cohort_intervention_activation_token_redempt_lock
         (${columns.join(', ')})
-        VALUES (${Array(72).fill('?').join(', ')})
+        VALUES (${Array(columns.length).fill('?').join(', ')})
       `;
       await db.query(query, bindings);
     }

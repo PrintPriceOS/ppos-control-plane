@@ -18,6 +18,55 @@ const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATAB
     const finalApvId = 'atfa_165e_1';
     const envId = 'ate_165e_1';
 
+async function seedFinalApprovalRealDB(finalApvId, envId) {
+  const authId = 'ata_165e_1';
+  const config = { redemption_lock_mode: 'TOKEN_REDEMPTION_LOCK_PRE_REDEMPTION_FREEZE_ONLY', token_status: 'ISSUANCE_RECORDED_NOT_REDEEMABLE', token_redeemable: false };
+  const nonExecution = { safe_workflow_boundary_preserved: true, execution_enforcement_disabled: true, no_runtime_mutations: true };
+  const writeScope = { writes_only_phase164_tables: true, wrote_phase128_to_163_operational_tables: false };
+
+  await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_lock WHERE source_activation_token_redemption_final_apv_id = ?', [finalApvId]);
+  await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_fapv WHERE activation_token_redemption_final_apv_id = ?', [finalApvId]);
+  await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_env WHERE activation_token_redemption_env_id = ?', [envId]);
+
+  await db.query(
+    `INSERT INTO cb_cohort_intervention_activation_token_redempt_env
+     (activation_token_redemption_env_id, source_activation_token_redemption_auth_id,
+      activation_token_redemption_envelope_status, activation_token_redemption_envelope_result,
+      execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status,
+      job_creation_status, queue_dispatch_status, runtime_mutation_status, activation_token_redemption_envelope_hash)
+     VALUES (?, ?, 'FINALIZED', 'REDEMPTION_ENVELOPE_PREPARED_NOT_REDEEMED',
+             'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_ENVELOPE_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
+             'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED',
+             'ZERO_RUNTIME_MUTATION_CONFIRMED', 'env_hash_165e')`,
+    [envId, authId]
+  );
+
+  await db.query(
+    `INSERT INTO cb_cohort_intervention_activation_token_redempt_fapv
+     (activation_token_redemption_final_apv_id, source_activation_token_redemption_env_id,
+      source_activation_token_redemption_auth_id, source_activation_token_redemption_readiness_id,
+      source_activation_token_issuance_id,
+      activation_token_redemption_final_apv_status, activation_token_redemption_final_apv_result,
+      execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status,
+      job_creation_status, queue_dispatch_status, runtime_mutation_status, activation_token_redemption_final_apv_hash,
+      risk_level, confidence_level, projected_impact_score, rollback_feasibility_score, evidence_completeness_score,
+      guardrail_status, write_scope_status, canary_envelope_json, non_execution_attestation_json,
+      write_scope_attestation_json, token_status, token_redemption_final_apv_status_val, token_redemption_status,
+      token_redeemable_status)
+     VALUES (?, ?, ?, 'atrr_dummy', 'ati_dummy', 'FINALIZED', 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED',
+             'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_FINAL_APPROVAL_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
+             'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED',
+             'ZERO_RUNTIME_MUTATION_CONFIRMED', 'fapv_hash_165e',
+             'LOW', 'HIGH', 35.0, 80.0, 95.0, 'PASS', 'PASS', ?, ?, ?,
+             'ISSUANCE_RECORDED_NOT_REDEEMABLE', 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED',
+             'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED', 'NOT_REDEEMABLE')`,
+    [
+      finalApvId, envId, authId,
+      JSON.stringify(config), JSON.stringify(nonExecution), JSON.stringify(writeScope)
+    ]
+  );
+}
+
     if (!isProdLike) {
       const config = { redemption_lock_mode: 'TOKEN_REDEMPTION_LOCK_PRE_REDEMPTION_FREEZE_ONLY', token_status: 'ISSUANCE_RECORDED_NOT_REDEEMABLE', token_redeemable: false };
       const nonExecution = { safe_workflow_boundary_preserved: true, execution_enforcement_disabled: true, no_runtime_mutations: true };
@@ -44,6 +93,8 @@ const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATAB
         token_redemption_status: 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED'
       });
       finalApvBuilder._mockState.rules.set(finalApvId, []);
+    } else {
+      await seedFinalApprovalRealDB(finalApvId, envId);
     }
 
     // Full workflow: draft → evaluate → decide → finalize
