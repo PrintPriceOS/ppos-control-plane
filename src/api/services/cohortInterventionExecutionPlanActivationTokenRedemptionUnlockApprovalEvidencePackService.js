@@ -104,6 +104,11 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalEvid
     }
 
     await db.query(
+      `DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_apv_ev WHERE activation_token_redemption_unlock_approval_id = ?`,
+      [record.activation_token_redemption_unlock_approval_id]
+    );
+
+    await db.query(
       `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_apv_ev
        (evidence_id, activation_token_redemption_unlock_approval_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
        VALUES (?, ?, ?, ?, ?, ?)`,
