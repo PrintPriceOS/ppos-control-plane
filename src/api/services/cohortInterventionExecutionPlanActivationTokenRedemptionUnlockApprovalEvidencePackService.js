@@ -39,7 +39,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalEvid
         unlock_approval_status: record.unlock_approval_status,
         unlock_approval_result: record.unlock_approval_result,
         unlock_approval_hash: record.unlock_approval_hash,
-        timestamp: new Date()
+        timestamp: record.finalized_at || record.created_at || 'mock_time'
       },
       phase166_unlock_eligibility: parentLineage.phase166_unlock_eligibility || null,
       phase165_token_redemption_lock: parentLineage.phase165_token_redemption_lock || null,
