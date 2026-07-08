@@ -243,8 +243,7 @@ async function setupFinalizedFinalApproval(finalApvId, envId, authId, readinessI
       });
     } else {
       await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_fapv WHERE activation_token_redemption_final_apv_id = ?', ['fapv_invalid']);
-      const createdEnv = await envBuilder.createTokenRedemptionEnvelopeDraft('ata_invalid_dummy', 'admin');
-      const createdFApv = await finalApvBuilder.createTokenRedemptionFinalApprovalDraft(createdEnv.tokenRedemptionEnvelope.activation_token_redemption_env_id, 'admin');
+      const createdFApv = await finalApvBuilder.createTokenRedemptionFinalApprovalDraft(envId, 'admin');
       await db.query(
         'UPDATE cb_cohort_intervention_activation_token_redempt_fapv SET activation_token_redemption_final_apv_id = ? WHERE activation_token_redemption_final_apv_id = ?',
         ['fapv_invalid', createdFApv.tokenRedemptionFinalApproval.activation_token_redemption_final_apv_id]
