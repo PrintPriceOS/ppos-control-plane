@@ -241,6 +241,29 @@ async function setupFinalizedFinalApproval(finalApvId, envId, authId, readinessI
         activation_token_redemption_final_apv_id: 'fapv_invalid',
         activation_token_redemption_final_apv_status: 'DRAFT'
       });
+    } else {
+      await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_fapv WHERE activation_token_redemption_final_apv_id = ?', ['fapv_invalid']);
+      await db.query(
+        `INSERT INTO cb_cohort_intervention_activation_token_redempt_fapv
+         (activation_token_redemption_final_apv_id, source_activation_token_redemption_env_id,
+          source_activation_token_redemption_auth_id, source_activation_token_redemption_readiness_id,
+          source_activation_token_issuance_id,
+          activation_token_redemption_final_apv_status, activation_token_redemption_final_apv_result,
+          execution_capability_status, activation_execution_status, package_freeze_status, plan_executable_status,
+          job_creation_status, queue_dispatch_status, runtime_mutation_status, activation_token_redemption_final_apv_hash,
+          risk_level, confidence_level, projected_impact_score, rollback_feasibility_score, evidence_completeness_score,
+          guardrail_status, write_scope_status, canary_envelope_json, non_execution_attestation_json,
+          write_scope_attestation_json, token_status, token_redemption_final_apv_status_val, token_redemption_status,
+          token_redeemable_status)
+         VALUES (?, 'env_dummy', 'auth_dummy', 'atrr_dummy', 'ati_dummy', 'DRAFT', 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED',
+                 'EXECUTION_NOT_ENABLED', 'TOKEN_REDEMPTION_FINAL_APPROVAL_FINALIZED_NOT_REDEEMED_NOT_EXECUTED',
+                 'FROZEN_IMMUTABLE', 'NOT_EXECUTABLE', 'NO_REAL_JOB_CREATED', 'NO_QUEUE_DISPATCHED',
+                 'ZERO_RUNTIME_MUTATION_CONFIRMED', 'fapv_hash_165b_invalid',
+                 'LOW', 'HIGH', 35.0, 80.0, 95.0, 'PASS', 'PASS', '{}', '{}', '{}',
+                 'ISSUANCE_RECORDED_NOT_REDEEMABLE', 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED',
+                 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED', 'NOT_REDEEMABLE')`,
+        ['fapv_invalid']
+      );
     }
 
     await assert.rejects(
