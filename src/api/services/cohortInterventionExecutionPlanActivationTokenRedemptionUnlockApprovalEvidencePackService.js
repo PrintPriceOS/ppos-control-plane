@@ -21,7 +21,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalEvid
       }
     } else {
       const rows = await db.query(
-        `SELECT lineage_hash_chain_json FROM cb_cohort_intervention_activation_token_redempt_unlock_elig WHERE activation_token_redemption_unlock_eligibility_id = ?`,
+        `SELECT lineage_hash_chain_json FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_ev WHERE activation_token_redemption_unlock_eligibility_id = ?`,
         [record.source_activation_token_redemption_unlock_eligibility_id]
       );
       if (rows && rows[0]) {
