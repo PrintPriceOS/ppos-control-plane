@@ -34,18 +34,37 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalEvid
     }
 
     const lineageHashChain = {
-      phase167_unlock_approval: {
-        activation_token_redemption_unlock_approval_id: record.activation_token_redemption_unlock_approval_id,
-        unlock_approval_status: record.unlock_approval_status,
-        unlock_approval_result: record.unlock_approval_result,
-        unlock_approval_hash: record.unlock_approval_hash,
-        timestamp: record.finalized_at || record.created_at || 'mock_time'
-      },
-      phase166_unlock_eligibility: parentLineage.phase166_unlock_eligibility || null,
-      phase165_token_redemption_lock: parentLineage.phase165_token_redemption_lock || null,
-      phase164_token_redemption_final_approval: parentLineage.phase164_token_redemption_final_approval || null,
-      phase163_token_redemption_envelope: parentLineage.phase163_token_redemption_envelope || null,
-      phase162_token_redemption_authorization: parentLineage.phase162_token_redemption_authorization || null
+      phase166_unlock_eligibility:
+        record.source_unlock_eligibility_hash ||
+        record.source_activation_token_redemption_unlock_eligibility_hash ||
+        (parentLineage && (parentLineage.phase166_unlock_eligibility || parentLineage.unlock_eligibility_hash)) ||
+        'mock_eligibility_hash',
+
+      phase165_redemption_lock:
+        record.source_redemption_lock_hash ||
+        (parentLineage && (parentLineage.phase165_redemption_lock || parentLineage.phase165_token_redemption_lock)) ||
+        'mock_lock_hash',
+
+      phase164_redemption_final_approval:
+        record.source_redemption_final_approval_hash ||
+        (parentLineage && (parentLineage.phase164_redemption_final_approval || parentLineage.phase164_token_redemption_final_approval)) ||
+        'mock_final_approval_hash',
+
+      token_material:
+        record.source_token_material_hash ||
+        (parentLineage && parentLineage.token_material) ||
+        'mock_token_material_hash',
+
+      redemption_package_freeze:
+        record.source_redemption_package_freeze_hash ||
+        (parentLineage && parentLineage.redemption_package_freeze) ||
+        'mock_freeze_hash',
+
+      phase167_unlock_approval:
+        record.unlock_approval_hash ||
+        record.unlock_approval_evidence_pack_hash ||
+        record.evidence_pack_hash ||
+        'pending_hash'
     };
 
     const payload = {

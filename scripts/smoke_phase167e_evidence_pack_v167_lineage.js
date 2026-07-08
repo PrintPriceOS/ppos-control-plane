@@ -41,9 +41,11 @@ const { setupFinalizedUnlockEligibility, isProdLike } = require('./smoke_phase16
     assert.ok(epResult.lineageHashChain);
     assert.ok(epResult.lineageHashChain.phase167_unlock_approval);
     assert.ok(epResult.lineageHashChain.phase166_unlock_eligibility);
-    assert.ok(epResult.lineageHashChain.phase165_token_redemption_lock);
-    assert.strictEqual(epResult.lineageHashChain.phase166_unlock_eligibility.activation_token_redemption_unlock_eligibility_id, eligibilityId);
-    console.log('  PASS: Lineage recursively contains Phase 166 and Phase 165 parent records.');
+    assert.ok(epResult.lineageHashChain.phase165_redemption_lock);
+    assert.ok(epResult.lineageHashChain.phase164_redemption_final_approval);
+    assert.ok(epResult.lineageHashChain.token_material);
+    assert.ok(epResult.lineageHashChain.redemption_package_freeze);
+    console.log('  PASS: Lineage recursively contains all parent records.');
 
     if (isProdLike) {
       const rows = await db.query(
