@@ -35,6 +35,16 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionLockEvaluatorServi
       throw new Error(`TOKEN_REDEMPTION_FINAL_APPROVAL_NOT_FOUND: Parent Final Approval not found.`);
     }
 
+    if (parent.token_status === undefined) {
+      parent.token_status = 'ISSUANCE_RECORDED_NOT_REDEEMABLE';
+    }
+    if (parent.token_redemption_status === undefined) {
+      parent.token_redemption_status = 'REDEMPTION_FINAL_APPROVED_NOT_REDEEMED';
+    }
+    if (parent.token_redeemable_status === undefined) {
+      parent.token_redeemable_status = 'NOT_REDEEMABLE';
+    }
+
     const rules = [];
     const addRule = (checkType, severity, description) => {
       rules.push({
