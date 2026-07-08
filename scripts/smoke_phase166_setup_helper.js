@@ -74,6 +74,9 @@ async function setupFinalizedRedemptionLock(lockId, finalApvId, envId, authId, r
     lockBuilder._mockState.rules.set(lockId, []);
   } else {
     // 1. Clear database tables sequentially to prevent primary key / foreign key conflicts
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_ev WHERE activation_token_redemption_unlock_eligibility_id IN (SELECT activation_token_redemption_unlock_eligibility_id FROM cb_cohort_intervention_activation_token_redempt_unlock_elig WHERE source_activation_token_redemption_lock_id = ?)', [lockId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_rl WHERE activation_token_redemption_unlock_eligibility_id IN (SELECT activation_token_redemption_unlock_eligibility_id FROM cb_cohort_intervention_activation_token_redempt_unlock_elig WHERE source_activation_token_redemption_lock_id = ?)', [lockId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_aud WHERE activation_token_redemption_unlock_eligibility_id IN (SELECT activation_token_redemption_unlock_eligibility_id FROM cb_cohort_intervention_activation_token_redempt_unlock_elig WHERE source_activation_token_redemption_lock_id = ?)', [lockId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig WHERE source_activation_token_redemption_lock_id = ?', [lockId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_lock WHERE activation_token_redemption_lock_id = ?', [lockId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_fapv WHERE activation_token_redemption_final_apv_id = ?', [finalApvId]);

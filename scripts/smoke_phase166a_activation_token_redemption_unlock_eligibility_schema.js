@@ -17,9 +17,9 @@ const allowFallback = process.env.ALLOW_SCHEMA_SMOKE_FALLBACK !== 'false';
   try {
     for (const tableName of [
       'cb_cohort_intervention_activation_token_redempt_unlock_elig',
-      'cb_cohort_intervention_activation_token_redempt_unlock_elig_rules',
+      'cb_cohort_intervention_activation_token_redempt_unlock_elig_rl',
       'cb_cohort_intervention_activation_token_redempt_unlock_elig_ev',
-      'cb_cohort_intervention_activation_token_redempt_unlock_elig_audits'
+      'cb_cohort_intervention_activation_token_redempt_unlock_elig_aud'
     ]) {
       const rows = await db.query(`SHOW TABLES LIKE ?`, [tableName]);
       assert.strictEqual(rows.length, 1, `Table ${tableName} does not exist`);

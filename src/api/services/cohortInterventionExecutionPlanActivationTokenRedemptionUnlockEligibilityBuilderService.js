@@ -283,7 +283,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityB
     const isProdLike = (process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL || process.env.CI_PRODUCTION_SMOKE === 'true') && process.env.DB_UNREACHABLE !== 'true';
     if (!isProdLike) return this._mockState.rules.get(unlockEligibilityId) || [];
     return await db.query(
-      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_rules WHERE activation_token_redemption_unlock_eligibility_id = ? ORDER BY created_at ASC`,
+      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_rl WHERE activation_token_redemption_unlock_eligibility_id = ? ORDER BY created_at ASC`,
       [unlockEligibilityId]
     );
   }

@@ -26,7 +26,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityA
 
     const auditId = `aud_${crypto.randomBytes(8).toString('hex')}`;
     await db.query(
-      `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_elig_audits
+      `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_elig_aud
        (audit_id, activation_token_redemption_unlock_eligibility_id, action_type, actor_id, details_json)
        VALUES (?, ?, ?, ?, ?)`,
       [auditId, unlockEligibilityId, actionType, actorId, JSON.stringify(details)]

@@ -119,10 +119,10 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityE
       builder._mockState.rules.set(unlockEligibilityId, rules);
     } else {
       // Clear rules
-      await db.query(`DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_rules WHERE activation_token_redemption_unlock_eligibility_id = ?`, [unlockEligibilityId]);
+      await db.query(`DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_elig_rl WHERE activation_token_redemption_unlock_eligibility_id = ?`, [unlockEligibilityId]);
       for (const rule of rules) {
         await db.query(
-          `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_elig_rules
+          `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_elig_rl
            (rule_id, activation_token_redemption_unlock_eligibility_id, check_type, severity, description)
            VALUES (?, ?, ?, ?, ?)`,
           [rule.rule_id, rule.activation_token_redemption_unlock_eligibility_id, rule.check_type, rule.severity, rule.description]

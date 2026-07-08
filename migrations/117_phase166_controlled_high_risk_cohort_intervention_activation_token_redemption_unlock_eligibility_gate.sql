@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unloc
   updated_by VARCHAR(128) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_elig_rules (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_elig_rl (
   rule_id VARCHAR(64) PRIMARY KEY,
   activation_token_redemption_unlock_eligibility_id VARCHAR(64) NOT NULL,
   check_type VARCHAR(128) NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unloc
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_elig_audits (
+CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_elig_aud (
   audit_id VARCHAR(64) PRIMARY KEY,
   activation_token_redemption_unlock_eligibility_id VARCHAR(64) NOT NULL,
   action_type VARCHAR(128) NOT NULL,
