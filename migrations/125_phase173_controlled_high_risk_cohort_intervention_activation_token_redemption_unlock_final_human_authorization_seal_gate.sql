@@ -1,7 +1,7 @@
 -- Migration 125: Phase 173 - Controlled High-Risk Cohort Intervention Activation Token Redemption Unlock Final Human Authorization Seal Gate
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_fhas (
-  activation_token_redemption_unlock_final_human_authorization_seal_id VARCHAR(64) PRIMARY KEY,
+  act_token_redempt_unlock_final_human_authorization_seal_id VARCHAR(64) PRIMARY KEY,
   source_act_token_redempt_unlock_dual_control_authorization_id VARCHAR(64) NOT NULL,
   source_act_token_redempt_unlock_operator_attestation_id VARCHAR(64) NOT NULL,
   source_act_token_redempt_unlock_pre_execution_freeze_id VARCHAR(64) NOT NULL,
@@ -107,32 +107,32 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unloc
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl (
   rule_id VARCHAR(64) PRIMARY KEY,
-  activation_token_redemption_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
+  act_token_redempt_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
   check_type VARCHAR(128) NOT NULL,
   severity VARCHAR(32) NOT NULL,
   description TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_unlock_fhas_rl_parent (activation_token_redemption_unlock_final_human_authorization_seal_id)
+  INDEX idx_unlock_fhas_rl_parent (act_token_redempt_unlock_final_human_authorization_seal_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev (
   evidence_id VARCHAR(64) PRIMARY KEY,
-  activation_token_redemption_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
+  act_token_redempt_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
   evidence_schema_version VARCHAR(16) NOT NULL,
   evidence_pack_hash VARCHAR(64) NOT NULL,
   evidence_payload_json LONGTEXT NOT NULL,
   lineage_hash_chain_json LONGTEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_unlock_fhas_ev_parent (activation_token_redemption_unlock_final_human_authorization_seal_id)
+  UNIQUE KEY uq_unlock_fhas_ev_parent (act_token_redempt_unlock_final_human_authorization_seal_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_fhas_aud (
   audit_id VARCHAR(64) PRIMARY KEY,
-  activation_token_redemption_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
+  act_token_redempt_unlock_final_human_authorization_seal_id VARCHAR(64) NOT NULL,
   action_type VARCHAR(128) NOT NULL,
   actor_id VARCHAR(128) NOT NULL,
   details_json LONGTEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_unlock_fhas_aud_parent (activation_token_redemption_unlock_final_human_authorization_seal_id),
+  INDEX idx_unlock_fhas_aud_parent (act_token_redempt_unlock_final_human_authorization_seal_id),
   INDEX idx_unlock_fhas_aud_action (action_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;

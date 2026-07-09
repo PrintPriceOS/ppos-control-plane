@@ -103,7 +103,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
 
     const payload = {
       evidence_schema_version: '173.0',
-      activation_token_redemption_unlock_final_human_authorization_seal_id: record.activation_token_redemption_unlock_final_human_authorization_seal_id,
+      act_token_redempt_unlock_final_human_authorization_seal_id: record.act_token_redempt_unlock_final_human_authorization_seal_id,
       source_act_token_redempt_unlock_dual_control_authorization_id: record.source_act_token_redempt_unlock_dual_control_authorization_id,
       simulation_type: record.simulation_type,
       tenant_id: record.tenant_id,
@@ -129,7 +129,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
 
     const epRecord = {
       evidence_id: evidenceId,
-      activation_token_redemption_unlock_final_human_authorization_seal_id: record.activation_token_redemption_unlock_final_human_authorization_seal_id,
+      act_token_redempt_unlock_final_human_authorization_seal_id: record.act_token_redempt_unlock_final_human_authorization_seal_id,
       evidence_schema_version: '173.0',
       evidence_pack_hash: evidencePackHash,
       evidence_payload_json: JSON.stringify(payload),
@@ -138,7 +138,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     };
 
     if (!isProdLike) {
-      this._mockEvidence.set(record.activation_token_redemption_unlock_final_human_authorization_seal_id, epRecord);
+      this._mockEvidence.set(record.act_token_redempt_unlock_final_human_authorization_seal_id, epRecord);
       return {
         evidence_pack_hash: evidencePackHash,
         lineageHashChain,
@@ -148,15 +148,15 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     }
 
     await db.query(
-      `DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
-      [record.activation_token_redemption_unlock_final_human_authorization_seal_id]
+      `DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
+      [record.act_token_redempt_unlock_final_human_authorization_seal_id]
     );
 
     await db.query(
       `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev
-       (evidence_id, activation_token_redemption_unlock_final_human_authorization_seal_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
+       (evidence_id, act_token_redempt_unlock_final_human_authorization_seal_id, evidence_schema_version, evidence_pack_hash, evidence_payload_json, lineage_hash_chain_json)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [evidenceId, record.activation_token_redemption_unlock_final_human_authorization_seal_id, '173.0', evidencePackHash, epRecord.evidence_payload_json, epRecord.lineage_hash_chain_json]
+      [evidenceId, record.act_token_redempt_unlock_final_human_authorization_seal_id, '173.0', evidencePackHash, epRecord.evidence_payload_json, epRecord.lineage_hash_chain_json]
     );
 
     return {

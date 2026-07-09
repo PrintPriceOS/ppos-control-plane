@@ -1,5 +1,5 @@
 export interface TokenRedemptionUnlockFinalHumanAuthorizationSeal {
-  activation_token_redemption_unlock_final_human_authorization_seal_id: string;
+  act_token_redempt_unlock_final_human_authorization_seal_id: string;
   source_act_token_redempt_unlock_dual_control_authorization_id: string;
   source_act_token_redempt_unlock_operator_attestation_id: string;
   source_act_token_redempt_unlock_pre_execution_freeze_id: string;
@@ -72,7 +72,7 @@ export interface TokenRedemptionUnlockFinalHumanAuthorizationSeal {
 
 export interface Rule {
   rule_id: string;
-  activation_token_redemption_unlock_final_human_authorization_seal_id: string;
+  act_token_redempt_unlock_final_human_authorization_seal_id: string;
   check_type: string;
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
   description: string;

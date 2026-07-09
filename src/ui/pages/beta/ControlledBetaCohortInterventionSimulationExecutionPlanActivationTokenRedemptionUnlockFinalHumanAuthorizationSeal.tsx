@@ -78,7 +78,7 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
     setLoading(true);
     try {
       const res = await createUnlockFinalHumanAuthorizationSeal(parentDualControlId);
-      navigate(`/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal/${res.tokenRedemptionUnlockFinalHumanAuthorizationSeal.activation_token_redemption_unlock_final_human_authorization_seal_id}`);
+      navigate(`/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal/${res.tokenRedemptionUnlockFinalHumanAuthorizationSeal.act_token_redempt_unlock_final_human_authorization_seal_id}`);
     } catch (e: any) {
       setError(e.response?.data?.error || e.message || 'Error creating draft');
       setLoading(false);
@@ -89,7 +89,7 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
     if (!record) return;
     setLoading(true);
     try {
-      const res = await evaluateUnlockFinalHumanAuthorizationSeal(record.activation_token_redemption_unlock_final_human_authorization_seal_id, confirmations);
+      const res = await evaluateUnlockFinalHumanAuthorizationSeal(record.act_token_redempt_unlock_final_human_authorization_seal_id, confirmations);
       setRecord(res.tokenRedemptionUnlockFinalHumanAuthorizationSeal);
       setRules(res.rules);
     } catch (e: any) {
@@ -103,7 +103,7 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
     if (!record) return;
     setLoading(true);
     try {
-      const res = await recordDecision(record.activation_token_redemption_unlock_final_human_authorization_seal_id, {
+      const res = await recordDecision(record.act_token_redempt_unlock_final_human_authorization_seal_id, {
         final_human_authorizer_id: finalAuthorizerId,
         final_human_authorizer_role: finalAuthorizerRole,
         final_human_authorization_seal_reason: reason,
@@ -111,7 +111,7 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
         rationale
       });
       setRecord(res.tokenRedemptionUnlockFinalHumanAuthorizationSeal);
-      const details = await getUnlockFinalHumanAuthorizationSealDetails(record.activation_token_redemption_unlock_final_human_authorization_seal_id);
+      const details = await getUnlockFinalHumanAuthorizationSealDetails(record.act_token_redempt_unlock_final_human_authorization_seal_id);
       setRules(details.rules);
     } catch (e: any) {
       setError(e.response?.data?.error || e.message || 'Error recording decision');
@@ -124,9 +124,9 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
     if (!record) return;
     setLoading(true);
     try {
-      const res = await finalizeUnlockFinalHumanAuthorizationSeal(record.activation_token_redemption_unlock_final_human_authorization_seal_id);
+      const res = await finalizeUnlockFinalHumanAuthorizationSeal(record.act_token_redempt_unlock_final_human_authorization_seal_id);
       setRecord(res.tokenRedemptionUnlockFinalHumanAuthorizationSeal);
-      const details = await getUnlockFinalHumanAuthorizationSealDetails(record.activation_token_redemption_unlock_final_human_authorization_seal_id);
+      const details = await getUnlockFinalHumanAuthorizationSealDetails(record.act_token_redempt_unlock_final_human_authorization_seal_id);
       setRules(details.rules);
     } catch (e: any) {
       setError(e.response?.data?.error || e.message || 'Error finalising');
@@ -196,13 +196,13 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
                     </thead>
                     <tbody className="divide-y divide-slate-800">
                       {list.map((item) => (
-                        <tr key={item.activation_token_redemption_unlock_final_human_authorization_seal_id} className="hover:bg-slate-800/30">
+                        <tr key={item.act_token_redempt_unlock_final_human_authorization_seal_id} className="hover:bg-slate-800/30">
                           <td className="py-2 font-mono text-xs">
                             <Link
-                              to={`/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal/${item.activation_token_redemption_unlock_final_human_authorization_seal_id}`}
+                              to={`/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal/${item.act_token_redempt_unlock_final_human_authorization_seal_id}`}
                               className="text-cyan-400 hover:underline"
                             >
-                              {item.activation_token_redemption_unlock_final_human_authorization_seal_id.substring(0, 12)}...
+                              {item.act_token_redempt_unlock_final_human_authorization_seal_id.substring(0, 12)}...
                             </Link>
                           </td>
                           <td className="py-2">{item.cohort_id}</td>
@@ -255,7 +255,7 @@ const ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRede
                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-lg font-bold text-white font-mono">{record.activation_token_redemption_unlock_final_human_authorization_seal_id}</h2>
+                      <h2 className="text-lg font-bold text-white font-mono">{record.act_token_redempt_unlock_final_human_authorization_seal_id}</h2>
                       <p className="text-xs text-slate-400 font-mono">Parent Dual-Control: {record.source_act_token_redempt_unlock_dual_control_authorization_id}</p>
                     </div>
                     <span className="px-3 py-1 bg-cyan-950 border border-cyan-800 text-cyan-200 text-xs font-semibold rounded-full uppercase">

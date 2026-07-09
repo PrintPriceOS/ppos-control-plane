@@ -31,7 +31,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     const addRule = (checkType, severity, description) => {
       rules.push({
         rule_id: `rul_${crypto.randomBytes(8).toString('hex')}`,
-        activation_token_redemption_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
+        act_token_redempt_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
         check_type: checkType,
         severity,
         description,
@@ -160,13 +160,13 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     if (!isProdLike) {
       builder._mockState.rules.set(unlockFinalHumanAuthorizationSealId, rules);
     } else {
-      await db.query(`DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`, [unlockFinalHumanAuthorizationSealId]);
+      await db.query(`DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`, [unlockFinalHumanAuthorizationSealId]);
       for (const rule of rules) {
         await db.query(
           `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl
-           (rule_id, activation_token_redemption_unlock_final_human_authorization_seal_id, check_type, severity, description)
+           (rule_id, act_token_redempt_unlock_final_human_authorization_seal_id, check_type, severity, description)
            VALUES (?, ?, ?, ?, ?)`,
-          [rule.rule_id, rule.activation_token_redemption_unlock_final_human_authorization_seal_id, rule.check_type, rule.severity, rule.description]
+          [rule.rule_id, rule.act_token_redempt_unlock_final_human_authorization_seal_id, rule.check_type, rule.severity, rule.description]
         );
       }
     }

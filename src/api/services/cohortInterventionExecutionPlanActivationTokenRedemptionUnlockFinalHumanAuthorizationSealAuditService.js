@@ -14,7 +14,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     if (!isProdLike) {
       this._mockAudits.push({
         audit_id: `aud_${crypto.randomBytes(8).toString('hex')}`,
-        activation_token_redemption_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
+        act_token_redempt_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
         action_type: actionType,
         actor_id: actorId,
         details_json: JSON.stringify(details),
@@ -27,7 +27,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     const auditId = `aud_${crypto.randomBytes(8).toString('hex')}`;
     await db.query(
       `INSERT INTO cb_cohort_intervention_activation_token_redempt_unlock_fhas_aud
-       (audit_id, activation_token_redemption_unlock_final_human_authorization_seal_id, action_type, actor_id, details_json)
+       (audit_id, act_token_redempt_unlock_final_human_authorization_seal_id, action_type, actor_id, details_json)
        VALUES (?, ?, ?, ?, ?)`,
       [auditId, unlockFinalHumanAuthorizationSealId, actionType, actorId, JSON.stringify(details)]
     );

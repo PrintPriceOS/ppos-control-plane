@@ -99,7 +99,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     };
 
     const record = {
-      activation_token_redemption_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
+      act_token_redempt_unlock_final_human_authorization_seal_id: unlockFinalHumanAuthorizationSealId,
       source_act_token_redempt_unlock_dual_control_authorization_id: unlockDualControlAuthorizationId,
       source_act_token_redempt_unlock_operator_attestation_id: parent.source_act_token_redempt_unlock_operator_attestation_id || 'oatt_dummy',
       source_act_token_redempt_unlock_pre_execution_freeze_id: parent.source_act_token_redempt_unlock_pre_execution_freeze_id || 'freeze_dummy',
@@ -244,12 +244,12 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
     await db.query(
       `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_fhas
        SET ${setClause}
-       WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
+       WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
       [...values, unlockFinalHumanAuthorizationSealId]
     );
 
     const rows = await db.query(
-      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
+      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
       [unlockFinalHumanAuthorizationSealId]
     );
 
@@ -280,7 +280,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
       return this._mockState.tokenRedemptionUnlockFinalHumanAuthorizationSeal.get(unlockFinalHumanAuthorizationSealId);
     }
     const rows = await db.query(
-      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
+      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
       [unlockFinalHumanAuthorizationSealId]
     );
     const record = rows[0];
@@ -340,7 +340,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAu
       return this._mockState.rules.get(unlockFinalHumanAuthorizationSealId) || [];
     }
     const rows = await db.query(
-      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
+      `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_rl WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
       [unlockFinalHumanAuthorizationSealId]
     );
     return rows;

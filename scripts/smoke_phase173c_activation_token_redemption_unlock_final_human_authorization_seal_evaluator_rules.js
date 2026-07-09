@@ -28,7 +28,7 @@ const { setupFinalizedUnlockDualControlAuthorization, isProdLike } = require('./
     await setupFinalizedUnlockDualControlAuthorization(unlockDualControlAuthorizationId, unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
 
     const draft = await builder.createTokenRedemptionUnlockFinalHumanAuthorizationSealDraft(unlockDualControlAuthorizationId, 'admin');
-    const unlockFinalHumanAuthorizationSealId = draft.tokenRedemptionUnlockFinalHumanAuthorizationSeal.activation_token_redemption_unlock_final_human_authorization_seal_id;
+    const unlockFinalHumanAuthorizationSealId = draft.tokenRedemptionUnlockFinalHumanAuthorizationSeal.act_token_redempt_unlock_final_human_authorization_seal_id;
 
     // 1. Record final human authorizer
     await decisionSvc.recordFinalHumanAuthorizer(unlockFinalHumanAuthorizationSealId, 'user_charlie', 'system_admin', 'Attested by Charlie');

@@ -29,7 +29,7 @@ const { setupFinalizedUnlockDualControlAuthorization, isProdLike } = require('./
     await setupFinalizedUnlockDualControlAuthorization(unlockDualControlAuthorizationId, unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
 
     const draft = await builder.createTokenRedemptionUnlockFinalHumanAuthorizationSealDraft(unlockDualControlAuthorizationId, 'admin');
-    const unlockFinalHumanAuthorizationSealId = draft.tokenRedemptionUnlockFinalHumanAuthorizationSeal.activation_token_redemption_unlock_final_human_authorization_seal_id;
+    const unlockFinalHumanAuthorizationSealId = draft.tokenRedemptionUnlockFinalHumanAuthorizationSeal.act_token_redempt_unlock_final_human_authorization_seal_id;
 
     await decisionSvc.recordFinalHumanAuthorizer(unlockFinalHumanAuthorizationSealId, 'user_charlie', 'system_admin', 'Attestation recorded');
 
@@ -89,7 +89,7 @@ const { setupFinalizedUnlockDualControlAuthorization, isProdLike } = require('./
 
     if (isProdLike) {
       const rows = await db.query(
-        `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev WHERE activation_token_redemption_unlock_final_human_authorization_seal_id = ?`,
+        `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas_ev WHERE act_token_redempt_unlock_final_human_authorization_seal_id = ?`,
         [unlockFinalHumanAuthorizationSealId]
       );
       assert.strictEqual(rows.length, 1);
