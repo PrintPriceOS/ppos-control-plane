@@ -257,6 +257,7 @@ const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlo
 const controlledBetaCohortInteremptionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin');
 const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin');
 const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin');
 
 
 
@@ -305,6 +306,7 @@ router.use('/beta/cohort-intervention-activation-token-redemption-unlock-eligibi
 router.use('/beta/cohort-intervention-activation-token-redemption-unlock-approval', controlledBetaCohortInteremptionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin);
 router.use('/beta/cohort-intervention-activation-token-redemption-unlock-final-review', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin);
 router.use('/beta/cohort-intervention-activation-token-redemption-unlock-seal', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-pre-execution-freeze', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin);
 
 
 // Phase 141 — Restricted High-Risk Cohort Intervention Simulation Gate

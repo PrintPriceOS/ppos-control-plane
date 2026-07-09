@@ -144,6 +144,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockApproval from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockApproval';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalReview from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalReview';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockSeal';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreeze from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreeze';
 
 
 export const App: React.FC = () => {
@@ -237,6 +238,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention-activation-token-redemption-unlock-approval/:id" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockApproval />} />
         <Route path="/admin/beta/cohort-intervention-activation-token-redemption-unlock-final-review/:id" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalReview />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-seal/:unlockSealId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockSeal />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-pre-execution-freeze/:unlockPreExecutionFreezeId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreeze />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-pre-execution-freeze" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreeze />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
