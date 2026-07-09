@@ -148,6 +148,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockOperatorAttestation from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockOperatorAttestation';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorization from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorization';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness';
 
 
 
@@ -250,6 +251,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-dual-control-authorization" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorization />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal/:unlockFinalHumanAuthorizationSealId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-compliance-witness/:unlockComplianceWitnessId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-compliance-witness" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
