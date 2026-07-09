@@ -1187,13 +1187,7 @@ async function setupFinalizedUnlockFinalHumanAuthorizationSeal(unlockFinalHumanA
       pre_execution_state_sealed_confirmed: true
     }, 'admin');
 
-    await unlockFinalHumanAuthorizationSealDecision.recordDecision(tempId, {
-      final_human_authorizer_id: 'dummy_charlie',
-      final_human_authorizer_role: 'system_admin',
-      final_human_authorization_seal_reason: 'Smoke 174 setup human seal decision',
-      decision: 'APPROVE_FINAL_SEAL',
-      rationale: 'Approved final human seal for setup'
-    }, 'admin');
+    await unlockFinalHumanAuthorizationSealDecision.recordDecision(tempId, 'APPROVE_FINAL_SEAL', 'Approved final human seal for setup', 'admin');
 
     await unlockFinalHumanAuthorizationSealDecision.finalizeUnlockFinalHumanAuthorizationSeal(tempId, 'admin');
 
