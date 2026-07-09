@@ -903,6 +903,157 @@ async function setupFinalizedUnlockOperatorAttestation(unlockOperatorAttestation
   }
 }
 
+async function setupFinalizedUnlockDualControlAuthorization(unlockDualControlAuthorizationId, unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId) {
+  await setupFinalizedUnlockOperatorAttestation(unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
+
+  const unlockDualControlAuthorizationBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationBuilderService').serviceInstance;
+  const unlockDualControlAuthorizationEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationEvaluatorService').serviceInstance;
+  const unlockDualControlAuthorizationDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationDecisionService').serviceInstance;
+
+  if (!isProdLike) {
+    unlockDualControlAuthorizationBuilder._mockState.tokenRedemptionUnlockDualControlAuthorization.set(unlockDualControlAuthorizationId, {
+      activation_token_redemption_unlock_dual_control_authorization_id: unlockDualControlAuthorizationId,
+      source_act_token_redempt_unlock_operator_attestation_id: unlockOperatorAttestationId,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: unlockPreExecutionFreezeId,
+      source_activation_token_redemption_unlock_seal_id: unlockSealId,
+      source_activation_token_redemption_unlock_final_review_id: finalReviewId,
+      source_activation_token_redemption_unlock_approval_id: approvalId,
+      source_activation_token_redemption_unlock_eligibility_id: eligibilityId,
+      source_activation_token_redemption_lock_id: lockId,
+      source_activation_token_redemption_final_apv_id: finalApvId,
+      source_activation_token_redemption_envelope_id: envId,
+      source_activation_token_redemption_auth_id: authId,
+      source_activation_token_redemption_readiness_id: readinessId,
+      source_activation_token_issuance_id: issuanceId,
+      source_activation_token_staging_id: 'mock_staging_id',
+      source_activation_token_preflight_id: 'mock_preflight_id',
+      source_plan_id: 'mock_plan_id',
+      source_dispatcher_id: 'mock_dispatcher_id',
+      source_envelope_id: 'mock_envelope_id',
+      source_auth_id: 'mock_auth_id',
+      source_readiness_id: 'mock_readiness_id',
+      source_approval_id: 'mock_approval_id',
+      source_prep_id: 'mock_prep_id',
+      cohort_id: 'mock_cohort',
+      tenant_id: 'mock_tenant',
+      simulation_type: 'mock_sim',
+      unlock_dual_control_authorization_status: 'FINALIZED',
+      unlock_dual_control_authorization_result: 'DUAL_CONTROL_AUTHORIZED_NOT_UNLOCKED',
+      unlock_operator_attestation_status: 'FINALIZED',
+      unlock_pre_execution_freeze_status: 'FINALIZED',
+      unlock_seal_status: 'FINALIZED',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      unlock_dual_control_authorization_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      unlock_dual_control_authorization_rules_json: {},
+      unlock_dual_control_authorization_blockers_json: {},
+      non_execution_attestation_json: { safe_workflow_boundary_preserved: true },
+      write_scope_attestation_json: { writes_only_phase172_tables: true },
+      source_unlock_operator_attestation_hash: 'oatt_hash_dummy',
+      source_unlock_pre_execution_freeze_hash: 'pfrz_hash_dummy',
+      source_unlock_seal_hash: 'seal_hash_dummy',
+      source_unlock_final_review_hash: 'frev_hash_dummy',
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_dual_control_authorization_hash: 'dcau_hash_dummy',
+      unlock_dual_control_authorization_evidence_pack_hash: 'dcau_ep_hash_dummy',
+      evidence_pack_hash: 'dcau_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase172_unlock_dual_control_authorization: 'dcau_hash_dummy',
+        phase171_unlock_operator_attestation: 'oatt_hash_dummy',
+        phase170_unlock_pre_execution_freeze: 'pfrz_hash_dummy',
+        phase169_unlock_readiness_seal: 'seal_hash_dummy',
+        phase168_unlock_final_review: 'frev_hash_dummy',
+        phase167_unlock_approval: 'apv_hash_dummy',
+        phase166_unlock_eligibility: 'elig_hash_dummy'
+      },
+      security_signature_json: {},
+      attestation_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_DUAL_CONTROL_AUTHORIZATION_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      primary_authorizer_id: 'dummy_alice',
+      secondary_authorizer_id: 'dummy_bob',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    unlockDualControlAuthorizationBuilder._mockState.rules.set(unlockDualControlAuthorizationId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fhas WHERE source_act_token_redempt_unlock_dual_control_authorization_id = ?', [unlockDualControlAuthorizationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_dcau_ev WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?', [unlockDualControlAuthorizationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_dcau_rl WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?', [unlockDualControlAuthorizationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_dcau_aud WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?', [unlockDualControlAuthorizationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_dcau WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?', [unlockDualControlAuthorizationId]);
+
+    const draft = await unlockDualControlAuthorizationBuilder.createTokenRedemptionUnlockDualControlAuthorizationDraft(unlockOperatorAttestationId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockDualControlAuthorization.activation_token_redemption_unlock_dual_control_authorization_id;
+
+    await unlockDualControlAuthorizationDecision.recordPrimaryAuthorizer(tempId, 'dummy_alice', 'operations_director');
+    await unlockDualControlAuthorizationDecision.recordSecondaryAuthorizer(tempId, 'dummy_bob', 'compliance_officer');
+
+    await unlockDualControlAuthorizationEvaluator.evaluateUnlockDualControlAuthorization(tempId, {
+      primary_authorizer_unlock_authorization_confirmation: true,
+      secondary_authorizer_unlock_authorization_confirmation: true,
+      security_officer_unlock_attestation_verified: true,
+      compliance_officer_unlock_attestation_verified: true,
+      operations_director_unlock_attestation_verified: true,
+      rollback_authority_unlock_attestation_verified: true,
+      kill_switch_verified: true,
+      non_execution_confirmed: true,
+      final_review_unlock_readiness_verified: true,
+      seal_authenticity_confirmed: true,
+      pre_execution_state_sealed_confirmed: true
+    }, 'admin');
+
+    await unlockDualControlAuthorizationDecision.recordDecision(tempId, 'APPROVE_DUAL_CONTROL', 'Smoke 173 setup dual control', 'admin');
+    await unlockDualControlAuthorizationDecision.finalizeUnlockDualControlAuthorization(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_dcau
+       SET activation_token_redemption_unlock_dual_control_authorization_id = ?
+       WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?`,
+      [unlockDualControlAuthorizationId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_dcau_ev
+       SET activation_token_redemption_unlock_dual_control_authorization_id = ?
+       WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?`,
+      [unlockDualControlAuthorizationId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_dcau_rl
+       SET activation_token_redemption_unlock_dual_control_authorization_id = ?
+       WHERE activation_token_redemption_unlock_dual_control_authorization_id = ?`,
+      [unlockDualControlAuthorizationId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
@@ -911,5 +1062,6 @@ module.exports = {
   setupFinalizedUnlockSeal,
   setupFinalizedUnlockPreExecutionFreeze,
   setupFinalizedUnlockOperatorAttestation,
+  setupFinalizedUnlockDualControlAuthorization,
   isProdLike
 };

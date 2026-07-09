@@ -1,0 +1,95 @@
+export interface TokenRedemptionUnlockFinalHumanAuthorizationSeal {
+  activation_token_redemption_unlock_final_human_authorization_seal_id: string;
+  source_act_token_redempt_unlock_dual_control_authorization_id: string;
+  source_act_token_redempt_unlock_operator_attestation_id: string;
+  source_act_token_redempt_unlock_pre_execution_freeze_id: string;
+  source_activation_token_redemption_unlock_seal_id: string;
+  source_activation_token_redemption_unlock_final_review_id: string;
+  source_activation_token_redemption_unlock_approval_id: string;
+  source_activation_token_redemption_unlock_eligibility_id: string;
+  source_activation_token_redemption_lock_id: string;
+  source_activation_token_redemption_final_apv_id: string;
+  source_activation_token_redemption_envelope_id: string;
+  source_activation_token_redemption_auth_id: string;
+  source_activation_token_redemption_readiness_id: string;
+  source_activation_token_issuance_id: string;
+  cohort_id: string;
+  tenant_id: string;
+  simulation_type: string;
+  unlock_final_human_authorization_seal_status: 'DRAFT' | 'EVALUATED' | 'APPROVED' | 'REJECTED' | 'FINALIZED' | 'BLOCKED';
+  unlock_final_human_authorization_seal_result: string;
+  unlock_final_human_authorization_seal_mode: string;
+  token_unlock_status: string;
+  token_redeemable_status: string;
+  token_redemption_status: string;
+  risk_level: string;
+  confidence_level: string;
+  projected_impact_score: number;
+  rollback_feasibility_score: number;
+  evidence_completeness_score: number;
+  guardrail_status: string;
+  write_scope_status: string;
+  canary_envelope_json: any;
+  unlock_final_human_authorization_seal_summary_json: any;
+  impact_review_json: any;
+  rollback_review_json: any;
+  guardrail_review_json: any;
+  unlock_final_human_authorization_seal_rules_json: any;
+  unlock_final_human_authorization_seal_blockers_json: any;
+  non_execution_attestation_json: any;
+  write_scope_attestation_json: any;
+  unlock_final_human_authorization_seal_hash: string;
+  unlock_final_human_authorization_seal_evidence_pack_hash: string;
+  evidence_pack_hash: string;
+  lineage_hash_chain_json: any;
+  execution_capability_status: string;
+  activation_execution_status: string;
+  package_freeze_status: string;
+  redemption_package_freeze_status: string;
+  plan_executable_status: string;
+  job_creation_status: string;
+  queue_dispatch_status: string;
+  runtime_mutation_status: string;
+  primary_authorizer_id: string;
+  secondary_authorizer_id: string;
+  final_human_authorizer_id: string | null;
+  final_human_authorizer_role: string | null;
+  final_human_authorized_at: string | null;
+  final_human_authorization_seal_reason: string | null;
+  final_human_authorization_seal_attestation_json: any;
+  dual_control_authorizer_separation_snapshot_json: any;
+  approved_by?: string;
+  approved_at?: string;
+  rejected_by?: string;
+  rejected_at?: string;
+  finalized_by?: string;
+  finalized_at?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface Rule {
+  rule_id: string;
+  activation_token_redemption_unlock_final_human_authorization_seal_id: string;
+  check_type: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  description: string;
+  created_at: string;
+}
+
+export interface Confirmations {
+  final_human_seal_authorizer_unlock_authorization_seal_confirmation: boolean;
+  primary_authorizer_unlock_authorization_verified: boolean;
+  secondary_authorizer_unlock_authorization_verified: boolean;
+  security_officer_unlock_attestation_verified: boolean;
+  compliance_officer_unlock_attestation_verified: boolean;
+  operations_director_unlock_attestation_verified: boolean;
+  rollback_authority_unlock_attestation_verified: boolean;
+  kill_switch_verified: boolean;
+  non_execution_confirmed: boolean;
+  final_review_unlock_readiness_verified: boolean;
+  seal_authenticity_confirmed: boolean;
+  pre_execution_state_sealed_confirmed: boolean;
+}
