@@ -55,6 +55,9 @@ const db = require('../src/api/services/mysqlClient');
     assert.ok(evalResult.rules.length >= 23, `Expected at least 23 rules evaluated, got ${evalResult.rules.length}`);
 
     const criticalViolations = evalResult.rules.filter(r => r.severity === 'CRITICAL');
+    if (criticalViolations.length > 0) {
+      console.log('CRITICAL VIOLATIONS FOUND:', JSON.stringify(criticalViolations, null, 2));
+    }
     assert.strictEqual(criticalViolations.length, 0, 'Should have zero critical rule violations when all confirmations are true');
     console.log('  PASS: Evaluator ran successfully with 13 confirmations.');
     console.log(`  PASS: ${evalResult.rules.length} rules recorded.`);
