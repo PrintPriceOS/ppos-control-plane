@@ -369,9 +369,136 @@ async function setupFinalizedUnlockApproval(approvalId, eligibilityId, lockId, f
   }
 }
 
+async function setupFinalizedUnlockFinalReview(finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId) {
+  await setupFinalizedUnlockApproval(approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
+
+  const unlockFrevBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewBuilderService').serviceInstance;
+  const unlockFrevEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewEvaluatorService').serviceInstance;
+  const unlockFrevDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewDecisionService').serviceInstance;
+
+  if (!isProdLike) {
+    unlockFrevBuilder._mockState.tokenRedemptionUnlockFinalReview.set(finalReviewId, {
+      activation_token_redemption_unlock_final_review_id: finalReviewId,
+      source_activation_token_redemption_unlock_approval_id: approvalId,
+      source_activation_token_redemption_unlock_eligibility_id: eligibilityId,
+      source_activation_token_redemption_lock_id: lockId,
+      source_activation_token_redemption_final_apv_id: finalApvId,
+      source_activation_token_redemption_envelope_id: envId,
+      source_activation_token_redemption_auth_id: authId,
+      source_activation_token_redemption_readiness_id: readinessId,
+      source_activation_token_issuance_id: issuanceId,
+      source_activation_token_staging_id: 'mock_staging_id',
+      source_activation_token_preflight_id: 'mock_preflight_id',
+      source_plan_id: 'mock_plan_id',
+      source_dispatcher_id: 'mock_dispatcher_id',
+      source_envelope_id: 'mock_envelope_id',
+      source_auth_id: 'mock_auth_id',
+      source_readiness_id: 'mock_readiness_id',
+      source_approval_id: 'mock_approval_id',
+      source_prep_id: 'mock_prep_id',
+      cohort_id: 'mock_cohort',
+      tenant_id: 'mock_tenant',
+      simulation_type: 'mock_sim',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_final_review_result: 'FINAL_REVIEW_PASSED_NOT_UNLOCKED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      unlock_final_review_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      unlock_final_review_rules_json: {},
+      unlock_final_review_blockers_json: {},
+      non_execution_attestation_json: { safe_workflow_boundary_preserved: true },
+      write_scope_attestation_json: { writes_only_phase168_tables: true },
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_final_review_hash: 'frev_hash_dummy',
+      unlock_final_review_evidence_pack_hash: 'frev_ep_hash_dummy',
+      evidence_pack_hash: 'frev_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase168_unlock_final_review: 'frev_hash_dummy',
+        phase167_unlock_approval: 'apv_hash_dummy',
+        phase166_unlock_eligibility: 'elig_hash_dummy'
+      },
+      security_signature_json: {},
+      final_review_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_FINAL_REVIEW_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    unlockFrevBuilder._mockState.rules.set(finalReviewId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_seal WHERE source_activation_token_redemption_unlock_final_review_id = ?', [finalReviewId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_frev_ev WHERE activation_token_redemption_unlock_final_review_id = ?', [finalReviewId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_frev_rl WHERE activation_token_redemption_unlock_final_review_id = ?', [finalReviewId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_frev_aud WHERE activation_token_redemption_unlock_final_review_id = ?', [finalReviewId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_frev WHERE activation_token_redemption_unlock_final_review_id = ?', [finalReviewId]);
+
+    const draft = await unlockFrevBuilder.createTokenRedemptionUnlockFinalReviewDraft(approvalId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockFinalReview.activation_token_redemption_unlock_final_review_id;
+
+    await unlockFrevEvaluator.evaluateUnlockFinalReview(tempId, {
+      security_officer_confirmation: true,
+      compliance_officer_confirmation: true,
+      operations_director_confirmation: true,
+      rollback_authority_confirmation: true,
+      kill_switch_confirmation: true,
+      non_execution_confirmation: true,
+      final_review_no_unlock_confirmation: true
+    }, 'admin');
+
+    await unlockFrevDecision.recordDecision(tempId, 'APPROVE_FINAL_REVIEW', 'Smoke 169 setup final review', 'admin');
+    await unlockFrevDecision.finalizeUnlockFinalReview(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_frev
+       SET activation_token_redemption_unlock_final_review_id = ?
+       WHERE activation_token_redemption_unlock_final_review_id = ?`,
+      [finalReviewId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_frev_ev
+       SET activation_token_redemption_unlock_final_review_id = ?
+       WHERE activation_token_redemption_unlock_final_review_id = ?`,
+      [finalReviewId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_frev_rl
+       SET activation_token_redemption_unlock_final_review_id = ?
+       WHERE activation_token_redemption_unlock_final_review_id = ?`,
+      [finalReviewId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
   setupFinalizedUnlockApproval,
+  setupFinalizedUnlockFinalReview,
   isProdLike
 };
