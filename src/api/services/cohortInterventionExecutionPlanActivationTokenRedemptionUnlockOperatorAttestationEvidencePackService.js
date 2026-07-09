@@ -15,14 +15,14 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAtte
     // Retrieve parent lineage
     let parentLineage = {};
     if (!isProdLike) {
-      const parent = freezeBuilder._mockState.tokenRedemptionUnlockPreExecutionFreeze.get(record.source_activation_token_redemption_unlock_pre_execution_freeze_id);
+      const parent = freezeBuilder._mockState.tokenRedemptionUnlockPreExecutionFreeze.get(record.source_act_token_redempt_unlock_pre_execution_freeze_id);
       if (parent) {
         parentLineage = parent.lineage_hash_chain_json || {};
       }
     } else {
       const rows = await db.query(
         `SELECT lineage_hash_chain_json FROM cb_cohort_intervention_activation_token_redempt_unlock_pfrz_ev WHERE activation_token_redemption_unlock_pre_execution_freeze_id = ?`,
-        [record.source_activation_token_redemption_unlock_pre_execution_freeze_id]
+        [record.source_act_token_redempt_unlock_pre_execution_freeze_id]
       );
       if (rows && rows[0]) {
         try {
@@ -89,7 +89,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAtte
     const payload = {
       evidence_schema_version: '171.0',
       activation_token_redemption_unlock_operator_attestation_id: record.activation_token_redemption_unlock_operator_attestation_id,
-      source_activation_token_redemption_unlock_pre_execution_freeze_id: record.source_activation_token_redemption_unlock_pre_execution_freeze_id,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: record.source_act_token_redempt_unlock_pre_execution_freeze_id,
       simulation_type: record.simulation_type,
       tenant_id: record.tenant_id,
       cohort_id: record.cohort_id,

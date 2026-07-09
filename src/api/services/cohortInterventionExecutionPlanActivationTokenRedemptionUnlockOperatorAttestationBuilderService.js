@@ -100,7 +100,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAtte
 
     const record = {
       activation_token_redemption_unlock_operator_attestation_id: unlockOperatorAttestationId,
-      source_activation_token_redemption_unlock_pre_execution_freeze_id: unlockPreExecutionFreezeId,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: unlockPreExecutionFreezeId,
       source_activation_token_redemption_unlock_seal_id: parent.source_activation_token_redemption_unlock_seal_id || 'seal_dummy',
       source_activation_token_redemption_unlock_final_review_id: parent.source_activation_token_redemption_unlock_final_review_id || 'frev_dummy',
       source_activation_token_redemption_unlock_approval_id: parent.source_activation_token_redemption_unlock_approval_id || 'apv_dummy',

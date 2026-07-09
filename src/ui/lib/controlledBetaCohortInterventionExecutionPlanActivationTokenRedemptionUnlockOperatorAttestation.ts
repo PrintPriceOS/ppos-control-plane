@@ -1,6 +1,6 @@
 export interface TokenRedemptionUnlockOperatorAttestation {
   activation_token_redemption_unlock_operator_attestation_id: string;
-  source_activation_token_redemption_unlock_pre_execution_freeze_id: string;
+  source_act_token_redempt_unlock_pre_execution_freeze_id: string;
   source_activation_token_redemption_unlock_seal_id: string;
   source_activation_token_redemption_unlock_final_review_id: string;
   source_activation_token_redemption_unlock_approval_id: string;

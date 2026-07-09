@@ -717,7 +717,7 @@ async function setupFinalizedUnlockPreExecutionFreeze(unlockPreExecutionFreezeId
     });
     unlockPreExecutionFreezeBuilder._mockState.rules.set(unlockPreExecutionFreezeId, []);
   } else {
-    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt WHERE source_activation_token_redemption_unlock_pre_execution_freeze_id = ?', [unlockPreExecutionFreezeId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt WHERE source_act_token_redempt_unlock_pre_execution_freeze_id = ?', [unlockPreExecutionFreezeId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_pfrz_ev WHERE activation_token_redemption_unlock_pre_execution_freeze_id = ?', [unlockPreExecutionFreezeId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_pfrz_rl WHERE activation_token_redemption_unlock_pre_execution_freeze_id = ?', [unlockPreExecutionFreezeId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_pfrz_aud WHERE activation_token_redemption_unlock_pre_execution_freeze_id = ?', [unlockPreExecutionFreezeId]);

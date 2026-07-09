@@ -14,11 +14,11 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAtte
 
     let parent = null;
     if (!isProdLike) {
-      parent = freezeBuilder._mockState.tokenRedemptionUnlockPreExecutionFreeze.get(record.source_activation_token_redemption_unlock_pre_execution_freeze_id);
+      parent = freezeBuilder._mockState.tokenRedemptionUnlockPreExecutionFreeze.get(record.source_act_token_redempt_unlock_pre_execution_freeze_id);
     } else {
       const rows = await db.query(
         `SELECT * FROM cb_cohort_intervention_activation_token_redempt_unlock_pfrz WHERE activation_token_redemption_unlock_pre_execution_freeze_id = ?`,
-        [record.source_activation_token_redemption_unlock_pre_execution_freeze_id]
+        [record.source_act_token_redempt_unlock_pre_execution_freeze_id]
       );
       if (rows && rows[0]) parent = rows[0];
     }

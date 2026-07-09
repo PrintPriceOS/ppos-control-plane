@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_oatt (
   activation_token_redemption_unlock_operator_attestation_id VARCHAR(64) PRIMARY KEY,
-  source_activation_token_redemption_unlock_pre_execution_freeze_id VARCHAR(64) NOT NULL,
+  source_act_token_redempt_unlock_pre_execution_freeze_id VARCHAR(64) NOT NULL,
   source_activation_token_redemption_unlock_seal_id VARCHAR(64) NOT NULL,
   source_activation_token_redemption_unlock_final_review_id VARCHAR(64) NOT NULL,
   source_activation_token_redemption_unlock_approval_id VARCHAR(64) NOT NULL,

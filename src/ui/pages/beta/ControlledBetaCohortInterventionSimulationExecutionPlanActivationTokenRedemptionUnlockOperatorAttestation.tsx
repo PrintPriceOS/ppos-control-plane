@@ -145,7 +145,7 @@ export default function ControlledBetaCohortInterventionSimulationExecutionPlanA
               {record.activation_token_redemption_unlock_operator_attestation_id}
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              Parent Freeze ID: <span className="font-mono text-slate-300">{record.source_activation_token_redemption_unlock_pre_execution_freeze_id}</span>
+              Parent Freeze ID: <span className="font-mono text-slate-300">{record.source_act_token_redempt_unlock_pre_execution_freeze_id}</span>
             </p>
           </div>
           <div className="flex items-center space-x-3">
