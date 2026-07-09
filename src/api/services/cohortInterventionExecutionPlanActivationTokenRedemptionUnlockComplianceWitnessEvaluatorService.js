@@ -93,7 +93,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWi
     }
 
     // 10. Write scope bounds
-    if (record.write_scope_status === 'PASSED') {
+    if (record.write_scope_status === 'PASSED' || record.write_scope_status === 'PASS') {
       addRule('WRITE_SCOPE_BOUNDS_CHECK', 'INFO', 'Verified database writes are bounded to Phase 174 tables only.');
     } else {
       addRule('WRITE_SCOPE_BOUNDS_CHECK', 'CRITICAL', 'Write scope bounds check failed.');
