@@ -762,6 +762,147 @@ async function setupFinalizedUnlockPreExecutionFreeze(unlockPreExecutionFreezeId
   }
 }
 
+async function setupFinalizedUnlockOperatorAttestation(unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId) {
+  await setupFinalizedUnlockPreExecutionFreeze(unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
+
+  const unlockOperatorAttestationBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationBuilderService').serviceInstance;
+  const unlockOperatorAttestationEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationEvaluatorService').serviceInstance;
+  const unlockOperatorAttestationDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationDecisionService').serviceInstance;
+
+  if (!isProdLike) {
+    unlockOperatorAttestationBuilder._mockState.tokenRedemptionUnlockOperatorAttestation.set(unlockOperatorAttestationId, {
+      activation_token_redemption_unlock_operator_attestation_id: unlockOperatorAttestationId,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: unlockPreExecutionFreezeId,
+      source_activation_token_redemption_unlock_seal_id: unlockSealId,
+      source_activation_token_redemption_unlock_final_review_id: finalReviewId,
+      source_activation_token_redemption_unlock_approval_id: approvalId,
+      source_activation_token_redemption_unlock_eligibility_id: eligibilityId,
+      source_activation_token_redemption_lock_id: lockId,
+      source_activation_token_redemption_final_apv_id: finalApvId,
+      source_activation_token_redemption_envelope_id: envId,
+      source_activation_token_redemption_auth_id: authId,
+      source_activation_token_redemption_readiness_id: readinessId,
+      source_activation_token_issuance_id: issuanceId,
+      source_activation_token_staging_id: 'mock_staging_id',
+      source_activation_token_preflight_id: 'mock_preflight_id',
+      source_plan_id: 'mock_plan_id',
+      source_dispatcher_id: 'mock_dispatcher_id',
+      source_envelope_id: 'mock_envelope_id',
+      source_auth_id: 'mock_auth_id',
+      source_readiness_id: 'mock_readiness_id',
+      source_approval_id: 'mock_approval_id',
+      source_prep_id: 'mock_prep_id',
+      cohort_id: 'mock_cohort',
+      tenant_id: 'mock_tenant',
+      simulation_type: 'mock_sim',
+      unlock_operator_attestation_status: 'FINALIZED',
+      unlock_operator_attestation_result: 'OPERATOR_ATTESTED_NOT_UNLOCKED',
+      unlock_pre_execution_freeze_status: 'FINALIZED',
+      unlock_seal_status: 'FINALIZED',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      unlock_operator_attestation_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      unlock_operator_attestation_rules_json: {},
+      unlock_operator_attestation_blockers_json: {},
+      non_execution_attestation_json: { safe_workflow_boundary_preserved: true },
+      write_scope_attestation_json: { writes_only_phase171_tables: true },
+      source_unlock_pre_execution_freeze_hash: 'pfrz_hash_dummy',
+      source_unlock_seal_hash: 'seal_hash_dummy',
+      source_unlock_final_review_hash: 'frev_hash_dummy',
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_operator_attestation_hash: 'oatt_hash_dummy',
+      unlock_operator_attestation_evidence_pack_hash: 'oatt_ep_hash_dummy',
+      evidence_pack_hash: 'oatt_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase171_unlock_operator_attestation: 'oatt_hash_dummy',
+        phase170_unlock_pre_execution_freeze: 'pfrz_hash_dummy',
+        phase169_unlock_readiness_seal: 'seal_hash_dummy',
+        phase168_unlock_final_review: 'frev_hash_dummy',
+        phase167_unlock_approval: 'apv_hash_dummy',
+        phase166_unlock_eligibility: 'elig_hash_dummy'
+      },
+      security_signature_json: {},
+      attestation_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_OPERATOR_ATTESTATION_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    unlockOperatorAttestationBuilder._mockState.rules.set(unlockOperatorAttestationId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_dcau WHERE source_act_token_redempt_unlock_operator_attestation_id = ?', [unlockOperatorAttestationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt_ev WHERE activation_token_redemption_unlock_operator_attestation_id = ?', [unlockOperatorAttestationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt_rl WHERE activation_token_redemption_unlock_operator_attestation_id = ?', [unlockOperatorAttestationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt_aud WHERE activation_token_redemption_unlock_operator_attestation_id = ?', [unlockOperatorAttestationId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_oatt WHERE activation_token_redemption_unlock_operator_attestation_id = ?', [unlockOperatorAttestationId]);
+
+    const draft = await unlockOperatorAttestationBuilder.createTokenRedemptionUnlockOperatorAttestationDraft(unlockPreExecutionFreezeId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockOperatorAttestation.activation_token_redemption_unlock_operator_attestation_id;
+
+    await unlockOperatorAttestationEvaluator.evaluateUnlockOperatorAttestation(tempId, {
+      security_officer_unlock_attestation_confirmation: true,
+      compliance_officer_unlock_attestation_confirmation: true,
+      operations_director_unlock_attestation_confirmation: true,
+      rollback_authority_unlock_attestation_confirmation: true,
+      kill_switch_verified: true,
+      non_execution_confirmed: true,
+      final_review_unlock_readiness_verified: true,
+      seal_authenticity_confirmed: true,
+      pre_execution_state_sealed_confirmed: true,
+      operator_attestation_confirmed: true
+    }, 'admin');
+
+    await unlockOperatorAttestationDecision.recordDecision(tempId, 'APPROVE_ATTESTATION', 'Smoke 172 setup attestation', 'admin');
+    await unlockOperatorAttestationDecision.finalizeUnlockOperatorAttestation(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_oatt
+       SET activation_token_redemption_unlock_operator_attestation_id = ?
+       WHERE activation_token_redemption_unlock_operator_attestation_id = ?`,
+      [unlockOperatorAttestationId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_oatt_ev
+       SET activation_token_redemption_unlock_operator_attestation_id = ?
+       WHERE activation_token_redemption_unlock_operator_attestation_id = ?`,
+      [unlockOperatorAttestationId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_oatt_rl
+       SET activation_token_redemption_unlock_operator_attestation_id = ?
+       WHERE activation_token_redemption_unlock_operator_attestation_id = ?`,
+      [unlockOperatorAttestationId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
@@ -769,5 +910,6 @@ module.exports = {
   setupFinalizedUnlockFinalReview,
   setupFinalizedUnlockSeal,
   setupFinalizedUnlockPreExecutionFreeze,
+  setupFinalizedUnlockOperatorAttestation,
   isProdLike
 };
