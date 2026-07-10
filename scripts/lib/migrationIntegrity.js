@@ -39,8 +39,9 @@ function discoverMigrations(migrationsDir) {
 }
 
 function calculateFileChecksum(filePath) {
-  const content = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(content).digest('hex');
+  const content = fs.readFileSync(filePath, 'utf8');
+  const normalized = content.replace(/\r\n/g, '\n');
+  return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
 }
 
 function classifySqlStatements(content) {
@@ -183,11 +184,64 @@ function scanRuntimeSchemaMutations(rootDir) {
   return findings;
 }
 
+function verifyMigrationBaseline(migrationsDir, baselinePath) {
+  try {
+    const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+    const { migrations } = discoverMigrations(migrationsDir);
+    
+    const baselineMap = new Map();
+    for (const m of baseline.migrations) {
+      baselineMap.set(m.relativePath.replace(/\\/g, '/'), m);
+    }
+    
+    if (migrations.length !== baseline.migrations.length) {
+      return { ok: false, error: `Migration file count mismatch. Repo: ${migrations.length}, Baseline: ${baseline.migrations.length}` };
+    }
+    
+    for (const m of migrations) {
+      const relPath = m.relativePath.replace(/\\/g, '/');
+      if (!baselineMap.has(relPath)) {
+        return { ok: false, error: `Untracked migration file: ${relPath}` };
+      }
+      const record = baselineMap.get(relPath);
+      const rawContent = fs.readFileSync(m.absolutePath);
+      const checksumRaw = crypto.createHash('sha256').update(rawContent).digest('hex');
+      const checksumLf = crypto.createHash('sha256').update(rawContent.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+      
+      if (record.sha256 !== checksumRaw && record.sha256 !== checksumLf) {
+        return { ok: false, error: `Checksum mismatch for ${relPath}. Expected: ${record.sha256}, Found Raw: ${checksumRaw}, LF: ${checksumLf}` };
+      }
+    }
+    
+    // Prefix collision validation
+    const collisions = findPrefixCollisions(migrations);
+    const baselineCollisions = baseline.approvedPrefixCollisions || {};
+    
+    for (const [prefix, paths] of Object.entries(collisions)) {
+      const normPaths = paths.map(p => p.replace(/\\/g, '/'));
+      const approved = baselineCollisions[prefix];
+      if (!approved) {
+        return { ok: false, error: `Unapproved prefix collision for "${prefix}"` };
+      }
+      const sortedApproved = [...approved].sort();
+      const sortedNormPaths = [...normPaths].sort();
+      if (JSON.stringify(sortedApproved) !== JSON.stringify(sortedNormPaths)) {
+        return { ok: false, error: `Approved collision membership changed for prefix "${prefix}"` };
+      }
+    }
+    
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   discoverMigrations,
   calculateFileChecksum,
   classifySqlStatements,
   loadMigrationBaseline,
   findPrefixCollisions,
-  scanRuntimeSchemaMutations
+  scanRuntimeSchemaMutations,
+  verifyMigrationBaseline
 };

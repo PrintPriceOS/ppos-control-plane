@@ -942,8 +942,12 @@ router.post('/jobs/:jobId/sync', async (req, res) => {
     const context = buildGatewayContext(req);
     const { jobId } = req.params;
     try {
-        // Enforce schema checks before executing sync operations
-        await require('../services/controlPlaneSchemaService').ensurePreflightRegistrySchema();
+        // Assert schema readiness — read-only check, never mutates
+        try {
+            await require('../services/schemaCompatibilityService').assertSchemaReady('PREFLIGHT_REGISTRY');
+        } catch (schemaErr) {
+            return res.status(503).json({ ok: false, error: { code: 'SCHEMA_NOT_READY', message: schemaErr.message } });
+        }
 
         // First verify job existence and scope if local record exists
         const rows = await db.query('SELECT tenant_id FROM preflight_job_registry WHERE job_id = ?', [jobId]);
@@ -1116,8 +1120,12 @@ router.post('/sync', async (req, res) => {
     const context = buildGatewayContext(req);
     console.log('[CONTROL][PREFLIGHT][SYNC-START] Initiating global preflight synchronization');
     try {
-        // Enforce schema checks before executing global sync operations
-        await require('../services/controlPlaneSchemaService').ensurePreflightRegistrySchema();
+        // Assert schema readiness — read-only check, never mutates
+        try {
+            await require('../services/schemaCompatibilityService').assertSchemaReady('PREFLIGHT_REGISTRY');
+        } catch (schemaErr) {
+            return res.status(503).json({ ok: false, error: { code: 'SCHEMA_NOT_READY', message: schemaErr.message } });
+        }
 
         const limit = req.body?.limit || req.query?.limit || 100;
         const statusParam = req.body?.status || req.query?.status;

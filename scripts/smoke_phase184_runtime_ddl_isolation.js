@@ -9,17 +9,19 @@ console.log('=== Phase 184: Runtime DDL Isolation Smoke Test ===\n');
 // 1. Static Scan
 console.log('1. Static Scan for Runtime DDL:');
 const disallowedRegex = /\b(CREATE TABLE|ALTER TABLE|DROP TABLE|CREATE INDEX|DROP INDEX|TRUNCATE|RENAME TABLE)\b/i;
+// Paths where DDL is unconditionally allowed (migration files, scripts, tests)
 const allowedPaths = [
-  'migrations',
-  'src/migrations',
-  'scripts',
-  'tests',
-  'test',
-  'src/api/services/controlPlaneSchemaService.js',
-  'src/api/services/industrialProvisioningService.js',
-  'src/api/services/ManufacturingPersistenceService.js',
-  'src/api/services/migrationService.js'
+  'migrations/',
+  'src/migrations/',
+  'scripts/',
+  'tests/',
+  'test/'
 ];
+
+// The required guard that must be present within a migrationOnly file
+// if it contains DDL statements. Files with this guard throw at runtime
+// unless PPOS_MIGRATION_EXECUTION=true, making DDL unreachable in production.
+const MIGRATION_GUARD = "PPOS_MIGRATION_EXECUTION !== 'true'";
 
 function scanDir(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -27,6 +29,7 @@ function scanDir(dir) {
     const fullPath = path.join(dir, entry.name);
     const relPath = path.relative(path.join(__dirname, '..'), fullPath).replace(/\\/g, '/');
 
+    // Skip unconditionally allowed paths
     if (allowedPaths.some(p => relPath.startsWith(p))) {
       continue;
     }
@@ -35,19 +38,46 @@ function scanDir(dir) {
       scanDir(fullPath);
     } else if (entry.isFile() && entry.name.endsWith('.js')) {
       const content = fs.readFileSync(fullPath, 'utf8');
-      
-      // We check if the content contains disallowed DDL strings and is not a comment
-      const matches = content.match(disallowedRegex);
-      if (matches) {
-        // Double check: if it's just a comment or a false positive we can inspect lines
+
+      if (!disallowedRegex.test(content)) {
+        continue; // No DDL at all — safe
+      }
+
+      // File contains DDL. It is only acceptable if it contains the migration guard,
+      // meaning all DDL paths are behind a PPOS_MIGRATION_EXECUTION check that throws.
+      if (content.includes(MIGRATION_GUARD)) {
+        // Guarded file — verify no DDL exists outside of a throw-guarded block
+        // by checking that the guard appears before any DDL line in the file.
         const lines = content.split('\n');
+        let guardSeen = false;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          if (disallowedRegex.test(line) && !line.trim().startsWith('//') && !line.trim().startsWith('*') && !line.trim().startsWith('/*')) {
-            console.error(`Error: Disallowed DDL statement found in runtime file: ${relPath}:${i + 1}`);
+          if (line.includes(MIGRATION_GUARD)) {
+            guardSeen = true;
+          }
+          if (
+            disallowedRegex.test(line) &&
+            !line.trim().startsWith('//') &&
+            !line.trim().startsWith('*') &&
+            !line.trim().startsWith('/*') &&
+            !guardSeen
+          ) {
+            console.error(`Error: Unguarded DDL found before migration guard in: ${relPath}:${i + 1}`);
             console.error(`  Line: ${line.trim()}`);
             process.exit(1);
           }
+        }
+        continue; // Guarded DDL — acceptable
+      }
+
+      // File has DDL with no migration guard — this is a hard failure
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (disallowedRegex.test(line) && !line.trim().startsWith('//') && !line.trim().startsWith('*') && !line.trim().startsWith('/*')) {
+          console.error(`Error: Unguarded DDL statement found in runtime file: ${relPath}:${i + 1}`);
+          console.error(`  Line: ${line.trim()}`);
+          process.exit(1);
         }
       }
     }
@@ -55,7 +85,7 @@ function scanDir(dir) {
 }
 
 scanDir(path.join(__dirname, '../src'));
-console.log('  PASS: Static scan completed. No disallowed runtime DDL found.');
+console.log('  PASS: Static scan completed. No unguarded runtime DDL found.');
 
 // 2. Import-Time Safety with guarded DB query mock
 console.log('\n2. Import-Time Safety Verification:');

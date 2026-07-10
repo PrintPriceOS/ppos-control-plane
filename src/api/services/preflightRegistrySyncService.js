@@ -267,8 +267,22 @@ class PreflightRegistrySyncService {
 
         console.log(`[CONTROL][PREFLIGHT][SYNC-LIST-ITEM] ${JSON.stringify({ jobId, tenantId, type, status })}`);
 
-        // Guarantee registry schema compliance before proceeding
-        await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
+        // Assert schema readiness — read-only compatibility check, never creates/alters structures
+        try {
+            await require('./schemaCompatibilityService').assertSchemaReady('PREFLIGHT_REGISTRY');
+        } catch (schemaErr) {
+            const blockedEvent = {
+                code: 'PREFLIGHT_REGISTRY_SYNC_BLOCKED',
+                reason: schemaErr.message,
+                jobId,
+                blockedAt: new Date().toISOString()
+            };
+            console.warn(`[CONTROL][PREFLIGHT][SYNC-BLOCKED] ${JSON.stringify(blockedEvent)}`);
+            throw Object.assign(new Error(`Sync blocked: schema not ready — ${schemaErr.message}`), {
+                code: 'PREFLIGHT_REGISTRY_SYNC_BLOCKED',
+                retryable: true
+            });
+        }
 
         // 2.5 Check existing sync error state before fetching
         let existingSyncError = {};

@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const assert = require('assert');
 const {
   discoverMigrations,
@@ -72,10 +73,8 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
   }
 
   // Check for changed checksums or untracked new files
-  // Check for changed checksums or untracked new files
   for (const d of migrations) {
     const relPath = d.relativePath.replace(/\\/g, '/');
-    const checksum = calculateFileChecksum(d.absolutePath);
 
     if (!baselineMap.has(relPath)) {
       console.error(`Error: Untracked new migration file found: ${relPath}`);
@@ -85,10 +84,15 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
     }
 
     const record = baselineMap.get(relPath);
-    if (record.sha256 !== checksum) {
+    const rawContent = fs.readFileSync(d.absolutePath);
+    const checksumRaw = crypto.createHash('sha256').update(rawContent).digest('hex');
+    const checksumLf = crypto.createHash('sha256').update(rawContent.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+
+    if (record.sha256 !== checksumRaw && record.sha256 !== checksumLf) {
       console.error(`Error: Checksum mismatch for ${relPath}`);
       console.error(`  Expected: ${record.sha256}`);
-      console.error(`  Found:    ${checksum}`);
+      console.error(`  Found Raw: ${checksumRaw}`);
+      console.error(`  Found LF:  ${checksumLf}`);
       integrityFailed = true;
     }
   }

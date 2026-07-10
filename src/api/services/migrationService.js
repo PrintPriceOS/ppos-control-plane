@@ -15,17 +15,19 @@ class MigrationService {
         this.migrationsPath = path.join(__dirname, '../../../migrations');
     }
 
-    /**
-     * Compute SHA-256 checksum for a migration file.
-     */
     getChecksum(content) {
-        return crypto.createHash('sha256').update(content).digest('hex');
+        const normalized = content.replace(/\r\n/g, '\n');
+        return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
     }
 
     /**
      * Initialize migration table.
+     * ONLY callable from the migration CLI context (PPOS_MIGRATION_EXECUTION=true).
      */
     async ensureMigrationTable() {
+        if (process.env.PPOS_MIGRATION_EXECUTION !== 'true') {
+            throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
+        }
         await db.query(`
             CREATE TABLE IF NOT EXISTS schema_versions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
