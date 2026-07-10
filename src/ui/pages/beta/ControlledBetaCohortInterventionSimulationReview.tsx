@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { controlledBetaCohortInterventionSimulationReviewClient } from '../../lib/controlledBetaCohortInterventionSimulationReviewClient';
+import { normalizeUiError } from '../../utils/errorUtils';
 import { ReviewRecord, ReviewFinding, ReviewDecision, ReviewEvidence, ReviewAuditLog } from '../../lib/controlledBetaCohortInterventionSimulationReview';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,7 +51,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       setReviews(data);
       addLog('Fetched simulation review list');
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -72,7 +73,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       setActiveReviewId(reviewId);
       addLog(`Loaded review details for ${reviewId}`);
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -91,7 +92,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       await loadReviews();
       await loadActiveReview(newReview.review_id);
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -112,7 +113,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       await loadActiveReview(review.review_id);
       await loadReviews();
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -132,7 +133,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       await loadActiveReview(review.review_id);
       await loadReviews();
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -147,7 +148,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       await loadActiveReview(review.review_id);
       await loadReviews();
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -177,7 +178,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
       await loadActiveReview(review.review_id);
       await loadReviews();
     } catch (e: any) {
-      setError(e.message);
+      setError(normalizeUiError(e));
     }
     setLoading(false);
   };
@@ -317,7 +318,7 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
               padding: '1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444',
               borderRadius: '0.5rem', color: '#fca5a5', marginBottom: '1rem', fontSize: '0.85rem'
             }}>
-              ⚠️ Error: {error}
+              ⚠️ Error: {normalizeUiError(error)}
             </div>
           )}
 
@@ -328,7 +329,12 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
               justifyContent: 'center', alignItems: 'center', color: '#64748b'
             }}>
               <span style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚖️</span>
-              <div>Select or create a simulation review to inspect details.</div>
+              <div><div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', padding: 24, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>No high-risk intervention simulations are available for review.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 141 High-Risk Intervention Simulation.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: FINALIZED simulation result.</div>
+              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create a Phase 141 simulation before opening a simulation review.</div>
+            </div></div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

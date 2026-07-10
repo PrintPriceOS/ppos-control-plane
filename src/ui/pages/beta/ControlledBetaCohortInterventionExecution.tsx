@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { cohortInterventionExecutionClient } from '../../api/controlledBetaCohortInterventionExecutionClient';
+import { normalizeUiError } from '../../utils/errorUtils';
 import { cohortInterventionApprovalClient } from '../../api/controlledBetaCohortInterventionApprovalClient';
 import {
   CohortInterventionExecution,
@@ -104,7 +105,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Failed to create execution package.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error occurred');
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Failed to generate dry run');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Failed to create rollback plan');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -174,7 +175,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Failed to record operator confirmation');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -221,7 +222,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Cancellation failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -242,7 +243,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Rollback failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -269,7 +270,7 @@ export function ControlledBetaCohortInterventionExecution() {
         setErrorMsg('Supersede failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -476,7 +477,12 @@ export function ControlledBetaCohortInterventionExecution() {
             </div>
           ) : (
             <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-              Select an execution record or create one from a finalized Phase 139 approval.
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>No finalized intervention approvals were found.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 139 Governed Cohort Intervention Approval.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: FINALIZED approval.</div>
+              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: approve a Phase 139 preparation before creating a safe-scope execution gate.</div>
+            </div>
             </div>
           )}
 

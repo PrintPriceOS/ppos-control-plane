@@ -54,7 +54,7 @@ export const ControlledBetaCohortInterventionSimulation: React.FC = () => {
       setSimulation(data.simulation);
       setSteps(data.steps || []);
       addLog(`Simulation created: ${data.simulation?.simulation_id} (type: ${simulationType})`);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(normalizeUiError(e)); }
     setLoading(false);
   };
 
@@ -69,7 +69,7 @@ export const ControlledBetaCohortInterventionSimulation: React.FC = () => {
       setSimulation(fresh.simulation);
       setSteps(fresh.steps || []);
       return data;
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(normalizeUiError(e)); }
     setLoading(false);
   };
 
@@ -209,7 +209,12 @@ export const ControlledBetaCohortInterventionSimulation: React.FC = () => {
           </h2>
           {!simulation ? (
             <div style={{ color: '#475569', fontSize: '0.85rem', textAlign: 'center', padding: '2rem' }}>
-              No simulation created yet
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', padding: 12, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 4, fontSize: '0.8rem' }}>No eligible Phase 140 execution gate was found.</div>
+              <div style={{ fontSize: '0.72rem', color: '#475569' }}>Required parent: Phase 140 Controlled Cohort Intervention Execution Gate.</div>
+              <div style={{ fontSize: '0.72rem', color: '#475569' }}>Required state: FINALIZED safe-scope execution marker.</div>
+              <div style={{ fontSize: '0.72rem', color: '#059669', marginTop: 6 }}>Next action: create and finalize a Phase 140 execution gate before running a simulation.</div>
+            </div>
             </div>
           ) : (
             <>

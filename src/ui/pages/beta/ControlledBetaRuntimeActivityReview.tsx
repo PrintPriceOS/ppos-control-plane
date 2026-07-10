@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { runtimeActivityReviewClient } from '../../api/controlledBetaRuntimeActivityReviewClient';
+import { normalizeUiError } from '../../utils/errorUtils';
 import {
   RuntimeActivityReview,
   RuntimeActivityReviewDecision,
@@ -89,7 +90,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setErrorMsg('Failed to create review');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -109,7 +110,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setErrorMsg('Evaluation failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -129,7 +130,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setErrorMsg('Finalization failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -158,7 +159,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setErrorMsg('Supersede call failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -344,8 +345,11 @@ export function ControlledBetaRuntimeActivityReview() {
               )}
             </div>
           ) : (
-            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-              Select a review snapshot from the list or create a new review snapshot to view metrics and recommendations.
+            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>No runtime activity observation snapshots are available yet.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 136 Runtime Activity Observation.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: finalized observation window with preserved safety invariants.</div>
+              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create or finalize a Phase 136 runtime activity observation before creating a cohort health review.</div>
             </div>
           )}
 

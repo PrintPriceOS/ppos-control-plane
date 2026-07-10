@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { cohortInterventionApprovalClient } from '../../api/controlledBetaCohortInterventionApprovalClient';
+import { normalizeUiError } from '../../utils/errorUtils';
 import { cohortInterventionPreparationClient } from '../../api/controlledBetaCohortInterventionPreparationClient';
 import {
   CohortInterventionApproval,
@@ -105,7 +106,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Failed to create approval package.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error occurred');
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Failed to sign step');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -151,7 +152,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Failed to update decision');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -172,7 +173,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Finalization failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Finalization blocked by safety rules.');
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -198,7 +199,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Rejection failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -224,7 +225,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Request changes call failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -250,7 +251,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Return call failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -276,7 +277,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Escalation failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -303,7 +304,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setErrorMsg('Supersede failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -558,7 +559,12 @@ export function ControlledBetaCohortInterventionApproval() {
             </div>
           ) : (
             <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-              Select an active approval or create one from a finalized Phase 138 preparation.
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>No finalized intervention preparations were found.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 138 Governed Cohort Intervention Preparation.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: FINALIZED preparation package.</div>
+              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create and finalize a Phase 138 preparation before requesting approval.</div>
+            </div>
             </div>
           )}
 

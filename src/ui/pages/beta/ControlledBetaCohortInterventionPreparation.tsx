@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { cohortInterventionPreparationClient } from '../../api/controlledBetaCohortInterventionPreparationClient';
+import { normalizeUiError } from '../../utils/errorUtils';
 import { runtimeActivityReviewClient } from '../../api/controlledBetaRuntimeActivityReviewClient';
 import {
   CohortInterventionPreparation,
@@ -101,7 +102,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Failed to generate intervention preparation.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error occurred');
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -122,7 +123,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Failed to update item status');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -142,7 +143,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Approval failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Finalization failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Finalization blocked by safety rules.');
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -189,7 +190,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Rejection failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -216,7 +217,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setErrorMsg('Supersede failed');
       }
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(normalizeUiError(err));
     } finally {
       setLoading(false);
     }
@@ -446,8 +447,11 @@ export function ControlledBetaCohortInterventionPreparation() {
               )}
             </div>
           ) : (
-            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-              Select an active preparation or create one from a finalized Phase 137 review.
+            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>No finalized runtime activity reviews were found.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 137 Runtime Activity Review.</div>
+              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: FINALIZED review snapshot.</div>
+              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create and finalize a Phase 137 review before preparing an intervention package.</div>
             </div>
           )}
 
