@@ -1,0 +1,64 @@
+export interface ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority {
+  act_token_redempt_unlock_emergency_rollback_authority_id: string;
+  source_act_token_redempt_unlock_legal_policy_hold_id: string;
+  source_act_token_redempt_unlock_risk_officer_countersign_id: string;
+  source_act_token_redempt_unlock_compliance_witness_id: string;
+  source_act_token_redempt_unlock_final_human_auth_seal_id: string;
+  source_act_token_redempt_unlock_dual_control_authorization_id: string;
+  source_act_token_redempt_unlock_operator_attestation_id: string;
+  source_act_token_redempt_unlock_pre_execution_freeze_id: string;
+  source_activation_token_redemption_unlock_seal_id: string;
+  source_activation_token_redemption_unlock_final_review_id: string;
+  source_activation_token_redemption_unlock_approval_id: string;
+  source_activation_token_redemption_unlock_eligibility_id: string;
+  source_activation_token_redemption_lock_id: string;
+  source_activation_token_redemption_final_apv_id: string;
+  source_activation_token_redemption_envelope_id: string;
+  source_activation_token_redemption_auth_id: string;
+  source_activation_token_redemption_readiness_id: string;
+  source_activation_token_issuance_id: string;
+  source_plan_id: string;
+  cohort_id: string;
+  tenant_id: string;
+  simulation_type: string;
+  unlock_emergency_rollback_authority_status: string;
+  unlock_emergency_rollback_authority_result: string;
+  unlock_emergency_rollback_authority_mode: string;
+  token_redemption_lock_status: string;
+  token_redemption_status: string;
+  token_unlock_status: string;
+  token_redeemable_status: string;
+  risk_level: string;
+  confidence_level: string;
+  projected_impact_score: number;
+  rollback_feasibility_score: number;
+  evidence_completeness_score: number;
+  guardrail_status: string;
+  write_scope_status: string;
+  rollback_officer_id?: string;
+  rollback_officer_role?: string;
+  rollback_officer_confirmed_at?: string;
+  rollback_authority_confirmation_reason?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface EmergencyRollbackAuthorityConfirmations {
+  emergency_rollback_authority_confirmation: boolean;
+  rollback_officer_assigned_confirmed: boolean;
+  emergency_stop_authority_ready_confirmed: boolean;
+  rollback_channel_available_confirmed: boolean;
+  rollback_runbook_available_confirmed: boolean;
+  kill_switch_verified: boolean;
+  non_execution_confirmed: boolean;
+  legal_policy_hold_clearance_verified: boolean;
+  risk_officer_countersign_verified: boolean;
+  compliance_witness_attestation_verified: boolean;
+  final_human_seal_authorizer_unlock_seal_verified: boolean;
+  primary_authorizer_unlock_authorization_verified: boolean;
+  secondary_authorizer_unlock_authorization_verified: boolean;
+  seal_authenticity_confirmed: boolean;
+  pre_execution_state_sealed_confirmed: boolean;
+}
