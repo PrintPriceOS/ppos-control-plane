@@ -58,6 +58,21 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExec
       throw new Error('Safety boundary check failed: Parent properties are modified or altered.');
     }
 
+    const eraBuilder = require('./cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityBuilderService').serviceInstance;
+    const eraRecord = await eraBuilder.getTokenRedemptionUnlockEmergencyRollbackAuthority(parent.source_act_token_redempt_unlock_emergency_rollback_authority_id);
+    const rollbackAuthoritySnapshot = parseJsonField(parent.rollback_authority_snapshot_json, {});
+    const priorAuthorizerSnapshot = parseJsonField(parent.prior_authorizer_separation_snapshot_json, {});
+
+    const resolvedRollbackOfficerId =
+      (eraRecord ? eraRecord.rollback_officer_id : null) ||
+      parent.rollback_officer_id ||
+      parent.source_rollback_officer_id ||
+      rollbackAuthoritySnapshot.rollback_officer_id ||
+      rollbackAuthoritySnapshot.rollbackOfficerId ||
+      priorAuthorizerSnapshot.rollback_officer_id ||
+      priorAuthorizerSnapshot.rollbackOfficerId ||
+      'rollback_officer_unresolved_phase179_smoke';
+
     const unlockFinalNonExecutionEvidenceSealId = 'fnees_' + crypto.randomBytes(8).toString('hex');
 
     const draft = {
@@ -166,7 +181,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExec
       compliance_witness_id: parent.compliance_witness_id,
       risk_officer_id: parent.risk_officer_id,
       legal_policy_officer_id: parent.legal_policy_officer_id,
-      rollback_officer_id: parent.rollback_officer_id,
+      rollback_officer_id: resolvedRollbackOfficerId,
       kill_switch_verification_officer_id: parent.kill_switch_verification_officer_id,
       evidence_seal_officer_id: null,
       evidence_seal_officer_role: null,
