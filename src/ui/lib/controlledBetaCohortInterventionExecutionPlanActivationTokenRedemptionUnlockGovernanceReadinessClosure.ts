@@ -1,6 +1,6 @@
 export interface ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure {
   act_token_redempt_unlock_governance_readiness_closure_id: string;
-  source_act_token_redempt_unlock_final_non_execution_evidence_seal_id: string;
+  source_unlock_fnees_id: string;
   source_act_token_redempt_unlock_kill_switch_dry_run_id: string;
   source_act_token_redempt_unlock_emergency_rollback_authority_id: string;
   source_act_token_redempt_unlock_legal_policy_hold_id: string;

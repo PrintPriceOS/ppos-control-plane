@@ -20,7 +20,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceRe
       throw new Error(`Record ${unlockGovernanceReadinessClosureId} not found.`);
     }
 
-    const parentFinalNonExecutionEvidenceSeal = await parentBuilder.getTokenRedemptionUnlockFinalNonExecutionEvidenceSeal(record.source_act_token_redempt_unlock_final_non_execution_evidence_seal_id);
+    const parentFinalNonExecutionEvidenceSeal = await parentBuilder.getTokenRedemptionUnlockFinalNonExecutionEvidenceSeal(record.source_unlock_fnees_id);
     if (!parentFinalNonExecutionEvidenceSeal) {
       throw new Error(`Parent final evidence seal not found.`);
     }
@@ -52,7 +52,7 @@ class CohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceRe
     const evidencePayload = {
       act_token_redempt_unlock_governance_readiness_closure_id: unlockGovernanceReadinessClosureId,
       schema_version: '180.0',
-      parent_final_non_execution_evidence_seal_id: record.source_act_token_redempt_unlock_final_non_execution_evidence_seal_id,
+      parent_final_non_execution_evidence_seal_id: record.source_unlock_fnees_id,
       governance_closure_officer_id_sha256: hashId(record.governance_closure_officer_id),
       governance_closure_officer_role: record.governance_closure_officer_role,
       primary_authorizer_id_sha256: hashId(record.primary_authorizer_id),

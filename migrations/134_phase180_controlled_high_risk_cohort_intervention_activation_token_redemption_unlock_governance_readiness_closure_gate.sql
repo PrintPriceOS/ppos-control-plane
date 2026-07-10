@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_grc (
   act_token_redempt_unlock_governance_readiness_closure_id VARCHAR(64) PRIMARY KEY,
-  source_act_token_redempt_unlock_final_non_execution_evidence_seal_id VARCHAR(64) NOT NULL,
+  source_unlock_fnees_id VARCHAR(64) NOT NULL,
   source_act_token_redempt_unlock_kill_switch_dry_run_id VARCHAR(64) NOT NULL,
   source_act_token_redempt_unlock_emergency_rollback_authority_id VARCHAR(64) NOT NULL,
   source_act_token_redempt_unlock_legal_policy_hold_id VARCHAR(64) NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unloc
   updated_by VARCHAR(64) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY idx_unlock_grc_source_fnees (source_act_token_redempt_unlock_final_non_execution_evidence_seal_id)
+  KEY idx_unlock_grc_source_fnees (source_unlock_fnees_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS cb_cohort_intervention_activation_token_redempt_unlock_grc_rl (

@@ -39,7 +39,7 @@ const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABA
     const draft = await builder.createTokenRedemptionUnlockGovernanceReadinessClosureDraft(fneesId, 'admin');
     const record = draft.tokenRedemptionUnlockGovernanceReadinessClosure;
 
-    assert.strictEqual(record.source_act_token_redempt_unlock_final_non_execution_evidence_seal_id, fneesId);
+    assert.strictEqual(record.source_unlock_fnees_id, fneesId);
     assert.strictEqual(record.unlock_governance_readiness_closure_status, 'DRAFT');
     assert.strictEqual(record.token_unlock_status, 'NOT_UNLOCKED');
     assert.strictEqual(record.unlock_governance_readiness_closure_mode, 'GOVERNANCE_READINESS_CLOSURE_ONLY');

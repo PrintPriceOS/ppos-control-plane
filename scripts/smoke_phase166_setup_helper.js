@@ -2231,7 +2231,7 @@ async function setupFinalizedUnlockFinalNonExecutionEvidenceSeal(
     });
     fneesBuilder._mockState.rules.set(unlockFinalNonExecutionEvidenceSealId, []);
   } else {
-    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_grc WHERE source_act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_grc WHERE source_unlock_fnees_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_ev WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_rl WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
     await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_aud WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
