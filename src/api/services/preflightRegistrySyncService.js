@@ -35,7 +35,8 @@ class PreflightRegistrySyncService {
 
         try {
             // Guarantee registry schema compliance before proceeding
-            await require('./controlPlaneSchemaService').ensurePreflightRegistrySchema();
+            const { assertSchemaReady } = require('./schemaCompatibilityService');
+            await assertSchemaReady('PREFLIGHT_REGISTRY');
 
             // Fetch live payload utilizing preflightServiceClient.getJob
             const upstreamJob = await preflightServiceClient.getJob(jobId, authHeader, targetTenantId);

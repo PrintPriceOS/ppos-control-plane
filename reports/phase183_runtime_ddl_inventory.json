@@ -1,7 +1,7 @@
 [
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 37,
+    "line": 40,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenants (",
     "startupReachable": "Possible/Analyzed",
@@ -9,7 +9,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 56,
+    "line": 59,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS api_keys (",
     "startupReachable": "Possible/Analyzed",
@@ -17,7 +17,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 71,
+    "line": 74,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS jobs (",
     "startupReachable": "Possible/Analyzed",
@@ -25,7 +25,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 91,
+    "line": 94,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS metrics (",
     "startupReachable": "Possible/Analyzed",
@@ -33,7 +33,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 114,
+    "line": 117,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_usage_stats (",
     "startupReachable": "Possible/Analyzed",
@@ -41,7 +41,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 128,
+    "line": 131,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_plan_history (",
     "startupReachable": "Possible/Analyzed",
@@ -49,7 +49,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 139,
+    "line": 142,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_alerts_history (",
     "startupReachable": "Possible/Analyzed",
@@ -57,7 +57,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 152,
+    "line": 155,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS notifications (",
     "startupReachable": "Possible/Analyzed",
@@ -65,7 +65,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 170,
+    "line": 173,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS control_plane_notifications (",
     "startupReachable": "Possible/Analyzed",
@@ -73,7 +73,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 192,
+    "line": 195,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS notification_events (",
     "startupReachable": "Possible/Analyzed",
@@ -81,7 +81,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 203,
+    "line": 206,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_notification_preferences (",
     "startupReachable": "Possible/Analyzed",
@@ -89,7 +89,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 215,
+    "line": 218,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS engagement_events (",
     "startupReachable": "Possible/Analyzed",
@@ -97,7 +97,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 228,
+    "line": 231,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS cs_workflows (",
     "startupReachable": "Possible/Analyzed",
@@ -105,7 +105,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 243,
+    "line": 246,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS autonomous_job_pipelines (",
     "startupReachable": "Possible/Analyzed",
@@ -113,7 +113,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 255,
+    "line": 258,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS pipeline_events (",
     "startupReachable": "Possible/Analyzed",
@@ -121,7 +121,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 268,
+    "line": 271,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS financial_ledger_entries (",
     "startupReachable": "Possible/Analyzed",
@@ -129,7 +129,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 285,
+    "line": 288,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS audit_help_analytics (",
     "startupReachable": "Possible/Analyzed",
@@ -137,7 +137,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 298,
+    "line": 301,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_artifacts (",
     "startupReachable": "Possible/Analyzed",
@@ -145,7 +145,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 325,
+    "line": 328,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS worker_nodes (",
     "startupReachable": "Possible/Analyzed",
@@ -153,7 +153,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 345,
+    "line": 348,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS operational_incidents (",
     "startupReachable": "Possible/Analyzed",
@@ -161,7 +161,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 364,
+    "line": 367,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS lifecycle_policies (",
     "startupReachable": "Possible/Analyzed",
@@ -169,7 +169,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 382,
+    "line": 385,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS control_users (",
     "startupReachable": "Possible/Analyzed",
@@ -177,7 +177,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 401,
+    "line": 404,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS materials_catalog (",
     "startupReachable": "Possible/Analyzed",
@@ -185,7 +185,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 424,
+    "line": 427,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS predictive_material_inventory (",
     "startupReachable": "Possible/Analyzed",
@@ -193,7 +193,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 466,
+    "line": 469,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS material_machine_compatibility (",
     "startupReachable": "Possible/Analyzed",
@@ -201,7 +201,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 482,
+    "line": 485,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS material_inventory_events (",
     "startupReachable": "Possible/Analyzed",
@@ -209,7 +209,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 502,
+    "line": 505,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS manufacturing_material_reservations (",
     "startupReachable": "Possible/Analyzed",
@@ -217,7 +217,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 518,
+    "line": 521,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS material_procurements (",
     "startupReachable": "Possible/Analyzed",
@@ -225,7 +225,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 577,
+    "line": 580,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_job_registry (",
     "startupReachable": "Possible/Analyzed",
@@ -233,7 +233,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 601,
+    "line": 604,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_artifact_registry (",
     "startupReachable": "Possible/Analyzed",
@@ -241,7 +241,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 616,
+    "line": 619,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_audit_events (",
     "startupReachable": "Possible/Analyzed",
@@ -249,7 +249,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 636,
+    "line": 639,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_governance_events (",
     "startupReachable": "Possible/Analyzed",
@@ -257,7 +257,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 652,
+    "line": 655,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS control_plane_preflight_human_reports (",
     "startupReachable": "Possible/Analyzed",
@@ -265,7 +265,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 678,
+    "line": 681,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS control_plane_preflight_review_approvals (",
     "startupReachable": "Possible/Analyzed",
@@ -273,7 +273,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 700,
+    "line": 703,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS job_marketplace_sessions (",
     "startupReachable": "Possible/Analyzed",
@@ -281,7 +281,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 727,
+    "line": 730,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS manufacturing_offers (",
     "startupReachable": "Possible/Analyzed",
@@ -289,7 +289,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 772,
+    "line": 775,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_events (",
     "startupReachable": "Possible/Analyzed",
@@ -297,7 +297,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 836,
+    "line": 839,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE job_marketplace_sessions MODIFY COLUMN session_status ENUM('OPEN','SELECTED','CANCELLED','EXPIRED','FAILED') DEFAULT 'OPEN'\");",
     "startupReachable": "Possible/Analyzed",
@@ -305,7 +305,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 837,
+    "line": 840,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN offer_status ENUM('PENDING','SENT','VIEWED','ACCEPTED','REJECTED','EXPIRED','CANCELLED','FAILED') DEFAULT 'PENDING'\");",
     "startupReachable": "Possible/Analyzed",
@@ -313,7 +313,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 838,
+    "line": 841,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN production_cost DECIMAL(14,4) NULL\");",
     "startupReachable": "Possible/Analyzed",
@@ -321,7 +321,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 839,
+    "line": 842,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN suggested_price DECIMAL(14,4) NULL\");",
     "startupReachable": "Possible/Analyzed",
@@ -329,7 +329,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 840,
+    "line": 843,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN estimated_margin DECIMAL(14,4) NULL\");",
     "startupReachable": "Possible/Analyzed",
@@ -337,7 +337,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 841,
+    "line": 844,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN margin_pct DECIMAL(10,4) NULL\");",
     "startupReachable": "Possible/Analyzed",
@@ -345,7 +345,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 842,
+    "line": 845,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(\"ALTER TABLE marketplace_events MODIFY COLUMN marketplace_session_id VARCHAR(64) NULL\");",
     "startupReachable": "Possible/Analyzed",
@@ -353,7 +353,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 914,
+    "line": 917,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);",
     "startupReachable": "Possible/Analyzed",
@@ -361,7 +361,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 941,
+    "line": 944,
     "operation": "CREATE INDEX",
     "snippet": "await db.query(`CREATE INDEX ${indexName} ON ${table}(${columns})`);",
     "startupReachable": "Possible/Analyzed",
@@ -369,7 +369,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1025,
+    "line": 1028,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE orders MODIFY COLUMN status ${statusEnum}`);",
     "startupReachable": "Possible/Analyzed",
@@ -377,7 +377,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1041,
+    "line": 1044,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS production_file_repositories (",
     "startupReachable": "Possible/Analyzed",
@@ -385,7 +385,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1063,
+    "line": 1066,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS production_files (",
     "startupReachable": "Possible/Analyzed",
@@ -393,7 +393,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1096,
+    "line": 1099,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS production_file_events (",
     "startupReachable": "Possible/Analyzed",
@@ -401,7 +401,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1124,
+    "line": 1127,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS printhouse_payment_settings (",
     "startupReachable": "Possible/Analyzed",
@@ -409,7 +409,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1143,
+    "line": 1146,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS invoices (",
     "startupReachable": "Possible/Analyzed",
@@ -417,7 +417,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1182,
+    "line": 1185,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_intents (",
     "startupReachable": "Possible/Analyzed",
@@ -425,7 +425,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1226,
+    "line": 1229,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_production_files (",
     "startupReachable": "Possible/Analyzed",
@@ -433,7 +433,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1250,
+    "line": 1253,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_audit_events (",
     "startupReachable": "Possible/Analyzed",
@@ -441,7 +441,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1269,
+    "line": 1272,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_offer_sessions (",
     "startupReachable": "Possible/Analyzed",
@@ -449,7 +449,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1308,
+    "line": 1311,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_orders (",
     "startupReachable": "Possible/Analyzed",
@@ -457,7 +457,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1344,
+    "line": 1347,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_files (",
     "startupReachable": "Possible/Analyzed",
@@ -465,7 +465,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1379,
+    "line": 1382,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_events (",
     "startupReachable": "Possible/Analyzed",
@@ -473,7 +473,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1402,
+    "line": 1405,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_preflight_bindings (",
     "startupReachable": "Possible/Analyzed",
@@ -481,7 +481,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1444,
+    "line": 1447,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_resource_limits (",
     "startupReachable": "Possible/Analyzed",
@@ -489,7 +489,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1462,
+    "line": 1465,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS preflight_tenant_quotas (",
     "startupReachable": "Possible/Analyzed",
@@ -497,7 +497,7 @@
   },
   {
     "file": "src/api/services/controlPlaneSchemaService.js",
-    "line": 1474,
+    "line": 1477,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS tenant_governance_events (",
     "startupReachable": "Possible/Analyzed",
@@ -505,7 +505,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 169,
+    "line": 164,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -513,7 +513,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 192,
+    "line": 187,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -521,7 +521,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 215,
+    "line": 210,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -529,7 +529,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 239,
+    "line": 234,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -537,7 +537,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 263,
+    "line": 258,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -545,7 +545,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 286,
+    "line": 281,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -553,7 +553,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 325,
+    "line": 320,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -561,7 +561,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 356,
+    "line": 351,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -569,7 +569,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 382,
+    "line": 377,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -577,7 +577,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 399,
+    "line": 394,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -585,7 +585,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 421,
+    "line": 416,
     "operation": "ALTER TABLE",
     "snippet": "await db.query(`ALTER TABLE ${gm.table} ADD COLUMN ${gm.column} ${gm.type}`);",
     "startupReachable": "Possible/Analyzed",
@@ -593,7 +593,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 441,
+    "line": 436,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS live_capacity_snapshots (",
     "startupReachable": "Possible/Analyzed",
@@ -601,7 +601,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 461,
+    "line": 456,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS production_evidence_ledger (",
     "startupReachable": "Possible/Analyzed",
@@ -609,7 +609,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 482,
+    "line": 477,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS sla_evidence_snapshots (",
     "startupReachable": "Possible/Analyzed",
@@ -617,7 +617,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 503,
+    "line": 498,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS federation_factories (",
     "startupReachable": "Possible/Analyzed",
@@ -625,7 +625,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 527,
+    "line": 522,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS routing_decisions (",
     "startupReachable": "Possible/Analyzed",
@@ -633,7 +633,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 542,
+    "line": 537,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS routing_scores (",
     "startupReachable": "Possible/Analyzed",
@@ -641,7 +641,7 @@
   },
   {
     "file": "src/api/services/industrialProvisioningService.js",
-    "line": 557,
+    "line": 552,
     "operation": "CREATE TABLE",
     "snippet": "CREATE TABLE IF NOT EXISTS routing_history (",
     "startupReachable": "Possible/Analyzed",

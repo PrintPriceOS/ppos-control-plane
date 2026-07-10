@@ -135,6 +135,34 @@ fastify.addHook('onRequest', async (request, reply) => {
 
 
 // Register Routes
+fastify.get('/live', async () => {
+    return { status: 'UP' };
+});
+
+fastify.get('/ready', async (request, reply) => {
+    const { evaluateSchemaCompatibility } = require('./src/api/services/schemaCompatibilityService');
+    const compat = await evaluateSchemaCompatibility();
+    if (compat.status !== 'READY') {
+        reply.status(503);
+        return {
+            status: 'NOT_READY',
+            reason: 'SCHEMA_NOT_READY',
+            schema: {
+                status: compat.status,
+                manifestVersion: compat.manifestVersion
+            }
+        };
+    }
+    return {
+        status: 'READY',
+        service: 'ppos-control-plane',
+        schema: {
+            status: 'READY',
+            manifestVersion: compat.manifestVersion
+        }
+    };
+});
+
 fastify.get('/health', async () => {
     const mode = process.env.PPOS_CONTROL_MODE || 'LIVE';
     
@@ -172,8 +200,8 @@ const start = async () => {
             process.exit(1);
         }
 
-        // 0. Initialize Database Schemas (Industrial Persistence)
-        require('./src/api/services/controlPlaneSchemaService');
+        // 0. Initialize Database Schemas (Legacy import commented out in Phase 184)
+        // require('./src/api/services/controlPlaneSchemaService');
 
         // 0.1 Industrial Provisioning (MES Bootstrap)
         try {

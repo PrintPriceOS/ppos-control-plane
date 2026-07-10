@@ -8,6 +8,9 @@ const logger = require('./logger').child('schema-service');
 
 class ControlPlaneSchemaService {
     async init() {
+        if (process.env.PPOS_MIGRATION_EXECUTION !== 'true') {
+            throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
+        }
         const isProduction = process.env.NODE_ENV === 'production';
         let mutationEnabled = process.env.PPOS_ENABLE_SCHEMA_MUTATION === 'true';
         const forceOverride = process.env.PPOS_FORCE_SCHEMA_MUTATION === 'true';

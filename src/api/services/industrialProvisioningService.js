@@ -74,21 +74,16 @@ class IndustrialProvisioningService {
             summary.warnings.push(`Initial metadata sync warning: ${err.message}`);
         }
 
-        // Step 1: Idempotent Column Hardening (Phase 18-22)
+        // Step 1: Schema Readiness Check (Phase 184 read-only validation)
         try {
-            summary.columnsEnsured = await this.ensureCoreColumns();
+            const { assertSchemaReady } = require('./schemaCompatibilityService');
+            await assertSchemaReady('CORE_RUNTIME');
+            summary.columnsEnsured = 0;
+            summary.migrationsApplied = 0;
         } catch (err) {
-            summary.failedSteps.push('ensureCoreColumns');
-            this._logStepError('ensureCoreColumns', err);
-        }
-
-        // Step 2: Modern SQL Migrations
-        try {
-            const migrationResult = await migrationService.runMigrations();
-            summary.migrationsApplied = migrationResult.appliedCount;
-        } catch (err) {
-            summary.failedSteps.push('migrations');
-            this._logStepError('migrations', err);
+            summary.failedSteps.push('schemaReadinessAssertion');
+            this._logStepError('schemaReadinessAssertion', err);
+            throw err;
         }
 
         // Step 3: Operational Node Sync
@@ -127,10 +122,10 @@ class IndustrialProvisioningService {
         return summary;
     }
 
-    /**
-     * Idempotent column hardening for Phase 18-22 industrial features.
-     */
     async ensureCoreColumns() {
+        if (process.env.PPOS_MIGRATION_EXECUTION !== 'true') {
+            throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
+        }
         let ensured = 0;
         const coreTables = []; // Placeholder for any specific table creation logic if needed
 

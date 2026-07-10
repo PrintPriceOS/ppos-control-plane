@@ -46,6 +46,9 @@ class MigrationService {
      * Run all pending migrations.
      */
     async runMigrations() {
+        if (process.env.PPOS_MIGRATION_EXECUTION !== 'true') {
+            throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
+        }
         logger.info({ event: 'migration_start', message: 'Starting database migration sequence' });
         
         await this.ensureMigrationTable();

@@ -11,6 +11,9 @@ class ManufacturingPersistenceService {
    * Initialize tables if they don't exist
    */
   async init() {
+    if (process.env.PPOS_MIGRATION_EXECUTION !== 'true') {
+      throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
+    }
     try {
       console.log('[PRODUCTION-PERSISTENCE] Initializing tables...');
       
@@ -1096,6 +1099,5 @@ class ManufacturingPersistenceService {
 }
 
 const service = new ManufacturingPersistenceService();
-service.init().catch(err => console.error('[MANUFACTURING-PERSISTENCE] Critical init error:', err));
-
+// service.init() is deprecated at import-time to prevent automatic runtime DDL execution
 module.exports = service;

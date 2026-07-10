@@ -856,18 +856,10 @@ class PreflightOperationsService {
     }
   }
 
-  /**
-   * Idempotent column provisioning helper
-   */
   async _ensureOriginalNameColumn() {
     if (this._provisionedOriginalName) return;
-    const db = require('./mysqlClient');
-    try {
-      await db.query('ALTER TABLE preflight_jobs ADD COLUMN original_name VARCHAR(255) NULL');
-      console.log('[PREFLIGHT-OPS] Idempotently provisioned original_name column in preflight_jobs');
-    } catch (e) {
-      // Column already exists or duplicate column error is safe to absorb
-    }
+    const { assertSchemaReady } = require('./schemaCompatibilityService');
+    await assertSchemaReady('PREFLIGHT_REGISTRY');
     this._provisionedOriginalName = true;
   }
 

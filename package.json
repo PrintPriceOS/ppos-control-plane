@@ -11,7 +11,9 @@
         "preview": "vite preview",
         "seed:demo-printhouse": "node scripts/seed-demo-printhouse.js",
         "migration:baseline:generate": "node scripts/generate_phase183_migration_baseline.js --write",
-        "migration:integrity": "node scripts/smoke_phase183_migration_integrity.js"
+        "migration:integrity": "node scripts/smoke_phase183_migration_integrity.js",
+        "db:migrate": "node scripts/run_control_plane_migrations.js",
+        "db:verify": "node scripts/smoke_phase183_migration_integrity.js"
     },
     "dependencies": {
         "@fastify/express": "^4.0.4",
