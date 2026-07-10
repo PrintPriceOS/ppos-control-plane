@@ -1719,6 +1719,158 @@ async function setupFinalizedUnlockLegalPolicyHold(unlockLegalPolicyHoldId, unlo
   }
 }
 
+async function setupFinalizedUnlockEmergencyRollbackAuthority(unlockEmergencyRollbackAuthorityId, unlockLegalPolicyHoldId, unlockRiskOfficerCountersignId, unlockComplianceWitnessId, unlockFinalHumanAuthorizationSealId, unlockDualControlAuthorizationId, unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId) {
+  const eraBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityBuilderService').serviceInstance;
+  const eraEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityEvaluatorService').serviceInstance;
+  const eraDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityDecisionService').serviceInstance;
+
+  await setupFinalizedUnlockLegalPolicyHold(unlockLegalPolicyHoldId, unlockRiskOfficerCountersignId, unlockComplianceWitnessId, unlockFinalHumanAuthorizationSealId, unlockDualControlAuthorizationId, unlockOperatorAttestationId, unlockPreExecutionFreezeId, unlockSealId, finalReviewId, approvalId, eligibilityId, lockId, finalApvId, envId, authId, readinessId, issuanceId);
+
+  if (!isProdLike) {
+    eraBuilder._mockState.tokenRedemptionUnlockEmergencyRollbackAuthority.set(unlockEmergencyRollbackAuthorityId, {
+      act_token_redempt_unlock_emergency_rollback_authority_id: unlockEmergencyRollbackAuthorityId,
+      source_act_token_redempt_unlock_legal_policy_hold_id: unlockLegalPolicyHoldId,
+      unlock_emergency_rollback_authority_status: 'FINALIZED',
+      unlock_emergency_rollback_authority_result: 'EMERGENCY_ROLLBACK_AUTHORITY_CONFIRMED_NOT_UNLOCKED',
+      unlock_emergency_rollback_authority_mode: 'EMERGENCY_ROLLBACK_AUTHORITY_CONFIRMATION_ONLY',
+      unlock_legal_policy_hold_status: 'FINALIZED',
+      unlock_risk_officer_countersign_status: 'FINALIZED',
+      unlock_compliance_witness_status: 'FINALIZED',
+      unlock_final_human_authorization_seal_status: 'FINALIZED',
+      unlock_dual_control_authorization_status: 'FINALIZED',
+      unlock_operator_attestation_status: 'FINALIZED',
+      unlock_pre_execution_freeze_status: 'FINALIZED',
+      unlock_seal_status: 'FINALIZED',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      unlock_emergency_rollback_authority_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      unlock_emergency_rollback_authority_rules_json: {},
+      unlock_emergency_rollback_authority_blockers_json: {},
+      non_execution_attestation_json: {},
+      write_scope_attestation_json: {},
+      source_unlock_legal_policy_hold_hash: 'lph_hash_dummy',
+      source_unlock_risk_officer_countersign_hash: 'roc_hash_dummy',
+      source_unlock_compliance_witness_hash: 'cwn_hash_dummy',
+      source_unlock_final_human_authorization_seal_hash: 'fhas_hash_dummy',
+      source_unlock_dual_control_authorization_hash: 'dcau_hash_dummy',
+      source_unlock_operator_attestation_hash: 'oatt_hash_dummy',
+      source_unlock_pre_execution_freeze_hash: 'freeze_hash_dummy',
+      source_unlock_seal_hash: 'seal_hash_dummy',
+      source_unlock_final_review_hash: 'frev_hash_dummy',
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_emergency_rollback_authority_hash: 'era_hash_dummy',
+      unlock_emergency_rollback_authority_evidence_pack_hash: 'era_ep_hash_dummy',
+      evidence_pack_hash: 'era_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase177_unlock_emergency_rollback_authority: 'era_hash_dummy',
+        phase176_unlock_legal_policy_hold: 'lph_hash_dummy',
+        phase175_unlock_risk_officer_countersign: 'roc_hash_dummy',
+        phase174_unlock_compliance_witness: 'cwn_hash_dummy',
+        phase173_unlock_final_human_authorization_seal: 'fhas_hash_dummy',
+        phase172_unlock_dual_control_authorization: 'dcau_hash_dummy',
+        phase171_unlock_operator_attestation: 'oatt_hash_dummy',
+        phase170_unlock_pre_execution_freeze: 'freeze_hash_dummy',
+        phase169_unlock_readiness_seal: 'seal_hash_dummy',
+        phase168_unlock_final_review: 'frev_hash_dummy',
+        phase167_unlock_approval: 'apv_hash_dummy',
+        phase166_unlock_eligibility: 'elig_hash_dummy'
+      },
+      security_signature_json: {},
+      attestation_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_EMERGENCY_ROLLBACK_AUTHORITY_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      primary_authorizer_id: 'dummy_alice',
+      secondary_authorizer_id: 'dummy_bob',
+      final_human_authorizer_id: 'dummy_charlie',
+      compliance_witness_id: 'dummy_diana',
+      risk_officer_id: 'dummy_elena',
+      legal_policy_officer_id: 'dummy_felix',
+      rollback_officer_id: 'dummy_george',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    eraBuilder._mockState.rules.set(unlockEmergencyRollbackAuthorityId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_ksdr WHERE source_act_token_redempt_unlock_emergency_rollback_authority_id = ?', [unlockEmergencyRollbackAuthorityId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_era_ev WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?', [unlockEmergencyRollbackAuthorityId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_era_rl WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?', [unlockEmergencyRollbackAuthorityId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_era_aud WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?', [unlockEmergencyRollbackAuthorityId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_era WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?', [unlockEmergencyRollbackAuthorityId]);
+
+    const draft = await eraBuilder.createTokenRedemptionUnlockEmergencyRollbackAuthorityDraft(unlockLegalPolicyHoldId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockEmergencyRollbackAuthority.act_token_redempt_unlock_emergency_rollback_authority_id;
+
+    await eraDecision.recordRollbackOfficer(tempId, 'dummy_george', 'rollback_officer', 'Smoke 178 setup rollback officer', 'admin');
+
+    await eraEvaluator.evaluateUnlockEmergencyRollbackAuthority(tempId, {
+      emergency_rollback_authority_confirmation: true,
+      rollback_officer_assigned_confirmed: true,
+      emergency_stop_authority_ready_confirmed: true,
+      rollback_channel_available_confirmed: true,
+      rollback_runbook_available_confirmed: true,
+      kill_switch_verified: true,
+      non_execution_confirmed: true,
+      legal_policy_hold_clearance_verified: true,
+      risk_officer_countersign_verified: true,
+      compliance_witness_attestation_verified: true,
+      final_human_seal_authorizer_unlock_seal_verified: true,
+      primary_authorizer_unlock_authorization_verified: true,
+      secondary_authorizer_unlock_authorization_verified: true,
+      seal_authenticity_confirmed: true,
+      pre_execution_state_sealed_confirmed: true
+    }, 'admin');
+
+    await eraDecision.recordDecision(tempId, 'APPROVE_EMERGENCY_ROLLBACK_AUTHORITY', 'Approved for setup', 'admin');
+    await eraDecision.finalizeUnlockEmergencyRollbackAuthority(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_era
+       SET act_token_redempt_unlock_emergency_rollback_authority_id = ?
+       WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?`,
+      [unlockEmergencyRollbackAuthorityId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_era_ev
+       SET act_token_redempt_unlock_emergency_rollback_authority_id = ?
+       WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?`,
+      [unlockEmergencyRollbackAuthorityId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_era_rl
+       SET act_token_redempt_unlock_emergency_rollback_authority_id = ?
+       WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?`,
+      [unlockEmergencyRollbackAuthorityId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
@@ -1732,5 +1884,6 @@ module.exports = {
   setupFinalizedUnlockComplianceWitness,
   setupFinalizedUnlockRiskOfficerCountersign,
   setupFinalizedUnlockLegalPolicyHold,
+  setupFinalizedUnlockEmergencyRollbackAuthority,
   isProdLike
 };

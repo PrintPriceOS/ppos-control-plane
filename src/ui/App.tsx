@@ -152,6 +152,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun';
 
 
 
@@ -262,6 +263,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-legal-policy-hold" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-emergency-rollback-authority/:unlockEmergencyRollbackAuthorityId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-emergency-rollback-authority" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run/:unlockKillSwitchDryRunId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
