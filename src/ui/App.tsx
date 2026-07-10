@@ -153,6 +153,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal';
 
 
 
@@ -265,6 +266,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-emergency-rollback-authority" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run/:unlockKillSwitchDryRunId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-non-execution-evidence-seal/:unlockFinalNonExecutionEvidenceSealId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-non-execution-evidence-seal" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />

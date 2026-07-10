@@ -1871,6 +1871,220 @@ async function setupFinalizedUnlockEmergencyRollbackAuthority(unlockEmergencyRol
   }
 }
 
+async function setupFinalizedUnlockKillSwitchDryRun(
+  unlockKillSwitchDryRunId,
+  unlockEmergencyRollbackAuthorityId,
+  unlockLegalPolicyHoldId,
+  rocId,
+  cwnId,
+  fhasId,
+  dcauId,
+  oattId,
+  freezeId,
+  sealId,
+  frevId,
+  apvId,
+  eligId,
+  lockId,
+  fapvId,
+  envId,
+  authId,
+  readinessId,
+  issuanceId
+) {
+  const ksdrBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunBuilderService').serviceInstance;
+  const ksdrEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunEvaluatorService').serviceInstance;
+  const ksdrDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunDecisionService').serviceInstance;
+
+  if (!isProdLike) {
+    ksdrBuilder._mockState.tokenRedemptionUnlockKillSwitchDryRun.set(unlockKillSwitchDryRunId, {
+      act_token_redempt_unlock_kill_switch_dry_run_id: unlockKillSwitchDryRunId,
+      source_act_token_redempt_unlock_emergency_rollback_authority_id: unlockEmergencyRollbackAuthorityId,
+      source_act_token_redempt_unlock_legal_policy_hold_id: unlockLegalPolicyHoldId,
+      source_act_token_redempt_unlock_risk_officer_countersign_id: rocId,
+      source_act_token_redempt_unlock_compliance_witness_id: cwnId,
+      source_act_token_redempt_unlock_final_human_auth_seal_id: fhasId,
+      source_act_token_redempt_unlock_dual_control_authorization_id: dcauId,
+      source_act_token_redempt_unlock_operator_attestation_id: oattId,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: freezeId,
+      source_activation_token_redemption_unlock_seal_id: sealId,
+      source_activation_token_redemption_unlock_final_review_id: frevId,
+      source_activation_token_redemption_unlock_approval_id: apvId,
+      source_activation_token_redemption_unlock_eligibility_id: eligId,
+      source_activation_token_redemption_lock_id: lockId,
+      source_activation_token_redemption_final_apv_id: fapvId,
+      source_activation_token_redemption_envelope_id: envId,
+      source_activation_token_redemption_auth_id: authId,
+      source_activation_token_redemption_readiness_id: readinessId,
+      source_activation_token_issuance_id: issuanceId,
+      source_activation_token_staging_id: 'mock_staging_id',
+      source_activation_token_preflight_id: 'mock_preflight_id',
+      source_plan_id: 'mock_plan_id',
+      source_dispatcher_id: 'mock_dispatcher_id',
+      source_envelope_id: 'mock_envelope_id',
+      source_auth_id: 'mock_auth_id',
+      source_readiness_id: 'mock_readiness_id',
+      source_approval_id: 'mock_approval_id',
+      source_prep_id: 'mock_prep_id',
+      cohort_id: 'mock_cohort',
+      tenant_id: 'mock_tenant',
+      simulation_type: 'mock_sim',
+      unlock_kill_switch_dry_run_status: 'FINALIZED',
+      unlock_kill_switch_dry_run_result: 'KILL_SWITCH_DRY_RUN_VERIFIED_NOT_UNLOCKED',
+      unlock_kill_switch_dry_run_mode: 'KILL_SWITCH_DRY_RUN_ONLY',
+      unlock_emergency_rollback_authority_status: 'FINALIZED',
+      unlock_legal_policy_hold_status: 'FINALIZED',
+      unlock_risk_officer_countersign_status: 'FINALIZED',
+      unlock_compliance_witness_status: 'FINALIZED',
+      unlock_final_human_authorization_seal_status: 'FINALIZED',
+      unlock_dual_control_authorization_status: 'FINALIZED',
+      unlock_operator_attestation_status: 'FINALIZED',
+      unlock_pre_execution_freeze_status: 'FINALIZED',
+      unlock_seal_status: 'FINALIZED',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      kill_switch_dry_run_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      kill_switch_dry_run_rules_json: {},
+      kill_switch_dry_run_blockers_json: {},
+      non_execution_attestation_json: { safe_workflow_boundary_preserved: true },
+      write_scope_attestation_json: { writes_only_phase178_tables: true },
+      source_unlock_emergency_rollback_authority_hash: 'era_hash_dummy',
+      source_unlock_legal_policy_hold_hash: 'lph_hash_dummy',
+      source_unlock_risk_officer_countersign_hash: 'roc_hash_dummy',
+      source_unlock_compliance_witness_hash: 'cwn_hash_dummy',
+      source_unlock_final_human_authorization_seal_hash: 'fhas_hash_dummy',
+      source_unlock_dual_control_authorization_hash: 'dcau_hash_dummy',
+      source_unlock_operator_attestation_hash: 'oatt_hash_dummy',
+      source_unlock_pre_execution_freeze_hash: 'freeze_hash_dummy',
+      source_unlock_seal_hash: 'seal_hash_dummy',
+      source_unlock_final_review_hash: 'frev_hash_dummy',
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_kill_switch_dry_run_hash: 'ksdr_hash_dummy',
+      unlock_kill_switch_dry_run_evidence_pack_hash: 'ksdr_ep_hash_dummy',
+      evidence_pack_hash: 'ksdr_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase178_unlock_kill_switch_dry_run: 'ksdr_hash_dummy',
+        phase177_unlock_emergency_rollback_authority: 'era_hash_dummy'
+      },
+      security_signature_json: {},
+      attestation_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_KILL_SWITCH_DRY_RUN_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      primary_authorizer_id: 'dummy_alice',
+      secondary_authorizer_id: 'dummy_bob',
+      final_human_authorizer_id: 'dummy_charlie',
+      compliance_witness_id: 'dummy_diana',
+      risk_officer_id: 'dummy_elena',
+      legal_policy_officer_id: 'dummy_felix',
+      rollback_officer_id: 'dummy_george',
+      kill_switch_verification_officer_id: 'dummy_henry',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    ksdrBuilder._mockState.rules.set(unlockKillSwitchDryRunId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees WHERE source_act_token_redempt_unlock_kill_switch_dry_run_id = ?', [unlockKillSwitchDryRunId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_ksdr_ev WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?', [unlockKillSwitchDryRunId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_ksdr_rl WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?', [unlockKillSwitchDryRunId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_ksdr_aud WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?', [unlockKillSwitchDryRunId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_ksdr WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?', [unlockKillSwitchDryRunId]);
+
+    await setupFinalizedUnlockEmergencyRollbackAuthority(
+      unlockEmergencyRollbackAuthorityId,
+      unlockLegalPolicyHoldId,
+      rocId,
+      cwnId,
+      fhasId,
+      dcauId,
+      oattId,
+      freezeId,
+      sealId,
+      frevId,
+      apvId,
+      eligId,
+      lockId,
+      fapvId,
+      envId,
+      authId,
+      readinessId,
+      issuanceId
+    );
+
+    const draft = await ksdrBuilder.createTokenRedemptionUnlockKillSwitchDryRunDraft(unlockEmergencyRollbackAuthorityId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockKillSwitchDryRun.act_token_redempt_unlock_kill_switch_dry_run_id;
+
+    await ksdrDecision.recordVerificationOfficer(tempId, 'dummy_henry', 'security_officer', 'Smoke 179 setup verification officer', 'admin');
+
+    await ksdrEvaluator.evaluateUnlockKillSwitchDryRun(tempId, {
+      kill_switch_dry_run_verification_confirmation: true,
+      kill_switch_route_available_confirmed: true,
+      kill_switch_dry_run_response_confirmed: true,
+      kill_switch_no_runtime_mutation_confirmed: true,
+      kill_switch_no_real_execution_confirmed: true,
+      rollback_officer_ready_confirmed: true,
+      emergency_stop_authority_ready_confirmed: true,
+      rollback_channel_available_confirmed: true,
+      rollback_runbook_available_confirmed: true,
+      non_execution_confirmed: true,
+      legal_policy_hold_clearance_verified: true,
+      risk_officer_countersign_verified: true,
+      compliance_witness_attestation_verified: true,
+      final_human_authorization_seal_verified: true,
+      seal_authenticity_confirmed: true,
+      pre_execution_state_sealed_confirmed: true
+    }, 'admin');
+
+    await ksdrDecision.recordDecision(tempId, 'APPROVE_KILL_SWITCH_DRY_RUN', 'Approved for setup', 'admin');
+    await ksdrDecision.finalizeUnlockKillSwitchDryRun(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_ksdr
+       SET act_token_redempt_unlock_kill_switch_dry_run_id = ?
+       WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?`,
+      [unlockKillSwitchDryRunId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_ksdr_ev
+       SET act_token_redempt_unlock_kill_switch_dry_run_id = ?
+       WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?`,
+      [unlockKillSwitchDryRunId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_ksdr_rl
+       SET act_token_redempt_unlock_kill_switch_dry_run_id = ?
+       WHERE act_token_redempt_unlock_kill_switch_dry_run_id = ?`,
+      [unlockKillSwitchDryRunId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
@@ -1885,5 +2099,6 @@ module.exports = {
   setupFinalizedUnlockRiskOfficerCountersign,
   setupFinalizedUnlockLegalPolicyHold,
   setupFinalizedUnlockEmergencyRollbackAuthority,
+  setupFinalizedUnlockKillSwitchDryRun,
   isProdLike
 };
