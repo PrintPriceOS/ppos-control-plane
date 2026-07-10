@@ -154,6 +154,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthority';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure';
 
 
 
@@ -268,6 +269,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRun />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-non-execution-evidence-seal/:unlockFinalNonExecutionEvidenceSealId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-final-non-execution-evidence-seal" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-governance-readiness-closure/:unlockGovernanceReadinessClosureId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-governance-readiness-closure" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />

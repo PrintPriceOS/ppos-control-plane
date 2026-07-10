@@ -2085,6 +2085,229 @@ async function setupFinalizedUnlockKillSwitchDryRun(
   }
 }
 
+
+
+async function setupFinalizedUnlockFinalNonExecutionEvidenceSeal(
+  unlockFinalNonExecutionEvidenceSealId,
+  unlockKillSwitchDryRunId,
+  unlockEmergencyRollbackAuthorityId,
+  unlockLegalPolicyHoldId,
+  rocId,
+  cwnId,
+  fhasId,
+  dcauId,
+  oattId,
+  freezeId,
+  sealId,
+  frevId,
+  apvId,
+  eligId,
+  lockId,
+  fapvId,
+  envId,
+  authId,
+  readinessId,
+  issuanceId
+) {
+  const fneesBuilder = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealBuilderService').serviceInstance;
+  const fneesEvaluator = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealEvaluatorService').serviceInstance;
+  const fneesDecision = require('../src/api/services/cohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealDecisionService').serviceInstance;
+
+  if (!isProdLike) {
+    fneesBuilder._mockState.tokenRedemptionUnlockFinalNonExecutionEvidenceSeal.set(unlockFinalNonExecutionEvidenceSealId, {
+      act_token_redempt_unlock_final_non_execution_evidence_seal_id: unlockFinalNonExecutionEvidenceSealId,
+      source_act_token_redempt_unlock_kill_switch_dry_run_id: unlockKillSwitchDryRunId,
+      source_act_token_redempt_unlock_emergency_rollback_authority_id: unlockEmergencyRollbackAuthorityId,
+      source_act_token_redempt_unlock_legal_policy_hold_id: unlockLegalPolicyHoldId,
+      source_act_token_redempt_unlock_risk_officer_countersign_id: rocId,
+      source_act_token_redempt_unlock_compliance_witness_id: cwnId,
+      source_act_token_redempt_unlock_final_human_auth_seal_id: fhasId,
+      source_act_token_redempt_unlock_dual_control_authorization_id: dcauId,
+      source_act_token_redempt_unlock_operator_attestation_id: oattId,
+      source_act_token_redempt_unlock_pre_execution_freeze_id: freezeId,
+      source_activation_token_redemption_unlock_seal_id: sealId,
+      source_activation_token_redemption_unlock_final_review_id: frevId,
+      source_activation_token_redemption_unlock_approval_id: apvId,
+      source_activation_token_redemption_unlock_eligibility_id: eligId,
+      source_activation_token_redemption_lock_id: lockId,
+      source_activation_token_redemption_final_apv_id: fapvId,
+      source_activation_token_redemption_envelope_id: envId,
+      source_activation_token_redemption_auth_id: authId,
+      source_activation_token_redemption_readiness_id: readinessId,
+      source_activation_token_issuance_id: issuanceId,
+      source_activation_token_staging_id: 'mock_staging_id',
+      source_activation_token_preflight_id: 'mock_preflight_id',
+      source_plan_id: 'mock_plan_id',
+      source_dispatcher_id: 'mock_dispatcher_id',
+      source_envelope_id: 'mock_envelope_id',
+      source_auth_id: 'mock_auth_id',
+      source_readiness_id: 'mock_readiness_id',
+      source_approval_id: 'mock_approval_id',
+      source_prep_id: 'mock_prep_id',
+      cohort_id: 'mock_cohort',
+      tenant_id: 'mock_tenant',
+      simulation_type: 'mock_sim',
+      unlock_final_non_execution_evidence_seal_status: 'FINALIZED',
+      unlock_final_non_execution_evidence_seal_result: 'FINAL_NON_EXECUTION_EVIDENCE_SEALED_NOT_UNLOCKED',
+      unlock_final_non_execution_evidence_seal_mode: 'FINAL_NON_EXECUTION_EVIDENCE_SEAL_ONLY',
+      unlock_kill_switch_dry_run_status: 'FINALIZED',
+      unlock_emergency_rollback_authority_status: 'FINALIZED',
+      unlock_legal_policy_hold_status: 'FINALIZED',
+      unlock_risk_officer_countersign_status: 'FINALIZED',
+      unlock_compliance_witness_status: 'FINALIZED',
+      unlock_final_human_authorization_seal_status: 'FINALIZED',
+      unlock_dual_control_authorization_status: 'FINALIZED',
+      unlock_operator_attestation_status: 'FINALIZED',
+      unlock_pre_execution_freeze_status: 'FINALIZED',
+      unlock_seal_status: 'FINALIZED',
+      unlock_final_review_status: 'FINALIZED',
+      unlock_approval_status: 'FINALIZED',
+      unlock_eligibility_status: 'UNLOCK_ELIGIBILITY_PASSED_NOT_UNLOCKED',
+      token_redemption_lock_status: 'LOCKED_NOT_REDEEMED',
+      token_redemption_status: 'LOCKED_NOT_REDEEMED',
+      token_unlock_status: 'NOT_UNLOCKED',
+      token_redeemable_status: 'NOT_REDEEMABLE',
+      risk_level: 'LOW',
+      confidence_level: 'HIGH',
+      projected_impact_score: 0.1,
+      rollback_feasibility_score: 0.9,
+      evidence_completeness_score: 1.0,
+      guardrail_status: 'PASSED',
+      write_scope_status: 'PASSED',
+      canary_envelope_json: {},
+      final_non_execution_evidence_summary_json: {},
+      impact_review_json: {},
+      rollback_review_json: {},
+      guardrail_review_json: {},
+      final_non_execution_evidence_rules_json: {},
+      final_non_execution_evidence_blockers_json: {},
+      non_execution_attestation_json: { safe_workflow_boundary_preserved: true },
+      write_scope_attestation_json: { writes_only_phase179_tables: true },
+      source_unlock_kill_switch_dry_run_hash: 'ksdr_hash_dummy',
+      source_unlock_emergency_rollback_authority_hash: 'era_hash_dummy',
+      source_unlock_legal_policy_hold_hash: 'lph_hash_dummy',
+      source_unlock_risk_officer_countersign_hash: 'roc_hash_dummy',
+      source_unlock_compliance_witness_hash: 'cwn_hash_dummy',
+      source_unlock_final_human_authorization_seal_hash: 'fhas_hash_dummy',
+      source_unlock_dual_control_authorization_hash: 'dcau_hash_dummy',
+      source_unlock_operator_attestation_hash: 'oatt_hash_dummy',
+      source_unlock_pre_execution_freeze_hash: 'freeze_hash_dummy',
+      source_unlock_seal_hash: 'seal_hash_dummy',
+      source_unlock_final_review_hash: 'frev_hash_dummy',
+      source_unlock_approval_hash: 'apv_hash_dummy',
+      source_unlock_eligibility_hash: 'elig_hash_dummy',
+      source_redemption_lock_hash: 'lock_hash_dummy',
+      source_redemption_final_approval_hash: 'fapv_hash_dummy',
+      source_redemption_package_freeze_hash: 'freeze_hash_dummy',
+      source_token_material_hash: 'token_material_hash_dummy',
+      unlock_final_non_execution_evidence_seal_hash: 'fnees_hash_dummy',
+      unlock_final_non_execution_evidence_seal_evidence_pack_hash: 'fnees_ep_hash_dummy',
+      evidence_pack_hash: 'fnees_ep_hash_dummy',
+      lineage_hash_chain_json: {
+        phase179_unlock_final_non_execution_evidence_seal: 'fnees_hash_dummy',
+        phase178_unlock_kill_switch_dry_run: 'ksdr_hash_dummy'
+      },
+      security_signature_json: {},
+      attestation_rationale_json: {},
+      execution_capability_status: 'EXECUTION_NOT_ENABLED',
+      activation_execution_status: 'UNLOCK_FINAL_NON_EXECUTION_EVIDENCE_SEAL_FINALIZED_NOT_UNLOCKED_NOT_REDEEMED_NOT_EXECUTED',
+      package_freeze_status: 'FROZEN_IMMUTABLE',
+      redemption_package_freeze_status: 'REDEMPTION_PACKAGE_FROZEN_IMMUTABLE',
+      plan_executable_status: 'NOT_EXECUTABLE',
+      job_creation_status: 'NO_REAL_JOB_CREATED',
+      queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
+      runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED',
+      primary_authorizer_id: 'dummy_alice',
+      secondary_authorizer_id: 'dummy_bob',
+      final_human_authorizer_id: 'dummy_charlie',
+      compliance_witness_id: 'dummy_diana',
+      risk_officer_id: 'dummy_elena',
+      legal_policy_officer_id: 'dummy_felix',
+      rollback_officer_id: 'dummy_george',
+      kill_switch_verification_officer_id: 'dummy_henry',
+      evidence_seal_officer_id: 'dummy_karl',
+      created_by: 'admin',
+      updated_by: 'admin'
+    });
+    fneesBuilder._mockState.rules.set(unlockFinalNonExecutionEvidenceSealId, []);
+  } else {
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_grc WHERE source_act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_ev WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_rl WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees_aud WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+    await db.query('DELETE FROM cb_cohort_intervention_activation_token_redempt_unlock_fnees WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?', [unlockFinalNonExecutionEvidenceSealId]);
+
+    await setupFinalizedUnlockKillSwitchDryRun(
+      unlockKillSwitchDryRunId,
+      unlockEmergencyRollbackAuthorityId,
+      unlockLegalPolicyHoldId,
+      rocId,
+      cwnId,
+      fhasId,
+      dcauId,
+      oattId,
+      freezeId,
+      sealId,
+      frevId,
+      apvId,
+      eligId,
+      lockId,
+      fapvId,
+      envId,
+      authId,
+      readinessId,
+      issuanceId
+    );
+
+    const draft = await fneesBuilder.createTokenRedemptionUnlockFinalNonExecutionEvidenceSealDraft(unlockKillSwitchDryRunId, 'admin');
+    const tempId = draft.tokenRedemptionUnlockFinalNonExecutionEvidenceSeal.act_token_redempt_unlock_final_non_execution_evidence_seal_id;
+
+    await fneesDecision.recordEvidenceSealOfficer(tempId, 'dummy_karl', 'compliance_officer', 'Smoke 180 setup evidence seal officer', 'admin');
+
+    await fneesEvaluator.evaluateUnlockFinalNonExecutionEvidenceSeal(tempId, {
+      final_non_execution_evidence_seal_confirmation: true,
+      token_never_unlocked_confirmed: true,
+      token_never_redeemable_confirmed: true,
+      token_never_redeemed_confirmed: true,
+      high_risk_execution_never_enabled_confirmed: true,
+      plan_never_executable_confirmed: true,
+      no_real_job_created_confirmed: true,
+      no_queue_dispatch_confirmed: true,
+      zero_runtime_mutation_confirmed: true,
+      kill_switch_dry_run_verified: true,
+      emergency_rollback_authority_verified: true,
+      legal_policy_hold_clearance_verified: true,
+      risk_officer_countersign_verified: true,
+      compliance_witness_attestation_verified: true,
+      final_human_authorization_seal_verified: true,
+      dual_control_authorization_verified: true,
+      lineage_integrity_verified: true
+    }, 'admin');
+
+    await fneesDecision.recordDecision(tempId, 'APPROVE_FINAL_NON_EXECUTION_EVIDENCE_SEAL', 'Approved for setup', 'admin');
+    await fneesDecision.finalizeUnlockFinalNonExecutionEvidenceSeal(tempId, 'admin');
+
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_fnees
+       SET act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?
+       WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?`,
+      [unlockFinalNonExecutionEvidenceSealId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_fnees_ev
+       SET act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?
+       WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?`,
+      [unlockFinalNonExecutionEvidenceSealId, tempId]
+    );
+    await db.query(
+      `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_fnees_rl
+       SET act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?
+       WHERE act_token_redempt_unlock_final_non_execution_evidence_seal_id = ?`,
+      [unlockFinalNonExecutionEvidenceSealId, tempId]
+    );
+  }
+}
+
 module.exports = {
   setupFinalizedRedemptionLock,
   setupFinalizedUnlockEligibility,
@@ -2100,5 +2323,6 @@ module.exports = {
   setupFinalizedUnlockLegalPolicyHold,
   setupFinalizedUnlockEmergencyRollbackAuthority,
   setupFinalizedUnlockKillSwitchDryRun,
+  setupFinalizedUnlockFinalNonExecutionEvidenceSeal,
   isProdLike
 };
