@@ -35,12 +35,12 @@ const isReplace = args.includes('--replace-existing');
   }
 
   console.log('Scanning migrations directory...');
-  const discovered = discoverMigrations(migrationsDir);
-  console.log(`Found ${discovered.length} migration files.`);
+  const { migrations } = discoverMigrations(migrationsDir);
+  console.log(`Found ${migrations.length} migration files.`);
 
   const migrationsRecord = [];
 
-  for (const m of discovered) {
+  for (const m of migrations) {
     const sha = calculateFileChecksum(m.absolutePath);
     const content = fs.readFileSync(m.absolutePath, 'utf8');
     const classification = classifySqlStatements(content);
@@ -58,7 +58,7 @@ const isReplace = args.includes('--replace-existing');
     });
   }
 
-  const collisions = findPrefixCollisions(discovered);
+  const collisions = findPrefixCollisions(migrations);
 
   // Filter collisions to clean JSON mapping
   const approvedCollisions = {};

@@ -37,9 +37,17 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
   }
 
   // 2. Discover files
-  const discovered = discoverMigrations(migrationsDir);
+  const { migrations, excluded } = discoverMigrations(migrationsDir);
   console.log(`Migration inventory:`);
-  console.log(`  PASS: ${discovered.length} migration files discovered.`);
+  console.log(`  PASS: ${migrations.length + excluded.length} SQL/baseline files discovered under migrations/.`);
+  console.log(`  PASS: ${migrations.length} files classified as migrations.`);
+  console.log(`  PASS: ${excluded.length} excluded non-migration files.`);
+  if (excluded.length > 0) {
+    console.log(`  Excluded files list:`);
+    for (const ex of excluded) {
+      console.log(`    - ${ex.filename} (Reason: ${ex.reason})`);
+    }
+  }
 
   // 3. Match count, literal paths, and checksums
   const baselineMap = new Map();
@@ -51,7 +59,7 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
     baselineMap.set(m.path, m);
   }
 
-  const discoveredPaths = new Set(discovered.map(d => d.relativePath.replace(/\\/g, '/')));
+  const discoveredPaths = new Set(migrations.map(d => d.relativePath.replace(/\\/g, '/')));
 
   let integrityFailed = false;
 
@@ -64,7 +72,8 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
   }
 
   // Check for changed checksums or untracked new files
-  for (const d of discovered) {
+  // Check for changed checksums or untracked new files
+  for (const d of migrations) {
     const relPath = d.relativePath.replace(/\\/g, '/');
     const checksum = calculateFileChecksum(d.absolutePath);
 
@@ -93,7 +102,7 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
 
   // 4. Prefix collision validation
   console.log(`\nPrefix collision validation:`);
-  const collisions = findPrefixCollisions(discovered);
+  const collisions = findPrefixCollisions(migrations);
   const baselineCollisions = baseline.approvedPrefixCollisions || {};
 
   let collisionFailed = false;
@@ -144,7 +153,7 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
   console.log(`\nSQL classification:`);
   let ddlCount = 0;
   let mixedCount = 0;
-  for (const d of discovered) {
+  for (const d of migrations) {
     const content = fs.readFileSync(d.absolutePath, 'utf8');
     const classification = classifySqlStatements(content);
     if (classification.containsDdl) {

@@ -6,22 +6,36 @@ const crypto = require('crypto');
 
 function discoverMigrations(migrationsDir) {
   if (!fs.existsSync(migrationsDir)) {
-    return [];
+    return { migrations: [], excluded: [] };
   }
   const files = fs.readdirSync(migrationsDir);
-  return files
-    .filter(f => f.endsWith('.sql'))
-    .map(f => {
-      const match = f.match(/^(\d+)[_-]/);
-      const prefix = match ? match[1] : null;
-      return {
+  const migrations = [];
+  const excluded = [];
+
+  for (const f of files) {
+    const isSql = f.endsWith('.sql');
+    const match = f.match(/^(\d+)[_-]/);
+    
+    if (isSql && match) {
+      migrations.push({
         filename: f,
         relativePath: `migrations/${f}`,
         absolutePath: path.join(migrationsDir, f),
-        prefix: prefix
-      };
-    })
-    .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+        prefix: match[1]
+      });
+    } else {
+      excluded.push({
+        filename: f,
+        relativePath: `migrations/${f}`,
+        reason: !isSql ? 'file does not have .sql extension' : 'filename does not match migration convention prefix (e.g. 001_...)'
+      });
+    }
+  }
+
+  migrations.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  excluded.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
+  return { migrations, excluded };
 }
 
 function calculateFileChecksum(filePath) {
