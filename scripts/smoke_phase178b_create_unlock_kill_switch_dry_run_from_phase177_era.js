@@ -60,6 +60,33 @@ const isProdLike = process.env.NODE_ENV === 'production' || !!process.env.DATABA
         queue_dispatch_status: 'NO_QUEUE_DISPATCHED',
         runtime_mutation_status: 'ZERO_RUNTIME_MUTATION_CONFIRMED'
       });
+    } else {
+      await setupHelper.setupFinalizedUnlockEmergencyRollbackAuthority(
+        badParentId,
+        'lph_bad_smoke_178b',
+        'roc_bad_smoke_178b',
+        'cwn_bad_smoke_178b',
+        'fhas_bad_smoke_178b',
+        'dcau_bad_smoke_178b',
+        'oatt_bad_smoke_178b',
+        'freeze_bad_smoke_178b',
+        'seal_bad_smoke_178b',
+        'frev_bad_smoke_178b',
+        'apv_bad_smoke_178b',
+        'elig_bad_smoke_178b',
+        'lock_bad_smoke_178b',
+        'fapv_bad_smoke_178b',
+        'env_bad_smoke_178b',
+        'auth_bad_smoke_178b',
+        'readiness_bad_smoke_178b',
+        'issuance_bad_smoke_178b'
+      );
+      await db.query(
+        `UPDATE cb_cohort_intervention_activation_token_redempt_unlock_era
+         SET unlock_emergency_rollback_authority_status = 'DRAFT'
+         WHERE act_token_redempt_unlock_emergency_rollback_authority_id = ?`,
+        [badParentId]
+      );
     }
 
     await assert.rejects(
