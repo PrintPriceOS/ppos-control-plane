@@ -150,6 +150,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSeal';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign';
+import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold';
 
 
 
@@ -256,6 +257,8 @@ export const App: React.FC = () => {
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-compliance-witness" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockComplianceWitness />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-risk-officer-countersign/:unlockRiskOfficerCountersignId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign />} />
         <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-risk-officer-countersign" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersign />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-legal-policy-hold/:unlockLegalPolicyHoldId" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold />} />
+        <Route path="/admin/beta/cohort-intervention/activation-token-redemption-unlock-legal-policy-hold" element={<ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHold />} />
 
 
                 <Route path="/admin/billing-usage" element={<BillingUsageDashboardPage />} />
