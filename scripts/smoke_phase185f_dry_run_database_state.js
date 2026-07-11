@@ -38,7 +38,8 @@ function runDryRun(mockEnv = {}) {
 
   // Database is unreachable -> exit code must be 5
   assert.equal(res.code, 5, `Expected exit code 5 (ledger incompatible/unreachable), got ${res.code}`);
-  assert(res.stdout.includes('Ledger evaluation status: DATABASE_UNREACHABLE'), 'Output should report unreachable state');
+  assert(res.stdout.includes('DATABASE_UNREACHABLE'), 'Output should report unreachable state');
+
 
   console.log('  PASS: Dry-run correctly exits with code 5 on unreachable databases.');
 })().catch(err => {

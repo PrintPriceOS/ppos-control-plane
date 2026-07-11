@@ -48,135 +48,185 @@ class MigrationService {
         const lockName = 'ppos-control-plane:migrations';
         const lockTimeout = 10; // seconds
 
-        // 2. Acquire database advisory lock
-        const [lockResult] = await db.query('SELECT GET_LOCK(?, ?) as is_locked', [lockName, lockTimeout]);
-        if (!lockResult || lockResult.is_locked !== 1) {
-            const lockMsg = 'Could not acquire database migration lock. Another runner might be active.';
-            logger.error({ event: 'migration_lock_failed', lockName });
-            throw new Error(lockMsg);
-        }
+        // 2. Acquire a dedicated connection from pool for advisory locking
+        const connection = await db.getPool().getConnection();
 
         try {
-            // Load local migrations to match against database
-            const { migrations } = discoverMigrations(this.migrationsPath);
-            const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
-
-            // 3. Preflight database ledger check
-            const ledgerStatus = await ledgerRead.evaluateLedgerStatus(baselineData);
-
-            if (ledgerStatus.status === 'DATABASE_UNREACHABLE') {
-                throw new Error(`Database connection failed: ${ledgerStatus.reason}`);
+            const [lockResult] = await connection.query('SELECT GET_LOCK(?, ?) as is_locked', [lockName, lockTimeout]);
+            if (!lockResult || lockResult.is_locked !== 1) {
+                const lockMsg = 'Could not acquire database migration lock. Another runner might be active.';
+                logger.error({ event: 'migration_lock_failed', lockName });
+                throw new Error(lockMsg);
             }
 
-            if (
-              ledgerStatus.status === 'MIGRATION_FAILED' ||
-              ledgerStatus.status === 'MIGRATION_CHECKSUM_MISMATCH' ||
-              ledgerStatus.status === 'MIGRATION_LEDGER_INCOMPATIBLE' ||
-              ledgerStatus.status === 'MIGRATION_IN_PROGRESS'
-            ) {
-                const blockMsg = `Migration blocked due to incompatible/corrupted database state: ${ledgerStatus.reason}`;
-                logger.error({ event: 'migration_preflight_failed', status: ledgerStatus.status, reason: ledgerStatus.reason });
-                throw new Error(blockMsg);
-            }
+            try {
+                // Load local migrations to match against database
+                const { migrations } = discoverMigrations(this.migrationsPath);
+                const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
 
-            // If we are ready and no migrations are pending, we are done
-            if (ledgerStatus.status === 'READY' && !ledgerStatus.legacy) {
-                logger.info({ event: 'migration_complete', message: 'Database schema is already up to date.' });
-                return { appliedCount: 0, total: migrations.length };
-            }
+                // 3. Preflight database ledger check
+                const ledgerStatus = await ledgerRead.evaluateLedgerStatus(baselineData);
 
-            // 4. Determine pending migrations
-            // To be backward compatible, we look up legacy table records as well.
-            const applied = await db.query('SELECT version, description, checksum FROM schema_versions');
-            const appliedMap = new Map();
-            for (const m of applied) {
-                const legacyPath = `migrations/${m.version}.sql`;
-                appliedMap.set(legacyPath, m.checksum);
-                if (m.description) {
-                    appliedMap.set(`migrations/${m.description}`, m.checksum);
-                }
-            }
-
-            let appliedCount = 0;
-            const runnerId = `runner-${process.pid}-${require('os').hostname()}`;
-
-            for (const m of migrations) {
-                const relPath = m.relativePath.replace(/\\/g, '/');
-
-                if (appliedMap.has(relPath)) {
-                    continue; // Already applied
+                if (ledgerStatus.status === 'DATABASE_UNREACHABLE') {
+                    throw new Error(`Database connection failed: ${ledgerStatus.reason}`);
                 }
 
-                const canonicalHash = calculateFileChecksum(m.absolutePath);
-                const content = fs.readFileSync(m.absolutePath, 'utf8');
+                if (
+                  ledgerStatus.status === 'MIGRATION_FAILED' ||
+                  ledgerStatus.status === 'MIGRATION_CHECKSUM_MISMATCH' ||
+                  ledgerStatus.status === 'MIGRATION_LEDGER_INCOMPATIBLE' ||
+                  ledgerStatus.status === 'MIGRATION_IN_PROGRESS'
+                ) {
+                    const blockMsg = `Migration blocked due to incompatible/corrupted database state: ${ledgerStatus.reason}`;
+                    logger.error({ event: 'migration_preflight_failed', status: ledgerStatus.status, reason: ledgerStatus.reason });
+                    throw new Error(blockMsg);
+                }
 
-                logger.info({ event: 'migration_applying', file: m.filename, path: relPath });
+                // If we are ready and no migrations are pending, we are done
+                if (ledgerStatus.status === 'READY' && !ledgerStatus.legacy) {
+                    logger.info({ event: 'migration_complete', message: 'Database schema is already up to date.' });
+                    return { appliedCount: 0, total: migrations.length };
+                }
 
-                const executionId = uuidv4();
-                const statements = content.split(';').map(s => s.trim()).filter(s => s.length > 0);
+                // 4. Determine pending migrations
+                // To be backward compatible, we look up legacy table records as well.
+                const applied = await connection.query('SELECT version, description, checksum FROM schema_versions');
+                const appliedMap = new Map();
+                for (const m of applied[0]) {
+                    const legacyPath = `migrations/${m.version}.sql`;
+                    appliedMap.set(legacyPath, m.checksum);
+                    if (m.description) {
+                        appliedMap.set(`migrations/${m.description}`, m.checksum);
+                    }
+                }
 
-                // Mark execution as STARTED in ledger
-                await ledgerWrite.markStarted({
-                    migrationPath: relPath,
-                    checksum: canonicalHash,
-                    executionId,
-                    runnerId,
-                    repositoryCommit: process.env.DEPLOY_COMMIT || null
-                });
+                let appliedCount = 0;
+                const runnerId = `runner-${process.pid}-${require('os').hostname()}`;
 
-                const startTime = Date.now();
-                let lastSql = '';
+                for (const m of migrations) {
+                    const relPath = m.relativePath.replace(/\\/g, '/');
 
-                try {
-                    for (let index = 0; index < statements.length; index++) {
-                        lastSql = statements[index];
-                        await ledgerWrite.updateHeartbeat(executionId);
-                        
-                        // Execute statement
-                        try {
-                            await db.query(lastSql);
-                        } catch (err) {
-                            // Idempotency: skip duplicates or table exists
-                            const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX'];
-                            if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050) {
-                                continue;
-                            }
-                            throw err;
-                        }
+                    if (appliedMap.has(relPath)) {
+                        continue; // Already applied
                     }
 
-                    // Success: mark as APPLIED
-                    await ledgerWrite.markApplied({
-                        executionId,
-                        executionTimeMs: Date.now() - startTime
-                    });
-                    appliedCount++;
+                    const canonicalHash = calculateFileChecksum(m.absolutePath);
+                    const content = fs.readFileSync(m.absolutePath, 'utf8');
 
-                } catch (err) {
-                    // Failure: mark as FAILED with audit-safe metrics
-                    await ledgerWrite.markFailed({
-                        executionId,
-                        executionTimeMs: Date.now() - startTime,
-                        error: err,
-                        statementIndex: statements.indexOf(lastSql),
-                        sqlStatement: lastSql
-                    });
-                    throw err;
+                    logger.info({ event: 'migration_applying', file: m.filename, path: relPath });
+
+                    const executionId = uuidv4();
+                    const statements = content.split(';').map(s => s.trim()).filter(s => s.length > 0);
+
+                    // Mark execution as STARTED in ledger (via connection)
+                    await connection.query(`
+                      INSERT INTO schema_versions (
+                        migration_path, version, checksum, state, execution_id, runner_id, repository_commit, started_at, updated_at
+                      ) VALUES (?, ?, ?, 'STARTED', ?, ?, ?, NOW(3), NOW(3))
+                      ON DUPLICATE KEY UPDATE
+                        state = 'STARTED',
+                        execution_id = VALUES(execution_id),
+                        runner_id = VALUES(runner_id),
+                        repository_commit = VALUES(repository_commit),
+                        started_at = NOW(3),
+                        updated_at = NOW(3),
+                        failed_at = NULL,
+                        failure_code = NULL,
+                        failure_message = NULL
+                    `, [
+                      relPath,
+                      m.filename.replace(/\.sql$/, ''),
+                      canonicalHash,
+                      executionId,
+                      runnerId,
+                      process.env.DEPLOY_COMMIT || null
+                    ]);
+
+                    const startTime = Date.now();
+                    let lastSql = '';
+
+                    try {
+                        for (let index = 0; index < statements.length; index++) {
+                            lastSql = statements[index];
+                            await connection.query(`
+                              UPDATE schema_versions
+                              SET heartbeat_at = NOW(3), updated_at = NOW(3)
+                              WHERE execution_id = ?
+                            `, [executionId]);
+                            
+                            // Execute statement
+                            try {
+                                await connection.query(lastSql);
+                            } catch (err) {
+                                // Idempotency: skip duplicates or table exists
+                                const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX'];
+                                if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050) {
+                                    continue;
+                                }
+                                throw err;
+                            }
+                        }
+
+                        // Success: mark as APPLIED
+                        await connection.query(`
+                          UPDATE schema_versions
+                          SET 
+                            state = 'APPLIED',
+                            applied_at = NOW(3),
+                            execution_time_ms = ?,
+                            updated_at = NOW(3)
+                          WHERE execution_id = ?
+                        `, [Date.now() - startTime, executionId]);
+                        
+                        appliedCount++;
+
+                    } catch (err) {
+                        // Failure: mark as FAILED with audit-safe metrics
+                        const failureCode = err.code || 'MIGRATION_ERROR';
+                        const failureMessage = ledgerWrite.sanitizeError(err);
+                        const fingerprint = ledgerWrite.getStatementFingerprint(lastSql);
+
+                        await connection.query(`
+                          UPDATE schema_versions
+                          SET 
+                            state = 'FAILED',
+                            failed_at = NOW(3),
+                            execution_time_ms = ?,
+                            failure_code = ?,
+                            failure_message = ?,
+                            failed_statement_index = ?,
+                            description = ?,
+                            updated_at = NOW(3)
+                          WHERE execution_id = ?
+                        `, [
+                          Date.now() - startTime,
+                          failureCode,
+                          failureMessage,
+                          statements.indexOf(lastSql),
+                          `SQL Fingerprint: ${fingerprint}`,
+                          executionId
+                        ]);
+                        throw err;
+                    }
                 }
+
+                logger.info({ 
+                    event: 'migration_complete', 
+                    message: `Migration sequence finished successfully. Applied ${appliedCount} new migrations.`
+                });
+
+                return { appliedCount, total: migrations.length };
+
+            } finally {
+                // 5. Always release database advisory lock
+                await connection.query('SELECT RELEASE_LOCK(?)', [lockName]);
             }
-
-            logger.info({ 
-                event: 'migration_complete', 
-                message: `Migration sequence finished successfully. Applied ${appliedCount} new migrations.`
-            });
-
-            return { appliedCount, total: migrations.length };
-
         } finally {
-            // 5. Always release database advisory lock
-            await db.query('SELECT RELEASE_LOCK(?)', [lockName]);
+            // Release connection back to pool
+            connection.release();
         }
     }
+
 
     /**
      * Fail-fast schema validation.

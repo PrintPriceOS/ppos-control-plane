@@ -239,18 +239,14 @@ console.log('\n5. Dry-run Zero-DDL Proof:');
   // ---------------------------------------------------------------------------
   // 3 (continued). Schema Compatibility Evaluation Tests
   // ---------------------------------------------------------------------------
+  
+  // Stub evaluateLedgerStatus to return READY so Phase 184 focuses on pure schema capability validation
+  const ledgerRead = require('../src/api/services/migrationLedgerReadService');
+  const originalEvaluateLedgerStatus = ledgerRead.evaluateLedgerStatus;
+  ledgerRead.evaluateLedgerStatus = async () => { return { status: 'READY' }; };
 
   // Test A: Compatible Schema Mock
   dbMock.query = async (sql) => {
-    if (sql.includes('information_schema.TABLES') && sql.includes('schema_versions')) {
-      return [{ TABLE_NAME: 'schema_versions' }];
-    }
-    if (sql.includes('information_schema.COLUMNS') && sql.includes('schema_versions')) {
-      return [{ COLUMN_NAME: 'version' }]; // simulate legacy structure to bypass checksum match
-    }
-    if (sql.includes('SELECT COUNT(*) as count FROM schema_versions')) {
-      return [{ count: 1 }];
-    }
     if (sql.includes('information_schema.columns')) {
       return [
         { TABLE_NAME: 'tenants', COLUMN_NAME: 'id' },
@@ -271,21 +267,13 @@ console.log('\n5. Dry-run Zero-DDL Proof:');
   };
 
 
+
   let res = await compatibilityService.evaluateSchemaCompatibility();
   assert.equal(res.status, 'READY', 'Mocked compatible schema should report READY');
   console.log('\n  PASS: Compatible schema evaluates to READY.');
 
   // Test B: Missing Table
   dbMock.query = async (sql) => {
-    if (sql.includes('information_schema.TABLES') && sql.includes('schema_versions')) {
-      return [{ TABLE_NAME: 'schema_versions' }];
-    }
-    if (sql.includes('information_schema.COLUMNS') && sql.includes('schema_versions')) {
-      return [{ COLUMN_NAME: 'version' }];
-    }
-    if (sql.includes('SELECT COUNT(*) as count FROM schema_versions')) {
-      return [{ count: 1 }];
-    }
     if (sql.includes('information_schema.columns')) return [{ TABLE_NAME: 'api_keys', COLUMN_NAME: 'id' }];
     return [];
   };
@@ -297,15 +285,6 @@ console.log('\n5. Dry-run Zero-DDL Proof:');
 
   // Test C: Missing Column
   dbMock.query = async (sql) => {
-    if (sql.includes('information_schema.TABLES') && sql.includes('schema_versions')) {
-      return [{ TABLE_NAME: 'schema_versions' }];
-    }
-    if (sql.includes('information_schema.COLUMNS') && sql.includes('schema_versions')) {
-      return [{ COLUMN_NAME: 'version' }];
-    }
-    if (sql.includes('SELECT COUNT(*) as count FROM schema_versions')) {
-      return [{ count: 1 }];
-    }
     if (sql.includes('information_schema.columns')) return [
       { TABLE_NAME: 'tenants', COLUMN_NAME: 'id' },
       { TABLE_NAME: 'api_keys', COLUMN_NAME: 'id' }
@@ -317,6 +296,7 @@ console.log('\n5. Dry-run Zero-DDL Proof:');
   console.log('  PASS: Missing required columns evaluates to SCHEMA_NOT_READY.');
 
 
+
   // Test D: Database Unreachable
   dbMock.query = async () => { throw new Error('ECONNREFUSED'); };
   res = await compatibilityService.evaluateSchemaCompatibility();
@@ -324,8 +304,11 @@ console.log('\n5. Dry-run Zero-DDL Proof:');
   console.log('  PASS: Unreachable database evaluates to DATABASE_UNREACHABLE.');
 
   console.log('\nPhase 184 Smoke Test: PASSED');
+  // Restore original function
+  ledgerRead.evaluateLedgerStatus = originalEvaluateLedgerStatus;
   process.exit(0);
 })().catch(err => {
   console.error('Smoke test failed:', err);
   process.exit(1);
 });
+

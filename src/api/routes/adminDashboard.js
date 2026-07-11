@@ -412,4 +412,15 @@ router.get('/overview', async (req, res) => {
     });
 });
 
+router.get('/system/migration-ledger-status', async (req, res) => {
+    try {
+        const { evaluateSchemaCompatibility } = require('../services/schemaCompatibilityService');
+        const compat = await evaluateSchemaCompatibility();
+        res.json(compat);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;
+

@@ -170,16 +170,6 @@ fastify.get('/ready', async (request, reply) => {
     };
 });
 
-fastify.get('/api/admin/system/migration-ledger-status', async (request, reply) => {
-    // Auth Check (matches standard admin routes protection)
-    const url = request.url;
-    // Fastify request pre-validation hooks handles standard onRequest check
-    const { evaluateSchemaCompatibility } = require('./src/api/services/schemaCompatibilityService');
-    const compat = await evaluateSchemaCompatibility();
-    return compat;
-});
-
-
 
 fastify.get('/health', async () => {
     const mode = process.env.PPOS_CONTROL_MODE || 'LIVE';

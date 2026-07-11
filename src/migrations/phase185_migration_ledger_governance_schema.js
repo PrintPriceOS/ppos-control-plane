@@ -17,27 +17,31 @@ async function up(db) {
     throw new Error('DDL_EXECUTION_FORBIDDEN_OUTSIDE_MIGRATION_CONTEXT');
   }
 
-  const sqlPath = path.join(__dirname, '../../migrations/135_phase185_migration_ledger_governance.sql');
-  const sqlContent = fs.readFileSync(sqlPath, 'utf8');
-
-  // Basic SQL statements splitter
-  const statements = sqlContent
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-
-  for (const sql of statements) {
-    try {
-      await db.query(sql);
-    } catch (err) {
-      // Ignore duplicate column, key, or constraint errors for idempotency
-      const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_DUP_INDEX', 'ER_MULTIPLE_PRI_KEY'];
-      if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1068) {
-        continue;
-      }
-      throw err;
+  // Idempotently add the new ledger columns as nullable so the runner can start writing to them.
+  // The actual backfill and constraints are safely handled by the SQL migration file 135_phase185.
+  await db.query(`
+    ALTER TABLE schema_versions
+      ADD COLUMN migration_path VARCHAR(512) NULL,
+      ADD COLUMN state ENUM('STARTED', 'APPLIED', 'FAILED') NULL,
+      ADD COLUMN execution_id CHAR(36) NULL,
+      ADD COLUMN runner_id VARCHAR(255) NULL,
+      ADD COLUMN repository_commit CHAR(40) NULL,
+      ADD COLUMN normalization VARCHAR(32) NOT NULL DEFAULT 'utf8-lf-v1',
+      ADD COLUMN started_at DATETIME(3) NULL,
+      ADD COLUMN heartbeat_at DATETIME(3) NULL,
+      ADD COLUMN failed_at DATETIME(3) NULL,
+      ADD COLUMN execution_time_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      ADD COLUMN failure_code VARCHAR(128) NULL,
+      ADD COLUMN failure_message TEXT NULL,
+      ADD COLUMN failed_statement_index INT NULL
+  `).catch(err => {
+    // Ignore duplicate column errors
+    if (err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060) {
+      return;
     }
-  }
+    throw err;
+  });
 }
+
 
 module.exports = { up };

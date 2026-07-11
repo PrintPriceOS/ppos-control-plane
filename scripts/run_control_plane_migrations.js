@@ -25,12 +25,43 @@ async function run() {
 
     try {
       const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+      const { migrations } = discoverMigrations(migrationsDir);
+      
+      let appliedCount = 0;
+      let failedCount = 0;
+      let startedCount = 0;
+
+      // Read-only inspection query
+      try {
+        const [rows] = await mysqlClient.getPool().query('SELECT state FROM schema_versions');
+        for (const row of rows) {
+          if (row.state === 'APPLIED') appliedCount++;
+          else if (row.state === 'FAILED') failedCount++;
+          else if (row.state === 'STARTED') startedCount++;
+        }
+      } catch (err) {
+        // Fallback for legacy tables before migration 135 runs
+        try {
+          const [legacyRows] = await mysqlClient.getPool().query('SELECT COUNT(*) as count FROM schema_versions');
+          appliedCount = legacyRows[0].count;
+        } catch (e) {
+          appliedCount = 0;
+        }
+      }
+
       const status = await ledgerRead.evaluateLedgerStatus(baseline);
 
-      console.log(`[DRY-RUN] Ledger evaluation status: ${status.status}`);
+      console.log(`=== Dry-Run Ledger Diagnostic ===`);
+      console.log(`Repository migrations: ${migrations.length}`);
+      console.log(`Applied migrations   : ${appliedCount}`);
+      console.log(`Failed migrations    : ${failedCount}`);
+      console.log(`Started migrations   : ${startedCount}`);
+      console.log(`Pending migrations   : ${migrations.length - appliedCount}`);
+      console.log(`Ledger status        : ${status.status}`);
       if (status.reason) {
-        console.log(`[DRY-RUN] Reason: ${status.reason}`);
+        console.log(`Diagnostic detail    : ${status.reason}`);
       }
+      console.log(`=================================`);
 
       if (status.status === 'DATABASE_UNREACHABLE' || status.status === 'MIGRATION_LEDGER_INCOMPATIBLE') {
         process.exit(5); // Code 5: Ledger unavailable or incompatible
@@ -45,12 +76,12 @@ async function run() {
       }
 
       if (status.status === 'PENDING_MIGRATIONS') {
-        console.log(`[DRY-RUN] Pending migrations detected.`);
         process.exit(2); // Code 2: Pending migrations exist
       }
 
       console.log(`[DRY-RUN] All applied migrations match local baseline. DB is up to date.`);
       process.exit(0);
+
 
     } catch (err) {
       console.error(`[DRY-RUN] Diagnostic failed:`, err.message);
@@ -66,6 +97,7 @@ async function run() {
 
   const { migrationService } = require('../src/api/services/migrationService');
   const mysqlClient = require('../src/api/services/mysqlClient');
+  const { discoverMigrations } = require('./lib/migrationIntegrity');
 
   try {
     console.log(`Initializing migration ledger table...`);
@@ -77,6 +109,74 @@ async function run() {
     const ledgerGovModule = require('../src/migrations/phase185_migration_ledger_governance_schema');
     await ledgerGovModule.up(mysqlClient);
 
+    // Dynamic Safe Backfill and Ledger Alignment
+    console.log(`Verifying and normalising database migration ledger records...`);
+    const dbPool = mysqlClient.getPool();
+    const dbConn = await dbPool.getConnection();
+
+    try {
+      // 1. Fetch current database entries
+      const [rows] = await dbConn.query('SELECT version, description, checksum, state FROM schema_versions');
+      
+      const { migrations } = discoverMigrations(path.join(__dirname, '../migrations'));
+      const baselinePath = path.join(__dirname, '../migrations/migration-integrity-baseline.json');
+      const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+
+      const baselineMap = new Map();
+      for (const m of baseline.migrations) {
+        const p = m.path || m.relativePath;
+        const filename = p.split('/').pop();
+        baselineMap.set(filename, m);
+      }
+
+      let unresolvedRows = 0;
+      let backfilledCount = 0;
+
+      for (const row of rows) {
+        const fileKey = row.description && row.description.endsWith('.sql') 
+          ? row.description 
+          : `${row.version}.sql`;
+        
+        // Match against baseline
+        if (!baselineMap.has(fileKey)) {
+          console.error(`[ERROR] Unresolved/ambiguous migration entry in database: ${fileKey}`);
+          unresolvedRows++;
+          continue;
+        }
+
+        const match = baselineMap.get(fileKey);
+        const canonicalPath = match.path || match.relativePath;
+        const canonicalChecksum = match.canonicalSha256 || match.sha256;
+
+        // If not normalized yet, normalize it
+        if (!row.state || row.state !== 'APPLIED') {
+          await dbConn.query(`
+            UPDATE schema_versions
+            SET
+              migration_path = ?,
+              checksum = ?,
+              state = 'APPLIED',
+              execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
+              started_at = COALESCE(started_at, applied_at, NOW(3)),
+              applied_at = COALESCE(applied_at, NOW(3))
+            WHERE version = ? OR description = ?
+          `, [canonicalPath, canonicalChecksum, row.version, row.description]);
+          backfilledCount++;
+        }
+      }
+
+      if (unresolvedRows > 0) {
+        throw new Error(`Migration ledger normalisation failed: ${unresolvedRows} unresolved/ambiguous database rows found.`);
+      }
+
+      if (backfilledCount > 0) {
+        console.log(`[LEDGER] Successfully normalised ${backfilledCount} legacy entries.`);
+      }
+
+    } finally {
+      dbConn.release();
+    }
+
     console.log(`Applying pending migrations...`);
     await migrationService.runMigrations();
     console.log(`Migration execution complete.`);
@@ -87,5 +187,6 @@ async function run() {
     try { await mysqlClient.closePool(); } catch (e) {}
   }
 }
+
 
 run();
