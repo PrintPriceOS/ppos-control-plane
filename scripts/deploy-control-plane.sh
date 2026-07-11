@@ -105,6 +105,11 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
+# Load and export environment variables from .env
+set -a
+[ -f .env ] && . .env
+set +a
+
 # 2. Fetch and Reset to exact commit
 echo "[DEPLOY] Syncing with remote repository..."
 git fetch --prune origin

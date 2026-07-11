@@ -17,7 +17,9 @@ if (!TOKEN) {
 
 const client = axios.create({
     baseURL: BASE_URL,
+    timeout: 15000,
     headers: {
+        'Accept': 'application/json',
         'Authorization': `Bearer ${TOKEN}`
     },
     validateStatus: false
@@ -41,9 +43,14 @@ async function runTests() {
     for (const ep of endpoints) {
         try {
             const start = Date.now();
-            const res = ep.method === 'post' 
-                ? await client.post(ep.url, {})
-                : await client.get(ep.url);
+            const res = await client.request({
+                method: ep.method || 'GET',
+                url: ep.url,
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${TOKEN}`
+                }
+            });
             
             const duration = Date.now() - start;
 
