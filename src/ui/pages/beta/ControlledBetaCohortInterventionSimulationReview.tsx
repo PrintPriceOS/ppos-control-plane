@@ -184,36 +184,29 @@ export const ControlledBetaCohortInterventionSimulationReview: React.FC = () => 
   };
 
   return (
-    <div id="phase142-review-dashboard" style={{
-      minHeight: '100vh', background: 'linear-gradient(135deg, #090c15, #151829, #1b1e36)',
-      padding: '2rem', fontFamily: "'Outfit', 'Inter', sans-serif", color: '#e2e8f0'
-    }}>
+    <div id="phase142-review-dashboard" className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 p-8 font-sans transition-colors duration-200">
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '2.5rem' }}>⚖️</span>
+      <div className="mb-8">
+        <div className="flex items-center gap-5 mb-2">
+          <span className="text-4xl">⚖️</span>
           <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, color: '#f8fafc', letterSpacing: '-0.025em' }}>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Phase 142 — Simulation Review Gate
             </h1>
-            <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.95rem' }}>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
               Governed Review Layer for High-Risk Cohort Intervention Simulations
             </p>
           </div>
         </div>
 
         {/* Safety / Non-Execution Warning Banner */}
-        <div style={{
-          marginTop: '1.25rem', padding: '1rem 1.5rem', borderRadius: '0.75rem',
-          background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)',
-          display: 'flex', alignItems: 'flex-start', gap: '1rem'
-        }}>
-          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🛡️</span>
+        <div className="mt-5 p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 flex items-start gap-4">
+          <span className="text-2xl flex-shrink-0">🛡️</span>
           <div>
-            <div style={{ fontWeight: 800, color: '#fecaca', fontSize: '0.9rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div className="font-extrabold text-red-800 dark:text-red-300 text-xs mb-1 uppercase tracking-wider">
               Review-Only Governance — Non-Execution Boundary
             </div>
-            <div style={{ color: '#fca5a5', fontSize: '0.85rem', lineHeight: '1.4' }}>
+            <div className="text-red-700 dark:text-red-400 text-xs leading-relaxed">
               This review does not execute high-risk intervention. Cohort pause, participant access restriction, invite revocation, controlled expansion, marketplace scope, payment execution, provider submission, tax/accounting submission, and enforcement behavior remain unchanged.
             </div>
           </div>
