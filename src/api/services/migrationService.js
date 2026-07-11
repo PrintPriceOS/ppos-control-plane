@@ -123,15 +123,14 @@ class MigrationService {
                     // Mark execution as STARTED in ledger (via connection)
                     await connection.query(`
                       INSERT INTO schema_versions (
-                        migration_path, version, checksum, state, execution_id, runner_id, repository_commit, started_at, updated_at
-                      ) VALUES (?, ?, ?, 'STARTED', ?, ?, ?, NOW(3), NOW(3))
+                        migration_path, version, checksum, state, execution_id, runner_id, repository_commit, started_at
+                      ) VALUES (?, ?, ?, 'STARTED', ?, ?, ?, NOW(3))
                       ON DUPLICATE KEY UPDATE
                         state = 'STARTED',
                         execution_id = VALUES(execution_id),
                         runner_id = VALUES(runner_id),
                         repository_commit = VALUES(repository_commit),
                         started_at = NOW(3),
-                        updated_at = NOW(3),
                         failed_at = NULL,
                         failure_code = NULL,
                         failure_message = NULL
@@ -152,7 +151,7 @@ class MigrationService {
                             lastSql = statements[index];
                             await connection.query(`
                               UPDATE schema_versions
-                              SET heartbeat_at = NOW(3), updated_at = NOW(3)
+                              SET heartbeat_at = NOW(3)
                               WHERE execution_id = ?
                             `, [executionId]);
                             
@@ -175,8 +174,7 @@ class MigrationService {
                           SET 
                             state = 'APPLIED',
                             applied_at = NOW(3),
-                            execution_time_ms = ?,
-                            updated_at = NOW(3)
+                            execution_time_ms = ?
                           WHERE execution_id = ?
                         `, [Date.now() - startTime, executionId]);
                         
@@ -197,8 +195,7 @@ class MigrationService {
                             failure_code = ?,
                             failure_message = ?,
                             failed_statement_index = ?,
-                            description = ?,
-                            updated_at = NOW(3)
+                            description = ?
                           WHERE execution_id = ?
                         `, [
                           Date.now() - startTime,
