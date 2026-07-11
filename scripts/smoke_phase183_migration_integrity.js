@@ -37,6 +37,14 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
     process.exit(1);
   }
 
+  // Verify baseline declares the expected canonical normalization model
+  const expectedNormalization = 'utf8-lf-v1';
+  if (baseline.contentNormalization !== expectedNormalization) {
+    console.error(`Error: Baseline contentNormalization is '${baseline.contentNormalization || 'missing'}', expected '${expectedNormalization}'.`);
+    console.error('Regenerate the baseline: node scripts/generate_phase183_migration_baseline.js --write --replace-existing');
+    process.exit(1);
+  }
+
   // 2. Discover files
   const { migrations, excluded } = discoverMigrations(migrationsDir);
   console.log(`Migration inventory:`);
@@ -84,15 +92,13 @@ const reportPath = path.join(reportDir, 'phase183_runtime_ddl_inventory.json');
     }
 
     const record = baselineMap.get(relPath);
-    const rawContent = fs.readFileSync(d.absolutePath);
-    const checksumRaw = crypto.createHash('sha256').update(rawContent).digest('hex');
-    const checksumLf = crypto.createHash('sha256').update(rawContent.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
-
-    if (record.sha256 !== checksumRaw && record.sha256 !== checksumLf) {
+    // Single canonical hash comparison — model: utf8-lf-v1
+    const canonicalHash = calculateFileChecksum(d.absolutePath);
+    const expectedHash = record.canonicalSha256 || record.sha256;
+    if (expectedHash !== canonicalHash) {
       console.error(`Error: Checksum mismatch for ${relPath}`);
-      console.error(`  Expected: ${record.sha256}`);
-      console.error(`  Found Raw: ${checksumRaw}`);
-      console.error(`  Found LF:  ${checksumLf}`);
+      console.error(`  Expected (canonical): ${expectedHash}`);
+      console.error(`  Computed (canonical): ${canonicalHash}`);
       integrityFailed = true;
     }
   }

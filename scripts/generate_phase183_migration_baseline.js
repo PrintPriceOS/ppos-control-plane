@@ -49,7 +49,8 @@ const isReplace = args.includes('--replace-existing');
     migrationsRecord.push({
       path: m.relativePath.replace(/\\/g, '/'),
       prefix: m.prefix,
-      sha256: sha,
+      canonicalSha256: sha,
+      contentNormalization: 'utf8-lf-v1',
       sizeBytes: size,
       containsDdl: classification.containsDdl,
       containsDml: classification.containsDml,
@@ -67,9 +68,10 @@ const isReplace = args.includes('--replace-existing');
   }
 
   const baselineJson = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     hashAlgorithm: 'sha256',
+    contentNormalization: 'utf8-lf-v1',
     approvedPrefixCollisions: approvedCollisions,
     migrations: migrationsRecord
   };

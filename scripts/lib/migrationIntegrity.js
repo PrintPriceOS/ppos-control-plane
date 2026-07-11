@@ -38,10 +38,19 @@ function discoverMigrations(migrationsDir) {
   return { migrations, excluded };
 }
 
+/**
+ * Compute the canonical SHA-256 checksum for a migration file.
+ * Normalization model: utf8-lf-v1
+ *   1. Read file bytes and decode as UTF-8
+ *   2. Normalize CRLF (\r\n) and lone CR (\r) to LF (\n)
+ *   3. Compute SHA-256 of the normalized string
+ * This produces a single deterministic hash regardless of platform line endings.
+ */
 function calculateFileChecksum(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const normalized = content.replace(/\r\n/g, '\n');
-  return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
+  const raw = fs.readFileSync(filePath, 'utf8');
+  // Normalize CRLF first, then any remaining lone CR
+  const canonical = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 function classifySqlStatements(content) {
@@ -204,12 +213,11 @@ function verifyMigrationBaseline(migrationsDir, baselinePath) {
         return { ok: false, error: `Untracked migration file: ${relPath}` };
       }
       const record = baselineMap.get(relPath);
-      const rawContent = fs.readFileSync(m.absolutePath);
-      const checksumRaw = crypto.createHash('sha256').update(rawContent).digest('hex');
-      const checksumLf = crypto.createHash('sha256').update(rawContent.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
-      
-      if (record.sha256 !== checksumRaw && record.sha256 !== checksumLf) {
-        return { ok: false, error: `Checksum mismatch for ${relPath}. Expected: ${record.sha256}, Found Raw: ${checksumRaw}, LF: ${checksumLf}` };
+      // Use a single canonical hash — model: utf8-lf-v1
+      const canonicalHash = calculateFileChecksum(m.absolutePath);
+      const expectedHash = record.canonicalSha256 || record.sha256; // support both field names during transition
+      if (expectedHash !== canonicalHash) {
+        return { ok: false, error: `Checksum mismatch for ${relPath}. Expected: ${expectedHash}, Canonical: ${canonicalHash}` };
       }
     }
     
