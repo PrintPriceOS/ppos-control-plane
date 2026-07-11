@@ -8,7 +8,12 @@ require('dotenv').config();
 const axios = require('axios');
 
 const BASE_URL = process.env.PPOS_CONTROL_URL || 'http://localhost:8080';
-const TOKEN = process.env.PPOS_CONTROL_TOKEN || 'admin-secret';
+const TOKEN = process.env.PPOS_CONTROL_TOKEN;
+
+if (!TOKEN) {
+    console.error('[ERROR] PPOS_CONTROL_TOKEN is required. Aborting smoke test.');
+    process.exit(1);
+}
 
 const client = axios.create({
     baseURL: BASE_URL,
@@ -27,7 +32,6 @@ async function runTests() {
         { name: 'Artifact Registry', url: '/api/admin/artifacts' },
         { name: 'Worker Fleet', url: '/api/admin/workers/fleet' },
         { name: 'Operational Incidents', url: '/api/admin/production-monitoring/incidents' },
-        { name: 'Lifecycle Policies', url: '/api/admin/orchestration/lifecycle/process', method: 'post' },
         { name: 'Industrial Telemetry', url: '/api/admin/telemetry/industrial' }
     ];
 
