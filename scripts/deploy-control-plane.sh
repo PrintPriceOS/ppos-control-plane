@@ -131,10 +131,11 @@ npm run build
 
 # 8. Archive current live frontend
 echo "[DEPLOY] Archiving active frontend build..."
-mkdir -p backups
+BACKUP_DIR="/opt/printprice-os/deployment-backups/ppos-control-plane"
+mkdir -p "$BACKUP_DIR"
 if [ -d "$WEB_ROOT" ] && [ -n "$(ls -A "$WEB_ROOT" 2>/dev/null)" ]; then
   tar -czf \
-    "backups/httpdocs_${PREVIOUS_COMMIT}_${TIMESTAMP}.tar.gz" \
+    "$BACKUP_DIR/httpdocs_${PREVIOUS_COMMIT}_${TIMESTAMP}.tar.gz" \
     -C "$WEB_ROOT" .
 fi
 
