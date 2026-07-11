@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-10T21:41:31.581Z",
+  "generatedAt": "2026-07-11T09:58:18.041Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -1815,6 +1815,19 @@
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/135_phase185_migration_ledger_governance.sql",
+      "prefix": "135",
+      "canonicalSha256": "fc281bf189613bfa91d532dce45d54993c957a580114f3abcef65324bcb022fa",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2064,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
       ]
     }
   ]

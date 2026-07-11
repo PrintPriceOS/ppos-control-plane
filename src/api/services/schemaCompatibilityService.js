@@ -26,6 +26,25 @@ async function evaluateSchemaCompatibility() {
 
     const checks = [];
     let isOverallReady = true;
+    let overallStatus = 'READY';
+    let ledgerReason = null;
+
+    // Load Phase 183 baseline data
+    const fs = require('fs');
+    const path = require('path');
+    const baselinePath = path.join(__dirname, '../../../migrations/migration-integrity-baseline.json');
+    const ledgerRead = require('./migrationLedgerReadService');
+
+    let ledgerStatus = { status: 'READY' };
+    if (fs.existsSync(baselinePath)) {
+      const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+      ledgerStatus = await ledgerRead.evaluateLedgerStatus(baseline);
+      if (ledgerStatus.status !== 'READY') {
+        isOverallReady = false;
+        overallStatus = ledgerStatus.status;
+        ledgerReason = ledgerStatus.reason;
+      }
+    }
 
     for (const [capabilityName, cap] of Object.entries(manifest.capabilities)) {
       const missingTables = [];
@@ -37,6 +56,7 @@ async function evaluateSchemaCompatibility() {
           missingTables.push(tableName);
           if (cap.required) {
             isOverallReady = false;
+            overallStatus = overallStatus === 'READY' ? 'SCHEMA_NOT_READY' : overallStatus;
           }
           continue;
         }
@@ -48,6 +68,7 @@ async function evaluateSchemaCompatibility() {
             missingColumns.push(`${tableName}.${col}`);
             if (cap.required) {
               isOverallReady = false;
+              overallStatus = overallStatus === 'READY' ? 'SCHEMA_NOT_READY' : overallStatus;
             }
           }
         }
@@ -62,7 +83,8 @@ async function evaluateSchemaCompatibility() {
     }
 
     return {
-      status: isOverallReady ? 'READY' : 'SCHEMA_NOT_READY',
+      status: overallStatus,
+      reason: ledgerReason,
       manifestVersion: manifest.manifestVersion,
       checkedAt: new Date().toISOString(),
       checks
@@ -77,6 +99,7 @@ async function evaluateSchemaCompatibility() {
     };
   }
 }
+
 
 async function assertSchemaReady(capabilityName) {
   const result = await evaluateSchemaCompatibility();

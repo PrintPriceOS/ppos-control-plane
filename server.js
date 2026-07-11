@@ -144,9 +144,16 @@ fastify.get('/ready', async (request, reply) => {
     const compat = await evaluateSchemaCompatibility();
     if (compat.status !== 'READY') {
         reply.status(503);
+        
+        // Secure sanitization: mask raw filenames or SQL paths in public endpoints
+        const sanitizedReason = compat.reason 
+            ? compat.reason.replace(/migrations\/[a-zA-Z0-9_-]+\.sql/g, 'migration_file.sql')
+            : 'DATABASE_SCHEMA_INCOMPATIBLE';
+
         return {
             status: 'NOT_READY',
-            reason: 'SCHEMA_NOT_READY',
+            reason: compat.status,
+            details: sanitizedReason,
             schema: {
                 status: compat.status,
                 manifestVersion: compat.manifestVersion
@@ -162,6 +169,17 @@ fastify.get('/ready', async (request, reply) => {
         }
     };
 });
+
+fastify.get('/api/admin/system/migration-ledger-status', async (request, reply) => {
+    // Auth Check (matches standard admin routes protection)
+    const url = request.url;
+    // Fastify request pre-validation hooks handles standard onRequest check
+    const { evaluateSchemaCompatibility } = require('./src/api/services/schemaCompatibilityService');
+    const compat = await evaluateSchemaCompatibility();
+    return compat;
+});
+
+
 
 fastify.get('/health', async () => {
     const mode = process.env.PPOS_CONTROL_MODE || 'LIVE';

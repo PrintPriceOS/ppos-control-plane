@@ -140,8 +140,26 @@ node scripts/smoke_phase184_runtime_ddl_isolation.js
 # 6. Database schema check (Policy A)
 echo "[DEPLOY] Verifying database migration status..."
 # Run dry-run migration to inspect if any schemas need mutation.
-# The dry-run returns 0 and outputs pending logs.
+set +e
 npm run db:migrate -- --dry-run
+DRY_RUN_CODE=$?
+set -e
+
+if [ $DRY_RUN_CODE -eq 0 ]; then
+  echo "[DEPLOY] Database schema matches local baseline. No pending migrations."
+elif [ $DRY_RUN_CODE -eq 2 ]; then
+  echo "[WARN] Pending migrations detected. Deploy blocked. Please run 'npm run db:migrate' manually."
+  exit 2
+elif [ $DRY_RUN_CODE -eq 3 ]; then
+  echo "[ERROR] Failed or stale STARTED migration detected in database. Recovery required."
+  exit 3
+elif [ $DRY_RUN_CODE -eq 4 ]; then
+  echo "[ERROR] Checksum mismatch or local baseline divergence detected."
+  exit 4
+else
+  echo "[ERROR] Database ledger is not available or incompatible. Exit code: $DRY_RUN_CODE"
+  exit 5
+fi
 
 # 7. Build Frontend
 echo "[DEPLOY] Building frontend distribution..."
