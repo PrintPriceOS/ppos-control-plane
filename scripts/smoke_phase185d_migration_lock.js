@@ -18,12 +18,13 @@ const mockConnection = {
   query: async (sql, params) => {
     if (sql.includes('GET_LOCK')) {
       acquiredLocks.push(params[0]);
-      return [{ is_locked: 1 }];
+      return [[{ is_locked: 1 }], []];
     }
     if (sql.includes('RELEASE_LOCK')) {
       releasedLocks.push(params[0]);
-      return [{ is_released: 1 }];
+      return [[{ is_released: 1 }], []];
     }
+
     if (sql.includes('information_schema.TABLES')) return [[{ TABLE_NAME: 'schema_versions' }]];
     if (sql.includes('information_schema.COLUMNS')) return [[{ COLUMN_NAME: 'state' }]];
     if (sql.includes('SELECT migration_path')) return [[]];

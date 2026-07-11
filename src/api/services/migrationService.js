@@ -52,12 +52,14 @@ class MigrationService {
         const connection = await db.getPool().getConnection();
 
         try {
-            const [lockResult] = await connection.query('SELECT GET_LOCK(?, ?) as is_locked', [lockName, lockTimeout]);
+            const [lockRows] = await connection.query('SELECT GET_LOCK(?, ?) as is_locked', [lockName, lockTimeout]);
+            const lockResult = lockRows ? lockRows[0] : null;
             if (!lockResult || lockResult.is_locked !== 1) {
                 const lockMsg = 'Could not acquire database migration lock. Another runner might be active.';
                 logger.error({ event: 'migration_lock_failed', lockName });
                 throw new Error(lockMsg);
             }
+
 
             try {
                 // Load local migrations to match against database
