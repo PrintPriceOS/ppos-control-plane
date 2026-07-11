@@ -27,41 +27,86 @@ async function run() {
       const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
       const { migrations } = discoverMigrations(migrationsDir);
       
-      let appliedCount = 0;
+      let migrationCount = 0;
+      let baselineMarkerCount = 0;
+      let phaseMarkerCount = 0;
+      let unresolvedCount = 0;
       let failedCount = 0;
       let startedCount = 0;
 
+      const baselineMap = new Map();
+      for (const m of baseline.migrations) {
+        const p = m.path || m.relativePath;
+        const filename = p.split('/').pop();
+        baselineMap.set(filename, m);
+      }
+
       // Read-only inspection query
       try {
-        const [rows] = await mysqlClient.getPool().query('SELECT state FROM schema_versions');
+        const [rows] = await mysqlClient.getPool().query('SELECT version, description, checksum, state FROM schema_versions');
         for (const row of rows) {
-          if (row.state === 'APPLIED') appliedCount++;
-          else if (row.state === 'FAILED') failedCount++;
-          else if (row.state === 'STARTED') startedCount++;
+          if (row.state === 'FAILED') {
+            failedCount++;
+          } else if (row.state === 'STARTED') {
+            startedCount++;
+          }
+
+          const fileKey = row.description && row.description.endsWith('.sql') 
+            ? row.description 
+            : `${row.version}.sql`;
+          
+          if (baselineMap.has(fileKey)) {
+            migrationCount++;
+          } else if (row.version === '1.0.0' && row.description === 'Initial Production Baseline') {
+            baselineMarkerCount++;
+          } else if (/^\d{3}$/.test(row.version) && /^Phase \d+:/.test(row.description || '') && !row.checksum) {
+            phaseMarkerCount++;
+          } else {
+            unresolvedCount++;
+          }
         }
       } catch (err) {
         // Fallback for legacy tables before migration 135 runs
         try {
-          const [legacyRows] = await mysqlClient.getPool().query('SELECT COUNT(*) as count FROM schema_versions');
-          appliedCount = legacyRows[0].count;
+          const [rows] = await mysqlClient.getPool().query('SELECT version, description, checksum FROM schema_versions');
+          for (const row of rows) {
+            const fileKey = row.description && row.description.endsWith('.sql') 
+              ? row.description 
+              : `${row.version}.sql`;
+            
+            if (baselineMap.has(fileKey)) {
+              migrationCount++;
+            } else if (row.version === '1.0.0' && row.description === 'Initial Production Baseline') {
+              baselineMarkerCount++;
+            } else if (/^\d{3}$/.test(row.version) && /^Phase \d+:/.test(row.description || '') && !row.checksum) {
+              phaseMarkerCount++;
+            } else {
+              unresolvedCount++;
+            }
+          }
         } catch (e) {
-          appliedCount = 0;
+          unresolvedCount = 0;
         }
       }
 
       const status = await ledgerRead.evaluateLedgerStatus(baseline);
 
       console.log(`=== Dry-Run Ledger Diagnostic ===`);
-      console.log(`Repository migrations: ${migrations.length}`);
-      console.log(`Applied migrations   : ${appliedCount}`);
-      console.log(`Failed migrations    : ${failedCount}`);
-      console.log(`Started migrations   : ${startedCount}`);
-      console.log(`Pending migrations   : ${migrations.length - appliedCount}`);
-      console.log(`Ledger status        : ${status.status}`);
+      console.log(`Repository migrations   : ${migrations.length}`);
+      console.log(`Legacy rows total       : ${migrationCount + baselineMarkerCount + phaseMarkerCount + unresolvedCount}`);
+      console.log(`Migration rows resolved : ${migrationCount}`);
+      console.log(`Baseline markers        : ${baselineMarkerCount}`);
+      console.log(`Phase markers           : ${phaseMarkerCount}`);
+      console.log(`Unresolved rows         : ${unresolvedCount}`);
+      console.log(`Pending migrations      : ${migrations.length - migrationCount}`);
+      console.log(`Failed migrations       : ${failedCount}`);
+      console.log(`Started migrations      : ${startedCount}`);
+      console.log(`Ledger status           : ${status.status}`);
       if (status.reason) {
-        console.log(`Diagnostic detail    : ${status.reason}`);
+        console.log(`Diagnostic detail       : ${status.reason}`);
       }
       console.log(`=================================`);
+
 
       if (status.status === 'DATABASE_UNREACHABLE' || status.status === 'MIGRATION_LEDGER_INCOMPATIBLE') {
         process.exit(5); // Code 5: Ledger unavailable or incompatible
