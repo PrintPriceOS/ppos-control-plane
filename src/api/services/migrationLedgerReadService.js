@@ -40,7 +40,7 @@ class MigrationLedgerReadService {
 
       // 3. Process evolved ledger state machine checks
       const entries = await db.query(`
-        SELECT migration_path, checksum, state, started_at, heartbeat_at, failure_code
+        SELECT record_type, migration_path, checksum, state, started_at, heartbeat_at, failure_code
         FROM schema_versions
         ORDER BY started_at ASC
       `);
@@ -49,12 +49,12 @@ class MigrationLedgerReadService {
       if (failedRecord) {
         return { 
           status: 'MIGRATION_FAILED', 
-          reason: `Migration failed: ${failedRecord.migration_path}. Error: ${failedRecord.failure_code}`
+          reason: `Migration failed: ${failedRecord.migration_path || 'unknown'}. Error: ${failedRecord.failure_code}`
         };
       }
 
-      // Stale STARTED detection
-      const startedRecords = entries.filter(e => e.state === 'STARTED');
+      // Stale STARTED detection (only for real migrations)
+      const startedRecords = entries.filter(e => e.state === 'STARTED' && (!e.record_type || e.record_type === 'MIGRATION'));
       const now = Date.now();
       for (const record of startedRecords) {
         const referenceTime = new Date(record.heartbeat_at || record.started_at).getTime();
@@ -79,7 +79,8 @@ class MigrationLedgerReadService {
         baselineMap.set(m.path || m.relativePath, m.canonicalSha256 || m.sha256);
       }
 
-      const applied = entries.filter(e => e.state === 'APPLIED');
+      // Validate only MIGRATION records
+      const applied = entries.filter(e => e.state === 'APPLIED' && (!e.record_type || e.record_type === 'MIGRATION'));
       for (const entry of applied) {
         if (!baselineMap.has(entry.migration_path)) {
           return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: `Unknown applied migration in database: ${entry.migration_path}` };
@@ -101,6 +102,7 @@ class MigrationLedgerReadService {
           return { status: 'PENDING_MIGRATIONS', reason: `Pending required migration: ${p}` };
         }
       }
+
 
       return { status: 'READY' };
     } catch (err) {

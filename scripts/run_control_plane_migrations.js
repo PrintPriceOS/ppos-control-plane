@@ -131,28 +131,26 @@ async function run() {
 
       let unresolvedRows = 0;
       let backfilledCount = 0;
+      let migrationCount = 0;
+      let baselineMarkerCount = 0;
+      let phaseMarkerCount = 0;
 
       for (const row of rows) {
         const fileKey = row.description && row.description.endsWith('.sql') 
           ? row.description 
           : `${row.version}.sql`;
         
-        // Match against baseline
-        if (!baselineMap.has(fileKey)) {
-          console.error(`[ERROR] Unresolved/ambiguous migration entry in database: ${fileKey}`);
-          unresolvedRows++;
-          continue;
-        }
+        // Rule 1: Real Migrations
+        if (baselineMap.has(fileKey)) {
+          migrationCount++;
+          const match = baselineMap.get(fileKey);
+          const canonicalPath = match.path || match.relativePath;
+          const canonicalChecksum = match.canonicalSha256 || match.sha256;
 
-        const match = baselineMap.get(fileKey);
-        const canonicalPath = match.path || match.relativePath;
-        const canonicalChecksum = match.canonicalSha256 || match.sha256;
-
-        // If not normalized yet, normalize it
-        if (!row.state || row.state !== 'APPLIED') {
           await dbConn.query(`
             UPDATE schema_versions
             SET
+              record_type = 'MIGRATION',
               migration_path = ?,
               checksum = ?,
               state = 'APPLIED',
@@ -162,20 +160,68 @@ async function run() {
             WHERE version = ? OR description = ?
           `, [canonicalPath, canonicalChecksum, row.version, row.description]);
           backfilledCount++;
+          continue;
         }
+
+        // Rule 2: Baseline Marker
+        if (row.version === '1.0.0' && row.description === 'Initial Production Baseline') {
+          baselineMarkerCount++;
+          await dbConn.query(`
+            UPDATE schema_versions
+            SET
+              record_type = 'BASELINE_MARKER',
+              migration_path = NULL,
+              checksum = '',
+              state = 'APPLIED',
+              execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
+              started_at = COALESCE(started_at, applied_at, NOW(3)),
+              applied_at = COALESCE(applied_at, NOW(3))
+            WHERE version = ? AND description = ?
+          `, [row.version, row.description]);
+          backfilledCount++;
+          continue;
+        }
+
+        // Rule 3: Phase Markers
+        if (/^\d{3}$/.test(row.version) && /^Phase \d+:/.test(row.description || '') && !row.checksum) {
+          phaseMarkerCount++;
+          await dbConn.query(`
+            UPDATE schema_versions
+            SET
+              record_type = 'PHASE_MARKER',
+              migration_path = NULL,
+              checksum = '',
+              state = 'APPLIED',
+              execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
+              started_at = COALESCE(started_at, applied_at, NOW(3)),
+              applied_at = COALESCE(applied_at, NOW(3))
+            WHERE version = ? AND description = ?
+          `, [row.version, row.description]);
+          backfilledCount++;
+          continue;
+        }
+
+        // Unresolved row
+        console.error(`[ERROR] Unresolved/ambiguous migration entry in database: version=${row.version}, desc=${row.description}`);
+        unresolvedRows++;
       }
+
+      console.log(`=== Backfill Normalisation Breakdown ===`);
+      console.log(`Legacy rows total       : ${rows.length}`);
+      console.log(`Migration rows resolved : ${migrationCount}`);
+      console.log(`Baseline markers        : ${baselineMarkerCount}`);
+      console.log(`Phase markers           : ${phaseMarkerCount}`);
+      console.log(`Unresolved rows         : ${unresolvedRows}`);
+      console.log(`========================================`);
 
       if (unresolvedRows > 0) {
         throw new Error(`Migration ledger normalisation failed: ${unresolvedRows} unresolved/ambiguous database rows found.`);
       }
 
-      if (backfilledCount > 0) {
-        console.log(`[LEDGER] Successfully normalised ${backfilledCount} legacy entries.`);
-      }
-
     } finally {
       dbConn.release();
     }
+
 
     console.log(`Applying pending migrations...`);
     await migrationService.runMigrations();

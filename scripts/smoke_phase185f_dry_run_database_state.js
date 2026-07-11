@@ -11,10 +11,19 @@ console.log('=== Smoke Test 185F: Dry-Run Database Exit Codes ===\n');
 const cliPath = path.join(__dirname, 'run_control_plane_migrations.js');
 
 function runDryRun(mockEnv = {}) {
+  // Isolate subprocess environment by deleting real DB variables
+  const cleanEnv = { ...process.env };
+  delete cleanEnv.DATABASE_URL;
+  delete cleanEnv.MYSQL_HOST;
+  delete cleanEnv.MYSQL_USER;
+  delete cleanEnv.MYSQL_PASSWORD;
+  delete cleanEnv.MYSQL_DATABASE;
+
   return new Promise((resolve) => {
     const proc = spawn('node', [cliPath, '--dry-run'], {
-      env: { ...process.env, ...mockEnv }
+      env: { ...cleanEnv, ...mockEnv }
     });
+
     
     let stdout = '';
     let stderr = '';

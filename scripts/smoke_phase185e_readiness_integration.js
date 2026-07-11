@@ -31,7 +31,7 @@ function getExpectedChecksum(relPath) {
         { COLUMN_NAME: 'failure_code' }
       ];
     }
-    if (sql.includes('SELECT migration_path')) {
+    if (sql.includes('FROM schema_versions')) {
       const targetPath = 'migrations/005_machine_detail_intelligence.sql';
       return [
         { 
@@ -70,13 +70,14 @@ function getExpectedChecksum(relPath) {
         { COLUMN_NAME: 'started_at' }
       ];
     }
-    if (sql.includes('SELECT migration_path')) {
+    if (sql.includes('FROM schema_versions')) {
       const firstPath = 'migrations/001_create_schema_version.sql';
       return [
         // Simulate only the first migration applied, leaving 137 pending
         { migration_path: firstPath, checksum: getExpectedChecksum(firstPath), state: 'APPLIED' }
       ];
     }
+
 
 
     return [];

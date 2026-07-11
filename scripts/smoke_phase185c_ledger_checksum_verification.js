@@ -19,7 +19,7 @@ const baselineMock = {
   dbMock.query = async (sql) => {
     if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
     if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }];
-    if (sql.includes('SELECT migration_path')) {
+    if (sql.includes('FROM schema_versions')) {
       return [
         { migration_path: 'migrations/001_create_schema_version.sql', checksum: 'hash-abc-BAD', state: 'APPLIED' }
       ];
@@ -35,7 +35,7 @@ const baselineMock = {
   dbMock.query = async (sql) => {
     if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
     if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }];
-    if (sql.includes('SELECT migration_path')) {
+    if (sql.includes('FROM schema_versions')) {
       return [
         { migration_path: 'migrations/999_unknown_migration.sql', checksum: 'hash-999', state: 'APPLIED' }
       ];
@@ -51,7 +51,7 @@ const baselineMock = {
   dbMock.query = async (sql) => {
     if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
     if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }];
-    if (sql.includes('SELECT migration_path')) {
+    if (sql.includes('FROM schema_versions')) {
       return [
         { 
           migration_path: 'migrations/002_other_migration.sql', 
@@ -63,6 +63,7 @@ const baselineMock = {
     }
     return [];
   };
+
 
   status = await ledgerRead.evaluateLedgerStatus(baselineMock);
   assert.equal(status.status, 'MIGRATION_FAILED', 'Should block on stale STARTED migrations');

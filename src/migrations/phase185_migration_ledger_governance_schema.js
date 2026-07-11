@@ -21,6 +21,7 @@ async function up(db) {
   // The actual backfill and constraints are safely handled by the SQL migration file 135_phase185.
   await db.query(`
     ALTER TABLE schema_versions
+      ADD COLUMN record_type ENUM('MIGRATION', 'BASELINE_MARKER', 'PHASE_MARKER') NOT NULL DEFAULT 'MIGRATION',
       ADD COLUMN migration_path VARCHAR(512) NULL,
       ADD COLUMN state ENUM('STARTED', 'APPLIED', 'FAILED') NULL,
       ADD COLUMN execution_id CHAR(36) NULL,
@@ -35,6 +36,7 @@ async function up(db) {
       ADD COLUMN failure_message TEXT NULL,
       ADD COLUMN failed_statement_index INT NULL
   `).catch(err => {
+
     // Ignore duplicate column errors
     if (err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060) {
       return;

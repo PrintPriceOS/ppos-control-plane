@@ -1,9 +1,11 @@
 'use strict';
 
-const assert = require('assert').strict;
-const { MigrationService } = require('../src/api/services/migrationService');
-
-console.log('=== Smoke Test 185D: Concurrent Migration Database Lock ===\n');
+// Clear environment variables to isolate from real database pool
+delete process.env.DATABASE_URL;
+delete process.env.MYSQL_HOST;
+delete process.env.MYSQL_USER;
+delete process.env.MYSQL_PASSWORD;
+delete process.env.MYSQL_DATABASE;
 
 const dbMock = require('../src/api/services/mysqlClient');
 
@@ -37,6 +39,9 @@ dbMock.getPool = () => {
   };
 };
 
+const { MigrationService } = require('../src/api/services/migrationService');
+
+const assert = require('assert').strict;
 
 (async () => {
   process.env.PPOS_MIGRATION_EXECUTION = 'true';

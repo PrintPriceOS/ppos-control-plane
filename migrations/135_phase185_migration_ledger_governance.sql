@@ -7,6 +7,7 @@
 
 -- 1. Idempotently add new ledger columns as nullable (Expand Phase)
 ALTER TABLE schema_versions
+  ADD COLUMN record_type ENUM('MIGRATION', 'BASELINE_MARKER', 'PHASE_MARKER') NOT NULL DEFAULT 'MIGRATION',
   ADD COLUMN migration_path VARCHAR(512) NULL,
   ADD COLUMN state ENUM('STARTED', 'APPLIED', 'FAILED') NULL,
   ADD COLUMN execution_id CHAR(36) NULL,
@@ -22,10 +23,9 @@ ALTER TABLE schema_versions
   ADD COLUMN failed_statement_index INT NULL;
 
 -- 2. Backfill existing legacy rows (Backfill Phase)
--- Calculate default path and map legacy entries safely to APPLIED state.
+-- The backfill is orchestrator-driven from the CLI, but we establish defaults here.
 UPDATE schema_versions
 SET
-  migration_path = CONCAT('migrations/', IF(description IS NOT NULL AND description LIKE '%.sql', description, CONCAT(version, '.sql'))),
   state = 'APPLIED',
   execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
   started_at = COALESCE(applied_at, CURRENT_TIMESTAMP(3)),
@@ -33,11 +33,13 @@ SET
 WHERE state IS NULL;
 
 -- 3. Apply constraints and defaults (Contract Phase)
+-- migration_path is kept NULLABLE globally to accommodate non-MIGRATION markers,
+-- but we add indexes for fast reads.
 ALTER TABLE schema_versions
-  MODIFY COLUMN migration_path VARCHAR(512) NOT NULL,
   MODIFY COLUMN state ENUM('STARTED', 'APPLIED', 'FAILED') NOT NULL DEFAULT 'STARTED',
   MODIFY COLUMN execution_id CHAR(36) NOT NULL,
   MODIFY COLUMN started_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   ADD UNIQUE KEY uq_schema_versions_migration_path (migration_path),
   ADD KEY idx_schema_versions_state (state),
-  ADD KEY idx_schema_versions_execution_id (execution_id);
+  ADD KEY idx_schema_versions_execution_id (execution_id),
+  ADD KEY idx_schema_versions_record_type (record_type);
