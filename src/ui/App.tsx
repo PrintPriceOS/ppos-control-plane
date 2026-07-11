@@ -106,6 +106,9 @@ import { SandboxCommercialPilot } from './pages/production/SandboxCommercialPilo
 import { PilotEvidenceReviewGoNoGo } from './pages/production/PilotEvidenceReviewGoNoGo';
 import { LimitedBetaPreparationGate } from './pages/beta/LimitedBetaPreparationGate';
 import { LimitedBetaRuntime } from './pages/beta/LimitedBetaRuntime';
+import { LimitedBetaRuntimeWorkspace } from './pages/beta/LimitedBetaRuntimeWorkspace';
+import { BetaCohortWorkspace } from './pages/beta/BetaCohortWorkspace';
+import { BetaGovernanceWorkspace } from './pages/beta/BetaGovernanceWorkspace';
 import { ControlledBetaCohortActivation } from './pages/beta/ControlledBetaCohortActivation';
 import { ControlledBetaInviteIssuance } from './pages/beta/ControlledBetaInviteIssuance';
 import { ControlledBetaInviteAcceptance } from './pages/beta/ControlledBetaInviteAcceptance';
@@ -210,18 +213,22 @@ export const App: React.FC = () => {
                 <Route path="/admin/production/sandbox-commercial-pilot" element={<SandboxCommercialPilot />} />
                 <Route path="/admin/production/pilot-evidence-review" element={<PilotEvidenceReviewGoNoGo />} />
                 <Route path="/admin/beta/preparation-gate" element={<LimitedBetaPreparationGate />} />
-                <Route path="/admin/beta/runtime" element={<LimitedBetaRuntime />} />
-                <Route path="/admin/beta/cohort-activation" element={<ControlledBetaCohortActivation />} />
-                <Route path="/admin/beta/invite-issuance" element={<ControlledBetaInviteIssuance />} />
-                <Route path="/admin/beta/invite-acceptance" element={<ControlledBetaInviteAcceptance />} />
-                <Route path="/admin/beta/runtime-sessions" element={<ControlledBetaRuntimeSession />} />
-                <Route path="/admin/beta/runtime-activity" element={<ControlledBetaRuntimeActivityObservation />} />
-                <Route path="/admin/beta/runtime-reviews" element={<ControlledBetaRuntimeActivityReview />} />
-                <Route path="/admin/beta/cohort-interventions" element={<ControlledBetaCohortInterventionPreparation />} />
-                <Route path="/admin/beta/cohort-intervention-approvals" element={<ControlledBetaCohortInterventionApproval />} />
-                <Route path="/admin/beta/cohort-intervention-executions" element={<ControlledBetaCohortInterventionExecution />} />
-                <Route path="/admin/beta/cohort-intervention-simulations" element={<ControlledBetaCohortInterventionSimulation />} />
-                <Route path="/admin/beta/cohort-intervention-simulation-reviews" element={<ControlledBetaCohortInterventionSimulationReview />} />
+                <Route path="/admin/beta/runtime" element={<LimitedBetaRuntimeWorkspace />} />
+                <Route path="/admin/beta/cohorts" element={<BetaCohortWorkspace />} />
+                <Route path="/admin/beta/governance" element={<BetaGovernanceWorkspace />} />
+                
+                {/* Legacy Redirects Compatibility */}
+                <Route path="/admin/beta/cohort-activation" element={<Navigate to="/admin/beta/cohorts?tab=activation" replace />} />
+                <Route path="/admin/beta/invite-issuance" element={<Navigate to="/admin/beta/cohorts?tab=invitations" replace />} />
+                <Route path="/admin/beta/invite-acceptance" element={<Navigate to="/admin/beta/cohorts?tab=participants" replace />} />
+                <Route path="/admin/beta/runtime-sessions" element={<Navigate to="/admin/beta/runtime?tab=sessions" replace />} />
+                <Route path="/admin/beta/runtime-activity" element={<Navigate to="/admin/beta/runtime?tab=activity" replace />} />
+                <Route path="/admin/beta/runtime-reviews" element={<Navigate to="/admin/beta/runtime?tab=health" replace />} />
+                <Route path="/admin/beta/cohort-interventions" element={<Navigate to="/admin/beta/governance?tab=interventions" replace />} />
+                <Route path="/admin/beta/cohort-intervention-approvals" element={<Navigate to="/admin/beta/governance?tab=approvals" replace />} />
+                <Route path="/admin/beta/cohort-intervention-executions" element={<Navigate to="/admin/beta/governance?tab=executions" replace />} />
+                <Route path="/admin/beta/cohort-intervention-simulations" element={<Navigate to="/admin/beta/governance?tab=simulations" replace />} />
+                <Route path="/admin/beta/cohort-intervention-simulation-reviews" element={<Navigate to="/admin/beta/governance?tab=simulation-reviews" replace />} />
                 <Route path="/admin/beta/cohort-intervention-approval-preparations" element={<ControlledBetaCohortInterventionSimulationApprovalPreparation />} />
                 <Route path="/admin/beta/cohort-intervention-simulation-approvals" element={<ControlledBetaCohortInterventionSimulationApproval />} />
                 <Route path="/admin/beta/cohort-intervention-readiness" element={<ControlledBetaCohortInterventionSimulationExecutionReadiness />} />

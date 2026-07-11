@@ -42,18 +42,10 @@ export const navigationConfig: NavItem[] = [
     { id: 'billing-usage', label: 'Billing & Plans', path: '/admin/billing-usage', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'production-monitoring', label: 'Production Monitoring', path: '/admin/production-monitoring', icon: 'SignalIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'industrial', label: 'Industrial Ops', path: '/admin/industrial', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-runtime', label: 'Limited Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-activation', label: 'Beta Cohort Activation', path: '/admin/beta/cohort-activation', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-invite-issuance', label: 'Beta Invite Issuance', path: '/admin/beta/invite-issuance', icon: 'EnvelopeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-invite-acceptance', label: 'Beta Invite Acceptance', path: '/admin/beta/invite-acceptance', icon: 'EnvelopeOpenIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-runtime-sessions', label: 'Beta Runtime Sessions', path: '/admin/beta/runtime-sessions', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-runtime-activity', label: 'Beta Activity Observation', path: '/admin/beta/runtime-activity', icon: 'EyeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-runtime-reviews', label: 'Beta Cohort Reviews', path: '/admin/beta/runtime-reviews', icon: 'DocumentMagnifyingGlassIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-interventions', label: 'Beta Cohort Interventions', path: '/admin/beta/cohort-interventions', icon: 'ExclamationTriangleIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-intervention-approvals', label: 'Beta Cohort Approvals', path: '/admin/beta/cohort-intervention-approvals', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-intervention-executions', label: 'Beta Cohort Executions', path: '/admin/beta/cohort-intervention-executions', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-intervention-simulations', label: 'Beta Cohort Simulations', path: '/admin/beta/cohort-intervention-simulations', icon: 'ChartBarIcon', roles: ['SUPER_ADMIN', 'SUPER_ADMIN', 'OPS_ADMIN'] },
-    { id: 'beta-cohort-intervention-simulation-reviews', label: 'Beta Simulation Reviews', path: '/admin/beta/cohort-intervention-simulation-reviews', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-runtime', label: 'Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-cohorts', label: 'Beta Cohorts', path: '/admin/beta/cohorts', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+    { id: 'beta-governance', label: 'Beta Governance', path: '/admin/beta/governance', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
+
 
 
 
