@@ -200,7 +200,8 @@ function verifyMigrationBaseline(migrationsDir, baselinePath) {
     
     const baselineMap = new Map();
     for (const m of baseline.migrations) {
-      baselineMap.set(m.relativePath.replace(/\\/g, '/'), m);
+      const p = m.path || m.relativePath;
+      baselineMap.set(p.replace(/\\/g, '/'), m);
     }
     
     if (migrations.length !== baseline.migrations.length) {
