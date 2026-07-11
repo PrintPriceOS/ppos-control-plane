@@ -55,6 +55,12 @@ module.exports = {
         PORT: 8081,
         PPOS_LOG_LEVEL: 'debug',
       },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 8081,
+        PPOS_CONTROL_MODE: 'LIVE',
+        PPOS_LOG_LEVEL: 'info',
+      },
     }
   ]
 };

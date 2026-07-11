@@ -34,6 +34,11 @@ echo "[DEPLOY] APP DIR: $APP_DIR"
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
 
+# Deployment progress trackers
+CODE_CHANGED=0
+BACKEND_RESTARTED=0
+FRONTEND_PUBLISHED=0
+
 # Rollback handler
 rollback() {
   local exit_code=$?
@@ -43,10 +48,16 @@ rollback() {
 
   echo "--------------------------------------------------------"
   echo "[CRITICAL] Deployment failed with exit code $exit_code."
-  echo "[ROLLBACK] Initiating recovery process..."
   echo "--------------------------------------------------------"
 
-  if [ -n "${PREVIOUS_COMMIT:-}" ]; then
+  if [ "${CODE_CHANGED}" -eq 0 ] && [ "${BACKEND_RESTARTED}" -eq 0 ] && [ "${FRONTEND_PUBLISHED}" -eq 0 ]; then
+    echo "[ROLLBACK] Failure occurred before any local changes or process restarts. No action needed."
+    exit "$exit_code"
+  fi
+
+  echo "[ROLLBACK] Initiating recovery process..."
+
+  if [ -n "${PREVIOUS_COMMIT:-}" ] && [ "${CODE_CHANGED}" -eq 1 ]; then
     echo "[ROLLBACK] Restoring repository to previous commit: $PREVIOUS_COMMIT"
     git reset --hard "$PREVIOUS_COMMIT" || true
 
@@ -60,7 +71,9 @@ rollback() {
     mkdir -p node_modules/@ppos
     rm -rf node_modules/@ppos/shared-infra
     ln -s /opt/printprice-os/ppos-shared-infra node_modules/@ppos/shared-infra || true
+  fi
 
+  if [ "${BACKEND_RESTARTED}" -eq 1 ]; then
     echo "[ROLLBACK] Re-triggering PM2 with prior state..."
     export PORT=8081
     export PPOS_CONTROL_PORT=8081
@@ -97,6 +110,7 @@ echo "[DEPLOY] Syncing with remote repository..."
 git fetch --prune origin
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
+CODE_CHANGED=1
 
 DEPLOY_COMMIT="$(git rev-parse HEAD)"
 echo "[DEPLOY] Target Commit: $DEPLOY_COMMIT"
@@ -145,6 +159,7 @@ export PORT=8081
 export PPOS_CONTROL_PORT=8081
 
 pm2 startOrReload ecosystem.config.js --only "$PROCESS_NAME" --env production --update-env
+BACKEND_RESTARTED=1
 
 # 10. Polling active readiness
 echo "[DEPLOY] Verifying service health..."
@@ -182,6 +197,7 @@ fi
 # 11. Publish Frontend Assets
 echo "[DEPLOY] Publishing compiled frontend to web root..."
 rsync -a --delete dist/ "$WEB_ROOT/"
+FRONTEND_PUBLISHED=1
 
 cat > "$WEB_ROOT/.htaccess" <<'EOF'
 <IfModule mod_passenger.c>
