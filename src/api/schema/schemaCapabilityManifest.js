@@ -10,7 +10,7 @@ module.exports = {
           columns: ['id', 'status', 'plan']
         },
         api_keys: {
-          columns: ['id', 'tenant_id', 'status']
+          columns: ['id', 'tenant_id']
         },
         jobs: {
           columns: ['id', 'tenant_id', 'status']

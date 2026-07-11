@@ -203,71 +203,80 @@ const start = async () => {
         // 0. Initialize Database Schemas (Legacy import commented out in Phase 184)
         // require('./src/api/services/controlPlaneSchemaService');
 
-        // 0.1 Industrial Provisioning (MES Bootstrap)
-        try {
-            const provisioningService = require('./src/api/services/industrialProvisioningService');
-            console.log('[INDUSTRIAL-PROVISIONING] Starting autonomous MES bootstrap...');
-            provisioningService.runFullProvisioning()
-                .then(summary => {
-                    console.log('[MES-BOOTSTRAP] Summary:', JSON.stringify(summary, null, 2));
-                    if (summary.warnings && summary.warnings.length > 0) {
-                        console.warn('[MES-BOOTSTRAP] Warnings:', JSON.stringify(summary.warnings, null, 2));
-                    }
-                    console.log(`[MACHINE-DISCOVERY] ${summary.machinesDiscovered} machines active.`);
-                    
-                    if (summary.failedSteps.length > 0) {
-                        console.error(`[MES-BOOTSTRAP] Completed with failures in steps: ${summary.failedSteps.join(', ')}`);
-                    } else if (summary.warnings.length > 0) {
-                        console.log('[MES-BOOTSTRAP] Completed with warnings.');
-                    } else {
-                        console.log('[MES-BOOTSTRAP] Completed cleanly.');
-                    }
+        // Evaluate schema compatibility at startup (Readiness-Gated Background Loop Startup)
+        const { evaluateSchemaCompatibility } = require('./src/api/services/schemaCompatibilityService');
+        const compat = await evaluateSchemaCompatibility().catch(err => ({ status: 'DATABASE_UNREACHABLE', message: err.message }));
+        const isReady = compat.status === 'READY';
 
-                    // Differentiate empty-state
-                    if (summary.machinesDiscovered === 0) {
-                        const sc = summary.sourceCounts || {};
-                        if (sc.printer_nodes === 0) {
-                            console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 printer_nodes exist.');
-                        } else if (sc.print_nodes === 0) {
-                            console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 print_nodes were synced (check ACTIVE status).');
-                        } else {
-                            console.log('[MES-BOOTSTRAP] Insight: 0 machines discovered despite active nodes (check machine profile JSON).');
+        if (!isReady) {
+            console.warn(`[BOOT] SCHEMA NOT READY (Status: ${compat.status}). Background loops and MES bootstrap startup deferred.`);
+        } else {
+            // 0.1 Industrial Provisioning (MES Bootstrap)
+            try {
+                const provisioningService = require('./src/api/services/industrialProvisioningService');
+                console.log('[INDUSTRIAL-PROVISIONING] Starting autonomous MES bootstrap...');
+                provisioningService.runFullProvisioning()
+                    .then(summary => {
+                        console.log('[MES-BOOTSTRAP] Summary:', JSON.stringify(summary, null, 2));
+                        if (summary.warnings && summary.warnings.length > 0) {
+                            console.warn('[MES-BOOTSTRAP] Warnings:', JSON.stringify(summary.warnings, null, 2));
                         }
-                    }
-                })
-                .catch(err => {
-                    console.error('[MES-BOOTSTRAP] Fatal provisioning exception:');
-                    console.error(err);
-                });
-        } catch (err) {
-            console.error('[INDUSTRIAL-PROVISIONING] Load failed:', err.message);
-        }
+                        console.log(`[MACHINE-DISCOVERY] ${summary.machinesDiscovered} machines active.`);
+                        
+                        if (summary.failedSteps.length > 0) {
+                            console.error(`[MES-BOOTSTRAP] Completed with failures in steps: ${summary.failedSteps.join(', ')}`);
+                        } else if (summary.warnings.length > 0) {
+                            console.log('[MES-BOOTSTRAP] Completed with warnings.');
+                        } else {
+                            console.log('[MES-BOOTSTRAP] Completed cleanly.');
+                        }
 
-        // 0.2 Autonomous MES Decision Loop
-        try {
-            const orchestrator = require('./src/api/services/autonomousOrchestrator');
-            orchestrator.start();
-            console.log('[AUTONOMOUS-MES] Orchestration loop initiated.');
-        } catch (err) {
-            console.error('[AUTONOMOUS-MES] Loop startup failed:', err.message);
-        }
-        
-        // 0.3 Industrial Event Orchestration (Phase 10 Integration)
-        try {
-            const industrialOrchestrator = require('./src/api/services/IndustrialEventOrchestrationService');
-            // Hardening: Support both init() and initializeConsumers() with typeof check
-            const initFn = industrialOrchestrator.init || industrialOrchestrator.initializeConsumers;
-            if (typeof initFn === 'function') {
-                const result = initFn.call(industrialOrchestrator);
-                if (result instanceof Promise) {
-                    result.catch(err => console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Async init failed:', err.message));
-                }
-                console.log('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers initialization triggered.');
-            } else {
-                console.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Warning: No valid initialization method found on industrialOrchestrator.');
+                        // Differentiate empty-state
+                        if (summary.machinesDiscovered === 0) {
+                            const sc = summary.sourceCounts || {};
+                            if (sc.printer_nodes === 0) {
+                                console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 printer_nodes exist.');
+                            } else if (sc.print_nodes === 0) {
+                                console.log('[MES-BOOTSTRAP] Insight: 0 machines because 0 print_nodes were synced (check ACTIVE status).');
+                            } else {
+                                console.log('[MES-BOOTSTRAP] Insight: 0 machines discovered despite active nodes (check machine profile JSON).');
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error('[MES-BOOTSTRAP] Fatal provisioning exception:');
+                        console.error(err);
+                    });
+            } catch (err) {
+                console.error('[INDUSTRIAL-PROVISIONING] Load failed:', err.message);
             }
-        } catch (err) {
-            console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Startup failed:', err.message);
+
+            // 0.2 Autonomous MES Decision Loop
+            try {
+                const orchestrator = require('./src/api/services/autonomousOrchestrator');
+                orchestrator.start();
+                console.log('[AUTONOMOUS-MES] Orchestration loop initiated.');
+            } catch (err) {
+                console.error('[AUTONOMOUS-MES] Loop startup failed:', err.message);
+            }
+            
+            // 0.3 Industrial Event Orchestration (Phase 10 Integration)
+            try {
+                const industrialOrchestrator = require('./src/api/services/IndustrialEventOrchestrationService');
+                // Hardening: Support both init() and initializeConsumers() with typeof check
+                const initFn = industrialOrchestrator.init || industrialOrchestrator.initializeConsumers;
+                if (typeof initFn === 'function') {
+                    const result = initFn.call(industrialOrchestrator);
+                    if (result instanceof Promise) {
+                        result.catch(err => console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Async init failed:', err.message));
+                    }
+                    console.log('[INDUSTRIAL-EVENT-ORCHESTRATION] Consumers initialization triggered.');
+                } else {
+                    console.warn('[INDUSTRIAL-EVENT-ORCHESTRATION] Warning: No valid initialization method found on industrialOrchestrator.');
+                }
+            } catch (err) {
+                console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Startup failed:', err.message);
+            }
         }
         
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)
@@ -420,9 +429,14 @@ const start = async () => {
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
         
-        // Start federation consensus and synchronization loops
-        await federationConsensusService.start();
-        await federationSyncService.start();
+        // Start federation consensus and synchronization loops (gated by schema compatibility)
+        if (isReady) {
+            await federationConsensusService.start();
+            await federationSyncService.start();
+            console.log('[BOOT] Federation consensus and sync daemons initiated.');
+        } else {
+            console.warn('[BOOT] Federation consensus and sync loops deferred due to schema compatibility status.');
+        }
         
         if (typeof process.send === 'function') {
             process.send('ready');
