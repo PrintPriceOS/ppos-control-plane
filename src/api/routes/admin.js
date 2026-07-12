@@ -112,6 +112,42 @@ router.use((req, res, next) => {
     }
   }
 
+  // 1.5 Global Admin Routes Protection
+  const isGlobalAdmin = context.isSuperAdmin || context.role === 'OPS_ADMIN' || context.role === 'SYSTEM_ADMIN';
+  if (!isGlobalAdmin) {
+    const isGlobalOnlyPath = 
+      path.startsWith('/tenants') ||
+      path.startsWith('/audit') ||
+      path.startsWith('/federation') ||
+      path.startsWith('/global') ||
+      path.startsWith('/financial-operations') ||
+      path.startsWith('/financials') ||
+      path.startsWith('/pre-production') ||
+      path.startsWith('/deployment') ||
+      path.startsWith('/operations') ||
+      path.startsWith('/prelaunch') ||
+      path.startsWith('/preproduction') ||
+      path.startsWith('/production/pilot-activation') ||
+      path.startsWith('/production/internal-order-lifecycle') ||
+      path.startsWith('/production/founding-printhouse-pilot') ||
+      path.startsWith('/production/sandbox-commercial-pilot') ||
+      path.startsWith('/production/pilot-evidence-review') ||
+      path.startsWith('/beta') ||
+      path.startsWith('/financial-reconciliation') ||
+      path.startsWith('/cs-workflows') ||
+      path.startsWith('/engagement-signals') ||
+      path.startsWith('/engagement-stats') ||
+      path.startsWith('/routing') ||
+      path === '/routes/debug';
+
+    if (isGlobalOnlyPath) {
+      return res.status(403).json({
+        ok: false,
+        error: { code: 'FORBIDDEN', message: 'Access denied: Route restricted to global system administrators.' }
+      });
+    }
+  }
+
   // 2. Suppress Noise for frequent endpoints in Production
   const isFrequent = [
     '/workers/heartbeat',

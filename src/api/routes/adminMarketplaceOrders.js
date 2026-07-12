@@ -8,12 +8,15 @@ const router = express.Router();
 const orderService = require('../services/marketplaceOrderService');
 const { resolveActorContext } = require('../middleware/auth');
 
-// Phase 39: Enforce Printhouse Scoping for Marketplace Orders
+// Phase 39: Enforce Printhouse & Tenant Scoping for Marketplace Orders
 router.use((req, res, next) => {
     const context = resolveActorContext(req);
-    if (context.isPrinthouseUser) {
-        req.query.printhouseId = context.printhouseId;
-        req.actorContext = context;
+    req.actorContext = context;
+    if (!context.isSuperAdmin) {
+        req.query.tenantId = context.tenantId;
+        if (context.isPrinthouseUser) {
+            req.query.printhouseId = context.printhouseId;
+        }
     }
     next();
 });
@@ -21,21 +24,29 @@ router.use((req, res, next) => {
 // Enforce ownership for specific order access
 router.param('id', async (req, res, next, id) => {
     const context = resolveActorContext(req);
-    if (context.isPrinthouseUser) {
-        try {
-            const order = await orderService.getOrder(id);
-            if (!order) {
-                return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
-            }
+    try {
+        const order = await orderService.getOrder(id);
+        if (!order) {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
+        }
+        
+        // Enforce Tenant isolation
+        if (!context.isSuperAdmin && order.tenantId !== context.tenantId) {
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
+        }
+        
+        // Enforce Printhouse isolation
+        if (!context.isSuperAdmin && context.isPrinthouseUser) {
             if (order.printhouse?.assignedPrinthouseId !== context.printhouseId && order.printhouseId !== context.printhouseId) {
                 return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
             }
-            req.marketplaceOrder = order;
-        } catch (err) {
-            return res.status(500).json({ ok: false, error: err.message });
         }
+        
+        req.marketplaceOrder = order;
+        next();
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
     }
-    next();
 });
 /**
  * GET /api/admin/marketplace/orders
@@ -59,6 +70,26 @@ router.get('/', async (req, res) => {
  */
 router.get('/audit', async (req, res) => {
     try {
+        const context = resolveActorContext(req);
+        const orderId = req.query.orderId || req.query.orderIntentId;
+        if (orderId) {
+            const order = await orderService.getOrder(orderId);
+            if (!order) return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
+            
+            if (!context.isSuperAdmin) {
+                if (order.tenantId !== context.tenantId) {
+                    return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+                }
+                if (context.isPrinthouseUser && order.printhouseId !== context.printhouseId) {
+                    return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+                }
+            }
+        } else {
+            if (!context.isSuperAdmin) {
+                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'Only global administrators can view all marketplace audit logs.' });
+            }
+        }
+
         const result = await orderService.listAuditEvents(req.query);
         return res.json(result);
     } catch (err) {

@@ -11,19 +11,16 @@ const materialService = require('../services/materialAvailabilityService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
 
+const { resolveActorContext } = require('../middleware/auth');
+
 // Helper to extract multi-tenant scope from request context
 function getScopeContext(req) {
-    const isSuper = req.headers?.['x-user-role'] === 'SUPER_ADMIN' || 
-                    req.headers?.['x-role'] === 'SUPER_ADMIN' || 
-                    req.query?.role === 'SUPER_ADMIN' || 
-                    req.query?.user_role === 'SUPER_ADMIN' || 
-                    (req.user && req.user?.role === 'SUPER_ADMIN') || 
-                    false;
+    const context = resolveActorContext(req);
     return {
-        tenantId: req.headers?.['x-tenant-id'] || req.query?.tenant_id || 'ppos-production',
-        printhouseId: req.headers?.['x-printhouse-id'] || req.query?.printhouse_id || null,
-        operatorId: req.headers?.['x-operator-id'] || req.body?.operator_id || req.query?.operator_id || 'operator-dashboard',
-        isSuperAdmin: isSuper
+        tenantId: context.isSuperAdmin ? (req.headers?.['x-tenant-id'] || req.query?.tenant_id || context.tenantId) : context.tenantId,
+        printhouseId: context.isSuperAdmin ? (req.headers?.['x-printhouse-id'] || req.query?.printhouse_id || context.printhouseId) : context.printhouseId,
+        operatorId: context.userId || 'operator-dashboard',
+        isSuperAdmin: context.isSuperAdmin
     };
 }
 

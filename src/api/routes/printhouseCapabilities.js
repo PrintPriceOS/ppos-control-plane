@@ -43,6 +43,32 @@ function getActorAndTenant(req, res) {
     return { actor, tenantId };
 }
 
+// Parameter validation to enforce multi-tenant & printhouse isolation on all printhouseId paths
+router.param('printhouseId', async (req, res, next, printhouseId) => {
+    try {
+        const actor = resolveActorContext(req);
+        const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
+        if (!printhouse) {
+            return res.status(404).json({ ok: false, error: 'PRINTHOUSE_NOT_FOUND' });
+        }
+        
+        // Tenant check
+        if (!actor.isSuperAdmin && printhouse.tenant_id !== actor.tenantId) {
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'Access denied to other tenant resources.' });
+        }
+        
+        // Printhouse check
+        if (!actor.isSuperAdmin && actor.isPrinthouseUser && printhouseId !== actor.printhouseId) {
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'Access denied to other printhouse resources.' });
+        }
+        
+        req.printhouseObj = printhouse;
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ----------------------------------------------------------------------
 // PRINTHOUSES CRUD
 // ----------------------------------------------------------------------
@@ -166,6 +192,12 @@ router.get('/:tenantId/machines', async (req, res) => {
         // Backward compatibility if tenantId is actually a printhouseId (starts with 'print_')
         if (tenantId.startsWith('print_')) {
             const printhouseId = tenantId;
+            
+            // Printhouse check for printhouse users
+            if (!actor.isSuperAdmin && actor.isPrinthouseUser && printhouseId !== actor.printhouseId) {
+                return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_PRINTHOUSE_ACCESS' });
+            }
+
             const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
             if (!printhouse) {
                 return res.status(404).json({ ok: false, error: 'PRINTHOUSE_NOT_FOUND' });
@@ -183,11 +215,15 @@ router.get('/:tenantId/machines', async (req, res) => {
             return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_TENANT_ACCESS' });
         }
 
-        // List all machines belonging to this tenantId
-        const rows = await require('../services/mysqlClient').query(
-            'SELECT * FROM printhouse_machines WHERE tenant_id = ?', 
-            [tenantId]
-        );
+        // List all machines belonging to this tenantId (scoped to printhouse if printer user)
+        let sql = 'SELECT * FROM printhouse_machines WHERE tenant_id = ?';
+        const params = [tenantId];
+        if (!actor.isSuperAdmin && actor.isPrinthouseUser && actor.printhouseId) {
+            sql += ' AND printhouse_id = ?';
+            params.push(actor.printhouseId);
+        }
+
+        const rows = await require('../services/mysqlClient').query(sql, params);
         rows.forEach(r => {
             r.supported_color_modes_json = safeParseJson(r.supported_color_modes_json, []);
             r.supported_print_methods_json = safeParseJson(r.supported_print_methods_json, []);

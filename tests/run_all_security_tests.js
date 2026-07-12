@@ -1,0 +1,49 @@
+/**
+ * tests/run_all_security_tests.js
+ * 
+ * Runs all security isolation and multi-tenant test suites.
+ */
+const { execSync } = require('child_process');
+
+const testSuites = [
+    'tests/security_activation_hub_isolation_test.js',
+    'tests/security_onboarding_isolation_test.js',
+    'tests/security_jobs_queue_isolation_test.js',
+    'tests/security_machines_materials_isolation_test.js',
+    'tests/security_pricing_marketplace_isolation_test.js',
+    'tests/security_files_artifacts_isolation_test.js',
+    'tests/security_metrics_audit_isolation_test.js',
+    'tests/security_frontend_route_visibility_test.js',
+    'tests/security_settings_tenant_config_isolation_test.js',
+    'tests/security_production_monitoring_industrial_ops_isolation_test.js',
+    'tests/security_legacy_alternate_routes_isolation_test.js'
+];
+
+console.log('Starting execution of all security isolation test suites...');
+
+let failed = false;
+
+for (const suite of testSuites) {
+    console.log(`\n=== Running ${suite} ===`);
+    try {
+        execSync(`node ${suite}`, {
+            env: {
+                ...process.env,
+                JWT_SECRET: 'test_secret'
+            },
+            stdio: 'inherit'
+        });
+        console.log(`✓ ${suite} passed successfully.`);
+    } catch (err) {
+        console.error(`✗ ${suite} failed.`);
+        failed = true;
+    }
+}
+
+if (failed) {
+    console.error('\nSome security test suites failed.');
+    process.exit(1);
+} else {
+    console.log('\nAll security test suites passed successfully!');
+    process.exit(0);
+}

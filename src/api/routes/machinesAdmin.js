@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../services/mysqlClient');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, resolveActorContext } = require('../middleware/auth');
 
 router.use(requireAdmin);
 
@@ -151,12 +151,28 @@ const calculateCompleteness = (node, location, healthState) => {
  * Returns live machines derived from print_nodes with normalized industrial telemetry.
  */
 router.get('/', async (req, res) => {
+    const context = resolveActorContext(req);
     try {
-        const rows = await db.query(`
+        let sql = `
             SELECT pn.*, pm.printhouse_id 
             FROM print_nodes pn
             LEFT JOIN printhouse_machines pm ON pn.id = pm.id
-        `);
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (!context.isSuperAdmin) {
+            if (context.tenantId) {
+                sql += ` AND pn.tenant_id = ?`;
+                params.push(context.tenantId);
+            }
+            if (context.printhouseId) {
+                sql += ` AND pm.printhouse_id = ?`;
+                params.push(context.printhouseId);
+            }
+        }
+
+        const rows = await db.query(sql, params);
         
         if (!rows || rows.length === 0) {
             return res.json({

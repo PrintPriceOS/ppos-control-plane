@@ -11,12 +11,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../services/mysqlClient');
 const topologyService = require('../services/FederationTopologyService');
+const { resolveActorContext } = require('../middleware/auth');
 
 function getCanonicalResult(payload) {
     return payload?.result || payload || {};
 }
 
 router.get('/overview', async (req, res) => {
+    const context = resolveActorContext(req);
     const warnings = [];
     
     // Initial structures with explicit nulls to signal missing/unresolved data instead of fake zeros
@@ -82,11 +84,17 @@ router.get('/overview', async (req, res) => {
 
     // --- 1. PREFLIGHT REGISTRY & JOBS DATA ---
     try {
-        const jobsRows = await db.query(`
+        let sql = `
             SELECT job_id, status, type, policy, canonical_payload_json, created_at 
             FROM preflight_job_registry 
-            ORDER BY created_at DESC LIMIT 1000
-        `);
+        `;
+        const params = [];
+        if (!context.isSuperAdmin && context.tenantId) {
+            sql += ` WHERE tenant_id = ? `;
+            params.push(context.tenantId);
+        }
+        sql += ` ORDER BY created_at DESC LIMIT 1000 `;
+        const jobsRows = await db.query(sql, params);
 
         // Table exists, so initialize counts to 0 to avoid fake zero display distinction
         preflight.source_status = "ACTIVE";
@@ -240,13 +248,19 @@ router.get('/overview', async (req, res) => {
 
     // --- 3. ECONOMY METRICS TABLE & AUDIT TRAIL ---
     try {
-        const metRows = await db.query(`
+        let metricsSql = `
             SELECT 
                 SUM(value_generated) as val_gen,
                 SUM(hours_saved) as hrs_sav,
                 AVG(risk_score_after) as avg_risk
             FROM metrics
-        `);
+        `;
+        const metricsParams = [];
+        if (!context.isSuperAdmin && context.tenantId) {
+            metricsSql += ` WHERE tenant_id = ? `;
+            metricsParams.push(context.tenantId);
+        }
+        const metRows = await db.query(metricsSql, metricsParams);
         economy.source_status = "ACTIVE";
         
         // Remove invented monetary proxy. Expose hoursSaved if exists. Keep estimatedAvoidedReprintCost null and push warning.
@@ -268,12 +282,18 @@ router.get('/overview', async (req, res) => {
 
         // Fix Success / Failure rates from audit trail safely
         try {
-            const fixAuditRows = await db.query(`
+            let auditSql = `
                 SELECT status, COUNT(*) as cnt 
                 FROM preflight_audit_events 
                 WHERE event_type = 'REQUEST_FIX' 
-                GROUP BY status
-            `);
+            `;
+            const auditParams = [];
+            if (!context.isSuperAdmin && context.tenantId) {
+                auditSql += ` AND tenant_id = ? `;
+                auditParams.push(context.tenantId);
+            }
+            auditSql += ` GROUP BY status `;
+            const fixAuditRows = await db.query(auditSql, auditParams);
             let fSucc = 0;
             let fFail = 0;
             (fixAuditRows || []).forEach(fa => {
@@ -292,11 +312,17 @@ router.get('/overview', async (req, res) => {
 
     // --- 4. GOVERNANCE EVENTS & AUDIT LOGS ---
     try {
-        const govRows = await db.query(`
+        let govSql = `
             SELECT rule_slug, evaluation_result, enforcement_action, created_at 
             FROM preflight_governance_events 
-            ORDER BY created_at DESC LIMIT 50
-        `);
+        `;
+        const govParams = [];
+        if (!context.isSuperAdmin && context.tenantId) {
+            govSql += ` WHERE tenant_id = ? `;
+            govParams.push(context.tenantId);
+        }
+        govSql += ` ORDER BY created_at DESC LIMIT 50 `;
+        const govRows = await db.query(govSql, govParams);
         governance.source_status = "ACTIVE";
         governance.jobsBlockedByPolicy = 0;
 
@@ -319,9 +345,16 @@ router.get('/overview', async (req, res) => {
 
         // Evaluate audit health status
         try {
-            const auditStatusRows = await db.query(`
-                SELECT status, COUNT(*) as cnt FROM preflight_audit_events GROUP BY status
-            `);
+            let auditStatusSql = `
+                SELECT status, COUNT(*) as cnt FROM preflight_audit_events 
+            `;
+            const auditStatusParams = [];
+            if (!context.isSuperAdmin && context.tenantId) {
+                auditStatusSql += ` WHERE tenant_id = ? `;
+                auditStatusParams.push(context.tenantId);
+            }
+            auditStatusSql += ` GROUP BY status `;
+            const auditStatusRows = await db.query(auditStatusSql, auditStatusParams);
             audit.source_status = "ACTIVE";
             let hasErrors = false;
             let hasWarnings = false;
@@ -331,11 +364,17 @@ router.get('/overview', async (req, res) => {
             });
             governance.auditStatus = hasErrors ? "errors" : hasWarnings ? "warnings" : "clean";
 
-            const recentEvents = await db.query(`
+            let recentEventsSql = `
                 SELECT action, status, message, created_at 
                 FROM preflight_audit_events 
-                ORDER BY created_at DESC LIMIT 5
-            `);
+            `;
+            const recentEventsParams = [];
+            if (!context.isSuperAdmin && context.tenantId) {
+                recentEventsSql += ` WHERE tenant_id = ? `;
+                recentEventsParams.push(context.tenantId);
+            }
+            recentEventsSql += ` ORDER BY created_at DESC LIMIT 5 `;
+            const recentEvents = await db.query(recentEventsSql, recentEventsParams);
             audit.latestEvents = (recentEvents || []).map(re => ({
                 event: re.action,
                 status: re.status,

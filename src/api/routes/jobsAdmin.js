@@ -58,6 +58,14 @@ async function resolveJobEntity(jobId, context) {
         throw err;
     }
 
+    // Security Enforcement: Printhouse isolation check
+    const printhouseId = rawBullJob?.data?.printhouseId || mysqlJob?.printhouse_id || null;
+    if (!context.isSuperAdmin && context.isPrinthouseUser && context.printhouseId && printhouseId && printhouseId !== context.printhouseId) {
+        const err = new Error("Access Denied: Requested Job belongs to another Printhouse.");
+        err.status = 403;
+        throw err;
+    }
+
     let status = mysqlJob?.status || 'UNKNOWN';
     let durationMs = null;
     let progress = mysqlJob?.progress || 0;
@@ -113,7 +121,9 @@ router.get("/", async (req, res) => {
         const realJobs = await queueOperator.getJobs(undefined, limit, offset);
         
         let filteredJobs = realJobs || [];
-        if (context.isPrinthouseUser || (!context.isSuperAdmin && context.tenantId)) {
+        if (context.isPrinthouseUser) {
+            filteredJobs = filteredJobs.filter(j => j.data?.tenantId === context.tenantId && j.data?.printhouseId === context.printhouseId);
+        } else if (!context.isSuperAdmin && context.tenantId) {
             filteredJobs = filteredJobs.filter(j => j.data?.tenantId === context.tenantId);
         }
 
@@ -149,9 +159,15 @@ router.get("/", async (req, res) => {
         const params = [];
 
         const conditions = [];
-        if (!context.isSuperAdmin && context.tenantId) {
-            conditions.push("tenant_id = ?");
-            params.push(context.tenantId);
+        if (!context.isSuperAdmin) {
+            if (context.tenantId) {
+                conditions.push("tenant_id = ?");
+                params.push(context.tenantId);
+            }
+            if (context.isPrinthouseUser && context.printhouseId) {
+                conditions.push("printhouse_id = ?");
+                params.push(context.printhouseId);
+            }
         }
         if (status && status !== 'ALL') {
             conditions.push("status = ?");

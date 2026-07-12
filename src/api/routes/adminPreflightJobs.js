@@ -297,6 +297,20 @@ function verifyTenantScope(req, targetTenantId) {
     }
 }
 
+// Parameter validation to enforce multi-tenant isolation on all jobId paths
+router.param('jobId', async (req, res, next, jobId) => {
+    try {
+        const rows = await db.query('SELECT tenant_id FROM preflight_job_registry WHERE job_id = ?', [jobId]);
+        const localRecord = rows[0];
+        if (localRecord) {
+            verifyTenantScope(req, localRecord.tenant_id);
+        }
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
 /**
  * Helper: Policy Contract Resolution to map legacy slugs to canonical IDs
  */
