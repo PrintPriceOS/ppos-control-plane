@@ -28,7 +28,12 @@ import {
   getDispatches, 
   rollbackDispatch,
   scoreDispatch,
-  getFederationRegistry
+  getFederationRegistry,
+  getPrinthouseDashboardSummary,
+  getPrinthouseDashboardMachines,
+  getPrinthouseDashboardQueue,
+  getPrinthouseDashboardIncidents,
+  getPrinthouseDashboardActivity
 } from "../../lib/adminApi";
 import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from "../../hooks/useAdminData";
@@ -208,16 +213,18 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 
 // --- TACTICAL SUB-COMPONENTS ---
 
-const IncidentBridge = ({ auditData }: { auditData?: any[] }) => {
-  const incidents = useAdminQuery('hawk-eye:incidents', getIndustrialIncidents, 10000);
-  const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
+const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { auditData?: any[], isPrinthouse?: boolean, printhouseIncidents?: any[] }) => {
+  const incidents = useAdminQuery(!isPrinthouse ? 'hawk-eye:incidents' : '', getIndustrialIncidents, 10000);
+  const anomalies = useAdminQuery(!isPrinthouse ? 'hawk-eye:anomalies' : '', getAnomalies, 15000);
   const auditArray = Array.isArray(auditData) ? auditData : [];
   const anomaliesArray = Array.isArray(anomalies.data) ? anomalies.data : [];
   
-  const incidentCount = incidents.data?.incidentBridge?.count 
-    ?? auditArray.filter((a: any) => a.event?.includes('BLOCKED')).length 
-    ?? anomaliesArray.length 
-    ?? 0;
+  const incidentCount = isPrinthouse
+    ? (printhouseIncidents?.length || 0)
+    : (incidents.data?.incidentBridge?.count 
+       ?? auditArray.filter((a: any) => a.event?.includes('BLOCKED')).length 
+       ?? anomaliesArray.length 
+       ?? 0);
     
   const bridgeStatus = incidentCount > 0 ? 'DEGRADED' : 'ONLINE';
 
@@ -238,15 +245,27 @@ const IncidentBridge = ({ auditData }: { auditData?: any[] }) => {
         <div className="font-mono font-bold text-xs">
           Active Incidents: {incidentCount}
         </div>
-        {safeArray(incidents.data).slice(0, 5).map((inc: any) => (
-          <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
-              <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
+        {isPrinthouse ? (
+          safeArray(printhouseIncidents).slice(0, 5).map((inc: any) => (
+            <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
+                <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.eventType || inc.title}</span>
+              </div>
+              <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
             </div>
-            <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
-          </div>
-        ))}
+          ))
+        ) : (
+          safeArray(incidents.data).slice(0, 5).map((inc: any) => (
+            <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
+                <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
+              </div>
+              <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
+            </div>
+          ))
+        )}
         {incidentCount === 0 && (
           <div className="p-3 bg-zinc-950/20 border border-zinc-800 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
@@ -486,13 +505,25 @@ const RoutingSimulationPanel = () => {
 
 export const CommandCenterPage: React.FC = () => {
   const role = getUserRole();
-  const industrial = useAdminQuery('hawk-eye:industrial', getIndustrialSnapshot, 10000);
-  const network = useAdminQuery('hawk-eye:network', getNetworkOverview, 60000);
-  const capacity = useAdminQuery('hawk-eye:capacity', getCapacity, 60000);
-  const routing = useAdminQuery('hawk-eye:routing', getRoutingEconomicOverview, 60000);
-  const audit = useAdminQuery('hawk-eye:audit', () => getAudit({ limit: 20 }), 5000);
-  const blocks = useAdminQuery('hawk-eye:blocks', getGovernanceBlocks, 30000);
-  const registry = useAdminQuery('hawk-eye:registry', getFederationRegistry, 10000);
+  const isGlobalAdmin = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN'].includes(role);
+  const isTenantAdmin = role === 'TENANT_ADMIN';
+  const isPrinthouseUser = ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role);
+
+  // Scoped queries for Printhouse context
+  const phSummary = useAdminQuery(isPrinthouseUser ? 'ph:summary' : '', getPrinthouseDashboardSummary, 10000);
+  const phMachines = useAdminQuery(isPrinthouseUser ? 'ph:machines' : '', getPrinthouseDashboardMachines, 30000);
+  const phQueue = useAdminQuery(isPrinthouseUser ? 'ph:queue' : '', getPrinthouseDashboardQueue, 10000);
+  const phIncidents = useAdminQuery(isPrinthouseUser ? 'ph:incidents' : '', getPrinthouseDashboardIncidents, 10000);
+  const phActivity = useAdminQuery(isPrinthouseUser ? 'ph:activity' : '', getPrinthouseDashboardActivity, 5000);
+
+  // Standard/Global queries
+  const industrial = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:industrial' : '', getIndustrialSnapshot, 10000);
+  const network = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:network' : '', getNetworkOverview, 60000);
+  const capacity = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:capacity' : '', getCapacity, 60000);
+  const routing = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:routing' : '', getRoutingEconomicOverview, 60000);
+  const audit = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:audit' : '', () => getAudit({ limit: 20 }), 5000);
+  const blocks = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:blocks' : '', getGovernanceBlocks, 30000);
+  const registry = useAdminQuery(!isPrinthouseUser ? 'hawk-eye:registry' : '', getFederationRegistry, 10000);
 
   const handleCommand = async (action: string) => {
     if (!window.confirm(`Trigger ${action.toUpperCase()}?`)) return;
@@ -503,183 +534,290 @@ export const CommandCenterPage: React.FC = () => {
     } catch (e: any) { alert(e.message); }
   };
 
-  const activeJobs = industrial.data?.queue?.queues?.[0]?.counts?.active || 0;
-  const waitingJobs = industrial.data?.queue?.queues?.[0]?.counts?.waiting || 0;
-  const throughput = industrial.data?.queue?.queues?.[0]?.throughput || 0;
+  const activeJobs = isPrinthouseUser
+    ? (phSummary.data?.data?.activeJobs || 0)
+    : (industrial.data?.queue?.queues?.[0]?.counts?.active || 0);
+  const waitingJobs = isPrinthouseUser
+    ? 0
+    : (industrial.data?.queue?.queues?.[0]?.counts?.waiting || 0);
+  const throughput = isPrinthouseUser
+    ? 0
+    : (industrial.data?.queue?.queues?.[0]?.throughput || 0);
+
+  if (!isGlobalAdmin && !isTenantAdmin && !isPrinthouseUser) {
+    return (
+      <div className="p-8 text-center uppercase font-black text-xs text-[#dc0000] border border-[#dc0000]/20 bg-[#dc0000]/5 rounded-none">
+        Security Exception: Unauthorized Role Context.
+      </div>
+    );
+  }
+
+  const storageAvailable = phSummary.data?.data?.storage?.status === 'ACTIVE';
 
   return (
     <div className="space-y-6 italic-text-off">
       {/* Header */}
       <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-4`}>
         <div>
-          <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>Control Plane</h1>
-          <p className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>Operational Intelligence</p>
+          <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>
+            {isPrinthouseUser ? 'Printhouse Portal' : 'Control Plane'}
+          </h1>
+          <p className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>
+            {isPrinthouseUser ? 'Operational Workspace' : 'Operational Intelligence'}
+          </p>
         </div>
         <div className="flex gap-4">
           <div className={`flex items-center gap-2 px-3 py-1.5 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
-            <div className={`w-2 h-2 ${industrial.data?.queue?.state === 'LIVE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
-            <span className={`text-[9px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-wider`}>System: {industrial.data?.queue?.state || 'OFFLINE'}</span>
+            <div className={`w-2 h-2 ${(isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'LIVE' || (isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'ACTIVE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
+            <span className={`text-[9px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-wider`}>System: {isPrinthouseUser ? 'ACTIVE' : (industrial.data?.queue?.state || 'OFFLINE')}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLUMN 1: INDUSTRIAL CORE */}
-        <div className="space-y-6">
-          <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status}>
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-3">
-                <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
-                <TelemetryItem label="Queue Depth" value={waitingJobs} status={waitingJobs > 100 ? 'warning' : 'stable'} />
-              </div>
-              <StatBar label="Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
-            </div>
-          </TacticalPanel>
-
-          <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={toDisplayText(industrial.data?.workers?.state, 'ACTIVE')} color="primary" status={industrial.status}>
-            <div className="space-y-2">
-              {(safeArray(industrial.data?.workers?.activeFleet).length ? safeArray(industrial.data?.workers?.activeFleet) : [
-                { id: 'worker-eu-west-1a', status: 'PROCESSING' },
-                { id: 'worker-eu-west-1b', status: 'LISTENING' },
-                { id: 'worker-us-east-1a', status: 'STANDBY' }
-              ]).slice(0, 4).map((w: any) => (
-                <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
-                  <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.id)}</span>
-                  <span className={`text-[8px] font-black ${w?.status === 'PROCESSING' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(w?.status)}</span>
+      {isPrinthouseUser ? (
+        /* PRINTHOUSE OPERATIONAL DASHBOARD */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* COLUMN 1 */}
+          <div className="space-y-6">
+            <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={phSummary.status}>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
+                  <TelemetryItem label="Failed (Today)" value={phSummary.data?.data?.failedJobsToday || 0} status="stable" />
                 </div>
-              ))}
-            </div>
-          </TacticalPanel>
-          
-          <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Tiering" color="slate" status={industrial.status}>
-             <div className="flex justify-between items-end mb-3">
-               <span className={`text-xl font-black ${COLORS.adaptive.textPrimary}`}>
-                 {((industrial.data?.storage?.totalSizeBytes || 1482093021) / (1024**3)).toFixed(1)} GB
-               </span>
-               <span className={`text-[9px] ${COLORS.adaptive.textMuted}`}>
-                 {industrial.data?.storage?.artifactCount || 342} Artifacts
-               </span>
-             </div>
-             <div className="grid grid-cols-3 gap-2">
-                <LifecycleTier label="HOT" value={industrial.data?.storage?.tierDistribution?.HOT || 64} color="primary" />
-                <LifecycleTier label="WARM" value={industrial.data?.storage?.tierDistribution?.WARM || 28} color="amber" />
-                <LifecycleTier label="COLD" value={industrial.data?.storage?.tierDistribution?.COLD || 8} color="slate" />
-             </div>
-          </TacticalPanel>
-        </div>
-
-        {/* COLUMN 2: GOVERNANCE & SECURITY */}
-        <div className="space-y-6">
-          <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
-            <div className="space-y-2">
-              {(safeArray(blocks.data?.blocks).length ? safeArray(blocks.data?.blocks) : [
-                { name: 'STRICT_PDF_X4_INTENT', status: 'ACTIVE' },
-                { name: 'MUTOOL_SANITY_GATE', status: 'ACTIVE' },
-                { name: 'GEO_TRIMBOX_RECOVERY', status: 'ACTIVE' }
-              ]).slice(0, 3).map((b: any) => (
-                <GovernanceRow key={b?.id || Math.random()} label={toDisplayText(b?.name)} status={toDisplayText(b?.status)} color={b?.status === 'ACTIVE' ? 'emerald' : 'red'} />
-              ))}
-            </div>
-          </TacticalPanel>
-
-          <IncidentBridge auditData={audit.data} />
-          <IntelligenceAnomalies registryData={registry.data?.registry} overviewData={network.data} />
-        </div>
-
-        {/* COLUMN 3: ECONOMY & LOGISTICS */}
-        <div className="space-y-6">
-          <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
-            <div className="space-y-4">
-              <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${Number(routing.data.metrics.avg_margin_pct).toFixed(1)}%` : '---'} status="stable" />
-              <div className={`flex justify-between border-t ${COLORS.adaptive.borderSubtle} pt-3`}>
-                <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>Quality</span>
-                <span className="text-sm font-black text-[#10B981]">{Number(routing.data?.avg_final_score || 0).toFixed(1)}</span>
+                <StatBar label="Completed Jobs Today" value={phSummary.data?.data?.completedJobsToday ? Math.min(100, (phSummary.data.data.completedJobsToday / 50) * 100) : 0} color="emerald" />
               </div>
-            </div>
-          </TacticalPanel>
+            </TacticalPanel>
 
-          <IndustrialHeartbeatMatrix />
+            <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={phMachines.status === 'success' ? 'ACTIVE' : 'LOADING'} color="primary" status={phMachines.status}>
+              <div className="space-y-2">
+                {safeArray(phMachines.data?.data?.machines).slice(0, 4).map((w: any) => (
+                  <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+                    <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.name || w?.id)}</span>
+                    <span className={`text-[8px] font-black ${w?.status === 'active' || w?.status === 'ACTIVE' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(w?.status)}</span>
+                  </div>
+                ))}
+                {safeArray(phMachines.data?.data?.machines).length === 0 && (
+                  <div className={`text-center py-4 uppercase font-black text-[9px] ${COLORS.adaptive.textMuted}`}>No Machines Configured</div>
+                )}
+              </div>
+            </TacticalPanel>
+          </div>
 
-          <TacticalPanel title="System Registry" icon={ServerIcon} badge="State DB" color="slate">
-             <div className="space-y-2">
-                 <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                    <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>PostgreSQL Clusters</span>
-                    <span className="text-[9px] font-mono font-black text-[#10B981]">SYNCED [{capacity.data?.length ? 2 + (capacity.data.length % 4) : 3}ms]</span>
-                 </div>
-                 <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                    <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Redis Sub/Pub Engine</span>
-                    <span className="text-[9px] font-mono font-black text-[#10B981]">ACTIVE [{network.data ? 4 : 7}ms]</span>
-                 </div>
-                 <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                    <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Control Plane Broker</span>
-                    <span className="text-[9px] font-mono font-black text-[#10B981]">HEALTHY [1ms]</span>
-                 </div>
-             </div>
-          </TacticalPanel>
-        </div>
+          {/* COLUMN 2 */}
+          <div className="space-y-6">
+            <IncidentBridge auditData={null} isPrinthouse={true} printhouseIncidents={phIncidents.data?.data?.incidents} />
+          </div>
 
-        {/* LIVE ORDERS FEED (PRINTHOUSE ADMINS ONLY) */}
-        {role === 'PRINTHOUSE_ADMIN' && (
+          {/* COLUMN 3 */}
+          <div className="space-y-6">
+            <TacticalPanel title="Operational Summary" icon={ServerIcon} badge="Summary" color="slate">
+               <div className="space-y-2">
+                   <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Storage Utilized</span>
+                      <span className="text-[9px] font-mono font-black text-[#10B981]">
+                        {storageAvailable ? `${((phSummary.data?.data?.storage?.sizeBytes || 0) / (1024**3)).toFixed(1)} GB` : 'Unavailable'}
+                      </span>
+                   </div>
+                   <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Active Artifacts</span>
+                      <span className="text-[9px] font-mono font-black text-[#10B981]">
+                        {storageAvailable ? (phSummary.data?.data?.storage?.artifactsCount || 0) : 'Unavailable'}
+                      </span>
+                   </div>
+               </div>
+            </TacticalPanel>
+          </div>
+
+          {/* LIVE REVENUE FEED */}
           <div className="lg:col-span-3">
             <LiveOrdersFeed />
           </div>
-        )}
 
-        {/* MAP */}
-        <div className="lg:col-span-3">
-          <TacticalPanel title="Manufacturing Heatmap" icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
-            <div className={`h-[400px] ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} relative overflow-hidden`}>
-               <FederationMap />
-               <div className={`absolute bottom-0 left-0 right-0 ${COLORS.adaptive.surface} bg-opacity-90 p-3 border-t ${COLORS.adaptive.borderPrimary} flex justify-around`}>
-                 <MiniMetric label="TOTAL NODES" value={capacity.data?.length || 0} />
-                 <MiniMetric label="LOAD" value={`${network.data?.capacity_utilization_pct || 0}%`} />
+          {/* SCOPED OPERATIONAL ACTIVITY */}
+          <div className="lg:col-span-3">
+            <TacticalPanel title="Operational Activity Stream" icon={BoltIcon} badge="Immutable" color="slate" status={phActivity.status}>
+              <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
+                {safeArray(phActivity.data?.data?.events).slice(0, 10).map((log: any) => (
+                  <div key={log.id} className="flex gap-2.5 items-center">
+                    <span className={COLORS.adaptive.textMuted}>[{new Date(log.timestamp || Date.now()).toLocaleTimeString()}]</span>
+                    <span className="text-[#10B981] font-bold">{log.action || 'SYSTEM_EVENT'}</span>
+                    <span className={COLORS.adaptive.textSecondary}>{log.message || 'Execution trail event logged.'}</span>
+                  </div>
+                ))}
+                {safeArray(phActivity.data?.data?.events).length === 0 && (
+                  <div className="flex flex-col gap-1.5 justify-center h-full text-center">
+                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>Stream Subscription Active</span>
+                    <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for operational activity traces...</span>
+                  </div>
+                )}
+              </div>
+            </TacticalPanel>
+          </div>
+        </div>
+      ) : (
+        /* SYSTEM ADMIN & TENANT ADMIN GLOBAL CONTROL ROOM */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* COLUMN 1: INDUSTRIAL CORE */}
+          <div className="space-y-6">
+            <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status}>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
+                  <TelemetryItem label="Queue Depth" value={waitingJobs} status={waitingJobs > 100 ? 'warning' : 'stable'} />
+                </div>
+                <StatBar label="Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
+              </div>
+            </TacticalPanel>
+
+            <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={toDisplayText(industrial.data?.workers?.state, 'ACTIVE')} color="primary" status={industrial.status}>
+              <div className="space-y-2">
+                {(safeArray(industrial.data?.workers?.activeFleet).length ? safeArray(industrial.data?.workers?.activeFleet) : [
+                  { id: 'worker-eu-west-1a', status: 'PROCESSING' },
+                  { id: 'worker-eu-west-1b', status: 'LISTENING' },
+                  { id: 'worker-us-east-1a', status: 'STANDBY' }
+                ]).slice(0, 4).map((w: any) => (
+                  <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+                    <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.id)}</span>
+                    <span className={`text-[8px] font-black ${w?.status === 'PROCESSING' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(w?.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </TacticalPanel>
+            
+            <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Tiering" color="slate" status={industrial.status}>
+               <div className="flex justify-between items-end mb-3">
+                 <span className={`text-xl font-black ${COLORS.adaptive.textPrimary}`}>
+                   {((industrial.data?.storage?.totalSizeBytes || 1482093021) / (1024**3)).toFixed(1)} GB
+                 </span>
+                 <span className={`text-[9px] ${COLORS.adaptive.textMuted}`}>
+                   {industrial.data?.storage?.artifactCount || 342} Artifacts
+                 </span>
                </div>
-            </div>
-            <UnlocatedCapacityStrip data={capacity.data || []} />
-          </TacticalPanel>
-        </div>
+               <div className="grid grid-cols-3 gap-2">
+                  <LifecycleTier label="HOT" value={industrial.data?.storage?.tierDistribution?.HOT || 64} color="primary" />
+                  <LifecycleTier label="WARM" value={industrial.data?.storage?.tierDistribution?.WARM || 28} color="amber" />
+                  <LifecycleTier label="COLD" value={industrial.data?.storage?.tierDistribution?.COLD || 8} color="slate" />
+               </div>
+            </TacticalPanel>
+          </div>
 
-        {/* AUDIT */}
-        <div className="lg:col-span-3">
-          <TacticalPanel title="Operational Audit Stream" icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
-            <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
-              {safeArray(audit.data).slice(0, 10).map((log: any) => (
-                <div key={log.id} className="flex gap-2.5 items-center">
-                  <span className={COLORS.adaptive.textMuted}>[{new Date(log.created_at || Date.now()).toLocaleTimeString()}]</span>
-                  <span className="text-[#10B981] font-bold">{log.action || 'SYSTEM_EVENT'}</span>
-                  <span className={COLORS.adaptive.textSecondary}>{log.entity_id || 'system-cluster'}</span>
+          {/* COLUMN 2: GOVERNANCE & SECURITY */}
+          <div className="space-y-6">
+            {!isTenantAdmin && (
+              <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
+                <div className="space-y-2">
+                  {(safeArray(blocks.data?.blocks).length ? safeArray(blocks.data?.blocks) : [
+                    { name: 'STRICT_PDF_X4_INTENT', status: 'ACTIVE' },
+                    { name: 'MUTOOL_SANITY_GATE', status: 'ACTIVE' },
+                    { name: 'GEO_TRIMBOX_RECOVERY', status: 'ACTIVE' }
+                  ]).slice(0, 3).map((b: any) => (
+                    <GovernanceRow key={b?.id || Math.random()} label={toDisplayText(b?.name)} status={toDisplayText(b?.status)} color={b?.status === 'ACTIVE' ? 'emerald' : 'red'} />
+                  ))}
                 </div>
-              ))}
-              {safeArray(audit.data).length === 0 && (
-                <div className="flex flex-col gap-1.5 justify-center h-full text-center">
-                  <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>Stream Subscription Active</span>
-                  <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for transactional microservice trace blocks...</span>
+              </TacticalPanel>
+            )}
+
+            <IncidentBridge auditData={audit.data} />
+            <IntelligenceAnomalies registryData={registry.data?.registry} overviewData={network.data} />
+          </div>
+
+          {/* COLUMN 3: ECONOMY & LOGISTICS */}
+          <div className="space-y-6">
+            <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
+              <div className="space-y-4">
+                <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${Number(routing.data.metrics.avg_margin_pct).toFixed(1)}%` : '---'} status="stable" />
+                <div className={`flex justify-between border-t ${COLORS.adaptive.borderSubtle} pt-3`}>
+                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>Quality</span>
+                  <span className="text-sm font-black text-[#10B981]">{Number(routing.data?.avg_final_score || 0).toFixed(1)}</span>
                 </div>
-              )}
+              </div>
+            </TacticalPanel>
+
+            {!isTenantAdmin && <IndustrialHeartbeatMatrix />}
+
+            {!isTenantAdmin && (
+              <TacticalPanel title="System Registry" icon={ServerIcon} badge="State DB" color="slate">
+                 <div className="space-y-2">
+                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                        <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>PostgreSQL Clusters</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">SYNCED [{capacity.data?.length ? 2 + (capacity.data.length % 4) : 3}ms]</span>
+                     </div>
+                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                        <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Redis Sub/Pub Engine</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">ACTIVE [{network.data ? 4 : 7}ms]</span>
+                     </div>
+                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                        <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Control Plane Broker</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">HEALTHY [1ms]</span>
+                     </div>
+                 </div>
+              </TacticalPanel>
+            )}
+          </div>
+
+          {/* MAP (SYSTEM ADMINS ONLY) */}
+          {!isTenantAdmin && (
+            <div className="lg:col-span-3">
+              <TacticalPanel title="Manufacturing Heatmap" icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
+                <div className={`h-[400px] ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} relative overflow-hidden`}>
+                   <FederationMap />
+                   <div className={`absolute bottom-0 left-0 right-0 ${COLORS.adaptive.surface} bg-opacity-90 p-3 border-t ${COLORS.adaptive.borderPrimary} flex justify-around`}>
+                     <MiniMetric label="TOTAL NODES" value={capacity.data?.length || 0} />
+                     <MiniMetric label="LOAD" value={`${network.data?.capacity_utilization_pct || 0}%`} />
+                   </div>
+                </div>
+                <UnlocatedCapacityStrip data={capacity.data || []} />
+              </TacticalPanel>
             </div>
-          </TacticalPanel>
-        </div>
+          )}
 
-        {/* DISPATCH & SIMULATION */}
-        <div className="lg:col-span-3">
-           <ManufacturingDispatchConsole />
-        </div>
-        <div className="lg:col-span-3">
-           <RoutingSimulationPanel />
-        </div>
+          {/* AUDIT */}
+          <div className="lg:col-span-3">
+            <TacticalPanel title="Operational Audit Stream" icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
+              <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
+                {safeArray(audit.data).slice(0, 10).map((log: any) => (
+                  <div key={log.id} className="flex gap-2.5 items-center">
+                    <span className={COLORS.adaptive.textMuted}>[{new Date(log.created_at || Date.now()).toLocaleTimeString()}]</span>
+                    <span className="text-[#10B981] font-bold">{log.action || 'SYSTEM_EVENT'}</span>
+                    <span className={COLORS.adaptive.textSecondary}>{log.entity_id || 'system-cluster'}</span>
+                  </div>
+                ))}
+                {safeArray(audit.data).length === 0 && (
+                  <div className="flex flex-col gap-1.5 justify-center h-full text-center">
+                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>Stream Subscription Active</span>
+                    <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for transactional microservice trace blocks...</span>
+                  </div>
+                )}
+              </div>
+            </TacticalPanel>
+          </div>
 
-        {/* SYSTEM COMMAND CONSOLE */}
-        <div className="lg:col-span-3">
-          <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <CommandButton label="Pause Queue Orchestration" badge="Emergency Global Stop" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
-              <CommandButton label="Resume Queue Orchestration" badge="Re-engage Worker Hubs" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
+          {/* DISPATCH & SIMULATION (SYSTEM ADMINS ONLY) */}
+          {!isTenantAdmin && (
+            <>
+              <div className="lg:col-span-3">
+                 <ManufacturingDispatchConsole />
+              </div>
+              <div className="lg:col-span-3">
+                 <RoutingSimulationPanel />
+              </div>
+            </>
+          )}
+
+          {/* SYSTEM COMMAND CONSOLE (SYSTEM ADMINS ONLY) */}
+          {!isTenantAdmin && (
+            <div className="lg:col-span-3">
+              <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <CommandButton label="Pause Queue Orchestration" badge="Emergency Global Stop" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
+                  <CommandButton label="Resume Queue Orchestration" badge="Re-engage Worker Hubs" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
+                </div>
+              </TacticalPanel>
             </div>
-          </TacticalPanel>
+          )}
         </div>
-      </div>
-
+      )}
     </div>
   );
 };

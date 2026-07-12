@@ -16,7 +16,11 @@ const testSuites = [
     'tests/security_frontend_route_visibility_test.js',
     'tests/security_settings_tenant_config_isolation_test.js',
     'tests/security_production_monitoring_industrial_ops_isolation_test.js',
-    'tests/security_legacy_alternate_routes_isolation_test.js'
+    'tests/security_legacy_alternate_routes_isolation_test.js',
+    'tests/security_printhouse_dashboard_isolation_test.js',
+    'tests/dashboard_no_mock_data_test.js',
+    'tests/dashboard_role_widget_visibility_test.js',
+    'tests/dashboard_printhouse_endpoint_matrix_test.js'
 ];
 
 console.log('Starting execution of all security isolation test suites...');

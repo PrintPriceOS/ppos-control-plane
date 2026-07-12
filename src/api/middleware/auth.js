@@ -278,13 +278,23 @@ function requireRole(minRole) {
 
 /**
  * Middleware to enforce Printhouse scope.
+ * Returns 401 when no authenticated identity is present.
+ * Returns 403 when identity is present but role is not Printhouse.
  */
 function requirePrinthouseScope() {
     return (req, res, next) => {
+        // 401: No identity — token missing, expired, or invalid
+        if (!req.user) {
+            return res.status(401).json({
+                ok: false,
+                error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+            });
+        }
         const { isPrinthouseUser, isSuperAdmin } = resolveActorContext(req);
         if (isPrinthouseUser || isSuperAdmin) {
             return next();
         }
+        // 403: Identity present but role insufficient
         return res.status(403).json({ 
             ok: false, 
             error: { code: 'FORBIDDEN', message: 'This route requires a Printhouse scope' } 

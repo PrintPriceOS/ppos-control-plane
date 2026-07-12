@@ -560,6 +560,30 @@ export async function getDashboardOverview() {
     return adminFetch<DashboardOverviewPayload>('/api/admin/dashboard/overview');
 }
 
+export async function getPrinthouseDashboardSummary() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/summary');
+}
+
+export async function getPrinthouseDashboardOrders() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/orders');
+}
+
+export async function getPrinthouseDashboardMachines() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/machines');
+}
+
+export async function getPrinthouseDashboardQueue() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/queue');
+}
+
+export async function getPrinthouseDashboardIncidents() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/incidents');
+}
+
+export async function getPrinthouseDashboardActivity() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/activity');
+}
+
 export async function getGovernanceBlocks() {
     return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }

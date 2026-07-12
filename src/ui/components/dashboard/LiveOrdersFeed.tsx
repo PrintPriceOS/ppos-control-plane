@@ -1,57 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Factory, Package, Zap } from 'lucide-react';
+import { getPrinthouseDashboardOrders } from '../../lib/adminApi';
 
-type OrderStatus = 'PENDING_ROUTING' | 'PRODUCTION' | 'SHIPPED';
+type OrderStatus = 'PENDING_ROUTING' | 'PRODUCTION' | 'SHIPPED' | 'ACKNOWLEDGED' | 'MACHINE_ASSIGNED' | 'IN_PRODUCTION';
 
 interface LiveOrder {
     id: string;
-    productName: string;
+    productName?: string;
     value: number;
     status: OrderStatus;
     timestamp: number;
     isUrgent: boolean;
 }
 
-const generateMockOrder = (): LiveOrder => {
-    const products = ['Business Cards Premium', 'Flyers 500x', 'Large Format Banner', 'Custom Packaging Box', 'Brochures Tri-fold'];
-    const isUrgent = Math.random() > 0.75;
-    return {
-        id: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
-        productName: products[Math.floor(Math.random() * products.length)],
-        value: Math.floor(80 + Math.random() * 600),
-        status: 'PENDING_ROUTING',
-        timestamp: Date.now(),
-        isUrgent
-    };
-};
-
 export const LiveOrdersFeed: React.FC = () => {
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     const [orders, setOrders] = useState<LiveOrder[]>([]);
+    const [revenue, setRevenue] = useState<number>(0);
     const [filter, setFilter] = useState<'ALL' | 'HIGH_PROFIT' | 'URGENT'>('ALL');
+    const [loading, setLoading] = useState<boolean>(true);
+
+    const fetchOrders = async () => {
+        try {
+            const res = await getPrinthouseDashboardOrders();
+            if (res && res.ok && res.data) {
+                setOrders(res.data.orders || []);
+                setRevenue(res.data.expectedRevenueEUR || 0);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        // Initial state
-        setOrders(Array.from({ length: 3 }).map(generateMockOrder));
-
-        const interval = setInterval(() => {
-            setOrders(prev => {
-                const newOrder = generateMockOrder();
-                const next = [newOrder, ...prev];
-                if (next.length > 8) next.pop(); // Keep only recent 8 to avoid clutter
-                return next;
-            });
-        }, 4500);
-
+        fetchOrders();
+        const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
     }, []);
 
     const getStatusIcon = (status: OrderStatus) => {
         switch (status) {
             case 'PENDING_ROUTING': return <Clock size={16} color="#eab308" />;
-            case 'PRODUCTION': return <Factory size={16} color="#3b82f6" />;
+            case 'PRODUCTION':
+            case 'MACHINE_ASSIGNED':
+            case 'IN_PRODUCTION':
+                return <Factory size={16} color="#3b82f6" />;
             case 'SHIPPED': return <Package size={16} color="#10b981" />;
+            default: return <Clock size={16} color="#a1a1aa" />;
         }
     };
 
@@ -77,9 +75,11 @@ export const LiveOrdersFeed: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: isDark ? '#fff' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Zap size={20} color="#dc0000" /> Live Revenue Feed
+                        <Zap size={20} color="#dc0000" /> Expected Printhouse Revenue
                     </h2>
-                    <p style={{ fontSize: '13px', color: isDark ? '#a1a1aa' : '#64748b' }}>Real-time orders routed to your node</p>
+                    <p style={{ fontSize: '13px', color: isDark ? '#a1a1aa' : '#64748b' }}>
+                        {loading ? 'Hydrating orders...' : `Expected Revenue: €${revenue.toFixed(2)}`}
+                    </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     {(['ALL', 'HIGH_PROFIT', 'URGENT'] as const).map(f => (
@@ -158,7 +158,7 @@ export const LiveOrdersFeed: React.FC = () => {
                         >
                             <div style={{ fontWeight: 500 }}>{order.id}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {order.productName}
+                                {order.productName || 'Assigned Production Order'}
                                 {order.isUrgent && (
                                     <span style={{ 
                                         fontSize: '10px', 
@@ -177,7 +177,7 @@ export const LiveOrdersFeed: React.FC = () => {
                                 </span>
                             </div>
                             <div style={{ textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
-                                ${order.value.toFixed(2)}
+                                {order.currency === 'USD' ? '$' : '€'}{order.value.toFixed(2)}
                             </div>
                         </motion.div>
                     ))}

@@ -515,6 +515,7 @@ router.use('/materials', require('./materialsAdmin')); // Materials & Paper Cata
 router.use('/audit', require('./auditExplorerAdmin')); // Forensic Audit Explorer
 router.use('/jobs', require('./jobsAdmin')); // Forensic Jobs Observability Layer
 router.use('/dashboard', require('./adminDashboard')); // Production Mission Control Layer
+router.use('/printhouse/dashboard', require('./printhouseDashboard')); // Dedicated Printhouse Dashboard API
 router.use('/observability', require('./adminOnboardingObservability')); // Phase 6: De-mocking Observability
 
 
