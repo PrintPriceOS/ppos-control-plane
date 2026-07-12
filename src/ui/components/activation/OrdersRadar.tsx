@@ -48,14 +48,17 @@ export const OrdersRadar: React.FC = () => {
                 <circle cx="0" cy="0" r="12" fill="#dc0000" />
                 
                 {/* Scanning line animation */}
-                <motion.line 
-                    x1="0" y1="0" x2="0" y2="-140" 
-                    stroke="rgba(220,0,0,0.5)" 
-                    strokeWidth="2"
+                <motion.g
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                    style={{ originX: 0, originY: 0 }}
-                />
+                    style={{ transformOrigin: "0px 0px" }}
+                >
+                    <line 
+                        x1="0" y1="0" x2="0" y2="-140" 
+                        stroke="rgba(220,0,0,0.5)" 
+                        strokeWidth="2"
+                    />
+                </motion.g>
             </svg>
 
             {/* Orders (Dots) Container */}

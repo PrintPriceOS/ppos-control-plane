@@ -50,7 +50,11 @@ export const ActivationHub: React.FC = () => {
         }
     }, [tasks]);
 
-    const handleVerifyAndRedirect = async () => {
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+    };
+
+    const handleGoToDashboard = async () => {
         setIsVerifying(true);
         try {
             // Optimistic local update so the guard allows us through
@@ -92,7 +96,8 @@ export const ActivationHub: React.FC = () => {
         }}>
             <VerifiedBadgeModal 
                 isOpen={isModalOpen} 
-                onClose={handleVerifyAndRedirect} 
+                onClose={handleCloseModal} 
+                onGoToDashboard={handleGoToDashboard}
             />
 
             <div style={{ marginBottom: '40px' }}>

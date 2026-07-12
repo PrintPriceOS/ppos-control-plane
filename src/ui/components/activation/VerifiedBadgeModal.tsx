@@ -5,9 +5,10 @@ import { ShieldCheck } from 'lucide-react';
 interface VerifiedBadgeModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onGoToDashboard: () => void;
 }
 
-export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, onClose }) => {
+export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, onClose, onGoToDashboard }) => {
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
     return (
@@ -74,7 +75,9 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
                         </p>
 
                         <button
-                            onClick={onClose}
+                            type="button"
+                            aria-label="Go to Dashboard"
+                            onClick={onGoToDashboard}
                             style={{
                                 width: '100%',
                                 padding: '14px 24px',
