@@ -1,0 +1,25 @@
+-- Phase 190.2 Trigger Test Fixture
+-- Minimal schema to support migration 136 trigger tests
+
+CREATE TABLE IF NOT EXISTS job_quotes (
+  id VARCHAR(64) PRIMARY KEY,
+  job_id VARCHAR(64) NOT NULL,
+  printer_id VARCHAR(64) NULL,
+  calculation_breakdown_json JSON NULL,
+  status ENUM('DRAFT','ACCEPTED','EXPIRED','REJECTED','SUPERSEDED','VOIDED') NOT NULL DEFAULT 'DRAFT',
+  revision INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id VARCHAR(64) PRIMARY KEY,
+  job_id VARCHAR(64) NULL,
+  tenant_id VARCHAR(64) NOT NULL,
+  assigned_printhouse_id VARCHAR(64) NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'EUR',
+  active_pricing_snapshot_id VARCHAR(64) NULL,
+  status VARCHAR(64) NOT NULL DEFAULT 'DRAFT',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

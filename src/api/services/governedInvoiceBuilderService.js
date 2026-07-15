@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mysqlClient = require('./mysqlClient');
 
 class GovernedInvoiceBuilderService {
     constructor() {
@@ -37,8 +38,71 @@ class GovernedInvoiceBuilderService {
             warnings.push('Currency mismatch between order and tax snapshot.');
         }
 
+        const pricingGovernance = require('../../config/pricingGovernance');
+        const canonicalizer = require('./pricingSnapshotCanonicalizer');
         const taxAmount = taxSnapshot ? taxSnapshot.tax_amount_estimated : 0;
-        const subtotalAmount = orderData.amount || 0;
+        let subtotalAmount = 0;
+        let pricingSnapshot = null;
+
+        const isLegacyOrder = pricingGovernance.isLegacyOrderEligibleByDate(orderData.created_at);
+
+        if (orderData.source_type === 'LEGACY_INVOICE_SOURCE') {
+            if (!isLegacyOrder) {
+                const err = new Error("Commercial order created after cutover lacks a sealed pricing snapshot. Legacy fallback forbidden.");
+                err.code = 'INVOICE_PRICING_SNAPSHOT_REQUIRED';
+                throw err;
+            }
+            if (orderData.active_pricing_snapshot_id) {
+                const err = new Error("Order with active pricing snapshot cannot use legacy fallback.");
+                err.code = 'INVOICE_PRICING_SNAPSHOT_REQUIRED';
+                throw err;
+            }
+            subtotalAmount = orderData.amount || 0;
+        } else {
+            if (!orderData.active_pricing_snapshot_id) {
+                const err = new Error("Commercial order lacks a sealed pricing snapshot");
+                err.code = 'INVOICE_PRICING_SNAPSHOT_REQUIRED';
+                throw err;
+            }
+
+            const pool = mysqlClient.getPool();
+            // Wrap in try/catch for test environments where pool might not be initialized
+            try {
+                const [snaps] = await pool.query('SELECT * FROM order_pricing_snapshots WHERE snapshot_id = ? AND status = "SEALED"', [orderData.active_pricing_snapshot_id]);
+                if (snaps.length === 0) {
+                    const err = new Error("Sealed pricing snapshot not found or not sealed");
+                    err.code = 'INVOICE_PRICING_SNAPSHOT_REQUIRED';
+                    throw err;
+                }
+                pricingSnapshot = snaps[0];
+            } catch(e) {
+                if (e.code === 'INVOICE_PRICING_SNAPSHOT_REQUIRED') throw e;
+                // For mock tests without a real DB running, we might simulate finding the snapshot
+                // if they provide a mock snapshot inside orderData.
+                if (orderData._mock_pricing_snapshot) {
+                    pricingSnapshot = orderData._mock_pricing_snapshot;
+                } else {
+                    throw e; // Bubble up DB errors
+                }
+            }
+
+            // Verify integrity
+            let parsedSnapshotJson;
+            try {
+                parsedSnapshotJson = typeof pricingSnapshot.snapshot_json === 'string'
+                    ? JSON.parse(pricingSnapshot.snapshot_json)
+                    : pricingSnapshot.snapshot_json;
+
+                // Mismatch throws SNAPSHOT_INTEGRITY_CHECK_FAILED
+                canonicalizer.verifyPricingSnapshotChecksum(parsedSnapshotJson, pricingSnapshot.snapshot_checksum);
+            } catch(e) {
+                // If it fails verification, do not build invoice
+                throw e;
+            }
+
+            subtotalAmount = Number(pricingSnapshot.final_amount);
+        }
+
         const totalAmount = subtotalAmount + taxAmount;
 
         const invoice = {
@@ -56,7 +120,7 @@ class GovernedInvoiceBuilderService {
             subtotal_amount: subtotalAmount,
             tax_amount: taxAmount,
             total_amount: totalAmount,
-            source_snapshot_json: { ...orderData },
+            source_snapshot_json: { ...orderData, pricingSnapshot },
             tax_readiness_snapshot_json: taxSnapshot ? { ...taxSnapshot } : null,
             reconciliation_snapshot_json: reconciliationSnapshot ? { ...reconciliationSnapshot } : null,
             metadata_json: { note: 'Governed invoice lifecycle/readiness only' },

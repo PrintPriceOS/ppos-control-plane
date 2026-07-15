@@ -1,6 +1,6 @@
 /**
  * src/api/services/marketplaceOrderService.js
- * 
+ *
  * Marketplace Order Intake Service for Phase 36.1.
  * Governs marketplace orders, print file slots, audit logs, preflight bindings, and readiness states.
  */
@@ -32,7 +32,7 @@ function generateId(prefix = 'ord') {
 
 class MarketplaceOrderService {
     /**
-     * Normalizes a physical order row along with its files, events, and preflight bindings 
+     * Normalizes a physical order row along with its files, events, and preflight bindings
      * into the canonical Control Plane operational format expected by the frontend and admins.
      */
     normalizeOrder(orderRow, files = [], events = [], bindings = []) {
@@ -278,12 +278,38 @@ class MarketplaceOrderService {
         const pricingSessionId = input.pricingSessionId || null;
         const selectedOfferId = input.selectedOfferId || null;
 
-        const bookSpecJson = input.bookSpec ? JSON.stringify(input.bookSpec) : null;
-        const selectedOfferJson = input.selectedOffer ? JSON.stringify(input.selectedOffer) : null;
-        const customerJson = input.customer ? JSON.stringify(input.customer) : null;
-        
+        // Prevent client manipulation of legacy or snapshot fields using strict allowlisting
+        const allowedInput = {
+            orderId: input.orderId,
+            pricingSessionId: input.pricingSessionId,
+            sessionId: input.sessionId,
+            tenantId: input.tenantId,
+            printhouseId: input.printhouseId,
+            customerId: input.customerId,
+            selectedOfferId: input.selectedOfferId,
+            selectedOffer: input.selectedOffer,
+            currency: input.currency,
+            estimatedPrice: input.estimatedPrice,
+            bookSpec: input.bookSpec,
+            customer: input.customer,
+            metadata: input.metadata ? { ...input.metadata } : {}
+        };
+
+        // Ensure legacy flags are not inside metadata either
+        if (allowedInput.metadata) {
+            delete allowedInput.metadata.source_type;
+            delete allowedInput.metadata.legacyInvoiceSource;
+            delete allowedInput.metadata.created_at;
+            delete allowedInput.metadata.pricingSnapshotCutover;
+            delete allowedInput.metadata.LEGACY_INVOICE_SOURCE;
+        }
+
+        const bookSpecJson = allowedInput.bookSpec ? JSON.stringify(allowedInput.bookSpec) : null;
+        const selectedOfferJson = allowedInput.selectedOffer ? JSON.stringify(allowedInput.selectedOffer) : null;
+        const customerJson = allowedInput.customer ? JSON.stringify(allowedInput.customer) : null;
+
         const readinessJson = JSON.stringify({ ready: false, blockers: ['FILES_REQUIRED'] });
-        const metadataJson = JSON.stringify(input.metadata || {});
+        const metadataJson = JSON.stringify(allowedInput.metadata || {});
 
         try {
             await mysqlClient.query(`
@@ -355,7 +381,7 @@ class MarketplaceOrderService {
     async getOrderDetail(id) {
         const order = await this.getOrder(id);
         if (!order) return { ok: false, error: 'ORDER_NOT_FOUND' };
-        
+
         // Populate audit format for admin tab
         const events = await mysqlClient.query(`
             SELECT * FROM marketplace_order_events WHERE order_id = ? ORDER BY created_at DESC
@@ -454,7 +480,7 @@ class MarketplaceOrderService {
 
         try {
             const rows = await mysqlClient.query(sql, params);
-            
+
             const orders = [];
             for (const row of rows) {
                 const order = await this.getOrder(row.order_id);
@@ -548,7 +574,7 @@ class MarketplaceOrderService {
         if (existing.length > 0) {
             // Find the active (non-superseded) file
             const activeFile = existing.find(f => f.status !== 'SUPERSEDED') || existing[0];
-            
+
             if (activeFile.status === 'PENDING' || activeFile.status === 'REQUIRED') {
                 // If it is just a pending/required slot, we update it in place
                 fileId = activeFile.file_id;
@@ -687,7 +713,7 @@ class MarketplaceOrderService {
             outcomeCategory = result.outcome_category || result.outcomeCategory || job.risk_level || 'COMPLETED';
             analysisIntegrity = result.analysisIntegrity || result.analysis_integrity || {};
             analyzerCoverage = result.analyzerCoverage || result.analyzer_coverage || {};
-            
+
             artifactRefs =
                 result.artifacts ||
                 result.artifactRefs ||
@@ -706,7 +732,7 @@ class MarketplaceOrderService {
             // Legacy preflight_jobs fallback
             status = job.status || 'PENDING';
             const resultData = safeParseJson(job.result, null) || safeParseJson(job.metadata_json, {});
-            
+
             outcomeCategory = resultData.outcomeCategory || resultData.outcome_category || resultData.outcome || (status === 'COMPLETED' ? 'COMPLETED' : 'FAILED');
             findingsCount = Number(resultData.findingsCount || resultData.findings_count || (resultData.findings && resultData.findings.length) || 0);
             analysisIntegrity = resultData.analysisIntegrity || resultData.analysis_integrity || {};
@@ -819,7 +845,7 @@ class MarketplaceOrderService {
         // 3. Required files INTERIOR_PDF and COVER_PDF required and must be uploaded
         const requiredRoles = ['INTERIOR_PDF', 'COVER_PDF'];
         const activeFiles = order.productionFiles.filter(f => f.status !== 'SUPERSEDED');
-        
+
         const interiorFile = activeFiles.find(f => f.kind === 'INTERIOR_PDF');
         const coverFile = activeFiles.find(f => f.kind === 'COVER_PDF');
 
@@ -894,7 +920,7 @@ class MarketplaceOrderService {
             // --- Phase 47 Human Report Readiness Checks ---
             try {
                 const snapshotRes = await humanReportSnapshotService.getLatestSnapshot(file.preflightJobId, { tenantId: order.tenantId });
-                
+
                 let gateObj = {
                     file_kind: file.kind,
                     job_id: file.preflightJobId,
@@ -918,10 +944,10 @@ class MarketplaceOrderService {
                     blockers.push(`PREFLIGHT_HUMAN_REPORT_REQUIRED_${file.kind}`);
                 } else {
                     gateObj.evaluated_snapshot_id = snapshotRes.snapshot_id;
-                    const report = typeof snapshotRes.report_json === 'string' 
-                        ? JSON.parse(snapshotRes.report_json) 
+                    const report = typeof snapshotRes.report_json === 'string'
+                        ? JSON.parse(snapshotRes.report_json)
                         : (snapshotRes.report_json || snapshotRes.report || {});
-                    
+
                     const innerReport = report.report || report;
                     const outcome = innerReport.outcome || 'UNKNOWN';
                     gateObj.outcome = outcome;
@@ -938,7 +964,7 @@ class MarketplaceOrderService {
                         gateObj.decision_report_outcome = decision.report_outcome;
                         gateObj.approved_artifact_type = decision.approved_artifact_type;
                         gateObj.approved_artifact_filename = decision.approved_artifact_filename;
-                        
+
                         if (gateObj.decision_snapshot_id && gateObj.evaluated_snapshot_id && gateObj.decision_snapshot_id !== gateObj.evaluated_snapshot_id) {
                             gateObj.snapshot_mismatch = true;
                         }
@@ -1002,7 +1028,7 @@ class MarketplaceOrderService {
                     }
                 }
                 }
-                
+
                 humanReportGates.push(gateObj);
             } catch (err) {
                 logger.warn({ event: 'HUMAN_REPORT_READINESS_CHECK_FAILED', jobId: file.preflightJobId, error: err.message });
@@ -1252,8 +1278,8 @@ class MarketplaceOrderService {
         };
 
         await mysqlClient.query(`
-            UPDATE marketplace_orders 
-            SET metadata_json = ?, status = 'CUSTOMER_ACTION_PENDING', updated_at = NOW() 
+            UPDATE marketplace_orders
+            SET metadata_json = ?, status = 'CUSTOMER_ACTION_PENDING', updated_at = NOW()
             WHERE order_id = ?
         `, [JSON.stringify(metadata), id]);
 
@@ -1321,12 +1347,12 @@ class MarketplaceOrderService {
     async assertOrderReadyForFinancialProgression(orderId, context = {}, options = {}) {
         // 1. Force refresh readiness
         const readiness = await this.computeReadiness(orderId);
-        
+
         // 2. Check strict readiness
         if (readiness.ready !== true) {
             // Include Human Report blocker explicitly
             const humanReportBlockers = readiness.blockers?.filter(b => b.startsWith('PREFLIGHT_REVIEW_')) || [];
-            
+
             // 3. Emit structured audit
             await this.addAuditEvent(orderId, 'FINANCIAL_PROGRESSION_BLOCKED_BY_READINESS', {
                 context,
@@ -1336,7 +1362,7 @@ class MarketplaceOrderService {
                 warnings: readiness.warnings,
                 humanReportGates: readiness.humanReportGates
             });
-            
+
             const error = new Error('Order is not ready for invoice/payment progression.');
             error.code = 'MARKETPLACE_READINESS_REQUIRED';
             error.statusCode = 409;

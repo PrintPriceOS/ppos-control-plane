@@ -6,6 +6,7 @@
  */
 const machineRegistry = require('./machineRegistryService');
 const pricingIntelligence = require('./pricingIntelligenceService');
+const industrialEconomics = require('./economics/IndustrialEconomicService');
 const logger = require('./logger').child('economic-routing');
 
 class EconomicRoutingService {
@@ -50,18 +51,38 @@ class EconomicRoutingService {
                     continue;
                 }
 
-                // 3. Calculate estimated cost
-                const estimatedCost = pricingIntelligence.calculateProductionCost({
-                    estimated_sheet_count: copies,
-                    color_factor: (colour === 'full' || colour === '4/4') ? 1.0 : 0.0,
-                    is_rush
-                }, pricingProfile);
+                // 3. Calculate accurate physical cost
+                let rateData;
+                try {
+                    rateData = await industrialEconomics.estimateProductionCost(machine.node_id, {
+                        volume: copies,
+                        binding,
+                        paper,
+                        colour,
+                        is_rush,
+                        currency: 'EUR' // Enforcing EUR for routing comparison in Phase 190
+                    });
+                } catch (pricingErr) {
+                    rejectedWithPricing.push({
+                        id: machine.id,
+                        nodeId: machine.node_id,
+                        reason: pricingErr.code || 'PRICING_ERROR',
+                        details: pricingErr.message
+                    });
+                    continue;
+                }
+
+                // 4. Apply commercial markup to get the suggested price for routing score
+                const strategyResult = pricingIntelligence.applyCommercialStrategy(rateData.operationalCost, pricingProfile, {
+                    is_rush,
+                    lead_time_days: 3
+                });
 
                 candidates.push({
                     nodeId: machine.node_id,
                     machineId: machine.id,
                     technicalScore: 100,
-                    estimatedCost,
+                    estimatedCost: Number(strategyResult.finalSuggestedPriceRaw),
                     pricingProfileId: pricingProfile.id,
                     specsMatched: {
                         binding,

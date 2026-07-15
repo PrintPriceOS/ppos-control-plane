@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  phase190-mysql:
+    image: mysql:8.0
+    container_name: ppos-phase190-test-mysql
+    environment:
+      MYSQL_DATABASE: ControlPhase190Test
+      MYSQL_USER: phase190
+      MYSQL_PASSWORD: phase190_test_only
+      MYSQL_ROOT_PASSWORD: phase190_root_test_only
+    ports:
+      - "33079:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

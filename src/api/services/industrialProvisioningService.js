@@ -247,24 +247,19 @@ class IndustrialProvisioningService {
             try {
                 const rates = typeof pn.rates_json === 'string' ? JSON.parse(pn.rates_json) : (pn.rates_json || {});
                 
-                const baseCost = rates.interior_full_colour_var_16p || rates.interior_full_colour_var_8p || 0.05;
-                const setupCost = rates.interior_full_colour_fixed_16p || rates.interior_full_colour_fixed_8p || 50.00;
-
                 const profileId = `pricing_${pn.id}_printer`;
 
                 await db.query(`
                     INSERT INTO printer_pricing_profiles (
                         id, printer_id, pricing_scope, currency, active,
-                        base_cost_per_sheet, setup_cost, color_multiplier,
-                        tac_penalty_multiplier, bleed_handling_cost, minimum_job_fee,
-                        rush_multiplier, lead_time_discount_multiplier
-                ) VALUES (?, ?, 'PRINTER', 'EUR', 1, ?, ?, 1.2, 1.1, 5.00, 150.00, 1.2, 0.95)
-                ON DUPLICATE KEY UPDATE
-                    base_cost_per_sheet = VALUES(base_cost_per_sheet),
-                    setup_cost = VALUES(setup_cost)
-            `, [
-                profileId, pn.id, baseCost, setupCost
-            ]);
+                        target_margin_pct, platform_markup_pct, dynamic_routing_premium,
+                        minimum_job_fee
+                    ) VALUES (?, ?, 'PRINTER', 'EUR', 0, 20.0, 15.0, 0.0, 150.00)
+                    ON DUPLICATE KEY UPDATE
+                        active = 0
+                `, [
+                    profileId, pn.id
+                ]);
             seeded++;
         } catch (err) {
                 this._logStepError(`seedPricingProfiles:node:${pn.id}`, err);

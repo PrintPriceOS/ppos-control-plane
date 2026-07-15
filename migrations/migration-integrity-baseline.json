@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-11T10:24:30.882Z",
+  "generatedAt": "2026-07-15T08:10:40.253Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -1828,6 +1828,23 @@
       "containsTransaction": false,
       "statementTypes": [
         "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/136_phase190_order_pricing_snapshot_sealing.sql",
+      "prefix": "136",
+      "canonicalSha256": "eb7a7fdf22bf24c10ff779e1795d4799847c51317bf7c5147faaa8bcfff40f9c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7387,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_TRIGGER",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
       ]
     }
   ]

@@ -27,8 +27,9 @@ export const PricingIntelligenceTab: React.FC = () => {
     const [formData, setFormData] = useState({
         printer_id: '',
         pricing_scope: 'PRINTER',
-        base_cost_per_sheet: 0.05,
-        setup_cost: 150,
+        target_margin_pct: 20,
+        platform_markup_pct: 15,
+        dynamic_routing_premium: 0,
         currency: 'EUR',
         minimum_job_fee: 50
     });
@@ -95,7 +96,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                     <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Pricing Intelligence Engine</h2>
                     <p className="text-sm font-medium text-slate-505 dark:text-zinc-400">Model production economics and manage margins.</p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                     {/* View Switcher Tabs */}
                     <div className="flex border border-slate-200 dark:border-zinc-800 p-1 bg-white/90 dark:bg-zinc-950/40 backdrop-blur-sm">
@@ -145,8 +146,8 @@ export const PricingIntelligenceTab: React.FC = () => {
                         <div className="space-y-4 font-mono">
                             <div>
                                 <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-500 dark:text-zinc-400">Printhouse ID</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     value={formData.printer_id}
                                     onChange={e => setFormData({...formData, printer_id: e.target.value})}
                                     className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
@@ -155,44 +156,58 @@ export const PricingIntelligenceTab: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Base Cost / Sheet</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.001"
-                                        value={formData.base_cost_per_sheet}
-                                        onChange={e => setFormData({...formData, base_cost_per_sheet: parseFloat(e.target.value)})}
+                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Target Margin (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={formData.target_margin_pct}
+                                        onChange={e => setFormData({...formData, target_margin_pct: parseFloat(e.target.value)})}
                                         className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Setup Cost</label>
-                                    <input 
-                                        type="number" 
-                                        value={formData.setup_cost}
-                                        onChange={e => setFormData({...formData, setup_cost: parseFloat(e.target.value)})}
+                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Platform Markup (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={formData.platform_markup_pct}
+                                        onChange={e => setFormData({...formData, platform_markup_pct: parseFloat(e.target.value)})}
                                         className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Min. Job Fee</label>
-                                <input 
-                                    type="number" 
-                                    value={formData.minimum_job_fee}
-                                    onChange={e => setFormData({...formData, minimum_job_fee: parseFloat(e.target.value)})}
-                                    className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Dynamic Routing Premium (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={formData.dynamic_routing_premium}
+                                        onChange={e => setFormData({...formData, dynamic_routing_premium: parseFloat(e.target.value)})}
+                                        className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-505 dark:text-zinc-400">Min. Job Fee</label>
+                                    <input
+                                        type="number"
+                                        value={formData.minimum_job_fee}
+                                        onChange={e => setFormData({...formData, minimum_job_fee: parseFloat(e.target.value)})}
+                                        className="w-full px-4 py-3 rounded-none border text-sm font-bold outline-none transition-all bg-slate-100/50 dark:bg-black/40 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-800"
+                                    />
+                                </div>
                             </div>
+
                         </div>
                         <div className="flex gap-3 mt-8 font-sans">
-                            <button 
+                            <button
                                 onClick={handleCreateProfile}
                                 disabled={isSaving || !formData.printer_id}
                                 className="flex-1 py-3 rounded-none font-black uppercase text-xs tracking-widest disabled:opacity-50 transition-all bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-white"
                             >
                                 {isSaving ? 'Saving...' : 'Save Profile'}
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setIsModalOpen(false)}
                                 className="px-6 py-3 border rounded-none font-black uppercase text-xs tracking-widest transition-all border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-900/30"
                             >
@@ -239,8 +254,8 @@ export const PricingIntelligenceTab: React.FC = () => {
                                 <tr className="text-[10px] font-black uppercase tracking-widest border-b bg-slate-50/50 dark:bg-zinc-900/20 border-b border-slate-100 dark:border-zinc-850/60 text-slate-500 dark:text-zinc-400">
                                     <th className="px-6 py-4">Printer / Machine</th>
                                     <th className="px-6 py-4">Scope</th>
-                                    <th className="px-6 py-4">Base Cost</th>
-                                    <th className="px-6 py-4">Setup</th>
+                                    <th className="px-6 py-4">Target Margin</th>
+                                    <th className="px-6 py-4">Markup</th>
                                     <th className="px-6 py-4">Min. Fee</th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
@@ -255,15 +270,15 @@ export const PricingIntelligenceTab: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-0.5 rounded-none text-[8px] font-black uppercase ${
-                                                p.pricing_scope === 'MACHINE' 
-                                                    ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' 
+                                                p.pricing_scope === 'MACHINE'
+                                                    ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400'
                                                     : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'
                                             }`}>
                                                 {p.pricing_scope}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 font-mono tracking-tight font-black text-xs text-slate-900 dark:text-white">{p.base_cost_per_sheet} {p.currency}</td>
-                                        <td className="px-6 py-4 font-mono tracking-tight font-black text-xs text-slate-900 dark:text-white">{p.setup_cost} {p.currency}</td>
+                                        <td className="px-6 py-4 font-mono tracking-tight font-black text-xs text-slate-900 dark:text-white">{p.target_margin_pct}%</td>
+                                        <td className="px-6 py-4 font-mono tracking-tight font-black text-xs text-slate-900 dark:text-white">{p.platform_markup_pct}%</td>
                                         <td className="px-6 py-4 font-mono tracking-tight font-black text-xs text-slate-900 dark:text-white">{p.minimum_job_fee} {p.currency}</td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1.5">
@@ -352,7 +367,7 @@ export const PricingIntelligenceTab: React.FC = () => {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black uppercase text-rose-500">{c.conflict_type}</span>
-                                            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400">• {c.job_name}</span>
+                                            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400">â€¢ {c.job_name}</span>
                                         </div>
                                         <p className="text-xs mt-0.5 text-slate-900 dark:text-white">{c.conflict_description}</p>
                                     </div>

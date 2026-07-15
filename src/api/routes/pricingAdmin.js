@@ -3,9 +3,46 @@ const router = express.Router();
 const db = require('../services/db');
 const quoteService = require('../services/quoteService');
 const crypto = require('crypto');
+const logger = require('../services/logger').child('pricing-admin');
 
 const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const mysql = require('../services/mysqlClient');
+
+/**
+ * GET /api/admin/pricing/readiness-audit
+ * Global Economic Production Readiness Auditor (Super Admin only).
+ */
+router.get('/readiness-audit', async (req, res) => {
+    try {
+        const pricingReadinessService = require('../services/pricingReadinessService');
+        const results = await pricingReadinessService.evaluateGlobalReadiness();
+        res.json({ ok: true, data: results });
+    } catch (err) {
+        logger.error({ event: 'global_pricing_readiness_audit_failed', error: err.message });
+        res.status(500).json({ ok: false, error: 'INTERNAL_SERVER_ERROR' });
+    }
+});
+
+/**
+ * GET /api/admin/pricing/my-readiness
+ * Scoped Economic Production Readiness Auditor (Printhouse only).
+ */
+router.get('/my-readiness', requireApprovedPrinthouse, async (req, res) => {
+    try {
+        const actor = req.user;
+        const pricingReadinessService = require('../services/pricingReadinessService');
+
+        if (!actor || !actor.printhouseId) {
+            return res.status(403).json({ ok: false, error: 'MUST_BE_PRINTHOUSE' });
+        }
+
+        const results = await pricingReadinessService.evaluateOwnReadiness(actor);
+        res.json({ ok: true, data: results });
+    } catch (err) {
+        logger.error({ event: 'scoped_pricing_readiness_audit_failed', error: err.message });
+        res.status(500).json({ ok: false, error: 'INTERNAL_SERVER_ERROR' });
+    }
+});
 
 /**
  * GET /api/admin/pricing/profiles
@@ -46,8 +83,7 @@ router.post('/profiles', requireApprovedPrinthouse, async (req, res) => {
     const id = crypto.randomUUID();
     const {
         printer_id, machine_id, pricing_scope, currency,
-        base_cost_per_sheet, setup_cost, color_multiplier,
-        tac_penalty_multiplier, bleed_handling_cost,
+        target_margin_pct, platform_markup_pct, dynamic_routing_premium,
         rush_multiplier, lead_time_discount_multiplier,
         minimum_job_fee
     } = req.body;
@@ -63,15 +99,13 @@ router.post('/profiles', requireApprovedPrinthouse, async (req, res) => {
         await mysql.query(`
             INSERT INTO printer_pricing_profiles (
                 id, printer_id, machine_id, pricing_scope, currency,
-                base_cost_per_sheet, setup_cost, color_multiplier,
-                tac_penalty_multiplier, bleed_handling_cost,
+                target_margin_pct, platform_markup_pct, dynamic_routing_premium,
                 rush_multiplier, lead_time_discount_multiplier,
                 minimum_job_fee
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             id, printer_id, machine_id, pricing_scope, currency || 'EUR',
-            base_cost_per_sheet, setup_cost, color_multiplier,
-            tac_penalty_multiplier, bleed_handling_cost,
+            target_margin_pct, platform_markup_pct, dynamic_routing_premium,
             rush_multiplier, lead_time_discount_multiplier,
             minimum_job_fee
         ]);
@@ -114,9 +148,9 @@ router.put('/profiles/:id', requireApprovedPrinthouse, async (req, res) => {
         const fields = [];
         const params = [];
         const allowed = [
-            'pricing_scope', 'currency', 'base_cost_per_sheet', 'setup_cost',
-            'color_multiplier', 'tac_penalty_multiplier', 'bleed_handling_cost',
-            'rush_multiplier', 'lead_time_discount_multiplier', 'minimum_job_fee', 'active'
+            'pricing_scope', 'currency', 'target_margin_pct', 'platform_markup_pct',
+            'dynamic_routing_premium', 'rush_multiplier', 'lead_time_discount_multiplier',
+            'minimum_job_fee', 'active'
         ];
 
         for (const key of allowed) {
