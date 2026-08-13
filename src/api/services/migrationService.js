@@ -41,8 +41,25 @@ async function ensurePreviousFailuresColumn(connOrDb) {
 async function runMigration140PreRemediation(connOrDb) {
   logger.info({ event: 'migration_remediation_140_start', message: 'Evaluating governed schema normalization pre-remediation for migration 140' });
   
-  // Define target mappings: Table -> Column -> { targetLength, targetCharset, targetCollation }
-  const targets = {
+  // Define metadata for the 13 legacy foreign keys to drop and recreate
+  const fksToAudit = [
+    { name: 'fk_machines_printer_node', childTable: 'printhouse_machines', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+    { name: 'fk_media_printer_node', childTable: 'printhouse_media', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+    { name: 'fk_policies_printer_node', childTable: 'printhouse_policy_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+    { name: 'fk_sla_printer_node', childTable: 'printhouse_sla_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+    { name: 'job_outcomes_ibfk_1', childTable: 'job_outcomes', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_capacity_ibfk_1', childTable: 'printer_capacity', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_contacts_ibfk_1', childTable: 'printer_contacts', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_machines_ibfk_1', childTable: 'printer_machines', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_papers_ibfk_1', childTable: 'printer_papers', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_performance_ibfk_1', childTable: 'printer_performance', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printer_service_regions_ibfk_1', childTable: 'printer_service_regions', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printhouse_capabilities_ibfk_1', childTable: 'printhouse_capabilities', childCols: ['printhouse_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'routing_history_ibfk_1', childTable: 'routing_history', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' }
+  ];
+
+  // Target mappings for all 15 tables and 22 columns
+  const allTargets = {
     printer_nodes: {
       id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
       tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
@@ -67,16 +84,78 @@ async function runMigration140PreRemediation(connOrDb) {
     materials_catalog: {
       id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
       tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    job_outcomes: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printer_capacity: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printer_contacts: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printer_machines: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci', preserveWidthIfLarger: true }
+    },
+    printer_papers: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printer_performance: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printer_service_regions: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_capabilities: {
+      printhouse_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    routing_history: {
+      printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
     }
   };
 
-  // Disable FK checks to allow alter
+  // 1. Audit tables that exist in the active schema
+  const existingTables = new Set();
+  const [tables] = await connOrDb.query(`
+    SELECT TABLE_NAME 
+    FROM information_schema.TABLES 
+    WHERE TABLE_SCHEMA = DATABASE()
+  `);
+  for (const t of tables) {
+    existingTables.add(t.TABLE_NAME);
+  }
+
+  // Filter FKs to drop/recreate based on tables that exist
+  const activeFks = fksToAudit.filter(f => existingTables.has(f.childTable) && existingTables.has(f.parentTable));
+
+  // Determine which FKs exist right now
+  const existingFkNames = new Set();
+  const [fksRows] = await connOrDb.query(`
+    SELECT CONSTRAINT_NAME 
+    FROM information_schema.REFERENTIAL_CONSTRAINTS 
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+  `);
+  for (const r of fksRows) {
+    existingFkNames.add(r.CONSTRAINT_NAME);
+  }
+
+  // Set FOREIGN_KEY_CHECKS = 0 strictly for the duration of drops and alters
   await connOrDb.query('SET FOREIGN_KEY_CHECKS = 0');
   
   try {
-    for (const [table, columns] of Object.entries(targets)) {
+    // 2. Drop legacy FK constraints if they are present
+    for (const fk of activeFks) {
+      if (existingFkNames.has(fk.name)) {
+        logger.info({ event: 'migration_remediation_140_drop_fk', constraintName: fk.name, table: fk.childTable, message: `Dropping foreign key constraint ${fk.name} on ${fk.childTable}` });
+        await connOrDb.query(`ALTER TABLE ${fk.childTable} DROP FOREIGN KEY ${fk.name}`);
+      }
+    }
+
+    // 3. Widen columns and convert charsets/collations
+    for (const [table, columns] of Object.entries(allTargets)) {
+      if (!existingTables.has(table)) continue;
+      
       for (const [column, spec] of Object.entries(columns)) {
-        // Query current column definition
         const [cols] = await connOrDb.query(`
           SELECT CHARACTER_MAXIMUM_LENGTH, CHARACTER_SET_NAME, COLLATION_NAME, IS_NULLABLE
           FROM information_schema.COLUMNS 
@@ -85,7 +164,12 @@ async function runMigration140PreRemediation(connOrDb) {
         
         if (cols && cols[0]) {
           const current = cols[0];
-          const needsLengthWiden = current.CHARACTER_MAXIMUM_LENGTH < spec.length;
+          let targetLength = spec.length;
+          if (spec.preserveWidthIfLarger && current.CHARACTER_MAXIMUM_LENGTH > targetLength) {
+            targetLength = current.CHARACTER_MAXIMUM_LENGTH;
+          }
+          
+          const needsLengthWiden = current.CHARACTER_MAXIMUM_LENGTH < targetLength;
           const needsCharsetConvert = current.CHARACTER_SET_NAME !== spec.charset || current.COLLATION_NAME !== spec.collation;
           
           if (needsLengthWiden || needsCharsetConvert) {
@@ -94,19 +178,58 @@ async function runMigration140PreRemediation(connOrDb) {
               event: 'migration_remediation_140_exec', 
               table, 
               column, 
-              message: `Normalizing ${table}.${column} to VARCHAR(${spec.length}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability} (was VARCHAR(${current.CHARACTER_MAXIMUM_LENGTH}) ${current.CHARACTER_SET_NAME}/${current.COLLATION_NAME})`
+              message: `Normalizing ${table}.${column} to VARCHAR(${targetLength}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability} (was VARCHAR(${current.CHARACTER_MAXIMUM_LENGTH}) ${current.CHARACTER_SET_NAME}/${current.COLLATION_NAME})`
             });
             
             await connOrDb.query(`
               ALTER TABLE ${table} 
-              MODIFY COLUMN ${column} VARCHAR(${spec.length}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability}
+              MODIFY COLUMN ${column} VARCHAR(${targetLength}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability}
             `);
           }
         }
       }
     }
+  } catch (err) {
+    logger.error({ event: 'migration_remediation_140_error', message: `Failure during normalization alters: ${err.message}`, error: err });
+    throw err;
   } finally {
+    // 4. Recreate dropped foreign keys to ensure database integrity (recovery sequence)
+    const recreationErrors = [];
+    for (const fk of activeFks) {
+      try {
+        const [checkFk] = await connOrDb.query(`
+          SELECT CONSTRAINT_NAME 
+          FROM information_schema.REFERENTIAL_CONSTRAINTS 
+          WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?
+        `, [fk.name]);
+        
+        if (!checkFk || checkFk.length === 0) {
+          logger.info({ event: 'migration_remediation_140_recreate_fk', constraintName: fk.name, table: fk.childTable, message: `Recreating foreign key constraint ${fk.name} on ${fk.childTable}` });
+          
+          const childColsCsv = fk.childCols.join(', ');
+          const parentColsCsv = fk.parentCols.join(', ');
+          
+          await connOrDb.query(`
+            ALTER TABLE ${fk.childTable} 
+            ADD CONSTRAINT ${fk.name} 
+            FOREIGN KEY (${childColsCsv}) 
+            REFERENCES ${fk.parentTable}(${parentColsCsv}) 
+            ON UPDATE ${fk.onUpdate} 
+            ON DELETE ${fk.onDelete}
+          `);
+        }
+      } catch (recErr) {
+        logger.error({ event: 'migration_remediation_140_recreate_error', constraintName: fk.name, message: `Failed to recreate constraint ${fk.name}: ${recErr.message}`, error: recErr });
+        recreationErrors.push(recErr);
+      }
+    }
+    
+    // Always restore FOREIGN_KEY_CHECKS = 1
     await connOrDb.query('SET FOREIGN_KEY_CHECKS = 1');
+    
+    if (recreationErrors.length > 0) {
+      throw new Error(`Normalization pre-remediation failed during constraint recreation: ${recreationErrors.map(e => e.message).join('; ')}`);
+    }
   }
   
   logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed' });

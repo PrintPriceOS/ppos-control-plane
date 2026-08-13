@@ -1,14 +1,14 @@
 # docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md
 
-## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC5)
+## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC6)
 
-### Version: 5.0 — 2026-08-13
+### Version: 6.0 — 2026-08-13
 **Status**: APPROVED FOR STAGE 1 COHORT BETA USE ONLY
 
 ---
 
 ## 1. Context & Operational Evidence
-In the production environment, migrations 136, 137, 138, and 139 have successfully been applied. However, migration 140 (`140_phase191e_materials_capacity_leadtimes.sql`) failed with error `ER_FK_INCOMPATIBLE_COLUMNS` due to key length mismatches between legacy columns (`printer_nodes.id` as `VARCHAR(36)` and `printhouse_machines.tenant_id` as `VARCHAR(50)`) and the new capacity table schemas.
+In the production environment, migrations 136, 137, 138, and 139 have successfully been applied. However, migration 140 (`140_phase191e_materials_capacity_leadtimes.sql`) failed with error `ER_FK_INCOMPATIBLE_COLUMNS` due to key length and character set/collation mismatches between legacy columns (e.g. `printer_nodes.id` as `utf8mb3_general_ci` / `VARCHAR(36)`) and the new capacity table schemas (created in `utf8mb4_unicode_ci` / `VARCHAR(50)`).
 
 Current target server database state:
 - `schema_versions` has migration 140 in state `FAILED`.
@@ -45,17 +45,17 @@ Verify that the local node can connect to MySQL with the new password:
 node -e "const db = require('./src/api/services/mysqlClient'); db.query('SELECT 1').then(() => console.log('Connected!')).catch(console.error)"
 ```
 
-### Step 3: Fetch and Deploy Release Candidate 5 (RC5)
+### Step 3: Fetch and Deploy Release Candidate 6 (RC6)
 Check out the corrected release candidate codebase on the target node:
 ```bash
 git fetch origin
-git checkout tags/phase-192-controlled-beta-rc5
+git checkout tags/phase-192-controlled-beta-rc6
 ```
 
 Verify that tag and HEAD point to the exact same commit:
 ```bash
 git rev-parse HEAD
-git rev-list -n 1 phase-192-controlled-beta-rc5
+git rev-list -n 1 phase-192-controlled-beta-rc6
 ```
 *Expected: Identical commit SHAs.*
 
@@ -97,11 +97,11 @@ node scripts/run_control_plane_migrations.js
 2. It detects the `FAILED` state of migration 140.
 3. Since `PPOS_ALLOW_MIGRATION_RETRY` is `true`, it compares the local checksum of 140 with the failed record's checksum.
 4. On match, the engine automatically executes `runMigration140PreRemediation` DDL helper to:
-   - Temporarily disable foreign key checks (`FOREIGN_KEY_CHECKS = 0`).
-   - Widen `printer_nodes.id` to `VARCHAR(50)`.
-   - Widen `printhouse_machines.tenant_id` to `VARCHAR(64)`.
-   - Widen `printhouse_media.tenant_id`, `printhouse_policy_profiles.tenant_id`, and `printhouse_sla_profiles.tenant_id` to `VARCHAR(64)` for complete referential compatibility.
-   - Re-enable foreign key checks (`FOREIGN_KEY_CHECKS = 1`).
+   - Identify which of the 13 legacy foreign keys exist.
+   - Drop only those active legacy foreign keys.
+   - Widen and convert all 22 parent/child columns to `VARCHAR(50)`/`VARCHAR(64)` and `utf8mb4`/`utf8mb4_unicode_ci` (preserving nullability exactly).
+   - Recreate all 13 legacy foreign keys with their exact original names and ON UPDATE/ON DELETE rules.
+   - Restore `FOREIGN_KEY_CHECKS = 1`.
 5. The engine preserves the previous failure detail of 140 into the `previous_failures` JSON column and sets state to `STARTED`.
 6. It executes the statements in migration 140 (which now pass with 100% type/referential compatibility).
 7. On success, it marks migration 140 as `APPLIED`.
@@ -137,4 +137,4 @@ curl http://127.0.0.1:8081/api/admin/runtime/health
 Once all migrations reach the `APPLIED` state, no historic migration files (001–145) may be modified. Any future schema alterations must use a new sequential file (146+).
 
 ---
-**RUNBOOK_VERSION**: 4.0
+**RUNBOOK_VERSION**: 6.0
