@@ -33,6 +33,11 @@ const VALID_MACHINE_TYPES = [
 /** Valid machine statuses */
 const VALID_STATUSES = ['ACTIVE', 'MAINTENANCE', 'DECOMMISSIONED', 'ARCHIVED'];
 
+/** Canonical technical capability enums */
+const VALID_COLOR_MODES = ['CMYK', 'CMYK+SPOT', 'CMYK+WHITE', 'RGB', 'GRAYSCALE', 'MONOCHROME', 'SPOT_ONLY'];
+const VALID_PRINT_METHODS = ['SHEETFED_OFFSET', 'DIGITAL_TONER', 'DIGITAL_INKJET', 'WIDE_FORMAT_INKJET', 'WEB_OFFSET', 'FLEXO', 'SCREEN_PRINTING'];
+const VALID_SIDES = ['SIMPLEX', 'DUPLEX'];
+
 /**
  * Machine templates: pre-populated defaults for common machine types.
  * Used in the Setup Hub to accelerate onboarding.
@@ -168,6 +173,17 @@ function makeMachinePublic(row) {
     out.supported_print_methods_json = safeParseJson(out.supported_print_methods_json, []);
     out.supported_sides_json = safeParseJson(out.supported_sides_json, []);
     out.metadata_json = safeParseJson(out.metadata_json, {});
+    out.supports_pdfx = !!out.supports_pdfx;
+    out.supports_pdfa = !!out.supports_pdfa;
+    out.supports_variable_data = !!out.supports_variable_data;
+    out.supports_white_ink = !!out.supports_white_ink;
+    out.supports_spot_uv = !!out.supports_spot_uv;
+    out.supports_lamination = !!out.supports_lamination;
+    out.supports_hardcover = !!out.supports_hardcover;
+    out.supports_softcover = !!out.supports_softcover;
+    out.supports_saddle_stitch = !!out.supports_saddle_stitch;
+    out.supports_perfect_binding = !!out.supports_perfect_binding;
+    out.supports_case_binding = !!out.supports_case_binding;
     return out;
 }
 
@@ -237,24 +253,77 @@ class PrinthouseMachineService {
         }
 
         // Dimensional constraints
-        if (payload.max_sheet_width_mm !== undefined && payload.min_sheet_width_mm !== undefined) {
+        const dimFields = [
+            'max_sheet_width_mm', 'max_sheet_height_mm',
+            'min_sheet_width_mm', 'min_sheet_height_mm',
+            'max_print_width_mm', 'max_print_height_mm'
+        ];
+        for (const dim of dimFields) {
+            if (payload[dim] !== undefined && payload[dim] !== null) {
+                if (typeof payload[dim] !== 'number' || !Number.isFinite(payload[dim]) || Number.isNaN(payload[dim]) || payload[dim] <= 0) {
+                    throw new Error(`INVALID_DIMENSIONS: ${dim} must be a positive number > 0`);
+                }
+            }
+        }
+
+        if (payload.max_sheet_width_mm !== undefined && payload.min_sheet_width_mm !== undefined &&
+            payload.max_sheet_width_mm !== null && payload.min_sheet_width_mm !== null) {
             if (payload.max_sheet_width_mm <= payload.min_sheet_width_mm) {
                 throw new Error('INVALID_DIMENSIONS: max_sheet_width_mm must be greater than min_sheet_width_mm');
             }
         }
-        if (payload.max_sheet_height_mm !== undefined && payload.min_sheet_height_mm !== undefined) {
+        if (payload.max_sheet_height_mm !== undefined && payload.min_sheet_height_mm !== undefined &&
+            payload.max_sheet_height_mm !== null && payload.min_sheet_height_mm !== null) {
             if (payload.max_sheet_height_mm <= payload.min_sheet_height_mm) {
                 throw new Error('INVALID_DIMENSIONS: max_sheet_height_mm must be greater than min_sheet_height_mm');
             }
         }
-        if (payload.max_print_width_mm !== undefined && payload.max_sheet_width_mm !== undefined) {
+        if (payload.max_print_width_mm !== undefined && payload.max_sheet_width_mm !== undefined &&
+            payload.max_print_width_mm !== null && payload.max_sheet_width_mm !== null) {
             if (payload.max_print_width_mm > payload.max_sheet_width_mm) {
                 throw new Error('INVALID_DIMENSIONS: max_print_width_mm cannot exceed max_sheet_width_mm');
             }
         }
-        if (payload.max_print_height_mm !== undefined && payload.max_sheet_height_mm !== undefined) {
+        if (payload.max_print_height_mm !== undefined && payload.max_sheet_height_mm !== undefined &&
+            payload.max_print_height_mm !== null && payload.max_sheet_height_mm !== null) {
             if (payload.max_print_height_mm > payload.max_sheet_height_mm) {
                 throw new Error('INVALID_DIMENSIONS: max_print_height_mm cannot exceed max_sheet_height_mm');
+            }
+        }
+
+        // Color modes array validation
+        if (payload.supported_color_modes_json !== undefined && payload.supported_color_modes_json !== null) {
+            if (!Array.isArray(payload.supported_color_modes_json)) {
+                throw new Error('INVALID_COLOR_MODES: supported_color_modes_json must be an array');
+            }
+            for (const mode of payload.supported_color_modes_json) {
+                if (typeof mode !== 'string' || !VALID_COLOR_MODES.includes(mode)) {
+                    throw new Error(`INVALID_COLOR_MODES: unknown color mode '${mode}'`);
+                }
+            }
+        }
+
+        // Print methods array validation
+        if (payload.supported_print_methods_json !== undefined && payload.supported_print_methods_json !== null) {
+            if (!Array.isArray(payload.supported_print_methods_json)) {
+                throw new Error('INVALID_PRINT_METHODS: supported_print_methods_json must be an array');
+            }
+            for (const method of payload.supported_print_methods_json) {
+                if (typeof method !== 'string' || !VALID_PRINT_METHODS.includes(method)) {
+                    throw new Error(`INVALID_PRINT_METHODS: unknown print method '${method}'`);
+                }
+            }
+        }
+
+        // Sides array validation
+        if (payload.supported_sides_json !== undefined && payload.supported_sides_json !== null) {
+            if (!Array.isArray(payload.supported_sides_json)) {
+                throw new Error('INVALID_SIDES: supported_sides_json must be an array');
+            }
+            for (const side of payload.supported_sides_json) {
+                if (typeof side !== 'string' || !VALID_SIDES.includes(side)) {
+                    throw new Error(`INVALID_SIDES: unknown side '${side}'`);
+                }
             }
         }
 
@@ -330,12 +399,17 @@ class PrinthouseMachineService {
             effectivePayload.supported_sides_json ? JSON.stringify(effectivePayload.supported_sides_json) : null,
             effectivePayload.max_pages_per_job || null, effectivePayload.max_file_size_mb || null,
             effectivePayload.max_tac_percent || null,
-            !!effectivePayload.supports_pdfx, !!effectivePayload.supports_pdfa,
-            !!effectivePayload.supports_variable_data, !!effectivePayload.supports_white_ink,
-            !!effectivePayload.supports_spot_uv, !!effectivePayload.supports_lamination,
-            !!effectivePayload.supports_hardcover, !!effectivePayload.supports_softcover,
-            !!effectivePayload.supports_saddle_stitch, !!effectivePayload.supports_perfect_binding,
-            !!effectivePayload.supports_case_binding,
+            effectivePayload.supports_pdfx !== undefined ? (effectivePayload.supports_pdfx ? 1 : 0) : 0,
+            effectivePayload.supports_pdfa !== undefined ? (effectivePayload.supports_pdfa ? 1 : 0) : 0,
+            effectivePayload.supports_variable_data !== undefined ? (effectivePayload.supports_variable_data ? 1 : 0) : 0,
+            effectivePayload.supports_white_ink !== undefined ? (effectivePayload.supports_white_ink ? 1 : 0) : 0,
+            effectivePayload.supports_spot_uv !== undefined ? (effectivePayload.supports_spot_uv ? 1 : 0) : 0,
+            effectivePayload.supports_lamination !== undefined ? (effectivePayload.supports_lamination ? 1 : 0) : 0,
+            effectivePayload.supports_hardcover !== undefined ? (effectivePayload.supports_hardcover ? 1 : 0) : 0,
+            effectivePayload.supports_softcover !== undefined ? (effectivePayload.supports_softcover ? 1 : 0) : 0,
+            effectivePayload.supports_saddle_stitch !== undefined ? (effectivePayload.supports_saddle_stitch ? 1 : 0) : 0,
+            effectivePayload.supports_perfect_binding !== undefined ? (effectivePayload.supports_perfect_binding ? 1 : 0) : 0,
+            effectivePayload.supports_case_binding !== undefined ? (effectivePayload.supports_case_binding ? 1 : 0) : 0,
             effectivePayload.metadata_json ? JSON.stringify(effectivePayload.metadata_json) : null
         ]);
 
@@ -421,30 +495,30 @@ class PrinthouseMachineService {
             safePayload.manufacturer || null,
             safePayload.model || null,
             safePayload.status || null,
-            safePayload.max_sheet_width_mm || null,
-            safePayload.max_sheet_height_mm || null,
-            safePayload.min_sheet_width_mm || null,
-            safePayload.min_sheet_height_mm || null,
-            safePayload.max_print_width_mm || null,
-            safePayload.max_print_height_mm || null,
-            safePayload.supported_color_modes_json ? JSON.stringify(safePayload.supported_color_modes_json) : null,
-            safePayload.supported_print_methods_json ? JSON.stringify(safePayload.supported_print_methods_json) : null,
-            safePayload.supported_sides_json ? JSON.stringify(safePayload.supported_sides_json) : null,
-            safePayload.max_pages_per_job || null,
-            safePayload.max_file_size_mb || null,
-            safePayload.max_tac_percent || null,
-            safePayload.supports_pdfx !== undefined ? !!safePayload.supports_pdfx : null,
-            safePayload.supports_pdfa !== undefined ? !!safePayload.supports_pdfa : null,
-            safePayload.supports_variable_data !== undefined ? !!safePayload.supports_variable_data : null,
-            safePayload.supports_white_ink !== undefined ? !!safePayload.supports_white_ink : null,
-            safePayload.supports_spot_uv !== undefined ? !!safePayload.supports_spot_uv : null,
-            safePayload.supports_lamination !== undefined ? !!safePayload.supports_lamination : null,
-            safePayload.supports_hardcover !== undefined ? !!safePayload.supports_hardcover : null,
-            safePayload.supports_softcover !== undefined ? !!safePayload.supports_softcover : null,
-            safePayload.supports_saddle_stitch !== undefined ? !!safePayload.supports_saddle_stitch : null,
-            safePayload.supports_perfect_binding !== undefined ? !!safePayload.supports_perfect_binding : null,
-            safePayload.supports_case_binding !== undefined ? !!safePayload.supports_case_binding : null,
-            safePayload.metadata_json ? JSON.stringify(safePayload.metadata_json) : null,
+            safePayload.max_sheet_width_mm !== undefined ? safePayload.max_sheet_width_mm : null,
+            safePayload.max_sheet_height_mm !== undefined ? safePayload.max_sheet_height_mm : null,
+            safePayload.min_sheet_width_mm !== undefined ? safePayload.min_sheet_width_mm : null,
+            safePayload.min_sheet_height_mm !== undefined ? safePayload.min_sheet_height_mm : null,
+            safePayload.max_print_width_mm !== undefined ? safePayload.max_print_width_mm : null,
+            safePayload.max_print_height_mm !== undefined ? safePayload.max_print_height_mm : null,
+            safePayload.supported_color_modes_json !== undefined ? JSON.stringify(safePayload.supported_color_modes_json) : null,
+            safePayload.supported_print_methods_json !== undefined ? JSON.stringify(safePayload.supported_print_methods_json) : null,
+            safePayload.supported_sides_json !== undefined ? JSON.stringify(safePayload.supported_sides_json) : null,
+            safePayload.max_pages_per_job !== undefined ? safePayload.max_pages_per_job : null,
+            safePayload.max_file_size_mb !== undefined ? safePayload.max_file_size_mb : null,
+            safePayload.max_tac_percent !== undefined ? safePayload.max_tac_percent : null,
+            safePayload.supports_pdfx !== undefined ? (safePayload.supports_pdfx ? 1 : 0) : null,
+            safePayload.supports_pdfa !== undefined ? (safePayload.supports_pdfa ? 1 : 0) : null,
+            safePayload.supports_variable_data !== undefined ? (safePayload.supports_variable_data ? 1 : 0) : null,
+            safePayload.supports_white_ink !== undefined ? (safePayload.supports_white_ink ? 1 : 0) : null,
+            safePayload.supports_spot_uv !== undefined ? (safePayload.supports_spot_uv ? 1 : 0) : null,
+            safePayload.supports_lamination !== undefined ? (safePayload.supports_lamination ? 1 : 0) : null,
+            safePayload.supports_hardcover !== undefined ? (safePayload.supports_hardcover ? 1 : 0) : null,
+            safePayload.supports_softcover !== undefined ? (safePayload.supports_softcover ? 1 : 0) : null,
+            safePayload.supports_saddle_stitch !== undefined ? (safePayload.supports_saddle_stitch ? 1 : 0) : null,
+            safePayload.supports_perfect_binding !== undefined ? (safePayload.supports_perfect_binding ? 1 : 0) : null,
+            safePayload.supports_case_binding !== undefined ? (safePayload.supports_case_binding ? 1 : 0) : null,
+            safePayload.metadata_json !== undefined ? JSON.stringify(safePayload.metadata_json) : null,
             machineId,
             siteId,
             tenantId

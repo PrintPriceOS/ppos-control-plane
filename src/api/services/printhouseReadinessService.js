@@ -239,7 +239,9 @@ class PrinthouseReadinessService {
                           OR supports_white_ink = 1 OR supports_spot_uv = 1 OR supports_lamination = 1
                           OR supports_hardcover = 1 OR supports_softcover = 1 OR supports_saddle_stitch = 1
                           OR supports_perfect_binding = 1 OR supports_case_binding = 1
-                          OR supported_color_modes_json IS NOT NULL)`,
+                          OR (supported_color_modes_json IS NOT NULL AND supported_color_modes_json != '' AND supported_color_modes_json != '[]')
+                          OR (supported_print_methods_json IS NOT NULL AND supported_print_methods_json != '' AND supported_print_methods_json != '[]')
+                          OR (supported_sides_json IS NOT NULL AND supported_sides_json != '' AND supported_sides_json != '[]'))`,
                     [tenantId, 'ARCHIVED']
                 );
                 capabilityCount = capRows[0]?.cnt || 0;

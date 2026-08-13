@@ -86,14 +86,8 @@ const wrapHandler = (fn) => async (req, res, next) => {
         if (err.message === 'LEAD_TIMES_NOT_CONFIGURED') {
             return res.status(400).json({ error: 'LEAD_TIMES_NOT_CONFIGURED' });
         }
-        if (err.message === 'INVALID_CAPACITY_VALUES') {
-            return res.status(400).json({ error: 'INVALID_CAPACITY_VALUES' });
-        }
-        if (err.message === 'INVALID_LEAD_TIME_CONFIGURATION') {
-            return res.status(400).json({ error: 'INVALID_LEAD_TIME_CONFIGURATION' });
-        }
-        if (err.message === 'INVALID_MATERIAL_CONFIGURATION') {
-            return res.status(400).json({ error: 'INVALID_MATERIAL_CONFIGURATION' });
+        if (err.message && typeof err.message === 'string' && err.message.startsWith('INVALID_')) {
+            return res.status(400).json({ error: err.message });
         }
         next(err);
     }
