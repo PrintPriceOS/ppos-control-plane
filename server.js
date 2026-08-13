@@ -105,6 +105,7 @@ fastify.addHook('onRequest', async (request, reply) => {
                 tenantId: 'ppos-production',
                 authMode: 'BREAK_GLASS'
             };
+            request.raw.user = request.user;
             return;
         }
 
@@ -124,6 +125,7 @@ fastify.addHook('onRequest', async (request, reply) => {
                 printhouseId: decoded.printhouse_id,
                 authMode: 'JWT'
             };
+            request.raw.user = request.user;
             
             return;
         } catch (err) {
@@ -328,6 +330,9 @@ const start = async () => {
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
+            fastify.use('/api/printhouse/onboarding/pricing', require('./src/api/routes/printhousePricingRoutes'));
+            fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseMachinesRoutes'));
+            fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseOnboardingRoutes'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
             fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));

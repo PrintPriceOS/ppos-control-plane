@@ -489,6 +489,44 @@ function isDark() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ adminMode = false }) => {
+    // Phase 191B Minimal Signup feature flag & URL search params check
+    const isLegacyRequested = typeof window !== 'undefined' && window.location.search.includes('legacy=true');
+    const isMinimalSignupEnabled = typeof import.meta !== 'undefined' && (import.meta as any).env 
+        ? ((import.meta as any).env.VITE_PRINTHOUSE_MINIMAL_SIGNUP_ENABLED !== 'false') 
+        : true;
+
+    const [useMinimalSignup, setUseMinimalSignup] = useState<boolean>(!adminMode && !isLegacyRequested && isMinimalSignupEnabled);
+
+
+    const [minimalEmail, setMinimalEmail] = useState('');
+    const [minimalTerms, setMinimalTerms] = useState(false);
+    const [minimalSubmitted, setMinimalSubmitted] = useState(false);
+    const [minimalLoading, setMinimalLoading] = useState(false);
+
+    const handleMinimalSignupSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!minimalEmail || !minimalEmail.includes('@')) return;
+        setMinimalLoading(true);
+
+        try {
+            await fetch('/api/auth/printhouse/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: minimalEmail,
+                    acceptTerms: minimalTerms,
+                    acceptPrivacy: minimalTerms
+                })
+            });
+            setMinimalSubmitted(true);
+        } catch (err) {
+            // Still show success to prevent enumeration
+            setMinimalSubmitted(true);
+        } finally {
+            setMinimalLoading(false);
+        }
+    };
+
     // Steps: 1: Legal Terms, 2: Company, 3: Capabilities, 4: Machinery & Capacity, 5: Compliance & QA, 6: Plan Selection, 7: Admin Credentials, 8: Success
     // In adminMode: step 1 (T&C) is skipped — start at 2
     const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(adminMode ? 2 : 1);
@@ -527,6 +565,7 @@ export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ 
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
     const [customModel, setCustomModel] = useState<string>('');
     const [machineQuantity, setMachineQuantity] = useState<number>(1);
+
 
     const termsContainerRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -952,6 +991,112 @@ export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ 
                                 >
                                     ← Back to Onboarding List
                                 </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <AuthToastContainer toasts={toasts} onDismiss={dismiss} />
+            </>
+        );
+    }
+
+    // ── Phase 191B Minimal Signup View ─────────────────────────────────────────
+    if (useMinimalSignup) {
+        return (
+            <>
+                <div style={backdrop}>
+                    <MotionBackground />
+                    <div style={{ ...cardWrap, maxWidth: 460 }}>
+                        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                            <PrintPriceLogo className="w-10 h-10 mx-auto mb-3" />
+                            <h1 style={{ fontSize: '24px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
+                                Join the PrintPrice Network
+                            </h1>
+                            <p style={{ color: dark ? '#a1a1aa' : '#64748b', fontSize: '14px', marginTop: '4px' }}>
+                                Minimal signup. Access your Printhouse workspace instantly.
+                            </p>
+                        </div>
+
+                        <div style={glassCard}>
+                            {minimalSubmitted ? (
+                                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                                    <CheckCircle size={48} style={{ color: '#10b981', margin: '0 auto 16px auto' }} />
+                                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: dark ? '#ffffff' : '#0f172a', marginBottom: '8px' }}>Check Your Email</h2>
+                                    <p style={{ color: dark ? '#a1a1aa' : '#64748b', fontSize: '14px', lineHeight: '1.6' }}>
+                                        If <strong>{minimalEmail}</strong> can be registered, we have sent activation instructions to your inbox.
+                                    </p>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleMinimalSignupSubmit}>
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: dark ? '#a1a1aa' : '#64748b', marginBottom: '6px' }}>
+                                            Work Email Address
+                                        </label>
+                                        <input
+                                            type="email"
+                                            required
+                                            value={minimalEmail}
+                                            onChange={(e) => setMinimalEmail(e.target.value)}
+                                            placeholder="owner@printhouse.com"
+                                            style={{
+                                                width: '100%',
+                                                background: dark ? '#09090b' : '#ffffff',
+                                                border: `1px solid ${dark ? '#27272a' : '#cbd5e1'}`,
+                                                color: dark ? '#ffffff' : '#0f172a',
+                                                padding: '12px 14px',
+                                                borderRadius: '8px',
+                                                fontSize: '14px',
+                                                outline: 'none'
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            id="terms"
+                                            required
+                                            checked={minimalTerms}
+                                            onChange={(e) => setMinimalTerms(e.target.checked)}
+                                            style={{ marginTop: '3px' }}
+                                        />
+                                        <label htmlFor="terms" style={{ fontSize: '12px', color: dark ? '#a1a1aa' : '#64748b', lineHeight: '1.4' }}>
+                                            I accept the <a href="#" style={{ color: '#dc0000' }}>Terms of Service</a> and <a href="#" style={{ color: '#dc0000' }}>Privacy Policy</a>.
+                                        </label>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={minimalLoading}
+                                        style={{
+                                            width: '100%',
+                                            background: '#dc0000',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            padding: '14px',
+                                            borderRadius: '8px',
+                                            fontWeight: 600,
+                                            fontSize: '15px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        {minimalLoading ? 'Sending link...' : 'Continue with Email'} <ArrowRight size={18} />
+                                    </button>
+
+                                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseMinimalSignup(false)}
+                                            style={{ background: 'none', border: 'none', color: dark ? '#71717a' : '#94a3b8', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
+                                        >
+                                            Use Full Legacy Onboarding Wizard (7 Steps)
+                                        </button>
+                                    </div>
+                                </form>
                             )}
                         </div>
                     </div>

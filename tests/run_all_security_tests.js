@@ -20,7 +20,23 @@ const testSuites = [
     'tests/security_printhouse_dashboard_isolation_test.js',
     'tests/dashboard_no_mock_data_test.js',
     'tests/dashboard_role_widget_visibility_test.js',
-    'tests/dashboard_printhouse_endpoint_matrix_test.js'
+    'tests/dashboard_printhouse_endpoint_matrix_test.js',
+    'tests/shipping_ssrf_secret_security_test.js',
+    'tests/marketplace_activation_governance_test.js',
+    'tests/printhouse_activation_adapter_test.js',
+    'tests/network_ops_discovery_remediation_test.js',
+    'tests/industrial_provisioning_routing_remediation_test.js',
+    'tests/industrial_provisioning_dispatch_remediation_test.js',
+    'tests/printer_sync_capability_remediation_test.js',
+    'tests/production_dispatch_reliability_test.js',
+    'tests/production_telemetry_state_machine_test.js',
+    'tests/production_dispatch_distributed_idempotency_test.js',
+    'tests/production_telemetry_persistent_replay_test.js',
+    'tests/smoke_phase192f_http_routes.js',
+    'tests/runtime_kill_switch_security_test.js',
+    'tests/runtime_kill_switch_effectiveness_test.js',
+    'tests/runtime_kill_switch_recovery_test.js',
+    'tests/phase192g_end_to_end_golden_path_test.js'
 ];
 
 console.log('Starting execution of all security isolation test suites...');

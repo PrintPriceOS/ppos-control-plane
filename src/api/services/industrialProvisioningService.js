@@ -6,6 +6,7 @@
 const db = require('./mysqlClient');
 const logger = require('./logger').child('provisioning-service');
 const machineRegistry = require('./machineRegistryService');
+const activationAdapter = require('./printhouseActivationAdapter');
 
 class IndustrialProvisioningService {
     /**
@@ -144,11 +145,17 @@ class IndustrialProvisioningService {
     }
 
     /**
-     * Syncs ACTIVE printer_nodes into print_nodes.
+     * Syncs ACTIVE printer_nodes with active JOB_ROUTING_ALLOWED grants into print_nodes topology.
      */
     async syncPrinterNodesToPrintNodes() {
         logger.info({ event: 'provisioning_step_start', step: 'syncPrinterNodesToPrintNodes' });
-        const printerNodes = await db.query("SELECT * FROM printer_nodes WHERE status = 'ACTIVE'");
+        const filterSql = activationAdapter.getCanonicalBulkFilterSql('g', 'JOB_ROUTING_ALLOWED');
+        const printerNodes = await db.query(`
+            SELECT p.* 
+            FROM printer_nodes p
+            INNER JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+            WHERE p.status = 'ACTIVE' AND ${filterSql}
+        `);
         let synced = 0;
 
         for (const pn of printerNodes) {
@@ -240,7 +247,13 @@ class IndustrialProvisioningService {
      */
     async seedPricingProfiles() {
         logger.info({ event: 'provisioning_step_start', step: 'seedPricingProfiles' });
-        const printerNodes = await db.query("SELECT * FROM printer_nodes WHERE status = 'ACTIVE'");
+        const filterSql = activationAdapter.getCanonicalBulkFilterSql('g', 'PRODUCTION_DISPATCH_ALLOWED');
+        const printerNodes = await db.query(`
+            SELECT p.* 
+            FROM printer_nodes p
+            INNER JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+            WHERE p.status = 'ACTIVE' AND ${filterSql}
+        `);
         let seeded = 0;
 
         for (const pn of printerNodes) {

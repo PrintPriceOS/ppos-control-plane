@@ -13,6 +13,9 @@ const mysql = require('../services/mysqlClient');
  * Global Economic Production Readiness Auditor (Super Admin only).
  */
 router.get('/readiness-audit', async (req, res) => {
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ ok: false, error: 'Forbidden: Super Admin only' });
+    }
     try {
         const pricingReadinessService = require('../services/pricingReadinessService');
         const results = await pricingReadinessService.evaluateGlobalReadiness();

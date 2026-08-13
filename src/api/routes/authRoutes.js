@@ -152,9 +152,103 @@ router.post('/login', async (req, res) => {
     }
 });
 
+const printhouseSignupService = require('../services/printhouseSignupService');
+const printhouseActivationService = require('../services/printhouseActivationService');
+
+/**
+ * POST /api/auth/printhouse/start
+ * Phase 191B Minimal Email Signup.
+ * Returns an enumeration-safe response. Never issues a JWT.
+ */
+router.post('/printhouse/start', async (req, res) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+        return res.json({
+            ok: true,
+            message: 'If this address can be used, activation instructions will be sent shortly.'
+        });
+    }
+
+    try {
+        const result = await printhouseSignupService.startSignup(req.body || {});
+        return res.json(result);
+    } catch (err) {
+        console.error('[AUTH-SIGNUP-START-ERROR]', err);
+        return res.json({
+            ok: true,
+            message: 'If this address can be used, activation instructions will be sent shortly.'
+        });
+    }
+});
+
+/**
+ * POST /api/auth/printhouse/resend-activation
+ * Resend activation link. Enumeration-safe.
+ */
+router.post('/printhouse/resend-activation', async (req, res) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+        return res.json({
+            ok: true,
+            message: 'If this address can be used, activation instructions will be sent shortly.'
+        });
+    }
+
+    try {
+        const result = await printhouseSignupService.resendActivation(req.body || {});
+        return res.json(result);
+    } catch (err) {
+        console.error('[AUTH-RESEND-ACTIVATION-ERROR]', err);
+        return res.json({
+            ok: true,
+            message: 'If this address can be used, activation instructions will be sent shortly.'
+        });
+    }
+});
+
+/**
+ * POST /api/auth/printhouse/activation/inspect
+ * Safe token inspection without consuming it.
+ */
+router.post('/printhouse/activation/inspect', async (req, res) => {
+    try {
+        const result = await printhouseActivationService.inspectToken(req.body || {});
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error('[AUTH-ACTIVATION-INSPECT-ERROR]', err);
+        return res.status(500).json({ ok: false, error: { code: 'ACTIVATION_FAILED', message: 'Internal inspection error' } });
+    }
+});
+
+/**
+ * POST /api/auth/printhouse/activate
+ * Atomic token consumption and minimum non-operational account creation.
+ * Returns JWT session upon success.
+ */
+router.post('/printhouse/activate', async (req, res) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+        return res.status(429).json({ ok: false, error: { code: 'ACTIVATION_RATE_LIMITED', message: 'Too many attempts. Please try again later.' } });
+    }
+
+    try {
+        const result = await printhouseActivationService.activateAccount(req.body || {});
+        if (!result.ok) {
+            return res.status(400).json(result);
+        }
+        return res.status(200).json(result);
+    } catch (err) {
+        console.error('[AUTH-ACTIVATE-ERROR]', err);
+        return res.status(500).json({ ok: false, error: { code: 'ACTIVATION_FAILED', message: 'Activation transaction failed' } });
+    }
+});
+
 /**
  * POST /api/auth/printhouse/register
- * Self-service registration for new Printhouses.
+ * Self-service registration for new Printhouses (Legacy / Admin provision).
  */
 router.post('/printhouse/register', async (req, res) => {
     const { companyName, email, password } = req.body;
@@ -198,6 +292,7 @@ router.post('/printhouse/register', async (req, res) => {
         res.status(400).json({ ok: false, error: err.message });
     }
 });
+
 
 /**
  * POST /api/auth/forgot-password

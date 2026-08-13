@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-15T08:10:40.253Z",
+  "generatedAt": "2026-08-07T00:31:49.111Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -794,7 +794,7 @@
       "prefix": "057",
       "canonicalSha256": "d8dbcb5c30aaa05302a13ea50db905b84eceab8e011faa2e0e754d759682714e",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 4361,
+      "sizeBytes": 4235,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -807,7 +807,7 @@
       "prefix": "058",
       "canonicalSha256": "e8ff811b58572cbf8ddc17ade58568a9772c2fea587f1447fb261d81003edac0",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 4226,
+      "sizeBytes": 4108,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": true,
@@ -820,7 +820,7 @@
       "prefix": "059",
       "canonicalSha256": "67ef56f31185553c8ef96277e1180a0494b8d860dbfe842f4e85f28c8c9f990e",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 3897,
+      "sizeBytes": 3807,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -833,7 +833,7 @@
       "prefix": "060",
       "canonicalSha256": "1384a9f63ec179cd0b6c2ecff8a911e39afe1a354d3ecd38bd60b0a23614422d",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 2877,
+      "sizeBytes": 2815,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -846,7 +846,7 @@
       "prefix": "061",
       "canonicalSha256": "e3a5605b17f951a3d4db4ee3e22ce8f406f7225859e6482eddb6cfe9fe460ae9",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 4006,
+      "sizeBytes": 3928,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -859,7 +859,7 @@
       "prefix": "062",
       "canonicalSha256": "75a481e0bfd2e001df818b206f9e222c940c8b139a0b05c7205bd48ceef10dba",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 3628,
+      "sizeBytes": 3551,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -872,7 +872,7 @@
       "prefix": "063",
       "canonicalSha256": "e5c193baeed8b1b32207465ad97e3a415516ff0e68e57dcde86f1277f5861946",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 5256,
+      "sizeBytes": 5142,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -885,7 +885,7 @@
       "prefix": "064",
       "canonicalSha256": "63ef08b57ccefc07a6a69ad73ab5ea639fafcf026b1185bd75b5db2d019a4094",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 5133,
+      "sizeBytes": 5031,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -898,7 +898,7 @@
       "prefix": "065",
       "canonicalSha256": "31326ed579ade3139cbcca2af64e54e5a762baf2cbeca9b06e419aa94ba21b1c",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 5105,
+      "sizeBytes": 5028,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -912,7 +912,7 @@
       "prefix": "066",
       "canonicalSha256": "bd213c697cd91500b51b47a551ab6309b8601ac708b5b2c784d92a096ba5114f",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 4902,
+      "sizeBytes": 4819,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -927,7 +927,7 @@
       "prefix": "067",
       "canonicalSha256": "de561169d9ace2b3d2b1441f4fa7c1e9fd823e2dab30340c60855f062d202707",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 11036,
+      "sizeBytes": 10835,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -942,7 +942,7 @@
       "prefix": "068",
       "canonicalSha256": "734484e832109873db7c4f7d4e59ca45b6047b2255f55cf2b994fc0e5fc303f1",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 13200,
+      "sizeBytes": 12969,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -957,7 +957,7 @@
       "prefix": "069",
       "canonicalSha256": "5cc8938b0aa54524d303cab04c0d5036af2a3c627bbe769617c8ff1fc2b718fd",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 12192,
+      "sizeBytes": 11971,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -972,7 +972,7 @@
       "prefix": "070",
       "canonicalSha256": "39368944ab61869c1c7676fa9b479291f0e1690e46776500edf1365c2681c16c",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 7786,
+      "sizeBytes": 7635,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -1733,7 +1733,7 @@
       "prefix": "128",
       "canonicalSha256": "d65f85e10c5e5bb92330018d272b7ad030b658ce41eab611e32c384091b0a3fa",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 8527,
+      "sizeBytes": 8369,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -1845,6 +1845,124 @@
         "CREATE_TRIGGER",
         "CREATE_PROCEDURE",
         "DROP_PROCEDURE"
+      ]
+    },
+    {
+      "path": "migrations/137_phase191b_printhouse_signup_requests.sql",
+      "prefix": "137",
+      "canonicalSha256": "8b2d93a7807a899e82160d7b8a794d01d41732825f7bc440ac50cb37305235cf",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1497,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/138_phase191c_printhouse_onboarding_profiles.sql",
+      "prefix": "138",
+      "canonicalSha256": "f05627a83b03a96338f31fca1faa0c13067612cc48c4cb8ac125637d9b9d3203",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1979,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/139_phase191d_machine_capabilities_migration.sql",
+      "prefix": "139",
+      "canonicalSha256": "3633f42ab59a3310470e3b8ed233d6fc495e3b5011ae23bcda9ad31fe0a15e3d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1520,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/140_phase191e_materials_capacity_leadtimes.sql",
+      "prefix": "140",
+      "canonicalSha256": "d9e1a65d8e1cb1025ed1d602232206a43768da972f505808faa96caf69cda7f3",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3193,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/141_phase191f_governed_pricing_configuration.sql",
+      "prefix": "141",
+      "canonicalSha256": "6a23f9dc107b4437bd69ae6e715a06ea6b1693cb0937f2da3d31593c59fb0d2b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5076,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/142_phase191g_shipping_and_integration_readiness.sql",
+      "prefix": "142",
+      "canonicalSha256": "45afb5c4501298b5c4a7594dfbecb5c89034cd29d90c4007732ddb35a039dc00",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5841,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/143_phase191h_marketplace_review_and_controlled_activation.sql",
+      "prefix": "143",
+      "canonicalSha256": "9decd817f9a43a6748dfe5ca31c5696a8f80d7449e4e0d1877b4b008693bcf2f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3427,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/144_phase192e2_distributed_dispatch_idempotency.sql",
+      "prefix": "144",
+      "canonicalSha256": "50bbecfcf521f86aff9f29c4ced25d753196105c56df7fc5e66e27159ddf0824",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1095,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/145_phase192f_runtime_observability_kill_switches.sql",
+      "prefix": "145",
+      "canonicalSha256": "dcea3abbb0f68c7e619417fed8565b0b89f95d65d40e7c86ca0badcd96b96bf4",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1638,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
       ]
     }
   ]

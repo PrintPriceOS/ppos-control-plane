@@ -14,6 +14,12 @@ async function runTests() {
     const mysql = require('../src/api/services/mysqlClient');
     const originalQuery = mysql.query;
     mysql.query = async (sql, params) => {
+        if (sql.includes("FROM printhouses")) {
+            return [{ id: FIXTURES.tenantA.printhouses[0], name: 'Print A' }];
+        }
+        if (sql.includes("print_rate_cards")) {
+            return [{ status: 'ACTIVE', formulas_json: '{"a": 1, "b": 2, "c": 3, "d": 4}' }];
+        }
         if (sql.includes("printer_nodes") && sql.includes("id = ?")) {
             return [{ status: 'active' }];
         }
@@ -65,8 +71,8 @@ async function runTests() {
         });
         const res = await dispatchRequest(pricingRouter, req);
         assert.strictEqual(res.statusCode, 200);
-        assert.ok(res.body.audit.length > 0);
-        assert.ok(!res.body.audit[0].rates_json, "Should not leak rates payload");
+        assert.ok(res.body.data.length > 0);
+        assert.ok(!res.body.data[0].rates_json, "Should not leak rates payload");
         console.log('✓ SuperAdmin allowed to global audit and no payload leaked');
     }
 
@@ -88,7 +94,7 @@ async function runTests() {
         const res = await dispatchRequest(pricingRouter, req);
         if (res.statusCode !== 200) console.error("Error body:", res.body);
         assert.strictEqual(res.statusCode, 200);
-        assert.strictEqual(res.body.printerId, FIXTURES.tenantA.printhouses[0]);
+        assert.strictEqual(res.body.data[0].printhouseId, FIXTURES.tenantA.printhouses[0]);
         console.log('✓ Printhouse can access my-readiness');
     }
 

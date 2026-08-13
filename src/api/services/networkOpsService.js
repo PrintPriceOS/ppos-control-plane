@@ -1,6 +1,7 @@
 // services/networkOpsService.js
 const db = require('./db');
 const printerSyncService = require('./printerSyncService');
+const activationAdapter = require('./printhouseActivationAdapter');
 
 class NetworkOpsService {
     /**
@@ -10,17 +11,24 @@ class NetworkOpsService {
         try {
             const today = new Date().toISOString().split('T')[0];
             const yesterday = new Date(Date.now() - 86400000).toISOString();
+            const filterSql = activationAdapter.getCanonicalBulkFilterSql('g', 'MARKETPLACE_VISIBLE');
 
             const { rows: nodes } = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active,
-                    COUNT(CASE WHEN status = 'ACTIVE' AND connect_status = 'READY' THEN 1 END) as routing_ready,
-                    COUNT(DISTINCT country || '-' || city) as regions_covered
-                FROM printer_nodes
+                    COUNT(CASE WHEN p.status = 'ACTIVE' AND ${filterSql} THEN 1 END) as active,
+                    COUNT(CASE WHEN p.status = 'ACTIVE' AND p.connect_status = 'READY' AND ${filterSql} THEN 1 END) as routing_ready,
+                    COUNT(DISTINCT p.country || '-' || p.city) as regions_covered
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
             `);
 
-            const { rows: quality } = await db.query('SELECT AVG(quality_score) as avg_score FROM printer_nodes WHERE status = "ACTIVE"');
+            const { rows: quality } = await db.query(`
+                SELECT AVG(p.quality_score) as avg_score 
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+                WHERE p.status = 'ACTIVE' AND ${filterSql}
+            `);
 
             const { rows: capacity } = await db.query(`
                 SELECT 
@@ -35,11 +43,12 @@ class NetworkOpsService {
             // Now using the formal sync_status field (Phase 26.3)
             const { rows: syncSummary } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN sync_status = 'HEALTHY' THEN 1 END) as healthy,
-                    COUNT(CASE WHEN sync_status = 'STALE' THEN 1 END) as stale,
-                    COUNT(CASE WHEN sync_status = 'OFFLINE' THEN 1 END) as offline
-                FROM printer_nodes 
-                WHERE status = 'ACTIVE'
+                    COUNT(CASE WHEN p.sync_status = 'HEALTHY' THEN 1 END) as healthy,
+                    COUNT(CASE WHEN p.sync_status = 'STALE' THEN 1 END) as stale,
+                    COUNT(CASE WHEN p.sync_status = 'OFFLINE' THEN 1 END) as offline
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+                WHERE p.status = 'ACTIVE' AND ${filterSql}
             `);
 
             const { rows: resMetrics } = await db.query(`

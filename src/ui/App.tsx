@@ -159,7 +159,8 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSeal';
 import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure from './pages/beta/ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosure';
 
-
+import { PrinthouseActivationPage } from './pages/PrinthouseActivationPage';
+import { PrinthouseSetupHub } from './pages/printhouse/PrinthouseSetupHub';
 
 export const App: React.FC = () => {
     return (
@@ -171,13 +172,16 @@ export const App: React.FC = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/activate" element={<PrinthouseActivationPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ActivationGuard><CommandCenterPage /></ActivationGuard>} />
+                <Route path="/printhouse/setup" element={<PrinthouseSetupHub />} />
                 <Route path="/activation-hub" element={<ActivationHub />} />
+
                 <Route path="/governance" element={<GovernancePage />} />
                 <Route path="/deployments" element={<DeploymentsPage />} />
                 <Route path="/audit" element={<div className="p-8"><AuditExplorerPage /></div>} />
