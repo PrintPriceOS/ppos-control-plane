@@ -92,6 +92,9 @@ const wrapHandler = (fn) => async (req, res, next) => {
         if (err.message === 'INVALID_LEAD_TIME_CONFIGURATION') {
             return res.status(400).json({ error: 'INVALID_LEAD_TIME_CONFIGURATION' });
         }
+        if (err.message === 'INVALID_MATERIAL_CONFIGURATION') {
+            return res.status(400).json({ error: 'INVALID_MATERIAL_CONFIGURATION' });
+        }
         next(err);
     }
 };

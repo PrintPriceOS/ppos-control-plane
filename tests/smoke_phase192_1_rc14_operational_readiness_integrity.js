@@ -102,13 +102,20 @@ db.query = async function mockQuery(sql, params = []) {
     const tenantId = params[0];
     const cnt = memoryStore.materials_catalog.filter(mat => {
       if (mat.tenant_id !== tenantId) return false;
+      let meta = {};
       if (mat.metadata_json) {
         try {
-          const meta = typeof mat.metadata_json === 'string' ? JSON.parse(mat.metadata_json) : mat.metadata_json;
+          meta = typeof mat.metadata_json === 'string' ? JSON.parse(mat.metadata_json) : mat.metadata_json;
           if (meta && meta.archived === true) return false;
         } catch (e) {}
       }
-      return true;
+      return mat.material_name && mat.material_name.trim() !== '' &&
+             mat.material_type && mat.material_type.trim() !== '' &&
+             mat.substrate_class && mat.substrate_class.trim() !== '' &&
+             mat.sheet_format && mat.sheet_format.trim() !== '' &&
+             mat.finish_type && mat.finish_type.trim() !== '' &&
+             (mat.gsm === null || mat.gsm === undefined || mat.gsm > 0) &&
+             meta && meta.configuration_source === 'EXPLICIT_ONBOARDING';
     }).length;
     return [{ cnt }];
   }
@@ -456,7 +463,15 @@ async function runTests() {
     id: 'mach-rc14-1', tenant_id: tenantId, printhouse_id: siteId, status: 'ACTIVE', supports_white_ink: 1
   });
   memoryStore.materials_catalog.push({
-    id: 'mat-rc14-1', tenant_id: tenantId, metadata_json: JSON.stringify({ name: 'Mat 1', archived: false })
+    id: 'mat-rc14-1',
+    tenant_id: tenantId,
+    material_name: 'Mat 1',
+    material_type: 'PAPER',
+    substrate_class: 'STANDARD',
+    sheet_format: 'SRA3',
+    finish_type: 'UNCOATED',
+    gsm: 120,
+    metadata_json: JSON.stringify({ configuration_source: 'EXPLICIT_ONBOARDING', configured_at: new Date().toISOString() })
   });
 
   const fullReadiness = await readinessService.computeReadiness(tenantId);

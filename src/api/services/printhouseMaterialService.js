@@ -31,6 +31,85 @@ function checkProtectedFields(payload) {
     }
 }
 
+const VALID_MATERIAL_TYPES = ['PAPER', 'BOARD', 'VINYL', 'INK', 'CONSUMABLE'];
+
+function validateAndNormalizeMaterial(data) {
+    if (!data || typeof data !== 'object') {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+
+    // 1. material_name (required, non-empty, trimmed)
+    if (typeof data.material_name !== 'string' || !data.material_name.trim()) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+    const materialName = data.material_name.trim();
+
+    // 2. material_type (required, supported value)
+    if (typeof data.material_type !== 'string' || !data.material_type.trim()) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+    const materialType = data.material_type.trim().toUpperCase();
+    if (!VALID_MATERIAL_TYPES.includes(materialType)) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+
+    // 3. substrate_class (required, non-empty trimmed string)
+    if (typeof data.substrate_class !== 'string' || !data.substrate_class.trim()) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+    const substrateClass = data.substrate_class.trim();
+
+    // 4. sheet_format (required, non-empty trimmed string)
+    if (typeof data.sheet_format !== 'string' || !data.sheet_format.trim()) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+    const sheetFormat = data.sheet_format.trim();
+
+    // 5. finish_type (required, non-empty trimmed string)
+    if (typeof data.finish_type !== 'string' || !data.finish_type.trim()) {
+        throw new Error('INVALID_MATERIAL_CONFIGURATION');
+    }
+    const finishType = data.finish_type.trim();
+
+    // 6. gsm (nullable; if provided, must be finite number > 0)
+    let gsm = null;
+    if (data.gsm !== undefined && data.gsm !== null) {
+        if (typeof data.gsm !== 'number' || !Number.isFinite(data.gsm) || Number.isNaN(data.gsm) || data.gsm <= 0) {
+            throw new Error('INVALID_MATERIAL_CONFIGURATION');
+        }
+        gsm = data.gsm;
+    }
+
+    // 7. supplier_country (optional; if provided, must be valid 2-letter code)
+    let supplierCountry = null;
+    if (data.supplier_country !== undefined && data.supplier_country !== null && data.supplier_country !== '') {
+        if (typeof data.supplier_country !== 'string' || !/^[A-Za-z]{2}$/.test(data.supplier_country.trim())) {
+            throw new Error('INVALID_MATERIAL_CONFIGURATION');
+        }
+        supplierCountry = data.supplier_country.trim().toUpperCase();
+    }
+
+    // 8. supplier_name (optional string)
+    let supplierName = null;
+    if (data.supplier_name !== undefined && data.supplier_name !== null) {
+        if (typeof data.supplier_name !== 'string') {
+            throw new Error('INVALID_MATERIAL_CONFIGURATION');
+        }
+        supplierName = data.supplier_name.trim() || null;
+    }
+
+    return {
+        material_name: materialName,
+        material_type: materialType,
+        substrate_class: substrateClass,
+        sheet_format: sheetFormat,
+        finish_type: finishType,
+        gsm,
+        supplier_country: supplierCountry,
+        supplier_name: supplierName
+    };
+}
+
 class PrinthouseMaterialService {
     /**
      * Retrieve material catalog entries for a site, excluding archived ones
@@ -63,17 +142,19 @@ class PrinthouseMaterialService {
      */
     async createMaterial(tenantId, siteId, payload) {
         checkProtectedFields(payload);
+        const normalized = validateAndNormalizeMaterial(payload);
 
         const id = 'mat-' + uuidv4();
-        const materialName = payload.material_name || 'New Substrate';
-        const materialType = payload.material_type || 'PAPER';
-        const substrateClass = payload.substrate_class || 'STANDARD';
-        const gsm = payload.gsm || null;
-        const sheetFormat = payload.sheet_format || 'SRA3';
-        const finishType = payload.finish_type || 'UNCOATED';
-        const supplierName = payload.supplier_name || 'Generic Supplier';
-        const supplierCountry = payload.supplier_country || 'ES';
-        const metadata = payload.metadata_json || {};
+        let metadata = {};
+        if (payload.metadata_json) {
+            if (typeof payload.metadata_json === 'string') {
+                try { metadata = JSON.parse(payload.metadata_json); } catch (e) { metadata = {}; }
+            } else if (typeof payload.metadata_json === 'object' && payload.metadata_json !== null) {
+                metadata = { ...payload.metadata_json };
+            }
+        }
+        metadata.configuration_source = 'EXPLICIT_ONBOARDING';
+        metadata.configured_at = new Date().toISOString();
 
         await db.query(
             `INSERT INTO materials_catalog 
@@ -83,14 +164,14 @@ class PrinthouseMaterialService {
                 id,
                 tenantId,
                 siteId,
-                materialName,
-                materialType,
-                substrateClass,
-                gsm,
-                sheetFormat,
-                finishType,
-                supplierName,
-                supplierCountry,
+                normalized.material_name,
+                normalized.material_type,
+                normalized.substrate_class,
+                normalized.gsm,
+                normalized.sheet_format,
+                normalized.finish_type,
+                normalized.supplier_name,
+                normalized.supplier_country,
                 JSON.stringify(metadata)
             ]
         );
@@ -107,40 +188,50 @@ class PrinthouseMaterialService {
         const material = await this.getMaterial(tenantId, siteId, materialId);
         if (!material) throw new Error('MATERIAL_NOT_FOUND');
 
-        const fieldsToUpdate = [];
-        const params = [];
+        // Combine existing with payload to validate full resulting record
+        const mergedData = {
+            material_name: payload.material_name !== undefined ? payload.material_name : material.material_name,
+            material_type: payload.material_type !== undefined ? payload.material_type : material.material_type,
+            substrate_class: payload.substrate_class !== undefined ? payload.substrate_class : material.substrate_class,
+            sheet_format: payload.sheet_format !== undefined ? payload.sheet_format : material.sheet_format,
+            finish_type: payload.finish_type !== undefined ? payload.finish_type : material.finish_type,
+            gsm: payload.gsm !== undefined ? payload.gsm : material.gsm,
+            supplier_country: payload.supplier_country !== undefined ? payload.supplier_country : material.supplier_country,
+            supplier_name: payload.supplier_name !== undefined ? payload.supplier_name : material.supplier_name
+        };
 
-        const allowedFields = [
-            'material_name',
-            'material_type',
-            'substrate_class',
-            'gsm',
-            'sheet_format',
-            'finish_type',
-            'supplier_name',
-            'supplier_country',
-            'metadata_json'
-        ];
+        const normalized = validateAndNormalizeMaterial(mergedData);
 
-        for (const field of allowedFields) {
-            if (field in payload) {
-                fieldsToUpdate.push(`${field} = ?`);
-                if (field === 'metadata_json') {
-                    params.push(JSON.stringify(payload[field]));
-                } else {
-                    params.push(payload[field]);
-                }
-            }
+        let metadata = {};
+        if (material.metadata_json) {
+            metadata = typeof material.metadata_json === 'string' ? JSON.parse(material.metadata_json) : { ...material.metadata_json };
         }
-
-        if (fieldsToUpdate.length > 0) {
-            params.push(materialId, tenantId, siteId);
-            await db.query(
-                `UPDATE materials_catalog SET ${fieldsToUpdate.join(', ')} 
-                 WHERE id = ? AND tenant_id = ? AND printhouse_id = ?`,
-                params
-            );
+        if (payload.metadata_json) {
+            const payloadMeta = typeof payload.metadata_json === 'string' ? JSON.parse(payload.metadata_json) : payload.metadata_json;
+            metadata = { ...metadata, ...payloadMeta };
         }
+        metadata.configuration_source = 'EXPLICIT_ONBOARDING';
+        metadata.configured_at = new Date().toISOString();
+
+        await db.query(
+            `UPDATE materials_catalog 
+             SET material_name = ?, material_type = ?, substrate_class = ?, gsm = ?, sheet_format = ?, finish_type = ?, supplier_name = ?, supplier_country = ?, metadata_json = ?
+             WHERE id = ? AND tenant_id = ? AND printhouse_id = ?`,
+            [
+                normalized.material_name,
+                normalized.material_type,
+                normalized.substrate_class,
+                normalized.gsm,
+                normalized.sheet_format,
+                normalized.finish_type,
+                normalized.supplier_name,
+                normalized.supplier_country,
+                JSON.stringify(metadata),
+                materialId,
+                tenantId,
+                siteId
+            ]
+        );
 
         return await this.getMaterial(tenantId, siteId, materialId);
     }

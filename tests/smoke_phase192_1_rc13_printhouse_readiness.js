@@ -92,13 +92,20 @@ db.query = async function mockQuery(sql, params = []) {
     const tenantId = params[0];
     const cnt = memoryStore.materials_catalog.filter(mat => {
       if (mat.tenant_id !== tenantId) return false;
+      let meta = {};
       if (mat.metadata_json) {
         try {
-          const meta = typeof mat.metadata_json === 'string' ? JSON.parse(mat.metadata_json) : mat.metadata_json;
+          meta = typeof mat.metadata_json === 'string' ? JSON.parse(mat.metadata_json) : mat.metadata_json;
           if (meta && meta.archived === true) return false;
         } catch (e) {}
       }
-      return true;
+      return mat.material_name && mat.material_name.trim() !== '' &&
+             mat.material_type && mat.material_type.trim() !== '' &&
+             mat.substrate_class && mat.substrate_class.trim() !== '' &&
+             mat.sheet_format && mat.sheet_format.trim() !== '' &&
+             mat.finish_type && mat.finish_type.trim() !== '' &&
+             (mat.gsm === null || mat.gsm === undefined || mat.gsm > 0) &&
+             meta && meta.configuration_source === 'EXPLICIT_ONBOARDING';
     }).length;
     return [{ cnt }];
   }
@@ -213,7 +220,13 @@ async function runTests() {
   memoryStore.materials_catalog.push({
     id: 'mat-1',
     tenant_id: tenantId,
-    metadata_json: JSON.stringify({ name: 'Silk 350g', archived: false })
+    material_name: 'Silk 350g',
+    material_type: 'PAPER',
+    substrate_class: 'PREMIUM',
+    sheet_format: 'SRA3',
+    finish_type: 'SILK',
+    gsm: 350,
+    metadata_json: JSON.stringify({ configuration_source: 'EXPLICIT_ONBOARDING', configured_at: new Date().toISOString() })
   });
 
   const readiness3 = await readinessService.computeReadiness(tenantId);

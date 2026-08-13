@@ -253,10 +253,18 @@ class PrinthouseReadinessService {
                 }
             }
 
-            // Count non-archived materials
+            // Count semantically valid non-archived materials with explicit provenance
             const materialRows = await db.query(
                 `SELECT COUNT(*) AS cnt FROM materials_catalog 
-                 WHERE tenant_id = ? AND (JSON_EXTRACT(metadata_json, '$.archived') IS NULL OR JSON_EXTRACT(metadata_json, '$.archived') != true)`,
+                 WHERE tenant_id = ? 
+                   AND (JSON_EXTRACT(metadata_json, '$.archived') IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.archived')) != 'true')
+                   AND material_name IS NOT NULL AND TRIM(material_name) != ''
+                   AND material_type IS NOT NULL AND TRIM(material_type) != ''
+                   AND substrate_class IS NOT NULL AND TRIM(substrate_class) != ''
+                   AND sheet_format IS NOT NULL AND TRIM(sheet_format) != ''
+                   AND finish_type IS NOT NULL AND TRIM(finish_type) != ''
+                   AND (gsm IS NULL OR gsm > 0)
+                   AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.configuration_source')) = 'EXPLICIT_ONBOARDING'`,
                 [tenantId]
             );
             materialCount = materialRows[0]?.cnt || 0;
