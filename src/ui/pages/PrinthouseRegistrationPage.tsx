@@ -36,7 +36,7 @@ import {
     Factory
 } from 'lucide-react';
 import { getAuthToken, setAuthToken, setAuthUser } from '../lib/authStore';
-import { AuthInput, AuthButton, MotionBackground } from '../components/auth/AuthShell';
+import { AuthInput, AuthButton, MotionBackground, AuthShell } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
@@ -485,51 +485,267 @@ function isDark() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PrinthouseRegistrationPage
+// Public Minimal Printhouse Registration (Phase 191B / RC17)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ adminMode = false }) => {
-    // Phase 191B Minimal Signup feature flag & URL search params check
-    const isLegacyRequested = typeof window !== 'undefined' && window.location.search.includes('legacy=true');
-    const isMinimalSignupEnabled = typeof import.meta !== 'undefined' && (import.meta as any).env 
-        ? ((import.meta as any).env.VITE_PRINTHOUSE_MINIMAL_SIGNUP_ENABLED !== 'false') 
-        : true;
+const PublicPrinthouseRegistration: React.FC = () => {
+    const [email, setEmail] = useState('');
+    const [status, setStatus] = useState<'EMAIL_ENTRY' | 'SENDING' | 'CHECK_EMAIL' | 'RESENDING' | 'ERROR'>('EMAIL_ENTRY');
+    const [resendStatus, setResendStatus] = useState<'IDLE' | 'RESENDING' | 'SENT'>('IDLE');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const [useMinimalSignup, setUseMinimalSignup] = useState<boolean>(!adminMode && !isLegacyRequested && isMinimalSignupEnabled);
-
-
-    const [minimalEmail, setMinimalEmail] = useState('');
-    const [minimalTerms, setMinimalTerms] = useState(false);
-    const [minimalSubmitted, setMinimalSubmitted] = useState(false);
-    const [minimalLoading, setMinimalLoading] = useState(false);
-
-    const handleMinimalSignupSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!minimalEmail || !minimalEmail.includes('@')) return;
-        setMinimalLoading(true);
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail || !normalizedEmail.includes('@')) return;
+
+        setStatus('SENDING');
+        setErrorMessage(null);
+        setResendStatus('IDLE');
 
         try {
-            await fetch('/api/auth/printhouse/start', {
+            const res = await fetch('/api/auth/printhouse/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: minimalEmail,
-                    acceptTerms: minimalTerms,
-                    acceptPrivacy: minimalTerms
-                })
+                body: JSON.stringify({ email: normalizedEmail })
             });
-            setMinimalSubmitted(true);
+            if (res.ok || res.status === 200 || res.status === 201) {
+                setStatus('CHECK_EMAIL');
+            } else {
+                const data = await res.json().catch(() => null);
+                if (data && data.message) {
+                    setStatus('CHECK_EMAIL');
+                } else {
+                    setStatus('ERROR');
+                    setErrorMessage('Unable to process registration. Please try again.');
+                }
+            }
         } catch (err) {
-            // Still show success to prevent enumeration
-            setMinimalSubmitted(true);
-        } finally {
-            setMinimalLoading(false);
+            setStatus('ERROR');
+            setErrorMessage('Network error. Please check your connection and try again.');
         }
     };
 
+    const handleResend = async () => {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail) return;
+
+        setResendStatus('RESENDING');
+
+        try {
+            await fetch('/api/auth/printhouse/resend-activation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: normalizedEmail })
+            });
+            setResendStatus('SENT');
+        } catch (err) {
+            setResendStatus('SENT');
+        }
+    };
+
+    const handleReset = () => {
+        setStatus('EMAIL_ENTRY');
+        setEmail('');
+        setResendStatus('IDLE');
+        setErrorMessage(null);
+    };
+
+    return (
+        <AuthShell
+            title="Create your printhouse account"
+            subtitle="Enter your work email and we'll send you an activation link."
+            maxWidth={460}
+        >
+            {status === 'ERROR' && (
+                <div style={{
+                    padding: '16px',
+                    marginBottom: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#f87171',
+                    fontSize: '14px',
+                    textAlign: 'center'
+                }}>
+                    <p style={{ margin: 0 }}>{errorMessage || 'An error occurred. Please try again.'}</p>
+                    <button
+                        type="button"
+                        onClick={handleReset}
+                        style={{
+                            marginTop: '12px',
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Try Again
+                    </button>
+                </div>
+            )}
+
+            {(status === 'CHECK_EMAIL' || status === 'RESENDING') && (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        margin: '0 auto 16px auto',
+                        borderRadius: '50%',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#34d399'
+                    }}>
+                        <CheckCircle size={32} />
+                    </div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
+                        Check your email
+                    </h2>
+                    <p style={{ color: '#a1a1aa', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                        If this address can be used, activation instructions will be sent shortly.
+                    </p>
+
+                    {resendStatus === 'SENT' && (
+                        <div style={{
+                            padding: '10px',
+                            marginBottom: '16px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#34d399',
+                            fontSize: '12px'
+                        }}>
+                            Activation instructions resent. Please check your inbox.
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <button
+                            type="button"
+                            onClick={handleResend}
+                            disabled={resendStatus === 'RESENDING'}
+                            style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                background: '#27272a',
+                                color: '#ffffff',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                cursor: resendStatus === 'RESENDING' ? 'not-allowed' : 'pointer',
+                                opacity: resendStatus === 'RESENDING' ? 0.6 : 1,
+                                transition: 'background 0.2s'
+                            }}
+                        >
+                            {resendStatus === 'RESENDING' ? 'Sending link...' : 'Resend activation email'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleReset}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '12px',
+                                color: '#71717a',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                            }}
+                        >
+                            Use a different email
+                        </button>
+                    </div>
+
+                    <div style={{ marginTop: '28px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '13px', color: '#a1a1aa' }}>
+                        Already have an account?{' '}
+                        <Link to="/login" style={{ color: '#dc0000', fontWeight: 600, textDecoration: 'none' }}>
+                            Sign in
+                        </Link>
+                    </div>
+                </div>
+            )}
+
+            {(status === 'EMAIL_ENTRY' || status === 'SENDING') && (
+                <form onSubmit={handleSubmit}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '8px' }}>
+                            Work Email Address
+                        </label>
+                        <input
+                            type="email"
+                            required
+                            autoFocus
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="owner@printhouse.com"
+                            style={{
+                                width: '100%',
+                                padding: '12px 14px',
+                                borderRadius: '8px',
+                                background: '#09090b',
+                                border: '1px solid #27272a',
+                                color: '#ffffff',
+                                fontSize: '14px',
+                                outline: 'none',
+                                transition: 'border-color 0.2s'
+                            }}
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={status === 'SENDING' || !email.trim()}
+                        style={{
+                            width: '100%',
+                            padding: '14px 16px',
+                            borderRadius: '8px',
+                            background: '#dc0000',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            fontSize: '15px',
+                            border: 'none',
+                            cursor: status === 'SENDING' || !email.trim() ? 'not-allowed' : 'pointer',
+                            opacity: status === 'SENDING' || !email.trim() ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            boxShadow: '0 4px 14px rgba(220, 0, 0, 0.3)',
+                            transition: 'background 0.2s'
+                        }}
+                    >
+                        {status === 'SENDING' ? 'Sending activation link...' : 'Send activation link'}
+                        <ArrowRight size={16} />
+                    </button>
+
+                    <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center', fontSize: '13px', color: '#a1a1aa' }}>
+                        Already have an account?{' '}
+                        <Link to="/login" style={{ color: '#dc0000', fontWeight: 600, textDecoration: 'none' }}>
+                            Sign in
+                        </Link>
+                    </div>
+                </form>
+            )}
+        </AuthShell>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin Printhouse Provisioning Wizard (Legacy / Internal Admin Mode)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AdminPrinthouseProvision: React.FC = () => {
+    const adminMode = true;
     // Steps: 1: Legal Terms, 2: Company, 3: Capabilities, 4: Machinery & Capacity, 5: Compliance & QA, 6: Plan Selection, 7: Admin Credentials, 8: Success
     // In adminMode: step 1 (T&C) is skipped — start at 2
-    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(adminMode ? 2 : 1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(2);
     const [formData, setFormData] = useState<FormData>({
         termsAccepted: false,
         termsReviewed: false,
@@ -1000,111 +1216,7 @@ export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ 
         );
     }
 
-    // ── Phase 191B Minimal Signup View ─────────────────────────────────────────
-    if (useMinimalSignup) {
-        return (
-            <>
-                <div style={backdrop}>
-                    <MotionBackground />
-                    <div style={{ ...cardWrap, maxWidth: 460 }}>
-                        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                            <PrintPriceLogo className="w-10 h-10 mx-auto mb-3" />
-                            <h1 style={{ fontSize: '24px', fontWeight: 800, color: dark ? '#f4f4f5' : '#0f172a' }}>
-                                Join the PrintPrice Network
-                            </h1>
-                            <p style={{ color: dark ? '#a1a1aa' : '#64748b', fontSize: '14px', marginTop: '4px' }}>
-                                Minimal signup. Access your Printhouse workspace instantly.
-                            </p>
-                        </div>
 
-                        <div style={glassCard}>
-                            {minimalSubmitted ? (
-                                <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                                    <CheckCircle size={48} style={{ color: '#10b981', margin: '0 auto 16px auto' }} />
-                                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: dark ? '#ffffff' : '#0f172a', marginBottom: '8px' }}>Check Your Email</h2>
-                                    <p style={{ color: dark ? '#a1a1aa' : '#64748b', fontSize: '14px', lineHeight: '1.6' }}>
-                                        If <strong>{minimalEmail}</strong> can be registered, we have sent activation instructions to your inbox.
-                                    </p>
-                                </div>
-                            ) : (
-                                <form onSubmit={handleMinimalSignupSubmit}>
-                                    <div style={{ marginBottom: '20px' }}>
-                                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: dark ? '#a1a1aa' : '#64748b', marginBottom: '6px' }}>
-                                            Work Email Address
-                                        </label>
-                                        <input
-                                            type="email"
-                                            required
-                                            value={minimalEmail}
-                                            onChange={(e) => setMinimalEmail(e.target.value)}
-                                            placeholder="owner@printhouse.com"
-                                            style={{
-                                                width: '100%',
-                                                background: dark ? '#09090b' : '#ffffff',
-                                                border: `1px solid ${dark ? '#27272a' : '#cbd5e1'}`,
-                                                color: dark ? '#ffffff' : '#0f172a',
-                                                padding: '12px 14px',
-                                                borderRadius: '8px',
-                                                fontSize: '14px',
-                                                outline: 'none'
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                                        <input
-                                            type="checkbox"
-                                            id="terms"
-                                            required
-                                            checked={minimalTerms}
-                                            onChange={(e) => setMinimalTerms(e.target.checked)}
-                                            style={{ marginTop: '3px' }}
-                                        />
-                                        <label htmlFor="terms" style={{ fontSize: '12px', color: dark ? '#a1a1aa' : '#64748b', lineHeight: '1.4' }}>
-                                            I accept the <a href="#" style={{ color: '#dc0000' }}>Terms of Service</a> and <a href="#" style={{ color: '#dc0000' }}>Privacy Policy</a>.
-                                        </label>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={minimalLoading}
-                                        style={{
-                                            width: '100%',
-                                            background: '#dc0000',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            padding: '14px',
-                                            borderRadius: '8px',
-                                            fontWeight: 600,
-                                            fontSize: '15px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        {minimalLoading ? 'Sending link...' : 'Continue with Email'} <ArrowRight size={18} />
-                                    </button>
-
-                                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setUseMinimalSignup(false)}
-                                            style={{ background: 'none', border: 'none', color: dark ? '#71717a' : '#94a3b8', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
-                                        >
-                                            Use Full Legacy Onboarding Wizard (7 Steps)
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <AuthToastContainer toasts={toasts} onDismiss={dismiss} />
-            </>
-        );
-    }
 
     // ── Main Form ──────────────────────────────────────────────────────────────
     return (
@@ -2288,3 +2400,15 @@ const selectStyle = (dark: boolean): CSSProperties => ({
     outline: 'none',
     fontFamily: "'Manrope', system-ui, sans-serif",
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page Export
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PrinthouseRegistrationPage: React.FC<{ adminMode?: boolean }> = ({ adminMode = false }) => {
+    if (adminMode) {
+        return <AdminPrinthouseProvision />;
+    }
+    return <PublicPrinthouseRegistration />;
+};
+
