@@ -40,9 +40,106 @@ async function ensurePreviousFailuresColumn(connOrDb) {
 
 async function runMigration140PreRemediation(connOrDb) {
   logger.info({ event: 'migration_remediation_140_start', message: 'Evaluating governed schema normalization pre-remediation for migration 140' });
-  
-  // Define metadata for the 13 legacy foreign keys to drop and recreate
-  const fksToAudit = [
+
+  // 1. EXACT TABLE PRECONDITION — no filtering; all 15 tables must exist or abort
+  const expectedTables = [
+    'printer_nodes',
+    'printhouse_machines',
+    'printhouse_media',
+    'printhouse_policy_profiles',
+    'printhouse_sla_profiles',
+    'materials_catalog',
+    'job_outcomes',
+    'printer_capacity',
+    'printer_contacts',
+    'printer_machines',
+    'printer_papers',
+    'printer_performance',
+    'printer_service_regions',
+    'printhouse_capabilities',
+    'routing_history'
+  ];
+
+  const [tablesRows] = await connOrDb.query(`
+    SELECT TABLE_NAME 
+    FROM information_schema.TABLES 
+    WHERE TABLE_SCHEMA = DATABASE()
+  `);
+  const existingTables = new Set(tablesRows.map(t => t.TABLE_NAME));
+
+  const missingTables = expectedTables.filter(t => !existingTables.has(t));
+  if (missingTables.length > 0) {
+    throw new Error(
+      `PRECONDITION FAILED: Missing required tables.\n` +
+      `  EXPECTED (${expectedTables.length}): [${expectedTables.join(', ')}]\n` +
+      `  OBSERVED (${existingTables.size}): [${[...existingTables].sort().join(', ')}]\n` +
+      `  MISSING: [${missingTables.join(', ')}]`
+    );
+  }
+
+  // 2. INDEX PRECONDITION
+  // Index names verified against real production/test schema evidence (2026-08-13).
+  // printer_nodes uses 'idx_tenant' (NOT 'idx_printer_nodes_tenant').
+  const requiredIndexes = [
+    { table: 'printer_nodes', indexName: 'PRIMARY' },
+    { table: 'printer_nodes', indexName: 'uk_printer_nodes_id_tenant' },
+    { table: 'printer_nodes', indexName: 'idx_tenant' },
+    { table: 'printhouse_machines', indexName: 'PRIMARY' },
+    { table: 'printhouse_machines', indexName: 'uk_pm_id_tenant' },
+    { table: 'printhouse_machines', indexName: 'fk_machines_printer_node' },
+    { table: 'materials_catalog', indexName: 'PRIMARY' },
+    { table: 'materials_catalog', indexName: 'uk_mat_cat_id_tenant' },
+    { table: 'materials_catalog', indexName: 'idx_tenant' },
+    // Child FK supporting indexes (InnoDB names them by constraint name)
+    { table: 'printhouse_media', indexName: 'fk_media_printer_node' },
+    { table: 'printhouse_policy_profiles', indexName: 'fk_policies_printer_node' },
+    { table: 'printhouse_sla_profiles', indexName: 'fk_sla_printer_node' },
+    { table: 'job_outcomes', indexName: 'printer_id' },
+    { table: 'printer_capacity', indexName: 'printer_id' },
+    { table: 'printer_contacts', indexName: 'printer_id' },
+    { table: 'printer_machines', indexName: 'printer_id' },
+    { table: 'printer_papers', indexName: 'printer_id' },
+    { table: 'printer_performance', indexName: 'printer_id' },
+    { table: 'printer_service_regions', indexName: 'printer_id' },
+    { table: 'printhouse_capabilities', indexName: 'printhouse_id' },
+    { table: 'routing_history', indexName: 'printer_id' }
+  ];
+
+  const [indexRows] = await connOrDb.query(`
+    SELECT DISTINCT TABLE_NAME, INDEX_NAME 
+    FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE()
+  `);
+  const existingIndexes = new Set(indexRows.map(r => `${r.TABLE_NAME}.${r.INDEX_NAME}`));
+
+  // InnoDB may name single-col FK indexes by constraint name instead of column name
+  const constraintAltNames = {
+    'job_outcomes': 'job_outcomes_ibfk_1',
+    'printer_capacity': 'printer_capacity_ibfk_1',
+    'printer_contacts': 'printer_contacts_ibfk_1',
+    'printer_machines': 'printer_machines_ibfk_1',
+    'printer_papers': 'printer_papers_ibfk_1',
+    'printer_performance': 'printer_performance_ibfk_1',
+    'printer_service_regions': 'printer_service_regions_ibfk_1',
+    'printhouse_capabilities': 'printhouse_capabilities_ibfk_1',
+    'routing_history': 'routing_history_ibfk_1'
+  };
+
+  const missingIndexes = [];
+  for (const idx of requiredIndexes) {
+    const key1 = `${idx.table}.${idx.indexName}`;
+    const altName = constraintAltNames[idx.table];
+    const key2 = altName ? `${idx.table}.${altName}` : null;
+    if (!existingIndexes.has(key1) && (!key2 || !existingIndexes.has(key2))) {
+      missingIndexes.push(`${idx.table}.${idx.indexName}`);
+    }
+  }
+  if (missingIndexes.length > 0) {
+    throw new Error(`PRECONDITION FAILED: Missing required indexes: [${missingIndexes.join(', ')}].`);
+  }
+
+  // 3. EXACT FK PRECONDITION — verified before any mutation in all states
+  const EXPECTED_FKS = [
     { name: 'fk_machines_printer_node', childTable: 'printhouse_machines', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
     { name: 'fk_media_printer_node', childTable: 'printhouse_media', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
     { name: 'fk_policies_printer_node', childTable: 'printhouse_policy_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
@@ -57,8 +154,153 @@ async function runMigration140PreRemediation(connOrDb) {
     { name: 'printhouse_capabilities_ibfk_1', childTable: 'printhouse_capabilities', childCols: ['printhouse_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
     { name: 'routing_history_ibfk_1', childTable: 'routing_history', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' }
   ];
+  const EXPECTED_FK_COUNT = 13;
+  if (EXPECTED_FKS.length !== EXPECTED_FK_COUNT) {
+    // Internal integrity check — must never fail unless someone edits EXPECTED_FKS
+    throw new Error(`INTERNAL ASSERTION FAILED: EXPECTED_FKS array has ${EXPECTED_FKS.length} entries, expected ${EXPECTED_FK_COUNT}.`);
+  }
 
-  // Target mappings for all 15 tables and 22 columns
+  // Read current FK graph from database
+  const [fkRows] = await connOrDb.query(`
+    SELECT 
+        k.CONSTRAINT_NAME,
+        k.TABLE_NAME,
+        k.COLUMN_NAME,
+        k.ORDINAL_POSITION,
+        k.REFERENCED_TABLE_NAME,
+        k.REFERENCED_COLUMN_NAME,
+        r.UPDATE_RULE,
+        r.DELETE_RULE
+    FROM information_schema.KEY_COLUMN_USAGE k
+    JOIN information_schema.REFERENTIAL_CONSTRAINTS r 
+      ON k.CONSTRAINT_NAME = r.CONSTRAINT_NAME 
+      AND k.CONSTRAINT_SCHEMA = r.CONSTRAINT_SCHEMA
+    WHERE k.CONSTRAINT_SCHEMA = DATABASE()
+    ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION
+  `);
+
+  const actualFks = {};
+  for (const r of fkRows) {
+    if (!actualFks[r.CONSTRAINT_NAME]) {
+      actualFks[r.CONSTRAINT_NAME] = {
+        name: r.CONSTRAINT_NAME,
+        childTable: r.TABLE_NAME,
+        childCols: [],
+        parentTable: r.REFERENCED_TABLE_NAME,
+        parentCols: [],
+        onUpdate: r.UPDATE_RULE,
+        onDelete: r.DELETE_RULE
+      };
+    }
+    actualFks[r.CONSTRAINT_NAME].childCols.push(r.COLUMN_NAME);
+    actualFks[r.CONSTRAINT_NAME].parentCols.push(r.REFERENCED_COLUMN_NAME);
+  }
+
+  // Helper: returns list of field-level discrepancies between an expected and actual FK
+  function auditFkDefinition(expected, actual) {
+    const errors = [];
+    if (actual.childTable !== expected.childTable) {
+      errors.push(`childTable: observed '${actual.childTable}', expected '${expected.childTable}'`);
+    }
+    if (actual.parentTable !== expected.parentTable) {
+      errors.push(`parentTable: observed '${actual.parentTable}', expected '${expected.parentTable}'`);
+    }
+    const childColsObs = JSON.stringify(actual.childCols.map(c => c.toLowerCase()));
+    const childColsExp = JSON.stringify(expected.childCols.map(c => c.toLowerCase()));
+    if (childColsObs !== childColsExp) {
+      errors.push(`childCols: observed ${childColsObs}, expected ${childColsExp}`);
+    }
+    const parentColsObs = JSON.stringify(actual.parentCols.map(c => c.toLowerCase()));
+    const parentColsExp = JSON.stringify(expected.parentCols.map(c => c.toLowerCase()));
+    if (parentColsObs !== parentColsExp) {
+      errors.push(`parentCols: observed ${parentColsObs}, expected ${parentColsExp}`);
+    }
+    if (actual.onUpdate.toUpperCase() !== expected.onUpdate.toUpperCase()) {
+      errors.push(`UPDATE_RULE: observed '${actual.onUpdate}', expected '${expected.onUpdate}'`);
+    }
+    if (actual.onDelete.toUpperCase() !== expected.onDelete.toUpperCase()) {
+      errors.push(`DELETE_RULE: observed '${actual.onDelete}', expected '${expected.onDelete}'`);
+    }
+    return errors;
+  }
+
+  // Retrieve current remediation state
+  await connOrDb.query(`
+    CREATE TABLE IF NOT EXISTS ppos_remediation_state (
+      state_key VARCHAR(100) PRIMARY KEY,
+      state_value VARCHAR(100) NOT NULL
+    )
+  `);
+  const [stateRows] = await connOrDb.query(`
+    SELECT state_value 
+    FROM ppos_remediation_state 
+    WHERE state_key = 'remediation_140_status'
+  `);
+  const remediationStatus = stateRows && stateRows[0] ? stateRows[0].state_value : 'NOT_STARTED';
+
+  if (remediationStatus === 'NOT_STARTED') {
+    // Canonical production precondition: all 13 FKs must be present and match exactly
+    const presentCount = EXPECTED_FKS.filter(fk => actualFks[fk.name]).length;
+    if (presentCount !== EXPECTED_FK_COUNT) {
+      const missingNames = EXPECTED_FKS.filter(fk => !actualFks[fk.name]).map(fk => fk.name);
+      throw new Error(
+        `PRECONDITION FAILED: FK count mismatch in NOT_STARTED state.\n` +
+        `  EXPECTED: ${EXPECTED_FK_COUNT} FKs\n` +
+        `  OBSERVED: ${presentCount} FKs\n` +
+        `  MISSING CONSTRAINTS: [${missingNames.join(', ')}]`
+      );
+    }
+
+    const fkErrors = [];
+    for (const expected of EXPECTED_FKS) {
+      const actual = actualFks[expected.name]; // guaranteed present (count verified above)
+      const defErrors = auditFkDefinition(expected, actual);
+      if (defErrors.length > 0) {
+        fkErrors.push(`Mismatch on '${expected.name}': ${defErrors.join('; ')}`);
+      }
+    }
+    if (fkErrors.length > 0) {
+      throw new Error(`PRECONDITION FAILED: Foreign key definition mismatches:\n  ${fkErrors.join('\n  ')}`);
+    }
+
+    // Set remediation status to IN_PROGRESS before making any mutations
+    await connOrDb.query(
+      `INSERT INTO ppos_remediation_state (state_key, state_value) VALUES ('remediation_140_status', 'IN_PROGRESS') ON DUPLICATE KEY UPDATE state_value = 'IN_PROGRESS'`
+    );
+
+  } else if (remediationStatus === 'IN_PROGRESS') {
+    // Idempotent recovery path. Inspect what has already been done.
+    const presentFks = EXPECTED_FKS.filter(fk => actualFks[fk.name]);
+    const absentFks = EXPECTED_FKS.filter(fk => !actualFks[fk.name]);
+
+    logger.info({
+      event: 'migration_remediation_140_recovery',
+      message: `Resuming from IN_PROGRESS. Present FKs: ${presentFks.length}/${EXPECTED_FK_COUNT}, absent (already processed): ${absentFks.length}/${EXPECTED_FK_COUNT}.`,
+      presentFks: presentFks.map(fk => fk.name),
+      absentFks: absentFks.map(fk => fk.name)
+    });
+
+    // Verify definition integrity of the FKs still present — corruption here is fatal
+    const fkErrors = [];
+    for (const expected of presentFks) {
+      const actual = actualFks[expected.name];
+      const defErrors = auditFkDefinition(expected, actual);
+      if (defErrors.length > 0) {
+        fkErrors.push(`IN_PROGRESS corruption on '${expected.name}': ${defErrors.join('; ')}`);
+      }
+    }
+    if (fkErrors.length > 0) {
+      throw new Error(
+        `PRECONDITION FAILED: IN_PROGRESS recovery aborted — unexpected FK definition corruption:\n  ${fkErrors.join('\n  ')}`
+      );
+    }
+
+  } else {
+    // Unknown/unexpected state — hard abort, require manual intervention
+    throw new Error(`PRECONDITION FAILED: Database is in an unexpected remediation state: '${remediationStatus}'. Manual intervention required.`);
+  }
+
+  // Target column specifications for all 15 tables / 22 columns
   const allTargets = {
     printer_nodes: {
       id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
@@ -114,73 +356,47 @@ async function runMigration140PreRemediation(connOrDb) {
     }
   };
 
-  // 1. Audit tables that exist in the active schema
-  const existingTables = new Set();
-  const [tables] = await connOrDb.query(`
-    SELECT TABLE_NAME 
-    FROM information_schema.TABLES 
-    WHERE TABLE_SCHEMA = DATABASE()
-  `);
-  for (const t of tables) {
-    existingTables.add(t.TABLE_NAME);
-  }
+  // Only drop FKs that are still present (idempotent — safe for IN_PROGRESS retry)
+  const activeFksToDrop = EXPECTED_FKS.filter(fk => actualFks[fk.name]);
 
-  // Filter FKs to drop/recreate based on tables that exist
-  const activeFks = fksToAudit.filter(f => existingTables.has(f.childTable) && existingTables.has(f.parentTable));
-
-  // Determine which FKs exist right now
-  const existingFkNames = new Set();
-  const [fksRows] = await connOrDb.query(`
-    SELECT CONSTRAINT_NAME 
-    FROM information_schema.REFERENTIAL_CONSTRAINTS 
-    WHERE CONSTRAINT_SCHEMA = DATABASE()
-  `);
-  for (const r of fksRows) {
-    existingFkNames.add(r.CONSTRAINT_NAME);
-  }
-
-  // Set FOREIGN_KEY_CHECKS = 0 strictly for the duration of drops and alters
+  // Set FOREIGN_KEY_CHECKS = 0 strictly for dropping constraints and modifying columns
   await connOrDb.query('SET FOREIGN_KEY_CHECKS = 0');
-  
+
   try {
-    // 2. Drop legacy FK constraints if they are present
-    for (const fk of activeFks) {
-      if (existingFkNames.has(fk.name)) {
-        logger.info({ event: 'migration_remediation_140_drop_fk', constraintName: fk.name, table: fk.childTable, message: `Dropping foreign key constraint ${fk.name} on ${fk.childTable}` });
-        await connOrDb.query(`ALTER TABLE ${fk.childTable} DROP FOREIGN KEY ${fk.name}`);
-      }
+    // 4. Drop legacy FK constraints (only those still present)
+    for (const fk of activeFksToDrop) {
+      logger.info({ event: 'migration_remediation_140_drop_fk', constraintName: fk.name, table: fk.childTable, message: `Dropping foreign key constraint ${fk.name} on ${fk.childTable}` });
+      await connOrDb.query(`ALTER TABLE ${fk.childTable} DROP FOREIGN KEY ${fk.name}`);
     }
 
-    // 3. Widen columns and convert charsets/collations
+    // 5. Widen columns and convert charsets/collations
     for (const [table, columns] of Object.entries(allTargets)) {
-      if (!existingTables.has(table)) continue;
-      
       for (const [column, spec] of Object.entries(columns)) {
         const [cols] = await connOrDb.query(`
           SELECT CHARACTER_MAXIMUM_LENGTH, CHARACTER_SET_NAME, COLLATION_NAME, IS_NULLABLE
           FROM information_schema.COLUMNS 
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
         `, [table, column]);
-        
+
         if (cols && cols[0]) {
           const current = cols[0];
           let targetLength = spec.length;
           if (spec.preserveWidthIfLarger && current.CHARACTER_MAXIMUM_LENGTH > targetLength) {
             targetLength = current.CHARACTER_MAXIMUM_LENGTH;
           }
-          
+
           const needsLengthWiden = current.CHARACTER_MAXIMUM_LENGTH < targetLength;
           const needsCharsetConvert = current.CHARACTER_SET_NAME !== spec.charset || current.COLLATION_NAME !== spec.collation;
-          
+
           if (needsLengthWiden || needsCharsetConvert) {
             const nullability = current.IS_NULLABLE === 'YES' ? 'NULL' : 'NOT NULL';
-            logger.info({ 
-              event: 'migration_remediation_140_exec', 
-              table, 
-              column, 
+            logger.info({
+              event: 'migration_remediation_140_exec',
+              table,
+              column,
               message: `Normalizing ${table}.${column} to VARCHAR(${targetLength}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability} (was VARCHAR(${current.CHARACTER_MAXIMUM_LENGTH}) ${current.CHARACTER_SET_NAME}/${current.COLLATION_NAME})`
             });
-            
+
             await connOrDb.query(`
               ALTER TABLE ${table} 
               MODIFY COLUMN ${column} VARCHAR(${targetLength}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability}
@@ -193,46 +409,86 @@ async function runMigration140PreRemediation(connOrDb) {
     logger.error({ event: 'migration_remediation_140_error', message: `Failure during normalization alters: ${err.message}`, error: err });
     throw err;
   } finally {
-    // 4. Recreate dropped foreign keys to ensure database integrity (recovery sequence)
-    const recreationErrors = [];
-    for (const fk of activeFks) {
-      try {
-        const [checkFk] = await connOrDb.query(`
-          SELECT CONSTRAINT_NAME 
-          FROM information_schema.REFERENTIAL_CONSTRAINTS 
-          WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?
-        `, [fk.name]);
-        
-        if (!checkFk || checkFk.length === 0) {
-          logger.info({ event: 'migration_remediation_140_recreate_fk', constraintName: fk.name, table: fk.childTable, message: `Recreating foreign key constraint ${fk.name} on ${fk.childTable}` });
-          
-          const childColsCsv = fk.childCols.join(', ');
-          const parentColsCsv = fk.parentCols.join(', ');
-          
-          await connOrDb.query(`
-            ALTER TABLE ${fk.childTable} 
-            ADD CONSTRAINT ${fk.name} 
-            FOREIGN KEY (${childColsCsv}) 
-            REFERENCES ${fk.parentTable}(${parentColsCsv}) 
-            ON UPDATE ${fk.onUpdate} 
-            ON DELETE ${fk.onDelete}
-          `);
-        }
-      } catch (recErr) {
-        logger.error({ event: 'migration_remediation_140_recreate_error', constraintName: fk.name, message: `Failed to recreate constraint ${fk.name}: ${recErr.message}`, error: recErr });
-        recreationErrors.push(recErr);
-      }
-    }
-    
-    // Always restore FOREIGN_KEY_CHECKS = 1
+    // Re-enable checks immediately before verifying orphans and recreating constraints
     await connOrDb.query('SET FOREIGN_KEY_CHECKS = 1');
-    
-    if (recreationErrors.length > 0) {
-      throw new Error(`Normalization pre-remediation failed during constraint recreation: ${recreationErrors.map(e => e.message).join('; ')}`);
+  }
+
+  // 6. ORPHAN CHECK BEFORE FK RECREATION
+  const orphanErrors = [];
+  for (const fk of EXPECTED_FKS) {
+    const joinParts = [];
+    for (let i = 0; i < fk.childCols.length; i++) {
+      joinParts.push(`c.${fk.childCols[i]} = p.${fk.parentCols[i]}`);
+    }
+    const joinCondition = joinParts.join(' AND ');
+
+    const [orphanRows] = await connOrDb.query(`
+      SELECT COUNT(*) as count 
+      FROM ${fk.childTable} c 
+      LEFT JOIN ${fk.parentTable} p ON ${joinCondition}
+      WHERE p.${fk.parentCols[0]} IS NULL
+    `);
+
+    const count = orphanRows[0].count;
+    if (count > 0) {
+      orphanErrors.push(`Constraint '${fk.name}' on '${fk.childTable}' has ${count} orphan rows referencing '${fk.parentTable}'`);
     }
   }
-  
-  logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed' });
+
+  if (orphanErrors.length > 0) {
+    await connOrDb.query(
+      `INSERT INTO ppos_remediation_state (state_key, state_value) VALUES ('remediation_140_status', 'FAILED_ORPHAN') ON DUPLICATE KEY UPDATE state_value = 'FAILED_ORPHAN'`
+    );
+    throw new Error(`ORPHAN CHECK FAILED: ${orphanErrors.join('; ')}`);
+  }
+
+
+
+  // 7. FK RECREATION WITH CHECKS ENABLED
+  const [fkChecks] = await connOrDb.query('SELECT @@FOREIGN_KEY_CHECKS as fk_checks');
+  const activeFkCheckVal = fkChecks && fkChecks[0] ? fkChecks[0].fk_checks : null;
+  if (Number(activeFkCheckVal) !== 1) {
+    throw new Error(`PRECONDITION FAILED: FOREIGN_KEY_CHECKS must be 1 before FK recreation, observed ${activeFkCheckVal}`);
+  }
+
+  const recreationErrors = [];
+  for (const fk of EXPECTED_FKS) {
+    try {
+      const [checkFk] = await connOrDb.query(`
+        SELECT CONSTRAINT_NAME 
+        FROM information_schema.REFERENTIAL_CONSTRAINTS 
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?
+      `, [fk.name]);
+
+      if (!checkFk || checkFk.length === 0) {
+        logger.info({ event: 'migration_remediation_140_recreate_fk', constraintName: fk.name, table: fk.childTable, message: `Recreating foreign key constraint ${fk.name} on ${fk.childTable}` });
+
+        const childColsCsv = fk.childCols.join(', ');
+        const parentColsCsv = fk.parentCols.join(', ');
+
+        await connOrDb.query(`
+          ALTER TABLE ${fk.childTable} 
+          ADD CONSTRAINT ${fk.name} 
+          FOREIGN KEY (${childColsCsv}) 
+          REFERENCES ${fk.parentTable}(${parentColsCsv}) 
+          ON UPDATE ${fk.onUpdate} 
+          ON DELETE ${fk.onDelete}
+        `);
+      }
+    } catch (recErr) {
+      logger.error({ event: 'migration_remediation_140_recreate_error', constraintName: fk.name, message: `Failed to recreate constraint ${fk.name}: ${recErr.message}`, error: recErr });
+      recreationErrors.push(recErr);
+    }
+  }
+
+  if (recreationErrors.length > 0) {
+    throw new Error(`Normalization pre-remediation failed during constraint recreation: ${recreationErrors.map(e => e.message).join('; ')}`);
+  }
+
+  // Clean up state table on success
+  await connOrDb.query(`DROP TABLE IF EXISTS ppos_remediation_state`);
+
+  logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed (RC7)' });
 }
 
 class MigrationService {
