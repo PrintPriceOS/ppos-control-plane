@@ -73,65 +73,123 @@ async function runMigration140PreRemediation(connOrDb) {
     );
   }
 
-  // 2. INDEX PRECONDITION
-  // Index names verified against real production/test schema evidence (2026-08-13).
-  // printer_nodes uses 'idx_tenant' (NOT 'idx_printer_nodes_tenant').
-  const requiredIndexes = [
-    { table: 'printer_nodes', indexName: 'PRIMARY' },
-    { table: 'printer_nodes', indexName: 'uk_printer_nodes_id_tenant' },
-    { table: 'printer_nodes', indexName: 'idx_tenant' },
-    { table: 'printhouse_machines', indexName: 'PRIMARY' },
-    { table: 'printhouse_machines', indexName: 'uk_pm_id_tenant' },
-    { table: 'printhouse_machines', indexName: 'fk_machines_printer_node' },
-    { table: 'materials_catalog', indexName: 'PRIMARY' },
-    { table: 'materials_catalog', indexName: 'uk_mat_cat_id_tenant' },
-    { table: 'materials_catalog', indexName: 'idx_tenant' },
-    // Child FK supporting indexes (InnoDB names them by constraint name)
-    { table: 'printhouse_media', indexName: 'fk_media_printer_node' },
-    { table: 'printhouse_policy_profiles', indexName: 'fk_policies_printer_node' },
-    { table: 'printhouse_sla_profiles', indexName: 'fk_sla_printer_node' },
-    { table: 'job_outcomes', indexName: 'printer_id' },
-    { table: 'printer_capacity', indexName: 'printer_id' },
-    { table: 'printer_contacts', indexName: 'printer_id' },
-    { table: 'printer_machines', indexName: 'printer_id' },
-    { table: 'printer_papers', indexName: 'printer_id' },
-    { table: 'printer_performance', indexName: 'printer_id' },
-    { table: 'printer_service_regions', indexName: 'printer_id' },
-    { table: 'printhouse_capabilities', indexName: 'printhouse_id' },
-    { table: 'routing_history', indexName: 'printer_id' }
+  // 2. SEMANTIC INDEX PRECONDITION
+  // We validate semantic index requirements rather than brittle exact names.
+  // Validates:
+  // - required columns are the leftmost ordered columns of the index
+  // - if uniqueRequired=true, NON_UNIQUE is 0
+  // - SUB_PART is null (full column indexing)
+  const semanticIndexRequirements = [
+    // printer_nodes parent/composite keys
+    { table: 'printer_nodes', columns: ['id'], uniqueRequired: true },
+    { table: 'printer_nodes', columns: ['id', 'tenant_id'], uniqueRequired: true },
+    { table: 'printer_nodes', columns: ['tenant_id'], uniqueRequired: false },
+
+    // printhouse_machines
+    { table: 'printhouse_machines', columns: ['id'], uniqueRequired: true },
+    { table: 'printhouse_machines', columns: ['id', 'tenant_id'], uniqueRequired: true },
+    { table: 'printhouse_machines', columns: ['printhouse_id', 'tenant_id'], uniqueRequired: false },
+
+    // materials_catalog
+    { table: 'materials_catalog', columns: ['id'], uniqueRequired: true },
+    { table: 'materials_catalog', columns: ['id', 'tenant_id'], uniqueRequired: true },
+    { table: 'materials_catalog', columns: ['tenant_id'], uniqueRequired: false },
+
+    // Child FK supporting indexes
+    { table: 'printhouse_media', columns: ['printhouse_id', 'tenant_id'], uniqueRequired: false },
+    { table: 'printhouse_policy_profiles', columns: ['printhouse_id', 'tenant_id'], uniqueRequired: false },
+    { table: 'printhouse_sla_profiles', columns: ['printhouse_id', 'tenant_id'], uniqueRequired: false },
+    { table: 'job_outcomes', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_capacity', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_contacts', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_machines', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_papers', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_performance', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printer_service_regions', columns: ['printer_id'], uniqueRequired: false },
+    { table: 'printhouse_capabilities', columns: ['printhouse_id'], uniqueRequired: false },
+    { table: 'routing_history', columns: ['printer_id'], uniqueRequired: false }
   ];
 
-  const [indexRows] = await connOrDb.query(`
-    SELECT DISTINCT TABLE_NAME, INDEX_NAME 
-    FROM information_schema.STATISTICS 
+  const [statRows] = await connOrDb.query(`
+    SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME, SUB_PART
+    FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE()
+    ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
   `);
-  const existingIndexes = new Set(indexRows.map(r => `${r.TABLE_NAME}.${r.INDEX_NAME}`));
 
-  // InnoDB may name single-col FK indexes by constraint name instead of column name
-  const constraintAltNames = {
-    'job_outcomes': 'job_outcomes_ibfk_1',
-    'printer_capacity': 'printer_capacity_ibfk_1',
-    'printer_contacts': 'printer_contacts_ibfk_1',
-    'printer_machines': 'printer_machines_ibfk_1',
-    'printer_papers': 'printer_papers_ibfk_1',
-    'printer_performance': 'printer_performance_ibfk_1',
-    'printer_service_regions': 'printer_service_regions_ibfk_1',
-    'printhouse_capabilities': 'printhouse_capabilities_ibfk_1',
-    'routing_history': 'routing_history_ibfk_1'
-  };
+  // Build table -> indexName -> { name, nonUnique, columns: [ { name, subPart } ] }
+  const tableIndexes = new Map();
+  for (const row of statRows) {
+    const tableName = row.TABLE_NAME;
+    const indexName = row.INDEX_NAME;
+    if (!tableIndexes.has(tableName)) {
+      tableIndexes.set(tableName, new Map());
+    }
+    const idxMap = tableIndexes.get(tableName);
+    if (!idxMap.has(indexName)) {
+      idxMap.set(indexName, {
+        name: indexName,
+        nonUnique: Number(row.NON_UNIQUE) === 1,
+        columns: []
+      });
+    }
+    idxMap.get(indexName).columns.push({
+      name: row.COLUMN_NAME,
+      subPart: row.SUB_PART != null ? Number(row.SUB_PART) : null
+    });
+  }
 
-  const missingIndexes = [];
-  for (const idx of requiredIndexes) {
-    const key1 = `${idx.table}.${idx.indexName}`;
-    const altName = constraintAltNames[idx.table];
-    const key2 = altName ? `${idx.table}.${altName}` : null;
-    if (!existingIndexes.has(key1) && (!key2 || !existingIndexes.has(key2))) {
-      missingIndexes.push(`${idx.table}.${idx.indexName}`);
+  const missingIndexRequirements = [];
+
+  for (const req of semanticIndexRequirements) {
+    const idxMap = tableIndexes.get(req.table);
+    if (!idxMap) {
+      missingIndexRequirements.push(`${req.table}(${req.columns.join(', ')})${req.uniqueRequired ? ' [UNIQUE]' : ''}`);
+      continue;
+    }
+
+    let satisfied = false;
+    for (const [idxName, idxDef] of idxMap.entries()) {
+      if (idxDef.columns.length < req.columns.length) {
+        continue;
+      }
+
+      // Check leftmost columns
+      let colsMatch = true;
+      for (let i = 0; i < req.columns.length; i++) {
+        const colDef = idxDef.columns[i];
+        if (colDef.name.toLowerCase() !== req.columns[i].toLowerCase()) {
+          colsMatch = false;
+          break;
+        }
+        if (colDef.subPart !== null) {
+          colsMatch = false;
+          break;
+        }
+      }
+
+      if (!colsMatch) {
+        continue;
+      }
+
+      // Check uniqueness if required
+      if (req.uniqueRequired) {
+        if (idxDef.nonUnique) {
+          continue; // Index is non-unique
+        }
+      }
+
+      satisfied = true;
+      break;
+    }
+
+    if (!satisfied) {
+      missingIndexRequirements.push(`${req.table}(${req.columns.join(', ')})${req.uniqueRequired ? ' [UNIQUE]' : ''}`);
     }
   }
-  if (missingIndexes.length > 0) {
-    throw new Error(`PRECONDITION FAILED: Missing required indexes: [${missingIndexes.join(', ')}].`);
+
+  if (missingIndexRequirements.length > 0) {
+    throw new Error(`PRECONDITION FAILED: Missing required indexes:\n  ${missingIndexRequirements.join('\n  ')}`);
   }
 
   // 3. EXACT FK PRECONDITION — verified before any mutation in all states
@@ -425,7 +483,7 @@ async function runMigration140PreRemediation(connOrDb) {
       WHERE p.${fk.parentCols[0]} IS NULL
     `);
 
-    const count = orphanRows[0].count;
+    const count = orphanRows && orphanRows[0] ? orphanRows[0].count : 0;
     if (count > 0) {
       orphanErrors.push(`Constraint '${fk.name}' on '${fk.childTable}' has ${count} orphan rows referencing '${fk.parentTable}'`);
     }
@@ -769,5 +827,6 @@ const migrationService = new MigrationService();
 
 module.exports = {
     MigrationService,
-    migrationService
+    migrationService,
+    runMigration140PreRemediation
 };
