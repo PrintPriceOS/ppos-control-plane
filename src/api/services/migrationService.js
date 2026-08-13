@@ -20,6 +20,23 @@ const {
 
 const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
+const { parseMigrationSql } = require('./migrationSqlParser');
+
+async function ensurePreviousFailuresColumn(connOrDb) {
+  try {
+    const tableCheck = await connOrDb.query(`
+      SELECT TABLE_NAME FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
+    `);
+    if (!tableCheck || tableCheck.length === 0) return;
+
+    await connOrDb.query('ALTER TABLE schema_versions ADD COLUMN previous_failures JSON NULL');
+  } catch (err) {
+    if (err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060) {
+      throw err;
+    }
+  }
+}
 
 class MigrationService {
     constructor() {
@@ -92,9 +109,14 @@ class MigrationService {
 
                 // 4. Determine pending migrations
                 // To be backward compatible, we look up legacy table records as well.
-                const applied = await connection.query('SELECT version, description, checksum FROM schema_versions');
+                await ensurePreviousFailuresColumn(connection);
+
+                const applied = await connection.query('SELECT version, description, checksum, state FROM schema_versions');
                 const appliedMap = new Map();
                 for (const m of applied[0]) {
+                    if (m.state === 'FAILED' || m.state === 'STARTED') {
+                        continue;
+                    }
                     const legacyPath = `migrations/${m.version}.sql`;
                     appliedMap.set(legacyPath, m.checksum);
                     if (m.description) {
@@ -118,13 +140,48 @@ class MigrationService {
                     logger.info({ event: 'migration_applying', file: m.filename, path: relPath });
 
                     const executionId = uuidv4();
-                    const statements = content.split(';').map(s => s.trim()).filter(s => s.length > 0);
+                    const parsed = parseMigrationSql(content);
+                    const statements = parsed.statements;
+
+                    // Audit check: load current record if it exists to preserve failure evidence
+                    let previousFailures = '[]';
+                    const [existingRows] = await connection.query(`
+                      SELECT execution_id, runner_id, started_at, failed_at, failure_code, failure_message, failed_statement_index, previous_failures
+                      FROM schema_versions
+                      WHERE migration_path = ?
+                    `, [relPath]);
+
+                    if (existingRows && existingRows.length > 0) {
+                        const existing = existingRows[0];
+                        let history = [];
+                        if (existing.previous_failures) {
+                            try {
+                                history = typeof existing.previous_failures === 'string'
+                                    ? JSON.parse(existing.previous_failures)
+                                    : existing.previous_failures;
+                            } catch (e) {
+                                history = [];
+                            }
+                        }
+                        if (existing.execution_id) {
+                            history.push({
+                                execution_id: existing.execution_id,
+                                runner_id: existing.runner_id,
+                                started_at: existing.started_at,
+                                failed_at: existing.failed_at,
+                                failure_code: existing.failure_code,
+                                failure_message: existing.failure_message,
+                                failed_statement_index: existing.failed_statement_index
+                            });
+                        }
+                        previousFailures = JSON.stringify(history);
+                    }
 
                     // Mark execution as STARTED in ledger (via connection)
                     await connection.query(`
                       INSERT INTO schema_versions (
-                        migration_path, version, checksum, state, execution_id, runner_id, repository_commit, started_at
-                      ) VALUES (?, ?, ?, 'STARTED', ?, ?, ?, NOW(3))
+                        migration_path, version, checksum, state, execution_id, runner_id, repository_commit, started_at, previous_failures
+                      ) VALUES (?, ?, ?, 'STARTED', ?, ?, ?, NOW(3), ?)
                       ON DUPLICATE KEY UPDATE
                         state = 'STARTED',
                         execution_id = VALUES(execution_id),
@@ -133,22 +190,27 @@ class MigrationService {
                         started_at = NOW(3),
                         failed_at = NULL,
                         failure_code = NULL,
-                        failure_message = NULL
+                        failure_message = NULL,
+                        previous_failures = VALUES(previous_failures)
                     `, [
                       relPath,
                       m.filename.replace(/\.sql$/, ''),
                       canonicalHash,
                       executionId,
                       runnerId,
-                      process.env.DEPLOY_COMMIT || null
+                      process.env.DEPLOY_COMMIT || null,
+                      previousFailures
                     ]);
 
                     const startTime = Date.now();
                     let lastSql = '';
+                    let lastIndex = 0;
 
                     try {
-                        for (let index = 0; index < statements.length; index++) {
-                            lastSql = statements[index];
+                        for (let i = 0; i < statements.length; i++) {
+                            const stmt = statements[i];
+                            lastSql = stmt.sql;
+                            lastIndex = stmt.index;
                             await connection.query(`
                               UPDATE schema_versions
                               SET heartbeat_at = NOW(3)
@@ -159,9 +221,9 @@ class MigrationService {
                             try {
                                 await connection.query(lastSql);
                             } catch (err) {
-                                // Idempotency: skip duplicates or table exists
-                                const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX'];
-                                if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050) {
+                                // Idempotency: skip duplicates, table exists, or trigger exists
+                                const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX', 'ER_TRG_ALREADY_EXISTS'];
+                                if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050 || err.errno === 1359) {
                                     continue;
                                 }
                                 throw err;
@@ -184,7 +246,7 @@ class MigrationService {
                         // Failure: mark as FAILED with audit-safe metrics
                         const failureCode = err.code || 'MIGRATION_ERROR';
                         const failureMessage = ledgerWrite.sanitizeError(err);
-                        const fingerprint = ledgerWrite.getStatementFingerprint(lastSql);
+                        const fingerprint = statements[lastIndex - 1] ? statements[lastIndex - 1].fingerprint : ledgerWrite.getStatementFingerprint(lastSql);
 
                         await connection.query(`
                           UPDATE schema_versions
@@ -201,7 +263,7 @@ class MigrationService {
                           Date.now() - startTime,
                           failureCode,
                           failureMessage,
-                          statements.indexOf(lastSql),
+                          lastIndex,
                           `SQL Fingerprint: ${fingerprint}`,
                           executionId
                         ]);

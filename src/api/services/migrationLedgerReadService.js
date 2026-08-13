@@ -3,6 +3,22 @@
 const db = require('./mysqlClient');
 const logger = require('./logger').child('migration-ledger-read');
 
+async function ensurePreviousFailuresColumn(connOrDb) {
+  try {
+    const tableCheck = await connOrDb.query(`
+      SELECT TABLE_NAME FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
+    `);
+    if (!tableCheck || tableCheck.length === 0) return;
+
+    await connOrDb.query('ALTER TABLE schema_versions ADD COLUMN previous_failures JSON NULL');
+  } catch (err) {
+    if (err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060) {
+      throw err;
+    }
+  }
+}
+
 class MigrationLedgerReadService {
   /**
    * Evaluates the database ledger state for readiness.
@@ -20,6 +36,8 @@ class MigrationLedgerReadService {
       if (!tableCheck) {
         return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: 'Table schema_versions does not exist' };
       }
+
+      await ensurePreviousFailuresColumn(db);
 
       // 2. Fetch all ledger entries
       // Handle fallback schema structure if Phase 185 upgrade has not run yet.
@@ -45,12 +63,31 @@ class MigrationLedgerReadService {
         ORDER BY started_at ASC
       `);
 
-      const failedRecord = entries.find(e => e.state === 'FAILED');
-      if (failedRecord) {
-        return { 
-          status: 'MIGRATION_FAILED', 
-          reason: `Migration failed: ${failedRecord.migration_path || 'unknown'}. Error: ${failedRecord.failure_code}`
-        };
+      const failedRecords = entries.filter(e => e.state === 'FAILED');
+      for (const failedRecord of failedRecords) {
+        const allowRetryEnv = process.env.PPOS_ALLOW_MIGRATION_RETRY === 'true';
+        let eligible = false;
+        if (allowRetryEnv) {
+          const baselineEntry = baseline.migrations.find(m => (m.path || m.relativePath) === failedRecord.migration_path);
+          if (baselineEntry) {
+            const expectedChecksum = baselineEntry.canonicalSha256 || baselineEntry.sha256;
+            if (expectedChecksum === failedRecord.checksum) {
+              const hasApplied = entries.some(e => e.migration_path === failedRecord.migration_path && e.state === 'APPLIED');
+              if (!hasApplied) {
+                eligible = true;
+              }
+            }
+          }
+        }
+
+        if (eligible) {
+          logger.info({ event: 'migration_retry_eligible', migration_path: failedRecord.migration_path, message: 'Failed migration eligible for governed retry' });
+        } else {
+          return { 
+            status: 'MIGRATION_FAILED', 
+            reason: `Migration failed: ${failedRecord.migration_path || 'unknown'}. Error: ${failedRecord.failure_code}`
+          };
+        }
       }
 
       // Stale STARTED detection (only for real migrations)

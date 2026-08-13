@@ -36,7 +36,8 @@ const testSuites = [
     'tests/runtime_kill_switch_security_test.js',
     'tests/runtime_kill_switch_effectiveness_test.js',
     'tests/runtime_kill_switch_recovery_test.js',
-    'tests/phase192g_end_to_end_golden_path_test.js'
+    'tests/phase192g_end_to_end_golden_path_test.js',
+    'tests/migration_remediation_suite_test.js'
 ];
 
 console.log('Starting execution of all security isolation test suites...');
