@@ -7,6 +7,7 @@
  * Phase 191D.1: Extended with machine and capability configuration readiness gates.
  */
 const db = require('./mysqlClient');
+const capabilityService = require('./printhouseCapabilityOnboardingService');
 
 class PrinthouseReadinessService {
     /**
@@ -230,21 +231,19 @@ class PrinthouseReadinessService {
             );
             sitesWithMachines = siteMachineRows.length;
 
-            // Count derived capabilities (non-archived machines with at least one capability)
+            // Count derived capabilities (non-archived machines with at least one canonical capability)
             if (machineCount > 0) {
-                const capRows = await db.query(
-                    `SELECT COUNT(*) AS cnt FROM printhouse_machines
-                     WHERE tenant_id = ? AND status != ?
-                     AND (supports_pdfx = 1 OR supports_pdfa = 1 OR supports_variable_data = 1
-                          OR supports_white_ink = 1 OR supports_spot_uv = 1 OR supports_lamination = 1
-                          OR supports_hardcover = 1 OR supports_softcover = 1 OR supports_saddle_stitch = 1
-                          OR supports_perfect_binding = 1 OR supports_case_binding = 1
-                          OR (supported_color_modes_json IS NOT NULL AND supported_color_modes_json != '' AND supported_color_modes_json != '[]')
-                          OR (supported_print_methods_json IS NOT NULL AND supported_print_methods_json != '' AND supported_print_methods_json != '[]')
-                          OR (supported_sides_json IS NOT NULL AND supported_sides_json != '' AND supported_sides_json != '[]'))`,
+                const activeMachines = await db.query(
+                    'SELECT * FROM printhouse_machines WHERE tenant_id = ? AND status != ?',
                     [tenantId, 'ARCHIVED']
                 );
-                capabilityCount = capRows[0]?.cnt || 0;
+                let capableMachinesCount = 0;
+                for (const m of activeMachines) {
+                    if (capabilityService.hasMeaningfulMachineCapability(m)) {
+                        capableMachinesCount++;
+                    }
+                }
+                capabilityCount = capableMachinesCount;
 
                 if (capabilityCount === 0) {
                     operationalAdvisories.push({

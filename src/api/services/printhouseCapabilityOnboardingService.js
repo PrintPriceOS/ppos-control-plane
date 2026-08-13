@@ -57,20 +57,36 @@ const PAPER_SIZES = {
 
 class PrinthouseCapabilityOnboardingService {
     /**
+     * Determine if a machine provides at least one canonical production capability.
+     * Evaluates color modes, capability flags, and dimensional format support.
+     * Print methods and sides are descriptive attributes, not independent capabilities.
+     */
+    hasMeaningfulMachineCapability(machine) {
+        if (!machine) return false;
+        return this.deriveCapabilitiesFromMachine(machine).length > 0;
+    }
+
+    /**
      * Derive the set of capabilities from a machine record.
      * This is the canonical provenance model: capabilities are COMPUTED from
      * machine configuration, not manually maintained.
      */
     deriveCapabilitiesFromMachine(machine) {
+        if (!machine) return [];
         const capabilities = [];
 
         // Color mode capabilities
-        const colorModes = machine.supported_color_modes_json || [];
-        if (colorModes.some(m => m.includes('CMYK'))) {
-            capabilities.push({ type: 'PRINT_CMYK', active: true, source_machine_id: machine.id });
+        let colorModes = machine.supported_color_modes_json;
+        if (typeof colorModes === 'string') {
+            try { colorModes = JSON.parse(colorModes); } catch (e) { colorModes = []; }
         }
-        if (colorModes.some(m => m.includes('SPOT'))) {
-            capabilities.push({ type: 'PRINT_SPOT_COLOR', active: true, source_machine_id: machine.id });
+        if (Array.isArray(colorModes)) {
+            if (colorModes.some(m => typeof m === 'string' && m.includes('CMYK'))) {
+                capabilities.push({ type: 'PRINT_CMYK', active: true, source_machine_id: machine.id });
+            }
+            if (colorModes.some(m => typeof m === 'string' && m.includes('SPOT'))) {
+                capabilities.push({ type: 'PRINT_SPOT_COLOR', active: true, source_machine_id: machine.id });
+            }
         }
 
         // Flag-based capabilities
@@ -89,26 +105,28 @@ class PrinthouseCapabilityOnboardingService {
         };
 
         for (const [field, capType] of Object.entries(flagMap)) {
-            if (machine[field]) {
+            if (machine[field] === 1 || machine[field] === true) {
                 capabilities.push({ type: capType, active: true, source_machine_id: machine.id });
             }
         }
 
         // Format capabilities (derived from dimensions)
-        const maxW = machine.max_sheet_width_mm || 0;
-        const maxH = machine.max_sheet_height_mm || 0;
+        const maxW = Number(machine.max_sheet_width_mm) || 0;
+        const maxH = Number(machine.max_sheet_height_mm) || 0;
 
-        for (const [formatName, dims] of Object.entries(PAPER_SIZES)) {
-            // Machine can handle this format if its max sheet size contains the paper in either orientation
-            const fitsNormal = maxW >= dims.w && maxH >= dims.h;
-            const fitsRotated = maxW >= dims.h && maxH >= dims.w;
-            if (fitsNormal || fitsRotated) {
-                capabilities.push({ type: `FORMAT_${formatName}`, active: true, source_machine_id: machine.id });
+        if (maxW > 0 && maxH > 0) {
+            for (const [formatName, dims] of Object.entries(PAPER_SIZES)) {
+                // Machine can handle this format if its max sheet size contains the paper in either orientation
+                const fitsNormal = maxW >= dims.w && maxH >= dims.h;
+                const fitsRotated = maxW >= dims.h && maxH >= dims.w;
+                if (fitsNormal || fitsRotated) {
+                    capabilities.push({ type: `FORMAT_${formatName}`, active: true, source_machine_id: machine.id });
+                }
             }
-        }
 
-        if (maxW > 700 || maxH > 700) {
-            capabilities.push({ type: 'FORMAT_LARGE', active: true, source_machine_id: machine.id });
+            if (maxW > 700 || maxH > 700) {
+                capabilities.push({ type: 'FORMAT_LARGE', active: true, source_machine_id: machine.id });
+            }
         }
 
         return capabilities;

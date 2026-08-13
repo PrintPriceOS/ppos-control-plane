@@ -1,9 +1,9 @@
 /**
  * tests/smoke_phase192_1_rc16_machine_capability_onboarding.js
  *
- * Phase 192 — RC16: Machine Capability Onboarding Completion Test Suite
+ * Phase 192 — RC16 & RC16.1: Machine Capability Onboarding & Canonical Derivation Alignment
  *
- * Covers requirements C1 through C16:
+ * Covers requirements C1 through C24:
  * C1. Machine with no technical capability -> capabilityCount = 0
  * C2. supported_color_modes_json = [] -> capabilityCount = 0
  * C3. Valid CMYK selection -> capabilityCount = 1
@@ -20,6 +20,14 @@
  * C14. No undefined values in computeReadiness()
  * C15. totalRequirements strictly equals 5
  * C16. Activation readiness remains fail-closed (NOT_ACTIVATED, all flags false)
+ * C17. Print-method-only machine: derived = 0 and readiness = 0 (perfect agreement)
+ * C18. Sides-only machine: derived = 0 and readiness = 0 (perfect agreement)
+ * C19. Valid CMYK: derived > 0 and readiness > 0
+ * C20. supports_pdfx = true: derived > 0 and readiness > 0
+ * C21. Valid dimensions producing FORMAT capability: derived > 0 and readiness > 0
+ * C22. Empty arrays + all false + no dimensions: derived = 0 and readiness = 0
+ * C23. DIGITAL_PRESS only: derived = 0 and readiness = 0
+ * C24. For every tested machine configuration: readiness machine capability truth == canonical derivation truth
  */
 
 'use strict';
@@ -63,54 +71,17 @@ const mockDb = {
       return Object.entries(groups).map(([printhouse_id, cnt]) => ({ printhouse_id, cnt }));
     }
 
-    if (upper.includes('SELECT COUNT(*) AS CNT FROM PRINTHOUSE_MACHINES WHERE TENANT_ID = ? AND STATUS != ?') && !upper.includes('SUPPORTS_')) {
+    if (upper.includes('SELECT COUNT(*) AS CNT FROM PRINTHOUSE_MACHINES WHERE TENANT_ID = ? AND STATUS != ?')) {
       const [tenantId, status] = params;
       const cnt = memoryStore.printhouse_machines.filter(m => m.tenant_id === tenantId && m.status !== status).length;
       return [{ cnt }];
     }
 
-    // 3. Machine Capabilities count
-    if (upper.includes('SELECT COUNT(*) AS CNT FROM PRINTHOUSE_MACHINES') && upper.includes('SUPPORTS_')) {
+    // 3. Machine SELECT by tenant / site / id
+    if (upper.includes('FROM PRINTHOUSE_MACHINES WHERE TENANT_ID = ? AND STATUS != ?')) {
       const [tenantId, status] = params;
-      const cnt = memoryStore.printhouse_machines.filter(m => {
-        if (m.tenant_id !== tenantId || m.status === status) return false;
-        
-        const hasFlag = m.supports_pdfx === 1 || m.supports_pdfx === true ||
-                        m.supports_pdfa === 1 || m.supports_pdfa === true ||
-                        m.supports_variable_data === 1 || m.supports_variable_data === true ||
-                        m.supports_white_ink === 1 || m.supports_white_ink === true ||
-                        m.supports_spot_uv === 1 || m.supports_spot_uv === true ||
-                        m.supports_lamination === 1 || m.supports_lamination === true ||
-                        m.supports_hardcover === 1 || m.supports_hardcover === true ||
-                        m.supports_softcover === 1 || m.supports_softcover === true ||
-                        m.supports_saddle_stitch === 1 || m.supports_saddle_stitch === true ||
-                        m.supports_perfect_binding === 1 || m.supports_perfect_binding === true ||
-                        m.supports_case_binding === 1 || m.supports_case_binding === true;
-
-        const hasColor = m.supported_color_modes_json !== null &&
-                         m.supported_color_modes_json !== undefined &&
-                         m.supported_color_modes_json !== '' &&
-                         m.supported_color_modes_json !== '[]' &&
-                         (Array.isArray(m.supported_color_modes_json) ? m.supported_color_modes_json.length > 0 : true);
-
-        const hasPrintMethod = m.supported_print_methods_json !== null &&
-                              m.supported_print_methods_json !== undefined &&
-                              m.supported_print_methods_json !== '' &&
-                              m.supported_print_methods_json !== '[]' &&
-                              (Array.isArray(m.supported_print_methods_json) ? m.supported_print_methods_json.length > 0 : true);
-
-        const hasSides = m.supported_sides_json !== null &&
-                         m.supported_sides_json !== undefined &&
-                         m.supported_sides_json !== '' &&
-                         m.supported_sides_json !== '[]' &&
-                         (Array.isArray(m.supported_sides_json) ? m.supported_sides_json.length > 0 : true);
-
-        return hasFlag || hasColor || hasPrintMethod || hasSides;
-      }).length;
-      return [{ cnt }];
+      return memoryStore.printhouse_machines.filter(m => m.tenant_id === tenantId && m.status !== status);
     }
-
-    // 4. Machine SELECT by id / site
     if (upper.includes('FROM PRINTHOUSE_MACHINES WHERE ID = ? AND PRINTHOUSE_ID = ? AND TENANT_ID = ?')) {
       const [id, siteId, tenantId] = params;
       return memoryStore.printhouse_machines.filter(m => m.id === id && m.printhouse_id === siteId && m.tenant_id === tenantId);
@@ -124,7 +95,7 @@ const mockDb = {
       });
     }
 
-    // 5. Machine INSERT
+    // 4. Machine INSERT
     if (upper.startsWith('INSERT INTO PRINTHOUSE_MACHINES')) {
       const [
         id, siteId, tenantId, name, type, manufacturer, model, status,
@@ -173,7 +144,7 @@ const mockDb = {
       return { affectedRows: 1 };
     }
 
-    // 6. Machine UPDATE
+    // 5. Machine UPDATE
     if (upper.startsWith('UPDATE PRINTHOUSE_MACHINES')) {
       if (upper.includes('SET STATUS = ?')) {
         const [status, id, siteId, tenantId] = params;
@@ -227,7 +198,7 @@ const mockDb = {
       return { affectedRows: 1 };
     }
 
-    // 7. Materials
+    // 6. Materials
     if (upper.includes('FROM MATERIALS_CATALOG') && upper.includes('COUNT(*)')) {
       const tenantId = params[0];
       const cnt = memoryStore.materials_catalog.filter(mat => {
@@ -250,7 +221,7 @@ const mockDb = {
       return [{ cnt }];
     }
 
-    // 8. Site Capacities
+    // 7. Site Capacities
     if (upper.includes('FROM PRINTHOUSE_SITE_CAPACITIES')) {
       const tenantId = params[0];
       const cnt = memoryStore.printhouse_site_capacities.filter(c => {
@@ -261,7 +232,7 @@ const mockDb = {
       return [{ cnt }];
     }
 
-    // 9. Site Lead Times
+    // 8. Site Lead Times
     if (upper.includes('FROM PRINTHOUSE_SITE_LEAD_TIMES')) {
       const tenantId = params[0];
       const cnt = memoryStore.printhouse_site_lead_times.filter(lt => {
@@ -281,7 +252,7 @@ const mockDb = {
       return [{ cnt }];
     }
 
-    // 10. Shipping regions & Integrations
+    // 9. Shipping regions & Integrations
     if (upper.includes('FROM PRINTHOUSE_SHIPPING_REGIONS')) {
       const tenantId = params[0];
       const rows = memoryStore.printhouse_shipping_regions.filter(r => r.tenant_id === tenantId && r.status === 'ACTIVE' && r.enabled === 1);
@@ -311,7 +282,7 @@ const readinessService = require('../src/api/services/printhouseReadinessService
 const capabilityService = require('../src/api/services/printhouseCapabilityOnboardingService');
 
 async function runTests() {
-  console.log('=== Phase 192 — RC16: Machine Capability Onboarding & Integrity Suite ===\n');
+  console.log('=== Phase 192 — RC16 / RC16.1: Machine Capability Onboarding & Canonical Alignment ===\n');
 
   const tenantId = 'ph-04c8f95f';
   const siteId = 'node-9679061b';
@@ -321,13 +292,12 @@ async function runTests() {
     { id: siteId, tenant_id: tenantId, name: 'Main Production Hub', status: 'ACTIVE' }
   ];
 
-  // Helper reset
   const resetMachines = () => {
     memoryStore.printhouse_machines = [];
   };
 
   // --- C1: Machine with no technical capability -> capabilityCount 0 ---
-  console.log('--- Capability Readiness & Integrity Predicate (C1 - C6) ---');
+  console.log('--- 1. Capability Readiness & Integrity Predicate (C1 - C6) ---');
   resetMachines();
   memoryStore.printhouse_machines.push({
     id: 'mach-blank',
@@ -390,7 +360,7 @@ async function runTests() {
   console.log('✓ Test C6: machine_type DIGITAL_PRESS alone -> capabilityCount = 0 (no auto-inference)');
 
   // --- Backend Validation Tests (C7 - C10) ---
-  console.log('\n--- Backend Validation Contract Tests (C7 - C10) ---');
+  console.log('\n--- 2. Backend Validation Contract Tests (C7 - C10) ---');
 
   // C7: Invalid color mode rejected
   assert.throws(
@@ -460,10 +430,9 @@ async function runTests() {
   console.log('✓ Test C10: Invalid dimensions rejected with INVALID_DIMENSIONS');
 
   // --- Machine Explicit Lifecycle & Updates (C11 - C13) ---
-  console.log('\n--- Machine Configuration & Update Semantics (C11 - C13) ---');
+  console.log('\n--- 3. Machine Configuration & Update Semantics (C11 - C13) ---');
   resetMachines();
 
-  // Create machine with explicit technical configuration
   const created = await machineService.createMachine(tenantId, siteId, {
     machine_name: 'HP Indigo 100K Digital Press',
     machine_type: 'DIGITAL_PRESS',
@@ -520,9 +489,8 @@ async function runTests() {
   console.log('✓ Test C13: Derived capability service returns capabilities matching stored configuration');
 
   // --- Full Readiness Contract & Invariants (C14 - C16) ---
-  console.log('\n--- Full Readiness Contract & Invariants (C14 - C16) ---');
+  console.log('\n--- 4. Full Readiness Contract & Invariants (C14 - C16) ---');
 
-  // Setup remaining operational requirements to verify 5/5
   memoryStore.materials_catalog = [{
     id: 'mat-magno-300',
     tenant_id: tenantId,
@@ -589,12 +557,202 @@ async function runTests() {
   assert.strictEqual(fullReadiness.activationReadiness.productionDispatchAllowed, false);
   console.log('✓ Test C16: Activation readiness strictly remains NOT_ACTIVATED with all capability flags false');
 
+  // --- RC16.1 Canonical Derivation & Readiness Alignment Tests (C17 - C24) ---
+  console.log('\n--- 5. Canonical Derivation & Readiness Alignment Tests (C17 - C24) ---');
+
+  // C17: Print-method-only machine -> derived = 0 and readiness = 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-print-method-only',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Toner Machine Only',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_print_methods_json: JSON.stringify(['DIGITAL_TONER']),
+    supported_color_modes_json: null,
+    supported_sides_json: null,
+    max_sheet_width_mm: null,
+    max_sheet_height_mm: null,
+    supports_pdfx: 0, supports_pdfa: 0, supports_variable_data: 0,
+    supports_white_ink: 0, supports_spot_uv: 0, supports_lamination: 0,
+    supports_hardcover: 0, supports_softcover: 0, supports_saddle_stitch: 0,
+    supports_perfect_binding: 0, supports_case_binding: 0
+  });
+  let derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  let opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(derivedCaps.length, 0, 'C17: Print method alone does NOT produce canonical capabilities');
+  assert.strictEqual(opReadiness.capabilityCount, 0, 'C17: Print method alone does NOT advance capabilityCount');
+  console.log('✓ Test C17: print-method-only machine -> derived = 0 and readiness = 0 (perfect agreement)');
+
+  // C18: Sides-only machine -> derived = 0 and readiness = 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-sides-only',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Duplex Machine Only',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_sides_json: JSON.stringify(['DUPLEX']),
+    supported_print_methods_json: null,
+    supported_color_modes_json: null,
+    max_sheet_width_mm: null,
+    max_sheet_height_mm: null,
+    supports_pdfx: 0, supports_pdfa: 0, supports_variable_data: 0,
+    supports_white_ink: 0, supports_spot_uv: 0, supports_lamination: 0,
+    supports_hardcover: 0, supports_softcover: 0, supports_saddle_stitch: 0,
+    supports_perfect_binding: 0, supports_case_binding: 0
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(derivedCaps.length, 0, 'C18: Sides alone do NOT produce canonical capabilities');
+  assert.strictEqual(opReadiness.capabilityCount, 0, 'C18: Sides alone do NOT advance capabilityCount');
+  console.log('✓ Test C18: sides-only machine -> derived = 0 and readiness = 0 (perfect agreement)');
+
+  // C19: Valid CMYK -> derived > 0 and readiness > 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-cmyk',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'CMYK Press',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_color_modes_json: JSON.stringify(['CMYK']),
+    supported_print_methods_json: JSON.stringify(['DIGITAL_TONER']),
+    supported_sides_json: JSON.stringify(['SIMPLEX', 'DUPLEX'])
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.ok(derivedCaps.length > 0, 'C19: CMYK produces canonical capability');
+  assert.strictEqual(opReadiness.capabilityCount, 1, 'C19: CMYK yields capabilityCount = 1');
+  console.log('✓ Test C19: valid CMYK -> derived > 0 and readiness > 0');
+
+  // C20: supports_pdfx = true -> derived > 0 and readiness > 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-pdfx',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'PDFX Press',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supports_pdfx: 1
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.ok(derivedCaps.length > 0, 'C20: supports_pdfx produces canonical capability');
+  assert.strictEqual(opReadiness.capabilityCount, 1, 'C20: supports_pdfx yields capabilityCount = 1');
+  console.log('✓ Test C20: supports_pdfx = true -> derived > 0 and readiness > 0');
+
+  // C21: Valid dimensions producing FORMAT capability -> derived > 0 and readiness > 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-dims-only',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Dimensional Press Only',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    max_sheet_width_mm: 330,
+    max_sheet_height_mm: 488,
+    supported_color_modes_json: '[]',
+    supported_print_methods_json: '[]',
+    supported_sides_json: '[]'
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.ok(derivedCaps.length > 0, 'C21: Valid dimensions produce FORMAT capabilities');
+  assert.strictEqual(opReadiness.capabilityCount, 1, 'C21: Valid dimensions advance capabilityCount');
+  console.log('✓ Test C21: valid dimensions producing FORMAT capability -> derived > 0 and readiness > 0');
+
+  // C22: Empty arrays + all false + no dimensions -> derived = 0 and readiness = 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-empty-all',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Empty Everything',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_color_modes_json: '[]',
+    supported_print_methods_json: '[]',
+    supported_sides_json: '[]',
+    max_sheet_width_mm: null,
+    max_sheet_height_mm: null,
+    supports_pdfx: 0, supports_pdfa: 0, supports_variable_data: 0,
+    supports_white_ink: 0, supports_spot_uv: 0, supports_lamination: 0,
+    supports_hardcover: 0, supports_softcover: 0, supports_saddle_stitch: 0,
+    supports_perfect_binding: 0, supports_case_binding: 0
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(derivedCaps.length, 0, 'C22: Empty configuration must yield 0 derived capabilities');
+  assert.strictEqual(opReadiness.capabilityCount, 0, 'C22: Empty configuration must yield 0 readiness capabilityCount');
+  console.log('✓ Test C22: empty arrays + all false + no dimensions -> derived = 0 and readiness = 0');
+
+  // C23: DIGITAL_PRESS only -> derived = 0 and readiness = 0
+  resetMachines();
+  memoryStore.printhouse_machines.push({
+    id: 'mach-type-only',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Type Only Machine',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE'
+  });
+  derivedCaps = capabilityService.deriveCapabilitiesFromMachine(memoryStore.printhouse_machines[0]);
+  opReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(derivedCaps.length, 0, 'C23: machine_type alone must yield 0 derived capabilities');
+  assert.strictEqual(opReadiness.capabilityCount, 0, 'C23: machine_type alone must yield 0 readiness capabilityCount');
+  console.log('✓ Test C23: DIGITAL_PRESS only -> derived = 0 and readiness = 0');
+
+  // C24: Comprehensive matrix asserting readiness truth == canonical derivation truth
+  const testMatrix = [
+    { label: 'Unconfigured machine', machine: { machine_type: 'OFFSET_PRESS' } },
+    { label: 'Print method only', machine: { supported_print_methods_json: ['SHEETFED_OFFSET'] } },
+    { label: 'Sides only', machine: { supported_sides_json: ['SIMPLEX'] } },
+    { label: 'Print method + Sides only', machine: { supported_print_methods_json: ['DIGITAL_TONER'], supported_sides_json: ['DUPLEX'] } },
+    { label: 'CMYK only', machine: { supported_color_modes_json: ['CMYK'] } },
+    { label: 'Spot color only', machine: { supported_color_modes_json: ['SPOT_ONLY'] } },
+    { label: 'Spot in modes array', machine: { supported_color_modes_json: ['CMYK+SPOT'] } },
+    { label: 'White ink flag', machine: { supports_white_ink: 1 } },
+    { label: 'Spot UV flag', machine: { supports_spot_uv: 1 } },
+    { label: 'Lamination flag', machine: { supports_lamination: true } },
+    { label: 'Dimensions A4 (210x297)', machine: { max_sheet_width_mm: 210, max_sheet_height_mm: 297 } },
+    { label: 'Dimensions Large (>700mm)', machine: { max_sheet_width_mm: 800, max_sheet_height_mm: 600 } },
+    { label: 'Invalid dimensions (10x10)', machine: { max_sheet_width_mm: 10, max_sheet_height_mm: 10 } }
+  ];
+
+  for (const item of testMatrix) {
+    resetMachines();
+    const candidate = {
+      id: 'mach-matrix-test',
+      printhouse_id: siteId,
+      tenant_id: tenantId,
+      machine_name: item.label,
+      status: 'ACTIVE',
+      ...item.machine
+    };
+    memoryStore.printhouse_machines.push(candidate);
+    const derivedTruth = capabilityService.hasMeaningfulMachineCapability(candidate);
+    const read = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+    const readinessTruth = read.capabilityCount > 0;
+    assert.strictEqual(
+      readinessTruth,
+      derivedTruth,
+      `C24 Agreement Failure on '${item.label}': readinessTruth=${readinessTruth}, derivedTruth=${derivedTruth}`
+    );
+  }
+  console.log('✓ Test C24: for every tested machine configuration: readiness machine capability truth == canonical derivation truth');
+
   console.log('\n================================================================');
-  console.log('ALL PHASE 192 RC16 MACHINE CAPABILITY ONBOARDING TESTS PASSED');
+  console.log('ALL PHASE 192 RC16 & RC16.1 TESTS PASSED SUCCESSFULLY (C1 - C24)');
   console.log('================================================================\n');
 }
 
 runTests().catch(err => {
-  console.error('\n[FAIL] RC16 Machine Capability Onboarding Test Failed:', err);
+  console.error('\n[FAIL] RC16 / RC16.1 Test Suite Failed:', err);
   process.exit(1);
 });

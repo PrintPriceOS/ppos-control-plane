@@ -86,17 +86,9 @@ db.query = async function mockQuery(sql, params = []) {
     }
     return Array.from(groups.entries()).map(([phId, cnt]) => ({ printhouse_id: phId, cnt }));
   }
-  if (upper.includes('FROM PRINTHOUSE_MACHINES') && upper.includes('SUPPORTS_')) {
+  if (upper.includes('FROM PRINTHOUSE_MACHINES') && !upper.includes('COUNT(*)') && !upper.includes('GROUP BY')) {
     const [tenantId, status] = params;
-    const cnt = memoryStore.printhouse_machines.filter(m => {
-      if (m.tenant_id !== tenantId || m.status === status) return false;
-      return m.supports_pdfx || m.supports_pdfa || m.supports_variable_data ||
-             m.supports_white_ink || m.supports_spot_uv || m.supports_lamination ||
-             m.supports_hardcover || m.supports_softcover || m.supports_saddle_stitch ||
-             m.supports_perfect_binding || m.supports_case_binding ||
-             m.supported_color_modes_json;
-    }).length;
-    return [{ cnt }];
+    return memoryStore.printhouse_machines.filter(m => m.tenant_id === tenantId && m.status !== status);
   }
 
   // 4. Materials
