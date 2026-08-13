@@ -1246,6 +1246,20 @@ UNRESTRICTED_PRODUCTION:
   (pending: EMAIL_DELIVERY + RATE_LIMIT + live soak evidence)
 ```
 
+---
+
+## Phase 192 — Deployment Remediation & Migration Engine (RC2)
+**STATUS: REMEDIATED / VALIDATED**
+- Naive SQL splitter replaced with deterministic `migrationSqlParser.js` supporting custom `DELIMITER` directives.
+- Idempotency guards added to ignore `ER_TRG_ALREADY_EXISTS` (1359) errors during partial retry.
+- Governed retry logic added to allow explicit retries (`PPOS_ALLOW_MIGRATION_RETRY=true`) for failed migrations with matching checksums.
+- Previous failure metadata preserved in a `previous_failures` JSON column on the `schema_versions` table before retry transition.
+- Created `docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md` containing the precise server execution sequence.
+- All 40 test suites passed successfully (`npm test` / `tests/run_all_security_tests.js`).
+- Clean production build: PASS.
+- Pushed tag `phase-192-controlled-beta-rc2` to origin.
+
+
 
 
 
