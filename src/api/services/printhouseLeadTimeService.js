@@ -63,6 +63,48 @@ class PrinthouseLeadTimeService {
     async setLeadTimes(tenantId, siteId, payload) {
         checkProtectedFields(payload);
 
+        if (!payload || typeof payload !== 'object') {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+
+        // 1. Validate Timezone
+        if (typeof payload.timezone !== 'string' || !payload.timezone.trim()) {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+        const timezone = payload.timezone.trim();
+        try {
+            Intl.DateTimeFormat(undefined, { timeZone: timezone });
+        } catch (e) {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+
+        // 2. Validate Workdays (non-empty array of integer days 0..6)
+        if (!Array.isArray(payload.workdays_json) || payload.workdays_json.length === 0) {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+        for (const day of payload.workdays_json) {
+            if (typeof day !== 'number' || !Number.isInteger(day) || day < 0 || day > 6) {
+                throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+            }
+        }
+        const workdays = JSON.stringify(payload.workdays_json);
+
+        // 3. Validate Cutoff Time (HH:MM in 24h format)
+        if (typeof payload.daily_cutoff_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(payload.daily_cutoff_time.trim())) {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+        const cutoff = payload.daily_cutoff_time.trim();
+
+        // 4. Validate Base Lead Time Days (finite number >= 0)
+        if (payload.base_lead_time_days === undefined || payload.base_lead_time_days === null ||
+            typeof payload.base_lead_time_days !== 'number' || !Number.isFinite(payload.base_lead_time_days) ||
+            Number.isNaN(payload.base_lead_time_days) || payload.base_lead_time_days < 0) {
+            throw new Error('INVALID_LEAD_TIME_CONFIGURATION');
+        }
+        const baseLeadDays = payload.base_lead_time_days;
+
+        const customRules = payload.custom_rules_json ? JSON.stringify(payload.custom_rules_json) : null;
+
         // Enforce boundary check
         const siteRows = await db.query(
             'SELECT * FROM printer_nodes WHERE id = ? AND tenant_id = ?',
@@ -71,12 +113,6 @@ class PrinthouseLeadTimeService {
         if (siteRows.length === 0) throw new Error('SITE_NOT_FOUND');
 
         const existing = await this.getLeadTimes(tenantId, siteId);
-
-        const timezone = payload.timezone || 'UTC';
-        const workdays = payload.workdays_json ? JSON.stringify(payload.workdays_json) : '[1,2,3,4,5]';
-        const cutoff = payload.daily_cutoff_time || '14:00';
-        const baseLeadDays = payload.base_lead_time_days !== undefined ? payload.base_lead_time_days : 3;
-        const customRules = payload.custom_rules_json ? JSON.stringify(payload.custom_rules_json) : null;
 
         if (existing) {
             await db.query(

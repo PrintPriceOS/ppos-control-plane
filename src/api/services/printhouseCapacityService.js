@@ -52,6 +52,28 @@ class PrinthouseCapacityService {
     async setSiteCapacity(tenantId, siteId, payload) {
         checkProtectedFields(payload);
 
+        // Validate numeric capacity fields if provided
+        if (payload.daily_jobs_limit !== undefined && payload.daily_jobs_limit !== null) {
+            if (typeof payload.daily_jobs_limit !== 'number' || !Number.isFinite(payload.daily_jobs_limit) || Number.isNaN(payload.daily_jobs_limit) || payload.daily_jobs_limit < 0) {
+                throw new Error('INVALID_CAPACITY_VALUES');
+            }
+        }
+        if (payload.daily_sheets_limit !== undefined && payload.daily_sheets_limit !== null) {
+            if (typeof payload.daily_sheets_limit !== 'number' || !Number.isFinite(payload.daily_sheets_limit) || Number.isNaN(payload.daily_sheets_limit) || payload.daily_sheets_limit < 0) {
+                throw new Error('INVALID_CAPACITY_VALUES');
+            }
+        }
+        if (payload.working_days_per_week !== undefined && payload.working_days_per_week !== null) {
+            if (typeof payload.working_days_per_week !== 'number' || !Number.isFinite(payload.working_days_per_week) || Number.isNaN(payload.working_days_per_week) || payload.working_days_per_week < 1 || payload.working_days_per_week > 7) {
+                throw new Error('INVALID_CAPACITY_VALUES');
+            }
+        }
+        if (payload.operating_hours_per_day !== undefined && payload.operating_hours_per_day !== null) {
+            if (typeof payload.operating_hours_per_day !== 'number' || !Number.isFinite(payload.operating_hours_per_day) || Number.isNaN(payload.operating_hours_per_day) || payload.operating_hours_per_day < 1 || payload.operating_hours_per_day > 24) {
+                throw new Error('INVALID_CAPACITY_VALUES');
+            }
+        }
+
         // Enforce boundary check
         const siteRows = await db.query(
             'SELECT * FROM printer_nodes WHERE id = ? AND tenant_id = ?',
@@ -92,6 +114,12 @@ class PrinthouseCapacityService {
      */
     async setMachineCapacity(tenantId, siteId, machineId, payload) {
         checkProtectedFields(payload);
+
+        if (payload.indicative_daily_capacity !== undefined && payload.indicative_daily_capacity !== null) {
+            if (typeof payload.indicative_daily_capacity !== 'number' || !Number.isFinite(payload.indicative_daily_capacity) || Number.isNaN(payload.indicative_daily_capacity) || payload.indicative_daily_capacity < 0) {
+                throw new Error('INVALID_CAPACITY_VALUES');
+            }
+        }
 
         // Enforce boundary check
         const machineRows = await db.query(

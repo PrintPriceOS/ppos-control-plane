@@ -269,9 +269,12 @@ class PrinthouseReadinessService {
                 });
             }
 
-            // Count configured site capacities
+            // Count configured site capacities (requiring positive jobs or sheets limit)
             const capacityRows = await db.query(
-                'SELECT COUNT(*) AS cnt FROM printhouse_site_capacities WHERE tenant_id = ?',
+                `SELECT COUNT(*) AS cnt FROM printhouse_site_capacities 
+                 WHERE tenant_id = ? 
+                   AND ((daily_jobs_limit IS NOT NULL AND daily_jobs_limit > 0)
+                        OR (daily_sheets_limit IS NOT NULL AND daily_sheets_limit > 0))`,
                 [tenantId]
             );
             capacityCount = capacityRows[0]?.cnt || 0;
@@ -284,9 +287,14 @@ class PrinthouseReadinessService {
                 });
             }
 
-            // Count configured site lead times
+            // Count configured site lead times (requiring explicit valid timezone, non-empty workdays, cutoff, and non-negative lead days)
             const leadTimeRows = await db.query(
-                'SELECT COUNT(*) AS cnt FROM printhouse_site_lead_times WHERE tenant_id = ?',
+                `SELECT COUNT(*) AS cnt FROM printhouse_site_lead_times 
+                 WHERE tenant_id = ? 
+                   AND timezone IS NOT NULL AND timezone != ''
+                   AND workdays_json IS NOT NULL AND workdays_json != '[]' AND workdays_json != ''
+                   AND daily_cutoff_time IS NOT NULL AND daily_cutoff_time != ''
+                   AND base_lead_time_days IS NOT NULL AND base_lead_time_days >= 0`,
                 [tenantId]
             );
             leadTimesCount = leadTimeRows[0]?.cnt || 0;

@@ -106,14 +106,24 @@ db.query = async function mockQuery(sql, params = []) {
   // Site capacities query
   if (upper.includes('FROM PRINTHOUSE_SITE_CAPACITIES')) {
     const tenantId = params[0];
-    const cnt = memoryStore.printhouse_site_capacities.filter(c => c.tenant_id === tenantId).length;
+    const cnt = memoryStore.printhouse_site_capacities.filter(c => {
+      if (c.tenant_id !== tenantId) return false;
+      return (c.daily_jobs_limit !== null && c.daily_jobs_limit !== undefined && c.daily_jobs_limit > 0) ||
+             (c.daily_sheets_limit !== null && c.daily_sheets_limit !== undefined && c.daily_sheets_limit > 0);
+    }).length;
     return [{ cnt }];
   }
 
   // Site lead times query
   if (upper.includes('FROM PRINTHOUSE_SITE_LEAD_TIMES')) {
     const tenantId = params[0];
-    const cnt = memoryStore.printhouse_site_lead_times.filter(lt => lt.tenant_id === tenantId).length;
+    const cnt = memoryStore.printhouse_site_lead_times.filter(lt => {
+      if (lt.tenant_id !== tenantId) return false;
+      return lt.timezone && lt.timezone.trim() !== '' &&
+             lt.workdays_json && lt.workdays_json !== '[]' && lt.workdays_json.trim() !== '' &&
+             lt.daily_cutoff_time && lt.daily_cutoff_time.trim() !== '' &&
+             lt.base_lead_time_days !== null && lt.base_lead_time_days !== undefined && lt.base_lead_time_days >= 0;
+    }).length;
     return [{ cnt }];
   }
 
@@ -209,7 +219,8 @@ async function runTests() {
     id: 'cap-1',
     tenant_id: tenantId,
     site_id: 'site-1',
-    daily_capacity: 1000
+    daily_jobs_limit: 100,
+    daily_sheets_limit: 1000
   });
 
   const readiness4 = await readinessService.computeReadiness(tenantId);
@@ -223,7 +234,10 @@ async function runTests() {
     id: 'lt-1',
     tenant_id: tenantId,
     site_id: 'site-1',
-    standard_lead_time_days: 2
+    timezone: 'Europe/Madrid',
+    workdays_json: '[1,2,3,4,5]',
+    daily_cutoff_time: '14:00',
+    base_lead_time_days: 2
   });
 
   const readiness5 = await readinessService.computeReadiness(tenantId);
