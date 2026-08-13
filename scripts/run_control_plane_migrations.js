@@ -179,8 +179,19 @@ async function run() {
       let migrationCount = 0;
       let baselineMarkerCount = 0;
       let phaseMarkerCount = 0;
+      let failedPreservedCount = 0;
+      let startedPreservedCount = 0;
+      let appliedPreservedCount = 0;
 
       for (const row of rows) {
+        if (row.state === 'FAILED') {
+          failedPreservedCount++;
+        } else if (row.state === 'STARTED') {
+          startedPreservedCount++;
+        } else {
+          appliedPreservedCount++;
+        }
+
         const fileKey = row.description && row.description.endsWith('.sql') 
           ? row.description 
           : `${row.version}.sql`;
@@ -198,10 +209,10 @@ async function run() {
               record_type = 'MIGRATION',
               migration_path = ?,
               checksum = ?,
-              state = 'APPLIED',
+              state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
               started_at = COALESCE(started_at, applied_at, NOW(3)),
-              applied_at = COALESCE(applied_at, NOW(3))
+              applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? OR description = ?
           `, [canonicalPath, canonicalChecksum, row.version, row.description]);
           backfilledCount++;
@@ -217,10 +228,10 @@ async function run() {
               record_type = 'BASELINE_MARKER',
               migration_path = NULL,
               checksum = '',
-              state = 'APPLIED',
+              state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
               started_at = COALESCE(started_at, applied_at, NOW(3)),
-              applied_at = COALESCE(applied_at, NOW(3))
+              applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? AND description = ?
           `, [row.version, row.description]);
           backfilledCount++;
@@ -236,10 +247,10 @@ async function run() {
               record_type = 'PHASE_MARKER',
               migration_path = NULL,
               checksum = '',
-              state = 'APPLIED',
+              state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
               started_at = COALESCE(started_at, applied_at, NOW(3)),
-              applied_at = COALESCE(applied_at, NOW(3))
+              applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? AND description = ?
           `, [row.version, row.description]);
           backfilledCount++;
@@ -253,7 +264,10 @@ async function run() {
 
       console.log(`=== Backfill Normalisation Breakdown ===`);
       console.log(`Legacy rows total       : ${rows.length}`);
-      console.log(`Migration rows resolved : ${migrationCount}`);
+      console.log(`Migration rows aligned  : ${migrationCount}`);
+      console.log(`FAILED rows preserved   : ${failedPreservedCount}`);
+      console.log(`STARTED rows preserved  : ${startedPreservedCount}`);
+      console.log(`APPLIED rows preserved  : ${appliedPreservedCount}`);
       console.log(`Baseline markers        : ${baselineMarkerCount}`);
       console.log(`Phase markers           : ${phaseMarkerCount}`);
       console.log(`Unresolved rows         : ${unresolvedRows}`);

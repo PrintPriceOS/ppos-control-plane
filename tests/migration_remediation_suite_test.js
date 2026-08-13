@@ -267,8 +267,6 @@ async function runPartialMigrationTests() {
     process.env.PPOS_MIGRATION_EXECUTION = 'true';
     process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
 
-    const service = new MigrationService();
-
     // Run migrations and ensure it ignores ER_TRG_ALREADY_EXISTS cleanly
     try {
         const originalDiscover = require('../scripts/lib/migrationIntegrity').discoverMigrations;
@@ -280,6 +278,7 @@ async function runPartialMigrationTests() {
             }]
         });
 
+        const service = new MigrationService();
         const res = await service.runMigrations();
         assert.ok(res.appliedCount >= 0);
         console.log('✓ Migration engine safely bypasses ER_TRG_ALREADY_EXISTS errors');

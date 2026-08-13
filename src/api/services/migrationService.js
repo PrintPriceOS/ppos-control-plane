@@ -12,11 +12,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const logger = require('./logger').child('migration-service');
-const { 
-  discoverMigrations, 
-  calculateFileChecksum, 
-  verifyMigrationBaseline 
-} = require('../../../scripts/lib/migrationIntegrity');
+const migrationIntegrity = require('../../../scripts/lib/migrationIntegrity');
 
 const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
@@ -508,7 +504,7 @@ class MigrationService {
         logger.info({ event: 'migration_start', message: 'Starting database migration sequence (Phase 185)' });
 
         // 1. Preflight local repository check (Verify Phase 183 baseline)
-        const integrity = verifyMigrationBaseline(this.migrationsPath, this.baselinePath);
+        const integrity = migrationIntegrity.verifyMigrationBaseline(this.migrationsPath, this.baselinePath);
         if (!integrity.ok) {
             const msg = `Local migration integrity compromised: ${integrity.error}`;
             logger.error({ event: 'migration_preflight_failed', reason: integrity.error });
@@ -533,7 +529,7 @@ class MigrationService {
 
             try {
                 // Load local migrations to match against database
-                const { migrations } = discoverMigrations(this.migrationsPath);
+                const { migrations } = migrationIntegrity.discoverMigrations(this.migrationsPath);
                 const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
 
                 // 3. Preflight database ledger check
@@ -587,7 +583,7 @@ class MigrationService {
                         continue; // Already applied
                     }
 
-                    const canonicalHash = calculateFileChecksum(m.absolutePath);
+                    const canonicalHash = migrationIntegrity.calculateFileChecksum(m.absolutePath);
                     const content = fs.readFileSync(m.absolutePath, 'utf8');
 
                     if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
