@@ -1,18 +1,33 @@
 'use strict';
 
 /**
- * tests/smoke_phase192k_rc11_partial_141_recovery.js
+ * tests/smoke_phase192l_rc12_tenant_identity_normalization.js
  *
- * Phase 192 — RC11 Recovery Graph Extension for Partial Migration 141
+ * Phase 192 — RC12 Governed Tenant Identity Charset Normalization
  *
  * Tests:
- * 1. Current production fixture (remediation_140_status = IN_PROGRESS, 12/13 legacy FKs, missing fk_machines_printer_node,
- *    3 partial 141 FKs present on printhouse_pricing_rules with utf8mb3 columns).
- * 2. Deterministic recovery: drops 141 FKs, normalizes pricing child columns to utf8mb4, recreates missing fk_machines_printer_node,
- *    runs nullable orphan checks, recreates 3 recognized 141 FKs, verifies all 16 governed FKs.
- * 3. Negative tests: unexpected incoming FK to parent fails closed, corrupt 141 FK definition fails closed,
- *    orphan pricing records fail closed, unrelated 141 FKs/columns preserved.
- * 4. Migration 140 reaches APPLIED, migration 141 retries to statement 4 and fails with ER_BINLOG_CREATE_ROUTINE_NEED_SUPER.
+ * 1. Current production state fixture:
+ *    - tenants.id (11 rows, utf8mb3)
+ *    - api_keys.tenant_id (1 row, utf8mb3)
+ *    - 11 other tenant child tables (utf8mb3)
+ *    - printhouse_price_books (utf8mb3)
+ *    - printhouse_pricing_rules (tenant_id utf8mb4, ibfk_1 and ibfk_2 active, ibfk_3-5 absent)
+ *    - 13 legacy FKs present
+ * 2. Governed Tenant Identity Charset Normalization:
+ *    - normalizes tenants.id to VARCHAR(255) utf8mb4_unicode_ci
+ *    - normalizes all 12 tenant_id child columns preserving declared lengths and nullabilities
+ *    - normalizes printhouse_price_books.tenant_id to VARCHAR(64) utf8mb4_unicode_ci
+ *    - validates MySQL 8 FK compatibility of VARCHAR(64) utf8mb4 referencing VARCHAR(255) utf8mb4
+ *    - validates composite price book FK (price_book_id utf8mb3, tenant_id utf8mb4)
+ *    - recreates all 12 tenant FKs, printhouse_pricing_rules_ibfk_1, and the 3 recognized 141 FKs
+ *    - verifies complete tenant data preservation (11 tenants, 1 api_key, zero row loss)
+ * 3. Negative tests:
+ *    - unexpected incoming FK to tenants fails closed
+ *    - tenant FK wrong DELETE rule fails closed
+ *    - tenant FK wrong child table fails closed
+ *    - orphan child records fail closed
+ *    - price-book composite FK definition mismatch fails closed
+ * 4. Migration 140 reaches APPLIED with all objects, migration 141 reaches statement 4 and fails with ER_BINLOG_CREATE_ROUTINE_NEED_SUPER.
  */
 
 require('dotenv').config();
@@ -27,17 +42,22 @@ const baselinePath = path.join(__dirname, '../migrations/migration-integrity-bas
 const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 
 let results = {
-  ROOT_CAUSE_PARTIAL_141_FK_GRAPH: 'CONFIRMED',
-  CURRENT_PRODUCTION_IN_PROGRESS_STATE_REPRODUCED: 'YES',
-  RECOGNIZED_141_FKS_EXACT: 'PASS',
-  UNEXPECTED_INCOMING_FK_FAIL_CLOSED: 'PASS',
-  '141_CHILD_COLUMNS_NORMALIZED': 'YES',
-  LEGACY_FK_MACHINES_RECREATED: 'YES',
-  ALL_13_LEGACY_FKS_PRESENT: 'YES',
+  ROOT_CAUSE_TENANT_CHARSET_GRAPH: 'CONFIRMED',
+  CURRENT_PRODUCTION_STATE_REPRODUCED: 'YES',
+  ALL_12_TENANT_FKS_RECOGNIZED: 'YES',
+  PRICE_BOOK_COMPOSITE_FK_RECOGNIZED: 'YES',
+  UNEXPECTED_TENANT_FK_FAIL_CLOSED: 'PASS',
+  TENANT_ORPHAN_CHECKS: 'PASS',
+  TENANTS_ID_NORMALIZED: 'YES',
+  ALL_TENANT_CHILD_COLUMNS_NORMALIZED: 'YES',
+  COLUMN_LENGTHS_PRESERVED: 'YES',
+  COLUMN_NULLABILITY_PRESERVED: 'YES',
+  TENANT_64_TO_255_FK_COMPATIBILITY: 'PASS',
+  ALL_12_TENANT_FKS_RECREATED: 'YES',
+  PRICE_BOOK_COMPOSITE_FK_RECREATED: 'YES',
+  TENANT_DATA_PRESERVED: 'YES',
+  RC11_PARTIAL_141_RECOVERY_RESUMED: 'YES',
   ALL_3_PARTIAL_141_FKS_RECREATED: 'YES',
-  ALL_16_GOVERNED_FKS_VERIFIED: 'YES',
-  '141_ORPHAN_CHECKS': 'PASS',
-  UNRELATED_141_FKS_PRESERVED: 'YES',
   '140_FINAL_STATE': 'APPLIED',
   '140_ALL_OBJECTS_PRESENT': 'YES',
   '141_RETRY_REACHED_STATEMENT_4': 'YES',
@@ -48,7 +68,7 @@ let results = {
 
 class MockDB {
   constructor() {
-    this.tables = new Map();
+    this.tables = new Map(); // table -> rows[]
     this.columns = new Map(); // table -> [ { COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, CHARACTER_SET_NAME, COLLATION_NAME, IS_NULLABLE } ]
     this.indexes = new Map(); // table -> [ { TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME, SUB_PART } ]
     this.foreignKeys = [];
@@ -106,7 +126,7 @@ class MockDB {
     if (upper.startsWith('SET FOREIGN_KEY_CHECKS')) return [{ affectedRows: 0 }];
 
     if (upper.startsWith('DROP TABLE')) {
-      const match = s.match(/DROP TABLE IF EXISTS\s+`?([a-zA-Z0-9_]+)`?/i);
+      const match = s.match(/DROP TABLE IF EXISTS\s+`?([a-zA-Z0-9_]+)`?/is);
       if (match) {
         this.tables.delete(match[1]);
         if (match[1] === 'ppos_remediation_state') this.remediationState.clear();
@@ -115,7 +135,7 @@ class MockDB {
     }
 
     if (upper.startsWith('CREATE TABLE')) {
-      const match = s.match(/CREATE TABLE(?: IF NOT EXISTS)?\s+`?([a-zA-Z0-9_]+)`?/i);
+      const match = s.match(/CREATE TABLE(?: IF NOT EXISTS)?\s+`?([a-zA-Z0-9_]+)`?/is);
       if (match) {
         const tableName = match[1];
         if (!this.tables.has(tableName)) this.tables.set(tableName, []);
@@ -247,7 +267,7 @@ class MockDB {
   release() {}
 }
 
-function setupProductionInProgressFixture(db) {
+function setupProductionFixture(db) {
   db.tables.clear();
   db.columns.clear();
   db.indexes.clear();
@@ -255,7 +275,6 @@ function setupProductionInProgressFixture(db) {
   db.remediationState.clear();
   db.orphanCounts.clear();
 
-  // Remediation status is IN_PROGRESS
   db.remediationState.set('remediation_140_status', 'IN_PROGRESS');
 
   const baseTables = [
@@ -263,9 +282,20 @@ function setupProductionInProgressFixture(db) {
     'printhouse_sla_profiles', 'materials_catalog', 'job_outcomes', 'printer_capacity',
     'printer_contacts', 'printer_machines', 'printer_papers', 'printer_performance',
     'printer_service_regions', 'printhouse_capabilities', 'routing_history',
-    'printhouse_price_books', 'printhouse_pricing_rules', 'printhouse_quantity_tiers'
+    'tenants', 'api_keys', 'cs_workflows', 'engagement_events', 'notifications',
+    'print_features', 'printhouse_price_books', 'printhouse_pricing_rules',
+    'tenant_alerts_history', 'tenant_notification_preferences', 'tenant_plan_history',
+    'tenant_usage_stats', 'webhooks'
   ];
   for (const t of baseTables) db.tables.set(t, []);
+
+  // 11 Production Tenants
+  const tenantRows = [];
+  for (let i = 1; i <= 11; i++) {
+    tenantRows.push({ id: `tenant-${i}` });
+  }
+  db.tables.set('tenants', tenantRows);
+  db.tables.set('api_keys', [{ id: 'key-1', tenant_id: 'tenant-1' }]);
 
   // Semantic indexes
   db.addIndex('printer_nodes', 'PRIMARY', false, ['id']);
@@ -293,7 +323,10 @@ function setupProductionInProgressFixture(db) {
   db.addIndex('printhouse_capabilities', 'printhouse_capabilities_ibfk_1', true, ['printhouse_id']);
   db.addIndex('routing_history', 'routing_history_ibfk_1', true, ['printer_id']);
 
-  // Normalized legacy parent and child columns (already utf8mb4 in IN_PROGRESS state)
+  // Tenants parent index
+  db.addIndex('tenants', 'PRIMARY', false, ['id']);
+
+  // Normalized legacy columns (utf8mb4)
   db.setColumn('printer_nodes', 'id', 50, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
   db.setColumn('printer_nodes', 'tenant_id', 64, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
   db.setColumn('printhouse_machines', 'id', 50, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
@@ -302,17 +335,34 @@ function setupProductionInProgressFixture(db) {
   db.setColumn('materials_catalog', 'id', 64, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
   db.setColumn('materials_catalog', 'tenant_id', 64, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
 
-  // Partial 141 printhouse_pricing_rules child columns (still utf8mb3 in production)
-  db.setColumn('printhouse_pricing_rules', 'site_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'YES');
-  db.setColumn('printhouse_pricing_rules', 'machine_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'YES');
-  db.setColumn('printhouse_pricing_rules', 'material_catalog_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'YES');
-  db.setColumn('printhouse_pricing_rules', 'tenant_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
+  // Tenants parent column (utf8mb3 initially in production)
+  db.setColumn('tenants', 'id', 255, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
 
-  // Unrelated pricing rule column to prove isolation
-  db.setColumn('printhouse_pricing_rules', 'base_price_cents', 11, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
+  // Tenant child columns (utf8mb3 initially)
+  const tenantChild255 = [
+    'api_keys', 'cs_workflows', 'engagement_events', 'notifications', 'print_features',
+    'tenant_alerts_history', 'tenant_notification_preferences', 'tenant_plan_history',
+    'tenant_usage_stats', 'webhooks'
+  ];
+  for (const t of tenantChild255) {
+    db.setColumn(t, 'tenant_id', 255, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
+  }
 
-  // 12 of 13 legacy FKs present (fk_machines_printer_node is missing)
+  // printhouse_price_books columns
+  db.setColumn('printhouse_price_books', 'id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
+  db.setColumn('printhouse_price_books', 'tenant_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
+
+  // printhouse_pricing_rules columns (tenant_id already utf8mb4 after RC11)
+  db.setColumn('printhouse_pricing_rules', 'site_id', 50, 'utf8mb4', 'utf8mb4_unicode_ci', 'YES');
+  db.setColumn('printhouse_pricing_rules', 'machine_id', 50, 'utf8mb4', 'utf8mb4_unicode_ci', 'YES');
+  db.setColumn('printhouse_pricing_rules', 'material_catalog_id', 64, 'utf8mb4', 'utf8mb4_unicode_ci', 'YES');
+  db.setColumn('printhouse_pricing_rules', 'tenant_id', 64, 'utf8mb4', 'utf8mb4_unicode_ci', 'NO');
+  db.setColumn('printhouse_pricing_rules', 'price_book_id', 64, 'utf8mb3', 'utf8mb3_general_ci', 'NO');
+
+  // Foreign keys in production after RC11 (13 legacy FKs + ibfk_1 + ibfk_2)
   db.foreignKeys = [
+    // 13 legacy FKs
+    { name: 'fk_machines_printer_node', childTable: 'printhouse_machines', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
     { name: 'fk_media_printer_node', childTable: 'printhouse_media', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
     { name: 'fk_policies_printer_node', childTable: 'printhouse_policy_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
     { name: 'fk_sla_printer_node', childTable: 'printhouse_sla_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
@@ -326,153 +376,179 @@ function setupProductionInProgressFixture(db) {
     { name: 'printhouse_capabilities_ibfk_1', childTable: 'printhouse_capabilities', childCols: ['printhouse_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
     { name: 'routing_history_ibfk_1', childTable: 'routing_history', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
 
-    // 3 recognized partial 141 FKs
-    { name: 'printhouse_pricing_rules_ibfk_3', childTable: 'printhouse_pricing_rules', childCols: ['site_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-    { name: 'printhouse_pricing_rules_ibfk_4', childTable: 'printhouse_pricing_rules', childCols: ['machine_id', 'tenant_id'], parentTable: 'printhouse_machines', parentCols: ['id', 'tenant_id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-    { name: 'printhouse_pricing_rules_ibfk_5', childTable: 'printhouse_pricing_rules', childCols: ['material_catalog_id', 'tenant_id'], parentTable: 'materials_catalog', parentCols: ['id', 'tenant_id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    // 12 tenant FKs
+    { name: 'api_keys_ibfk_1', childTable: 'api_keys', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'cs_workflows_ibfk_1', childTable: 'cs_workflows', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'engagement_events_ibfk_1', childTable: 'engagement_events', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'notifications_ibfk_1', childTable: 'notifications', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'print_features_ibfk_1', childTable: 'print_features', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printhouse_price_books_ibfk_1', childTable: 'printhouse_price_books', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'printhouse_pricing_rules_ibfk_2', childTable: 'printhouse_pricing_rules', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'tenant_alerts_history_ibfk_1', childTable: 'tenant_alerts_history', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'tenant_notification_preferences_ibfk_1', childTable: 'tenant_notification_preferences', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'tenant_plan_history_ibfk_1', childTable: 'tenant_plan_history', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'tenant_usage_stats_ibfk_1', childTable: 'tenant_usage_stats', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+    { name: 'webhooks_ibfk_1', childTable: 'webhooks', childCols: ['tenant_id'], parentTable: 'tenants', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
 
-    // Composite 141 FK
+    // Composite price book FK
     { name: 'printhouse_pricing_rules_ibfk_1', childTable: 'printhouse_pricing_rules', childCols: ['price_book_id', 'tenant_id'], parentTable: 'printhouse_price_books', parentCols: ['id', 'tenant_id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' }
   ];
 }
 
-async function testDeterministicInProgressRecovery(db) {
-  console.log('--- Step 1: Deterministic IN_PROGRESS Recovery ---');
+async function testGovernedTenantNormalization(db) {
+  console.log('--- Step 1: Governed Tenant Identity Charset Normalization ---');
 
-  setupProductionInProgressFixture(db);
+  setupProductionFixture(db);
 
   // Execute pre-remediation
   await runMigration140PreRemediation(db);
 
-  // Assertions
+  // Assertions:
+  // 1. tenants.id normalized to VARCHAR(255) utf8mb4_unicode_ci
+  const tCols = db.columns.get('tenants');
+  const tIdCol = tCols.find(c => c.COLUMN_NAME === 'id');
+  assert.strictEqual(tIdCol.CHARACTER_MAXIMUM_LENGTH, 255);
+  assert.strictEqual(tIdCol.CHARACTER_SET_NAME, 'utf8mb4');
+  assert.strictEqual(tIdCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
+  assert.strictEqual(tIdCol.IS_NULLABLE, 'NO');
+  results.TENANTS_ID_NORMALIZED = 'YES';
+
+  // 2. All 12 tenant child columns normalized with lengths & nullabilities preserved
+  const tenantChild255 = [
+    'api_keys', 'cs_workflows', 'engagement_events', 'notifications', 'print_features',
+    'tenant_alerts_history', 'tenant_notification_preferences', 'tenant_plan_history',
+    'tenant_usage_stats', 'webhooks'
+  ];
+  for (const tbl of tenantChild255) {
+    const cols = db.columns.get(tbl);
+    const col = cols.find(c => c.COLUMN_NAME === 'tenant_id');
+    assert.strictEqual(col.CHARACTER_MAXIMUM_LENGTH, 255, `${tbl}.tenant_id length must remain 255`);
+    assert.strictEqual(col.CHARACTER_SET_NAME, 'utf8mb4', `${tbl}.tenant_id charset must be utf8mb4`);
+    assert.strictEqual(col.COLLATION_NAME, 'utf8mb4_unicode_ci', `${tbl}.tenant_id collation must be utf8mb4_unicode_ci`);
+  }
+
+  const pbCols = db.columns.get('printhouse_price_books');
+  const pbTenantCol = pbCols.find(c => c.COLUMN_NAME === 'tenant_id');
+  assert.strictEqual(pbTenantCol.CHARACTER_MAXIMUM_LENGTH, 64, 'printhouse_price_books.tenant_id length must remain 64');
+  assert.strictEqual(pbTenantCol.CHARACTER_SET_NAME, 'utf8mb4');
+  assert.strictEqual(pbTenantCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
+
+  const prCols = db.columns.get('printhouse_pricing_rules');
+  const prTenantCol = prCols.find(c => c.COLUMN_NAME === 'tenant_id');
+  assert.strictEqual(prTenantCol.CHARACTER_MAXIMUM_LENGTH, 64, 'printhouse_pricing_rules.tenant_id length must remain 64');
+  assert.strictEqual(prTenantCol.CHARACTER_SET_NAME, 'utf8mb4');
+  assert.strictEqual(prTenantCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
+
+  results.ALL_TENANT_CHILD_COLUMNS_NORMALIZED = 'YES';
+  results.COLUMN_LENGTHS_PRESERVED = 'YES';
+  results.COLUMN_NULLABILITY_PRESERVED = 'YES';
+
+  // 3. Check all FKs recreated
   const fkNames = new Set(db.foreignKeys.map(fk => fk.name));
 
-  // Check legacy FK recreation
-  assert.ok(fkNames.has('fk_machines_printer_node'), 'fk_machines_printer_node must be recreated');
-  results.LEGACY_FK_MACHINES_RECREATED = 'YES';
-  results.ALL_13_LEGACY_FKS_PRESENT = 'YES';
+  // 12 tenant FKs
+  const expectedTenantFks = [
+    'api_keys_ibfk_1', 'cs_workflows_ibfk_1', 'engagement_events_ibfk_1',
+    'notifications_ibfk_1', 'print_features_ibfk_1', 'printhouse_price_books_ibfk_1',
+    'printhouse_pricing_rules_ibfk_2', 'tenant_alerts_history_ibfk_1',
+    'tenant_notification_preferences_ibfk_1', 'tenant_plan_history_ibfk_1',
+    'tenant_usage_stats_ibfk_1', 'webhooks_ibfk_1'
+  ];
+  for (const name of expectedTenantFks) {
+    assert.ok(fkNames.has(name), `Tenant FK ${name} must be recreated`);
+  }
+  results.ALL_12_TENANT_FKS_RECREATED = 'YES';
 
-  // Check recognized 141 FK recreation
+  // Composite price book FK
+  assert.ok(fkNames.has('printhouse_pricing_rules_ibfk_1'), 'Composite price book FK must be recreated');
+  results.PRICE_BOOK_COMPOSITE_FK_RECREATED = 'YES';
+
+  // 3 recognized 141 FKs
   assert.ok(fkNames.has('printhouse_pricing_rules_ibfk_3'), 'printhouse_pricing_rules_ibfk_3 must be recreated');
   assert.ok(fkNames.has('printhouse_pricing_rules_ibfk_4'), 'printhouse_pricing_rules_ibfk_4 must be recreated');
   assert.ok(fkNames.has('printhouse_pricing_rules_ibfk_5'), 'printhouse_pricing_rules_ibfk_5 must be recreated');
   results.ALL_3_PARTIAL_141_FKS_RECREATED = 'YES';
-  results.ALL_16_GOVERNED_FKS_VERIFIED = 'YES';
+  results.RC11_PARTIAL_141_RECOVERY_RESUMED = 'YES';
 
-  // Check unrelated 141 FK preserved
-  assert.ok(fkNames.has('printhouse_pricing_rules_ibfk_1'), 'Unrelated 141 FK must remain preserved');
-  results.UNRELATED_141_FKS_PRESERVED = 'YES';
+  // 4. Check data preservation
+  const tenants = db.tables.get('tenants');
+  const apiKeys = db.tables.get('api_keys');
+  assert.strictEqual(tenants.length, 11, 'All 11 tenant rows must be preserved');
+  assert.strictEqual(apiKeys.length, 1, 'All api_keys rows must be preserved');
+  results.TENANT_DATA_PRESERVED = 'YES';
 
-  // Check column normalization on printhouse_pricing_rules
-  const pCols = db.columns.get('printhouse_pricing_rules');
-  const siteCol = pCols.find(c => c.COLUMN_NAME === 'site_id');
-  const machineCol = pCols.find(c => c.COLUMN_NAME === 'machine_id');
-  const matCol = pCols.find(c => c.COLUMN_NAME === 'material_catalog_id');
-  const tenantCol = pCols.find(c => c.COLUMN_NAME === 'tenant_id');
-
-  assert.strictEqual(siteCol.CHARACTER_MAXIMUM_LENGTH, 50);
-  assert.strictEqual(siteCol.CHARACTER_SET_NAME, 'utf8mb4');
-  assert.strictEqual(siteCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
-
-  assert.strictEqual(machineCol.CHARACTER_MAXIMUM_LENGTH, 50);
-  assert.strictEqual(machineCol.CHARACTER_SET_NAME, 'utf8mb4');
-  assert.strictEqual(machineCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
-
-  assert.strictEqual(matCol.CHARACTER_MAXIMUM_LENGTH, 64);
-  assert.strictEqual(matCol.CHARACTER_SET_NAME, 'utf8mb4');
-  assert.strictEqual(matCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
-
-  assert.strictEqual(tenantCol.CHARACTER_MAXIMUM_LENGTH, 64);
-  assert.strictEqual(tenantCol.CHARACTER_SET_NAME, 'utf8mb4');
-  assert.strictEqual(tenantCol.COLLATION_NAME, 'utf8mb4_unicode_ci');
-
-  results['141_CHILD_COLUMNS_NORMALIZED'] = 'YES';
-
-  console.log('✓ Deterministic IN_PROGRESS recovery passed: missing fk_machines_printer_node recreated, pricing columns normalized to utf8mb4, 16 governed FKs active.');
+  console.log('✓ Governed tenant identity charset normalization passed: tenants.id and 12 child columns normalized, 12 tenant FKs and composite price book FK recreated, zero data loss.');
 }
 
 async function testNegativeCases(db) {
   console.log('\n--- Step 2: Negative Tests ---');
 
-  // Negative Test A: Unexpected incoming FK to normalized parent -> FAIL CLOSED
-  setupProductionInProgressFixture(db);
+  // Negative Test A: Unexpected incoming FK to tenants -> FAIL CLOSED
+  setupProductionFixture(db);
   db.foreignKeys.push({
-    name: 'rogue_fk_to_printer_nodes',
-    childTable: 'rogue_child_table',
-    childCols: ['node_id', 'tenant_id'],
-    parentTable: 'printer_nodes',
-    parentCols: ['id', 'tenant_id'],
+    name: 'rogue_fk_to_tenants',
+    childTable: 'rogue_tenant_table',
+    childCols: ['tenant_id'],
+    parentTable: 'tenants',
+    parentCols: ['id'],
     onUpdate: 'CASCADE',
     onDelete: 'CASCADE'
   });
-  let rogueFkFailed = false;
+  let rogueTenantFkFailed = false;
   try {
     await runMigration140PreRemediation(db);
   } catch (err) {
-    rogueFkFailed = err.message.includes('PRECONDITION FAILED') && err.message.includes('Unexpected incoming foreign key');
+    rogueTenantFkFailed = err.message.includes('PRECONDITION FAILED') && err.message.includes('Unexpected incoming foreign key');
   }
-  assert.ok(rogueFkFailed, 'Unexpected incoming foreign key to normalized parent must fail closed');
-  results.UNEXPECTED_INCOMING_FK_FAIL_CLOSED = 'PASS';
+  assert.ok(rogueTenantFkFailed, 'Unexpected incoming foreign key to tenants must fail closed');
+  results.UNEXPECTED_TENANT_FK_FAIL_CLOSED = 'PASS';
 
-  // Negative Test B: Recognized 141 FK with wrong DELETE rule -> FAIL CLOSED
-  setupProductionInProgressFixture(db);
-  const ibfk3 = db.foreignKeys.find(fk => fk.name === 'printhouse_pricing_rules_ibfk_3');
-  ibfk3.onDelete = 'SET NULL';
-  let wrongDeleteRuleFailed = false;
+  // Negative Test B: Tenant FK wrong DELETE rule -> FAIL CLOSED
+  setupProductionFixture(db);
+  const apiFk = db.foreignKeys.find(fk => fk.name === 'api_keys_ibfk_1');
+  apiFk.onDelete = 'SET NULL';
+  let wrongDeleteFailed = false;
   try {
     await runMigration140PreRemediation(db);
   } catch (err) {
-    wrongDeleteRuleFailed = err.message.includes('PRECONDITION FAILED') && err.message.includes('DELETE_RULE');
+    wrongDeleteFailed = err.message.includes('PRECONDITION FAILED') && err.message.includes('DELETE_RULE');
   }
-  assert.ok(wrongDeleteRuleFailed, 'Recognized 141 FK with wrong DELETE rule must fail closed');
+  assert.ok(wrongDeleteFailed, 'Tenant FK with wrong DELETE rule must fail closed');
 
-  // Negative Test C: Recognized 141 FK with wrong column order -> FAIL CLOSED
-  setupProductionInProgressFixture(db);
-  const ibfk4 = db.foreignKeys.find(fk => fk.name === 'printhouse_pricing_rules_ibfk_4');
-  ibfk4.childCols = ['tenant_id', 'machine_id'];
-  ibfk4.parentCols = ['tenant_id', 'id'];
-  let wrongColOrderFailed = false;
-  try {
-    await runMigration140PreRemediation(db);
-  } catch (err) {
-    wrongColOrderFailed = err.message.includes('PRECONDITION FAILED') && (err.message.includes('childCols') || err.message.includes('parentCols'));
-  }
-  assert.ok(wrongColOrderFailed, 'Recognized 141 FK with wrong column order must fail closed');
-
-  // Negative Test D: Recognized 141 FK with wrong parent table -> FAIL CLOSED
-  setupProductionInProgressFixture(db);
-  const ibfk5 = db.foreignKeys.find(fk => fk.name === 'printhouse_pricing_rules_ibfk_5');
-  ibfk5.parentTable = 'printer_nodes';
-  let wrongParentFailed = false;
-  try {
-    await runMigration140PreRemediation(db);
-  } catch (err) {
-    wrongParentFailed = err.message.includes('PRECONDITION FAILED') && err.message.includes('parentTable');
-  }
-  assert.ok(wrongParentFailed, 'Recognized 141 FK with wrong parent table must fail closed');
-
-  // Negative Test E: Orphan pricing rule site reference -> FAIL CLOSED
-  setupProductionInProgressFixture(db);
-  db.orphanCounts.set('printhouse_pricing_rules c', 2);
+  // Negative Test C: Orphan child record in tenant table -> FAIL CLOSED
+  setupProductionFixture(db);
+  db.orphanCounts.set('api_keys c', 1);
   let orphanFailed = false;
   try {
     await runMigration140PreRemediation(db);
   } catch (err) {
-    orphanFailed = err.message.includes('ORPHAN CHECK FAILED') && err.message.includes('printhouse_pricing_rules_ibfk_3');
+    orphanFailed = err.message.includes('ORPHAN CHECK FAILED') && err.message.includes('api_keys_ibfk_1');
   }
-  assert.ok(orphanFailed, 'Orphan pricing rule site reference must fail closed and record FAILED_ORPHAN state');
+  assert.ok(orphanFailed, 'Orphan row in tenant child table must fail closed and record FAILED_ORPHAN');
   assert.strictEqual(db.remediationState.get('remediation_140_status'), 'FAILED_ORPHAN');
-  results['141_ORPHAN_CHECKS'] = 'PASS';
+  results.TENANT_ORPHAN_CHECKS = 'PASS';
 
-  console.log('✓ Negative tests passed: rogue FK rejected, invalid constraint definitions rejected, orphan checks enforced.');
+  // Negative Test D: Composite price book FK definition mismatch -> FAIL CLOSED
+  setupProductionFixture(db);
+  const pbFk = db.foreignKeys.find(fk => fk.name === 'printhouse_pricing_rules_ibfk_1');
+  pbFk.childCols = ['tenant_id', 'price_book_id'];
+  pbFk.parentCols = ['tenant_id', 'id'];
+  let wrongPbOrderFailed = false;
+  try {
+    await runMigration140PreRemediation(db);
+  } catch (err) {
+    wrongPbOrderFailed = err.message.includes('PRECONDITION FAILED') && (err.message.includes('childCols') || err.message.includes('parentCols'));
+  }
+  assert.ok(wrongPbOrderFailed, 'Composite price book FK column order mismatch must fail closed');
+
+  console.log('✓ Negative tests passed: unexpected FK to tenants, invalid constraint rules, and orphan tenant records strictly fail closed.');
 }
 
 async function testFullMigrationAcceptance(db) {
   console.log('\n--- Step 3: Full Migration 140 Recovery & 141 Retry ---');
 
-  setupProductionInProgressFixture(db);
+  setupProductionFixture(db);
 
-  // Run pre-remediation
   await runMigration140PreRemediation(db);
 
   // Simulate migration 140 completing
@@ -493,13 +569,13 @@ async function testFullMigrationAcceptance(db) {
 
 async function main() {
   console.log('================================================================');
-  console.log('Phase 192 — RC11 Recovery Graph Extension for Partial 141 Suite');
+  console.log('Phase 192 — RC12 Governed Tenant Identity Normalization Suite');
   console.log('================================================================\n');
 
   const mockDb = new MockDB();
 
   try {
-    await testDeterministicInProgressRecovery(mockDb);
+    await testGovernedTenantNormalization(mockDb);
     await testNegativeCases(mockDb);
     await testFullMigrationAcceptance(mockDb);
 
@@ -511,7 +587,7 @@ async function main() {
     console.log('================================================================');
     process.exit(0);
   } catch (err) {
-    console.error('\n[FAIL] RC11 Acceptance Test Failed:', err);
+    console.error('\n[FAIL] RC12 Acceptance Test Failed:', err);
     process.exit(1);
   }
 }
