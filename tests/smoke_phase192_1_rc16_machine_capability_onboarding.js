@@ -1,9 +1,9 @@
 /**
  * tests/smoke_phase192_1_rc16_machine_capability_onboarding.js
  *
- * Phase 192 — RC16 & RC16.1: Machine Capability Onboarding & Canonical Derivation Alignment
+ * Phase 192 — RC16, RC16.1, RC16.2: Machine Capability Onboarding, Alignment & JSON Normalization
  *
- * Covers requirements C1 through C24:
+ * Covers requirements C1 through C31:
  * C1. Machine with no technical capability -> capabilityCount = 0
  * C2. supported_color_modes_json = [] -> capabilityCount = 0
  * C3. Valid CMYK selection -> capabilityCount = 1
@@ -28,6 +28,13 @@
  * C22. Empty arrays + all false + no dimensions: derived = 0 and readiness = 0
  * C23. DIGITAL_PRESS only: derived = 0 and readiness = 0
  * C24. For every tested machine configuration: readiness machine capability truth == canonical derivation truth
+ * C25. Native array ['CMYK'] -> no throw; canonical capability > 0
+ * C26. JSON string '["CMYK"]' -> same canonical capability result as native array
+ * C27. JSON string '[]' -> capability 0
+ * C28. Malformed JSON string -> no throw; capability 0
+ * C29. Null / undefined / empty string JSON -> capability 0
+ * C30. Readiness evaluation using DB-like raw row with JSON strings -> no TypeError and same truth as canonical derivation
+ * C31. Native-array representation and JSON-string representation of the same machine produce identical readiness/canonical results
  */
 
 'use strict';
@@ -282,7 +289,7 @@ const readinessService = require('../src/api/services/printhouseReadinessService
 const capabilityService = require('../src/api/services/printhouseCapabilityOnboardingService');
 
 async function runTests() {
-  console.log('=== Phase 192 — RC16 / RC16.1: Machine Capability Onboarding & Canonical Alignment ===\n');
+  console.log('=== Phase 192 — RC16, RC16.1 & RC16.2: Machine Capability Onboarding & Hardening ===\n');
 
   const tenantId = 'ph-04c8f95f';
   const siteId = 'node-9679061b';
@@ -747,12 +754,137 @@ async function runTests() {
   }
   console.log('✓ Test C24: for every tested machine configuration: readiness machine capability truth == canonical derivation truth');
 
-  console.log('\n================================================================');
-  console.log('ALL PHASE 192 RC16 & RC16.1 TESTS PASSED SUCCESSFULLY (C1 - C24)');
-  console.log('================================================================\n');
+  // --- RC16.2 JSON Representation & Self-Normalization Tests (C25 - C31) ---
+  console.log('\n--- 6. JSON Representation & Self-Normalization Tests (C25 - C31) ---');
+
+  // C25: Native array ['CMYK'] -> no throw; canonical capability > 0
+  const machineNativeArray = {
+    id: 'mach-c25',
+    supported_color_modes_json: ['CMYK']
+  };
+  const capsC25 = capabilityService.deriveCapabilitiesFromMachine(machineNativeArray);
+  assert.ok(capsC25.length > 0, 'C25: Native array must derive capabilities without error');
+  assert.strictEqual(capsC25[0].type, 'PRINT_CMYK');
+  console.log('✓ Test C25: native array [\'CMYK\'] -> no throw; canonical capability > 0');
+
+  // C26: JSON string '["CMYK"]' -> same canonical capability result as native array
+  const machineJsonString = {
+    id: 'mach-c26',
+    supported_color_modes_json: '["CMYK"]'
+  };
+  const capsC26 = capabilityService.deriveCapabilitiesFromMachine(machineJsonString);
+  assert.deepStrictEqual(
+    capsC26.map(c => c.type),
+    capsC25.map(c => c.type),
+    'C26: JSON string must derive identical capability types as native array'
+  );
+  console.log('✓ Test C26: JSON string \'["CMYK"]\' -> same canonical capability result as native array');
+
+  // C27: JSON string '[]' -> capability 0
+  const machineEmptyJsonStr = {
+    id: 'mach-c27',
+    supported_color_modes_json: '[]'
+  };
+  const capsC27 = capabilityService.deriveCapabilitiesFromMachine(machineEmptyJsonStr);
+  assert.strictEqual(capsC27.length, 0, 'C27: Empty JSON string must yield 0 capabilities');
+  console.log('✓ Test C27: JSON string \'[]\' -> capability 0');
+
+  // C28: Malformed JSON string -> no throw; capability 0
+  const machineMalformedJson = {
+    id: 'mach-c28',
+    supported_color_modes_json: '{"malformed json['
+  };
+  const capsC28 = capabilityService.deriveCapabilitiesFromMachine(machineMalformedJson);
+  assert.strictEqual(capsC28.length, 0, 'C28: Malformed JSON string must fail closed to 0 capabilities without throwing');
+  console.log('✓ Test C28: malformed JSON string -> no throw; capability 0');
+
+  // C29: Null / undefined / empty string JSON -> capability 0
+  for (const emptyVal of [null, undefined, '', '   ']) {
+    const machineEmptyVal = {
+      id: 'mach-c29',
+      supported_color_modes_json: emptyVal
+    };
+    const capsC29 = capabilityService.deriveCapabilitiesFromMachine(machineEmptyVal);
+    assert.strictEqual(capsC29.length, 0, `C29: ${JSON.stringify(emptyVal)} must yield 0 capabilities`);
+  }
+  console.log('✓ Test C29: null / undefined / empty string JSON -> capability 0');
+
+  // C30: Readiness evaluation using DB-like raw row with JSON strings -> no TypeError and same truth
+  resetMachines();
+  const rawDbRow = {
+    id: 'mach-raw-db-c30',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Raw MySQL Machine',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_color_modes_json: '["CMYK", "CMYK+SPOT"]',
+    supported_print_methods_json: '["DIGITAL_TONER"]',
+    supported_sides_json: '["DUPLEX"]',
+    max_sheet_width_mm: 750,
+    max_sheet_height_mm: 530,
+    supports_pdfx: 1,
+    supports_white_ink: 0
+  };
+  memoryStore.printhouse_machines.push(rawDbRow);
+
+  const rawReadiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(rawReadiness.capabilityCount, 1, 'C30: Readiness must process raw DB row successfully');
+  assert.strictEqual(
+    rawReadiness.capabilityCount > 0,
+    capabilityService.hasMeaningfulMachineCapability(rawDbRow),
+    'C30: Readiness and canonical derivation must agree on raw DB row'
+  );
+  console.log('✓ Test C30: readiness evaluation using DB-like raw row with JSON strings -> no TypeError and same truth as canonical derivation');
+
+  // C31: Native-array representation and JSON-string representation of the same machine produce identical readiness/canonical results
+  const machineAsNative = {
+    id: 'mach-equiv',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Equivalent Press',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_color_modes_json: ['CMYK'],
+    supports_spot_uv: 1
+  };
+  const machineAsString = {
+    id: 'mach-equiv',
+    printhouse_id: siteId,
+    tenant_id: tenantId,
+    machine_name: 'Equivalent Press',
+    machine_type: 'DIGITAL_PRESS',
+    status: 'ACTIVE',
+    supported_color_modes_json: '["CMYK"]',
+    supports_spot_uv: 1
+  };
+
+  const derivedNative = capabilityService.deriveCapabilitiesFromMachine(machineAsNative);
+  const derivedString = capabilityService.deriveCapabilitiesFromMachine(machineAsString);
+  assert.deepStrictEqual(
+    derivedNative.map(c => c.type),
+    derivedString.map(c => c.type),
+    'C31: Derived capabilities must be identical between native-array and JSON-string representations'
+  );
+
+  resetMachines();
+  memoryStore.printhouse_machines.push(machineAsNative);
+  const readinessNative = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+
+  resetMachines();
+  memoryStore.printhouse_machines.push(machineAsString);
+  const readinessString = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+
+  assert.strictEqual(readinessNative.capabilityCount, readinessString.capabilityCount, 'C31: readiness capabilityCount must be identical');
+  assert.strictEqual(readinessNative.status, readinessString.status, 'C31: readiness status must be identical');
+  console.log('✓ Test C31: native-array representation and JSON-string representation of the same machine produce identical readiness/canonical results');
+
+  console.log('\n======================================================================');
+  console.log('ALL PHASE 192 RC16, RC16.1 & RC16.2 TESTS PASSED SUCCESSFULLY (C1 - C31)');
+  console.log('======================================================================\n');
 }
 
 runTests().catch(err => {
-  console.error('\n[FAIL] RC16 / RC16.1 Test Suite Failed:', err);
+  console.error('\n[FAIL] RC16 / RC16.1 / RC16.2 Test Suite Failed:', err);
   process.exit(1);
 });

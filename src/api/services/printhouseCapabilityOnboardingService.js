@@ -75,18 +75,14 @@ class PrinthouseCapabilityOnboardingService {
         if (!machine) return [];
         const capabilities = [];
 
-        // Color mode capabilities
-        let colorModes = machine.supported_color_modes_json;
-        if (typeof colorModes === 'string') {
-            try { colorModes = JSON.parse(colorModes); } catch (e) { colorModes = []; }
+        // Color mode capabilities (representation-safe self-normalization)
+        const rawColorModes = this._safeParseJson(machine.supported_color_modes_json, []);
+        const colorModes = Array.isArray(rawColorModes) ? rawColorModes : [];
+        if (colorModes.some(m => typeof m === 'string' && m.includes('CMYK'))) {
+            capabilities.push({ type: 'PRINT_CMYK', active: true, source_machine_id: machine.id });
         }
-        if (Array.isArray(colorModes)) {
-            if (colorModes.some(m => typeof m === 'string' && m.includes('CMYK'))) {
-                capabilities.push({ type: 'PRINT_CMYK', active: true, source_machine_id: machine.id });
-            }
-            if (colorModes.some(m => typeof m === 'string' && m.includes('SPOT'))) {
-                capabilities.push({ type: 'PRINT_SPOT_COLOR', active: true, source_machine_id: machine.id });
-            }
+        if (colorModes.some(m => typeof m === 'string' && m.includes('SPOT'))) {
+            capabilities.push({ type: 'PRINT_SPOT_COLOR', active: true, source_machine_id: machine.id });
         }
 
         // Flag-based capabilities
@@ -145,11 +141,6 @@ class PrinthouseCapabilityOnboardingService {
         const capabilityMap = new Map();
 
         for (const machine of machines) {
-            // Parse JSON fields
-            machine.supported_color_modes_json = this._safeParseJson(machine.supported_color_modes_json, []);
-            machine.supported_print_methods_json = this._safeParseJson(machine.supported_print_methods_json, []);
-            machine.supported_sides_json = this._safeParseJson(machine.supported_sides_json, []);
-
             const derived = this.deriveCapabilitiesFromMachine(machine);
             const isMachineActive = machine.status === 'ACTIVE';
             for (const cap of derived) {
@@ -250,10 +241,16 @@ class PrinthouseCapabilityOnboardingService {
         );
     }
 
-    _safeParseJson(str, fallback = {}) {
-        if (!str) return fallback;
-        if (typeof str !== 'string') return str;
-        try { return JSON.parse(str); } catch { return fallback; }
+    _safeParseJson(val, fallback = {}) {
+        if (val === null || val === undefined || val === '') return fallback;
+        if (typeof val === 'object') return val;
+        if (typeof val !== 'string') return fallback;
+        try {
+            const parsed = JSON.parse(val);
+            return (parsed !== null && parsed !== undefined) ? parsed : fallback;
+        } catch {
+            return fallback;
+        }
     }
 }
 
