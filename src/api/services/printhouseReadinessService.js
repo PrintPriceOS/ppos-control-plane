@@ -299,6 +299,30 @@ class PrinthouseReadinessService {
                 });
             }
 
+            // Count active enabled shipping regions
+            let shippingCount = 0;
+            try {
+                const shippingRows = await db.query(
+                    'SELECT COUNT(*) AS cnt FROM printhouse_shipping_regions WHERE tenant_id = ? AND enabled = TRUE AND status = ?',
+                    [tenantId, 'ACTIVE']
+                );
+                shippingCount = shippingRows[0]?.cnt || 0;
+            } catch (e) {
+                // Table may not exist yet
+            }
+
+            // Count configured integrations (non-disabled)
+            let integrationCount = 0;
+            try {
+                const integrationRows = await db.query(
+                    'SELECT COUNT(*) AS cnt FROM printhouse_integration_profiles WHERE tenant_id = ? AND status <> ?',
+                    [tenantId, 'DISABLED']
+                );
+                integrationCount = integrationRows[0]?.cnt || 0;
+            } catch (e) {
+                // Table may not exist yet
+            }
+
             // Advisory: sites without machines
             const siteCount = (sites || []).length;
             if (siteCount > 0 && sitesWithMachines < siteCount) {
@@ -308,6 +332,41 @@ class PrinthouseReadinessService {
                     message: `${siteCount - sitesWithMachines} site(s) have no machines configured`
                 });
             }
+
+            // Calculate 5 operational requirements
+            const totalRequirements = 5;
+            let completedRequirements = 0;
+            if (machineCount > 0) completedRequirements++;
+            if (capabilityCount > 0) completedRequirements++;
+            if (materialCount > 0) completedRequirements++;
+            if (capacityCount > 0) completedRequirements++;
+            if (leadTimesCount > 0) completedRequirements++;
+
+            let status = 'NOT_STARTED';
+            if (completedRequirements === totalRequirements && operationalBlockers.length === 0) {
+                status = 'READY';
+            } else if (completedRequirements > 0) {
+                status = 'IN_PROGRESS';
+            } else {
+                status = 'NOT_STARTED';
+            }
+
+            return {
+                status,
+                available: false,
+                machineCount,
+                capabilityCount,
+                sitesWithMachines,
+                materialCount,
+                capacityCount,
+                leadTimesCount,
+                shippingCount,
+                integrationCount,
+                completedRequirements,
+                totalRequirements,
+                blockingIssues: operationalBlockers,
+                advisories: operationalAdvisories
+            };
         } catch (err) {
             // Table may not exist yet — degrade gracefully
             return {
@@ -319,6 +378,10 @@ class PrinthouseReadinessService {
                 materialCount: 0,
                 capacityCount: 0,
                 leadTimesCount: 0,
+                shippingCount: 0,
+                integrationCount: 0,
+                completedRequirements: 0,
+                totalRequirements: 5,
                 blockingIssues: [],
                 advisories: [],
                 message: 'Onboarding tables not yet fully initialized.'
