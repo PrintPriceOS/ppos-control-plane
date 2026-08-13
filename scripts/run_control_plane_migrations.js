@@ -282,6 +282,17 @@ async function run() {
     }
 
 
+    if (process.env.PPOS_ALLOW_FALSE_APPLIED_140_REPAIR === 'true') {
+      console.log(`Executing governed repair for false-APPLIED migration 140...`);
+      const { repairFalseAppliedMigration140 } = require('../src/api/services/migrationRepairService');
+      const repairConn = await dbPool.getConnection();
+      try {
+        await repairFalseAppliedMigration140(repairConn);
+      } finally {
+        repairConn.release();
+      }
+    }
+
     console.log(`Applying pending migrations...`);
     await migrationService.runMigrations();
     console.log(`Migration execution complete.`);

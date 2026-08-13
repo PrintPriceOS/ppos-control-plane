@@ -528,6 +528,12 @@ class MigrationService {
 
 
             try {
+                // If explicit false-APPLIED 140 repair is requested, execute governed repair
+                if (process.env.PPOS_ALLOW_FALSE_APPLIED_140_REPAIR === 'true') {
+                    const { repairFalseAppliedMigration140 } = require('./migrationRepairService');
+                    await repairFalseAppliedMigration140(connection);
+                }
+
                 // Load local migrations to match against database
                 const { migrations } = migrationIntegrity.discoverMigrations(this.migrationsPath);
                 const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
