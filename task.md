@@ -1248,20 +1248,28 @@ UNRESTRICTED_PRODUCTION:
 
 ---
 
-## Phase 192 — Deployment Remediation & Migration Engine (RC2)
+## Phase 192 — Deployment Remediation & Migration Engine (RC2 / RC3)
 **STATUS: REMEDIATED / VALIDATED**
 - Naive SQL splitter replaced with deterministic `migrationSqlParser.js` supporting custom `DELIMITER` directives.
 - Idempotency guards added to ignore `ER_TRG_ALREADY_EXISTS` (1359) errors during partial retry.
 - Governed retry logic added to allow explicit retries (`PPOS_ALLOW_MIGRATION_RETRY=true`) for failed migrations with matching checksums.
-- Previous failure metadata preserved in a `previous_failures` JSON column on the `schema_versions` table before retry transition.
+- Removed dynamic DDL mutations (`previous_failures` column creation) from read-only paths (`migrationLedgerReadService.js`) to enforce zero-runtime-DDL integrity.
 - Created `docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md` containing the precise server execution sequence.
 - All 40 test suites passed successfully (`npm test` / `tests/run_all_security_tests.js`).
 - Clean production build: PASS.
-- Pushed tag `phase-192-controlled-beta-rc2` to origin.
+- Pushed tag `phase-192-controlled-beta-rc3` to origin.
 
+---
 
-
-
+## Phase 192 — RC4 Migration 140 Schema Compatibility
+**STATUS: REMEDIATED / VALIDATED**
+- Diagnosed failure of migration 140 on production due to key width mismatches (e.g. `printhouse_machines.tenant_id` being `VARCHAR(50)` while `printhouse_machine_materials` uses `VARCHAR(64)`).
+- Implemented `runMigration140PreRemediation` inside `migrationService.js` to automatically and safely widen key columns:
+  - `printer_nodes.id` to `VARCHAR(50)`
+  - `printhouse_machines.tenant_id` to `VARCHAR(64)`
+  - `printhouse_media.tenant_id`, `printhouse_policy_profiles.tenant_id`, `printhouse_sla_profiles.tenant_id` to `VARCHAR(64)`
+- Verified recovery against a real MySQL 8 container with actual data widening, foreign keys activation, and subsequent migrations execution.
+- Pushed tag `phase-192-controlled-beta-rc4` to origin.
 
 
 

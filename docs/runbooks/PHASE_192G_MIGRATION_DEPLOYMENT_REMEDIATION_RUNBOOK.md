@@ -1,21 +1,20 @@
 # docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md
 
-## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC3)
+## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC4)
 
-### Version: 3.0 — 2026-08-13
+### Version: 4.0 — 2026-08-13
 **Status**: APPROVED FOR STAGE 1 COHORT BETA USE ONLY
 
 ---
 
 ## 1. Context & Operational Evidence
-During the deployment attempt of Phase 192 RC1, migration 136 (`136_phase190_order_pricing_snapshot_sealing.sql`) failed due to delimiter syntax in stored procedures and trigger declarations which the legacy naive splitting logic (`content.split(';')`) was unable to parse.
+In the production environment, migrations 136, 137, 138, and 139 have successfully been applied. However, migration 140 (`140_phase191e_materials_capacity_leadtimes.sql`) failed with error `ER_FK_INCOMPATIBLE_COLUMNS` due to key length mismatches between legacy columns (`printer_nodes.id` as `VARCHAR(36)` and `printhouse_machines.tenant_id` as `VARCHAR(50)`) and the new capacity table schemas.
 
 Current target server database state:
-- `schema_versions` has migration 136 in state `FAILED` (with error `ER_PARSE_ERROR`).
-- `order_pricing_snapshots` table exists (partial side effect).
-- All columns added to `orders` or `job_quotes` by 136 are **NOT** present.
-- All triggers in 136 are **NOT** present.
-- Migrations 137–145 are **NOT** applied.
+- `schema_versions` has migration 140 in state `FAILED`.
+- Tables `printhouse_machine_materials`, `printhouse_site_capacities`, and `printhouse_site_lead_times` are **NOT** created.
+- Capacity columns on `printhouse_machines` are **NOT** created.
+- Migrations 141–145 remain **NOT APPLIED**.
 
 Additionally, database credentials exposed during diagnostics must be rotated immediately before restarting production node runtimes.
 
@@ -46,17 +45,17 @@ Verify that the local node can connect to MySQL with the new password:
 node -e "const db = require('./src/api/services/mysqlClient'); db.query('SELECT 1').then(() => console.log('Connected!')).catch(console.error)"
 ```
 
-### Step 3: Fetch and Deploy Release Candidate 3 (RC3)
+### Step 3: Fetch and Deploy Release Candidate 4 (RC4)
 Check out the corrected release candidate codebase on the target node:
 ```bash
 git fetch origin
-git checkout tags/phase-192-controlled-beta-rc3
+git checkout tags/phase-192-controlled-beta-rc4
 ```
 
 Verify that tag and HEAD point to the exact same commit:
 ```bash
 git rev-parse HEAD
-git rev-list -n 1 phase-192-controlled-beta-rc3
+git rev-list -n 1 phase-192-controlled-beta-rc4
 ```
 *Expected: Identical commit SHAs.*
 
@@ -80,7 +79,7 @@ Check the ledger status before executing any database mutations:
 node scripts/run_control_plane_migrations.js --dry-run
 ```
 *Expected Output:*
-- Failed migrations: `1` (migration 136)
+- Failed migrations: `1` (migration 140)
 - Ledger status: `PENDING_MIGRATIONS` (Since `PPOS_ALLOW_MIGRATION_RETRY=true` allows retry of the failed migration).
 - Exit Code: `2` (Pending migrations exist)
 
@@ -95,15 +94,18 @@ node scripts/run_control_plane_migrations.js
 ```
 *Expected execution path:*
 1. The engine acquires the database advisory lock.
-2. It detects the `FAILED` state of migration 136.
-3. Since `PPOS_ALLOW_MIGRATION_RETRY` is `true`, it compares the local checksum of 136 with the failed record's checksum.
-4. On match, it preserves the previous failure detail into the `previous_failures` JSON column and sets state to `STARTED`.
-5. It parses migration 136 using the new deterministic parser (respecting `DELIMITER $$`).
-6. It safely skips the duplicate table creation `order_pricing_snapshots` (idempotent bypass).
-7. It creates the remaining columns on `orders` and `job_quotes`.
-8. It successfully creates the immutability/consistency triggers, ignoring duplicate errors if any exist.
-9. On success, it marks migration 136 as `APPLIED`.
-10. The engine proceeds to apply pending migrations 137–145 in numerical order.
+2. It detects the `FAILED` state of migration 140.
+3. Since `PPOS_ALLOW_MIGRATION_RETRY` is `true`, it compares the local checksum of 140 with the failed record's checksum.
+4. On match, the engine automatically executes `runMigration140PreRemediation` DDL helper to:
+   - Temporarily disable foreign key checks (`FOREIGN_KEY_CHECKS = 0`).
+   - Widen `printer_nodes.id` to `VARCHAR(50)`.
+   - Widen `printhouse_machines.tenant_id` to `VARCHAR(64)`.
+   - Widen `printhouse_media.tenant_id`, `printhouse_policy_profiles.tenant_id`, and `printhouse_sla_profiles.tenant_id` to `VARCHAR(64)` for complete referential compatibility.
+   - Re-enable foreign key checks (`FOREIGN_KEY_CHECKS = 1`).
+5. The engine preserves the previous failure detail of 140 into the `previous_failures` JSON column and sets state to `STARTED`.
+6. It executes the statements in migration 140 (which now pass with 100% type/referential compatibility).
+7. On success, it marks migration 140 as `APPLIED`.
+8. The engine proceeds to apply pending migrations 141–145 in numerical order.
 
 ### Step 8: Verification of Applied Migrations
 Confirm that all 145 migrations are marked as `APPLIED` in the ledger:
@@ -117,9 +119,9 @@ node scripts/run_control_plane_migrations.js --dry-run
 Validate the schema integrity of triggers and tables:
 ```sql
 -- Connect to MySQL and run:
-SHOW TABLES LIKE 'order_pricing_snapshots';
-SHOW COLUMNS FROM orders LIKE 'active_pricing_snapshot_id';
-SHOW TRIGGERS LIKE 'order_pricing_snapshots';
+SHOW TABLES LIKE 'printhouse_machine_materials';
+SHOW TABLES LIKE 'printhouse_site_capacities';
+SHOW TABLES LIKE 'printhouse_site_lead_times';
 ```
 
 ### Step 9: Restart PM2 and Verify Readiness
@@ -135,4 +137,4 @@ curl http://127.0.0.1:8081/api/admin/runtime/health
 Once all migrations reach the `APPLIED` state, no historic migration files (001–145) may be modified. Any future schema alterations must use a new sequential file (146+).
 
 ---
-**RUNBOOK_VERSION**: 3.0
+**RUNBOOK_VERSION**: 4.0

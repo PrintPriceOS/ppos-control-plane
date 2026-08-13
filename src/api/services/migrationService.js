@@ -38,6 +38,55 @@ async function ensurePreviousFailuresColumn(connOrDb) {
   }
 }
 
+async function runMigration140PreRemediation(connOrDb) {
+  logger.info({ event: 'migration_remediation_140_start', message: 'Evaluating governed schema normalization pre-remediation for migration 140' });
+  
+  // Disable FK checks to allow alter
+  await connOrDb.query('SET FOREIGN_KEY_CHECKS = 0');
+  
+  try {
+    // 1. Check printer_nodes.id length
+    const [printerNodesCols] = await connOrDb.query(`
+      SELECT CHARACTER_MAXIMUM_LENGTH 
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'printer_nodes' AND COLUMN_NAME = 'id'
+    `);
+    if (printerNodesCols && printerNodesCols[0] && printerNodesCols[0].CHARACTER_MAXIMUM_LENGTH < 50) {
+      logger.info({ event: 'migration_remediation_140_exec', message: `Widening printer_nodes.id from VARCHAR(${printerNodesCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(50)` });
+      await connOrDb.query('ALTER TABLE printer_nodes MODIFY COLUMN id VARCHAR(50) NOT NULL');
+    }
+
+    // 2. Check tenant_id length in printhouse_machines
+    const [machinesCols] = await connOrDb.query(`
+      SELECT CHARACTER_MAXIMUM_LENGTH 
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'printhouse_machines' AND COLUMN_NAME = 'tenant_id'
+    `);
+    if (machinesCols && machinesCols[0] && machinesCols[0].CHARACTER_MAXIMUM_LENGTH < 64) {
+      logger.info({ event: 'migration_remediation_140_exec', message: `Widening printhouse_machines.tenant_id from VARCHAR(${machinesCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(64)` });
+      await connOrDb.query('ALTER TABLE printhouse_machines MODIFY COLUMN tenant_id VARCHAR(64) NOT NULL');
+    }
+
+    // 3. Widen tenant_id in other printhouse config tables to VARCHAR(64)
+    const configTables = ['printhouse_media', 'printhouse_policy_profiles', 'printhouse_sla_profiles'];
+    for (const tbl of configTables) {
+      const [tblCols] = await connOrDb.query(`
+        SELECT CHARACTER_MAXIMUM_LENGTH 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'tenant_id'
+      `, [tbl]);
+      if (tblCols && tblCols[0] && tblCols[0].CHARACTER_MAXIMUM_LENGTH < 64) {
+        logger.info({ event: 'migration_remediation_140_exec', message: `Widening ${tbl}.tenant_id from VARCHAR(${tblCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(64)` });
+        await connOrDb.query(`ALTER TABLE ${tbl} MODIFY COLUMN tenant_id VARCHAR(64) NOT NULL`);
+      }
+    }
+  } finally {
+    await connOrDb.query('SET FOREIGN_KEY_CHECKS = 1');
+  }
+  
+  logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed' });
+}
+
 class MigrationService {
     constructor() {
         this.migrationsPath = path.join(__dirname, '../../../migrations');
@@ -136,6 +185,10 @@ class MigrationService {
 
                     const canonicalHash = calculateFileChecksum(m.absolutePath);
                     const content = fs.readFileSync(m.absolutePath, 'utf8');
+
+                    if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
+                        await runMigration140PreRemediation(connection);
+                    }
 
                     logger.info({ event: 'migration_applying', file: m.filename, path: relPath });
 
