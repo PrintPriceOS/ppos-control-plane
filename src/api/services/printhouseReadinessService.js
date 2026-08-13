@@ -287,14 +287,15 @@ class PrinthouseReadinessService {
                 });
             }
 
-            // Count configured site lead times (requiring explicit valid timezone, non-empty workdays, cutoff, and non-negative lead days)
+            // Count configured site lead times (requiring explicit valid timezone, non-empty workdays, cutoff, non-negative lead days, and EXPLICIT_ONBOARDING provenance)
             const leadTimeRows = await db.query(
                 `SELECT COUNT(*) AS cnt FROM printhouse_site_lead_times 
                  WHERE tenant_id = ? 
                    AND timezone IS NOT NULL AND timezone != ''
                    AND workdays_json IS NOT NULL AND workdays_json != '[]' AND workdays_json != ''
                    AND daily_cutoff_time IS NOT NULL AND daily_cutoff_time != ''
-                   AND base_lead_time_days IS NOT NULL AND base_lead_time_days >= 0`,
+                   AND base_lead_time_days IS NOT NULL AND base_lead_time_days >= 0
+                   AND JSON_UNQUOTE(JSON_EXTRACT(custom_rules_json, '$.configuration_source')) = 'EXPLICIT_ONBOARDING'`,
                 [tenantId]
             );
             leadTimesCount = leadTimeRows[0]?.cnt || 0;

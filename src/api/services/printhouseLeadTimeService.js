@@ -103,7 +103,22 @@ class PrinthouseLeadTimeService {
         }
         const baseLeadDays = payload.base_lead_time_days;
 
-        const customRules = payload.custom_rules_json ? JSON.stringify(payload.custom_rules_json) : null;
+        // 5. Attach explicit onboarding provenance to custom_rules_json
+        let customRulesObj = {};
+        if (payload.custom_rules_json) {
+            if (typeof payload.custom_rules_json === 'string') {
+                try {
+                    customRulesObj = JSON.parse(payload.custom_rules_json);
+                } catch (e) {
+                    customRulesObj = {};
+                }
+            } else if (typeof payload.custom_rules_json === 'object' && payload.custom_rules_json !== null) {
+                customRulesObj = { ...payload.custom_rules_json };
+            }
+        }
+        customRulesObj.configuration_source = 'EXPLICIT_ONBOARDING';
+        customRulesObj.configured_at = new Date().toISOString();
+        const customRules = JSON.stringify(customRulesObj);
 
         // Enforce boundary check
         const siteRows = await db.query(

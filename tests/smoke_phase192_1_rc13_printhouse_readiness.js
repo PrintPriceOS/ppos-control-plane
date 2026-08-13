@@ -119,10 +119,18 @@ db.query = async function mockQuery(sql, params = []) {
     const tenantId = params[0];
     const cnt = memoryStore.printhouse_site_lead_times.filter(lt => {
       if (lt.tenant_id !== tenantId) return false;
+      let isExplicit = false;
+      if (lt.custom_rules_json) {
+        try {
+          const parsed = typeof lt.custom_rules_json === 'string' ? JSON.parse(lt.custom_rules_json) : lt.custom_rules_json;
+          isExplicit = parsed && parsed.configuration_source === 'EXPLICIT_ONBOARDING';
+        } catch (e) {}
+      }
       return lt.timezone && lt.timezone.trim() !== '' &&
              lt.workdays_json && lt.workdays_json !== '[]' && lt.workdays_json.trim() !== '' &&
              lt.daily_cutoff_time && lt.daily_cutoff_time.trim() !== '' &&
-             lt.base_lead_time_days !== null && lt.base_lead_time_days !== undefined && lt.base_lead_time_days >= 0;
+             lt.base_lead_time_days !== null && lt.base_lead_time_days !== undefined && lt.base_lead_time_days >= 0 &&
+             isExplicit;
     }).length;
     return [{ cnt }];
   }
@@ -237,7 +245,8 @@ async function runTests() {
     timezone: 'Europe/Madrid',
     workdays_json: '[1,2,3,4,5]',
     daily_cutoff_time: '14:00',
-    base_lead_time_days: 2
+    base_lead_time_days: 2,
+    custom_rules_json: JSON.stringify({ configuration_source: 'EXPLICIT_ONBOARDING', configured_at: new Date().toISOString() })
   });
 
   const readiness5 = await readinessService.computeReadiness(tenantId);

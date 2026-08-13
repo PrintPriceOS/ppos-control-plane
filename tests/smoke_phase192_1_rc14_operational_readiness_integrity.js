@@ -159,10 +159,18 @@ db.query = async function mockQuery(sql, params = []) {
     const tenantId = params[0];
     const cnt = memoryStore.printhouse_site_lead_times.filter(lt => {
       if (lt.tenant_id !== tenantId) return false;
+      let isExplicit = false;
+      if (lt.custom_rules_json) {
+        try {
+          const parsed = typeof lt.custom_rules_json === 'string' ? JSON.parse(lt.custom_rules_json) : lt.custom_rules_json;
+          isExplicit = parsed && parsed.configuration_source === 'EXPLICIT_ONBOARDING';
+        } catch (e) {}
+      }
       return lt.timezone && lt.timezone.trim() !== '' &&
              lt.workdays_json && lt.workdays_json !== '[]' && lt.workdays_json.trim() !== '' &&
              lt.daily_cutoff_time && lt.daily_cutoff_time.trim() !== '' &&
-             lt.base_lead_time_days !== null && lt.base_lead_time_days !== undefined && lt.base_lead_time_days >= 0;
+             lt.base_lead_time_days !== null && lt.base_lead_time_days !== undefined && lt.base_lead_time_days >= 0 &&
+             isExplicit;
     }).length;
     return [{ cnt }];
   }
@@ -304,41 +312,73 @@ async function runTests() {
   console.log('✓ Capacity Validation: Negative, NaN, and out-of-range values strictly rejected');
 
 
-  // ─── PART 2: Lead Times Readiness Hardening ───────────────────────
-  console.log('\n--- 2. Lead Times Readiness Tests ---');
+  // ─── PART 2: Lead Times Readiness Hardening (H1 - H7) ────────────
+  console.log('\n--- 2. Lead Times Readiness Tests (H1 - H7) ---');
 
-  // Test G: No row -> leadTimesCount = 0
+  // H1: No lead-time row -> leadTimesCount = 0
   readiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
-  assert.strictEqual(readiness.leadTimesCount, 0, 'Test G: No row must have leadTimesCount = 0');
-  console.log('✓ Test G: No row -> leadTimesCount = 0');
+  assert.strictEqual(readiness.leadTimesCount, 0, 'H1: No row must have leadTimesCount = 0');
+  console.log('✓ Test H1: No lead-time row -> leadTimesCount = 0');
 
-  // Test H: Obvious empty / default-only invalid artifact -> leadTimesCount = 0
+  // H2: Legacy default tuple WITHOUT explicit provenance: UTC / [1,2,3,4,5] / 14:00 / 3 -> leadTimesCount = 0
   memoryStore.printhouse_site_lead_times.push({
-    id: 'lt-h', printhouse_id: siteId, tenant_id: tenantId,
-    timezone: '', workdays_json: '[]', daily_cutoff_time: '', base_lead_time_days: null
+    id: 'lt-h2', printhouse_id: siteId, tenant_id: tenantId,
+    timezone: 'UTC', workdays_json: '[1,2,3,4,5]', daily_cutoff_time: '14:00',
+    base_lead_time_days: 3, custom_rules_json: null
   });
   readiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
-  assert.strictEqual(readiness.leadTimesCount, 0, 'Test H: Empty artifact must NOT satisfy lead times readiness');
-  console.log('✓ Test H: Obvious empty/invalid artifact -> leadTimesCount = 0');
+  assert.strictEqual(readiness.leadTimesCount, 0, 'H2: Legacy default tuple without explicit provenance must NOT satisfy readiness');
+  console.log('✓ Test H2: Legacy default tuple WITHOUT explicit provenance -> leadTimesCount = 0');
 
-  // Test I: Valid explicit configuration -> leadTimesCount = 1
-  memoryStore.printhouse_site_lead_times[0].timezone = 'Europe/Madrid';
+  // H3: Legacy non-default-looking row WITHOUT explicit provenance -> leadTimesCount = 0
+  // (proves this is provenance-based, not value-blacklisting)
+  memoryStore.printhouse_site_lead_times[0].timezone = 'Europe/London';
+  memoryStore.printhouse_site_lead_times[0].workdays_json = '[1,2,3,4]';
+  memoryStore.printhouse_site_lead_times[0].daily_cutoff_time = '18:00';
+  memoryStore.printhouse_site_lead_times[0].base_lead_time_days = 5;
+  memoryStore.printhouse_site_lead_times[0].custom_rules_json = null;
+  readiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(readiness.leadTimesCount, 0, 'H3: Legacy non-default row without provenance must NOT satisfy readiness');
+  console.log('✓ Test H3: Legacy non-default row WITHOUT explicit provenance -> leadTimesCount = 0 (proves provenance-based)');
+
+  // H4: Explicitly configured row with exactly defaults (UTC / [1,2,3,4,5] / 14:00 / 3) WITH explicit provenance -> leadTimesCount = 1
+  memoryStore.printhouse_site_lead_times[0].timezone = 'UTC';
   memoryStore.printhouse_site_lead_times[0].workdays_json = '[1,2,3,4,5]';
   memoryStore.printhouse_site_lead_times[0].daily_cutoff_time = '14:00';
-  memoryStore.printhouse_site_lead_times[0].base_lead_time_days = 2;
+  memoryStore.printhouse_site_lead_times[0].base_lead_time_days = 3;
+  memoryStore.printhouse_site_lead_times[0].custom_rules_json = JSON.stringify({
+    configuration_source: 'EXPLICIT_ONBOARDING',
+    configured_at: new Date().toISOString()
+  });
   readiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
-  assert.strictEqual(readiness.leadTimesCount, 1, 'Test I: Valid explicit configuration must satisfy lead times readiness');
-  console.log('✓ Test I: Valid explicit configuration -> leadTimesCount = 1');
+  assert.strictEqual(readiness.leadTimesCount, 1, 'H4: Explicit configuration matching default values WITH provenance must satisfy readiness');
+  console.log('✓ Test H4: Explicit configuration matching default values WITH explicit provenance -> leadTimesCount = 1');
 
-  // Lead Times validation tests in setLeadTimes:
-  console.log('\n--- Lead Times Validation Tests ---');
-  // 1. Empty payload
+  // H5: Explicit custom configuration -> leadTimesCount = 1
+  memoryStore.printhouse_site_lead_times[0].timezone = 'Europe/Madrid';
+  memoryStore.printhouse_site_lead_times[0].workdays_json = '[1,2,3,4,5]';
+  memoryStore.printhouse_site_lead_times[0].daily_cutoff_time = '16:30';
+  memoryStore.printhouse_site_lead_times[0].base_lead_time_days = 2;
+  memoryStore.printhouse_site_lead_times[0].custom_rules_json = JSON.stringify({
+    notes: 'Custom express production',
+    configuration_source: 'EXPLICIT_ONBOARDING',
+    configured_at: new Date().toISOString()
+  });
+  readiness = await readinessService._computeOperationalReadiness(tenantId, memoryStore.printer_nodes);
+  assert.strictEqual(readiness.leadTimesCount, 1, 'H5: Explicit custom configuration must satisfy readiness');
+  console.log('✓ Test H5: Explicit custom configuration -> leadTimesCount = 1');
+
+  // H6: Empty payload rejected by setLeadTimes()
+  console.log('\n--- Lead Times Validation Tests (H6 - H7) ---');
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {}),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Empty payload must be rejected'
+    'H6: Empty payload must be rejected'
   );
-  // 2. Invalid timezone
+  console.log('✓ Test H6: Empty payload rejected with INVALID_LEAD_TIME_CONFIGURATION');
+
+  // H7: Invalid timezone / workdays / cutoff / negative lead days rejected
+  // 1. Invalid timezone
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {
       timezone: 'Invalid/NonExistent_Zone',
@@ -347,9 +387,9 @@ async function runTests() {
       base_lead_time_days: 2
     }),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Invalid timezone must be rejected'
+    'H7: Invalid timezone must be rejected'
   );
-  // 3. Empty workdays
+  // 2. Empty workdays
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {
       timezone: 'UTC',
@@ -358,9 +398,9 @@ async function runTests() {
       base_lead_time_days: 2
     }),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Empty workdays array must be rejected'
+    'H7: Empty workdays array must be rejected'
   );
-  // 4. Invalid workday index (e.g. 7)
+  // 3. Invalid workday index
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {
       timezone: 'UTC',
@@ -369,9 +409,9 @@ async function runTests() {
       base_lead_time_days: 2
     }),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Workday index out of 0..6 must be rejected'
+    'H7: Workday index out of 0..6 must be rejected'
   );
-  // 5. Invalid cutoff format
+  // 4. Invalid cutoff format
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {
       timezone: 'UTC',
@@ -380,9 +420,9 @@ async function runTests() {
       base_lead_time_days: 2
     }),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Invalid cutoff time format must be rejected'
+    'H7: Invalid cutoff time format must be rejected'
   );
-  // 6. Negative base_lead_time_days
+  // 5. Negative base_lead_time_days
   await assert.rejects(
     async () => leadTimeService.setLeadTimes(tenantId, siteId, {
       timezone: 'UTC',
@@ -391,10 +431,10 @@ async function runTests() {
       base_lead_time_days: -1
     }),
     /INVALID_LEAD_TIME_CONFIGURATION/,
-    'Negative base_lead_time_days must be rejected'
+    'H7: Negative base_lead_time_days must be rejected'
   );
 
-  // 7. Legitimate explicit configuration succeeds
+  // Legitimate explicit configuration via setLeadTimes persists provenance
   const configured = await leadTimeService.setLeadTimes(tenantId, siteId, {
     timezone: 'Europe/Paris',
     workdays_json: [1, 2, 3, 4, 5],
@@ -403,7 +443,9 @@ async function runTests() {
   });
   assert.ok(configured, 'Legitimate lead times configuration must succeed');
   assert.strictEqual(configured.timezone, 'Europe/Paris');
-  console.log('✓ Lead Times Validation: Empty payloads, invalid timezone/workdays/cutoff/negative days rejected');
+  const storedCustom = JSON.parse(configured.custom_rules_json);
+  assert.strictEqual(storedCustom.configuration_source, 'EXPLICIT_ONBOARDING');
+  console.log('✓ Test H7: Invalid timezone/workdays/cutoff/negative days rejected, legitimate write persists EXPLICIT_ONBOARDING');
 
 
   // ─── PART 3: Full Readiness Invariants & Non-Authorizing Safety ───
