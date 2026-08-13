@@ -1,8 +1,8 @@
 # docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md
 
-## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC2)
+## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC3)
 
-### Version: 2.0 — 2026-08-13
+### Version: 3.0 — 2026-08-13
 **Status**: APPROVED FOR STAGE 1 COHORT BETA USE ONLY
 
 ---
@@ -17,27 +17,64 @@ Current target server database state:
 - All triggers in 136 are **NOT** present.
 - Migrations 137–145 are **NOT** applied.
 
+Additionally, database credentials exposed during diagnostics must be rotated immediately before restarting production node runtimes.
+
 ---
 
 ## 2. Intended Production Recovery Sequence
 
 Follow this runbook step-by-step. Do not bypass any verification checks.
 
-### Step 1: Deploy Release Candidate 2 (RC2)
+### Step 1: Rotate MySQL Credentials Outside Git
+Connect to the production MySQL server host and run the rotation query:
+```sql
+ALTER USER 'controlplane'@'localhost' IDENTIFIED BY 'NEW_COMPLEX_PASSWORD';
+FLUSH PRIVILEGES;
+```
+*Note: Replace `NEW_COMPLEX_PASSWORD` with a newly-generated cryptographically secure password. Do NOT commit this password to git.*
+
+### Step 2: Update Production .env Config Outside Git
+Edit the untracked `.env` file on the production host to update database connection strings:
+```bash
+# Update both discrete password variable and DATABASE_URL
+DATABASE_URL=mysql://controlplane:NEW_COMPLEX_PASSWORD@localhost:3306/Control
+MYSQL_PASSWORD=NEW_COMPLEX_PASSWORD
+```
+
+Verify that the local node can connect to MySQL with the new password:
+```bash
+node -e "const db = require('./src/api/services/mysqlClient'); db.query('SELECT 1').then(() => console.log('Connected!')).catch(console.error)"
+```
+
+### Step 3: Fetch and Deploy Release Candidate 3 (RC3)
 Check out the corrected release candidate codebase on the target node:
 ```bash
 git fetch origin
-git checkout tags/phase-192-controlled-beta-rc2
+git checkout tags/phase-192-controlled-beta-rc3
 ```
 
-### Step 2: Local Integrity & Checksum Verification
+Verify that tag and HEAD point to the exact same commit:
+```bash
+git rev-parse HEAD
+git rev-list -n 1 phase-192-controlled-beta-rc3
+```
+*Expected: Identical commit SHAs.*
+
+### Step 4: Run Node Dependency and Build Bootstraps
+Verify dependencies and build the static frontend bundle:
+```bash
+npm ci
+npm run build
+```
+
+### Step 5: Local Integrity & Checksum Verification
 Validate that all local migration files match the baseline registry:
 ```bash
 npm run migration:integrity
 ```
 *Expected Output:* `Phase 183: PASSED`
 
-### Step 3: Run Database Dry-Run Diagnostic
+### Step 6: Run Database Dry-Run Diagnostic
 Check the ledger status before executing any database mutations:
 ```bash
 node scripts/run_control_plane_migrations.js --dry-run
@@ -47,7 +84,7 @@ node scripts/run_control_plane_migrations.js --dry-run
 - Ledger status: `PENDING_MIGRATIONS` (Since `PPOS_ALLOW_MIGRATION_RETRY=true` allows retry of the failed migration).
 - Exit Code: `2` (Pending migrations exist)
 
-### Step 4: Perform Explicit Governed Retry
+### Step 7: Perform Explicit Governed Retry
 Execute the migrations with retry governance enabled:
 ```bash
 # Set explicit retry authorization environment variable
@@ -68,7 +105,7 @@ node scripts/run_control_plane_migrations.js
 9. On success, it marks migration 136 as `APPLIED`.
 10. The engine proceeds to apply pending migrations 137–145 in numerical order.
 
-### Step 5: Verification of applied migrations
+### Step 8: Verification of Applied Migrations
 Confirm that all 145 migrations are marked as `APPLIED` in the ledger:
 ```bash
 node scripts/run_control_plane_migrations.js --dry-run
@@ -85,10 +122,10 @@ SHOW COLUMNS FROM orders LIKE 'active_pricing_snapshot_id';
 SHOW TRIGGERS LIKE 'order_pricing_snapshots';
 ```
 
-### Step 6: Restart Runtime
-Restart the application node(s) to reload the fresh schema mapping and verify the readiness probe:
+### Step 9: Restart PM2 and Verify Readiness
+Update PM2 environment and restart the runtime process:
 ```bash
-pm2 restart all
+pm2 restart all --update-env
 curl http://127.0.0.1:8081/api/admin/runtime/health
 ```
 
@@ -98,4 +135,4 @@ curl http://127.0.0.1:8081/api/admin/runtime/health
 Once all migrations reach the `APPLIED` state, no historic migration files (001–145) may be modified. Any future schema alterations must use a new sequential file (146+).
 
 ---
-**RUNBOOK_VERSION**: 2.0
+**RUNBOOK_VERSION**: 3.0
