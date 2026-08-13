@@ -41,43 +41,68 @@ async function ensurePreviousFailuresColumn(connOrDb) {
 async function runMigration140PreRemediation(connOrDb) {
   logger.info({ event: 'migration_remediation_140_start', message: 'Evaluating governed schema normalization pre-remediation for migration 140' });
   
+  // Define target mappings: Table -> Column -> { targetLength, targetCharset, targetCollation }
+  const targets = {
+    printer_nodes: {
+      id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_machines: {
+      id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      printhouse_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_media: {
+      printhouse_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_policy_profiles: {
+      printhouse_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_sla_profiles: {
+      printhouse_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    materials_catalog: {
+      id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    }
+  };
+
   // Disable FK checks to allow alter
   await connOrDb.query('SET FOREIGN_KEY_CHECKS = 0');
   
   try {
-    // 1. Check printer_nodes.id length
-    const [printerNodesCols] = await connOrDb.query(`
-      SELECT CHARACTER_MAXIMUM_LENGTH 
-      FROM information_schema.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'printer_nodes' AND COLUMN_NAME = 'id'
-    `);
-    if (printerNodesCols && printerNodesCols[0] && printerNodesCols[0].CHARACTER_MAXIMUM_LENGTH < 50) {
-      logger.info({ event: 'migration_remediation_140_exec', message: `Widening printer_nodes.id from VARCHAR(${printerNodesCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(50)` });
-      await connOrDb.query('ALTER TABLE printer_nodes MODIFY COLUMN id VARCHAR(50) NOT NULL');
-    }
-
-    // 2. Check tenant_id length in printhouse_machines
-    const [machinesCols] = await connOrDb.query(`
-      SELECT CHARACTER_MAXIMUM_LENGTH 
-      FROM information_schema.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'printhouse_machines' AND COLUMN_NAME = 'tenant_id'
-    `);
-    if (machinesCols && machinesCols[0] && machinesCols[0].CHARACTER_MAXIMUM_LENGTH < 64) {
-      logger.info({ event: 'migration_remediation_140_exec', message: `Widening printhouse_machines.tenant_id from VARCHAR(${machinesCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(64)` });
-      await connOrDb.query('ALTER TABLE printhouse_machines MODIFY COLUMN tenant_id VARCHAR(64) NOT NULL');
-    }
-
-    // 3. Widen tenant_id in other printhouse config tables to VARCHAR(64)
-    const configTables = ['printhouse_media', 'printhouse_policy_profiles', 'printhouse_sla_profiles'];
-    for (const tbl of configTables) {
-      const [tblCols] = await connOrDb.query(`
-        SELECT CHARACTER_MAXIMUM_LENGTH 
-        FROM information_schema.COLUMNS 
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'tenant_id'
-      `, [tbl]);
-      if (tblCols && tblCols[0] && tblCols[0].CHARACTER_MAXIMUM_LENGTH < 64) {
-        logger.info({ event: 'migration_remediation_140_exec', message: `Widening ${tbl}.tenant_id from VARCHAR(${tblCols[0].CHARACTER_MAXIMUM_LENGTH}) to VARCHAR(64)` });
-        await connOrDb.query(`ALTER TABLE ${tbl} MODIFY COLUMN tenant_id VARCHAR(64) NOT NULL`);
+    for (const [table, columns] of Object.entries(targets)) {
+      for (const [column, spec] of Object.entries(columns)) {
+        // Query current column definition
+        const [cols] = await connOrDb.query(`
+          SELECT CHARACTER_MAXIMUM_LENGTH, CHARACTER_SET_NAME, COLLATION_NAME, IS_NULLABLE
+          FROM information_schema.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+        `, [table, column]);
+        
+        if (cols && cols[0]) {
+          const current = cols[0];
+          const needsLengthWiden = current.CHARACTER_MAXIMUM_LENGTH < spec.length;
+          const needsCharsetConvert = current.CHARACTER_SET_NAME !== spec.charset || current.COLLATION_NAME !== spec.collation;
+          
+          if (needsLengthWiden || needsCharsetConvert) {
+            const nullability = current.IS_NULLABLE === 'YES' ? 'NULL' : 'NOT NULL';
+            logger.info({ 
+              event: 'migration_remediation_140_exec', 
+              table, 
+              column, 
+              message: `Normalizing ${table}.${column} to VARCHAR(${spec.length}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability} (was VARCHAR(${current.CHARACTER_MAXIMUM_LENGTH}) ${current.CHARACTER_SET_NAME}/${current.COLLATION_NAME})`
+            });
+            
+            await connOrDb.query(`
+              ALTER TABLE ${table} 
+              MODIFY COLUMN ${column} VARCHAR(${spec.length}) CHARACTER SET ${spec.charset} COLLATE ${spec.collation} ${nullability}
+            `);
+          }
+        }
       }
     }
   } finally {

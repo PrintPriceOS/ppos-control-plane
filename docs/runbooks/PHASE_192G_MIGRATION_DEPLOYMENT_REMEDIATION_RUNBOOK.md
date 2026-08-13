@@ -1,8 +1,8 @@
 # docs/runbooks/PHASE_192G_MIGRATION_DEPLOYMENT_REMEDIATION_RUNBOOK.md
 
-## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC4)
+## Phase 192G — Migration Engine Remediation & Recovery Runbook (RC5)
 
-### Version: 4.0 — 2026-08-13
+### Version: 5.0 — 2026-08-13
 **Status**: APPROVED FOR STAGE 1 COHORT BETA USE ONLY
 
 ---
@@ -45,17 +45,17 @@ Verify that the local node can connect to MySQL with the new password:
 node -e "const db = require('./src/api/services/mysqlClient'); db.query('SELECT 1').then(() => console.log('Connected!')).catch(console.error)"
 ```
 
-### Step 3: Fetch and Deploy Release Candidate 4 (RC4)
+### Step 3: Fetch and Deploy Release Candidate 5 (RC5)
 Check out the corrected release candidate codebase on the target node:
 ```bash
 git fetch origin
-git checkout tags/phase-192-controlled-beta-rc4
+git checkout tags/phase-192-controlled-beta-rc5
 ```
 
 Verify that tag and HEAD point to the exact same commit:
 ```bash
 git rev-parse HEAD
-git rev-list -n 1 phase-192-controlled-beta-rc4
+git rev-list -n 1 phase-192-controlled-beta-rc5
 ```
 *Expected: Identical commit SHAs.*
 

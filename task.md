@@ -1261,15 +1261,19 @@ UNRESTRICTED_PRODUCTION:
 
 ---
 
-## Phase 192 — RC4 Migration 140 Schema Compatibility
+## Phase 192 — RC5 Migration 140 Exact Schema Compatibility
 **STATUS: REMEDIATED / VALIDATED**
-- Diagnosed failure of migration 140 on production due to key width mismatches (e.g. `printhouse_machines.tenant_id` being `VARCHAR(50)` while `printhouse_machine_materials` uses `VARCHAR(64)`).
-- Implemented `runMigration140PreRemediation` inside `migrationService.js` to automatically and safely widen key columns:
-  - `printer_nodes.id` to `VARCHAR(50)`
-  - `printhouse_machines.tenant_id` to `VARCHAR(64)`
-  - `printhouse_media.tenant_id`, `printhouse_policy_profiles.tenant_id`, `printhouse_sla_profiles.tenant_id` to `VARCHAR(64)`
-- Verified recovery against a real MySQL 8 container with actual data widening, foreign keys activation, and subsequent migrations execution.
-- Pushed tag `phase-192-controlled-beta-rc4` to origin.
+- Diagnosed failure of migration 140 on production due to combined key width mismatches (e.g. `printhouse_machines.tenant_id` being `VARCHAR(50)` vs new capacity tables using `VARCHAR(64)`) and character set/collation incompatibilities (e.g. legacy tables using `utf8mb3`/`utf8mb3_general_ci` vs new capacity tables using `utf8mb4`/`utf8mb4_unicode_ci`).
+- Implemented `runMigration140PreRemediation` inside `migrationService.js` to automatically, safely, and dynamically normalize both key width and character set/collation for:
+  - `printer_nodes` (id, tenant_id)
+  - `printhouse_machines` (id, printhouse_id, tenant_id)
+  - `printhouse_media` (printhouse_id, tenant_id)
+  - `printhouse_policy_profiles` (printhouse_id, tenant_id)
+  - `printhouse_sla_profiles` (printhouse_id, tenant_id)
+  - `materials_catalog` (id, tenant_id)
+- Verified recovery against a real MySQL 8 container with exact production charset/collation configuration, replicating and passing both Phase 139 and Phase 140 foreign key verifications.
+- Pushed tag `phase-192-controlled-beta-rc5` to origin.
+
 
 
 
