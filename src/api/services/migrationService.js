@@ -214,6 +214,37 @@ async function runMigration140PreRemediation(connOrDb) {
     throw new Error(`INTERNAL ASSERTION FAILED: EXPECTED_FKS array has ${EXPECTED_FKS.length} entries, expected ${EXPECTED_FK_COUNT}.`);
   }
 
+  // Recognized optional FKs from partial migration 141
+  const RECOGNIZED_141_FKS = [
+    {
+      name: 'printhouse_pricing_rules_ibfk_3',
+      childTable: 'printhouse_pricing_rules',
+      childCols: ['site_id', 'tenant_id'],
+      parentTable: 'printer_nodes',
+      parentCols: ['id', 'tenant_id'],
+      onUpdate: 'NO ACTION',
+      onDelete: 'CASCADE'
+    },
+    {
+      name: 'printhouse_pricing_rules_ibfk_4',
+      childTable: 'printhouse_pricing_rules',
+      childCols: ['machine_id', 'tenant_id'],
+      parentTable: 'printhouse_machines',
+      parentCols: ['id', 'tenant_id'],
+      onUpdate: 'NO ACTION',
+      onDelete: 'CASCADE'
+    },
+    {
+      name: 'printhouse_pricing_rules_ibfk_5',
+      childTable: 'printhouse_pricing_rules',
+      childCols: ['material_catalog_id', 'tenant_id'],
+      parentTable: 'materials_catalog',
+      parentCols: ['id', 'tenant_id'],
+      onUpdate: 'NO ACTION',
+      onDelete: 'CASCADE'
+    }
+  ];
+
   // Read current FK graph from database
   const [fkRows] = await connOrDb.query(`
     SELECT 
@@ -276,6 +307,34 @@ async function runMigration140PreRemediation(connOrDb) {
       errors.push(`DELETE_RULE: observed '${actual.onDelete}', expected '${expected.onDelete}'`);
     }
     return errors;
+  }
+
+  // Fail closed on any unexpected incoming FK to normalized parents
+  const normalizedParentTables = new Set(['printer_nodes', 'printhouse_machines', 'materials_catalog']);
+  const allowedFkNames = new Set([...EXPECTED_FKS.map(fk => fk.name), ...RECOGNIZED_141_FKS.map(fk => fk.name)]);
+
+  for (const [fkName, fkDef] of Object.entries(actualFks)) {
+    if (normalizedParentTables.has(fkDef.parentTable)) {
+      if (!allowedFkNames.has(fkName)) {
+        throw new Error(
+          `PRECONDITION FAILED: Unexpected incoming foreign key '${fkName}' on '${fkDef.childTable}' referencing parent '${fkDef.parentTable}'.`
+        );
+      }
+    }
+  }
+
+  // Audit any present recognized 141 FK definitions
+  const recognized141Errors = [];
+  for (const exp141 of RECOGNIZED_141_FKS) {
+    if (actualFks[exp141.name]) {
+      const defErrors = auditFkDefinition(exp141, actualFks[exp141.name]);
+      if (defErrors.length > 0) {
+        recognized141Errors.push(`Mismatch on recognized 141 FK '${exp141.name}': ${defErrors.join('; ')}`);
+      }
+    }
+  }
+  if (recognized141Errors.length > 0) {
+    throw new Error(`PRECONDITION FAILED: Recognized 141 foreign key definition mismatches:\n  ${recognized141Errors.join('\n  ')}`);
   }
 
   // Retrieve current remediation state
@@ -354,7 +413,7 @@ async function runMigration140PreRemediation(connOrDb) {
     throw new Error(`PRECONDITION FAILED: Database is in an unexpected remediation state: '${remediationStatus}'. Manual intervention required.`);
   }
 
-  // Target column specifications for all 15 tables / 22 columns
+  // Target column specifications for all 15 tables / 22 columns + printhouse_pricing_rules
   const allTargets = {
     printer_nodes: {
       id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
@@ -407,17 +466,23 @@ async function runMigration140PreRemediation(connOrDb) {
     },
     routing_history: {
       printer_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
+    },
+    printhouse_pricing_rules: {
+      site_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      machine_id: { length: 50, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      material_catalog_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' },
+      tenant_id: { length: 64, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' }
     }
   };
 
   // Only drop FKs that are still present (idempotent — safe for IN_PROGRESS retry)
-  const activeFksToDrop = EXPECTED_FKS.filter(fk => actualFks[fk.name]);
+  const activeFksToDrop = [...EXPECTED_FKS, ...RECOGNIZED_141_FKS].filter(fk => actualFks[fk.name]);
 
   // Set FOREIGN_KEY_CHECKS = 0 strictly for dropping constraints and modifying columns
   await connOrDb.query('SET FOREIGN_KEY_CHECKS = 0');
 
   try {
-    // 4. Drop legacy FK constraints (only those still present)
+    // 4. Drop legacy and recognized 141 FK constraints (only those still present)
     for (const fk of activeFksToDrop) {
       logger.info({ event: 'migration_remediation_140_drop_fk', constraintName: fk.name, table: fk.childTable, message: `Dropping foreign key constraint ${fk.name} on ${fk.childTable}` });
       await connOrDb.query(`ALTER TABLE ${fk.childTable} DROP FOREIGN KEY ${fk.name}`);
@@ -489,14 +554,42 @@ async function runMigration140PreRemediation(connOrDb) {
     }
   }
 
+  // Check orphans for recognized 141 FKs if printhouse_pricing_rules exists
+  const [pricingRulesTableCheck] = await connOrDb.query(`
+    SELECT TABLE_NAME FROM information_schema.TABLES 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'printhouse_pricing_rules'
+  `);
+  const pricingRulesExists = pricingRulesTableCheck && pricingRulesTableCheck.length > 0;
+
+  if (pricingRulesExists) {
+    for (const fk of RECOGNIZED_141_FKS) {
+      const nullableCol = fk.childCols[0]; // site_id, machine_id, material_catalog_id
+      const joinParts = [];
+      for (let i = 0; i < fk.childCols.length; i++) {
+        joinParts.push(`c.${fk.childCols[i]} = p.${fk.parentCols[i]}`);
+      }
+      const joinCondition = joinParts.join(' AND ');
+
+      const [orphanRows] = await connOrDb.query(`
+        SELECT COUNT(*) as count 
+        FROM ${fk.childTable} c 
+        LEFT JOIN ${fk.parentTable} p ON ${joinCondition}
+        WHERE c.${nullableCol} IS NOT NULL AND p.${fk.parentCols[0]} IS NULL
+      `);
+
+      const count = orphanRows && orphanRows[0] ? orphanRows[0].count : 0;
+      if (count > 0) {
+        orphanErrors.push(`Recognized 141 constraint '${fk.name}' on '${fk.childTable}' has ${count} orphan rows referencing '${fk.parentTable}'`);
+      }
+    }
+  }
+
   if (orphanErrors.length > 0) {
     await connOrDb.query(
       `INSERT INTO ppos_remediation_state (state_key, state_value) VALUES ('remediation_140_status', 'FAILED_ORPHAN') ON DUPLICATE KEY UPDATE state_value = 'FAILED_ORPHAN'`
     );
     throw new Error(`ORPHAN CHECK FAILED: ${orphanErrors.join('; ')}`);
   }
-
-
 
   // 7. FK RECREATION WITH CHECKS ENABLED
   const [fkChecks] = await connOrDb.query('SELECT @@FOREIGN_KEY_CHECKS as fk_checks');
@@ -505,8 +598,13 @@ async function runMigration140PreRemediation(connOrDb) {
     throw new Error(`PRECONDITION FAILED: FOREIGN_KEY_CHECKS must be 1 before FK recreation, observed ${activeFkCheckVal}`);
   }
 
+  const allGovernedFksToRecreate = [...EXPECTED_FKS];
+  if (pricingRulesExists) {
+    allGovernedFksToRecreate.push(...RECOGNIZED_141_FKS);
+  }
+
   const recreationErrors = [];
-  for (const fk of EXPECTED_FKS) {
+  for (const fk of allGovernedFksToRecreate) {
     try {
       const [checkFk] = await connOrDb.query(`
         SELECT CONSTRAINT_NAME 
@@ -542,7 +640,7 @@ async function runMigration140PreRemediation(connOrDb) {
   // Clean up state table on success
   await connOrDb.query(`DROP TABLE IF EXISTS ppos_remediation_state`);
 
-  logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed (RC7)' });
+  logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed (RC7/RC11)' });
 }
 
 class MigrationService {
