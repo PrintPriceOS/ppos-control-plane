@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     SIG_KEYS, COLOUR_KEYS, SECTIONS, COUNTRIES, BINDING_CONFIGS, 
-    BindingKey, PrinthouseRates, BySection, ByColour, BySignature, EMPTY_RATES 
+    BindingKey, PrinthouseRates, BySection, ByColour, BySignature, EMPTY_RATES, emptyBySection 
 } from '../../../pages/os/PrinthousesPage';
 import { 
     SUGGESTED_RATES_METADATA, BINDING_TS_STEP_MEANS, COMMON_OPERATIONAL_CONFIG 
