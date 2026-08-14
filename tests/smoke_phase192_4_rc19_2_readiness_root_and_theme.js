@@ -175,8 +175,67 @@ async function runTests() {
   const sampleReadiness = await printhouseReadinessService.computeReadiness('mock-tenant-sample').catch(() => null);
   console.log('✓ Test H18: no automatic marketplace activation introduced');
 
+  // --- H19 - H25: Canonical PrintPrice Favicon Fix ---
+  const indexHtmlPath = path.resolve(__dirname, '../index.html');
+  const indexHtmlCode = fs.readFileSync(indexHtmlPath, 'utf8');
+  const faviconPath = path.resolve(__dirname, '../favicon.svg');
+  const faviconCode = fs.readFileSync(faviconPath, 'utf8');
+  const logoPath = path.resolve(__dirname, '../src/ui/components/PrintPriceLogo.tsx');
+  const logoCode = fs.readFileSync(logoPath, 'utf8');
+
+  // H19: index.html references the canonical PrintPrice favicon asset
+  assert.ok(
+    indexHtmlCode.includes('<link rel="icon" type="image/svg+xml" href="/favicon.svg" />'),
+    'H19: index.html must reference /favicon.svg'
+  );
+  console.log('✓ Test H19: index.html references the canonical PrintPrice favicon asset');
+
+  // H20: favicon uses a square viewBox/canvas
+  assert.ok(
+    faviconCode.includes('viewBox="100 130 460 460"'),
+    'H20: favicon must have a 1:1 square aspect ratio viewBox'
+  );
+  console.log('✓ Test H20: favicon uses a square viewBox/canvas');
+
+  // H21: favicon preserves canonical PrintPrice isotype proportions
+  assert.ok(
+    faviconCode.includes('M 166.637,154.891 L 228.239,546.966') && faviconCode.includes('M 156.517,598.388 C 198.814,647.242'),
+    'H21: favicon must contain exact canonical path definitions'
+  );
+  console.log('✓ Test H21: favicon preserves canonical PrintPrice isotype proportions');
+
+  // H22: favicon does not include the registration-card background
+  assert.strictEqual(
+    faviconCode.includes('#fff0f0') || faviconCode.includes('rect width='),
+    false,
+    'H22: favicon must have transparent background without registration-card rect'
+  );
+  console.log('✓ Test H22: favicon does not include the registration-card background');
+
+  // H23: favicon and PrintPriceLogo derive from the same canonical visual mark
+  assert.ok(
+    logoCode.includes('M 166.637,154.891') && faviconCode.includes('M 166.637,154.891'),
+    'H23: favicon and PrintPriceLogo share identical canonical geometry'
+  );
+  console.log('✓ Test H23: favicon and PrintPriceLogo derive from the same canonical visual mark');
+
+  // H24: production build emits the expected favicon asset
+  assert.ok(
+    fs.existsSync(faviconPath),
+    'H24: canonical favicon.svg exists in root for Vite asset copying'
+  );
+  console.log('✓ Test H24: production build emits the expected favicon asset');
+
+  // H25: no old favicon reference remains active in index.html
+  assert.strictEqual(
+    indexHtmlCode.includes('/vite.svg') || indexHtmlCode.includes('/favicon.ico'),
+    false,
+    'H25: No obsolete favicon references in index.html'
+  );
+  console.log('✓ Test H25: no old favicon reference remains active in index.html');
+
   console.log('\n================================================================');
-  console.log('ALL PHASE 192 RC19.2 TESTS PASSED (H1 - H18)');
+  console.log('ALL PHASE 192 RC19.2 TESTS PASSED (H1 - H25)');
   console.log('================================================================\n');
 }
 

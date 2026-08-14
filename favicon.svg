@@ -1,5 +1,14 @@
-<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="28" cy="28" r="18" fill="#dc0000" />
-  <path d="M 19 90 L 32 25 H 55 A 35 20 0 0 1 55 65 H 42 L 37 90 Z" fill="#dc0000" />
-  <path d="M 48.2 34 H 55 A 26 11 0 0 1 55 56 H 43.8 Z" fill="#ffffff" />
+<svg viewBox="100 130 460 460" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g id="Document" fill="none" stroke="black" fontFamily="Times New Roman" fontSize="16" transform="scale(1 -1)">
+    <g id="Spread" transform="translate(0 -792)">
+      <g id="Layer 1">
+        <path d="M 166.637,154.891 L 228.239,546.966 L 362.138,546.966 L 362.138,546.91 L 386.19,547.675 C 414.353,546.868 442.894,540.857 468.485,528.494 C 504.928,510.893 532.674,481.27 539.836,443.187 C 547.145,404.313 531.043,367.105 500.932,339.813 C 478.593,319.561 450.331,305.99 420.686,298.533 L 402.903,294.817 L 380.919,154.891 L 166.637,154.891 Z" stroke="none" fill="#dc0000" strokeLinejoin="miter" markerStart="none" markerEnd="none"/>
+        <path d="M 156.517,598.388 C 198.814,647.242 272.791,652.564 321.645,610.268 C 370.499,567.971 375.822,493.994 333.525,445.14 C 291.228,396.286 217.251,390.963 168.397,433.26 C 119.543,475.557 114.221,549.534 156.517,598.388 Z" fill="#dc0000" stroke="none" strokeLinejoin="miter" markerStart="none" markerEnd="none"/>
+        <g id="Group" fill="#ffffff" strokeLinejoin="miter" stroke="none">
+          <path d="M 215.926,197.04 L 264.285,504.817 L 362.138,504.817 C 392.928,505.712 424.099,503.128 450.152,490.542 C 505.719,463.699 515.784,410.162 472.626,371.045 C 446.302,347.183 406.221,334.172 366.353,333.744 L 344.873,197.04 L 215.926,197.04 Z" markerStart="none" markerEnd="none"/>
+        </g>
+      </g>
+    </g>
+  </g>
 </svg>
+
