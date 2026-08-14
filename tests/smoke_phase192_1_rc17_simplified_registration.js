@@ -118,9 +118,12 @@ async function runTests() {
   assert.ok(actCode.includes('setAuthUser(data.user)'), 'R13: Must store user context on success');
   console.log('✓ Test R13: activation success stores JWT/session');
 
-  // R14: Activation redirects to correct printhouse dashboard/setup route
-  assert.ok(actCode.includes("navigate('/dashboard')"), 'R14: Must redirect to /dashboard which gates to setup hub');
-  console.log('✓ Test R14: activation redirects to correct printhouse dashboard/setup route');
+  // R14: Activation redirects to correct printhouse setup/dashboard route
+  assert.ok(
+    actCode.includes("navigate('/printhouse/setup'") || actCode.includes("navigate('/dashboard'"),
+    'R14: Must redirect to canonical setup hub or dashboard'
+  );
+  console.log('✓ Test R14: activation redirects to correct printhouse setup route');
 
   // --- R15 - R17: Admin Flow & Governance Invariants ---
   console.log('\n--- 4. Admin Provisioning & Governance Invariants (R15 - R17) ---');

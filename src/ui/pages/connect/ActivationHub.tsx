@@ -54,38 +54,9 @@ export const ActivationHub: React.FC = () => {
         setIsModalOpen(false);
     };
 
-    const handleGoToDashboard = async () => {
-        setIsVerifying(true);
-        try {
-            // Optimistic local update so the guard allows us through
-            const user = getAuthUser();
-            if (user) {
-                const updatedUser = { 
-                    ...user, 
-                    metadata: { ...(user.metadata || {}), orchestration_status: 'VERIFIED' } 
-                };
-                setAuthUser(updatedUser);
-            }
-            
-            // Close modal immediately so UI does not stay in blocking modal state
-            setIsModalOpen(false);
-
-            // Optional verification signal to backend
-            try {
-                await fetch('/api/auth/printhouse/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            } catch {
-                // Ignore network errors on optional verify ping
-            }
-
-            navigate('/dashboard', { replace: true });
-        } catch {
-            navigate('/dashboard', { replace: true });
-        } finally {
-            setIsVerifying(false);
-        }
+    const handleGoToDashboard = () => {
+        setIsModalOpen(false);
+        navigate('/dashboard', { replace: true });
     };
 
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');

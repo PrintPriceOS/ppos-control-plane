@@ -6,9 +6,15 @@ interface VerifiedBadgeModalProps {
     isOpen: boolean;
     onClose: () => void;
     onGoToDashboard: () => void;
+    isGovernedVerified?: boolean;
 }
 
-export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, onClose, onGoToDashboard }) => {
+export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    onGoToDashboard,
+    isGovernedVerified = false
+}) => {
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
     return (
@@ -36,7 +42,7 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
                             borderRadius: '24px',
                             padding: '48px',
                             textAlign: 'center',
-                            maxWidth: '400px',
+                            maxWidth: '420px',
                             width: '90%',
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
                         }}
@@ -62,7 +68,7 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
                             color: isDark ? '#ffffff' : '#0f172a',
                             marginBottom: '12px'
                         }}>
-                            Verified Partner
+                            {isGovernedVerified ? 'Verified Partner' : 'Workspace Activated'}
                         </h2>
                         
                         <p style={{ 
@@ -71,12 +77,15 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
                             marginBottom: '32px',
                             lineHeight: 1.5
                         }}>
-                            Your node is fully provisioned and securely integrated. You are now ready to receive automated orders from the PrintPrice Marketplace.
+                            {isGovernedVerified 
+                                ? 'Your node is fully provisioned and securely integrated. You are now authorized to receive automated orders from the PrintPrice Marketplace.'
+                                : 'Your PrintPrice workspace has been created. Complete your guided printhouse setup to configure machines, paper materials, lead times, and commercial pricing.'
+                            }
                         </p>
 
                         <button
                             type="button"
-                            aria-label="Go to Dashboard"
+                            aria-label={isGovernedVerified ? "Go to Dashboard" : "Start Printhouse Setup"}
                             onClick={onGoToDashboard}
                             style={{
                                 width: '100%',
@@ -94,7 +103,7 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
                             onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                             onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                         >
-                            Go to Dashboard
+                            {isGovernedVerified ? 'Go to Dashboard' : 'Start Printhouse Setup'}
                         </button>
                     </motion.div>
                 </div>
@@ -102,3 +111,4 @@ export const VerifiedBadgeModal: React.FC<VerifiedBadgeModalProps> = ({ isOpen, 
         </AnimatePresence>
     );
 };
+

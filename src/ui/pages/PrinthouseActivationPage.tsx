@@ -84,7 +84,7 @@ export const PrinthouseActivationPage: React.FC = () => {
                 if (data.user) setAuthUser(data.user);
 
                 setTimeout(() => {
-                    navigate('/dashboard');
+                    navigate('/printhouse/setup', { replace: true });
                 }, 1500);
             } else {
                 setStatus('ERROR');
