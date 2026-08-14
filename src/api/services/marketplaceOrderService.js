@@ -455,6 +455,8 @@ class MarketplaceOrderService {
             status,
             tenantId,
             printhouseId,
+            allowedPrinthouseIds,
+            search,
             limit = 50,
             offset = 0
         } = filters;
@@ -462,17 +464,42 @@ class MarketplaceOrderService {
         let sql = `SELECT * FROM marketplace_orders WHERE 1=1`;
         const params = [];
 
+        // Phase 192 RC20.2: Enforce strict Printhouse Assignment isolation
+        if (allowedPrinthouseIds !== undefined) {
+            if (Array.isArray(allowedPrinthouseIds) && allowedPrinthouseIds.length > 0) {
+                const placeholders = allowedPrinthouseIds.map(() => '?').join(', ');
+                sql += ` AND printhouse_id IN (${placeholders})`;
+                params.push(...allowedPrinthouseIds);
+            } else {
+                // If a printhouse user has 0 printer nodes or empty list, they must see 0 orders (fail-closed)
+                sql += ` AND 1=0`;
+            }
+        } else if (printhouseId) {
+            sql += ` AND printhouse_id = ?`;
+            params.push(printhouseId);
+        } else if (tenantId && !filters.isSuperAdmin) {
+            // General Tenant isolation for non-printhouse actors (e.g. buyer tenant)
+            sql += ` AND tenant_id = ?`;
+            params.push(tenantId);
+        }
+
         if (status) {
             sql += ` AND status = ?`;
             params.push(status);
         }
-        if (tenantId) {
-            sql += ` AND tenant_id = ?`;
-            params.push(tenantId);
-        }
-        if (printhouseId) {
-            sql += ` AND printhouse_id = ?`;
-            params.push(printhouseId);
+
+        // Phase 192 RC20.2: Server-side search filtering within authorized boundary
+        if (search && typeof search === 'string' && search.trim().length > 0) {
+            const searchPattern = `%${search.trim()}%`;
+            sql += ` AND (
+                order_id LIKE ? 
+                OR pricing_session_id LIKE ? 
+                OR selected_offer_id LIKE ? 
+                OR customer_id LIKE ? 
+                OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.name')) LIKE ? 
+                OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.email')) LIKE ?
+            )`;
+            params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;

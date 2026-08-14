@@ -15,17 +15,27 @@ router.get('/packages', async (req, res) => {
         console.log('[PRINTHOUSE_HANDOFF_PACKAGES_LIST_REQUEST]', req.query);
         const { resolveActorContext } = require('../middleware/auth');
         const context = resolveActorContext(req);
+        const handoffService = require('../services/marketplacePrinthouseHandoffService');
         
-        let targetPrinthouseId = req.query.printhouseId;
-        if (context.isPrinthouseUser) {
-            targetPrinthouseId = context.printhouseId;
+        const filters = {
+            status: req.query.status
+        };
+
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            const db = require('../services/mysqlClient');
+            const nodes = await db.query(
+                'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"',
+                [context.tenantId]
+            );
+            const nodeIds = nodes.map(n => n.id);
+            if (context.printhouseId && !nodeIds.includes(context.printhouseId)) {
+                nodeIds.push(context.printhouseId);
+            }
+            filters.allowedPrinthouseIds = nodeIds;
+        } else if (req.query.printhouseId) {
+            filters.printhouseId = req.query.printhouseId;
         }
 
-        const handoffService = require('../services/marketplacePrinthouseHandoffService');
-        const filters = {
-            status: req.query.status,
-            printhouseId: targetPrinthouseId
-        };
         const result = await handoffService.listPrinthouseHandoffPackages(filters);
         return res.json(result);
     } catch (err) {

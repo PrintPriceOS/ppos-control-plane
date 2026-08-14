@@ -57,7 +57,13 @@ async function listPrinthouseHandoffPackages(filters = {}, options = {}) {
     if (filters.status) {
         results = results.filter(p => p.dispatchStatus === filters.status);
     }
-    if (filters.printhouseId) {
+    if (filters.allowedPrinthouseIds !== undefined) {
+        if (Array.isArray(filters.allowedPrinthouseIds)) {
+            results = results.filter(p => filters.allowedPrinthouseIds.includes(p.printhouse?.id));
+        } else {
+            results = [];
+        }
+    } else if (filters.printhouseId) {
         results = results.filter(p => p.printhouse?.id === filters.printhouseId);
     }
 

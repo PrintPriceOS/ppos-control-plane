@@ -35,7 +35,7 @@ export const MarketplacePage: React.FC = () => {
                     Marketplace Order Intake
                 </h1>
                 <p className="text-sm text-slate-500 font-medium tracking-tight mt-1">
-                    Operational intake for Budget marketplace orders, production files, preflight readiness and handoff preparation.
+                    Orders assigned to your printhouse from the PrintPrice marketplace, production files, preflight readiness, and handoff preparation.
                 </p>
             </div>
 

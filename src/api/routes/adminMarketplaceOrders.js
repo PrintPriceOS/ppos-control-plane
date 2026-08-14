@@ -8,14 +8,32 @@ const router = express.Router();
 const orderService = require('../services/marketplaceOrderService');
 const { resolveActorContext } = require('../middleware/auth');
 
-// Phase 39: Enforce Printhouse & Tenant Scoping for Marketplace Orders
-router.use((req, res, next) => {
+// Phase 39 & Phase 192 RC20.2: Enforce Printhouse & Tenant Scoping for Marketplace Orders
+router.use(async (req, res, next) => {
     const context = resolveActorContext(req);
     req.actorContext = context;
+    
     if (!context.isSuperAdmin) {
         req.query.tenantId = context.tenantId;
-        if (context.isPrinthouseUser) {
-            req.query.printhouseId = context.printhouseId;
+        
+        if (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR') {
+            try {
+                const db = require('../services/mysqlClient');
+                // Fetch all printer nodes owned by this tenant
+                const nodes = await db.query(
+                    'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"',
+                    [context.tenantId]
+                );
+                const nodeIds = nodes.map(n => n.id);
+                if (context.printhouseId && !nodeIds.includes(context.printhouseId)) {
+                    nodeIds.push(context.printhouseId);
+                }
+                req.actorContext.allowedPrinthouseIds = nodeIds;
+                req.query.allowedPrinthouseIds = nodeIds;
+            } catch (err) {
+                console.error('[ADMIN-MARKETPLACE-ORDERS] Failed to resolve printer nodes for tenant:', err);
+                return res.status(500).json({ ok: false, error: 'FAILED_TO_RESOLVE_PRINTHOUSE_CONTEXT' });
+            }
         }
     }
     next();
@@ -23,23 +41,25 @@ router.use((req, res, next) => {
 
 // Enforce ownership for specific order access
 router.param('id', async (req, res, next, id) => {
-    const context = resolveActorContext(req);
+    const context = req.actorContext || resolveActorContext(req);
     try {
         const order = await orderService.getOrder(id);
         if (!order) {
             return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND' });
         }
         
-        // Enforce Tenant isolation
-        if (!context.isSuperAdmin && order.tenantId !== context.tenantId) {
-            return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
-        }
-        
-        // Enforce Printhouse isolation
-        if (!context.isSuperAdmin && context.isPrinthouseUser) {
-            if (order.printhouse?.assignedPrinthouseId !== context.printhouseId && order.printhouseId !== context.printhouseId) {
+        // Enforce Printhouse assignment isolation for PRINTHOUSE_ADMIN / OPERATOR
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            const allowedNodes = context.allowedPrinthouseIds || [];
+            const assignedId = order.printhouse?.assignedPrinthouseId || order.printhouseId || order.offer?.printerId;
+            
+            // Mandatory Rule: An order is visible to a printhouse if and only if assigned to one of its owned printer nodes
+            if (!assignedId || !allowedNodes.includes(assignedId)) {
                 return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
             }
+        } else if (!context.isSuperAdmin && order.tenantId !== context.tenantId) {
+            // General Tenant isolation for non-printhouse actors
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
         }
         
         req.marketplaceOrder = order;
@@ -54,8 +74,16 @@ router.param('id', async (req, res, next, id) => {
  */
 router.get('/', async (req, res) => {
     try {
-        console.log('[MARKETPLACE_ORDERS_LIST_REQUEST]', req.query);
-        const result = await orderService.listOrders(req.query);
+        const context = req.actorContext || resolveActorContext(req);
+        const queryParams = {
+            ...req.query,
+            isSuperAdmin: context.isSuperAdmin
+        };
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            queryParams.allowedPrinthouseIds = context.allowedPrinthouseIds || [];
+        }
+        console.log('[MARKETPLACE_ORDERS_LIST_REQUEST]', queryParams);
+        const result = await orderService.listOrders(queryParams);
         return res.json(result);
     } catch (err) {
         console.error('[ADMIN-MARKETPLACE-ORDERS] Failed to list orders:', err);
