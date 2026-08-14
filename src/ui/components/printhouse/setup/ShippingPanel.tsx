@@ -147,100 +147,104 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
         }
     };
 
+    const inputClass = "w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
+    const labelClass = "block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5";
+
     return (
-        <div style={{ background: '#191b2a', border: '1px solid #23263d', borderRadius: '12px', padding: '24px', color: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#f0f2f5' }}>
-                        Shipping Regions & Delivery Configuration
-                    </h3>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9095a9' }}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Truck size={20} className="text-[#dc0000]" />
+                        <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
+                            Shipping Regions & Delivery Configuration
+                        </h3>
+                    </div>
+                    <p className="m-0 text-xs text-zinc-500 dark:text-zinc-400">
                         Configure regions served, transit lead times, pickup availability, and preview delivery estimates.
                     </p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(!showAddForm)}
-                    style={{
-                        background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px',
-                        padding: '8px 16px', fontSize: '13px', fontWeight: 500, cursor: 'pointer'
-                    }}
+                    className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                 >
                     {showAddForm ? 'Cancel' : '+ Add Shipping Region'}
                 </button>
             </div>
 
             {message && (
-                <div style={{
-                    padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px',
-                    background: message.type === 'success' ? '#065f46' : '#991b1b', color: '#fff'
-                }}>
+                <div className={`p-3 rounded-lg text-xs mb-4 ${
+                    message.type === 'success' 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200' 
+                        : 'bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200'
+                }`}>
                     {message.text}
                 </div>
             )}
 
             {showAddForm && (
-                <form onSubmit={handleCreateRegion} style={{ background: '#11131f', padding: '16px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #2d3148' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <form onSubmit={handleCreateRegion} className="bg-zinc-50 dark:bg-zinc-900/60 p-5 rounded-xl mb-5 border border-zinc-200 dark:border-zinc-800 transition-colors">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: '#a0a5ba', marginBottom: '4px' }}>Region Name</label>
+                            <label className={labelClass}>Region Name</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.name}
                                 onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 placeholder="e.g. EU Central Region"
-                                style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: '#a0a5ba', marginBottom: '4px' }}>Region Code</label>
+                            <label className={labelClass}>Region Code</label>
                             <input
                                 type="text"
                                 value={formData.code}
                                 onChange={e => setFormData({ ...formData, code: e.target.value })}
                                 placeholder="e.g. EU_CENTRAL"
-                                style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                        <label style={{ display: 'block', fontSize: '12px', color: '#a0a5ba', marginBottom: '4px' }}>Supported Countries (Comma Separated ISO codes)</label>
+                    <div className="mb-3">
+                        <label className={labelClass}>Supported Countries (Comma Separated ISO codes)</label>
                         <input
                             type="text"
                             value={formData.countries}
                             onChange={e => setFormData({ ...formData, countries: e.target.value })}
                             placeholder="DE, FR, ES, IT, NL"
-                            style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                            className={inputClass}
                         />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: '#a0a5ba', marginBottom: '4px' }}>Standard Transit (Days)</label>
+                            <label className={labelClass}>Standard Transit (Days)</label>
                             <input
                                 type="number"
                                 value={formData.standardTransitDays}
                                 onChange={e => setFormData({ ...formData, standardTransitDays: Number(e.target.value) })}
-                                style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: '#a0a5ba', marginBottom: '4px' }}>Handling Days</label>
+                            <label className={labelClass}>Handling Days</label>
                             <input
                                 type="number"
                                 value={formData.handlingDays}
                                 onChange={e => setFormData({ ...formData, handlingDays: Number(e.target.value) })}
-                                style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                                className={inputClass}
                             />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
-                            <label style={{ fontSize: '13px', color: '#e2e8f0', cursor: 'pointer' }}>
+                        <div className="flex items-center sm:mt-6">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={formData.pickupAvailable}
                                     onChange={e => setFormData({ ...formData, pickupAvailable: e.target.checked })}
-                                    style={{ marginRight: '8px' }}
+                                    className="rounded text-[#dc0000] focus:ring-[#dc0000]"
                                 />
                                 Customer Pickup Available
                             </label>
@@ -249,7 +253,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
 
                     <button
                         type="submit"
-                        style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer shadow-xs"
                     >
                         Save Region
                     </button>
@@ -258,23 +262,28 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
 
             {/* Region List */}
             {loading ? (
-                <p style={{ color: '#9095a9', fontSize: '13px' }}>Loading shipping regions...</p>
+                <p className="text-xs text-zinc-500">Loading shipping regions...</p>
             ) : regions.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', background: '#11131f', borderRadius: '8px', border: '1px border-dashed #2d3148' }}>
-                    <p style={{ margin: 0, color: '#9095a9', fontSize: '14px' }}>No shipping regions configured yet.</p>
+                <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                    <p className="m-0 text-xs text-zinc-500 font-semibold">No shipping regions configured yet.</p>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="flex flex-col gap-3">
                     {regions.map(r => (
-                        <div key={r.id} style={{ background: '#11131f', border: '1px solid #23263d', borderRadius: '8px', padding: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div key={r.id} className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 transition-colors">
+                            <div className="flex justify-between items-center flex-wrap gap-3">
                                 <div>
-                                    <h4 style={{ margin: 0, fontSize: '15px', color: '#fff' }}>{r.name} <span style={{ fontSize: '12px', color: '#3b82f6', background: '#1e293b', padding: '2px 8px', borderRadius: '4px' }}>{r.code}</span></h4>
-                                    <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                                    <h4 className="m-0 text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                        {r.name}
+                                        <span className="text-[11px] text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded font-mono">
+                                            {r.code}
+                                        </span>
+                                    </h4>
+                                    <p className="m-0 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                                         Countries: {r.countries.join(', ') || 'All'} | Transit: {r.standardTransitDays} days | Handling: {r.handlingDays} days {r.pickupAvailable && '| Pickup Available'}
                                     </p>
                                 </div>
-                                <span style={{ background: r.enabled ? '#065f46' : '#475569', color: '#fff', fontSize: '11px', padding: '3px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                <span className={`text-[11px] px-2 py-0.5 rounded font-semibold text-white ${r.enabled ? 'bg-emerald-600' : 'bg-zinc-500'}`}>
                                     {r.enabled ? 'ACTIVE' : 'DISABLED'}
                                 </span>
                             </div>
@@ -284,28 +293,28 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
             )}
 
             {/* Delivery Estimate Preview Widget */}
-            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #23263d' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#e2e8f0' }}>Non-Binding Delivery Estimate Calculator</h4>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <label style={{ fontSize: '12px', color: '#a0a5ba' }}>Production Lead Days (Phase 191E):</label>
+            <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800">
+                <h4 className="m-0 mb-2 text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Non-Binding Delivery Estimate Calculator</h4>
+                <div className="flex gap-3 items-center flex-wrap">
+                    <label className="text-xs text-zinc-600 dark:text-zinc-400">Production Lead Days (Phase 191E):</label>
                     <input
                         type="number"
                         value={estimatePayload.productionLeadDays}
                         onChange={e => setEstimatePayload({ ...estimatePayload, productionLeadDays: Number(e.target.value) })}
-                        style={{ width: '80px', padding: '6px', borderRadius: '4px', background: '#1c1f30', border: '1px solid #333852', color: '#fff' }}
+                        className="w-20 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2.5 py-1.5 rounded-lg text-xs"
                     />
                     <button
                         onClick={handleComputeEstimate}
-                        style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer' }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors shadow-xs"
                     >
                         Calculate Delivery Window
                     </button>
                 </div>
 
                 {estimateResult && (
-                    <div style={{ marginTop: '12px', padding: '12px', background: '#1e1b4b', border: '1px solid #3730a3', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe' }}>
+                    <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs text-indigo-900 dark:text-indigo-200">
                         <strong>Estimated Delivery Window:</strong> {estimateResult.estimatedDeliveryWindow?.from} to {estimateResult.estimatedDeliveryWindow?.to} ({estimateResult.timelineComponents?.totalEstimatedDaysMin}-{estimateResult.timelineComponents?.totalEstimatedDaysMax} total days)
-                        <div style={{ fontSize: '11px', color: '#818cf8', marginTop: '4px' }}>* Non-binding estimate for operational visibility only. Zero financial commitments created.</div>
+                        <div className="text-[11px] opacity-75 mt-1">* Non-binding estimate for operational visibility only. Zero financial commitments created.</div>
                     </div>
                 )}
             </div>

@@ -68,7 +68,7 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
     };
 
     if (loading) {
-        return <div style={{ color: '#9095a9', padding: '20px' }}>Loading marketplace readiness status...</div>;
+        return <div className="text-zinc-500 p-5 text-xs">Loading marketplace readiness status...</div>;
     }
 
     const currentStatus = reviewStatus?.status || 'DRAFT';
@@ -76,71 +76,74 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
     const canSubmit = blockers.length === 0 && ['DRAFT', 'CHANGES_REQUESTED', 'REJECTED'].includes(currentStatus);
 
     return (
-        <div style={{ background: '#191b2a', border: '1px solid #23263d', borderRadius: '12px', padding: '24px', color: '#fff' }}>
-            <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#f0f2f5' }}>
-                    Marketplace Readiness & Governed Review
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9095a9' }}>
-                    Final step before marketplace activation. Review your 6 onboarding module statuses and submit for official platform review.
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
+            <div className="mb-5">
+                <div className="flex items-center gap-2 mb-1">
+                    <CheckSquare size={20} className="text-[#dc0000]" />
+                    <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
+                        Marketplace Readiness & Governed Review
+                    </h3>
+                </div>
+                <p className="m-0 text-xs text-zinc-500 dark:text-zinc-400">
+                    Final step before marketplace activation. Review your onboarding module statuses and submit for official platform review.
                 </p>
             </div>
 
             {message && (
-                <div style={{
-                    padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px',
-                    background: message.type === 'success' ? '#065f46' : '#991b1b', color: '#fff'
-                }}>
+                <div className={`p-3 rounded-lg text-xs mb-4 ${
+                    message.type === 'success' 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200' 
+                        : 'bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200'
+                }`}>
                     {message.text}
                 </div>
             )}
 
             {/* Status Banner */}
-            <div style={{ background: '#11131f', border: '1px solid #23263d', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 mb-6 transition-colors">
+                <div className="flex justify-between items-center flex-wrap gap-3">
                     <div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>CURRENT REVIEW STATUS</div>
-                        <div style={{ fontSize: '20px', fontWeight: 700, color: currentStatus === 'APPROVED' ? '#34d399' : '#fbbf24', marginTop: '2px' }}>
+                        <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">CURRENT REVIEW STATUS</div>
+                        <div className={`text-xl font-bold mt-0.5 ${currentStatus === 'APPROVED' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                             {currentStatus}
                         </div>
                     </div>
                     {currentStatus === 'APPROVED' && (
-                        <div style={{ background: '#064e3b', color: '#34d399', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 rounded-lg text-xs font-bold">
                             ✓ MARKETPLACE APPROVED
                         </div>
                     )}
                 </div>
 
                 {currentStatus === 'CHANGES_REQUESTED' && (
-                    <div style={{ marginTop: '14px', padding: '12px', background: '#451a03', border: '1px solid #78350f', borderRadius: '6px', color: '#fde68a', fontSize: '13px' }}>
+                    <div className="mt-3.5 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg text-amber-900 dark:text-amber-300 text-xs">
                         <strong>Reviewer Change Request ({reviewStatus.reasonCode}):</strong>
-                        <p style={{ margin: '4px 0 0' }}>{reviewStatus.explanation}</p>
+                        <p className="m-0 mt-1">{reviewStatus.explanation}</p>
                     </div>
                 )}
             </div>
 
             {/* Submission Gate Section */}
-            <div style={{ background: '#11131f', border: '1px solid #23263d', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '16px', color: '#fff' }}>Submit Setup for Official Review</h4>
-                <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#94a3b8', maxWidth: '600px', marginInline: 'auto' }}>
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 text-center transition-colors">
+                <h4 className="m-0 mb-1.5 text-sm font-bold text-zinc-900 dark:text-white">Submit Setup for Official Review</h4>
+                <p className="m-0 mb-4 text-xs text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
                     Once submitted, an immutable evidence snapshot will be recorded for platform administrators. Submitting does not automatically enable live production routing.
                 </p>
 
                 <button
                     onClick={handleSubmitForReview}
                     disabled={!canSubmit || submitting}
-                    style={{
-                        background: canSubmit ? '#10b981' : '#334155',
-                        color: canSubmit ? '#fff' : '#94a3b8',
-                        border: 'none', borderRadius: '6px', padding: '10px 24px', fontSize: '14px', fontWeight: 600,
-                        cursor: canSubmit ? 'pointer' : 'not-allowed'
-                    }}
+                    className={`font-semibold px-6 py-2.5 rounded-lg text-xs transition-colors shadow-xs ${
+                        canSubmit 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                            : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed border border-zinc-300 dark:border-zinc-700'
+                    }`}
                 >
                     {submitting ? 'Submitting Snapshot...' : currentStatus === 'READY_FOR_REVIEW' || currentStatus === 'UNDER_REVIEW' ? 'Review Currently Underway' : 'Submit for Admin Review'}
                 </button>
 
                 {!canSubmit && blockers.length > 0 && (
-                    <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#f87171' }}>
+                    <p className="m-0 mt-3 text-xs text-red-600 dark:text-red-400 font-medium">
                         ⚠️ You have {blockers.length} blocking issues in previous modules that must be resolved before submitting.
                     </p>
                 )}

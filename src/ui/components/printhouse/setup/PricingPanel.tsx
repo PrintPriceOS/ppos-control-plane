@@ -424,74 +424,62 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
             />
 
             {/* DOWNSTREAM / OPTIONAL: COMMERCIAL PRICING POLICIES & CATALOGS */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e4e4e7', overflow: 'hidden' }}>
+            <div className="bg-white dark:bg-[#18181b] rounded-xl border border-zinc-200 dark:border-[#27272a] overflow-hidden transition-colors">
                 <div 
                     onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
-                    style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        padding: '16px 24px', 
-                        cursor: 'pointer',
-                        backgroundColor: '#fafafa',
-                        borderBottom: showCommercialPolicy ? '1px solid #e4e4e7' : 'none'
-                    }}
+                    className="flex justify-between items-center px-6 py-4 cursor-pointer bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-[#27272a] transition-colors"
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Tag size={18} style={{ color: '#71717a' }} />
+                    <div className="flex items-center gap-2.5">
+                        <Tag size={18} className="text-zinc-500 dark:text-zinc-400" />
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="m-0 text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                                 Commercial Pricing Policies & Markups
-                                <span style={{ fontSize: '11px', fontWeight: 500, color: '#71717a', backgroundColor: '#f4f4f5', padding: '2px 8px', borderRadius: '4px' }}>
+                                <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded">
                                     Downstream / Optional
                                 </span>
                             </h3>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#71717a' }}>
+                            <p className="m-0 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                                 Configure commercial quantity tiers, surcharge markups, and customer-specific price books applied on top of industrial costs.
                             </p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {showCommercialPolicy ? <ChevronUp size={18} color="#71717a" /> : <ChevronDown size={18} color="#71717a" />}
+                    <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+                        {showCommercialPolicy ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
                 </div>
 
                 {showCommercialPolicy && (
                     <div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 24px', borderBottom: '1px solid #e4e4e7' }}>
+                        <div className="flex justify-end px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
                             <button
                                 onClick={() => {
                                     setCloningBook(null);
                                     setEditingBook(null);
                                     setShowBookModal(true);
                                 }}
-                                style={{
-                                    backgroundColor: '#dc0000', color: '#ffffff', border: 'none', borderRadius: '6px',
-                                    padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: '6px'
-                                }}
+                                className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3.5 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
                             >
                                 <Plus size={14} /> Create Catalog
                             </button>
                         </div>
                         {/* Price Books Table */}
                         {loadingBooks ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#a1a1aa' }}>Loading price catalogs...</div>
+                    <div className="p-10 text-center text-xs text-zinc-500">Loading price catalogs...</div>
                 ) : priceBooks.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '13px' }}>
+                    <div className="p-10 text-center text-zinc-500 dark:text-zinc-400 text-xs">
                         No price books configured. Create your first catalog draft to get started.
                     </div>
                 ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-xs text-left">
                             <thead>
-                                <tr style={{ borderBottom: '1px solid #27272a', color: '#a1a1aa' }}>
-                                    <th style={{ padding: '14px 24px' }}>Name</th>
-                                    <th style={{ padding: '14px 20px' }}>Currency</th>
-                                    <th style={{ padding: '14px 20px' }}>Status</th>
-                                    <th style={{ padding: '14px 20px' }}>Validation Status</th>
-                                    <th style={{ padding: '14px 20px' }}>Validity Boundaries</th>
-                                    <th style={{ padding: '14px 24px', width: '280px', textAlign: 'right' }}>Actions</th>
+                                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900/40 font-semibold">
+                                    <th className="px-6 py-3.5">Name</th>
+                                    <th className="px-5 py-3.5">Currency</th>
+                                    <th className="px-5 py-3.5">Status</th>
+                                    <th className="px-5 py-3.5">Validation Status</th>
+                                    <th className="px-5 py-3.5">Validity Boundaries</th>
+                                    <th className="px-6 py-3.5 w-72 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -503,56 +491,50 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                     return (
                                         <tr
                                             key={pb.id}
-                                            style={{
-                                                borderBottom: '1px solid #27272a',
-                                                backgroundColor: isSelected ? 'rgba(220,0,0,0.03)' : 'transparent',
-                                                cursor: 'pointer'
-                                            }}
+                                            className={`border-b border-zinc-200 dark:border-zinc-800 cursor-pointer transition-colors ${
+                                                isSelected ? 'bg-red-50/40 dark:bg-red-950/20' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/40'
+                                            }`}
                                             onClick={() => setSelectedBook(pb)}
                                         >
-                                            <td style={{ padding: '14px 24px', fontWeight: 600, color: '#ffffff' }}>
-                                                {pb.name} <span style={{ fontSize: '11px', color: '#71717a', fontWeight: 400 }}>(v{pb.version})</span>
+                                            <td className="px-6 py-3.5 font-bold text-zinc-900 dark:text-white">
+                                                {pb.name} <span className="text-[11px] text-zinc-500 font-normal">(v{pb.version})</span>
                                             </td>
-                                            <td style={{ padding: '14px 20px', color: '#e4e4e7' }}>{pb.currency}</td>
-                                            <td style={{ padding: '14px 20px' }}>
-                                                <span style={{
-                                                    backgroundColor: pb.status === 'PUBLISHED' ? 'rgba(16, 185, 129, 0.1)' : pb.status === 'APPROVED' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(234, 179, 8, 0.1)',
-                                                    color: pb.status === 'PUBLISHED' ? '#34d399' : pb.status === 'APPROVED' ? '#60a5fa' : '#facc15',
-                                                    padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700
-                                                }}>
+                                            <td className="px-5 py-3.5 text-zinc-800 dark:text-zinc-200">{pb.currency}</td>
+                                            <td className="px-5 py-3.5">
+                                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                                    pb.status === 'PUBLISHED' 
+                                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' 
+                                                        : pb.status === 'APPROVED' 
+                                                        ? 'bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300' 
+                                                        : 'bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                                }`}>
                                                     {pb.status}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '14px 20px' }} onClick={(e) => e.stopPropagation()}>
+                                            <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                                                 {validatingBookId === pb.id ? (
-                                                    <span style={{ color: '#a1a1aa', fontSize: '11px' }}>Auditing...</span>
+                                                    <span className="text-zinc-500 text-xs">Auditing...</span>
                                                 ) : audit ? (
-                                                    <span style={{
-                                                        color: audit.isValid ? '#10b981' : '#f87171',
-                                                        display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px'
-                                                    }}>
+                                                    <span className={`flex items-center gap-1 text-xs font-semibold ${audit.isValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                                                         {audit.isValid ? <ShieldCheck size={14} /> : <BadgeAlert size={14} />}
                                                         {audit.isValid ? 'Clean Audit' : `${audit.errors.length} Issues`}
                                                     </span>
                                                 ) : (
                                                     <button
                                                         onClick={() => handleValidateBook(pb.id)}
-                                                        style={{
-                                                            background: 'none', border: 'none', color: '#a1a1aa',
-                                                            textDecoration: 'underline', cursor: 'pointer', padding: 0
-                                                        }}
+                                                        className="bg-transparent border-0 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer p-0 text-xs"
                                                     >
                                                         Run Audit Check
                                                     </button>
                                                 )}
                                             </td>
-                                            <td style={{ padding: '14px 20px', color: '#a1a1aa', fontSize: '12px' }}>
+                                            <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400 text-xs">
                                                 {pb.effective_from ? new Date(pb.effective_from).toLocaleDateString() : 'Immediate'} 
                                                 {' → '} 
                                                 {pb.effective_to ? new Date(pb.effective_to).toLocaleDateString() : 'Forever'}
                                             </td>
-                                            <td style={{ padding: '14px 24px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <td className="px-6 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex gap-2 justify-end">
                                                     {hasDraftStatus && (
                                                         <button
                                                             title="Edit metadata"
@@ -561,7 +543,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                                 setEditingBook(pb);
                                                                 setShowBookModal(true);
                                                             }}
-                                                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px' }}
+                                                            className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 p-1 cursor-pointer"
                                                         >
                                                             <Edit size={16} />
                                                         </button>
@@ -573,7 +555,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                             setCloningBook(pb);
                                                             setShowBookModal(true);
                                                         }}
-                                                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px' }}
+                                                        className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 p-1 cursor-pointer"
                                                     >
                                                         <Copy size={16} />
                                                     </button>
@@ -581,17 +563,14 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                         <>
                                                             <button
                                                                 onClick={() => handleTransitionStatus(pb.id, 'APPROVED')}
-                                                                style={{
-                                                                    backgroundColor: '#27272a', color: '#ffffff', border: 'none',
-                                                                    borderRadius: '4px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer'
-                                                                }}
+                                                                className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors"
                                                             >
                                                                 Approve
                                                             </button>
                                                             <button
                                                                 title="Delete draft"
                                                                 onClick={() => handleDeleteBook(pb.id)}
-                                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                                                             >
                                                                 <Trash2 size={16} />
                                                             </button>
@@ -600,10 +579,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                     {pb.status === 'APPROVED' && (
                                                         <button
                                                             onClick={() => handleTransitionStatus(pb.id, 'PUBLISHED')}
-                                                            style={{
-                                                                backgroundColor: '#10b981', color: '#ffffff', border: 'none',
-                                                                borderRadius: '4px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer'
-                                                            }}
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors"
                                                         >
                                                             Publish
                                                         </button>
@@ -611,10 +587,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                     {pb.status === 'PUBLISHED' && (
                                                         <button
                                                             onClick={() => handleTransitionStatus(pb.id, 'RETIRED')}
-                                                            style={{
-                                                                backgroundColor: '#ef4444', color: '#ffffff', border: 'none',
-                                                                borderRadius: '4px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer'
-                                                            }}
+                                                            className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors"
                                                         >
                                                             Retire
                                                         </button>
@@ -631,27 +604,22 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
 
                 {/* SECTION 2: BOOK RULES & SIMULATOR (VISIBLE ONLY IF SELECTED & EXPANDED) */}
                 {selectedBook && (
-                    <div style={{ padding: '0 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid #e4e4e7' }}>
+                    <div className="p-6 pt-4 flex flex-col gap-5 border-t border-zinc-200 dark:border-zinc-800">
                         {/* Sub Tab selection bar */}
-                        <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #e4e4e7', paddingBottom: '12px', paddingTop: '16px' }}>
+                        <div className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-3 pt-2">
                             <button
                                 onClick={() => setSubTab('RULES')}
-                                style={{
-                                    background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '13px', fontWeight: 700,
-                                    color: subTab === 'RULES' ? '#dc0000' : '#71717a', cursor: 'pointer',
-                                    borderBottom: subTab === 'RULES' ? '2px solid #dc0000' : 'none'
-                                }}
+                                className={`bg-transparent border-0 pb-2 text-xs font-bold cursor-pointer transition-colors ${
+                                    subTab === 'RULES' ? 'text-[#dc0000] border-b-2 border-[#dc0000]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                                }`}
                             >
                                 Pricing Rules Grid
                             </button>
                             <button
                                 onClick={() => setSubTab('SIMULATOR')}
-                                style={{
-                                    background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '13px', fontWeight: 700,
-                                    color: subTab === 'SIMULATOR' ? '#dc0000' : '#71717a', cursor: 'pointer',
-                                    borderBottom: subTab === 'SIMULATOR' ? '2px solid #dc0000' : 'none',
-                                    display: 'flex', alignItems: 'center', gap: '6px'
-                                }}
+                                className={`bg-transparent border-0 pb-2 text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors ${
+                                    subTab === 'SIMULATOR' ? 'text-[#dc0000] border-b-2 border-[#dc0000]' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                                }`}
                             >
                                 <Calculator size={14} /> Pricing Sandbox
                             </button>
@@ -659,16 +627,13 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
 
                         {/* Validation issues warning block */}
                         {validationAudits[selectedBook.id] && !validationAudits[selectedBook.id].isValid && (
-                            <div style={{
-                                backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)',
-                                borderRadius: '8px', padding: '16px', fontSize: '13px'
-                            }}>
-                                <h5 style={{ margin: '0 0 8px 0', color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl p-4 text-xs">
+                                <h5 className="m-0 mb-2 text-red-700 dark:text-red-300 font-bold flex items-center gap-1.5">
                                     <ShieldAlert size={16} /> Validation Flags for {selectedBook.name}
                                 </h5>
-                                <ul style={{ margin: 0, paddingLeft: '20px', color: '#71717a', lineHeight: '1.6' }}>
+                                <ul className="m-0 pl-5 text-zinc-600 dark:text-zinc-400 space-y-1">
                                     {validationAudits[selectedBook.id].errors.map((err: any, idx: number) => (
-                                        <li key={idx} style={{ color: '#ef4444' }}>{err.message}</li>
+                                        <li key={idx} className="text-red-600 dark:text-red-400 font-medium">{err.message}</li>
                                     ))}
                                     {validationAudits[selectedBook.id].advisories.map((adv: any, idx: number) => (
                                         <li key={idx}>{adv.message} (Advisory)</li>
@@ -678,14 +643,14 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                         )}
 
                         {subTab === 'RULES' && (
-                            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e4e4e7', overflow: 'hidden' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e4e4e7', backgroundColor: '#fafafa' }}>
+                            <div className="bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-colors">
+                                <div className="flex justify-between items-center p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40">
                                     <div>
-                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Layers size={16} style={{ color: '#dc0000' }} />
+                                        <h4 className="m-0 text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                            <Layers size={16} className="text-[#dc0000]" />
                                             Pricing Rules for: {selectedBook.name}
                                         </h4>
-                                        <span style={{ fontSize: '11px', color: '#71717a' }}>ID: {selectedBook.id}</span>
+                                        <span className="text-[11px] text-zinc-500">ID: {selectedBook.id}</span>
                                     </div>
                                     {selectedBook.status === 'DRAFT' && (
                                         <button
@@ -693,11 +658,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                 setEditingRule(null);
                                                 setShowRuleModal(true);
                                             }}
-                                            style={{
-                                                backgroundColor: '#18181b', color: '#ffffff', border: 'none', borderRadius: '6px',
-                                                padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                                                display: 'flex', alignItems: 'center', gap: '4px'
-                                            }}
+                                            className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer"
                                         >
                                             <Plus size={14} /> Add Rule
                                         </button>
@@ -705,24 +666,24 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                 </div>
 
                                 {loadingRules ? (
-                                    <div style={{ padding: '30px', textAlign: 'center', color: '#71717a' }}>Loading pricing rules...</div>
+                                    <div className="p-8 text-center text-xs text-zinc-500">Loading pricing rules...</div>
                                 ) : rules.length === 0 ? (
-                                    <div style={{ padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '13px' }}>
+                                    <div className="p-8 text-center text-xs text-zinc-500 font-semibold">
                                         No rules defined in this book.
                                     </div>
                                 ) : (
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full border-collapse text-xs text-left">
                                             <thead>
-                                                <tr style={{ borderBottom: '1px solid #e4e4e7', color: '#71717a', backgroundColor: '#fafafa' }}>
-                                                    <th style={{ padding: '12px 20px' }}>Scope</th>
-                                                    <th style={{ padding: '12px 16px' }}>Site / Machine / Material</th>
-                                                    <th style={{ padding: '12px 16px' }}>Pricing Unit</th>
-                                                    <th style={{ padding: '12px 16px' }}>Base Price</th>
-                                                    <th style={{ padding: '12px 16px' }}>Setup Charge</th>
-                                                    <th style={{ padding: '12px 16px' }}>Min Job Floor</th>
-                                                    <th style={{ padding: '12px 16px' }}>Quantity Tiers</th>
-                                                    {selectedBook.status === 'DRAFT' && <th style={{ padding: '12px 20px', width: '120px', textAlign: 'right' }}>Actions</th>}
+                                                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/50 font-semibold">
+                                                    <th className="px-5 py-3">Scope</th>
+                                                    <th className="px-4 py-3">Site / Machine / Material</th>
+                                                    <th className="px-4 py-3">Pricing Unit</th>
+                                                    <th className="px-4 py-3">Base Price</th>
+                                                    <th className="px-4 py-3">Setup Charge</th>
+                                                    <th className="px-4 py-3">Min Job Floor</th>
+                                                    <th className="px-4 py-3">Quantity Tiers</th>
+                                                    {selectedBook.status === 'DRAFT' && <th className="px-5 py-3 w-28 text-right">Actions</th>}
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -739,45 +700,45 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                                     if (rule.scope === 'SURCHARGE') targetDetails = 'General Surcharge';
 
                                                     return (
-                                                        <tr key={rule.id} style={{ borderBottom: '1px solid #e4e4e7' }}>
-                                                            <td style={{ padding: '12px 20px', fontWeight: 600, color: '#09090b' }}>
-                                                                <span style={{
-                                                                    backgroundColor: rule.scope === 'TENANT_DEFAULT' ? 'rgba(220,0,0,0.1)' : '#f4f4f5',
-                                                                    color: rule.scope === 'TENANT_DEFAULT' ? '#dc0000' : '#52525b',
-                                                                    padding: '2px 6px', borderRadius: '4px', fontSize: '10px'
-                                                                }}>
+                                                        <tr key={rule.id} className="border-b border-zinc-200 dark:border-zinc-800 transition-colors hover:bg-white/50 dark:hover:bg-zinc-800/30">
+                                                            <td className="px-5 py-3 font-bold text-zinc-900 dark:text-white">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                    rule.scope === 'TENANT_DEFAULT' 
+                                                                        ? 'bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-[#dc0000]' 
+                                                                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                                                }`}>
                                                                     {rule.scope}
                                                                 </span>
                                                             </td>
-                                                            <td style={{ padding: '12px 16px', color: '#18181b' }}>{targetDetails}</td>
-                                                            <td style={{ padding: '12px 16px', color: '#71717a' }}>{rule.pricing_unit}</td>
-                                                            <td style={{ padding: '12px 16px', color: '#09090b', fontWeight: 600 }}>{Number(rule.base_price).toFixed(4)} {selectedBook.currency}</td>
-                                                            <td style={{ padding: '12px 16px', color: '#09090b' }}>{Number(rule.setup_charge).toFixed(2)} {selectedBook.currency}</td>
-                                                            <td style={{ padding: '12px 16px', color: '#09090b' }}>{Number(rule.minimum_order_value).toFixed(2)} {selectedBook.currency}</td>
-                                                            <td style={{ padding: '12px 16px' }}>
+                                                            <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200">{targetDetails}</td>
+                                                            <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{rule.pricing_unit}</td>
+                                                            <td className="px-4 py-3 text-zinc-900 dark:text-white font-bold">{Number(rule.base_price).toFixed(4)} {selectedBook.currency}</td>
+                                                            <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200">{Number(rule.setup_charge).toFixed(2)} {selectedBook.currency}</td>
+                                                            <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200">{Number(rule.minimum_order_value).toFixed(2)} {selectedBook.currency}</td>
+                                                            <td className="px-4 py-3">
                                                                 {rule.tiers && rule.tiers.length > 0 ? (
-                                                                    <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#059669', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                                                    <span className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded text-[11px] font-bold">
                                                                         {rule.tiers.length} Tiers Defined
                                                                     </span>
                                                                 ) : (
-                                                                    <span style={{ color: '#71717a' }}>No tiers</span>
+                                                                    <span className="text-zinc-500">No tiers</span>
                                                                 )}
                                                             </td>
                                                             {selectedBook.status === 'DRAFT' && (
-                                                                <td style={{ padding: '12px 20px', textAlign: 'right' }}>
-                                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                <td className="px-5 py-3 text-right">
+                                                                    <div className="flex gap-2 justify-end">
                                                                         <button
                                                                             onClick={() => {
                                                                                 setEditingRule(rule);
                                                                                 setShowRuleModal(true);
                                                                             }}
-                                                                            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+                                                                            className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 p-1 cursor-pointer"
                                                                         >
                                                                             <Edit size={14} />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => handleDeleteRule(rule.id)}
-                                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                                                                         >
                                                                             <Trash2 size={14} />
                                                                         </button>

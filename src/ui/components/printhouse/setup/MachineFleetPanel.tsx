@@ -389,29 +389,21 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
         return badges;
     };
 
-    const inputStyle: React.CSSProperties = {
-        width: '100%', background: '#18181b', border: '1px solid #3f3f46',
-        borderRadius: '8px', padding: '10px 14px', color: '#f4f4f5', fontSize: '14px',
-        outline: 'none'
-    };
-
-    const btnPrimary: React.CSSProperties = {
-        background: '#dc0000', color: '#fff', border: 'none', padding: '10px 24px',
-        borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer'
-    };
+    const inputClass = "w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
+    const labelClass = "block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5";
 
     return (
-        <div>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
             {/* Site Selector */}
             {sites.length > 1 && (
-                <div style={{ marginBottom: '20px' }}>
-                    <label style={{ fontSize: '13px', color: '#a1a1aa', display: 'block', marginBottom: '6px' }}>
+                <div className="mb-5">
+                    <label className={labelClass}>
                         Production Site
                     </label>
                     <select
                         value={selectedSiteId}
                         onChange={e => setSelectedSiteId(e.target.value)}
-                        style={{ ...inputStyle, cursor: 'pointer' }}
+                        className={`${inputClass} cursor-pointer`}
                     >
                         {sites.map(s => (
                             <option key={s.siteId} value={s.siteId}>{s.siteName}</option>
@@ -421,43 +413,42 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             )}
 
             {/* Header Row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Cog size={20} style={{ color: '#dc0000' }} />
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#fff' }}>
-                        Machinery Fleet {machines.length > 0 && <span style={{ color: '#71717a', fontWeight: 400 }}>({machines.length})</span>}
+            <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                    <Cog size={20} className="text-[#dc0000]" />
+                    <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
+                        Machinery Fleet {machines.length > 0 && <span className="text-zinc-500 font-normal">({machines.length})</span>}
                     </h3>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => fetchMachines(selectedSiteId)} style={{ ...btnPrimary, background: '#27272a', padding: '8px 12px' }}>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => fetchMachines(selectedSiteId)}
+                        className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 p-2 rounded-lg transition-colors cursor-pointer"
+                    >
                         <RefreshCw size={14} />
                     </button>
-                    <button onClick={() => openCreateForm()} style={btnPrimary}>
-                        <Plus size={14} style={{ marginRight: '4px' }} /> Add Machine
+                    <button
+                        onClick={() => openCreateForm()}
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                        <Plus size={14} /> Add Machine
                     </button>
                 </div>
             </div>
 
             {/* Template Quick-Start */}
             {!isEditing && machines.length === 0 && templates.length > 0 && (
-                <div style={{
-                    background: '#18181b', border: '1px solid #27272a', borderRadius: '12px',
-                    padding: '20px', marginBottom: '20px'
-                }}>
-                    <p style={{ color: '#a1a1aa', fontSize: '13px', margin: '0 0 12px 0' }}>
-                        <Zap size={14} style={{ marginRight: '4px', color: '#f59e0b' }} />
+                <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 mb-5 transition-colors">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 m-0 mb-3 flex items-center">
+                        <Zap size={14} className="mr-1 text-amber-500" />
                         Quick start with a verified template:
                     </p>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div className="flex gap-2.5 flex-wrap">
                         {templates.map(t => (
                             <button
                                 key={t.template_id}
                                 onClick={() => openCreateForm(t.template_id)}
-                                style={{
-                                    background: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px',
-                                    padding: '8px 16px', color: '#f4f4f5', fontSize: '13px', cursor: 'pointer',
-                                    fontWeight: 500
-                                }}
+                                className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
                             >
                                 {MACHINE_TYPE_LABELS[t.template_id] || t.template_id}
                             </button>
@@ -467,59 +458,58 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             )}
 
             {/* Machine List */}
-            {loading && <div style={{ textAlign: 'center', padding: '40px', color: '#71717a' }}><RefreshCw size={24} className="animate-spin" /></div>}
+            {loading && (
+                <div className="text-center py-10 text-zinc-500">
+                    <RefreshCw size={24} className="animate-spin inline-block" />
+                </div>
+            )}
 
             {!loading && !isEditing && machines.map(m => (
                 <div
                     key={m.id}
-                    style={{
-                        background: '#18181b', border: '1px solid #27272a', borderRadius: '12px',
-                        padding: '16px 20px', marginBottom: '12px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                    }}
+                    className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:px-5 mb-3 flex items-center justify-between transition-colors"
                 >
-                    <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '15px', color: '#fff' }}>{m.machine_name}</span>
-                            <span style={{
-                                background: STATUS_COLORS[m.status] || '#71717a',
-                                color: '#fff', fontSize: '11px', fontWeight: 600,
-                                padding: '2px 8px', borderRadius: '4px'
-                            }}>
+                    <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2.5 mb-1.5">
+                            <span className="font-bold text-sm text-zinc-900 dark:text-white">{m.machine_name}</span>
+                            <span
+                                className="text-[11px] font-semibold px-2 py-0.5 rounded text-white"
+                                style={{ background: STATUS_COLORS[m.status] || '#71717a' }}
+                            >
                                 {m.status}
                             </span>
                         </div>
-                        <div style={{ fontSize: '13px', color: '#a1a1aa', marginBottom: '6px' }}>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                             {MACHINE_TYPE_LABELS[m.machine_type] || m.machine_type}
                             {m.manufacturer && ` · ${m.manufacturer}`}
                             {m.model && ` ${m.model}`}
                             {m.max_sheet_width_mm && m.max_sheet_height_mm && (
-                                <span style={{ color: '#71717a' }}> · Max Sheet: {m.max_sheet_width_mm} × {m.max_sheet_height_mm} mm</span>
+                                <span className="text-zinc-400 dark:text-zinc-500"> · Max Sheet: {m.max_sheet_width_mm} × {m.max_sheet_height_mm} mm</span>
                             )}
                         </div>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <div className="flex gap-1.5 flex-wrap">
                             {capabilityBadges(m).map(badge => (
-                                <span key={badge} style={{
-                                    background: '#27272a', color: '#a1a1aa', fontSize: '11px',
-                                    padding: '2px 8px', borderRadius: '4px', border: '1px solid #3f3f46'
-                                }}>
+                                <span
+                                    key={badge}
+                                    className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 text-[11px] px-2 py-0.5 rounded"
+                                >
                                     {badge}
                                 </span>
                             ))}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => openEditForm(m)} style={{
-                            background: '#27272a', border: '1px solid #3f3f46', borderRadius: '6px',
-                            padding: '6px 10px', color: '#a1a1aa', cursor: 'pointer'
-                        }}>
+                    <div className="flex gap-2 shrink-0">
+                        <button
+                            onClick={() => openEditForm(m)}
+                            className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 p-2 rounded-lg transition-colors cursor-pointer"
+                        >
                             <Edit2 size={14} />
                         </button>
                         {m.status !== 'ARCHIVED' && (
-                            <button onClick={() => handleArchive(m.id)} style={{
-                                background: '#27272a', border: '1px solid #3f3f46', borderRadius: '6px',
-                                padding: '6px 10px', color: '#ef4444', cursor: 'pointer'
-                            }}>
+                            <button
+                                onClick={() => handleArchive(m.id)}
+                                className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 p-2 rounded-lg transition-colors cursor-pointer"
+                            >
                                 <Trash2 size={14} />
                             </button>
                         )}
@@ -528,54 +518,46 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             ))}
 
             {!loading && !isEditing && machines.length === 0 && (
-                <div style={{
-                    textAlign: 'center', padding: '40px', color: '#71717a',
-                    background: '#18181b', borderRadius: '12px', border: '1px solid #27272a'
-                }}>
-                    <Cog size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                    <p style={{ margin: 0 }}>No machines configured yet. Add your first machine to unlock capabilities.</p>
+                <div className="text-center py-10 text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <Cog size={32} className="mb-3 opacity-40 mx-auto" />
+                    <p className="m-0 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        No machines configured yet. Add your first machine to unlock capabilities.
+                    </p>
                 </div>
             )}
 
             {/* Create/Edit Form */}
             {isEditing && (
-                <div style={{
-                    background: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px',
-                    padding: '24px', marginTop: '12px'
-                }}>
-                    <h4 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '16px', fontWeight: 700 }}>
+                <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-3 transition-colors">
+                    <h4 className="m-0 mb-4 text-base font-bold text-zinc-900 dark:text-white">
                         {editingMachineId ? 'Edit Machine & Capabilities' : 'Add Machine & Capabilities'}
                     </h4>
 
                     {errorMsg && (
-                        <div style={{
-                            background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: '8px',
-                            padding: '10px 14px', marginBottom: '16px', color: '#fca5a5', fontSize: '13px',
-                            display: 'flex', alignItems: 'center', gap: '8px'
-                        }}>
+                        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-3 rounded-lg text-xs mb-4 flex items-center gap-2">
                             <AlertCircle size={14} /> {errorMsg}
                         </div>
                     )}
 
                     {/* Section 1: Identification */}
-                    <div style={{ marginBottom: '20px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f4f4f5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className="mb-5">
+                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             1. Machine Identification
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Machine Name *</label>
+                                <label className={labelClass}>Machine Name *</label>
                                 <input
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.machine_name || ''}
                                     onChange={e => setForm({ ...form, machine_name: e.target.value })}
                                     placeholder="e.g. HP Indigo 100K Digital Press"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Machine Type *</label>
+                                <label className={labelClass}>Machine Type *</label>
                                 <select
-                                    style={{ ...inputStyle, cursor: 'pointer' }}
+                                    className={`${inputClass} cursor-pointer`}
                                     value={form.machine_type || 'DIGITAL_PRESS'}
                                     onChange={e => setForm({ ...form, machine_type: e.target.value })}
                                 >
@@ -585,18 +567,18 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 </select>
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Manufacturer</label>
+                                <label className={labelClass}>Manufacturer</label>
                                 <input
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.manufacturer || ''}
                                     onChange={e => setForm({ ...form, manufacturer: e.target.value })}
                                     placeholder="e.g. HP, Heidelberg, Canon, Konica Minolta"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Model</label>
+                                <label className={labelClass}>Model</label>
                                 <input
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.model || ''}
                                     onChange={e => setForm({ ...form, model: e.target.value })}
                                     placeholder="e.g. 100K Digital Press"
@@ -606,66 +588,66 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     </div>
 
                     {/* Section 2: Dimensions */}
-                    <div style={{ marginBottom: '20px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f4f4f5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className="mb-5">
+                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             2. Sheet & Print Dimensions (mm)
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Max Sheet Width (mm)</label>
+                                <label className={labelClass}>Max Sheet Width (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.max_sheet_width_mm}
                                     onChange={e => setForm({ ...form, max_sheet_width_mm: e.target.value })}
                                     placeholder="e.g. 750"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Max Sheet Height (mm)</label>
+                                <label className={labelClass}>Max Sheet Height (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.max_sheet_height_mm}
                                     onChange={e => setForm({ ...form, max_sheet_height_mm: e.target.value })}
                                     placeholder="e.g. 530"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Max Print Width (mm)</label>
+                                <label className={labelClass}>Max Print Width (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.max_print_width_mm}
                                     onChange={e => setForm({ ...form, max_print_width_mm: e.target.value })}
                                     placeholder="e.g. 740"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Min Sheet Width (mm)</label>
+                                <label className={labelClass}>Min Sheet Width (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.min_sheet_width_mm}
                                     onChange={e => setForm({ ...form, min_sheet_width_mm: e.target.value })}
                                     placeholder="e.g. 297"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Min Sheet Height (mm)</label>
+                                <label className={labelClass}>Min Sheet Height (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.min_sheet_height_mm}
                                     onChange={e => setForm({ ...form, min_sheet_height_mm: e.target.value })}
                                     placeholder="e.g. 210"
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '4px' }}>Max Print Height (mm)</label>
+                                <label className={labelClass}>Max Print Height (mm)</label>
                                 <input
                                     type="number"
-                                    style={inputStyle}
+                                    className={inputClass}
                                     value={form.max_print_height_mm}
                                     onChange={e => setForm({ ...form, max_print_height_mm: e.target.value })}
                                     placeholder="e.g. 510"
@@ -675,11 +657,11 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     </div>
 
                     {/* Section 3: Color Modes */}
-                    <div style={{ marginBottom: '20px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f4f4f5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className="mb-5">
+                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             3. Supported Color Modes
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                             {COLOR_MODE_OPTIONS.map(opt => {
                                 const checked = (form.supported_color_modes_json || []).includes(opt.value);
                                 return (
@@ -687,16 +669,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                         type="button"
                                         key={opt.value}
                                         onClick={() => toggleArrayItem('supported_color_modes_json', opt.value)}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '8px 12px', borderRadius: '8px',
-                                            background: checked ? 'rgba(220, 0, 0, 0.15)' : '#27272a',
-                                            border: `1px solid ${checked ? '#dc0000' : '#3f3f46'}`,
-                                            color: checked ? '#fff' : '#a1a1aa',
-                                            cursor: 'pointer', textAlign: 'left', fontSize: '13px'
-                                        }}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors border ${
+                                            checked 
+                                                ? 'bg-red-50 dark:bg-red-950/40 border-[#dc0000] text-red-900 dark:text-red-200' 
+                                                : 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                                        }`}
                                     >
-                                        {checked ? <CheckSquare size={16} color="#dc0000" /> : <Square size={16} color="#71717a" />}
+                                        {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
                                         <span>{opt.label}</span>
                                     </button>
                                 );
@@ -705,13 +684,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     </div>
 
                     {/* Section 4: Print Methods & Sides */}
-                    <div style={{ marginBottom: '20px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f4f4f5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className="mb-5">
+                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             4. Print Methods & Printing Sides
                         </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '6px' }}>Print Methods</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+                        <div className="mb-3">
+                            <label className={labelClass}>Print Methods</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 {PRINT_METHOD_OPTIONS.map(opt => {
                                     const checked = (form.supported_print_methods_json || []).includes(opt.value);
                                     return (
@@ -719,16 +698,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                             type="button"
                                             key={opt.value}
                                             onClick={() => toggleArrayItem('supported_print_methods_json', opt.value)}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: '8px',
-                                                padding: '8px 12px', borderRadius: '8px',
-                                                background: checked ? 'rgba(220, 0, 0, 0.15)' : '#27272a',
-                                                border: `1px solid ${checked ? '#dc0000' : '#3f3f46'}`,
-                                                color: checked ? '#fff' : '#a1a1aa',
-                                                cursor: 'pointer', textAlign: 'left', fontSize: '13px'
-                                            }}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors border ${
+                                                checked 
+                                                    ? 'bg-red-50 dark:bg-red-950/40 border-[#dc0000] text-red-900 dark:text-red-200' 
+                                                    : 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                                            }`}
                                         >
-                                            {checked ? <CheckSquare size={16} color="#dc0000" /> : <Square size={16} color="#71717a" />}
+                                            {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
                                             <span>{opt.label}</span>
                                         </button>
                                     );
@@ -736,8 +712,8 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                             </div>
                         </div>
                         <div>
-                            <label style={{ fontSize: '12px', color: '#a1a1aa', display: 'block', marginBottom: '6px' }}>Printing Sides</label>
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <label className={labelClass}>Printing Sides</label>
+                            <div className="flex gap-2.5 flex-wrap">
                                 {SIDES_OPTIONS.map(opt => {
                                     const checked = (form.supported_sides_json || []).includes(opt.value);
                                     return (
@@ -745,16 +721,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                             type="button"
                                             key={opt.value}
                                             onClick={() => toggleArrayItem('supported_sides_json', opt.value)}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: '8px',
-                                                padding: '8px 16px', borderRadius: '8px',
-                                                background: checked ? 'rgba(220, 0, 0, 0.15)' : '#27272a',
-                                                border: `1px solid ${checked ? '#dc0000' : '#3f3f46'}`,
-                                                color: checked ? '#fff' : '#a1a1aa',
-                                                cursor: 'pointer', fontSize: '13px'
-                                            }}
+                                            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors border ${
+                                                checked 
+                                                    ? 'bg-red-50 dark:bg-red-950/40 border-[#dc0000] text-red-900 dark:text-red-200' 
+                                                    : 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                                            }`}
                                         >
-                                            {checked ? <CheckSquare size={16} color="#dc0000" /> : <Square size={16} color="#71717a" />}
+                                            {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
                                             <span>{opt.label}</span>
                                         </button>
                                     );
@@ -764,31 +737,28 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     </div>
 
                     {/* Section 5: Technical Capabilities */}
-                    <div style={{ marginBottom: '24px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f4f4f5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className="mb-6">
+                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             5. Technical Capabilities & Features
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px' }}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                             {CAPABILITY_TOGGLES.map(cap => {
-                                const checked = !!form[cap.field];
+                                const checked = !form[cap.field];
                                 return (
                                     <button
                                         type="button"
                                         key={cap.field}
                                         onClick={() => setForm({ ...form, [cap.field]: !checked })}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '10px 12px', borderRadius: '8px',
-                                            background: checked ? 'rgba(34, 197, 94, 0.15)' : '#27272a',
-                                            border: `1px solid ${checked ? '#22c55e' : '#3f3f46'}`,
-                                            color: checked ? '#fff' : '#a1a1aa',
-                                            cursor: 'pointer', textAlign: 'left', fontSize: '13px'
-                                        }}
+                                        className={`flex items-center gap-2 p-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors border text-left ${
+                                            checked 
+                                                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-200' 
+                                                : 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                                        }`}
                                     >
-                                        {checked ? <CheckCircle size={16} color="#22c55e" /> : <Square size={16} color="#71717a" />}
+                                        {checked ? <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Square size={16} className="text-zinc-400 shrink-0" />}
                                         <div>
-                                            <div style={{ fontWeight: checked ? 600 : 400 }}>{cap.label}</div>
-                                            <div style={{ fontSize: '11px', color: '#71717a' }}>{cap.group}</div>
+                                            <div className="font-semibold">{cap.label}</div>
+                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{cap.group}</div>
                                         </div>
                                     </button>
                                 );
@@ -796,14 +766,18 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid #27272a', paddingTop: '16px' }}>
+                    <div className="flex gap-2.5 justify-end border-t border-zinc-200 dark:border-zinc-800 pt-4">
                         <button
                             onClick={() => setIsEditing(false)}
-                            style={{ ...btnPrimary, background: '#27272a' }}
+                            className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                         >
                             Cancel
                         </button>
-                        <button onClick={handleSave} disabled={loading} style={btnPrimary}>
+                        <button
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="px-5 py-2 bg-[#dc0000] hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+                        >
                             {loading ? 'Saving...' : editingMachineId ? 'Update Machine & Capabilities' : 'Create Machine & Capabilities'}
                         </button>
                     </div>

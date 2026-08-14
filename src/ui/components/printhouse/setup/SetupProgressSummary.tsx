@@ -37,88 +37,59 @@ export const SetupProgressSummary: React.FC<{ readiness?: ReadinessData }> = ({ 
     const isCoreComplete = account?.status === 'COMPLETE' && config?.status === 'COMPLETE' && pricing?.status === 'COMPLETE';
 
     return (
-        <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '16px',
-            marginBottom: '28px'
-        }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
             {/* 1. Account Setup Card */}
-            <div style={{
-                background: '#ffffff',
-                border: `1px solid ${account?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>1. Account & Sites</span>
-                    <ShieldCheck size={18} style={{ color: account?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
+            <div className={`bg-white dark:bg-[#18181b] border ${account?.status === 'COMPLETE' ? 'border-emerald-500' : 'border-zinc-200 dark:border-[#27272a]'} rounded-xl p-5 shadow-xs transition-colors`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">1. Account & Sites</span>
+                    <ShieldCheck size={18} className={account?.status === 'COMPLETE' ? 'text-emerald-500' : 'text-amber-600 dark:text-amber-500'} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
+                <div className="text-xl font-bold text-zinc-900 dark:text-white mb-1">
                     {account ? `${account.completedRequirements} / ${account.totalRequirements || 6}` : '0 / 6'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: account?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{account?.status || 'IN_PROGRESS'}</strong>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Status: <strong className={account?.status === 'COMPLETE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{account?.status || 'IN_PROGRESS'}</strong>
                 </div>
             </div>
 
             {/* 2. Operational Configuration Card */}
-            <div style={{
-                background: '#ffffff',
-                border: `1px solid ${config?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>2. Production Readiness</span>
-                    <Clock size={18} style={{ color: config?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
+            <div className={`bg-white dark:bg-[#18181b] border ${config?.status === 'COMPLETE' ? 'border-emerald-500' : 'border-zinc-200 dark:border-[#27272a]'} rounded-xl p-5 shadow-xs transition-colors`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">2. Production Readiness</span>
+                    <Clock size={18} className={config?.status === 'COMPLETE' ? 'text-emerald-500' : 'text-amber-600 dark:text-amber-500'} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
+                <div className="text-xl font-bold text-zinc-900 dark:text-white mb-1">
                     {config ? `${config.completedRequirements} / ${config.totalRequirements || 5}` : '0 / 5'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: config?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{config?.status || 'IN_PROGRESS'}</strong>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Status: <strong className={config?.status === 'COMPLETE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{config?.status || 'IN_PROGRESS'}</strong>
                 </div>
             </div>
 
             {/* 3. Pricing Readiness Card */}
-            <div style={{
-                background: '#ffffff',
-                border: `1px solid ${pricing?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>3. Industrial Pricing</span>
-                    <Tag size={18} style={{ color: pricing?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
+            <div className={`bg-white dark:bg-[#18181b] border ${pricing?.status === 'COMPLETE' ? 'border-emerald-500' : 'border-zinc-200 dark:border-[#27272a]'} rounded-xl p-5 shadow-xs transition-colors`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">3. Industrial Pricing</span>
+                    <Tag size={18} className={pricing?.status === 'COMPLETE' ? 'text-emerald-500' : 'text-amber-600 dark:text-amber-500'} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
+                <div className="text-xl font-bold text-zinc-900 dark:text-white mb-1">
                     {pricing?.status === 'COMPLETE' ? 'Configured' : pricing?.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: pricing?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{pricing?.status || 'NOT_STARTED'}</strong>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Status: <strong className={pricing?.status === 'COMPLETE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{pricing?.status || 'NOT_STARTED'}</strong>
                 </div>
             </div>
 
             {/* 4. Overall Core Status */}
-            <div style={{
-                background: isCoreComplete ? 'rgba(16, 185, 129, 0.08)' : '#fafafa',
-                border: `1px solid ${isCoreComplete ? '#10b981' : '#e4e4e7'}`,
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Core Setup Status</span>
-                    {isCoreComplete ? <CheckCircle size={18} color="#10b981" /> : <Clock size={18} color="#d97706" />}
+            <div className={`${isCoreComplete ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500' : 'bg-white dark:bg-[#18181b] border-zinc-200 dark:border-[#27272a]'} border rounded-xl p-5 shadow-xs transition-colors`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Core Setup Status</span>
+                    {isCoreComplete ? <CheckCircle size={18} className="text-emerald-500" /> : <Clock size={18} className="text-amber-600 dark:text-amber-500" />}
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: isCoreComplete ? '#059669' : '#d97706', marginBottom: '4px' }}>
+                <div className={`text-lg font-bold ${isCoreComplete ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'} mb-1`}>
                     {isCoreComplete ? 'SETUP COMPLETE' : 'SETUP INCOMPLETE'}
                 </div>
-                <div style={{ fontSize: '11px', color: '#71717a' }}>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
                     {isCoreComplete ? 'Ready for dashboard & marketplace review' : 'Complete 8 modules below'}
                 </div>
             </div>

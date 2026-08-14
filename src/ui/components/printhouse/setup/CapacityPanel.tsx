@@ -145,27 +145,22 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
         }
     };
 
+    const inputClass = "w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
+    const labelClass = "block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5";
+
     return (
-        <div style={{ background: '#18181b', padding: '24px', borderRadius: '12px', border: '1px solid #27272a' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Activity size={20} style={{ color: '#dc0000' }} />
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: 0 }}>Indicative Production Capacity</h2>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                    <Activity size={20} className="text-[#dc0000]" />
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Indicative Production Capacity</h2>
                 </div>
 
                 {sites.length > 1 && (
                     <select
                         value={selectedSiteId}
                         onChange={(e) => setSelectedSiteId(e.target.value)}
-                        style={{
-                            background: '#09090b',
-                            color: '#ffffff',
-                            border: '1px solid #3f3f46',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            fontSize: '13px'
-                        }}
+                        className={`${inputClass} cursor-pointer max-w-xs`}
                     >
                         {sites.map(site => (
                             <option key={site.siteId} value={site.siteId}>{site.siteName}</option>
@@ -175,138 +170,124 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
             </div>
 
             {error && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#450a0a', border: '1px solid #991b1b', color: '#fca5a5', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-3 rounded-lg text-xs mb-4">
                     <AlertCircle size={16} />
                     <span>{error}</span>
                 </div>
             )}
 
             {successMsg && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#064e3b', border: '1px solid #065f46', color: '#a7f3d0', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 p-3 rounded-lg text-xs mb-4">
                     <CheckCircle size={16} />
                     <span>{successMsg}</span>
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px' }} className="responsive-grid-split">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Site Capacity Config Form */}
-                <form onSubmit={handleSaveSiteCapacity} style={{ background: '#09090b', padding: '20px', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px 0', color: '#ffffff' }}>Site Throughput Targets</h3>
+                <form onSubmit={handleSaveSiteCapacity} className="lg:col-span-5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex flex-col gap-3 transition-colors">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">Site Throughput Targets</h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>DAILY JOBS LIMIT</label>
+                            <label className={labelClass}>DAILY JOBS LIMIT</label>
                             <input
                                 type="number"
                                 placeholder="No limit"
                                 value={dailyJobsLimit}
                                 onChange={(e) => setDailyJobsLimit(e.target.value === '' ? '' : Number(e.target.value))}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>DAILY SHEETS LIMIT</label>
+                            <label className={labelClass}>DAILY SHEETS LIMIT</label>
                             <input
                                 type="number"
                                 placeholder="No limit"
                                 value={dailySheetsLimit}
                                 onChange={(e) => setDailySheetsLimit(e.target.value === '' ? '' : Number(e.target.value))}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>WORKING DAYS / WEEK</label>
+                            <label className={labelClass}>WORKING DAYS / WEEK</label>
                             <input
                                 type="number"
                                 min="1"
                                 max="7"
                                 value={workingDays}
                                 onChange={(e) => setWorkingDays(Number(e.target.value))}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>OPERATING HOURS / DAY</label>
+                            <label className={labelClass}>OPERATING HOURS / DAY</label>
                             <input
                                 type="number"
                                 min="1"
                                 max="24"
                                 value={operatingHours}
                                 onChange={(e) => setOperatingHours(Number(e.target.value))}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>NOTES / EXCEPTIONS</label>
+                        <label className={labelClass}>NOTES / EXCEPTIONS</label>
                         <textarea
                             placeholder="e.g. Closed during national bank holidays"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box', minHeight: '60px', resize: 'vertical' }}
+                            className={`${inputClass} min-h-[60px] resize-y`}
                         />
                     </div>
 
-                    <div style={{ background: '#27272a', padding: '10px', borderRadius: '6px', display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '4px 0' }}>
-                        <ShieldAlert size={14} style={{ color: '#f59e0b', marginTop: '2px', flexShrink: 0 }} />
-                        <span style={{ fontSize: '10.5px', color: '#d4d4d8', lineHeight: '1.4' }}>
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 p-2.5 rounded-lg flex gap-2 items-start my-1 text-xs text-amber-900 dark:text-amber-300">
+                        <ShieldAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                        <span className="leading-tight">
                             <strong>Indicative capacity only.</strong> Dynamic job scheduling, allocation queues, and live routing are not active in this phase.
                         </span>
                     </div>
 
                     <button
                         type="submit"
-                        style={{
-                            background: '#dc0000',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            marginTop: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            fontSize: '13px'
-                        }}
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 mt-1 shadow-xs cursor-pointer"
                     >
                         <Check size={16} /> Save Site Capacity
                     </button>
                 </form>
 
                 {/* Machine-Specific Throughput Constraints */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0', color: '#ffffff' }}>Machinery Limits</h3>
+                <div className="lg:col-span-7 flex flex-col gap-3">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">Machinery Limits</h3>
                     {machines.length === 0 ? (
-                        <div style={{ background: '#09090b', padding: '24px', borderRadius: '8px', border: '1px solid #27272a', textColors: '#71717a', textAlign: 'center' }}>
-                            <p style={{ fontSize: '13px', margin: 0, color: '#a1a1aa' }}>No active machines configured at this site.</p>
-                            <p style={{ fontSize: '11px', margin: '4px 0 0 0', color: '#71717a' }}>Go to Machinery tab to add presses first.</p>
+                        <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
+                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">No active machines configured at this site.</p>
+                            <p className="text-xs text-zinc-500 mt-1 mb-0">Go to Machinery tab to add presses first.</p>
                         </div>
                     ) : (
                         machines.map(m => (
-                            <div key={m.id} style={{ background: '#09090b', padding: '14px 16px', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div key={m.id} className="bg-zinc-50 dark:bg-zinc-900/60 p-3.5 sm:px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 flex justify-between items-center flex-wrap gap-3 transition-colors">
                                 <div>
-                                    <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff', margin: 0 }}>{m.machine_name}</h4>
-                                    <span style={{ fontSize: '11px', color: '#a1a1aa' }}>{m.machine_type}</span>
+                                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white m-0">{m.machine_name}</h4>
+                                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{m.machine_type}</span>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="flex items-center gap-2">
                                     <input
                                         type="number"
                                         value={machineCapacityVal[m.id] !== undefined ? machineCapacityVal[m.id] : 0}
                                         onChange={(e) => setMachineCapacityVal({ ...machineCapacityVal, [m.id]: Number(e.target.value) })}
-                                        style={{ background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '6px 8px', borderRadius: '4px', fontSize: '12px', width: '80px' }}
+                                        className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-1.5 rounded-lg text-xs w-20"
                                     />
                                     <select
                                         value={machineCapacityUnit[m.id] || 'impressions'}
                                         onChange={(e) => setMachineCapacityUnit({ ...machineCapacityUnit, [m.id]: e.target.value })}
-                                        style={{ background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '6px 8px', borderRadius: '4px', fontSize: '12px' }}
+                                        className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-1.5 rounded-lg text-xs cursor-pointer"
                                     >
                                         <option value="impressions">impressions/day</option>
                                         <option value="sheets">sheets/day</option>
@@ -316,7 +297,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                                     <button
                                         type="button"
                                         onClick={() => handleSaveMachineCapacity(m.id)}
-                                        style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#ffffff', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                        className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                                     >
                                         Save
                                     </button>

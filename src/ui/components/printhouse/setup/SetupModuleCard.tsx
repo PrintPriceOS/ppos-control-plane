@@ -39,112 +39,91 @@ export const SetupModuleCard: React.FC<SetupModuleCardProps> = ({
     const getIconStyles = () => {
         if (isLocked) {
             return {
-                bg: '#f4f4f5',
-                color: '#a1a1aa',
-                border: '#e4e4e7'
+                bg: 'bg-zinc-100 dark:bg-zinc-800',
+                color: 'text-zinc-400 dark:text-zinc-500',
+                border: 'border-zinc-200 dark:border-zinc-700'
             };
         }
         if (status === 'COMPLETE') {
             return {
-                bg: 'rgba(16, 185, 129, 0.1)',
-                color: '#059669',
-                border: 'rgba(16, 185, 129, 0.2)'
+                bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+                color: 'text-emerald-600 dark:text-emerald-400',
+                border: 'border-emerald-200 dark:border-emerald-800/60'
             };
         }
         if (status === 'IN_PROGRESS') {
             return {
-                bg: 'rgba(217, 119, 6, 0.1)',
-                color: '#d97706',
-                border: 'rgba(217, 119, 6, 0.2)'
+                bg: 'bg-amber-50 dark:bg-amber-950/40',
+                color: 'text-amber-600 dark:text-amber-400',
+                border: 'border-amber-200 dark:border-amber-800/60'
             };
         }
         if (status === 'NEEDS_ATTENTION') {
             return {
-                bg: 'rgba(239, 68, 68, 0.1)',
-                color: '#dc2626',
-                border: 'rgba(239, 68, 68, 0.2)'
+                bg: 'bg-red-50 dark:bg-red-950/40',
+                color: 'text-red-600 dark:text-red-400',
+                border: 'border-red-200 dark:border-red-800/60'
             };
         }
         return {
-            bg: '#f4f4f5',
-            color: '#71717a',
-            border: '#e4e4e7'
+            bg: 'bg-zinc-100 dark:bg-zinc-800',
+            color: 'text-zinc-600 dark:text-zinc-300',
+            border: 'border-zinc-200 dark:border-zinc-700'
         };
     };
 
     const iconStyle = getIconStyles();
 
     return (
-        <div 
-            className="group"
-            style={{
-                background: isLocked ? '#f4f4f5' : '#ffffff',
-                border: `1px solid ${status === 'COMPLETE' ? '#10b981' : status === 'NEEDS_ATTENTION' ? '#ef4444' : isLocked ? '#e4e4e7' : '#e4e4e7'}`,
-                borderRadius: '12px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: isLocked ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease-out'
-            }}
+        <div
+            className={`group ${
+                isLocked 
+                    ? 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800/80 shadow-none' 
+                    : status === 'COMPLETE'
+                        ? 'bg-white dark:bg-[#18181b] border-emerald-500/80 dark:border-emerald-500/60 shadow-xs'
+                        : status === 'NEEDS_ATTENTION'
+                            ? 'bg-white dark:bg-[#18181b] border-red-500/80 dark:border-red-500/60 shadow-xs'
+                            : 'bg-white dark:bg-[#18181b] border-zinc-200 dark:border-[#27272a] shadow-xs'
+            } border rounded-xl p-6 flex flex-col justify-between transition-all hover:shadow-md`}
         >
             <div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
                         {icon && (
                             <div 
                                 aria-hidden="true"
-                                style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
-                                    backgroundColor: iconStyle.bg,
-                                    color: iconStyle.color,
-                                    border: `1px solid ${iconStyle.border}`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'transform 180ms ease-out, color 180ms ease-out',
-                                    flexShrink: 0
-                                }}
+                                className={`w-[38px] h-[38px] rounded-lg border flex items-center justify-center shrink-0 transition-transform duration-180 ease-out group-hover:scale-105 ${iconStyle.bg} ${iconStyle.color} ${iconStyle.border}`}
                             >
-                                <span style={{ display: 'inline-flex', transform: 'scale(1.3)' }}>
+                                <span className="inline-flex scale-[1.3]">
                                     {icon}
                                 </span>
                             </div>
                         )}
                         <div>
-                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: isLocked ? '#71717a' : '#09090b', margin: 0 }}>
+                            <h3 className={`text-sm font-bold m-0 ${isLocked ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}`}>
                                 {title}
                             </h3>
                         </div>
                     </div>
                     <div>
-                        {status === 'COMPLETE' && <CheckCircle size={18} style={{ color: '#10b981' }} />}
-                        {status === 'IN_PROGRESS' && <Clock size={18} style={{ color: '#d97706' }} />}
-                        {status === 'NEEDS_ATTENTION' && <AlertCircle size={18} style={{ color: '#ef4444' }} />}
-                        {isLocked && <Lock size={18} style={{ color: '#a1a1aa' }} />}
+                        {status === 'COMPLETE' && <CheckCircle size={18} className="text-emerald-500" />}
+                        {status === 'IN_PROGRESS' && <Clock size={18} className="text-amber-600 dark:text-amber-500" />}
+                        {status === 'NEEDS_ATTENTION' && <AlertCircle size={18} className="text-red-500" />}
+                        {isLocked && <Lock size={18} className="text-zinc-400 dark:text-zinc-600" />}
                     </div>
                 </div>
-                <p style={{ fontSize: '13px', color: isLocked ? '#a1a1aa' : '#52525b', lineHeight: '1.5', margin: '0 0 14px 0' }}>
+                <p className={`text-xs leading-relaxed mb-3.5 ${isLocked ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
                     {description}
                 </p>
 
                 {missingRequirements.length > 0 && status !== 'COMPLETE' && (
-                    <div style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fef3c7',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        marginBottom: '16px'
-                    }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 rounded-lg p-2.5 sm:px-3 mb-4">
+                        <div className="text-[11px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
                             Missing Requirements:
                         </div>
-                        <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', color: '#78350f' }}>
+                        <ul className="m-0 pl-4 text-xs text-amber-800 dark:text-amber-200/90 space-y-0.5">
                             {missingRequirements.map((req, idx) => (
-                                <li key={idx} style={{ marginBottom: '2px' }}>{req}</li>
+                                <li key={idx}>{req}</li>
                             ))}
                         </ul>
                     </div>
@@ -155,45 +134,22 @@ export const SetupModuleCard: React.FC<SetupModuleCardProps> = ({
                 {isActionable ? (
                     <button
                         onClick={onAction}
-                        style={{
-                            background: status === 'COMPLETE' ? '#f4f4f5' : '#dc0000',
-                            color: status === 'COMPLETE' ? '#18181b' : '#ffffff',
-                            border: status === 'COMPLETE' ? '1px solid #e4e4e7' : 'none',
-                            padding: '10px 16px',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            width: '100%',
-                            justifyContent: 'center',
-                            boxShadow: status === 'COMPLETE' ? 'none' : '0 2px 4px rgba(220, 0, 0, 0.2)'
-                        }}
+                        className={`w-full py-2.5 px-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                            status === 'COMPLETE'
+                                ? 'bg-zinc-100 dark:bg-zinc-800/90 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700'
+                                : 'bg-[#dc0000] hover:bg-red-700 text-white shadow-xs'
+                        }`}
                     >
                         {getCtaLabel()} <ArrowRight size={14} />
                     </button>
                 ) : (
-                    <div style={{
-                        background: '#e4e4e7',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        color: '#52525b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        fontWeight: 500
-                    }}>
-                        <Lock size={14} color="#71717a" />
-                        <span>{dependencyHint || 'Prerequisite required'}</span>
+                    <div className="py-2.5 px-4 bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-semibold text-center flex items-center justify-center gap-1.5 cursor-not-allowed">
+                        <Lock size={14} />
+                        <span>{dependencyHint || 'Prerequisites required'}</span>
                     </div>
                 )}
             </div>
         </div>
     );
 };
-
 

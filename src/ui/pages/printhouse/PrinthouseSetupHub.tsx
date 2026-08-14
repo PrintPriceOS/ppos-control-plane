@@ -164,45 +164,26 @@ export const PrinthouseSetupHub: React.FC = () => {
     ];
 
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px', color: '#18181b' }}>
+        <div className="max-w-[1100px] mx-auto py-8 px-6 text-zinc-900 dark:text-zinc-100 transition-colors">
             {/* Header Banner */}
-            <div style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#09090b', margin: '0 0 8px 0' }}>
+            <div className="mb-8">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white mb-2">
                     Welcome to Your Printhouse Workspace
                 </h1>
-                <p style={{ fontSize: '14px', color: '#52525b', margin: 0, maxWidth: '720px', lineHeight: '1.6' }}>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl leading-relaxed m-0">
                     Configure your production environment at your own pace. Complete the 8 operational modules below so PrintPrice OS can accurately route jobs, verify preflight specifications, and enable automated marketplace dispatch.
                 </p>
             </div>
 
             {fetchError && (
-                <div style={{
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#991b1b',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <AlertTriangle size={18} color="#dc2626" />
-                        <span style={{ fontSize: '13px', fontWeight: 500 }}>{fetchError}</span>
+                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-3.5 sm:px-4 rounded-xl mb-5 flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle size={18} className="text-red-600 dark:text-red-400 shrink-0" />
+                        <span className="text-xs font-medium">{fetchError}</span>
                     </div>
                     <button
                         onClick={fetchOnboardingData}
-                        style={{
-                            background: '#dc2626',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 600
-                        }}
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                     >
                         Retry Loading
                     </button>
@@ -210,29 +191,26 @@ export const PrinthouseSetupHub: React.FC = () => {
             )}
 
             {/* Navigation Tabs */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e4e4e7', paddingBottom: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
-                {tabDefs.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => tab.enabled && handleSelectTab(tab.key)}
-                        style={{
-                            background: activeTab === tab.key ? '#dc0000' : '#f4f4f5',
-                            color: activeTab === tab.key ? '#ffffff' : tab.enabled ? '#18181b' : '#a1a1aa',
-                            border: '1px solid ' + (activeTab === tab.key ? '#dc0000' : '#e4e4e7'),
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: tab.enabled ? 'pointer' : 'not-allowed',
-                            opacity: tab.enabled ? 1 : 0.6,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
+            <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-7 flex-wrap">
+                {tabDefs.map(tab => {
+                    const isActive = activeTab === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => tab.enabled && handleSelectTab(tab.key)}
+                            disabled={!tab.enabled}
+                            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isActive
+                                    ? 'bg-[#dc0000] text-white border border-[#dc0000] shadow-sm'
+                                    : tab.enabled
+                                        ? 'bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700'
+                                        : 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-600 border border-zinc-200/50 dark:border-zinc-800/50 cursor-not-allowed opacity-60'
+                            }`}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Readiness Summary (Top 3 Aggregate Dimensions + Overall Core Status) */}
@@ -241,10 +219,10 @@ export const PrinthouseSetupHub: React.FC = () => {
             {/* Tab Contents */}
             {activeTab === 'OVERVIEW' && (
                 <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#09090b', marginBottom: '16px' }}>
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">
                         Guided Setup Tasks (8 Modules)
                     </h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {/* 1. Company Profile */}
                         <SetupModuleCard
                             title="1. Company Profile"

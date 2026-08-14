@@ -190,27 +190,22 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
         }
     };
 
+    const inputClass = "w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
+    const labelClass = "block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5";
+
     return (
-        <div style={{ background: '#18181b', padding: '24px', borderRadius: '12px', border: '1px solid #27272a' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Layers size={20} style={{ color: '#dc0000' }} />
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: 0 }}>Materials & Substrate Catalog</h2>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                    <Layers size={20} className="text-[#dc0000]" />
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Materials & Substrate Catalog</h2>
                 </div>
 
                 {sites.length > 1 && (
                     <select
                         value={selectedSiteId}
                         onChange={(e) => setSelectedSiteId(e.target.value)}
-                        style={{
-                            background: '#09090b',
-                            color: '#ffffff',
-                            border: '1px solid #3f3f46',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            fontSize: '13px'
-                        }}
+                        className={`${inputClass} cursor-pointer max-w-xs`}
                     >
                         {sites.map(site => (
                             <option key={site.siteId} value={site.siteId}>{site.siteName}</option>
@@ -220,43 +215,43 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
             </div>
 
             {error && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#450a0a', border: '1px solid #991b1b', color: '#fca5a5', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-3 rounded-lg text-xs mb-4">
                     <AlertCircle size={16} />
                     <span>{error}</span>
                 </div>
             )}
 
             {successMsg && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#064e3b', border: '1px solid #065f46', color: '#a7f3d0', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 p-3 rounded-lg text-xs mb-4">
                     <CheckCircle size={16} />
                     <span>{successMsg}</span>
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', flexWrap: 'wrap' }} className="responsive-grid-split">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Catalog Addition Form */}
-                <form onSubmit={handleCreateMaterial} style={{ background: '#09090b', padding: '20px', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px 0', color: '#ffffff' }}>Add New Material</h3>
+                <form onSubmit={handleCreateMaterial} className="lg:col-span-5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex flex-col gap-3 transition-colors">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">Add New Material</h3>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>MATERIAL NAME</label>
+                        <label className={labelClass}>MATERIAL NAME</label>
                         <input
                             type="text"
                             required
                             placeholder="e.g. Silk Matt Coated Paper"
                             value={materialName}
                             onChange={(e) => setMaterialName(e.target.value)}
-                            style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                            className={inputClass}
                         />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>TYPE</label>
+                            <label className={labelClass}>TYPE</label>
                             <select
                                 value={materialType}
                                 onChange={(e) => setMaterialType(e.target.value)}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px' }}
+                                className={`${inputClass} cursor-pointer`}
                             >
                                 <option value="PAPER">Paper Substrate</option>
                                 <option value="BOARD">Rigid Board</option>
@@ -266,102 +261,88 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                             </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>SUBSTRATE CLASS</label>
+                            <label className={labelClass}>SUBSTRATE CLASS</label>
                             <input
                                 type="text"
                                 placeholder="e.g. COATED, UNCOATED"
                                 value={substrateClass}
                                 onChange={(e) => setSubstrateClass(e.target.value)}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>GSM (WEIGHT)</label>
+                            <label className={labelClass}>GSM (WEIGHT)</label>
                             <input
                                 type="number"
                                 value={gsm}
                                 onChange={(e) => setGsm(Number(e.target.value))}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>FORMAT SIZE</label>
+                            <label className={labelClass}>FORMAT SIZE</label>
                             <input
                                 type="text"
                                 placeholder="e.g. SRA3, B2, 700x1000"
                                 value={sheetFormat}
                                 onChange={(e) => setSheetFormat(e.target.value)}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>FINISH TYPE</label>
+                            <label className={labelClass}>FINISH TYPE</label>
                             <input
                                 type="text"
                                 placeholder="e.g. MATT, GLOSS, SILK"
                                 value={finishType}
                                 onChange={(e) => setFinishType(e.target.value)}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>SUPPLIER COUNTRY</label>
+                            <label className={labelClass}>SUPPLIER COUNTRY</label>
                             <input
                                 type="text"
                                 placeholder="e.g. ES, DE, FR"
                                 value={supplierCountry}
                                 onChange={(e) => setSupplierCountry(e.target.value)}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                                className={inputClass}
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', color: '#a1a1aa', marginBottom: '4px', fontWeight: 600 }}>SUPPLIER NAME</label>
+                        <label className={labelClass}>SUPPLIER NAME</label>
                         <input
                             type="text"
                             placeholder="e.g. Antalis Co."
                             value={supplierName}
                             onChange={(e) => setSupplierName(e.target.value)}
-                            style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '8px 12px', borderRadius: '6px', outline: 'none', fontSize: '13px', boxSizing: 'border-box' }}
+                            className={inputClass}
                         />
                     </div>
 
                     <button
                         type="submit"
-                        style={{
-                            background: '#dc0000',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            marginTop: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            fontSize: '13px'
-                        }}
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 mt-2 shadow-xs cursor-pointer"
                     >
                         <Plus size={16} /> Add to Site Catalog
                     </button>
                 </form>
 
                 {/* Substrate Catalog Listing */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="lg:col-span-7 flex flex-col gap-3">
                     {materials.length === 0 ? (
-                        <div style={{ background: '#09090b', padding: '32px', borderRadius: '8px', border: '1px solid #27272a', textAlign: 'center', color: '#71717a' }}>
-                            <Layers size={32} style={{ margin: '0 auto 12px auto', display: 'block', opacity: 0.5 }} />
-                            <p style={{ fontSize: '14px', margin: 0 }}>No materials configured for this site yet.</p>
-                            <p style={{ fontSize: '12px', margin: '4px 0 0 0', opacity: 0.8 }}>Use the form to configure your first paper stock or media item.</p>
+                        <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
+                            <Layers size={32} className="mx-auto mb-3 opacity-40" />
+                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">No materials configured for this site yet.</p>
+                            <p className="text-xs text-zinc-500 mt-1 mb-0">Use the form to configure your first paper stock or media item.</p>
                         </div>
                     ) : (
                         materials.map(mat => {
@@ -369,21 +350,21 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                             const isPairingMode = pairingMaterialId === mat.id;
 
                             return (
-                                <div key={mat.id} style={{ background: '#09090b', padding: '16px', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div key={mat.id} className="bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 transition-colors">
+                                    <div className="flex justify-between items-start">
                                         <div>
-                                            <span style={{ fontSize: '11px', background: '#27272a', color: '#d4d4d8', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                            <span className="text-[11px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded font-semibold">
                                                 {mat.material_type}
                                             </span>
-                                            <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', margin: '6px 0 2px 0' }}>{mat.material_name}</h4>
-                                            <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0 }}>
+                                            <h4 className="text-sm font-bold text-zinc-900 dark:text-white mt-1.5 mb-0.5">{mat.material_name}</h4>
+                                            <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0">
                                                 {mat.gsm} GSM • {mat.sheet_format} • {mat.finish_type}
                                             </p>
                                         </div>
 
                                         <button
                                             onClick={() => handleArchiveMaterial(mat.id)}
-                                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
                                             title="Archive Material"
                                         >
                                             <Trash2 size={16} />
@@ -391,32 +372,32 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                     </div>
 
                                     {/* Machine Pairings */}
-                                    <div style={{ background: '#18181b', padding: '12px', borderRadius: '6px', border: '1px solid #27272a' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#d4d4d8' }}>Machine Compatibilities</span>
+                                    <div className="bg-white dark:bg-zinc-900/90 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">Machine Compatibilities</span>
                                             <button
                                                 onClick={() => setPairingMaterialId(isPairingMode ? null : mat.id)}
-                                                style={{ background: 'transparent', border: 'none', color: '#38bdf8', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                className="text-sky-600 dark:text-sky-400 text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                                             >
                                                 <Link2 size={12} /> {isPairingMode ? 'Close Pairing' : 'Manage Pairings'}
                                             </button>
                                         </div>
 
                                         {pairedMachineDetails.length === 0 && !isPairingMode && (
-                                            <p style={{ fontSize: '11px', color: '#71717a', margin: 0 }}>Not associated with any machines yet.</p>
+                                            <p className="text-xs text-zinc-500 m-0">Not associated with any machines yet.</p>
                                         )}
 
                                         {/* Paired list */}
                                         {!isPairingMode && pairedMachineDetails.length > 0 && (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                            <div className="flex flex-wrap gap-1.5">
                                                 {pairedMachineDetails.map(pairedStr => {
                                                     const [mId, provenance] = pairedStr.split(':');
                                                     const machineObj = machines.find(m => m.id === mId);
                                                     if (!machineObj) return null;
                                                     return (
-                                                        <div key={mId} style={{ background: '#27272a', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-                                                            <span style={{ color: '#ffffff', fontWeight: 600 }}>{machineObj.machine_name}</span>
-                                                            <span style={{ fontSize: '9px', background: '#3f3f46', color: '#cbd5e1', padding: '1px 4px', borderRadius: '2px' }} title="Compatibility Provenance">
+                                                        <div key={mId} className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded flex items-center gap-1.5 text-xs">
+                                                            <span className="text-zinc-900 dark:text-white font-semibold">{machineObj.machine_name}</span>
+                                                            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded" title="Compatibility Provenance">
                                                                 {provenance}
                                                             </span>
                                                         </div>
@@ -427,26 +408,26 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
 
                                         {/* Interactive pairing mode */}
                                         {isPairingMode && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                                            <div className="flex flex-col gap-2 mt-2">
                                                 {machines.length === 0 ? (
-                                                    <p style={{ fontSize: '11px', color: '#a1a1aa', margin: 0 }}>No machines configured. Configure a machine first.</p>
+                                                    <p className="text-xs text-zinc-500 m-0">No machines configured. Configure a machine first.</p>
                                                 ) : (
                                                     machines.map(m => {
                                                         const isPaired = pairedMachineDetails.some(p => p.startsWith(m.id + ':'));
                                                         const currentProvenance = pairedMachineDetails.find(p => p.startsWith(m.id + ':'))?.split(':')[1] || '';
 
                                                         return (
-                                                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#09090b', padding: '8px 10px', borderRadius: '4px', border: '1px solid #27272a' }}>
+                                                            <div key={m.id} className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/60 p-2 rounded border border-zinc-200 dark:border-zinc-700">
                                                                 <div>
-                                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#ffffff' }}>{m.machine_name}</span>
+                                                                    <span className="text-xs font-semibold text-zinc-900 dark:text-white">{m.machine_name}</span>
                                                                     {isPaired && (
-                                                                        <span style={{ display: 'block', fontSize: '9px', color: '#a1a1aa' }}>
+                                                                        <span className="block text-[10px] text-zinc-500">
                                                                             Provenance: {currentProvenance}
                                                                         </span>
                                                                     )}
                                                                 </div>
 
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <div className="flex items-center gap-2">
                                                                     {!isPaired && (
                                                                         <>
                                                                             <input
@@ -454,12 +435,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                                 placeholder="provenance code"
                                                                                 value={provenanceMap[m.id] || ''}
                                                                                 onChange={(e) => setProvenanceMap({ ...provenanceMap, [m.id]: e.target.value })}
-                                                                                style={{ background: '#18181b', border: '1px solid #3f3f46', color: '#ffffff', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', width: '100px' }}
+                                                                                className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-1 rounded text-xs w-28"
                                                                             />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => handlePairMachine(mat.id, m.id)}
-                                                                                style={{ background: '#dc0000', border: 'none', color: '#ffffff', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}
+                                                                                className="bg-[#dc0000] hover:bg-red-700 text-white px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors"
                                                                             >
                                                                                 Link
                                                                             </button>
@@ -469,9 +450,9 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleUnpairMachine(mat.id, m.id)}
-                                                                            style={{ background: '#3f3f46', border: 'none', color: '#fca5a5', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                                                                            className="bg-zinc-200 dark:bg-zinc-700 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
                                                                         >
-                                                                            <Unlink size={10} /> Unlink
+                                                                            <Unlink size={12} /> Unlink
                                                                         </button>
                                                                     )}
                                                                 </div>
