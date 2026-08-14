@@ -161,22 +161,22 @@ export const PrinthouseSetupHub: React.FC = () => {
     ];
 
     return (
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px', color: '#f4f4f5' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px', color: '#18181b' }}>
             {/* Header Banner */}
             <div style={{ marginBottom: '32px' }}>
-                <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#ffffff', margin: '0 0 8px 0' }}>
+                <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#09090b', margin: '0 0 8px 0' }}>
                     Welcome to Your Printhouse Workspace
                 </h1>
-                <p style={{ fontSize: '14px', color: '#a1a1aa', margin: 0, maxWidth: '720px', lineHeight: '1.6' }}>
+                <p style={{ fontSize: '14px', color: '#52525b', margin: 0, maxWidth: '720px', lineHeight: '1.6' }}>
                     Configure your production environment at your own pace. Complete the 8 operational modules below so PrintPrice OS can accurately route jobs, verify preflight specifications, and enable automated marketplace dispatch.
                 </p>
             </div>
 
             {fetchError && (
                 <div style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid #ef4444',
-                    color: '#fca5a5',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
                     padding: '12px 16px',
                     borderRadius: '8px',
                     marginBottom: '20px',
@@ -185,13 +185,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                     justifyContent: 'space-between'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <AlertTriangle size={18} color="#ef4444" />
-                        <span>{fetchError}</span>
+                        <AlertTriangle size={18} color="#dc2626" />
+                        <span style={{ fontSize: '13px', fontWeight: 500 }}>{fetchError}</span>
                     </div>
                     <button
                         onClick={fetchOnboardingData}
                         style={{
-                            background: '#27272a',
+                            background: '#dc2626',
                             color: '#ffffff',
                             border: 'none',
                             padding: '6px 12px',
@@ -207,18 +207,18 @@ export const PrinthouseSetupHub: React.FC = () => {
             )}
 
             {/* Navigation Tabs */}
-            <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #27272a', paddingBottom: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e4e4e7', paddingBottom: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
                 {tabDefs.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => tab.enabled && handleSelectTab(tab.key)}
                         style={{
-                            background: activeTab === tab.key ? '#dc0000' : '#18181b',
-                            color: tab.enabled ? '#ffffff' : '#52525b',
-                            border: 'none',
-                            padding: '10px 20px',
+                            background: activeTab === tab.key ? '#dc0000' : '#f4f4f5',
+                            color: activeTab === tab.key ? '#ffffff' : tab.enabled ? '#18181b' : '#a1a1aa',
+                            border: '1px solid ' + (activeTab === tab.key ? '#dc0000' : '#e4e4e7'),
+                            padding: '8px 16px',
                             borderRadius: '8px',
-                            fontSize: '14px',
+                            fontSize: '13px',
                             fontWeight: 600,
                             cursor: tab.enabled ? 'pointer' : 'not-allowed',
                             opacity: tab.enabled ? 1 : 0.6,
@@ -238,7 +238,7 @@ export const PrinthouseSetupHub: React.FC = () => {
             {/* Tab Contents */}
             {activeTab === 'OVERVIEW' && (
                 <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#09090b', marginBottom: '16px' }}>
                         Guided Setup Tasks (8 Modules)
                     </h2>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>

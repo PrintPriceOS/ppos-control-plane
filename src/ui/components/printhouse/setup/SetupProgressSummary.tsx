@@ -45,80 +45,85 @@ export const SetupProgressSummary: React.FC<{ readiness?: ReadinessData }> = ({ 
         }}>
             {/* 1. Account Setup Card */}
             <div style={{
-                background: '#18181b',
-                border: `1px solid ${account?.status === 'COMPLETE' ? '#10b981' : '#27272a'}`,
+                background: '#ffffff',
+                border: `1px solid ${account?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
                 borderRadius: '12px',
-                padding: '20px'
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#a1a1aa' }}>1. Account & Sites</span>
-                    <ShieldCheck size={18} style={{ color: account?.status === 'COMPLETE' ? '#10b981' : '#eab308' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>1. Account & Sites</span>
+                    <ShieldCheck size={18} style={{ color: account?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
                     {account ? `${account.completedRequirements} / ${account.totalRequirements || 6}` : '0 / 6'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: account?.status === 'COMPLETE' ? '#10b981' : '#eab308' }}>{account?.status || 'IN_PROGRESS'}</strong>
+                    Status: <strong style={{ color: account?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{account?.status || 'IN_PROGRESS'}</strong>
                 </div>
             </div>
 
             {/* 2. Operational Configuration Card */}
             <div style={{
-                background: '#18181b',
-                border: `1px solid ${config?.status === 'COMPLETE' ? '#10b981' : '#27272a'}`,
+                background: '#ffffff',
+                border: `1px solid ${config?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
                 borderRadius: '12px',
-                padding: '20px'
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#a1a1aa' }}>2. Production Readiness</span>
-                    <Clock size={18} style={{ color: config?.status === 'COMPLETE' ? '#10b981' : '#eab308' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>2. Production Readiness</span>
+                    <Clock size={18} style={{ color: config?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
                     {config ? `${config.completedRequirements} / ${config.totalRequirements || 5}` : '0 / 5'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: config?.status === 'COMPLETE' ? '#10b981' : '#eab308' }}>{config?.status || 'IN_PROGRESS'}</strong>
+                    Status: <strong style={{ color: config?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{config?.status || 'IN_PROGRESS'}</strong>
                 </div>
             </div>
 
             {/* 3. Pricing Readiness Card */}
             <div style={{
-                background: '#18181b',
-                border: `1px solid ${pricing?.status === 'COMPLETE' ? '#10b981' : '#27272a'}`,
+                background: '#ffffff',
+                border: `1px solid ${pricing?.status === 'COMPLETE' ? '#10b981' : '#e4e4e7'}`,
                 borderRadius: '12px',
-                padding: '20px'
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#a1a1aa' }}>3. Commercial Pricing</span>
-                    <Tag size={18} style={{ color: pricing?.status === 'COMPLETE' ? '#10b981' : '#eab308' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>3. Commercial Pricing</span>
+                    <Tag size={18} style={{ color: pricing?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
                     {pricing?.status === 'COMPLETE' ? 'Configured' : 'Missing Price Book'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#71717a' }}>
-                    Status: <strong style={{ color: pricing?.status === 'COMPLETE' ? '#10b981' : '#eab308' }}>{pricing?.status || 'NOT_STARTED'}</strong>
+                    Status: <strong style={{ color: pricing?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{pricing?.status || 'NOT_STARTED'}</strong>
                 </div>
             </div>
 
             {/* 4. Overall Core Status */}
             <div style={{
-                background: isCoreComplete ? 'rgba(16, 185, 129, 0.1)' : '#18181b',
-                border: `1px solid ${isCoreComplete ? '#10b981' : '#27272a'}`,
+                background: isCoreComplete ? 'rgba(16, 185, 129, 0.08)' : '#fafafa',
+                border: `1px solid ${isCoreComplete ? '#10b981' : '#e4e4e7'}`,
                 borderRadius: '12px',
-                padding: '20px'
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#a1a1aa' }}>Core Setup Status</span>
-                    {isCoreComplete ? <CheckCircle size={18} color="#10b981" /> : <Clock size={18} color="#eab308" />}
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Core Setup Status</span>
+                    {isCoreComplete ? <CheckCircle size={18} color="#10b981" /> : <Clock size={18} color="#d97706" />}
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: isCoreComplete ? '#10b981' : '#eab308', marginBottom: '4px' }}>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: isCoreComplete ? '#059669' : '#d97706', marginBottom: '4px' }}>
                     {isCoreComplete ? 'SETUP COMPLETE' : 'SETUP INCOMPLETE'}
                 </div>
-                <div style={{ fontSize: '11px', color: '#a1a1aa' }}>
+                <div style={{ fontSize: '11px', color: '#71717a' }}>
                     {isCoreComplete ? 'Ready for dashboard & marketplace review' : 'Complete 8 modules below'}
                 </div>
             </div>
         </div>
     );
 };
+
 

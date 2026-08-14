@@ -9,36 +9,46 @@ const router = express.Router();
 const materialService = require('../services/printhouseMaterialService');
 const capacityService = require('../services/printhouseCapacityService');
 const leadTimeService = require('../services/printhouseLeadTimeService');
+const readinessService = require('../services/printhouseReadinessService');
+const onboardingService = require('../services/printhouseOnboardingService');
+const { requireAdmin } = require('../middleware/auth');
 const db = require('../services/mysqlClient');
 
-// Middleware to extract tenant context and check role/status
+// Middleware to extract tenant context and check role/status with strict fail-closed auth
 const requireAuth = async (req, res, next) => {
-    if (req.user) {
-        const allowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN'];
-        if (!allowedRoles.includes(req.user.role)) {
-            return res.status(403).json({ error: 'FORBIDDEN: Invalid role' });
+    // First, let standard auth middleware populate req.user if a valid Bearer JWT is present
+    if (!req.user) {
+        return requireAdmin(req, res, async () => {
+            await finalizeTenantVerification(req, res, next);
+        });
+    }
+    await finalizeTenantVerification(req, res, next);
+};
+
+const finalizeTenantVerification = async (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+    }
+
+    const allowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN: Invalid role' });
+    }
+
+    try {
+        const tenants = await db.query('SELECT status FROM tenants WHERE id = ?', [req.user.tenantId]);
+        if (tenants.length === 0) {
+            return res.status(403).json({ error: 'FORBIDDEN: Tenant not found' });
         }
-        try {
-            const tenants = await db.query('SELECT status FROM tenants WHERE id = ?', [req.user.tenantId]);
-            if (tenants.length === 0) {
-                return res.status(403).json({ error: 'FORBIDDEN: Tenant not found' });
-            }
-            const tenantStatus = tenants[0].status;
-            if (tenantStatus === 'SUSPENDED') {
-                return res.status(403).json({ error: 'FORBIDDEN: Tenant account suspended' });
-            }
-            if (tenantStatus === 'DELETED') {
-                return res.status(403).json({ error: 'FORBIDDEN: Tenant account deleted' });
-            }
-        } catch (err) {
-            return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' });
+        const tenantStatus = tenants[0].status;
+        if (tenantStatus === 'SUSPENDED') {
+            return res.status(403).json({ error: 'FORBIDDEN: Tenant account suspended' });
         }
-    } else {
-        req.user = {
-            id: 'mock-user-1',
-            tenantId: req.headers['x-tenant-id'] || 'mock-tenant-1',
-            role: 'PRINTHOUSE_ADMIN'
-        };
+        if (tenantStatus === 'DELETED') {
+            return res.status(403).json({ error: 'FORBIDDEN: Tenant account deleted' });
+        }
+    } catch (err) {
+        return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' });
     }
     next();
 };
@@ -62,6 +72,35 @@ const verifySiteAccess = async (req, res, next) => {
 };
 
 router.use(requireAuth);
+
+// ──── 0. Root Readiness & Onboarding State Aggregation Endpoint ───────────────
+router.get('/', async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
+        if (!tenantId) {
+            return res.status(400).json({ ok: false, error: 'Tenant context required' });
+        }
+
+        const [readiness, company, sites] = await Promise.all([
+            readinessService.computeReadiness(tenantId),
+            onboardingService.getCompanyProfile(tenantId).catch(() => ({})),
+            onboardingService.getProductionSites(tenantId).catch(() => ([]))
+        ]);
+
+        res.json({
+            ok: true,
+            data: {
+                company,
+                sites,
+                readiness
+            }
+        });
+    } catch (err) {
+        console.error('[ONBOARDING][ROOT-READINESS-ERROR]', err);
+        res.status(500).json({ ok: false, error: err.message || 'Failed to compute printhouse readiness' });
+    }
+});
+
 
 // Helper to catch FIELD_NOT_EDITABLE errors and return 400 Bad Request
 const wrapHandler = (fn) => async (req, res, next) => {
