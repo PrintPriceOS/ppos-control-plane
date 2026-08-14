@@ -22,9 +22,9 @@ async function runTests() {
     assert(content.includes('animate={{ rotate: 360 }}'), 'Group must define rotation animation');
     console.log('✓ Rotation animation is applied to a group container');
 
-    // 3. Group must define transformOrigin "0px 0px"
-    assert(content.includes('style={{ transformOrigin: "0px 0px" }}'), 'Group must specify transformOrigin: "0px 0px"');
-    console.log('✓ Group rotates around the exact geometric center (0px 0px)');
+    // 3. Group must define transformOrigin "0px 0px" or "0 0"
+    assert(content.includes('transformOrigin: "0px 0px"') || content.includes('transformOrigin: "0 0"'), 'Group must specify centered transformOrigin');
+    console.log('✓ Group rotates around the exact geometric center (0, 0)');
 
     // 4. Line element starts exactly at local origin (0, 0)
     assert(content.includes('x1="0"'), 'Line must start at x=0');

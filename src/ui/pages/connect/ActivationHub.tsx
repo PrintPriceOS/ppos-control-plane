@@ -62,18 +62,26 @@ export const ActivationHub: React.FC = () => {
             if (user) {
                 const updatedUser = { 
                     ...user, 
-                    metadata: { ...user.metadata, orchestration_status: 'VERIFIED' } 
+                    metadata: { ...(user.metadata || {}), orchestration_status: 'VERIFIED' } 
                 };
                 setAuthUser(updatedUser);
             }
             
-            // In a real scenario, this connects to the actual backend endpoint:
-            await fetch('/api/auth/printhouse/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            }).catch(() => {}); // fire and forget for this mock
-
+            // Close modal immediately so UI does not stay in blocking modal state
             setIsModalOpen(false);
+
+            // Optional verification signal to backend
+            try {
+                await fetch('/api/auth/printhouse/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            } catch {
+                // Ignore network errors on optional verify ping
+            }
+
+            navigate('/dashboard', { replace: true });
+        } catch {
             navigate('/dashboard', { replace: true });
         } finally {
             setIsVerifying(false);

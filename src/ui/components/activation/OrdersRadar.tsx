@@ -51,7 +51,7 @@ export const OrdersRadar: React.FC = () => {
                 <motion.g
                     animate={{ rotate: 360 }}
                     transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                    style={{ transformOrigin: "0px 0px" }}
+                    style={{ transformOrigin: "0 0", transformBox: "view-box" }}
                 >
                     <line 
                         x1="0" y1="0" x2="0" y2="-140" 
