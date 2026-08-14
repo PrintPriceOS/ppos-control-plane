@@ -53,6 +53,132 @@ const finalizeTenantVerification = async (req, res, next) => {
     next();
 };
 
+// ── GET /api/printhouse/onboarding/pricing/industrial ──
+router.get('/pricing/industrial', requireAuth, async (req, res) => {
+    const tenantId = req.user.tenantId;
+    try {
+        const rows = await db.query('SELECT * FROM printer_nodes WHERE tenant_id = ? LIMIT 1', [tenantId]);
+        if (rows.length === 0) {
+            return res.json({
+                ok: true,
+                data: {
+                    nodeId: null,
+                    configured: false,
+                    signatures: [16],
+                    deliveryTime: '14 days',
+                    productionLeadDays: 11,
+                    limits: { min_copies: 50, max_pages: 1500 },
+                    rates: null
+                }
+            });
+        }
+        const node = rows[0];
+        let parsedRates = null;
+        if (node.rates_json) {
+            try {
+                parsedRates = typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
+            } catch (e) {
+                parsedRates = null;
+            }
+        }
+        const isConfigured = parsedRates !== null && Object.keys(parsedRates).length > 0;
+
+        res.json({
+            ok: true,
+            data: {
+                nodeId: node.id,
+                configured: isConfigured,
+                signatures: typeof node.signatures === 'string' ? JSON.parse(node.signatures) : (node.signatures || [16]),
+                deliveryTime: node.delivery_time || '14 days',
+                productionLeadDays: node.production_lead_days || 11,
+                limits: typeof node.limits === 'string' ? JSON.parse(node.limits) : (node.limits || { min_copies: 50, max_pages: 1500 }),
+                rates: parsedRates
+            }
+        });
+    } catch (err) {
+        console.error('[ONBOARDING] Error fetching industrial pricing:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// Helper: Safe deterministic deep merge that protects against prototype pollution
+function isPlainObject(obj) {
+    return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
+}
+
+function safeDeepMergeRates(target, source) {
+    if (!isPlainObject(target)) target = {};
+    if (!isPlainObject(source)) return target;
+
+    const result = { ...target };
+
+    for (const key of Object.keys(source)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+            continue;
+        }
+
+        const sourceVal = source[key];
+        const targetVal = target[key];
+
+        if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
+            result[key] = safeDeepMergeRates(targetVal, sourceVal);
+        } else {
+            result[key] = sourceVal;
+        }
+    }
+
+    return result;
+}
+
+// ── PUT /api/printhouse/onboarding/pricing/industrial ──
+router.put('/pricing/industrial', requireAuth, async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const { signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+
+    try {
+        const rows = await db.query('SELECT id, rates_json FROM printer_nodes WHERE tenant_id = ? LIMIT 1', [tenantId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ ok: false, error: 'No printer node found for tenant. Configure production sites first.' });
+        }
+        const node = rows[0];
+        const nodeId = node.id;
+
+        const fields = [];
+        const params = [];
+
+        if (signatures !== undefined) { fields.push('signatures = ?'); params.push(JSON.stringify(signatures)); }
+        if (delivery_time !== undefined) { fields.push('delivery_time = ?'); params.push(String(delivery_time)); }
+        if (production_lead_days !== undefined) { fields.push('production_lead_days = ?'); params.push(parseInt(production_lead_days, 10) || 0); }
+        if (limits !== undefined) { fields.push('limits = ?'); params.push(JSON.stringify(limits)); }
+        
+        if (rates !== undefined) {
+            let existingRates = {};
+            if (node.rates_json) {
+                try {
+                    existingRates = typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
+                    if (!isPlainObject(existingRates)) existingRates = {};
+                } catch (e) {
+                    existingRates = {};
+                }
+            }
+            const mergedRates = safeDeepMergeRates(existingRates, rates);
+            fields.push('rates_json = ?');
+            params.push(JSON.stringify(mergedRates));
+        }
+
+        if (fields.length > 0) {
+            params.push(nodeId);
+            params.push(tenantId);
+            await db.query(`UPDATE printer_nodes SET ${fields.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
+        }
+
+        res.json({ ok: true, message: 'Industrial pricing rates updated successfully' });
+    } catch (err) {
+        console.error('[ONBOARDING] Error updating industrial pricing:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // Middleware to enforce site boundary isolation
 const verifySiteAccess = async (req, res, next) => {
     const { siteId } = req.params;

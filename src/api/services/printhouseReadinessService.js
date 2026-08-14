@@ -120,29 +120,76 @@ class PrinthouseReadinessService {
             advisories: opConfig.advisories
         };
 
-        // ──── Phase 191F: Pricing Readiness ────
+        // ──── Phase 191F / 192 RC20B: Industrial Pricing Readiness ────
         let priceBookCount = 0;
-        let pricingStatus = 'PRICING_NOT_CONFIGURED';
+        let pricingStatus = 'NOT_STARTED';
         let hasPublished = false;
         let hasApproved = false;
+        const pricingBlockers = [];
+        const pricingAdvisories = [];
 
         try {
+            // 1. Check commercial PriceBooks (downstream policy layer)
             const pbRows = await db.query(
                 'SELECT status FROM printhouse_price_books WHERE tenant_id = ?',
                 [tenantId]
             );
             priceBookCount = pbRows.length;
-            if (priceBookCount > 0) {
-                hasPublished = pbRows.some(r => r.status === 'PUBLISHED');
-                hasApproved = pbRows.some(r => r.status === 'APPROVED');
-                if (hasPublished || hasApproved) {
-                    pricingStatus = 'COMPLETE';
-                } else {
-                    pricingStatus = 'IN_PROGRESS';
+            hasPublished = pbRows.some(r => r.status === 'PUBLISHED');
+            hasApproved = pbRows.some(r => r.status === 'APPROVED');
+
+            // 2. Check canonical industrial manufacturing rates (printer_nodes.rates_json)
+            const nodeRows = await db.query(
+                'SELECT rates_json FROM printer_nodes WHERE tenant_id = ? LIMIT 1',
+                [tenantId]
+            );
+
+            if (nodeRows.length > 0 && nodeRows[0].rates_json) {
+                let rates = null;
+                try {
+                    rates = typeof nodeRows[0].rates_json === 'string' 
+                        ? JSON.parse(nodeRows[0].rates_json) 
+                        : nodeRows[0].rates_json;
+                } catch (e) {
+                    rates = null;
                 }
+
+                if (rates && typeof rates === 'object' && Object.keys(rates).length > 0) {
+                    // Check required economic quote engine dimensions
+                    const hasInterior = (rates.interior_one_colour_fixed && Object.values(rates.interior_one_colour_fixed).some(v => v > 0)) ||
+                                        (rates.interior_full_colour_fixed && Object.values(rates.interior_full_colour_fixed).some(v => v > 0)) ||
+                                        (rates.interior_pp_bw > 0 || rates.interior_pp_color > 0);
+
+                    const hasPaper = (rates.paper_price_interior_by_kilo && Object.values(rates.paper_price_interior_by_kilo).some(v => v > 0)) ||
+                                     (rates.paper_kg_interior > 0 || rates.paper_interior_fixed_by_colours);
+
+                    const hasBinding = (rates.binding_pb_fixed_by_sections && Object.values(rates.binding_pb_fixed_by_sections).some(v => v > 0)) ||
+                                       (rates.binding_ss_fixed_by_sections && Object.values(rates.binding_ss_fixed_by_sections).some(v => v > 0)) ||
+                                       (rates.binding_ts_fixed_by_sections && Object.values(rates.binding_ts_fixed_by_sections).some(v => v > 0)) ||
+                                       (rates.bind_pb_fixed > 0 || rates.bind_saddle_per_book > 0 || rates.binding_ts_fixed > 0);
+
+                    const hasTransport = (rates.transport_costs && Object.values(rates.transport_costs).some(v => v > 0)) ||
+                                         (rates.ship_per_kg > 0);
+
+                    if (hasInterior && hasPaper && hasBinding && hasTransport) {
+                        pricingStatus = 'COMPLETE';
+                    } else {
+                        pricingStatus = 'IN_PROGRESS';
+                        if (!hasInterior) pricingBlockers.push({ code: 'MISSING_INTERIOR_PRICING', module: 'PRICING', message: 'Configure interior printing sheet or run rates' });
+                        if (!hasPaper) pricingBlockers.push({ code: 'MISSING_PAPER_PRICING', module: 'PRICING', message: 'Configure paper cost per kilo' });
+                        if (!hasBinding) pricingBlockers.push({ code: 'MISSING_BINDING_PRICING', module: 'PRICING', message: 'Configure at least one binding rate' });
+                        if (!hasTransport) pricingBlockers.push({ code: 'MISSING_TRANSPORT_PRICING', module: 'PRICING', message: 'Configure destination transport cost' });
+                    }
+                } else {
+                    pricingStatus = 'NOT_STARTED';
+                    pricingBlockers.push({ code: 'MISSING_INDUSTRIAL_PRICING', module: 'PRICING', message: 'Configure industrial manufacturing rates' });
+                }
+            } else {
+                pricingStatus = 'NOT_STARTED';
+                pricingBlockers.push({ code: 'MISSING_PRINTER_NODE', module: 'PRICING', message: 'No printer node configured for pricing' });
             }
         } catch (e) {
-            // Table might not exist yet
+            pricingStatus = 'NOT_STARTED';
         }
 
         return {
@@ -165,7 +212,9 @@ class PrinthouseReadinessService {
                 priceBookCount,
                 hasPublished,
                 hasApproved,
-                available: pricingStatus === 'COMPLETE'
+                available: pricingStatus === 'COMPLETE',
+                blockingIssues: pricingBlockers,
+                advisories: pricingAdvisories
             },
             shippingReadiness: {
                 status: opConfig.shippingCount > 0 ? 'COMPLETE' : 'INCOMPLETE',

@@ -1,15 +1,18 @@
 /**
  * src/ui/components/printhouse/setup/PricingPanel.tsx
  * 
- * Main orchestration panel for Printhouse Price Books, Rules, and Simulations.
- * Integrates PriceBookForm, PricingRuleBuilder, and PricingPreview.
+ * Phase 192 RC20B — Printhouse Pricing Setup Panel
+ * 
+ * Primary Experience: Canonical Industrial Manufacturing Pricing (rates_json)
+ * Downstream Experience: Commercial Price Books, Rules, and Simulations.
  */
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
+import { CanonicalIndustrialPricingEditor } from '../pricing/CanonicalIndustrialPricingEditor';
 import { PriceBookForm } from './PriceBookForm';
 import { PricingRuleBuilder } from './PricingRuleBuilder';
 import { PricingPreview } from './PricingPreview';
-import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers } from 'lucide-react';
+import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PricingPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -19,6 +22,13 @@ interface PricingPanelProps {
 type PricingSubTab = 'RULES' | 'SIMULATOR';
 
 export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) => {
+    // ── Industrial Pricing State ──
+    const [industrialData, setIndustrialData] = useState<any | null>(null);
+    const [loadingIndustrial, setLoadingIndustrial] = useState(true);
+    const [savingIndustrial, setSavingIndustrial] = useState(false);
+
+    // ── Downstream Commercial Policies State ──
+    const [showCommercialPolicy, setShowCommercialPolicy] = useState(false);
     const [priceBooks, setPriceBooks] = useState<any[]>([]);
     const [selectedBook, setSelectedBook] = useState<any | null>(null);
     const [rules, setRules] = useState<any[]>([]);
@@ -49,6 +59,49 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
     const [subTab, setSubTab] = useState<PricingSubTab>('RULES');
 
     const token = getAuthToken();
+
+    const fetchIndustrialPricing = async () => {
+        setLoadingIndustrial(true);
+        try {
+            const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (json.ok && json.data) {
+                setIndustrialData(json.data);
+            }
+        } catch (e) {
+            console.error('Error loading industrial pricing:', e);
+        } finally {
+            setLoadingIndustrial(false);
+        }
+    };
+
+    const handleSaveIndustrialPricing = async (payload: any) => {
+        setSavingIndustrial(true);
+        try {
+            const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) {
+                throw new Error(json.error || 'Failed to save industrial pricing');
+            }
+            await fetchIndustrialPricing();
+            onSaved?.();
+        } finally {
+            setSavingIndustrial(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchIndustrialPricing();
+    }, []);
 
     // Fetch lists
     const fetchPriceBooks = async () => {
@@ -337,8 +390,8 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
             {/* Notifications */}
             {error && (
                 <div style={{
-                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#f87171', fontSize: '13px', alignItems: 'center'
+                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '13px', alignItems: 'center'
                 }}>
                     <ShieldAlert size={16} />
                     <span>{error}</span>
@@ -346,44 +399,83 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
             )}
             {successMsg && (
                 <div style={{
-                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px', color: '#34d399', fontSize: '13px', alignItems: 'center'
+                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0', borderRadius: '8px', color: '#065f46', fontSize: '13px', alignItems: 'center'
                 }}>
                     <CheckCircle size={16} />
                     <span>{successMsg}</span>
                 </div>
             )}
 
-            {/* SECTION 1: PRICE BOOKS OVERVIEW */}
-            <div style={{ backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #27272a' }}>
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Tag size={18} style={{ color: '#dc0000' }} />
-                            Commercial Price Books
-                        </h3>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#a1a1aa' }}>
-                            Configure versioned price catalogs. draft price books are mutable, while approved or published books are sealed for integrity.
-                        </p>
+            {/* PRIMARY: CANONICAL INDUSTRIAL PRICING (rates_json) */}
+            <CanonicalIndustrialPricingEditor
+                mode="ONBOARDING"
+                initialNodeData={industrialData ? {
+                    id: industrialData.nodeId,
+                    name: '',
+                    signatures: industrialData.signatures,
+                    delivery_time: industrialData.deliveryTime,
+                    production_lead_days: industrialData.productionLeadDays,
+                    limits: industrialData.limits,
+                    rates: industrialData.rates
+                } : undefined}
+                onSave={handleSaveIndustrialPricing}
+                saving={savingIndustrial}
+            />
+
+            {/* DOWNSTREAM / OPTIONAL: COMMERCIAL PRICING POLICIES & CATALOGS */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e4e4e7', overflow: 'hidden' }}>
+                <div 
+                    onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '16px 24px', 
+                        cursor: 'pointer',
+                        backgroundColor: '#fafafa',
+                        borderBottom: showCommercialPolicy ? '1px solid #e4e4e7' : 'none'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Tag size={18} style={{ color: '#71717a' }} />
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Commercial Pricing Policies & Markups
+                                <span style={{ fontSize: '11px', fontWeight: 500, color: '#71717a', backgroundColor: '#f4f4f5', padding: '2px 8px', borderRadius: '4px' }}>
+                                    Downstream / Optional
+                                </span>
+                            </h3>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#71717a' }}>
+                                Configure commercial quantity tiers, surcharge markups, and customer-specific price books applied on top of industrial costs.
+                            </p>
+                        </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            setCloningBook(null);
-                            setEditingBook(null);
-                            setShowBookModal(true);
-                        }}
-                        style={{
-                            backgroundColor: '#dc0000', color: '#ffffff', border: 'none', borderRadius: '6px',
-                            padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '6px', transition: 'background-color 0.2s'
-                        }}
-                    >
-                        <Plus size={14} /> Create Catalog
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {showCommercialPolicy ? <ChevronUp size={18} color="#71717a" /> : <ChevronDown size={18} color="#71717a" />}
+                    </div>
                 </div>
 
-                {/* Price Books Table */}
-                {loadingBooks ? (
+                {showCommercialPolicy && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 24px', borderBottom: '1px solid #e4e4e7' }}>
+                            <button
+                                onClick={() => {
+                                    setCloningBook(null);
+                                    setEditingBook(null);
+                                    setShowBookModal(true);
+                                }}
+                                style={{
+                                    backgroundColor: '#dc0000', color: '#ffffff', border: 'none', borderRadius: '6px',
+                                    padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                }}
+                            >
+                                <Plus size={14} /> Create Catalog
+                            </button>
+                        </div>
+                        {/* Price Books Table */}
+                        {loadingBooks ? (
                     <div style={{ padding: '40px', textAlign: 'center', color: '#a1a1aa' }}>Loading price catalogs...</div>
                 ) : priceBooks.length === 0 ? (
                     <div style={{ padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '13px' }}>
@@ -534,6 +626,8 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                )}
                     </div>
                 )}
             </div>

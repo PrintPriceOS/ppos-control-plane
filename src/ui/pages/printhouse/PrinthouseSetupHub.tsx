@@ -141,8 +141,11 @@ export const PrinthouseSetupHub: React.FC = () => {
         .filter((b: any) => b.module === 'LEAD_TIMES')
         .map((b: any) => b.message || b.code);
 
+    const pricingBlockers = (readiness?.pricingReadiness?.blockingIssues || []).concat(readiness?.pricingReadiness?.advisories || []);
     const pricingMissing = readiness?.pricingReadiness?.status !== 'COMPLETE'
-        ? ['Configure and publish base costs or price book']
+        ? (pricingBlockers.length > 0 
+            ? pricingBlockers.map((b: any) => b.message || b.code) 
+            : ['Configure and save industrial manufacturing rates'])
         : [];
 
     const tabDefs: { key: TabKey; label: string; icon: React.ReactNode; enabled: boolean }[] = [
