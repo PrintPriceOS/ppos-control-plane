@@ -130,13 +130,19 @@ router.post('/snapshot', requireGlobalAdmin, async (req, res) => {
 /**
  * GET /api/admin/marketplace/sessions
  * Returns real active marketplace sessions.
+ * Phase 192 RC20.3: Restrict pricing sessions browser to SUPER_ADMIN / platform operators.
  */
 router.get('/sessions', async (req, res) => {
     try {
         const context = resolveActorContext(req);
-        if (context.isPrinthouseUser) {
-            req.query.printhouseId = context.printhouseId;
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            return res.status(403).json({
+                ok: false,
+                error: 'FORBIDDEN',
+                message: 'Pricing sessions browser is restricted to global platform administrators.'
+            });
         }
+        
         // Support rich filtering query parameters via listSessions contract
         const result = await marketplaceService.listSessions(req.query);
         return res.json({
@@ -155,21 +161,22 @@ router.get('/sessions', async (req, res) => {
 /**
  * GET /api/admin/marketplace/sessions/:id
  * Returns real detail for a specific marketplace session.
+ * Phase 192 RC20.3: Restrict pricing session detail and competitor forensics to SUPER_ADMIN / platform operators.
  */
 router.get('/sessions/:id', async (req, res) => {
     try {
+        const context = resolveActorContext(req);
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            return res.status(403).json({
+                ok: false,
+                error: 'FORBIDDEN',
+                message: 'Pricing session forensics and proposal details are restricted to global platform administrators.'
+            });
+        }
+
         const detailResult = await marketplaceService.getSessionDetail(req.params.id);
         if (!detailResult || !detailResult.ok || !detailResult.session) {
             return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
-        }
-        
-        const context = resolveActorContext(req);
-        if (context.isPrinthouseUser) {
-            const offers = detailResult.session.offers || [];
-            const isParticipant = offers.some(o => o.printerId === context.printhouseId || o.printhouseId === context.printhouseId);
-            if (!isParticipant) {
-                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this session.' });
-            }
         }
 
         return res.json({
@@ -184,6 +191,7 @@ router.get('/sessions/:id', async (req, res) => {
 /**
  * POST /api/admin/marketplace/sessions/:sessionId/select
  * Administrative override to explicitly select a winning offer.
+ * Phase 192 RC20.3: Restrict manual offer selection to SUPER_ADMIN / platform operators.
  */
 router.post('/sessions/:sessionId/select', async (req, res) => {
     const sessionId = req.params.sessionId;
@@ -192,17 +200,12 @@ router.post('/sessions/:sessionId/select', async (req, res) => {
 
     try {
         const context = resolveActorContext(req);
-        if (context.isPrinthouseUser) {
-            // Check if the Printhouse is trying to select their own offer
-            const detailResult = await marketplaceService.getSessionDetail(sessionId);
-            if (!detailResult || !detailResult.ok || !detailResult.session) {
-                return res.status(404).json({ ok: false, error: 'MARKETPLACE_SESSION_NOT_FOUND' });
-            }
-            const offers = detailResult.session.offers || [];
-            const targetOffer = offers.find(o => o.id === targetOfferId);
-            if (!targetOffer || (targetOffer.printerId !== context.printhouseId && targetOffer.printhouseId !== context.printhouseId)) {
-                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You cannot select an offer that does not belong to your printhouse.' });
-            }
+        if (!context.isSuperAdmin && (context.isPrinthouseUser || context.role === 'PRINTHOUSE_ADMIN' || context.role === 'PRINTHOUSE_OPERATOR')) {
+            return res.status(403).json({
+                ok: false,
+                error: 'FORBIDDEN',
+                message: 'Manual offer selection is restricted to global platform administrators.'
+            });
         }
 
         if (!targetOfferId) {
