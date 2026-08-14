@@ -44,6 +44,129 @@ interface CanonicalIndustrialPricingEditorProps {
     saving?: boolean;
 }
 
+// Helper to create fully hydrated initial rates with historical starting values for unconfigured nodes
+export function getInitialHydratedRates(persistedRates?: PrinthouseRates | null): PrinthouseRates {
+    // Start with empty baseline
+    const base: PrinthouseRates = {
+        interior_one_colour_fixed: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        interior_one_colour_var: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        interior_two_colour_fixed: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        interior_two_colour_var: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        interior_full_colour_fixed: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        interior_full_colour_var: { '32p': 0, '24p': 0, '16p': 0, '12p': 0, '8p': 0, '4p': 0 },
+        pms_interior_fixed: 0,
+        cover_fixed_by_colours: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+        cover_var_per_1000_by_colours: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+        pms_cover: { fixed: 0, var: 0 },
+        lam_fixed: { varnish: 0, gloss: 0, matt: 0 },
+        lam_var_per_1000: { varnish: 0, gloss: 0, matt: 0 },
+        uv_varnish: { fixed: 0, var: 0 },
+        endpaper_fixed_by_colours: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+        endpaper_var_per_1000_by_colours: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+        binding_pb_fixed_by_sections: emptyBySection(), binding_pb_var_per_1000_by_sections: emptyBySection(),
+        binding_ss_fixed_by_sections: emptyBySection(), binding_ss_var_per_1000_by_sections: emptyBySection(),
+        binding_ts_fixed_by_sections: emptyBySection(), binding_ts_var_per_1000_by_sections: emptyBySection(),
+        binding_hc_fixed_by_sections: emptyBySection(), binding_hc_var_per_1000_by_sections: emptyBySection(),
+        binding_wo_fixed_by_sections: emptyBySection(), binding_wo_var_per_1000_by_sections: emptyBySection(),
+        binding_sp_fixed_by_sections: emptyBySection(), binding_sp_var_per_1000_by_sections: emptyBySection(),
+        paper_interior_fixed_by_colours: { one: 0, two: 0, full: 0 },
+        paper_interior_var_per_1000_by_colours: { one: 0, two: 0, full: 0 },
+        paper_cover_fixed_by_colours: { one: 0, two: 0, full: 0 },
+        paper_cover_var_per_1000_by_colours: { one: 0, two: 0, full: 0 },
+        paper_endpapers_fixed_by_colours: { one: 0, two: 0, full: 0 },
+        paper_endpapers_var_per_1000_by_colours: { one: 0, two: 0, full: 0 },
+        paper_waste_for_binding: { pb: 0, ss: 0, sc: 0, hc: 0, wo: 0, sp: 0 },
+        paper_price_interior_by_kilo: { offset: 0, mc: 0, lux: 0, munken: 0, other: 0 },
+        paper_price_cover_by_kilo: { mc: 0, artboard: 0, offset: 0, wfmc: 0, other: 0 },
+        paper_price_endpaper_by_kilo: { offset: 0, mc: 0, other: 0 },
+        technical_costs_for_transport: false,
+        additional_transport_multiplier: 1,
+        percentage_technical_costs: { belgium: 0, netherlands: 0, finland: 0, hungary: 0, poland: 0 },
+        transport_costs: { es: 0.95, be: 1.145, nl: 1.189, de: 1.165, fr: 1.178, at: 1.225 }
+    };
+
+    // Pre-populate exact supported historical starting values
+    base.lam_fixed.gloss = 6.0;
+    base.lam_fixed.matt = 6.0;
+    base.lam_var_per_1000.gloss = 25.0;
+    base.lam_var_per_1000.matt = 25.0;
+
+    base.cover_fixed_by_colours['1'] = 40.0;
+    base.cover_var_per_1000_by_colours['1'] = 8.0;
+    base.cover_fixed_by_colours['4'] = 66.0;
+    base.cover_var_per_1000_by_colours['4'] = 12.5;
+
+    // Perfect Bound historical defaults (fixed 0.164 €/book, var 0.0147 €/section)
+    SECTIONS.forEach(s => {
+        const secNum = parseInt(s, 10) || 1;
+        base.binding_pb_fixed_by_sections[s] = 0.164;
+        base.binding_pb_var_per_1000_by_sections[s] = parseFloat((0.0147 * secNum * 1000).toFixed(2));
+    });
+
+    // Wire-O historical default (0.282 €/book)
+    SECTIONS.forEach(s => {
+        base.binding_wo_fixed_by_sections[s] = 0.282;
+    });
+
+    // Saddle stitch historical default (0.12 €/book)
+    SECTIONS.forEach(s => {
+        base.binding_ss_fixed_by_sections[s] = 0.12;
+    });
+
+    // Hardcover historical default (1.25 €/book)
+    SECTIONS.forEach(s => {
+        base.binding_hc_fixed_by_sections[s] = 1.25;
+    });
+
+    // Thread Sewn fixed base (59.85 €) and step matrix for steps 4 to 24
+    SECTIONS.forEach(s => {
+        const secNum = parseInt(s, 10);
+        base.binding_ts_fixed_by_sections[s] = 59.85;
+        if (BINDING_TS_STEP_MEANS[secNum]) {
+            base.binding_ts_var_per_1000_by_sections[s] = BINDING_TS_STEP_MEANS[secNum];
+        }
+    });
+
+    if (persistedRates && Object.keys(persistedRates).length > 0) {
+        // Overlay persisted rates so saved values (including explicit 0) always win
+        return {
+            ...base,
+            ...persistedRates,
+            interior_one_colour_fixed: { ...base.interior_one_colour_fixed, ...persistedRates.interior_one_colour_fixed },
+            interior_one_colour_var: { ...base.interior_one_colour_var, ...persistedRates.interior_one_colour_var },
+            interior_two_colour_fixed: { ...base.interior_two_colour_fixed, ...persistedRates.interior_two_colour_fixed },
+            interior_two_colour_var: { ...base.interior_two_colour_var, ...persistedRates.interior_two_colour_var },
+            interior_full_colour_fixed: { ...base.interior_full_colour_fixed, ...persistedRates.interior_full_colour_fixed },
+            interior_full_colour_var: { ...base.interior_full_colour_var, ...persistedRates.interior_full_colour_var },
+            cover_fixed_by_colours: { ...base.cover_fixed_by_colours, ...persistedRates.cover_fixed_by_colours },
+            cover_var_per_1000_by_colours: { ...base.cover_var_per_1000_by_colours, ...persistedRates.cover_var_per_1000_by_colours },
+            lam_fixed: { ...base.lam_fixed, ...persistedRates.lam_fixed },
+            lam_var_per_1000: { ...base.lam_var_per_1000, ...persistedRates.lam_var_per_1000 },
+            uv_varnish: { ...base.uv_varnish, ...persistedRates.uv_varnish },
+            endpaper_fixed_by_colours: { ...base.endpaper_fixed_by_colours, ...persistedRates.endpaper_fixed_by_colours },
+            endpaper_var_per_1000_by_colours: { ...base.endpaper_var_per_1000_by_colours, ...persistedRates.endpaper_var_per_1000_by_colours },
+            binding_pb_fixed_by_sections: { ...base.binding_pb_fixed_by_sections, ...persistedRates.binding_pb_fixed_by_sections },
+            binding_pb_var_per_1000_by_sections: { ...base.binding_pb_var_per_1000_by_sections, ...persistedRates.binding_pb_var_per_1000_by_sections },
+            binding_ss_fixed_by_sections: { ...base.binding_ss_fixed_by_sections, ...persistedRates.binding_ss_fixed_by_sections },
+            binding_ss_var_per_1000_by_sections: { ...base.binding_ss_var_per_1000_by_sections, ...persistedRates.binding_ss_var_per_1000_by_sections },
+            binding_ts_fixed_by_sections: { ...base.binding_ts_fixed_by_sections, ...persistedRates.binding_ts_fixed_by_sections },
+            binding_ts_var_per_1000_by_sections: { ...base.binding_ts_var_per_1000_by_sections, ...persistedRates.binding_ts_var_per_1000_by_sections },
+            binding_hc_fixed_by_sections: { ...base.binding_hc_fixed_by_sections, ...persistedRates.binding_hc_fixed_by_sections },
+            binding_hc_var_per_1000_by_sections: { ...base.binding_hc_var_per_1000_by_sections, ...persistedRates.binding_hc_var_per_1000_by_sections },
+            binding_wo_fixed_by_sections: { ...base.binding_wo_fixed_by_sections, ...persistedRates.binding_wo_fixed_by_sections },
+            binding_wo_var_per_1000_by_sections: { ...base.binding_wo_var_per_1000_by_sections, ...persistedRates.binding_wo_var_per_1000_by_sections },
+            binding_sp_fixed_by_sections: { ...base.binding_sp_fixed_by_sections, ...persistedRates.binding_sp_fixed_by_sections },
+            binding_sp_var_per_1000_by_sections: { ...base.binding_sp_var_per_1000_by_sections, ...persistedRates.binding_sp_var_per_1000_by_sections },
+            paper_price_interior_by_kilo: { ...base.paper_price_interior_by_kilo, ...persistedRates.paper_price_interior_by_kilo },
+            paper_price_cover_by_kilo: { ...base.paper_price_cover_by_kilo, ...persistedRates.paper_price_cover_by_kilo },
+            paper_price_endpaper_by_kilo: { ...base.paper_price_endpaper_by_kilo, ...persistedRates.paper_price_endpaper_by_kilo },
+            transport_costs: { ...base.transport_costs, ...persistedRates.transport_costs }
+        };
+    }
+
+    return base;
+}
+
 export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPricingEditorProps> = ({
     mode = 'ONBOARDING',
     initialNodeData,
@@ -68,7 +191,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
         delivery_time: initialNodeData?.delivery_time || '14 days',
         production_lead_days: initialNodeData?.production_lead_days || 11,
         limits: initialNodeData?.limits || { min_copies: 50, max_pages: 1500 },
-        rates: initialNodeData?.rates ? { ...EMPTY_RATES, ...initialNodeData.rates } : { ...EMPTY_RATES },
+        rates: getInitialHydratedRates(initialNodeData?.rates),
         region: initialNodeData?.region || '',
         latitude: initialNodeData?.latitude || 0,
         longitude: initialNodeData?.longitude || 0,
@@ -90,7 +213,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 delivery_time: initialNodeData.delivery_time || '14 days',
                 production_lead_days: initialNodeData.production_lead_days || 11,
                 limits: initialNodeData.limits || { min_copies: 50, max_pages: 1500 },
-                rates: initialNodeData.rates ? { ...EMPTY_RATES, ...initialNodeData.rates } : { ...EMPTY_RATES },
+                rates: getInitialHydratedRates(initialNodeData.rates),
                 region: initialNodeData.region || '',
                 latitude: initialNodeData.latitude || 0,
                 longitude: initialNodeData.longitude || 0,
@@ -137,11 +260,13 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
             );
         }
 
+        const isLowSample = meta.sampleSize === 3;
+
         return (
             <div className="mt-1 flex items-center justify-between text-[11px] bg-amber-50 border border-amber-200 text-amber-900 px-2 py-1 rounded">
                 <div>
-                    <span className="font-semibold">Suggested: {meta.value} {meta.unit}</span>
-                    <span className="text-amber-700 ml-1">({meta.sampleSize === 3 ? 'n=3 low-sample' : `n=${meta.sampleSize}`})</span>
+                    <span className="font-semibold">{isLowSample ? 'Suggested · low sample' : 'Suggested starting value'}</span>
+                    <span className="text-amber-700 ml-1">· Historical reference ({isLowSample ? 'n=3' : `n=${meta.sampleSize}`})</span>
                 </div>
                 {onApply && (
                     <button 
@@ -632,7 +757,22 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
                             <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-                                <h3 className="text-sm font-bold text-zinc-900 mb-3">Interior Paper Costs (€/kg)</h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-zinc-900">Interior Paper Costs (€/kg)</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const updated = { ...form.rates.paper_price_interior_by_kilo };
+                                            (['offset', 'mc', 'lux', 'munken', 'other'] as const).forEach(g => {
+                                                updated[g] = 1.252;
+                                            });
+                                            setRates(r => ({ ...r, paper_price_interior_by_kilo: updated }));
+                                        }}
+                                        className="text-xs font-semibold text-[#dc0000] hover:underline"
+                                    >
+                                        Apply generic baseline (1.252 €/kg)
+                                    </button>
+                                </div>
                                 <div className="space-y-3">
                                     {(['offset', 'mc', 'lux', 'munken', 'other'] as const).map(grade => (
                                         <div key={grade}>
@@ -653,13 +793,28 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-amber-900">
+                                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
                                     Generic historical baseline: 1.252 €/kg (n=13). Not grade-specific.
                                 </div>
                             </div>
 
                             <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-                                <h3 className="text-sm font-bold text-zinc-900 mb-3">Cover Paper Costs (€/kg)</h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-zinc-900">Cover Paper Costs (€/kg)</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const updated = { ...form.rates.paper_price_cover_by_kilo };
+                                            (['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).forEach(g => {
+                                                updated[g] = 2.515;
+                                            });
+                                            setRates(r => ({ ...r, paper_price_cover_by_kilo: updated }));
+                                        }}
+                                        className="text-xs font-semibold text-[#dc0000] hover:underline"
+                                    >
+                                        Apply generic baseline (2.515 €/kg)
+                                    </button>
+                                </div>
                                 <div className="space-y-3">
                                     {(['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).map(grade => (
                                         <div key={grade}>
@@ -680,7 +835,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-amber-900">
+                                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
                                     Generic historical baseline: 2.515 €/kg (n=13). Not grade-specific.
                                 </div>
                             </div>
@@ -718,7 +873,9 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                 }))}
                                                 className={inputClass}
                                             />
-                                            <div className="text-[10px] text-zinc-400">Suggested: {suggest} €/kg (n=13)</div>
+                                            <div className="mt-1 text-[11px] text-amber-800 font-medium">
+                                                Suggested starting value · Historical reference (n=13)
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

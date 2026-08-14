@@ -248,6 +248,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 1. Company Profile */}
                         <SetupModuleCard
                             title="1. Company Profile"
+                            icon={<Building2 size={16} />}
                             description="Legal company identity, primary country, tax/VAT identifier, and administrative contact."
                             status={companyStatus}
                             isActionable={true}
@@ -258,6 +259,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 2. Production Sites */}
                         <SetupModuleCard
                             title="2. Production Sites"
+                            icon={<Factory size={16} />}
                             description="Physical printing plants, operating addresses, city location, and facility timezone."
                             status={sitesStatus}
                             isActionable={true}
@@ -268,6 +270,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 3. Machinery Fleet */}
                         <SetupModuleCard
                             title="3. Machinery Fleet"
+                            icon={<Cog size={16} />}
                             description="Offset presses, digital devices, cutting tables, binders, and finishing equipment."
                             status={machinesStatus}
                             isActionable={hasSites}
@@ -279,6 +282,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 4. Production Capabilities */}
                         <SetupModuleCard
                             title="4. Machine Capabilities"
+                            icon={<Shield size={16} />}
                             description="Color management (CMYK, Spot UV, White Ink), maximum sheet dimensions, and PDF/X specs."
                             status={capabilitiesStatus}
                             isActionable={hasSites && hasMachines}
@@ -290,6 +294,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 5. Materials & Substrates */}
                         <SetupModuleCard
                             title="5. Materials & Substrates"
+                            icon={<Layers size={16} />}
                             description="Substrate catalog, paper grammages, sheet sizes, and finishing compatibility."
                             status={materialsStatus}
                             isActionable={hasSites}
@@ -301,6 +306,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 6. Production Capacity */}
                         <SetupModuleCard
                             title="6. Production Capacity"
+                            icon={<Activity size={16} />}
                             description="Daily throughput constraints, shift schedules, working calendar, and job allocations."
                             status={capacityStatus}
                             isActionable={hasSites}
@@ -312,6 +318,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {/* 7. Lead Times */}
                         <SetupModuleCard
                             title="7. Lead Times"
+                            icon={<Clock size={16} />}
                             description="Site-level daily cut-off times, timezone cut-offs, turnaround SLAs, and completion schedules."
                             status={leadTimesStatus}
                             isActionable={hasSites}
@@ -320,10 +327,11 @@ export const PrinthouseSetupHub: React.FC = () => {
                             onAction={() => hasSites ? handleSelectTab('LEAD_TIMES') : handleSelectTab('SITES')}
                         />
 
-                        {/* 8. Pricing & Price Books */}
+                        {/* 8. Industrial Pricing */}
                         <SetupModuleCard
-                            title="8. Pricing & Price Books"
-                            description="Base machine run costs, quantity volume tiers, margins, and published price books."
+                            title="8. Industrial Pricing"
+                            icon={<Tag size={16} />}
+                            description="Base manufacturing rates, paper kg costs, binding operations, and transport rates."
                             status={pricingStatus}
                             isActionable={hasSites}
                             dependencyHint="Requires at least 1 Production Site"

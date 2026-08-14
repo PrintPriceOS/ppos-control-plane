@@ -628,193 +628,186 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                         </table>
                     </div>
                 )}
+
+                {/* SECTION 2: BOOK RULES & SIMULATOR (VISIBLE ONLY IF SELECTED & EXPANDED) */}
+                {selectedBook && (
+                    <div style={{ padding: '0 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid #e4e4e7' }}>
+                        {/* Sub Tab selection bar */}
+                        <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #e4e4e7', paddingBottom: '12px', paddingTop: '16px' }}>
+                            <button
+                                onClick={() => setSubTab('RULES')}
+                                style={{
+                                    background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '13px', fontWeight: 700,
+                                    color: subTab === 'RULES' ? '#dc0000' : '#71717a', cursor: 'pointer',
+                                    borderBottom: subTab === 'RULES' ? '2px solid #dc0000' : 'none'
+                                }}
+                            >
+                                Pricing Rules Grid
+                            </button>
+                            <button
+                                onClick={() => setSubTab('SIMULATOR')}
+                                style={{
+                                    background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '13px', fontWeight: 700,
+                                    color: subTab === 'SIMULATOR' ? '#dc0000' : '#71717a', cursor: 'pointer',
+                                    borderBottom: subTab === 'SIMULATOR' ? '2px solid #dc0000' : 'none',
+                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                }}
+                            >
+                                <Calculator size={14} /> Pricing Sandbox
+                            </button>
+                        </div>
+
+                        {/* Validation issues warning block */}
+                        {validationAudits[selectedBook.id] && !validationAudits[selectedBook.id].isValid && (
+                            <div style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)',
+                                borderRadius: '8px', padding: '16px', fontSize: '13px'
+                            }}>
+                                <h5 style={{ margin: '0 0 8px 0', color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <ShieldAlert size={16} /> Validation Flags for {selectedBook.name}
+                                </h5>
+                                <ul style={{ margin: 0, paddingLeft: '20px', color: '#71717a', lineHeight: '1.6' }}>
+                                    {validationAudits[selectedBook.id].errors.map((err: any, idx: number) => (
+                                        <li key={idx} style={{ color: '#ef4444' }}>{err.message}</li>
+                                    ))}
+                                    {validationAudits[selectedBook.id].advisories.map((adv: any, idx: number) => (
+                                        <li key={idx}>{adv.message} (Advisory)</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {subTab === 'RULES' && (
+                            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e4e4e7', overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e4e4e7', backgroundColor: '#fafafa' }}>
+                                    <div>
+                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Layers size={16} style={{ color: '#dc0000' }} />
+                                            Pricing Rules for: {selectedBook.name}
+                                        </h4>
+                                        <span style={{ fontSize: '11px', color: '#71717a' }}>ID: {selectedBook.id}</span>
+                                    </div>
+                                    {selectedBook.status === 'DRAFT' && (
+                                        <button
+                                            onClick={() => {
+                                                setEditingRule(null);
+                                                setShowRuleModal(true);
+                                            }}
+                                            style={{
+                                                backgroundColor: '#18181b', color: '#ffffff', border: 'none', borderRadius: '6px',
+                                                padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', gap: '4px'
+                                            }}
+                                        >
+                                            <Plus size={14} /> Add Rule
+                                        </button>
+                                    )}
+                                </div>
+
+                                {loadingRules ? (
+                                    <div style={{ padding: '30px', textAlign: 'center', color: '#71717a' }}>Loading pricing rules...</div>
+                                ) : rules.length === 0 ? (
+                                    <div style={{ padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '13px' }}>
+                                        No rules defined in this book.
+                                    </div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '1px solid #e4e4e7', color: '#71717a', backgroundColor: '#fafafa' }}>
+                                                    <th style={{ padding: '12px 20px' }}>Scope</th>
+                                                    <th style={{ padding: '12px 16px' }}>Site / Machine / Material</th>
+                                                    <th style={{ padding: '12px 16px' }}>Pricing Unit</th>
+                                                    <th style={{ padding: '12px 16px' }}>Base Price</th>
+                                                    <th style={{ padding: '12px 16px' }}>Setup Charge</th>
+                                                    <th style={{ padding: '12px 16px' }}>Min Job Floor</th>
+                                                    <th style={{ padding: '12px 16px' }}>Quantity Tiers</th>
+                                                    {selectedBook.status === 'DRAFT' && <th style={{ padding: '12px 20px', width: '120px', textAlign: 'right' }}>Actions</th>}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rules.map((rule) => {
+                                                    const siteName = sites.find(s => s.siteId === rule.site_id)?.siteName || rule.site_id;
+                                                    const machineName = machines.find(m => m.id === rule.machine_id)?.name || rule.machine_id;
+                                                    const materialName = materials.find(m => m.id === rule.material_catalog_id)?.name || rule.material_catalog_id;
+
+                                                    let targetDetails = 'Global Default';
+                                                    if (rule.scope === 'SITE_OVERRIDE') targetDetails = `Site: ${siteName}`;
+                                                    if (rule.scope === 'MACHINE_OVERRIDE') targetDetails = `Site: ${siteName} → Machine: ${machineName}`;
+                                                    if (rule.scope === 'MATERIAL_RULE') targetDetails = `Site: ${siteName} → Material: ${materialName}`;
+                                                    if (rule.scope === 'FINISHING_RULE') targetDetails = `Capability: ${rule.capability_name}`;
+                                                    if (rule.scope === 'SURCHARGE') targetDetails = 'General Surcharge';
+
+                                                    return (
+                                                        <tr key={rule.id} style={{ borderBottom: '1px solid #e4e4e7' }}>
+                                                            <td style={{ padding: '12px 20px', fontWeight: 600, color: '#09090b' }}>
+                                                                <span style={{
+                                                                    backgroundColor: rule.scope === 'TENANT_DEFAULT' ? 'rgba(220,0,0,0.1)' : '#f4f4f5',
+                                                                    color: rule.scope === 'TENANT_DEFAULT' ? '#dc0000' : '#52525b',
+                                                                    padding: '2px 6px', borderRadius: '4px', fontSize: '10px'
+                                                                }}>
+                                                                    {rule.scope}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '12px 16px', color: '#18181b' }}>{targetDetails}</td>
+                                                            <td style={{ padding: '12px 16px', color: '#71717a' }}>{rule.pricing_unit}</td>
+                                                            <td style={{ padding: '12px 16px', color: '#09090b', fontWeight: 600 }}>{Number(rule.base_price).toFixed(4)} {selectedBook.currency}</td>
+                                                            <td style={{ padding: '12px 16px', color: '#09090b' }}>{Number(rule.setup_charge).toFixed(2)} {selectedBook.currency}</td>
+                                                            <td style={{ padding: '12px 16px', color: '#09090b' }}>{Number(rule.minimum_order_value).toFixed(2)} {selectedBook.currency}</td>
+                                                            <td style={{ padding: '12px 16px' }}>
+                                                                {rule.tiers && rule.tiers.length > 0 ? (
+                                                                    <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#059669', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                                                        {rule.tiers.length} Tiers Defined
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{ color: '#71717a' }}>No tiers</span>
+                                                                )}
+                                                            </td>
+                                                            {selectedBook.status === 'DRAFT' && (
+                                                                <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setEditingRule(rule);
+                                                                                setShowRuleModal(true);
+                                                                            }}
+                                                                            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+                                                                        >
+                                                                            <Edit size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteRule(rule.id)}
+                                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {subTab === 'SIMULATOR' && (
+                            <PricingPreview
+                                priceBookId={selectedBook.id}
+                                sites={sites}
+                                machines={machines}
+                                materials={materials}
+                                currency={selectedBook.currency}
+                            />
+                        )}
+                    </div>
+                )}
                     </div>
                 )}
             </div>
-
-            {/* SECTION 2: BOOK RULES & SIMULATOR (VISIBLE ONLY IF SELECTED) */}
-            {selectedBook ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Sub Tab selection bar */}
-                    <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #27272a', paddingBottom: '12px' }}>
-                        <button
-                            onClick={() => setSubTab('RULES')}
-                            style={{
-                                background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '14px', fontWeight: 700,
-                                color: subTab === 'RULES' ? '#dc0000' : '#71717a', cursor: 'pointer',
-                                borderBottom: subTab === 'RULES' ? '2px solid #dc0000' : 'none'
-                            }}
-                        >
-                            Pricing Rules Grid
-                        </button>
-                        <button
-                            onClick={() => setSubTab('SIMULATOR')}
-                            style={{
-                                background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '14px', fontWeight: 700,
-                                color: subTab === 'SIMULATOR' ? '#dc0000' : '#71717a', cursor: 'pointer',
-                                borderBottom: subTab === 'SIMULATOR' ? '2px solid #dc0000' : 'none',
-                                display: 'flex', alignItems: 'center', gap: '6px'
-                            }}
-                        >
-                            <Calculator size={14} /> Pricing Sandbox
-                        </button>
-                    </div>
-
-                    {/* Validation issues warning block */}
-                    {validationAudits[selectedBook.id] && !validationAudits[selectedBook.id].isValid && (
-                        <div style={{
-                            backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)',
-                            borderRadius: '8px', padding: '16px', fontSize: '13px'
-                        }}>
-                            <h5 style={{ margin: '0 0 8px 0', color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <ShieldAlert size={16} /> Validation Flags for {selectedBook.name}
-                            </h5>
-                            <ul style={{ margin: 0, paddingLeft: '20px', color: '#a1a1aa', lineHeight: '1.6' }}>
-                                {validationAudits[selectedBook.id].errors.map((err: any, idx: number) => (
-                                    <li key={idx} style={{ color: '#f87171' }}>{err.message}</li>
-                                ))}
-                                {validationAudits[selectedBook.id].advisories.map((adv: any, idx: number) => (
-                                    <li key={idx}>{adv.message} (Advisory)</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {subTab === 'RULES' && (
-                        <div style={{ backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #27272a' }}>
-                                <div>
-                                    <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Layers size={16} style={{ color: '#dc0000' }} />
-                                        Pricing Rules for: {selectedBook.name}
-                                    </h4>
-                                    <span style={{ fontSize: '11px', color: '#71717a' }}>ID: {selectedBook.id}</span>
-                                </div>
-                                {selectedBook.status === 'DRAFT' && (
-                                    <button
-                                        onClick={() => {
-                                            setEditingRule(null);
-                                            setShowRuleModal(true);
-                                        }}
-                                        style={{
-                                            backgroundColor: '#27272a', color: '#ffffff', border: 'none', borderRadius: '6px',
-                                            padding: '6px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', gap: '4px'
-                                        }}
-                                    >
-                                        <Plus size={14} /> Add Rule
-                                    </button>
-                                )}
-                            </div>
-
-                            {loadingRules ? (
-                                <div style={{ padding: '30px', textAlign: 'center', color: '#a1a1aa' }}>Loading pricing rules...</div>
-                            ) : rules.length === 0 ? (
-                                <div style={{ padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '13px' }}>
-                                    No rules defined in this book.
-                                </div>
-                            ) : (
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
-                                        <thead>
-                                            <tr style={{ borderBottom: '1px solid #27272a', color: '#a1a1aa' }}>
-                                                <th style={{ padding: '12px 24px' }}>Scope</th>
-                                                <th style={{ padding: '12px 16px' }}>Site / Machine / Material</th>
-                                                <th style={{ padding: '12px 16px' }}>Pricing Unit</th>
-                                                <th style={{ padding: '12px 16px' }}>Base Price</th>
-                                                <th style={{ padding: '12px 16px' }}>Setup Charge</th>
-                                                <th style={{ padding: '12px 16px' }}>Min Job Floor</th>
-                                                <th style={{ padding: '12px 16px' }}>Quantity Tiers</th>
-                                                {selectedBook.status === 'DRAFT' && <th style={{ padding: '12px 24px', width: '120px', textAlign: 'right' }}>Actions</th>}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rules.map((rule) => {
-                                                const siteName = sites.find(s => s.siteId === rule.site_id)?.siteName || rule.site_id;
-                                                const machineName = machines.find(m => m.id === rule.machine_id)?.name || rule.machine_id;
-                                                const materialName = materials.find(m => m.id === rule.material_catalog_id)?.name || rule.material_catalog_id;
-
-                                                let targetDetails = 'Global Default';
-                                                if (rule.scope === 'SITE_OVERRIDE') targetDetails = `Site: ${siteName}`;
-                                                if (rule.scope === 'MACHINE_OVERRIDE') targetDetails = `Site: ${siteName} → Machine: ${machineName}`;
-                                                if (rule.scope === 'MATERIAL_RULE') targetDetails = `Site: ${siteName} → Material: ${materialName}`;
-                                                if (rule.scope === 'FINISHING_RULE') targetDetails = `Capability: ${rule.capability_name}`;
-                                                if (rule.scope === 'SURCHARGE') targetDetails = 'General Surcharge';
-
-                                                return (
-                                                    <tr key={rule.id} style={{ borderBottom: '1px solid #27272a' }}>
-                                                        <td style={{ padding: '12px 24px', fontWeight: 600, color: '#ffffff' }}>
-                                                            <span style={{
-                                                                backgroundColor: rule.scope === 'TENANT_DEFAULT' ? 'rgba(220,0,0,0.1)' : 'rgba(39,39,42,0.5)',
-                                                                padding: '2px 6px', borderRadius: '4px', fontSize: '10px'
-                                                            }}>
-                                                                {rule.scope}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '12px 16px', color: '#e4e4e7' }}>{targetDetails}</td>
-                                                        <td style={{ padding: '12px 16px', color: '#a1a1aa' }}>{rule.pricing_unit}</td>
-                                                        <td style={{ padding: '12px 16px', color: '#ffffff' }}>{Number(rule.base_price).toFixed(4)} {selectedBook.currency}</td>
-                                                        <td style={{ padding: '12px 16px', color: '#ffffff' }}>{Number(rule.setup_charge).toFixed(2)} {selectedBook.currency}</td>
-                                                        <td style={{ padding: '12px 16px', color: '#ffffff' }}>{Number(rule.minimum_order_value).toFixed(2)} {selectedBook.currency}</td>
-                                                        <td style={{ padding: '12px 16px' }}>
-                                                            {rule.tiers && rule.tiers.length > 0 ? (
-                                                                <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                                                                    {rule.tiers.length} Tiers Defined
-                                                                </span>
-                                                            ) : (
-                                                                <span style={{ color: '#71717a' }}>No tiers</span>
-                                                            )}
-                                                        </td>
-                                                        {selectedBook.status === 'DRAFT' && (
-                                                            <td style={{ padding: '12px 24px', textAlign: 'right' }}>
-                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setEditingRule(rule);
-                                                                            setShowRuleModal(true);
-                                                                        }}
-                                                                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px' }}
-                                                                    >
-                                                                        <Edit size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteRule(rule.id)}
-                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {subTab === 'SIMULATOR' && (
-                        <PricingPreview
-                            priceBookId={selectedBook.id}
-                            sites={sites}
-                            machines={machines}
-                            materials={materials}
-                            currency={selectedBook.currency}
-                        />
-                    )}
-                </div>
-            ) : (
-                <div style={{
-                    backgroundColor: '#18181b', borderRadius: '12px', border: '1px dashed #27272a',
-                    padding: '40px', textAlign: 'center', color: '#71717a', fontSize: '14px'
-                }}>
-                    <Info size={24} style={{ margin: '0 auto 10px auto', color: '#71717a' }} />
-                    Select a Price Book above to configure its rules or simulate quote pricing.
-                </div>
-            )}
 
             {/* MODAL 1: PRICE BOOK METADATA */}
             {showBookModal && (

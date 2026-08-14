@@ -92,11 +92,11 @@ export const SetupProgressSummary: React.FC<{ readiness?: ReadinessData }> = ({ 
                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>3. Commercial Pricing</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>3. Industrial Pricing</span>
                     <Tag size={18} style={{ color: pricing?.status === 'COMPLETE' ? '#10b981' : '#d97706' }} />
                 </div>
                 <div style={{ fontSize: '20px', fontWeight: 700, color: '#09090b', marginBottom: '4px' }}>
-                    {pricing?.status === 'COMPLETE' ? 'Configured' : 'Missing Price Book'}
+                    {pricing?.status === 'COMPLETE' ? 'Configured' : pricing?.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#71717a' }}>
                     Status: <strong style={{ color: pricing?.status === 'COMPLETE' ? '#059669' : '#d97706' }}>{pricing?.status || 'NOT_STARTED'}</strong>
