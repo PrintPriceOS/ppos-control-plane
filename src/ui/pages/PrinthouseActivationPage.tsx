@@ -34,7 +34,7 @@ export const PrinthouseActivationPage: React.FC = () => {
         fetch('/api/auth/printhouse/activation/inspect', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token })
+            body: JSON.stringify({ rawToken: token })
         })
         .then(res => res.json())
         .then(data => {
@@ -74,7 +74,7 @@ export const PrinthouseActivationPage: React.FC = () => {
             const res = await fetch('/api/auth/printhouse/activate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, password })
+                body: JSON.stringify({ rawToken: token, password })
             });
 
             const data = await res.json();
