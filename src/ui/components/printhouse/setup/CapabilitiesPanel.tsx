@@ -81,17 +81,17 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
     };
 
     return (
-        <div>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
             {/* Site Selector */}
             {sites.length > 1 && (
-                <div style={{ marginBottom: '20px' }}>
-                    <label style={{ fontSize: '13px', color: '#a1a1aa', display: 'block', marginBottom: '6px' }}>
+                <div className="mb-5">
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                         Production Site
                     </label>
                     <select
                         value={selectedSiteId}
                         onChange={e => setSelectedSiteId(e.target.value)}
-                        style={{ ...inputStyle, cursor: 'pointer' }}
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors cursor-pointer"
                     >
                         {sites.map(s => (
                             <option key={s.siteId} value={s.siteId}>{s.siteName}</option>
@@ -101,82 +101,69 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
             )}
 
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Shield size={20} style={{ color: '#dc0000' }} />
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#fff' }}>
+            <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                    <Shield size={20} className="text-[#dc0000]" />
+                    <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
                         Production Capabilities
                     </h3>
                 </div>
                 <button
                     onClick={() => fetchCapabilities(selectedSiteId)}
-                    style={{
-                        background: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px',
-                        padding: '8px 12px', color: '#a1a1aa', cursor: 'pointer'
-                    }}
+                    className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 p-2 rounded-lg transition-colors cursor-pointer"
                 >
                     <RefreshCw size={14} />
                 </button>
             </div>
 
             {/* Summary Bar */}
-            <div style={{
-                background: '#18181b', border: '1px solid #27272a', borderRadius: '12px',
-                padding: '16px 20px', marginBottom: '20px',
-                display: 'flex', gap: '32px'
-            }}>
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:px-5 mb-5 flex flex-wrap gap-8 transition-colors">
                 <div>
-                    <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{capabilities.length}</span>
-                    <span style={{ fontSize: '13px', color: '#71717a', marginLeft: '6px' }}>capabilities</span>
+                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{capabilities.length}</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">capabilities</span>
                 </div>
                 <div>
-                    <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{machineCount}</span>
-                    <span style={{ fontSize: '13px', color: '#71717a', marginLeft: '6px' }}>active machines</span>
+                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{machineCount}</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">active machines</span>
                 </div>
                 <div>
-                    <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>{Object.keys(groupedByModule).length}</span>
-                    <span style={{ fontSize: '13px', color: '#71717a', marginLeft: '6px' }}>modules</span>
+                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{Object.keys(groupedByModule).length}</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">modules</span>
                 </div>
             </div>
 
             {loading && (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#71717a' }}>
-                    <RefreshCw size={24} className="animate-spin" />
+                <div className="text-center py-10 text-zinc-500">
+                    <RefreshCw size={24} className="animate-spin inline-block" />
                 </div>
             )}
 
             {/* Capability Groups */}
             {!loading && Object.entries(groupedByModule).map(([module, caps]) => (
-                <div key={module} style={{ marginBottom: '20px' }}>
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #27272a'
-                    }}>
-                        <div style={{
-                            width: '8px', height: '8px', borderRadius: '50%',
-                            background: MODULE_COLORS[module] || '#71717a'
-                        }} />
-                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#d4d4d8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div key={module} className="mb-5">
+                    <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                        <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: MODULE_COLORS[module] || '#71717a' }}
+                        />
+                        <h4 className="m-0 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                             {module}
                         </h4>
-                        <span style={{ fontSize: '12px', color: '#71717a' }}>({caps.length})</span>
+                        <span className="text-xs text-zinc-400">({caps.length})</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                         {caps.map(cap => (
                             <div
                                 key={cap.type}
-                                style={{
-                                    background: '#18181b', border: '1px solid #27272a', borderRadius: '8px',
-                                    padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px'
-                                }}
+                                className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 sm:px-4 flex items-center gap-2.5 transition-colors"
                             >
                                 {cap.active
-                                    ? <CheckCircle2 size={16} style={{ color: '#22c55e', flexShrink: 0 }} />
-                                    : <XCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
+                                    ? <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                    : <XCircle size={16} className="text-red-500 shrink-0" />
                                 }
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>{cap.label}</div>
-                                    <div style={{ fontSize: '11px', color: '#71717a' }}>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{cap.label}</div>
+                                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
                                         {cap.source_machine_ids.length} machine{cap.source_machine_ids.length !== 1 ? 's' : ''}
                                     </div>
                                 </div>
@@ -188,13 +175,10 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
 
             {/* Empty State */}
             {!loading && capabilities.length === 0 && (
-                <div style={{
-                    textAlign: 'center', padding: '40px', color: '#71717a',
-                    background: '#18181b', borderRadius: '12px', border: '1px solid #27272a'
-                }}>
-                    <Shield size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                    <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>No capabilities detected</p>
-                    <p style={{ margin: 0, fontSize: '13px' }}>
+                <div className="text-center py-10 text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <Shield size={32} className="mb-3 opacity-40 mx-auto" />
+                    <p className="m-0 font-semibold text-zinc-800 dark:text-zinc-200 text-sm">No capabilities detected</p>
+                    <p className="mt-1 mb-0 text-xs text-zinc-500">
                         Add machines and configure their features to automatically derive production capabilities.
                     </p>
                 </div>
@@ -202,11 +186,7 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
 
             {/* Provenance Notice */}
             {capabilities.length > 0 && (
-                <div style={{
-                    marginTop: '16px', padding: '12px 16px',
-                    background: '#1a1a2e', border: '1px solid #312e81', borderRadius: '8px',
-                    fontSize: '12px', color: '#818cf8'
-                }}>
+                <div className="mt-4 p-3.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs text-indigo-900 dark:text-indigo-300">
                     💡 Capabilities are automatically derived from your machine configuration.
                     Update machine features to modify your capability profile.
                 </div>

@@ -15,31 +15,16 @@ export const FieldGuidance: React.FC<FieldGuidanceProps> = ({ title, description
     const [show, setShow] = useState(false);
 
     return (
-        <div style={{ position: 'relative', display: 'inline-block', marginLeft: '6px' }}>
+        <div className="relative inline-block ml-1.5 align-middle">
             <HelpCircle
                 size={14}
-                style={{ cursor: 'help', color: '#a1a1aa', verticalAlign: 'middle' }}
+                className="cursor-help text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
                 onMouseEnter={() => setShow(true)}
                 onMouseLeave={() => setShow(false)}
             />
             {show && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '125%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: '#18181b',
-                    color: '#f4f4f5',
-                    border: '1px solid #dc0000',
-                    fontSize: '12px',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    width: '220px',
-                    zIndex: 9999,
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.6)',
-                    lineHeight: '1.4'
-                }}>
-                    <strong style={{ color: '#ffffff', display: 'block', marginBottom: '2px' }}>{title}</strong>
+                <div className="absolute bottom-[125%] left-1/2 -translate-x-1/2 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-[#dc0000] text-xs p-2.5 rounded-lg w-56 z-[9999] shadow-xl leading-relaxed transition-all pointer-events-none">
+                    <strong className="text-zinc-900 dark:text-white block mb-0.5">{title}</strong>
                     {description}
                 </div>
             )}

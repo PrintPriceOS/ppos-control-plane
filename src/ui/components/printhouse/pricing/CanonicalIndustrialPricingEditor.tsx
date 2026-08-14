@@ -486,19 +486,50 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {/* ── 3. INTERIOR ── */}
                 {tab === 'Interior' && (
                     <div className="space-y-8">
-                        <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-600">
+                        <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-600 dark:text-zinc-400">
                             Configure base plate setup (Fixed) and run rate per 1,000 sheets (Variable) for supported signature formats.
                         </div>
 
                         {([
-                            { label: '1 Colour (1/1)', fixedKey: 'interior_one_colour_fixed', varKey: 'interior_one_colour_var', fixedSuggestKey: 'interior_11_fixed', varSuggestKey: 'interior_11_var', defFixed: 80.31, defVar: 8.12 },
-                            { label: '2 Colour (2/2)', fixedKey: 'interior_two_colour_fixed', varKey: 'interior_two_colour_var' },
-                            { label: 'Full Colour (4/4 CMYK)', fixedKey: 'interior_full_colour_fixed', varKey: 'interior_full_colour_var', fixedSuggestKey: 'interior_44_fixed', varSuggestKey: 'interior_44_var', defFixed: 120.0, defVar: 18.0 }
-                        ] as const).map(({ label, fixedKey, varKey, fixedSuggestKey, varSuggestKey, defFixed, defVar }) => (
-                            <div key={label} className="border border-zinc-200 rounded-lg p-4 bg-white">
+                            {
+                                label: '1 Colour (1/1)',
+                                fixedKey: 'interior_one_colour_fixed',
+                                varKey: 'interior_one_colour_var',
+                                fixedSuggestKey: 'interior_11_fixed',
+                                varSuggestKey: 'interior_11_var',
+                                defFixed: 80.31,
+                                defVar: 8.12,
+                                sampleText: 'Historical reference · n=13'
+                            },
+                            {
+                                label: '2 Colour (2/2)',
+                                fixedKey: 'interior_two_colour_fixed',
+                                varKey: 'interior_two_colour_var'
+                            },
+                            {
+                                label: 'Full Colour (4/4 CMYK)',
+                                fixedKey: 'interior_full_colour_fixed',
+                                varKey: 'interior_full_colour_var',
+                                fixedSuggestKey: 'interior_44_fixed',
+                                varSuggestKey: 'interior_44_var',
+                                defFixed: 120.0,
+                                defVar: 18.0,
+                                sampleText: 'Historical reference · n=3 · Low sample'
+                            }
+                        ] as const).map(({ label, fixedKey, varKey, fixedSuggestKey, defFixed, defVar, sampleText }) => (
+                            <div key={label} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-zinc-900">{label}</h3>
-                                    {fixedSuggestKey && (
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{label}</h3>
+                                </div>
+
+                                {fixedSuggestKey && (
+                                    <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
+                                        <div>
+                                            <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Suggested starting baseline</span>
+                                            <span className="mr-3">Fixed setup: <strong className="font-mono">€{defFixed?.toFixed(2)}</strong></span>
+                                            <span>Variable /1000: <strong className="font-mono">€{defVar?.toFixed(2)}</strong></span>
+                                            <span className="text-[11px] opacity-75 ml-3">({sampleText})</span>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -507,19 +538,20 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                     setRateField(varKey as keyof PrinthouseRates, k, defVar || 0);
                                                 });
                                             }}
-                                            className="text-xs font-semibold text-[#dc0000] hover:underline"
+                                            className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                         >
-                                            Apply baseline to all signatures
+                                            Apply baseline to supported signatures
                                         </button>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+
                                 <div className="overflow-x-auto">
                                     <table className="text-xs border-collapse min-w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase pb-2 w-28">Type</th>
+                                                <th className="text-left text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 w-28">Type</th>
                                                 {SIG_KEYS.map(k => (
-                                                    <th key={k} className="text-center text-[11px] font-bold text-zinc-500 uppercase pb-2 px-2 min-w-[90px]">
+                                                    <th key={k} className="text-center text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 px-2 min-w-[90px]">
                                                         {k}
                                                     </th>
                                                 ))}
@@ -529,19 +561,31 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             {(['Fixed Setup (€)', 'Variable /1000 (€)'] as const).map((rowLabel, ri) => {
                                                 const key = ri === 0 ? fixedKey : varKey;
                                                 return (
-                                                    <tr key={rowLabel} className="border-t border-zinc-100">
-                                                        <td className="text-xs font-semibold text-zinc-700 py-2 pr-3">{rowLabel}</td>
-                                                        {SIG_KEYS.map(k => (
-                                                            <td key={k} className="px-1 py-1">
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    value={(form.rates[key] as any)[k] ?? 0}
-                                                                    onChange={e => setRateField(key as keyof PrinthouseRates, k, parseFloat(e.target.value) || 0)}
-                                                                    className={inputClass}
-                                                                />
-                                                            </td>
-                                                        ))}
+                                                    <tr key={rowLabel} className="border-t border-zinc-100 dark:border-zinc-800">
+                                                        <td className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 py-2 pr-3">{rowLabel}</td>
+                                                        {SIG_KEYS.map(k => {
+                                                            const rawVal = (form.rates[key] as any)?.[k];
+                                                            const displayVal = (rawVal === undefined || rawVal === null || rawVal === '') 
+                                                                ? '' 
+                                                                : rawVal === 0 
+                                                                    ? (initialNodeData?.rates ? '0' : '') 
+                                                                    : rawVal;
+                                                            return (
+                                                                <td key={k} className="px-1 py-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        placeholder="—"
+                                                                        value={displayVal}
+                                                                        onChange={e => {
+                                                                            const v = e.target.value === '' ? null : (parseFloat(e.target.value) || 0);
+                                                                            setRateField(key as keyof PrinthouseRates, k, v);
+                                                                        }}
+                                                                        className={inputClass}
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 );
                                             })}
@@ -755,10 +799,18 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {/* ── 7. PAPER COSTS ── */}
                 {tab === 'Paper Costs' && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-zinc-900">Interior Paper Costs (€/kg)</h3>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Interior Paper Costs (€/kg)</h3>
+                                </div>
+                                
+                                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
+                                    <div>
+                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Generic historical baseline</span>
+                                        <span className="font-mono text-sm font-bold">€1.252 / kg</span>
+                                        <span className="text-[11px] opacity-75 block mt-0.5">Historical reference · n=13 · Not grade-specific</span>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -768,39 +820,57 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             });
                                             setRates(r => ({ ...r, paper_price_interior_by_kilo: updated }));
                                         }}
-                                        className="text-xs font-semibold text-[#dc0000] hover:underline"
+                                        className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                     >
-                                        Apply generic baseline (1.252 €/kg)
+                                        Apply generic baseline
                                     </button>
                                 </div>
+
                                 <div className="space-y-3">
-                                    {(['offset', 'mc', 'lux', 'munken', 'other'] as const).map(grade => (
-                                        <div key={grade}>
-                                            <label className={labelClass}>{grade.toUpperCase()}</label>
-                                            <input
-                                                type="number"
-                                                step="0.001"
-                                                value={form.rates.paper_price_interior_by_kilo?.[grade] ?? 0}
-                                                onChange={e => setRates(r => ({
-                                                    ...r,
-                                                    paper_price_interior_by_kilo: {
-                                                        ...r.paper_price_interior_by_kilo,
-                                                        [grade]: parseFloat(e.target.value) || 0
-                                                    }
-                                                }))}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-                                    Generic historical baseline: 1.252 €/kg (n=13). Not grade-specific.
+                                    {(['offset', 'mc', 'lux', 'munken', 'other'] as const).map(grade => {
+                                        const rawVal = form.rates.paper_price_interior_by_kilo?.[grade];
+                                        const displayVal = (rawVal === undefined || rawVal === null || rawVal === '')
+                                            ? ''
+                                            : rawVal === 0
+                                                ? (initialNodeData?.rates ? '0' : '')
+                                                : rawVal;
+                                        return (
+                                            <div key={grade}>
+                                                <label className={labelClass}>{grade.toUpperCase()}</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.001"
+                                                    placeholder="—"
+                                                    value={displayVal}
+                                                    onChange={e => {
+                                                        const val = e.target.value === '' ? null : (parseFloat(e.target.value) || 0);
+                                                        setRates(r => ({
+                                                            ...r,
+                                                            paper_price_interior_by_kilo: {
+                                                                ...r.paper_price_interior_by_kilo,
+                                                                [grade]: val
+                                                            }
+                                                        }));
+                                                    }}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <div className="border border-zinc-200 rounded-lg p-4 bg-white">
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-zinc-900">Cover Paper Costs (€/kg)</h3>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Cover Paper Costs (€/kg)</h3>
+                                </div>
+
+                                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
+                                    <div>
+                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Generic historical baseline</span>
+                                        <span className="font-mono text-sm font-bold">€2.515 / kg</span>
+                                        <span className="text-[11px] opacity-75 block mt-0.5">Historical reference · n=13 · Not grade-specific</span>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -810,33 +880,43 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             });
                                             setRates(r => ({ ...r, paper_price_cover_by_kilo: updated }));
                                         }}
-                                        className="text-xs font-semibold text-[#dc0000] hover:underline"
+                                        className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                     >
-                                        Apply generic baseline (2.515 €/kg)
+                                        Apply generic baseline
                                     </button>
                                 </div>
+
                                 <div className="space-y-3">
-                                    {(['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).map(grade => (
-                                        <div key={grade}>
-                                            <label className={labelClass}>{grade.toUpperCase()}</label>
-                                            <input
-                                                type="number"
-                                                step="0.001"
-                                                value={form.rates.paper_price_cover_by_kilo?.[grade] ?? 0}
-                                                onChange={e => setRates(r => ({
-                                                    ...r,
-                                                    paper_price_cover_by_kilo: {
-                                                        ...r.paper_price_cover_by_kilo,
-                                                        [grade]: parseFloat(e.target.value) || 0
-                                                    }
-                                                }))}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-                                    Generic historical baseline: 2.515 €/kg (n=13). Not grade-specific.
+                                    {(['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).map(grade => {
+                                        const rawVal = form.rates.paper_price_cover_by_kilo?.[grade];
+                                        const displayVal = (rawVal === undefined || rawVal === null || rawVal === '')
+                                            ? ''
+                                            : rawVal === 0
+                                                ? (initialNodeData?.rates ? '0' : '')
+                                                : rawVal;
+                                        return (
+                                            <div key={grade}>
+                                                <label className={labelClass}>{grade.toUpperCase()}</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.001"
+                                                    placeholder="—"
+                                                    value={displayVal}
+                                                    onChange={e => {
+                                                        const val = e.target.value === '' ? null : (parseFloat(e.target.value) || 0);
+                                                        setRates(r => ({
+                                                            ...r,
+                                                            paper_price_cover_by_kilo: {
+                                                                ...r.paper_price_cover_by_kilo,
+                                                                [grade]: val
+                                                            }
+                                                        }));
+                                                    }}
+                                                    className={inputClass}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

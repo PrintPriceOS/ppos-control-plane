@@ -91,30 +91,18 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
     };
 
     return (
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
+            <div className="flex items-center justify-between mb-5">
                 <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: 0 }}>Production Sites</h2>
-                    <p style={{ fontSize: '13px', color: '#a1a1aa', margin: '4px 0 0 0' }}>
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Production Sites</h2>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 mb-0">
                         Manage your physical printing facilities and production nodes.
                     </p>
                 </div>
                 {!isEditing && (
                     <button
                         onClick={openCreateForm}
-                        style={{
-                            background: '#dc0000',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '10px 16px',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1.5"
                     >
                         <Plus size={16} /> Add Production Site
                     </button>
@@ -122,20 +110,20 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
             </div>
 
             {errorMsg && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#fca5a5', padding: '12px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                    <AlertCircle size={16} /> {errorMsg}
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 p-3 rounded-lg mb-5 flex items-center gap-2 text-xs font-medium">
+                    <AlertCircle size={16} className="text-red-600 dark:text-red-400" /> {errorMsg}
                 </div>
             )}
 
             {isEditing ? (
-                <form onSubmit={handleSubmit} style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', marginTop: 0, marginBottom: '16px' }}>
+                <form onSubmit={handleSubmit} className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 mb-5">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mt-0 mb-4">
                         {editingSiteId ? 'Edit Production Site' : 'Configure Primary Site'}
                     </h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                                 Facility / Site Name
                                 <FieldGuidance title="Facility Name" description="Unique name for this printing plant (e.g. Madrid Main Plant)." />
                             </label>
@@ -145,12 +133,12 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                                 value={form.siteName || ''}
                                 onChange={(e) => setForm({ ...form, siteName: e.target.value })}
                                 placeholder="e.g. Central Production Plant"
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '10px 12px', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                                 Country
                             </label>
                             <input
@@ -158,12 +146,12 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                                 required
                                 value={form.country || ''}
                                 onChange={(e) => setForm({ ...form, country: e.target.value })}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '10px 12px', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                                 City / Location
                             </label>
                             <input
@@ -172,19 +160,19 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                                 value={form.city || ''}
                                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                                 placeholder="e.g. Madrid"
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '10px 12px', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                                 Timezone
                                 <FieldGuidance title="Site Timezone" description="Used to compute SLA deadlines and scheduling cut-off times." />
                             </label>
                             <select
                                 value={form.timezone || 'Europe/Madrid'}
                                 onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-                                style={{ width: '100%', background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '10px 12px', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
                             >
                                 <option value="Europe/Madrid">Europe/Madrid (CET)</option>
                                 <option value="Europe/London">Europe/London (GMT)</option>
@@ -194,18 +182,18 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="flex gap-3">
                         <button
                             type="submit"
                             disabled={loading}
-                            style={{ background: '#dc0000', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                            className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition-colors shadow-sm disabled:opacity-50"
                         >
                             {loading ? 'Saving...' : 'Save Production Site'}
                         </button>
                         <button
                             type="button"
                             onClick={() => setIsEditing(false)}
-                            style={{ background: '#27272a', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
+                            className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium px-5 py-2 rounded-lg text-xs transition-colors"
                         >
                             Cancel
                         </button>
@@ -214,18 +202,18 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
             ) : null}
 
             {/* Sites List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex flex-col gap-3">
                 {sites.map((site) => (
-                    <div key={site.siteId} style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                            <Factory size={24} style={{ color: site.status === 'CONFIGURING' || site.status === 'active' ? '#10b981' : '#eab308' }} />
+                    <div key={site.siteId} className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 sm:px-5 flex items-center justify-between transition-colors">
+                        <div className="flex items-center gap-3.5">
+                            <Factory size={24} className={site.status === 'CONFIGURING' || site.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'} />
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: 0 }}>{site.siteName}</h4>
-                                    {site.isPrimary && <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px' }}>Primary Plant</span>}
-                                    <span style={{ background: '#27272a', color: '#a1a1aa', fontSize: '11px', padding: '2px 8px', borderRadius: '4px' }}>{site.status}</span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm font-semibold text-zinc-900 dark:text-white m-0">{site.siteName}</h4>
+                                    {site.isPrimary && <span className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded">Primary Plant</span>}
+                                    <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] px-2 py-0.5 rounded">{site.status}</span>
                                 </div>
-                                <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '4px 0 0 0' }}>
+                                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 mb-0">
                                     {site.city || 'Pending City'}, {site.country || 'Pending Country'} ({site.timezone || 'CET'})
                                 </p>
                             </div>
@@ -233,7 +221,7 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
 
                         <button
                             onClick={() => openEditForm(site)}
-                            style={{ background: '#27272a', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 px-3.5 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
                         >
                             <Edit2 size={14} /> Configure Site
                         </button>
