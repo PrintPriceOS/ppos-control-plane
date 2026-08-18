@@ -6,6 +6,7 @@
  * delivery methods, and non-binding delivery estimate preview.
  */
 import React, { useState, useEffect } from 'react';
+import { Truck } from 'lucide-react';
 
 interface ShippingRegion {
     id: string;
