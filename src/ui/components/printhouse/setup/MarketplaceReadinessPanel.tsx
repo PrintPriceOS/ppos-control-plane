@@ -6,6 +6,8 @@
  * and gates the 'Submit for Admin Review' action on zero blocking issues.
  */
 import React, { useState, useEffect } from 'react';
+import { CheckSquare } from 'lucide-react';
+import { getAuthToken } from '../../../lib/authStore';
 
 interface MarketplaceReadinessPanelProps {
     onSaved?: () => void;
@@ -26,7 +28,7 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
         setLoading(true);
         try {
             const res = await fetch('/api/printhouse/onboarding/review-status', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` }
+                headers: { 'Authorization': `Bearer ${getAuthToken()}` }
             });
             const data = await res.json();
             if (data.success) {
@@ -48,7 +50,7 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({})
             });

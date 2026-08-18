@@ -7,6 +7,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Truck } from 'lucide-react';
+import { getAuthToken } from '../../../lib/authStore';
 
 interface ShippingRegion {
     id: string;
@@ -56,7 +57,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
         setLoading(true);
         try {
             const res = await fetch(`/api/printhouse/onboarding/shipping/regions?siteId=${siteId || ''}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` }
+                headers: { 'Authorization': `Bearer ${getAuthToken()}` }
             });
             const data = await res.json();
             if (data.success) {
@@ -93,7 +94,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({
                     siteId: siteId || 'site-1',
@@ -126,7 +127,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({
                     siteId: siteId || 'site-1',

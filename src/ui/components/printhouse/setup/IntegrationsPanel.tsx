@@ -6,6 +6,8 @@
  * Enforces one-time secret reveal, secret redaction, and SSRF security status.
  */
 import React, { useState, useEffect } from 'react';
+import { Cpu } from 'lucide-react';
+import { getAuthToken } from '../../../lib/authStore';
 
 interface IntegrationProfile {
     id: string;
@@ -40,7 +42,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
         setLoading(true);
         try {
             const res = await fetch(`/api/printhouse/onboarding/integrations?siteId=${siteId || ''}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` }
+                headers: { 'Authorization': `Bearer ${getAuthToken()}` }
             });
             const data = await res.json();
             if (data.success) {
@@ -70,7 +72,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({
                     name: formData.name,
@@ -99,7 +101,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({ scopes: ['read', 'write'] })
             });
@@ -119,7 +121,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 }
             });
             const data = await res.json();
