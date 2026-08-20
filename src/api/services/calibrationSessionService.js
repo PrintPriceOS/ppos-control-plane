@@ -25,7 +25,8 @@
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const db = require('./mysqlClient');
-const logger = require('./logger').child('calibration-session');
+const logger = require('./logger').child('calibration-session-service');
+const { isValidIso2Country } = require('../../lib/countryCatalog');
 
 // ── Canonical Reference Book Taxonomy (Physical Job Specification) ──────────
 
@@ -156,8 +157,8 @@ class CalibrationSessionService {
         if (!VALID_BINDING_METHOD.includes(spec.binding_method)) {
             errors.push(`binding_method must be one of: ${VALID_BINDING_METHOD.join(', ')}`);
         }
-        if (!spec.delivery_country || !ISO2_COUNTRY_PATTERN.test(spec.delivery_country)) {
-            errors.push('delivery_country must be an ISO-2 uppercase country code (e.g. ES, DE, FR)');
+        if (!spec.delivery_country || !isValidIso2Country(spec.delivery_country)) {
+            errors.push('delivery_country must be a valid ISO-2 uppercase country code (e.g. ES, DE, FR)');
         }
 
         // Optional enum fields

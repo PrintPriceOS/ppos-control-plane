@@ -18,6 +18,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const aiAdapter = require('./aiProviderAdapter');
 const calibrationSessionService = require('./calibrationSessionService');
+const { isValidIso2Country } = require('../../lib/countryCatalog');
 const logger = require('./logger').child('calibration-assistant');
 
 // ── Strict Allowlist: Physical Spec Fields (Canonical Phase 193B) ───────────
@@ -565,7 +566,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     normalized.specPatch[key] = val;
                 } else if (key === 'delivery_country') {
                     const code = String(val).toUpperCase().trim();
-                    if (ISO2_COUNTRY_PATTERN.test(code)) normalized.specPatch[key] = code;
+                    if (isValidIso2Country(code)) normalized.specPatch[key] = code;
                 } else if (key === 'uv_varnish' || key === 'endpapers') {
                     normalized.specPatch[key] = Boolean(val);
                 }

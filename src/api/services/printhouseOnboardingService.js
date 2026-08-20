@@ -47,6 +47,9 @@ class PrinthouseOnboardingService {
         };
     }
 
+const { isValidIso2Country, normalizeIso2Country } = require('../../lib/countryCatalog');
+
+class PrinthouseOnboardingService {
     /**
      * Update Company Profile canonical data with strict allowlisting.
      */
@@ -67,6 +70,15 @@ class PrinthouseOnboardingService {
             companyRegistrationId
         } = payload || {};
 
+        if (country !== undefined && country !== null && country !== '') {
+            if (!isValidIso2Country(country)) {
+                const err = new Error(`Invalid country code '${country}'. Must be a valid ISO 3166-1 alpha-2 code.`);
+                err.code = 'INVALID_COUNTRY_CODE';
+                err.statusCode = 400;
+                throw err;
+            }
+        }
+
         const [tenant] = await db.query('SELECT metadata_json FROM tenants WHERE id = ?', [tenantId]);
         if (!tenant) throw new Error('ONBOARDING_PROFILE_NOT_FOUND');
 
@@ -81,7 +93,9 @@ class PrinthouseOnboardingService {
 
         if (legalName !== undefined) metadata.legal_name = String(legalName).trim();
         if (tradingName !== undefined) metadata.trading_name = String(tradingName).trim();
-        if (country !== undefined) metadata.country = String(country).trim();
+        if (country !== undefined) {
+            metadata.country = country ? normalizeIso2Country(country) : '';
+        }
         if (city !== undefined) metadata.city = String(city).trim();
         if (address !== undefined) metadata.address = String(address).trim();
         if (postalCode !== undefined) metadata.postal_code = String(postalCode).trim();

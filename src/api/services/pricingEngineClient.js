@@ -5,6 +5,7 @@
  */
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { normalizeIso2Country } = require('../../lib/countryCatalog');
 
 class PricingEngineClient {
     /**
@@ -180,9 +181,16 @@ class PricingEngineClient {
             s.total_page_count = (Number(s.interior_pages) || 0) + (Number(s.cover_pages) || 4);
         }
 
-        // 5. ISO Country
-        if (s.delivery_country) {
-            s.delivery_country = String(s.delivery_country).toUpperCase().substring(0, 2);
+        // 5. ISO Country (Strict fail-closed: valid normalized, absent omitted, invalid throws)
+        if (s.delivery_country !== undefined && s.delivery_country !== null && s.delivery_country !== '') {
+            const normalized = normalizeIso2Country(s.delivery_country);
+            if (!normalized) {
+                const err = new Error(`Invalid destination country code '${s.delivery_country}'. Must be a valid ISO 3166-1 alpha-2 code.`);
+                err.code = 'INVALID_DESTINATION_COUNTRY';
+                err.statusCode = 400;
+                throw err;
+            }
+            s.delivery_country = normalized;
         }
 
         return s;

@@ -23,6 +23,7 @@ const buildPriceAdapter = require('./buildPriceCalibrationAdapter');
 const shippingRegionService = require('./printhouseShippingRegionService');
 const priceBookService = require('./printhousePriceBookService');
 const ruleService = require('./printhousePricingRuleService');
+const { isValidIso2Country, normalizeIso2Country } = require('../../lib/countryCatalog');
 const logger = require('./logger').child('quote-preview-service');
 
 class PrinthouseQuotePreviewService {
@@ -139,25 +140,35 @@ class PrinthouseQuotePreviewService {
         let transportCost = bpeResult.predictedTransportPrice;
 
         // 6. Resolve Shipping Region & Transit Times (Canonical Shipping Service)
-        const deliveryCountry = (jobSpec.delivery_country || 'ES').toUpperCase();
+        const rawCountry = jobSpec.delivery_country;
+        let deliveryCountry = null;
         let shippingStatus = 'CONFIGURED';
         let estimatedDeliveryDays = 2;
 
-        try {
-            const regions = await shippingRegionService.listShippingRegions(tenantId, node.id);
-            const matchingRegions = (regions || []).filter(r => r.enabled && Array.isArray(r.countries) && r.countries.map(c => c.toUpperCase()).includes(deliveryCountry));
-            if (matchingRegions.length === 1) {
-                estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
-            } else if (matchingRegions.length > 1) {
-                shippingStatus = 'AMBIGUOUS_SHIPPING_REGION';
-                warnings.push(`Destination country '${deliveryCountry}' is configured in multiple active regions (${matchingRegions.map(r => r.name).join(', ')}).`);
-                estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
-            } else {
-                shippingStatus = 'DESTINATION_NOT_IN_ACTIVE_SHIPPING_REGIONS';
-                warnings.push(`Destination country '${deliveryCountry}' is not explicitly mapped in active shipping regions.`);
+        if (!rawCountry) {
+            shippingStatus = 'DESTINATION_COUNTRY_REQUIRED';
+            warnings.push('Destination country is required for quote preview.');
+        } else if (!isValidIso2Country(rawCountry)) {
+            shippingStatus = 'INVALID_DESTINATION_COUNTRY';
+            warnings.push(`Invalid destination country code '${rawCountry}'. Must be a valid ISO 3166-1 alpha-2 code.`);
+        } else {
+            deliveryCountry = normalizeIso2Country(rawCountry);
+            try {
+                const regions = await shippingRegionService.listShippingRegions(tenantId, node.id);
+                const matchingRegions = (regions || []).filter(r => r.enabled && Array.isArray(r.countries) && r.countries.map(c => c.toUpperCase()).includes(deliveryCountry));
+                if (matchingRegions.length === 1) {
+                    estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
+                } else if (matchingRegions.length > 1) {
+                    shippingStatus = 'AMBIGUOUS_SHIPPING_REGION';
+                    warnings.push(`Destination country '${deliveryCountry}' is configured in multiple active regions (${matchingRegions.map(r => r.name).join(', ')}).`);
+                    estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
+                } else {
+                    shippingStatus = 'DESTINATION_NOT_IN_ACTIVE_SHIPPING_REGIONS';
+                    warnings.push(`Destination country '${deliveryCountry}' is not explicitly mapped in active shipping regions.`);
+                }
+            } catch (e) {
+                shippingStatus = 'SHIPPING_SERVICE_UNAVAILABLE';
             }
-        } catch (e) {
-            shippingStatus = 'SHIPPING_SERVICE_UNAVAILABLE';
         }
 
         // 7. Resolve Commercial Pricing Policy (Optional Markup)
