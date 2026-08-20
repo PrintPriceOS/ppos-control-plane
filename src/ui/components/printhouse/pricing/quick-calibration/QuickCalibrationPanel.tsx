@@ -230,7 +230,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     };
 
     // ── 2. Explicit Apply / Save (193B Session Creation / Update) ──
-    const handleApplyProposal = async (proposal: any) => {
+    const handleApplyProposal = async (proposal: any): Promise<any | null> => {
         setError(null);
         const mergedSpec = { ...draftSpec, ...(proposal?.specPatch || {}) };
         const newSpec = canonicalizeBookSpec(mergedSpec);
@@ -245,13 +245,14 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             if (proposal?.specPatch) {
                 setExtractedFields(Object.keys(proposal.specPatch));
             }
-            return;
+            return null;
         }
 
         try {
+            let persistedSession: any;
             if (!session?.id) {
                 // Explicit creation with complete Phase 193B payload
-                const created = await printhouseCalibrationApi.createSession({
+                persistedSession = await printhouseCalibrationApi.createSession({
                     printerNodeId,
                     referenceBookName: 'Quick Calibration Book',
                     bookSpec: newSpec,
@@ -264,9 +265,9 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     includesFinishing: newComms.includesFinishing,
                     includesPackaging: newComms.includesPackaging
                 });
-                setSession(created);
+                setSession(persistedSession);
             } else {
-                const updated = await printhouseCalibrationApi.updateDraftSession(session.id, {
+                persistedSession = await printhouseCalibrationApi.updateDraftSession(session.id, {
                     bookSpec: newSpec,
                     targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
                     currency: newComms.currency || 'EUR',
@@ -277,15 +278,17 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     includesFinishing: newComms.includesFinishing,
                     includesPackaging: newComms.includesPackaging
                 });
-                setSession(updated);
+                setSession(persistedSession);
             }
             setConfirmedFields(Object.keys(newSpec).filter(k => newSpec[k] !== undefined && newSpec[k] !== null && newSpec[k] !== ''));
             setExtractedFields([]);
             setActiveProposal(null);
             setSuccessMessage('Specifications verified and saved to calibration session.');
             setTimeout(() => setSuccessMessage(null), 4000);
+            return persistedSession;
         } catch (err: any) {
             setError(err.message || 'Failed to save calibration session');
+            return null;
         }
     };
 
@@ -365,40 +368,46 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     };
 
     // ── 4. Mark Ready (193B Transition) ──
-    const handleMarkReady = async () => {
+    const handleMarkReady = async (): Promise<any | null> => {
         setError(null);
-        const validation = validateDraftForCreation(draftSpec, draftCommercials);
-        if (!validation.valid) {
-            setError(`Please complete all required fields: ${validation.missing.join(', ')}`);
-            return;
+        let workingSession = session;
+
+        if (!workingSession?.id) {
+            workingSession = await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
         }
 
+        if (!workingSession?.id) return null;
+
         try {
-            if (!session?.id) {
-                await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
-            }
-            if (session?.id) {
-                const updated = await printhouseCalibrationApi.markSessionReady(session.id);
+            if (workingSession.status !== 'READY') {
+                const updated = await printhouseCalibrationApi.markSessionReady(workingSession.id);
                 setSession(updated);
                 setSuccessMessage('Session marked READY. You can now calculate pricing.');
                 setTimeout(() => setSuccessMessage(null), 3000);
+                return updated;
             }
+            return workingSession;
         } catch (err: any) {
             setError(err.message || 'Failed to mark session ready');
+            return null;
         }
     };
 
     // ── 5. Calculate Starting Pricing (193C Deterministic Solver) ──
     const handleCalculate = async () => {
-        if (!session?.id) {
-            await handleMarkReady();
-        }
-        if (!session?.id) return;
-
         setCalculating(true);
         setError(null);
         try {
-            const run = await printhouseCalibrationApi.calculateCalibration(session.id);
+            let readySession = session;
+            if (!readySession?.id || readySession.status !== 'READY') {
+                readySession = await handleMarkReady();
+            }
+
+            if (!readySession?.id || readySession.status !== 'READY') {
+                return;
+            }
+
+            const run = await printhouseCalibrationApi.calculateCalibration(readySession.id);
             setActiveRun(run);
             setSuccessMessage(`Calibration completed with residual of ${run.absolute_residual} EUR.`);
             setTimeout(() => setSuccessMessage(null), 4000);
