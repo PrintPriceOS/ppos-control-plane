@@ -259,6 +259,84 @@ MANAGER MESSAGE:
     }
 
     /**
+     * Executes stateless pre-session natural-language interpretation (ZERO-WRITE / NO SESSION REQUIRED).
+     * Reuses the exact same canonical structured validator, schema allowlists, and fail-closed rules.
+     *
+     * @param {string} tenantId - From JWT
+     * @param {string} userMessage - Manager's natural language input
+     * @param {Object} actor - Authenticated user info { id, email, role }
+     * @param {Object} [options] - Optional mock/test injection
+     * @returns {Promise<Object>} Validated structured proposal
+     */
+    async interpret(tenantId, userMessage, actor, options = {}) {
+        if (!tenantId || !userMessage) {
+            const err = new Error('MISSING_REQUIRED_INTERPRET_PARAMETERS');
+            err.code = 'MISSING_REQUIRED_INTERPRET_PARAMETERS';
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const sanitizedMessage = String(userMessage).trim().slice(0, MAX_MESSAGE_LENGTH_CHARS);
+        if (!sanitizedMessage) {
+            const err = new Error('USER_MESSAGE_EMPTY');
+            err.code = 'USER_MESSAGE_EMPTY';
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Build minimal pre-session prompt
+        const contextPrompt = `CURRENT SESSION STATE:
+Reference Book Name: Pre-Session Calibration Workspace (Stateless)
+Current Physical Specification: {}
+Current Commercial Inclusions: {}
+Session Status: PRE_SESSION
+
+MANAGER MESSAGE:
+"${sanitizedMessage}"`;
+
+        let aiResult;
+        const startTime = Date.now();
+        try {
+            aiResult = await aiAdapter.generateStructuredCompletion({
+                systemInstruction: SYSTEM_INSTRUCTION,
+                userPrompt: contextPrompt,
+                history: [],
+                mockResponse: options.mockResponse || null
+            });
+        } catch (aiErr) {
+            logger.warn('Pre-session AI provider failed, returning fail-closed error', {
+                tenantId,
+                error: aiErr.code || aiErr.message
+            });
+            await this._logAudit(tenantId, actor, null, 'CALIBRATION_AI_PRESESSION_VALIDATION_FAILED', {
+                error: aiErr.code || aiErr.message,
+                latencyMs: aiErr.latencyMs || (Date.now() - startTime)
+            });
+            throw aiErr;
+        }
+
+        // Deterministic Schema & Allowlist Validation (Untrusted Data Gate - Reused 100%)
+        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json);
+
+        // Record Audit Log (Metadata-only)
+        await this._logAudit(tenantId, actor, null, 'CALIBRATION_AI_PRESESSION_INTERPRET_INVOKED', {
+            model: aiResult.model,
+            latencyMs: aiResult.latencyMs,
+            intent: validatedResponse.intent,
+            hasSpecPatch: Object.keys(validatedResponse.specPatch).length > 0,
+            clarificationCount: validatedResponse.clarificationQuestions.length,
+            readyForValidation: validatedResponse.readyForValidation
+        });
+
+        return {
+            ok: true,
+            proposal: validatedResponse,
+            model: aiResult.model,
+            latencyMs: aiResult.latencyMs
+        };
+    }
+
+    /**
      * Explains a calibration run in plain language (SIDE-EFFECT FREE).
      *
      * @param {string} tenantId - From JWT

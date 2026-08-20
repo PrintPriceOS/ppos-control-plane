@@ -153,7 +153,29 @@ export const printhouseCalibrationApi = {
         return handleResponse<any>(res);
     },
 
-    // ── Phase 193E: AI Conversational Calibration Assistant (Zero-Write) ────
+    // ── Phase 193E / Phase 193F.2: AI Conversational Calibration Assistant (Zero-Write) ────
+    async interpretPreSession(message: string) {
+        const res = await fetch(`${BASE_URL}/calibration-assistant/interpret`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ message })
+        });
+        return handleResponse<{
+            ok: boolean;
+            proposal: {
+                intent: string;
+                specPatch: any;
+                declaredCommercials: any;
+                clarificationQuestions: Array<{ field: string; question: string; options?: string[] }>;
+                explanation: string;
+                warnings: string[];
+                readyForValidation: boolean;
+            };
+            model: string;
+            latencyMs: number;
+        }>(res);
+    },
+
     async assistantChat(sessionId: string, message: string) {
         const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/assistant/chat`, {
             method: 'POST',

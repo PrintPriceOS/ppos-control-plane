@@ -448,6 +448,15 @@ router.get('/pricing/revisions/:revisionId', wrapHandler(async (req, res) => {
 // ──── 7. AI Conversational Calibration Assistant (Phase 193E) ────────────────
 const calibrationAssistantService = require('../services/calibrationAssistantService');
 
+// POST /api/printhouse/onboarding/pricing/calibration-assistant/interpret — Stateless Pre-Session Interpretation (Phase 193F.2)
+router.post('/pricing/calibration-assistant/interpret', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const message = req.body.message;
+    const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
+    const result = await calibrationAssistantService.interpret(tenantId, message, actor);
+    res.status(200).json({ ok: true, data: result });
+}));
+
 // POST /api/printhouse/onboarding/pricing/calibrations/:id/assistant/chat — Conversational intake (Side-effect free)
 router.post('/pricing/calibrations/:id/assistant/chat', wrapHandler(async (req, res) => {
     const tenantId = req.user.tenantId;

@@ -424,7 +424,82 @@ test('E21d', 'No assistant acceptance or rates mutation routes exist', () => {
     assert.ok(!routesSource.includes('/assistant/mutate'));
 });
 
-// ── 7. Summary Output ────────────────────────────────────────────────────────
+// ── 7. Stateless Pre-Session Interpretation Tests (Phase 193F.2) ────────────
+
+console.log('\n═══ Phase 193F.2: Stateless Pre-Session Interpretation Tests ═══\n');
+
+test('E23a', 'POST /pricing/calibration-assistant/interpret endpoint is mounted in router', () => {
+    assert.ok(routesSource.includes("router.post('/pricing/calibration-assistant/interpret'"));
+});
+
+asyncTest('E23b', 'Stateless interpret executes with zero session required and produces valid proposal', async () => {
+    const mockProposal = {
+        intent: 'SPEC_EXTRACTION',
+        specPatch: {
+            copies: 1000,
+            book_width_mm: 170,
+            book_height_mm: 240,
+            interior_pages: 128,
+            interior_print: '4/4',
+            paper_type_interior: 'offset',
+            paper_weight_interior: 80,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 300,
+            lamination: 'matt',
+            binding_method: 'perfect bound',
+            delivery_country: 'ES'
+        },
+        declaredCommercials: {
+            targetManufacturingPrice: 2450.0,
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: false
+        },
+        clarificationQuestions: [],
+        explanation: 'Extracted book specification for 1,000 copies.',
+        warnings: [],
+        readyForValidation: true
+    };
+
+    const result = await assistant.interpret('tenant-001', '1,000 copies 170x240mm...', { id: 'usr-1', email: 'a@b.com' }, {
+        mockResponse: mockProposal
+    });
+
+    assert.ok(result.ok);
+    assert.strictEqual(result.proposal.intent, 'SPEC_EXTRACTION');
+    assert.strictEqual(result.proposal.specPatch.copies, 1000);
+    assert.strictEqual(result.proposal.declaredCommercials.targetManufacturingPrice, 2450.0);
+});
+
+test('E23c', 'Stateless interpret rejects forbidden control/pricing fields fail-closed', () => {
+    const invalidMock = {
+        intent: 'calibrate_reference_book',
+        rates: { fake_rate: 100 },
+        specPatch: { copies: 1000 },
+        declaredCommercials: {},
+        clarificationQuestions: [],
+        explanation: 'Invalid',
+        warnings: [],
+        readyForValidation: true
+    };
+
+    const validated = assistant._validateAndNormalizeAIResponse(invalidMock);
+    assert.strictEqual(validated.readyForValidation, false);
+    assert.deepStrictEqual(validated.specPatch, {});
+    assert.ok(validated.warnings.includes('FORBIDDEN_CONTROL_FIELDS_REJECTED'));
+});
+
+test('E23d', 'Stateless interpret is strictly zero-write (zero DB mutations on domain tables)', () => {
+    const serviceSource = fs.readFileSync(assistantPath, 'utf8');
+    assert.ok(!serviceSource.includes('INSERT INTO printhouse_pricing_calibration_sessions'));
+    assert.ok(!serviceSource.includes('INSERT INTO printhouse_pricing_calibration_runs'));
+    assert.ok(!serviceSource.includes('INSERT INTO printhouse_pricing_revisions'));
+});
+
+// ── 8. Summary Output ────────────────────────────────────────────────────────
 
 console.log(`\n═══ Phase 193E Results: ${passed} passed, ${failed} failed ═══\n`);
 if (failed > 0) {

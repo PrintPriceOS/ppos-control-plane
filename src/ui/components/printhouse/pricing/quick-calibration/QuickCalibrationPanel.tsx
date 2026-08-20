@@ -127,34 +127,36 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         setMessages(prev => [...prev, userMsg]);
 
         try {
-            // If session exists on server, call assistant API; otherwise handle in local memory
+            let result: any;
             if (session?.id) {
-                const result = await printhouseCalibrationApi.assistantChat(session.id, text);
-                setAiUnavailable(false);
-
-                if (result && result.proposal) {
-                    setActiveProposal(result.proposal);
-
-                    const assistantMsg = {
-                        role: 'assistant' as const,
-                        text: result.proposal.explanation || 'I have extracted the book specifications for your review.',
-                        timestamp: new Date().toISOString(),
-                        proposal: result.proposal
-                    };
-                    setMessages(prev => [...prev, assistantMsg]);
-
-                    if (result.proposal.specPatch) {
-                        setExtractedFields(Object.keys(result.proposal.specPatch));
-                    }
-                }
+                result = await printhouseCalibrationApi.assistantChat(session.id, text);
             } else {
-                // Pre-session conversational mock/fallback: provide structured template response locally
+                result = await printhouseCalibrationApi.interpretPreSession(text);
+            }
+
+            setAiUnavailable(false);
+
+            if (result && result.proposal) {
+                setActiveProposal(result.proposal);
+
                 const assistantMsg = {
                     role: 'assistant' as const,
-                    text: 'I have noted these reference book parameters. Review the structured specification and commercial declaration on the right, then click Apply & Save to create your calibration baseline.',
-                    timestamp: new Date().toISOString()
+                    text: result.proposal.explanation || 'I have extracted the book specifications for your review.',
+                    timestamp: new Date().toISOString(),
+                    proposal: result.proposal
                 };
                 setMessages(prev => [...prev, assistantMsg]);
+
+                // Track extracted fields in memory
+                if (result.proposal.specPatch) {
+                    const extracted = Object.keys(result.proposal.specPatch);
+                    setExtractedFields(extracted);
+                    // Update in-memory draft with extracted fields immediately for review
+                    setDraftSpec((prev: any) => ({ ...prev, ...result.proposal.specPatch }));
+                }
+                if (result.proposal.declaredCommercials) {
+                    setDraftCommercials((prev: any) => ({ ...prev, ...result.proposal.declaredCommercials }));
+                }
             }
         } catch (err: any) {
             if (err.code === 'AI_PROVIDER_UNAVAILABLE' || err.code === 'AI_PROVIDER_TIMEOUT') {
