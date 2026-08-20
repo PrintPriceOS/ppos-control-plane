@@ -273,8 +273,8 @@ async function runTests() {
 
   // P32: Canonical migration baseline integrity intact
   const migrations = fs.readdirSync(path.resolve(__dirname, '../migrations')).filter(f => f.endsWith('.sql'));
-  assert.strictEqual(migrations.length, 150, 'P32: Exactly 150 migrations must exist following Phase 193C baseline');
-  console.log('✓ Test P32: canonical migration baseline intact (150 migrations registered)');
+  assert.strictEqual(migrations.length, 151, 'P32: Exactly 151 migrations must exist following Phase 193D baseline');
+  console.log('✓ Test P32: canonical migration baseline intact (151 migrations registered)');
 
   // P33: RC19/RC19.2 onboarding flow remains intact with updated canonical pricing label
   const setupHubPath = path.resolve(__dirname, '../src/ui/pages/printhouse/PrinthouseSetupHub.tsx');

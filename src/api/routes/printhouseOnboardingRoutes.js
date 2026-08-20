@@ -416,6 +416,34 @@ router.get('/pricing/calibrations/:id/runs/:runId', wrapHandler(async (req, res)
     res.json({ ok: true, data: run });
 }));
 
+
+// ──── 6. Governed Calibration Acceptance & Pricing Revisions (Phase 193D) ───
+const calibrationAcceptanceService = require('../services/calibrationAcceptanceService');
+
+// POST /api/printhouse/onboarding/pricing/calibrations/:id/accept — Accept calibration run
+router.post('/pricing/calibrations/:id/accept', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const runId = req.body.runId;
+    const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
+    const result = await calibrationAcceptanceService.acceptCalibrationRun(tenantId, req.params.id, runId, actor);
+    res.status(200).json({ ok: true, data: result });
+}));
+
+// GET /api/printhouse/onboarding/pricing/revisions — List immutable pricing revisions
+router.get('/pricing/revisions', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const nodeId = req.query.printerNodeId || null;
+    const revisions = await calibrationAcceptanceService.listRevisions(tenantId, nodeId);
+    res.json({ ok: true, data: revisions });
+}));
+
+// GET /api/printhouse/onboarding/pricing/revisions/:revisionId — Get single immutable revision
+router.get('/pricing/revisions/:revisionId', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const revision = await calibrationAcceptanceService.getRevision(tenantId, req.params.revisionId);
+    res.json({ ok: true, data: revision });
+}));
+
 module.exports = router;
 
 

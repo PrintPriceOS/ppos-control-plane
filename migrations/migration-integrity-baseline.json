@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-20T08:25:49.866Z",
+  "generatedAt": "2026-08-20T09:05:52.373Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -1985,6 +1985,19 @@
       "canonicalSha256": "d9982a7f13f28f6d1a0e6481be4c74a851de4624efa3396f49964fbca1e37b0e",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 2544,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/148_phase193d_governed_pricing_acceptance.sql",
+      "prefix": "148",
+      "canonicalSha256": "39382744c6889c6b18ce08b77d35792692cf1ad4541fc9beb0fec251deafc61f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3295,
       "containsDdl": true,
       "containsDml": false,
       "containsTransaction": false,
