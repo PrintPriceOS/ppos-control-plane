@@ -5,8 +5,9 @@
  */
 import React, { useState } from 'react';
 import { FieldGuidance } from './FieldGuidance';
-import { Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, ChevronDown, Search } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { COUNTRIES, getCountryDisplayName, getCountryName } from '../../../lib/countryCatalog';
 
 interface CompanyData {
     companyName: string;
@@ -118,27 +119,24 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                     />
                 </div>
 
-                <div>
+                <div className="relative">
                     <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                         Primary Country
                         <FieldGuidance title="Primary Country" description="Main country of registration and legal operations." />
                     </label>
-                    <select
-                        value={form.country}
-                        onChange={(e) => setForm({ ...form, country: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
-                    >
-                        <option value="ES">Spain (ES)</option>
-                        <option value="PT">Portugal (PT)</option>
-                        <option value="FR">France (FR)</option>
-                        <option value="DE">Germany (DE)</option>
-                        <option value="IT">Italy (IT)</option>
-                        <option value="NL">Netherlands (NL)</option>
-                        <option value="BE">Belgium (BE)</option>
-                        <option value="PL">Poland (PL)</option>
-                        <option value="UK">United Kingdom (UK)</option>
-                        <option value="US">United States (US)</option>
-                    </select>
+                    <div className="relative">
+                        <select
+                            value={form.country}
+                            onChange={(e) => setForm({ ...form, country: e.target.value })}
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        >
+                            {COUNTRIES.map(c => (
+                                <option key={c.code} value={c.code}>
+                                    {c.name} ({c.code})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
