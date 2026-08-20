@@ -266,7 +266,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     includesPackaging: newComms.includesPackaging
                 });
                 setSession(persistedSession);
-            } else {
+            } else if (session.status === 'DRAFT') {
+                // Guard: Only update if session is in editable DRAFT status
                 persistedSession = await printhouseCalibrationApi.updateDraftSession(session.id, {
                     bookSpec: newSpec,
                     targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
@@ -279,6 +280,9 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     includesPackaging: newComms.includesPackaging
                 });
                 setSession(persistedSession);
+            } else {
+                // Session is already READY, CALCULATED, or ACCEPTED — do NOT mutate or call updateDraftSession
+                persistedSession = session;
             }
             setConfirmedFields(Object.keys(newSpec).filter(k => newSpec[k] !== undefined && newSpec[k] !== null && newSpec[k] !== ''));
             setExtractedFields([]);
@@ -445,10 +449,10 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
     // ── Rate Comparison Mapper ──
     const getRateComparisonItems = () => {
-        if (!activeRun?.proposed_patch_json) return [];
-        const patch = typeof activeRun.proposed_patch_json === 'string'
+        const patch = activeRun?.proposedPatch || (typeof activeRun?.proposed_patch_json === 'string'
             ? JSON.parse(activeRun.proposed_patch_json)
-            : activeRun.proposed_patch_json;
+            : activeRun?.proposed_patch_json);
+        if (!patch) return [];
 
         const items: any[] = [];
         if (patch.interior_full_colour_fixed?.['16p']) {
@@ -462,81 +466,67 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 status: 'CALIBRATED'
             });
         }
-        if (patch.cover_fixed_by_colours?.['4']) {
-            items.push({
-                path: 'cover_fixed_by_colours.4',
-                category: 'Cover Print',
-                label: '4-Colour Cover Fixed Setup',
-                currentValue: 66.0,
-                proposedValue: patch.cover_fixed_by_colours['4'],
-                unit: '€',
-                status: 'CALIBRATED'
-            });
-        }
         if (patch.paper_price_interior_by_kilo?.['offset']) {
             items.push({
                 path: 'paper_price_interior_by_kilo.offset',
-                category: 'Paper Stock',
-                label: 'Offset Paper Stock per Kilo',
-                currentValue: 1.252,
+                category: 'Paper',
+                label: 'Interior Offset Paper / kg',
+                currentValue: 1.15,
                 proposedValue: patch.paper_price_interior_by_kilo['offset'],
                 unit: '€/kg',
                 status: 'CALIBRATED'
             });
         }
-        if (patch.binding_pb_fixed_by_sections?.['16']) {
+        if (patch.binding_perfect_bound_fixed) {
             items.push({
-                path: 'binding_pb_fixed_by_sections.16',
+                path: 'binding_perfect_bound_fixed',
                 category: 'Binding',
-                label: 'Perfect Bound Setup (16-page Sections)',
-                currentValue: 0.164,
-                proposedValue: patch.binding_pb_fixed_by_sections['16'],
-                unit: '€/book',
-                status: 'PRIOR_ANCHORED'
+                label: 'Perfect Binding Fixed Setup',
+                currentValue: 150.0,
+                proposedValue: patch.binding_perfect_bound_fixed,
+                unit: '€',
+                status: 'CALIBRATED'
             });
         }
         return items;
     };
 
-    if (!printerNodeId) {
-        return (
-            <div className="p-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-center text-xs text-zinc-500">
-                Please select a production node first to launch Quick Pricing Calibration.
-            </div>
-        );
-    }
-
-    const isCalculated = Boolean(activeRun);
+    const isReadyForCalculation = session?.status === 'READY' || session?.status === 'CALCULATED';
+    const isCalculated = session?.status === 'CALCULATED' || activeRun !== null;
     const isAccepted = session?.status === 'ACCEPTED';
-    const isReadyForCalculation = session?.status === 'READY';
+
+    // Canonical finite number helper
+    const targetPriceVal = Number(activeRun?.targetPrice ?? activeRun?.target_price ?? draftCommercials.targetManufacturingPrice ?? 0);
+    const predictedPriceVal = Number(activeRun?.enginePriceAfter ?? activeRun?.predicted_manufacturing_price ?? 0);
+    const residualVal = Number(activeRun?.absoluteResidual ?? activeRun?.absolute_residual ?? 0);
 
     return (
         <div className="space-y-6">
-            {/* Header / Node Context Card */}
-            <div className="p-5 bg-gradient-to-r from-red-950/10 via-zinc-50 to-white dark:from-red-950/30 dark:via-[#18181b] dark:to-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            {/* Header & Mode Selector */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs">
                 <div>
                     <div className="flex items-center gap-2">
-                        <Sparkles className="text-[#dc0000] w-5 h-5" />
-                        <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                            Guided Pricing Setup
-                        </h3>
-                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                            {isAccepted ? 'PRICING CALIBRATED' : isCalculated ? 'READY FOR ACCEPTANCE' : session?.status || 'LOCAL_DRAFT'}
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                            Pricing Calibration Assistant
+                        </h2>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-950/50 text-[#dc0000] dark:text-red-400 border border-red-200/50 dark:border-red-800/50">
+                            <Sparkles size={11} />
+                            <span>Phase 193H</span>
                         </span>
                     </div>
                     <p className="text-xs text-zinc-500 mt-1">
-                        Calibrating node: <span className="font-bold text-zinc-800 dark:text-zinc-200">{printerNodeName}</span> ({printerNodeId})
+                        Node: <strong className="text-zinc-700 dark:text-zinc-300">{printerNodeName}</strong> ({printerNodeId})
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                     <button
                         type="button"
                         onClick={() => setShowAdvanced(!showAdvanced)}
                         className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs ${
                             showAdvanced 
-                                ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900' 
-                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50'
+                                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white' 
+                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200'
                         }`}
                     >
                         <Sliders size={14} />
@@ -628,7 +618,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
                     <CalibrationWarnings
                         warnings={session?.warnings_json ? JSON.parse(session.warnings_json) : []}
-                        residual={activeRun?.absolute_residual}
+                        residual={residualVal}
                         isCalculated={isCalculated}
                     />
 
@@ -658,9 +648,9 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     accepting={accepting}
                     nodeName={printerNodeName}
                     bookName={session?.reference_book_name || 'Reference Book'}
-                    targetPrice={Number(activeRun.target_price)}
-                    predictedPrice={Number(activeRun.predicted_manufacturing_price)}
-                    residual={Number(activeRun.absolute_residual)}
+                    targetPrice={Number.isFinite(targetPriceVal) ? targetPriceVal : 0}
+                    predictedPrice={Number.isFinite(predictedPriceVal) ? predictedPriceVal : 0}
+                    residual={Number.isFinite(residualVal) ? residualVal : 0}
                     error={error}
                 />
             )}

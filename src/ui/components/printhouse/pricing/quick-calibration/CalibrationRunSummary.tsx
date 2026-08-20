@@ -10,12 +10,19 @@ import { Calculator, CheckCircle2, AlertTriangle, Sparkles, Truck, Activity } fr
 interface CalibrationRun {
     id: string;
     status: string;
-    target_price: number;
-    predicted_manufacturing_price: number;
-    absolute_residual: number;
-    percent_residual: number;
+    targetPrice?: number;
+    target_price?: number;
+    enginePriceAfter?: number;
+    predicted_manufacturing_price?: number;
+    absoluteResidual?: number;
+    absolute_residual?: number;
+    percentResidual?: number;
+    percent_residual?: number;
+    evaluationsCount?: number;
     evaluations_count?: number;
+    proposedPatch?: any;
     proposed_patch_json?: any;
+    identifiabilityReport?: any;
     identifiability_report_json?: any;
     aiExplanation?: string;
 }
@@ -33,7 +40,12 @@ export const CalibrationRunSummary: React.FC<CalibrationRunSummaryProps> = ({
     onExplain,
     explaining = false
 }) => {
-    const isPrecise = run.absolute_residual <= 0.50;
+    const targetPrice = Number(run.targetPrice ?? run.target_price ?? 0);
+    const predictedPrice = Number(run.enginePriceAfter ?? run.predicted_manufacturing_price ?? 0);
+    const residual = Number(run.absoluteResidual ?? run.absolute_residual ?? 0);
+    const percentResidual = Number(run.percentResidual ?? run.percent_residual ?? 0);
+
+    const isPrecise = residual <= 0.50;
 
     return (
         <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-5 space-y-5 shadow-sm">
@@ -74,14 +86,14 @@ export const CalibrationRunSummary: React.FC<CalibrationRunSummaryProps> = ({
                 <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <span className="text-xs text-zinc-500 block mb-1">Target Price</span>
                     <span className="text-base font-bold text-zinc-900 dark:text-white">
-                        {Number(run.target_price).toFixed(2)} EUR
+                        {Number.isFinite(targetPrice) ? targetPrice.toFixed(2) : '0.00'} EUR
                     </span>
                 </div>
 
                 <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <span className="text-xs text-zinc-500 block mb-1">Predicted Price</span>
                     <span className="text-base font-bold text-zinc-900 dark:text-white">
-                        {Number(run.predicted_manufacturing_price).toFixed(2)} EUR
+                        {Number.isFinite(predictedPrice) ? predictedPrice.toFixed(2) : '0.00'} EUR
                     </span>
                 </div>
 
@@ -92,9 +104,9 @@ export const CalibrationRunSummary: React.FC<CalibrationRunSummaryProps> = ({
                 }`}>
                     <span className="text-xs opacity-80 block mb-1">Residual</span>
                     <span className="text-base font-bold flex items-center gap-1">
-                        {Number(run.absolute_residual).toFixed(2)} EUR
+                        {Number.isFinite(residual) ? residual.toFixed(2) : '0.00'} EUR
                         <span className="text-[11px] font-normal opacity-80">
-                            ({(Number(run.percent_residual) * 100).toFixed(2)}%)
+                            ({(Number.isFinite(percentResidual) ? percentResidual * 100 : 0).toFixed(2)}%)
                         </span>
                     </span>
                 </div>

@@ -88,13 +88,25 @@ class CalibrationRunService {
             ]
         );
 
+        // 5. If solver succeeded and is acceptance-eligible, transition session READY -> CALCULATED
+        const isAcceptableStatus = solverResult.status === 'CONVERGED' || solverResult.status === 'UNDERDETERMINED_ANCHOR';
+        if (isAcceptableStatus) {
+            await db.query(
+                `UPDATE printhouse_pricing_calibration_sessions
+                 SET status = 'CALCULATED', updated_at = NOW(6)
+                 WHERE id = ? AND tenant_id = ? AND status = 'READY'`,
+                [sessionId, tenantId]
+            );
+        }
+
         logger.info({
             event: 'calibration_run_completed',
             runId,
             sessionId,
             tenantId,
             status: solverResult.status,
-            absoluteResidual: solverResult.absoluteResidual
+            absoluteResidual: solverResult.absoluteResidual,
+            sessionStatusTransition: isAcceptableStatus ? 'CALCULATED' : 'REMAINED_READY'
         });
 
         return this.getRun(tenantId, sessionId, runId);

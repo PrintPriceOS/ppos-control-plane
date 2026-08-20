@@ -36,6 +36,34 @@ async function handleResponse<T>(res: Response): Promise<T> {
     return json.data !== undefined ? json.data : json;
 }
 
+export interface CalibrationRun {
+    id: string;
+    tenantId?: string;
+    calibrationSessionId?: string;
+    printerNodeId?: string;
+    solverVersion?: string;
+    solverConfig?: any;
+    status: string;
+    sessionInputChecksum?: string;
+    rateSnapshotChecksum?: string;
+    evaluationsCount?: number;
+    executionDurationMs?: number;
+    enginePriceBefore?: number;
+    enginePriceAfter: number;
+    targetPrice: number;
+    absoluteResidual: number;
+    percentResidual: number;
+    activeRatePaths?: string[];
+    proposedPatch?: Record<string, any>;
+    candidateParameters?: any;
+    identifiabilityReport?: any;
+    warnings?: any[];
+    error?: any;
+    createdBy?: any;
+    startedAt?: string;
+    completedAt?: string;
+}
+
 export interface CreateCalibrationSessionPayload {
     printerNodeId: string;
     referenceBookName?: string;

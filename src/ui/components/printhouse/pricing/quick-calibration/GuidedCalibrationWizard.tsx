@@ -682,19 +682,25 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-700/60 text-xs">
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Target Price</span>
-                                    <div className="font-bold text-zinc-900 dark:text-white">€ {activeRun.target_price}</div>
+                                    <div className="font-bold text-zinc-900 dark:text-white">
+                                        € {Number(activeRun.targetPrice ?? activeRun.target_price ?? draftCommercials.targetManufacturingPrice ?? 0).toFixed(2)}
+                                    </div>
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Predicted Cost</span>
-                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">€ {activeRun.predicted_manufacturing_price}</div>
+                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                                        € {Number(activeRun.enginePriceAfter ?? activeRun.predicted_manufacturing_price ?? 0).toFixed(2)}
+                                    </div>
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Residual</span>
-                                    <div className="font-bold text-zinc-900 dark:text-white">€ {activeRun.absolute_residual}</div>
+                                    <div className="font-bold text-zinc-900 dark:text-white">
+                                        € {Number(activeRun.absoluteResidual ?? activeRun.absolute_residual ?? 0).toFixed(2)}
+                                    </div>
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Status</span>
-                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">CONVERGED</div>
+                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">{activeRun.status || 'CONVERGED'}</div>
                                 </div>
                             </div>
                         )}
