@@ -7,6 +7,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const auditLogger = require('./auditLoggerService');
+const { isValidIso2Country, normalizeIso2Country } = require('../../lib/countryCatalog');
 
 class PrinthouseOnboardingService {
     /**
@@ -46,10 +47,6 @@ class PrinthouseOnboardingService {
             updatedAt: tenant.updated_at || tenant.created_at
         };
     }
-
-const { isValidIso2Country, normalizeIso2Country } = require('../../lib/countryCatalog');
-
-class PrinthouseOnboardingService {
     /**
      * Update Company Profile canonical data with strict allowlisting.
      */

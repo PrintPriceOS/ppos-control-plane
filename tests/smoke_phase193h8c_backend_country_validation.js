@@ -1,9 +1,10 @@
 /**
  * tests/smoke_phase193h8c_backend_country_validation.js
  *
- * Phase 193H.8C Acceptance Suite: Backend ISO Country Validation & Normalization Hardening.
+ * Phase 193H.8C.1 Acceptance Suite: Backend ISO Country Validation, Normalization Hardening & Module Load Integrity.
  *
  * Guarantees:
+ * H8C-00: All CommonJS backend modules require/load cleanly without syntax or initialization errors
  * H8C-01: One shared master country catalog exists (src/lib/countryCatalog.js) with 249 ISO entries
  * H8C-02: Backend validator isValidIso2Country rejects full country name "Spain"
  * H8C-03: Backend validator isValidIso2Country rejects 3-letter ISO code "DEU"
@@ -34,6 +35,8 @@
  * H8C-28: Valid "ES" survives canonical adaptation unchanged
  * H8C-29: Valid lowercase "es" normalizes to "ES" cleanly
  */
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_secret_for_module_verification_32bytes!!';
+
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
@@ -58,7 +61,29 @@ function test(id, description, fn) {
 const LIB_DIR = path.join(__dirname, '../src/lib');
 const API_DIR = path.join(__dirname, '../src/api');
 
-console.log('\n═══ Phase 193H.8C: Backend Country Validation Hardening ═══\n');
+console.log('\n═══ Phase 193H.8C.1: Backend Country Validation Hardening & Module Load Integrity ═══\n');
+
+// H8C-00: Module Load Integrity
+test('H8C-00', 'All H.8C backend modules and routes require/load cleanly without syntax errors', () => {
+    const onboardingService = require('../src/api/services/printhouseOnboardingService');
+    assert.strictEqual(typeof onboardingService, 'object');
+    assert.strictEqual(typeof onboardingService.updateCompanyProfile, 'function');
+
+    const onboardingRoutes = require('../src/api/routes/printhouseOnboardingRoutes');
+    assert.strictEqual(typeof onboardingRoutes, 'function');
+
+    const pricingEngineClient = require('../src/api/services/pricingEngineClient');
+    assert.strictEqual(typeof pricingEngineClient, 'object');
+
+    const quotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+    assert.strictEqual(typeof quotePreviewService, 'object');
+
+    const calibrationSessionService = require('../src/api/services/calibrationSessionService');
+    assert.strictEqual(typeof calibrationSessionService, 'object');
+
+    const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+    assert.strictEqual(typeof calibrationAssistantService, 'object');
+});
 
 const {
     COUNTRIES,
@@ -203,7 +228,7 @@ test('H8C-29', 'pricingEngineClient normalizes valid lowercase "es" to "ES"', ()
     assert.strictEqual(res.delivery_country, 'ES');
 });
 
-console.log(`\n═══ Phase 193H.8C Results: ${passed} passed, ${failed} failed ═══\n`);
+console.log(`\n═══ Phase 193H.8C.1 Results: ${passed} passed, ${failed} failed ═══\n`);
 if (failed > 0) {
     process.exit(1);
 }
