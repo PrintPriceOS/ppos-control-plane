@@ -394,7 +394,27 @@ async function runAudit() {
             valueExtractor: r => r.val
         });
 
-        // 8. marketplace_launch_cohorts.allowed_countries_json (Migration 025)
+        // 8. tax_vat_readiness_snapshots.customer_country (Migration 033)
+        await auditSurface({
+            surfaceName: 'tax_vat_readiness_snapshots.customer_country',
+            semanticDomain: 'TAX_CUSTOMER_COUNTRY',
+            sql: 'SELECT id, customer_country AS val FROM tax_vat_readiness_snapshots',
+            isJsonArray: false,
+            idColumn: 'id',
+            valueExtractor: r => r.val
+        });
+
+        // 9. tax_vat_readiness_snapshots.seller_country (Migration 033)
+        await auditSurface({
+            surfaceName: 'tax_vat_readiness_snapshots.seller_country',
+            semanticDomain: 'TAX_SELLER_COUNTRY',
+            sql: 'SELECT id, seller_country AS val FROM tax_vat_readiness_snapshots',
+            isJsonArray: false,
+            idColumn: 'id',
+            valueExtractor: r => r.val
+        });
+
+        // 10. marketplace_launch_cohorts.allowed_countries_json (Migration 025)
         await auditSurface({
             surfaceName: 'marketplace_launch_cohorts.allowed_countries_json',
             semanticDomain: 'MARKETPLACE_LAUNCH_ALLOWLIST',
