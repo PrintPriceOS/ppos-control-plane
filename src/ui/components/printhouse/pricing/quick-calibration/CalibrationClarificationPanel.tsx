@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { HelpCircle, Check, ArrowRight, Search } from 'lucide-react';
-import { getCountryName, getCountryDisplayName, filterCountries } from '../../../../lib/countryCatalog';
+import { getCountryName, getCountryDisplayName, filterCountries, isValidIso2Country } from '../../../../lib/countryCatalog';
 
 interface Question {
     field: string;
@@ -40,7 +40,12 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
 
     const handleTextInputChange = (field: string, val: string) => {
         setTextInputs(prev => ({ ...prev, [field]: val }));
-        setSelectedAnswers(prev => ({ ...prev, [field]: val }));
+        // For non-destination fields, text input is the answer.
+        // For destination fields, typing is strictly a search query and MUST NOT set the selected answer.
+        const isDestinationField = field === 'delivery_country' || field === 'destination' || field === 'transport_destination';
+        if (!isDestinationField) {
+            setSelectedAnswers(prev => ({ ...prev, [field]: val }));
+        }
         setHighlightedIndices(prev => ({ ...prev, [field]: 0 }));
     };
 
@@ -52,11 +57,11 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
         if (e.key === 'Enter') {
             e.preventDefault();
             e.stopPropagation();
-            if (filteredList.length > 0) {
+            if (filteredList && filteredList.length > 0) {
                 const currentIndex = highlightedIndices[field] ?? 0;
                 const safeIndex = (currentIndex >= 0 && currentIndex < filteredList.length) ? currentIndex : 0;
                 const chosen = filteredList[safeIndex];
-                if (chosen) {
+                if (chosen && isValidIso2Country(chosen.code)) {
                     handleOptionSelect(field, chosen.code);
                     setTextInputs(prev => ({ ...prev, [field]: '' }));
                 }
@@ -166,8 +171,10 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
 
                                     {/* Selected State vs Search State Machine */}
                                     {(() => {
-                                        const isCountrySelected = Boolean(currentSelected && currentSelected !== 'Transport not included');
-                                        const selectedIso = isCountrySelected ? (currentSelected.length === 2 ? currentSelected.toUpperCase() : currentSelected) : null;
+                                        const isTransportNotIncluded = currentSelected === 'Transport not included';
+                                        const isValidCountry = Boolean(currentSelected && isValidIso2Country(currentSelected));
+                                        const isCountrySelected = isValidCountry;
+                                        const selectedIso = isCountrySelected ? currentSelected.toUpperCase() : null;
                                         const selectedName = selectedIso ? getCountryDisplayName(selectedIso) : currentSelected;
                                         const query = textInputs[q.field] || '';
                                         const filteredCandidates = query.trim().length > 0 ? filterCountries(query).slice(0, 12) : [];
