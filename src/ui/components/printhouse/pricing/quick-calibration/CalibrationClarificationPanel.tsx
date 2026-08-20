@@ -28,6 +28,9 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
 
     if (!questions || questions.length === 0) return null;
 
+    // Keyboard highlighted candidate index per field
+    const [highlightedIndices, setHighlightedIndices] = useState<Record<string, number>>({});
+
     const handleOptionSelect = (field: string, opt: string) => {
         setSelectedAnswers(prev => ({
             ...prev,
@@ -38,6 +41,59 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
     const handleTextInputChange = (field: string, val: string) => {
         setTextInputs(prev => ({ ...prev, [field]: val }));
         setSelectedAnswers(prev => ({ ...prev, [field]: val }));
+        setHighlightedIndices(prev => ({ ...prev, [field]: 0 }));
+    };
+
+    const handleCountryKeyDown = (
+        e: React.KeyboardEvent<HTMLInputElement>,
+        field: string,
+        filteredList: Array<{ code: string; name: string }>
+    ) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (filteredList.length > 0) {
+                const currentIndex = highlightedIndices[field] ?? 0;
+                const safeIndex = (currentIndex >= 0 && currentIndex < filteredList.length) ? currentIndex : 0;
+                const chosen = filteredList[safeIndex];
+                if (chosen) {
+                    handleOptionSelect(field, chosen.code);
+                    setTextInputs(prev => ({ ...prev, [field]: `${chosen.name} (${chosen.code})` }));
+                }
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (filteredList.length > 0) {
+                setHighlightedIndices(prev => {
+                    const curr = prev[field] ?? 0;
+                    return { ...prev, [field]: (curr + 1) % filteredList.length };
+                });
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (filteredList.length > 0) {
+                setHighlightedIndices(prev => {
+                    const curr = prev[field] ?? 0;
+                    return { ...prev, [field]: curr <= 0 ? filteredList.length - 1 : curr - 1 };
+                });
+            }
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setTextInputs(prev => ({ ...prev, [field]: '' }));
+            return;
+        }
     };
 
     const hasAnyAnswers = Object.keys(selectedAnswers).some(k => Boolean(selectedAnswers[k]?.trim()));
@@ -109,45 +165,59 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
                                     </div>
 
                                     {/* Searchable input for other countries */}
-                                    <div className="relative">
-                                        <Search size={13} className="absolute left-3 top-2.5 text-zinc-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Or search another destination country (e.g. Poland, Kazakhstan, Switzerland)..."
-                                            value={textInputs[q.field] || ''}
-                                            onChange={(e) => handleTextInputChange(q.field, e.target.value)}
-                                            className="w-full text-xs pl-8 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                        />
-                                    </div>
+                                    {(() => {
+                                         const query = textInputs[q.field] || '';
+                                         const filteredCandidates = query.trim().length > 0 ? filterCountries(query).slice(0, 12) : [];
+                                         const highlightedIdx = highlightedIndices[q.field] ?? 0;
 
-                                    {/* Dynamic filtered country list when search query is active */}
-                                    {textInputs[q.field] && textInputs[q.field].trim().length > 0 && (
-                                        <div className="flex flex-wrap gap-1 p-2 bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 rounded-lg max-h-32 overflow-y-auto">
-                                            {filterCountries(textInputs[q.field]).slice(0, 12).map(c => {
-                                                const isSelected = currentSelected === c.code;
-                                                return (
-                                                    <button
-                                                        key={c.code}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            handleOptionSelect(q.field, c.code);
-                                                            setTextInputs(prev => ({ ...prev, [q.field]: `${c.name} (${c.code})` }));
-                                                        }}
-                                                        className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 border ${
-                                                            isSelected
-                                                                ? 'bg-amber-600 text-white border-amber-700 font-bold'
-                                                                : 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50'
-                                                        }`}
-                                                    >
-                                                        <span>{c.name} ({c.code})</span>
-                                                    </button>
-                                                );
-                                            })}
-                                            {filterCountries(textInputs[q.field]).length === 0 && (
-                                                <span className="text-[11px] text-zinc-400 py-1 px-2">No matching country found</span>
-                                            )}
-                                        </div>
-                                    )}
+                                         return (
+                                             <div className="space-y-2">
+                                                 <div className="relative">
+                                                     <Search size={13} className="absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
+                                                     <input
+                                                         type="text"
+                                                         placeholder="Or search another destination country (e.g. Poland, Kazakhstan, Switzerland)..."
+                                                         value={query}
+                                                         onChange={(e) => handleTextInputChange(q.field, e.target.value)}
+                                                         onKeyDown={(e) => handleCountryKeyDown(e, q.field, filteredCandidates)}
+                                                         className="w-full text-xs pl-8 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                     />
+                                                 </div>
+
+                                                 {/* Dynamic filtered country list when search query is active */}
+                                                 {query.trim().length > 0 && (
+                                                     <div className="flex flex-wrap gap-1 p-2 bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 rounded-lg max-h-32 overflow-y-auto">
+                                                         {filteredCandidates.map((c, cIdx) => {
+                                                             const isSelected = currentSelected === c.code;
+                                                             const isHighlighted = highlightedIdx === cIdx;
+                                                             return (
+                                                                 <button
+                                                                     key={c.code}
+                                                                     type="button"
+                                                                     onClick={() => {
+                                                                         handleOptionSelect(q.field, c.code);
+                                                                         setTextInputs(prev => ({ ...prev, [q.field]: `${c.name} (${c.code})` }));
+                                                                     }}
+                                                                     className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 border ${
+                                                                         isSelected
+                                                                             ? 'bg-amber-600 text-white border-amber-700 font-bold shadow-2xs'
+                                                                             : isHighlighted
+                                                                             ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-950 dark:text-amber-100 border-amber-400 dark:border-amber-600 font-semibold ring-1 ring-amber-400'
+                                                                             : 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50'
+                                                                     }`}
+                                                                 >
+                                                                     <span>{c.name} ({c.code})</span>
+                                                                 </button>
+                                                             );
+                                                         })}
+                                                         {filteredCandidates.length === 0 && (
+                                                             <span className="text-[11px] text-zinc-400 py-1 px-2">No matching country found</span>
+                                                         )}
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         );
+                                     })()}
                                 </div>
                             ) : q.options && q.options.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
@@ -178,6 +248,12 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
                                         placeholder="Enter details here..."
                                         value={textInputs[q.field] || ''}
                                         onChange={(e) => handleTextInputChange(q.field, e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                            }
+                                        }}
                                         className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     />
                                 </div>

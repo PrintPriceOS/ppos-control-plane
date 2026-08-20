@@ -77,7 +77,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         paper_weight_cover: undefined,
         lamination: undefined,
         binding_method: undefined,
-        delivery_country: 'ES'
+        delivery_country: undefined
     });
 
     const [draftCommercials, setDraftCommercials] = useState<any>({

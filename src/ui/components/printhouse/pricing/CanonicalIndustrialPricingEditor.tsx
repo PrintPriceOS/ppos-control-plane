@@ -969,7 +969,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                     ...r,
                                                     transport_costs: {
                                                         ...r.transport_costs,
-                                                        [lower]: defaultSuggest !== undefined ? defaultSuggest : 0
+                                                        [lower]: defaultSuggest !== undefined ? defaultSuggest : (null as any)
                                                     }
                                                 }));
                                             }}
@@ -997,6 +997,11 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                 <div className="sm:col-span-6">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{displayName}</span>
+                                                        {val === null || val === undefined ? (
+                                                            <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">
+                                                                Pending Rate
+                                                            </span>
+                                                        ) : null}
                                                     </div>
                                                     <div className="mt-0.5 text-[11px]">
                                                         {hasSuggestion ? (
@@ -1005,7 +1010,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                             </span>
                                                         ) : (
                                                             <span className="text-zinc-400">
-                                                                Custom configured rate (no historical baseline)
+                                                                Custom destination (manual rate entry)
                                                             </span>
                                                         )}
                                                     </div>
@@ -1019,17 +1024,27 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                             value={val === null || val === undefined ? '' : val}
                                                             onChange={e => {
                                                                 const raw = e.target.value;
-                                                                const parsed = raw === '' ? 0 : parseFloat(raw);
-                                                                setRates(r => ({
-                                                                    ...r,
-                                                                    transport_costs: {
-                                                                        ...r.transport_costs,
-                                                                        [lowerCode]: isNaN(parsed) ? 0 : parsed
-                                                                    }
-                                                                }));
+                                                                if (raw === '') {
+                                                                    setRates(r => ({
+                                                                        ...r,
+                                                                        transport_costs: {
+                                                                            ...r.transport_costs,
+                                                                            [lowerCode]: null as any
+                                                                        }
+                                                                    }));
+                                                                } else {
+                                                                    const parsed = parseFloat(raw);
+                                                                    setRates(r => ({
+                                                                        ...r,
+                                                                        transport_costs: {
+                                                                            ...r.transport_costs,
+                                                                            [lowerCode]: isNaN(parsed) ? (null as any) : parsed
+                                                                        }
+                                                                    }));
+                                                                }
                                                             }}
                                                             className={inputClass}
-                                                            placeholder="0.000"
+                                                            placeholder="Enter rate (e.g. 1.250)"
                                                         />
                                                         <span className="absolute right-3 top-2 text-xs text-zinc-400 font-medium">€/kg</span>
                                                     </div>

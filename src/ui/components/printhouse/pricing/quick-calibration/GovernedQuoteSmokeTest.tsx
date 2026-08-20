@@ -44,7 +44,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         paper_weight_cover: initialSpec?.paper_weight_cover || 300,
         lamination: initialSpec?.lamination || 'matt',
         binding_method: initialSpec?.binding_method || 'perfect bound',
-        delivery_country: initialSpec?.delivery_country || 'ES'
+        delivery_country: initialSpec?.delivery_country || ''
     });
 
     const [loading, setLoading] = useState(false);
@@ -290,10 +290,15 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         Destination ({availableDestinations.length} configured)
                     </label>
                     <select
-                        value={spec.delivery_country || (availableDestinations[0]?.code || 'ES')}
+                        value={spec.delivery_country || ''}
                         onChange={e => setSpec(prev => ({ ...prev, delivery_country: e.target.value }))}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     >
+                        {!availableDestinations.some(d => d.code === spec.delivery_country) && spec.delivery_country && (
+                            <option value={spec.delivery_country}>
+                                {getCountryDisplayName(spec.delivery_country)} ({spec.delivery_country}) — Reference Job Destination
+                            </option>
+                        )}
                         {availableDestinations.map(d => (
                             <option key={d.code} value={d.code}>
                                 {d.name} ({d.code}) {d.regionName ? `— ${d.regionName}` : ''}
