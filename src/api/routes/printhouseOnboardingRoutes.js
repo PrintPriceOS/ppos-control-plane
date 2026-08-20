@@ -228,31 +228,52 @@ router.get('/', async (req, res) => {
 });
 
 
-// Helper to catch FIELD_NOT_EDITABLE errors and return 400 Bad Request
+// Helper to catch errors and return canonical HTTP statuses
 const wrapHandler = (fn) => async (req, res, next) => {
     try {
         await fn(req, res, next);
     } catch (err) {
         if (err.message === 'FIELD_NOT_EDITABLE') {
-            return res.status(400).json({ error: 'FIELD_NOT_EDITABLE', fields: err.fields });
+            return res.status(400).json({ ok: false, error: 'FIELD_NOT_EDITABLE', fields: err.fields });
         }
         if (err.message === 'MATERIAL_NOT_FOUND') {
-            return res.status(404).json({ error: 'MATERIAL_NOT_FOUND' });
+            return res.status(404).json({ ok: false, error: 'MATERIAL_NOT_FOUND' });
         }
         if (err.message === 'MACHINE_NOT_FOUND') {
-            return res.status(404).json({ error: 'MACHINE_NOT_FOUND' });
+            return res.status(404).json({ ok: false, error: 'MACHINE_NOT_FOUND' });
         }
         if (err.message === 'SITE_NOT_FOUND') {
-            return res.status(404).json({ error: 'SITE_NOT_FOUND' });
+            return res.status(404).json({ ok: false, error: 'SITE_NOT_FOUND' });
         }
         if (err.message === 'ASSOCIATION_NOT_FOUND') {
-            return res.status(404).json({ error: 'ASSOCIATION_NOT_FOUND' });
+            return res.status(404).json({ ok: false, error: 'ASSOCIATION_NOT_FOUND' });
         }
         if (err.message === 'LEAD_TIMES_NOT_CONFIGURED') {
-            return res.status(400).json({ error: 'LEAD_TIMES_NOT_CONFIGURED' });
+            return res.status(400).json({ ok: false, error: 'LEAD_TIMES_NOT_CONFIGURED' });
+        }
+        if (err.code && err.code.startsWith('AI_')) {
+            const status = err.statusCode || (err.code === 'AI_PROVIDER_TIMEOUT' ? 504 : err.code === 'AI_RATE_LIMITED' ? 429 : 503);
+            return res.status(status).json({
+                ok: false,
+                error: err.code,
+                message: err.code === 'AI_PROVIDER_UNAVAILABLE'
+                    ? 'AI assistant is temporarily unavailable. Please try again or enter details manually.'
+                    : err.code === 'AI_PROVIDER_TIMEOUT'
+                    ? 'AI assistant request timed out. Please try again.'
+                    : err.code === 'AI_RATE_LIMITED'
+                    ? 'AI assistant is experiencing high demand. Please try again shortly.'
+                    : 'AI assistant could not parse the specification. Please check your input.'
+            });
+        }
+        if (err.statusCode && typeof err.statusCode === 'number') {
+            return res.status(err.statusCode).json({
+                ok: false,
+                error: err.code || err.message,
+                message: err.message
+            });
         }
         if (err.message && typeof err.message === 'string' && err.message.startsWith('INVALID_')) {
-            return res.status(400).json({ error: err.message });
+            return res.status(400).json({ ok: false, error: err.message });
         }
         next(err);
     }

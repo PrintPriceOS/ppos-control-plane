@@ -24,14 +24,16 @@ function getHeaders(): HeadersInit {
 
 async function handleResponse<T>(res: Response): Promise<T> {
     const json = await res.json();
-    if (!res.ok || !json.ok) {
-        const error = new Error(json.error || json.message || `HTTP ${res.status}`);
+    if (!res.ok || json.ok === false) {
+        const errCode = json.error || json.code || `HTTP_${res.status}`;
+        const errMsg = json.message || (typeof json.error === 'string' ? json.error : `Request failed with status ${res.status}`);
+        const error = new Error(errMsg);
         (error as any).status = res.status;
-        (error as any).code = json.code;
+        (error as any).code = errCode;
         (error as any).details = json.details;
         throw error;
     }
-    return json.data;
+    return json.data !== undefined ? json.data : json;
 }
 
 export interface CreateCalibrationSessionPayload {

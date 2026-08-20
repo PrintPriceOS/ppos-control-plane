@@ -164,11 +164,11 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 }
             }
         } catch (err: any) {
-            if (err.code === 'AI_PROVIDER_UNAVAILABLE' || err.code === 'AI_PROVIDER_TIMEOUT') {
+            if (err.code === 'AI_PROVIDER_UNAVAILABLE' || err.code === 'AI_PROVIDER_TIMEOUT' || err.code === 'AI_RATE_LIMITED' || err.status === 503 || err.status === 504 || err.status === 429) {
                 setAiUnavailable(true);
                 const systemMsg = {
                     role: 'assistant' as const,
-                    text: 'AI Assistant is offline. You can continue configuring the reference book directly using the structured form.',
+                    text: 'The AI assistant is temporarily busy. Your setup is completely safe and nothing has been saved. You can try sending again in a moment, or continue entering your job details in Step 2.',
                     timestamp: new Date().toISOString()
                 };
                 setMessages(prev => [...prev, systemMsg]);

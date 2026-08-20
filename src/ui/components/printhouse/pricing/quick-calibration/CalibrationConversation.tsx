@@ -57,19 +57,28 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                 <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-[#dc0000]" />
                     <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                        Calibration Assistant
+                        Pricing Setup Assistant
                     </span>
                 </div>
                 <span className="text-[11px] text-zinc-500">
-                    Conversational Spec Extraction
+                    Conversational Job Intake
                 </span>
             </div>
 
-            {/* AI Offline Banner (F2.10) */}
+            {/* AI Offline / Busy Banner (Phase 193H.2 UX Hardening) */}
             {aiUnavailable && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
-                    <AlertTriangle size={15} className="text-amber-600 shrink-0" />
-                    <span>AI Assistant is currently offline. You can continue configuring your reference book directly in the structured form.</span>
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-xs space-y-2">
+                    <div className="flex items-start gap-2.5">
+                        <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="font-bold text-amber-900 dark:text-amber-100">
+                                AI assistant is busy right now
+                            </p>
+                            <p className="text-amber-800 dark:text-amber-300 mt-0.5">
+                                Your setup is safe and nothing has been saved. You can try again or enter the job details manually.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 
