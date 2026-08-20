@@ -28,6 +28,7 @@ import { CalibrationRateComparison } from './CalibrationRateComparison';
 import { CalibrationWarnings } from './CalibrationWarnings';
 import { CalibrationAcceptanceModal } from './CalibrationAcceptanceModal';
 import { PricingRevisionHistoryModal } from './PricingRevisionHistoryModal';
+import { isValidIso2Country } from '../../../../lib/countryCatalog';
 import { 
     Sparkles, RefreshCw, Calculator, ShieldCheck, CheckCircle2, 
     AlertTriangle, History, ArrowRight, X, Layers, CheckCircle, 
@@ -141,7 +142,17 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             else normalized.binding_method = bm;
         }
 
-        // 4. Delivery country ISO-2
+        // 4. Print Specifications
+        if (normalized.interior_print) {
+            const match = String(normalized.interior_print).match(/\b([1-4]\/[1-4])\b/);
+            if (match) normalized.interior_print = match[1];
+        }
+        if (normalized.cover_print) {
+            const match = String(normalized.cover_print).match(/\b([1-5]\/[0-5])\b/);
+            if (match) normalized.cover_print = match[1];
+        }
+
+        // 5. Delivery country ISO-2
         if (normalized.delivery_country) {
             normalized.delivery_country = String(normalized.delivery_country).toUpperCase().trim();
         }
@@ -163,11 +174,18 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         if (!spec.paper_type_cover) missing.push('Cover paper type');
         if (!spec.paper_weight_cover) missing.push('Cover paper weight');
         if (!spec.binding_method) missing.push('Binding method');
-        if (!spec.delivery_country) missing.push('Delivery country');
+        if (!spec.delivery_country || !isValidIso2Country(spec.delivery_country)) {
+            missing.push('Delivery country (valid 2-letter ISO code)');
+        }
 
         if (!comms.targetManufacturingPrice || comms.targetManufacturingPrice <= 0) {
             missing.push('Known Manufacturing Price (> 0 EUR)');
         }
+        if (comms.includesPaper === null || comms.includesPaper === undefined) missing.push('includesPaper flag');
+        if (comms.includesBinding === null || comms.includesBinding === undefined) missing.push('includesBinding flag');
+        if (comms.includesFinishing === null || comms.includesFinishing === undefined) missing.push('includesFinishing flag');
+        if (comms.includesPackaging === null || comms.includesPackaging === undefined) missing.push('includesPackaging flag');
+
         return { valid: missing.length === 0, missing };
     };
 

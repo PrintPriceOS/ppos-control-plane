@@ -589,6 +589,11 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 coverPaperWeight: 'paper_weight_cover',
                 cover_gsm: 'paper_weight_cover',
                 cover_print_specification: 'cover_print',
+                cover_printing: 'cover_print',
+                cover_colors: 'cover_print',
+                cover_colours: 'cover_print',
+                cover_colour: 'cover_print',
+                cover_colors_specification: 'cover_print',
                 coverPrint: 'cover_print',
                 binding: 'binding_method',
                 bindingMethod: 'binding_method',
@@ -625,11 +630,21 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     const s = String(val).trim();
                     if (VALID_INTERIOR_PRINT.includes(s)) {
                         normalized.specPatch[key] = s;
+                    } else {
+                        const match = s.match(/\b([1-4]\/[1-4])\b/);
+                        if (match && VALID_INTERIOR_PRINT.includes(match[1])) {
+                            normalized.specPatch[key] = match[1];
+                        }
                     }
                 } else if (key === 'cover_print') {
                     const s = String(val).trim();
                     if (VALID_COVER_PRINT.includes(s)) {
                         normalized.specPatch[key] = s;
+                    } else {
+                        const match = s.match(/\b([1-5]\/[0-5])\b/);
+                        if (match && VALID_COVER_PRINT.includes(match[1])) {
+                            normalized.specPatch[key] = match[1];
+                        }
                     }
                 } else if (key === 'binding_method') {
                     const s = String(val).toLowerCase().trim();

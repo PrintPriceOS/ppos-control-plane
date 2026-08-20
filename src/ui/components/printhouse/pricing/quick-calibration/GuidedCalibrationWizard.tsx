@@ -17,7 +17,7 @@ import {
 import { CalibrationConversation } from './CalibrationConversation';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
 import { CountrySelect } from '../../../common/CountrySelect';
-import { getCountryDisplayName } from '../../../../lib/countryCatalog';
+import { getCountryDisplayName, isValidIso2Country } from '../../../../lib/countryCatalog';
 
 interface GuidedCalibrationWizardProps {
     printerNodeId?: string;
@@ -96,9 +96,12 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         draftSpec.interior_print &&
         draftSpec.paper_type_interior &&
         draftSpec.paper_weight_interior && draftSpec.paper_weight_interior > 0 &&
+        draftSpec.cover_print &&
         draftSpec.paper_type_cover &&
         draftSpec.paper_weight_cover && draftSpec.paper_weight_cover > 0 &&
-        draftSpec.binding_method
+        draftSpec.binding_method &&
+        draftSpec.delivery_country &&
+        isValidIso2Country(draftSpec.delivery_country)
     );
 
     const isStep2Complete = Boolean(
@@ -110,8 +113,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         isStep2Complete &&
         draftCommercials.targetManufacturingPrice &&
         Number(draftCommercials.targetManufacturingPrice) > 0 &&
-        draftCommercials.includesPaper !== null &&
-        draftCommercials.includesBinding !== null
+        draftCommercials.includesPaper !== null && draftCommercials.includesPaper !== undefined &&
+        draftCommercials.includesBinding !== null && draftCommercials.includesBinding !== undefined &&
+        draftCommercials.includesFinishing !== null && draftCommercials.includesFinishing !== undefined &&
+        draftCommercials.includesPackaging !== null && draftCommercials.includesPackaging !== undefined
     );
 
     const isStep4Complete = Boolean(
@@ -145,7 +150,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     const canNavigateToStep = (targetStep: number): boolean => {
         if (targetStep === 1) return true;
         if (targetStep <= step) return true; // Backward navigation to already reached step allowed
-        if (targetStep === 2) return isStep1Complete;
+        if (targetStep === 2) return Boolean(draftSpec.copies) || isStep1Complete;
         if (targetStep === 3) return isStep1Complete && isStep2Complete;
         if (targetStep === 4) return isStep1Complete && isStep2Complete && isStep3Complete;
         if (targetStep === 5) return isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
@@ -240,7 +245,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <button
                             type="button"
                             onClick={() => setStep(2)}
-                            disabled={!isStep1Complete}
+                            disabled={!draftSpec.copies}
                             className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
                         >
                             <span>Continue to Review</span>
@@ -420,10 +425,11 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             </label>
                             <div className="flex items-center gap-2">
                                 <select
-                                    value={draftSpec.cover_print || '4/0'}
-                                    onChange={e => setDraftSpec((p: any) => ({ ...p, cover_print: e.target.value }))}
+                                    value={draftSpec.cover_print || ''}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, cover_print: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
+                                    <option value="">Select Cover Print *</option>
                                     <option value="4/0">4/0 Front Only</option>
                                     <option value="4/4">4/4 Both Sides</option>
                                     <option value="1/0">1/0 Front Black</option>
