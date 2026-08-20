@@ -618,7 +618,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 await onApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
                                 setStep(4);
                             }}
-                            disabled={!isCostComplete}
+                            disabled={!isStep3Complete}
                             className="px-6 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
                         >
                             <span>Use this job to calibrate my pricing</span>
