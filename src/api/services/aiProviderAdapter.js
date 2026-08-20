@@ -16,6 +16,7 @@ const logger = require('./logger').child('ai-provider-adapter');
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const GEMINI_API_VERSION = 'v1beta';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 
 class AIProviderAdapter {
     constructor() {
@@ -28,6 +29,14 @@ class AIProviderAdapter {
      */
     getApiKey() {
         return process.env.GEMINI_API_KEY || process.env.PPOS_GEMINI_API_KEY || null;
+    }
+
+    /**
+     * Retrieves the configured model name with fallback to DEFAULT_GEMINI_MODEL.
+     * @returns {string}
+     */
+    getConfiguredModel() {
+        return process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
     }
 
     /**
@@ -45,7 +54,7 @@ class AIProviderAdapter {
      * @param {string} options.systemInstruction - System instructions defining schema and boundaries
      * @param {string} options.userPrompt - Sanitized user message and context
      * @param {Array} [options.history] - Optional sanitized conversational history
-     * @param {string} [options.model] - Target model name
+     * @param {string} [options.model] - Target model name override
      * @param {Object} [options.mockResponse] - Optional mock response for testing/isolated execution
      * @returns {Promise<{ rawText: string, json: Object, model: string, usage: Object, latencyMs: number }>}
      */
@@ -53,10 +62,11 @@ class AIProviderAdapter {
         systemInstruction,
         userPrompt,
         history = [],
-        model = 'gemini-1.5-flash',
+        model = null,
         mockResponse = null
     }) {
         const startTime = Date.now();
+        const selectedModel = model || this.getConfiguredModel();
 
         // 1. Support deterministic mock injection for unit/integration tests
         if (mockResponse) {
@@ -110,7 +120,7 @@ class AIProviderAdapter {
             }
         };
 
-        const targetModel = model.startsWith('models/') ? model : `models/${model}`;
+        const targetModel = selectedModel.startsWith('models/') ? selectedModel : `models/${selectedModel}`;
         const url = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/${targetModel}:generateContent?key=${apiKey}`;
 
         try {
@@ -174,18 +184,34 @@ class AIProviderAdapter {
 
             if (err.response) {
                 const status = err.response.status;
+                const errorData = err.response.data?.error || {};
+
+                // Sanitized diagnostics (NO secrets, NO prompts, NO headers)
+                const sanitizedDiagnostics = {
+                    provider: 'Google Gemini',
+                    apiVersion: GEMINI_API_VERSION,
+                    model: targetModel,
+                    httpStatus: status,
+                    providerCode: errorData.code || status,
+                    providerStatus: errorData.status || 'UNKNOWN',
+                    providerMessage: errorData.message || 'Error reported by provider'
+                };
+
+                logger.warn('AI provider request failed with error response', sanitizedDiagnostics);
+
                 if (status === 429) {
                     const rateErr = new Error('AI provider rate limit exceeded');
                     rateErr.code = 'AI_RATE_LIMITED';
                     rateErr.statusCode = 429;
+                    rateErr.diagnostics = sanitizedDiagnostics;
                     rateErr.latencyMs = latencyMs;
                     throw rateErr;
                 }
 
-                const providerErr = new Error(`AI provider returned HTTP ${status}`);
+                const providerErr = new Error(`AI provider returned HTTP ${status}: ${sanitizedDiagnostics.providerStatus}`);
                 providerErr.code = 'AI_PROVIDER_UNAVAILABLE';
                 providerErr.statusCode = 503;
-                providerErr.details = err.response.data;
+                providerErr.diagnostics = sanitizedDiagnostics;
                 providerErr.latencyMs = latencyMs;
                 throw providerErr;
             }

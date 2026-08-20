@@ -111,6 +111,39 @@ test('E3', 'Provider adapter normalizes errors into canonical codes (TIMEOUT, UN
     assert.ok(['AI_PROVIDER_UNAVAILABLE', 'AI_PROVIDER_TIMEOUT'].includes(caught.code));
 });
 
+test('E3b (Model Modernization)', 'Provider adapter uses gemini-3.5-flash by default and drops obsolete 1.5 defaults', () => {
+    const adapter = require(adapterPath);
+    const adapterSource = fs.readFileSync(adapterPath, 'utf8');
+    assert.strictEqual(adapter.getConfiguredModel(), 'gemini-3.5-flash');
+    assert.ok(!adapterSource.includes("model = 'gemini-1.5-flash'"));
+    assert.ok(!adapterSource.includes("model = 'gemini-2.0-flash'"));
+});
+
+test('E3c (Model Env Override)', 'Provider adapter respects GEMINI_MODEL environment override', () => {
+    const adapter = require(adapterPath);
+    const originalEnv = process.env.GEMINI_MODEL;
+    try {
+        process.env.GEMINI_MODEL = 'gemini-3.1-flash-lite';
+        assert.strictEqual(adapter.getConfiguredModel(), 'gemini-3.1-flash-lite');
+    } finally {
+        if (originalEnv !== undefined) {
+            process.env.GEMINI_MODEL = originalEnv;
+        } else {
+            delete process.env.GEMINI_MODEL;
+        }
+    }
+});
+
+test('E3d (Sanitized Diagnostics)', 'Provider adapter captures sanitized diagnostics without raw prompts or secrets', () => {
+    const adapterSource = fs.readFileSync(adapterPath, 'utf8');
+    assert.ok(adapterSource.includes('sanitizedDiagnostics'));
+    assert.ok(adapterSource.includes('providerCode: errorData.code || status'));
+    assert.ok(adapterSource.includes('providerStatus: errorData.status || \'UNKNOWN\''));
+    assert.ok(!adapterSource.includes('sanitizedDiagnostics.userPrompt'));
+    assert.ok(!adapterSource.includes('sanitizedDiagnostics.apiKey'));
+    assert.ok(!adapterSource.includes('sanitizedDiagnostics.jwt'));
+});
+
 // ── 2. Structured Schema & Taxonomy Normalization Tests ──────────────────────
 
 console.log('\n═══ Phase 193E: Structured Schema & Taxonomy Gate ═══\n');

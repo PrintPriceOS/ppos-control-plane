@@ -491,15 +491,13 @@ test('F30 (Backend 193B Validation Preserved)', 'Backend validation integrity: c
 
 // ── 6. Stateless Pre-Session Interpretation Interaction Tests (Phase 193F.2) ─
 
-console.log('\n═══ Phase 193F.2: Pre-Session AI Interpretation & Provenance Tests ═══\n');
-
 test('F31 (Stateless Interpret Wiring)', 'Frontend wiring: QuickCalibrationPanel calls interpretPreSession in LOCAL_DRAFT mode', () => {
     const panelSource = fs.readFileSync(path.join(UI_BASE, 'QuickCalibrationPanel.tsx'), 'utf8');
     assert.ok(panelSource.includes('printhouseCalibrationApi.interpretPreSession(text)'));
     assert.ok(panelSource.includes('printhouseCalibrationApi.assistantChat(session.id, text)'));
 });
 
-asyncTest('F32 (Pre-Session In-Memory Update)', 'Runtime: Pre-session interpretation updates in-memory draftSpec and sets AI Extracted badges without DB writes', async () => {
+test('F32 (Pre-Session In-Memory Update)', 'Runtime: Pre-session interpretation updates in-memory draftSpec and sets AI Extracted badges without DB writes', () => {
     const mockProposal = {
         intent: 'SPEC_EXTRACTION',
         specPatch: {
