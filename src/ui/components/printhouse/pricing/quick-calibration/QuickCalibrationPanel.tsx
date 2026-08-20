@@ -100,6 +100,55 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [accepting, setAccepting] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
 
+    // Helper: Normalizes bookSpec taxonomy fields to canonical backend contract
+    const canonicalizeBookSpec = (spec: any) => {
+        if (!spec || typeof spec !== 'object') return spec;
+        const normalized = { ...spec };
+
+        // 1. Lamination: 'gloss' | 'matt' | 'varnish' | null
+        if (normalized.lamination !== undefined && normalized.lamination !== null) {
+            const rawLam = String(normalized.lamination).toLowerCase().trim();
+            if (rawLam === 'gloss' || rawLam === 'glossy') {
+                normalized.lamination = 'gloss';
+            } else if (rawLam === 'matt' || rawLam === 'matte') {
+                normalized.lamination = 'matt';
+            } else if (rawLam === 'varnish') {
+                normalized.lamination = 'varnish';
+            } else if (rawLam === '' || rawLam === 'none' || rawLam === 'null') {
+                normalized.lamination = null;
+            }
+        }
+
+        // 2. Paper Types
+        if (normalized.paper_type_interior) {
+            const pt = String(normalized.paper_type_interior).toLowerCase().trim();
+            if (pt === 'coated' || pt === 'gloss' || pt === 'matt') normalized.paper_type_interior = 'mc';
+            else if (pt === 'uncoated' || pt === 'woodfree') normalized.paper_type_interior = 'offset';
+            else normalized.paper_type_interior = pt;
+        }
+        if (normalized.paper_type_cover) {
+            const pt = String(normalized.paper_type_cover).toLowerCase().trim();
+            if (pt === 'coated') normalized.paper_type_cover = 'mc';
+            else normalized.paper_type_cover = pt;
+        }
+
+        // 3. Binding Method
+        if (normalized.binding_method) {
+            const bm = String(normalized.binding_method).toLowerCase().trim();
+            if (bm === 'perfect' || bm === 'pb') normalized.binding_method = 'perfect bound';
+            else if (bm === 'sewn' || bm === 'thread-sewn') normalized.binding_method = 'thread sewn';
+            else if (bm === 'case' || bm === 'casebound' || bm === 'hardback') normalized.binding_method = 'hardcover';
+            else normalized.binding_method = bm;
+        }
+
+        // 4. Delivery country ISO-2
+        if (normalized.delivery_country) {
+            normalized.delivery_country = String(normalized.delivery_country).toUpperCase().trim();
+        }
+
+        return normalized;
+    };
+
     // Helper: Validates whether local draft satisfies Phase 193B mandatory contract
     const validateDraftForCreation = (spec: any, comms: any): { valid: boolean; missing: string[] } => {
         const missing: string[] = [];
@@ -183,7 +232,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     // ── 2. Explicit Apply / Save (193B Session Creation / Update) ──
     const handleApplyProposal = async (proposal: any) => {
         setError(null);
-        const newSpec = { ...draftSpec, ...(proposal?.specPatch || {}) };
+        const mergedSpec = { ...draftSpec, ...(proposal?.specPatch || {}) };
+        const newSpec = canonicalizeBookSpec(mergedSpec);
         const newComms = { ...draftCommercials, ...(proposal?.declaredCommercials || {}) };
 
         setDraftSpec(newSpec);
@@ -276,6 +326,13 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     } else if (field === 'cover_print' || field === 'coverPrint') {
                         const match = answer.match(/\b([1-5]\/[0-5])\b/);
                         updatedSpec.cover_print = match ? match[1] : answer;
+                    } else if (field === 'lamination' || field === 'finishing') {
+                        const rawLam = answer.toLowerCase().trim();
+                        if (rawLam.includes('gloss')) updatedSpec.lamination = 'gloss';
+                        else if (rawLam.includes('matt') || rawLam.includes('matte')) updatedSpec.lamination = 'matt';
+                        else if (rawLam.includes('varnish')) updatedSpec.lamination = 'varnish';
+                        else if (rawLam.includes('none') || rawLam.includes('no')) updatedSpec.lamination = null;
+                        else updatedSpec.lamination = answer;
                     } else {
                         updatedSpec[field] = answer;
                     }

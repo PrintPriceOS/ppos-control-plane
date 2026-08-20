@@ -664,6 +664,10 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     const s = String(val).toLowerCase().trim();
                     if (VALID_LAMINATION.includes(s)) {
                         normalized.specPatch[key] = s;
+                    } else if (s === 'matte') {
+                        normalized.specPatch[key] = 'matt';
+                    } else if (s === 'glossy') {
+                        normalized.specPatch[key] = 'gloss';
                     }
                 } else if (key === 'orientation' && VALID_ORIENTATION.includes(val)) {
                     normalized.specPatch[key] = val;
