@@ -1281,4 +1281,6 @@ UNRESTRICTED_PRODUCTION:
 - **Phase 193D (Governed Calibration Acceptance)**: Sealed & Tagged (`phase-193d-governed-calibration-acceptance`).
 - **Phase 193E (AI Conversational Assistant Backend)**: Sealed & Tagged (`phase-193e-conversational-calibration-assistant`).
 - **Phase 193F.1 (Frontend Quick Calibration UX Integration Audit)**: **COMPLETED** (`docs/audits/PHASE_193F_QUICK_CALIBRATION_UX_ARCHITECTURE.md`).
-- **Phase 193F.2 (Frontend Quick Calibration UI Implementation)**: **QUEUED / PENDING AUTHORIZATION**.
+- **Phase 193F.2 (Frontend Quick Calibration UI Implementation)**: Sealed & Tagged (`phase-193f-quick-pricing-calibration-ui`).
+- **Phase 193G (Pre-Deploy & Production Readiness Acceptance)**: **AUDITED / GO CLASSIFICATION** (`docs/audits/PHASE_193G_PRE_DEPLOY_PRODUCTION_READINESS.md`).
+  - Production Deployment Status: **PENDING EXPLICIT WINDOW AUTHORIZATION (193G.2)**.
