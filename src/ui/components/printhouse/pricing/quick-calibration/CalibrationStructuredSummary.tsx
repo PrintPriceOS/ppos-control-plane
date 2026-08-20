@@ -54,6 +54,13 @@ export const CalibrationStructuredSummary: React.FC<CalibrationStructuredSummary
                 </span>
             );
         }
+        if (confirmedFields.includes(field)) {
+            return (
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <Check size={10} /> Confirmed
+                </span>
+            );
+        }
         if (extractedFields.includes(field)) {
             return (
                 <span className="text-[10px] font-semibold text-blue-700 bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -62,8 +69,8 @@ export const CalibrationStructuredSummary: React.FC<CalibrationStructuredSummary
             );
         }
         return (
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <Check size={10} /> Confirmed
+            <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                Draft
             </span>
         );
     };

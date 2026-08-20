@@ -34,13 +34,27 @@ async function handleResponse<T>(res: Response): Promise<T> {
     return json.data;
 }
 
+export interface CreateCalibrationSessionPayload {
+    printerNodeId: string;
+    referenceBookName?: string;
+    bookSpec: any;
+    targetManufacturingPrice: number;
+    currency?: string;
+    transportPricePerKg?: number | null;
+    transportCurrency?: string;
+    includesPaper?: boolean | null;
+    includesBinding?: boolean | null;
+    includesFinishing?: boolean | null;
+    includesPackaging?: boolean | null;
+}
+
 export const printhouseCalibrationApi = {
     // ── Phase 193B: Reference Book & Calibration Sessions ───────────────────
-    async createSession(printerNodeId: string, referenceBookName?: string) {
+    async createSession(payload: CreateCalibrationSessionPayload) {
         const res = await fetch(`${BASE_URL}/calibrations`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ printerNodeId, referenceBookName })
+            body: JSON.stringify(payload)
         });
         return handleResponse<any>(res);
     },

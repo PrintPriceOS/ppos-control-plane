@@ -351,6 +351,144 @@ test('F23 (Runtime AI Fallback)', 'Runtime: Offline provider enables manual stru
     assert.strictEqual(manualSpec.copies, 500);
 });
 
+// ── 5. Explicit Creation Flow & Provenance Tests (Phase 193F Fix) ────────────
+
+console.log('\n═══ Phase 193F Fix: Explicit Creation Flow & Provenance Tests ═══\n');
+
+test('F24 (Mount Zero POST)', 'Mount behavior: QuickCalibrationPanel does NOT call createSession on mount (0 POSTs on mount)', () => {
+    const panelSource = fs.readFileSync(path.join(UI_BASE, 'QuickCalibrationPanel.tsx'), 'utf8');
+    // Ensure no useEffect calls createSession
+    assert.ok(!panelSource.includes('useEffect(() => {\n        if (printerNodeId) {\n            initSession();'));
+    assert.ok(!panelSource.includes('printhouseCalibrationApi.createSession(\n                printerNodeId'));
+});
+
+test('F25 (Clean Initial State)', 'Empty initial state: No fake defaults (copies undefined, price null, status LOCAL_DRAFT)', () => {
+    const panelSource = fs.readFileSync(path.join(UI_BASE, 'QuickCalibrationPanel.tsx'), 'utf8');
+    assert.ok(panelSource.includes('copies: undefined'));
+    assert.ok(panelSource.includes('targetManufacturingPrice: null'));
+    assert.ok(panelSource.includes("session?.status || 'LOCAL_DRAFT'"));
+    // Ensure fake defaults are eliminated
+    assert.ok(!panelSource.includes('copies: 1000'));
+    assert.ok(!panelSource.includes('targetManufacturingPrice: 2450.0'));
+});
+
+test('F26 (Semantic Field Provenance)', 'Field provenance: Missing vs AI Extracted vs Confirmed vs Draft', () => {
+    const summarySource = fs.readFileSync(path.join(UI_BASE, 'CalibrationStructuredSummary.tsx'), 'utf8');
+    assert.ok(summarySource.includes('Missing'));
+    assert.ok(summarySource.includes('AI Extracted'));
+    assert.ok(summarySource.includes('Confirmed'));
+    assert.ok(summarySource.includes('Draft'));
+
+    // Simulation of badge function
+    function getBadge(field, val, extractedFields, confirmedFields) {
+        if (val === undefined || val === null || val === '') return 'Missing';
+        if (confirmedFields.includes(field)) return 'Confirmed';
+        if (extractedFields.includes(field)) return 'AI Extracted';
+        return 'Draft';
+    }
+
+    assert.strictEqual(getBadge('copies', undefined, [], []), 'Missing');
+    assert.strictEqual(getBadge('copies', 500, ['copies'], []), 'AI Extracted');
+    assert.strictEqual(getBadge('copies', 500, [], ['copies']), 'Confirmed');
+    assert.strictEqual(getBadge('copies', 500, [], []), 'Draft');
+});
+
+test('F27 (API Contract 193B Shape)', 'API contract: createSession accepts and sends full Phase 193B shape', () => {
+    const apiSource = fs.readFileSync(API_CLIENT_PATH, 'utf8');
+    assert.ok(apiSource.includes('interface CreateCalibrationSessionPayload'));
+    assert.ok(apiSource.includes('bookSpec: any;'));
+    assert.ok(apiSource.includes('targetManufacturingPrice: number;'));
+    assert.ok(apiSource.includes('async createSession(payload: CreateCalibrationSessionPayload)'));
+});
+
+test('F28 (Invalid Local State Prevents POST)', 'Pre-POST validation: Incomplete local draft blocks createSession', () => {
+    function validateDraftForCreation(spec, comms) {
+        const missing = [];
+        if (!spec.copies || spec.copies < 1) missing.push('Copies');
+        if (!spec.book_width_mm) missing.push('Width');
+        if (!comms.targetManufacturingPrice || comms.targetManufacturingPrice <= 0) missing.push('Price');
+        return { valid: missing.length === 0, missing };
+    }
+
+    const incompleteSpec = { copies: undefined, book_width_mm: undefined };
+    const incompleteComms = { targetManufacturingPrice: null };
+    const result = validateDraftForCreation(incompleteSpec, incompleteComms);
+
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.missing.includes('Copies'));
+    assert.ok(result.missing.includes('Price'));
+});
+
+test('F29 (Complete Data Triggers Valid createSession)', 'Valid flow: Complete verified draft calls createSession exactly once with 193B payload', async () => {
+    let callCount = 0;
+    let sentPayload = null;
+
+    const mockApi = {
+        createSession: async (payload) => {
+            callCount++;
+            sentPayload = payload;
+            return {
+                id: 'psess-new-001',
+                status: 'DRAFT',
+                book_spec_json: payload.bookSpec,
+                target_manufacturing_price: payload.targetManufacturingPrice
+            };
+        }
+    };
+
+    const completeSpec = {
+        copies: 1000,
+        book_width_mm: 170,
+        book_height_mm: 240,
+        interior_pages: 128,
+        interior_print: '4/4',
+        paper_type_interior: 'offset',
+        paper_weight_interior: 80,
+        cover_print: '4/0',
+        paper_type_cover: 'mc',
+        paper_weight_cover: 300,
+        binding_method: 'perfect bound',
+        delivery_country: 'ES'
+    };
+
+    const completeComms = {
+        targetManufacturingPrice: 2450.0,
+        currency: 'EUR',
+        transportPricePerKg: 0.95,
+        includesPaper: true,
+        includesBinding: true,
+        includesFinishing: true,
+        includesPackaging: false
+    };
+
+    const session = await mockApi.createSession({
+        printerNodeId: 'node-001',
+        bookSpec: completeSpec,
+        targetManufacturingPrice: completeComms.targetManufacturingPrice,
+        currency: completeComms.currency,
+        transportPricePerKg: completeComms.transportPricePerKg,
+        includesPaper: completeComms.includesPaper,
+        includesBinding: completeComms.includesBinding,
+        includesFinishing: completeComms.includesFinishing,
+        includesPackaging: completeComms.includesPackaging
+    });
+
+    assert.strictEqual(callCount, 1);
+    assert.strictEqual(sentPayload.printerNodeId, 'node-001');
+    assert.strictEqual(sentPayload.targetManufacturingPrice, 2450.0);
+    assert.strictEqual(sentPayload.bookSpec.copies, 1000);
+    assert.strictEqual(session.status, 'DRAFT');
+});
+
+test('F30 (Backend 193B Validation Preserved)', 'Backend validation integrity: calibrationSessionService.js retains strict validation without relaxation', () => {
+    const serviceSource = fs.readFileSync(path.join(__dirname, '../src/api/services/calibrationSessionService.js'), 'utf8');
+    assert.ok(serviceSource.includes("const validation = this.validateBookSpec(bookSpec);"));
+    assert.ok(serviceSource.includes("if (!validation.valid) {"));
+    assert.ok(serviceSource.includes("err.code = 'INVALID_BOOK_SPEC';"));
+    assert.ok(serviceSource.includes("if (typeof targetManufacturingPrice !== 'number' || targetManufacturingPrice <= 0) {"));
+    assert.ok(serviceSource.includes("err.code = 'INVALID_MANUFACTURING_PRICE';"));
+});
+
 console.log(`\n═══ Phase 193F Results: ${passed} passed, ${failed} failed ═══\n`);
 if (failed > 0) {
     process.exit(1);

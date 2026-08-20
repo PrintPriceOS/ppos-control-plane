@@ -58,32 +58,32 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [activeProposal, setActiveProposal] = useState<any | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
 
-    // ── Local Editable Draft Spec & Commercials ──
+    // ── Local Editable Draft Spec & Commercials (Initially Clean / Empty) ──
     const [draftSpec, setDraftSpec] = useState<any>({
-        copies: 1000,
-        book_width_mm: 170,
-        book_height_mm: 240,
-        interior_pages: 128,
-        interior_print: '4/4',
-        paper_type_interior: 'offset',
-        paper_weight_interior: 80,
-        cover_print: '4/0',
-        paper_type_cover: 'mc',
-        paper_weight_cover: 300,
-        lamination: 'matt',
-        binding_method: 'perfect bound',
+        copies: undefined,
+        book_width_mm: undefined,
+        book_height_mm: undefined,
+        interior_pages: undefined,
+        interior_print: undefined,
+        paper_type_interior: undefined,
+        paper_weight_interior: undefined,
+        cover_print: undefined,
+        paper_type_cover: undefined,
+        paper_weight_cover: undefined,
+        lamination: null,
+        binding_method: undefined,
         delivery_country: 'ES'
     });
 
     const [draftCommercials, setDraftCommercials] = useState<any>({
-        targetManufacturingPrice: 2450.0,
+        targetManufacturingPrice: null,
         currency: 'EUR',
-        transportPricePerKg: 0.950,
+        transportPricePerKg: null,
         transportCurrency: 'EUR',
-        includesPaper: true,
-        includesBinding: true,
-        includesFinishing: true,
-        includesPackaging: false
+        includesPaper: null,
+        includesBinding: null,
+        includesFinishing: null,
+        includesPackaging: null
     });
 
     // ── Tracking Metadata ──
@@ -95,53 +95,30 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [accepting, setAccepting] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-    // Initialize or load active calibration session
-    useEffect(() => {
-        if (printerNodeId) {
-            initSession();
-        }
-    }, [printerNodeId]);
+    // Helper: Validates whether local draft satisfies Phase 193B mandatory contract
+    const validateDraftForCreation = (spec: any, comms: any): { valid: boolean; missing: string[] } => {
+        const missing: string[] = [];
+        if (!spec.copies || spec.copies < 1) missing.push('Copies (positive integer)');
+        if (!spec.book_width_mm) missing.push('Width mm');
+        if (!spec.book_height_mm) missing.push('Height mm');
+        if (!spec.interior_pages || spec.interior_pages < 1) missing.push('Interior pages');
+        if (!spec.interior_print) missing.push('Interior print (1/1, 2/2, 4/4)');
+        if (!spec.paper_type_interior) missing.push('Interior paper type');
+        if (!spec.paper_weight_interior) missing.push('Interior paper weight');
+        if (!spec.cover_print) missing.push('Cover print');
+        if (!spec.paper_type_cover) missing.push('Cover paper type');
+        if (!spec.paper_weight_cover) missing.push('Cover paper weight');
+        if (!spec.binding_method) missing.push('Binding method');
+        if (!spec.delivery_country) missing.push('Delivery country');
 
-    const initSession = async () => {
-        if (!printerNodeId) return;
-        setLoadingSession(true);
-        setError(null);
-        try {
-            const newSession = await printhouseCalibrationApi.createSession(
-                printerNodeId,
-                'Quick Calibration Book'
-            );
-            setSession(newSession);
-            if (newSession.book_spec_json) {
-                try {
-                    const parsed = typeof newSession.book_spec_json === 'string'
-                        ? JSON.parse(newSession.book_spec_json)
-                        : newSession.book_spec_json;
-                    if (Object.keys(parsed).length > 0) {
-                        setDraftSpec(parsed);
-                    }
-                } catch (e) {}
-            }
-            if (newSession.target_manufacturing_price) {
-                setDraftCommercials((prev: any) => ({
-                    ...prev,
-                    targetManufacturingPrice: newSession.target_manufacturing_price,
-                    includesPaper: newSession.includes_paper,
-                    includesBinding: newSession.includes_binding,
-                    includesFinishing: newSession.includes_finishing,
-                    includesPackaging: newSession.includes_packaging
-                }));
-            }
-        } catch (err: any) {
-            setError(err.message || 'Failed to initialize calibration session');
-        } finally {
-            setLoadingSession(false);
+        if (!comms.targetManufacturingPrice || comms.targetManufacturingPrice <= 0) {
+            missing.push('Known Manufacturing Price (> 0 EUR)');
         }
+        return { valid: missing.length === 0, missing };
     };
 
     // ── 1. Conversational Chat (193E Zero-Write) ──
     const handleSendMessage = async (text: string) => {
-        if (!session?.id) return;
         setSendingChat(true);
         setError(null);
 
@@ -150,24 +127,34 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         setMessages(prev => [...prev, userMsg]);
 
         try {
-            const result = await printhouseCalibrationApi.assistantChat(session.id, text);
-            setAiUnavailable(false);
+            // If session exists on server, call assistant API; otherwise handle in local memory
+            if (session?.id) {
+                const result = await printhouseCalibrationApi.assistantChat(session.id, text);
+                setAiUnavailable(false);
 
-            if (result && result.proposal) {
-                setActiveProposal(result.proposal);
+                if (result && result.proposal) {
+                    setActiveProposal(result.proposal);
 
+                    const assistantMsg = {
+                        role: 'assistant' as const,
+                        text: result.proposal.explanation || 'I have extracted the book specifications for your review.',
+                        timestamp: new Date().toISOString(),
+                        proposal: result.proposal
+                    };
+                    setMessages(prev => [...prev, assistantMsg]);
+
+                    if (result.proposal.specPatch) {
+                        setExtractedFields(Object.keys(result.proposal.specPatch));
+                    }
+                }
+            } else {
+                // Pre-session conversational mock/fallback: provide structured template response locally
                 const assistantMsg = {
                     role: 'assistant' as const,
-                    text: result.proposal.explanation || 'I have extracted the book specifications for your review.',
-                    timestamp: new Date().toISOString(),
-                    proposal: result.proposal
+                    text: 'I have noted these reference book parameters. Review the structured specification and commercial declaration on the right, then click Apply & Save to create your calibration baseline.',
+                    timestamp: new Date().toISOString()
                 };
                 setMessages(prev => [...prev, assistantMsg]);
-
-                // Track extracted fields in memory
-                if (result.proposal.specPatch) {
-                    setExtractedFields(Object.keys(result.proposal.specPatch));
-                }
             }
         } catch (err: any) {
             if (err.code === 'AI_PROVIDER_UNAVAILABLE' || err.code === 'AI_PROVIDER_TIMEOUT') {
@@ -186,41 +173,71 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         }
     };
 
-    // ── 2. Explicit Apply Proposal (193B Session Update) ──
+    // ── 2. Explicit Apply / Save (193B Session Creation / Update) ──
     const handleApplyProposal = async (proposal: any) => {
-        if (!session?.id || !proposal) return;
         setError(null);
-
-        const newSpec = { ...draftSpec, ...(proposal.specPatch || {}) };
-        const newComms = { ...draftCommercials, ...(proposal.declaredCommercials || {}) };
+        const newSpec = { ...draftSpec, ...(proposal?.specPatch || {}) };
+        const newComms = { ...draftCommercials, ...(proposal?.declaredCommercials || {}) };
 
         setDraftSpec(newSpec);
         setDraftCommercials(newComms);
 
+        const validation = validateDraftForCreation(newSpec, newComms);
+        if (!validation.valid) {
+            setError(`Cannot persist session yet. Missing mandatory fields: ${validation.missing.join(', ')}`);
+            if (proposal?.specPatch) {
+                setExtractedFields(Object.keys(proposal.specPatch));
+            }
+            return;
+        }
+
         try {
-            const updated = await printhouseCalibrationApi.updateDraftSession(session.id, {
-                bookSpec: newSpec,
-                targetManufacturingPrice: newComms.targetManufacturingPrice,
-                currency: newComms.currency || 'EUR',
-                transportPricePerKg: newComms.transportPricePerKg,
-                transportCurrency: newComms.transportCurrency || 'EUR',
-                includesPaper: newComms.includesPaper,
-                includesBinding: newComms.includesBinding,
-                includesFinishing: newComms.includesFinishing,
-                includesPackaging: newComms.includesPackaging
-            });
-            setSession(updated);
-            setConfirmedFields(Object.keys(proposal.specPatch || {}));
+            if (!session?.id) {
+                // Explicit creation with complete Phase 193B payload
+                const created = await printhouseCalibrationApi.createSession({
+                    printerNodeId,
+                    referenceBookName: 'Quick Calibration Book',
+                    bookSpec: newSpec,
+                    targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
+                    currency: newComms.currency || 'EUR',
+                    transportPricePerKg: newComms.transportPricePerKg ? Number(newComms.transportPricePerKg) : null,
+                    transportCurrency: newComms.transportCurrency || 'EUR',
+                    includesPaper: newComms.includesPaper,
+                    includesBinding: newComms.includesBinding,
+                    includesFinishing: newComms.includesFinishing,
+                    includesPackaging: newComms.includesPackaging
+                });
+                setSession(created);
+            } else {
+                const updated = await printhouseCalibrationApi.updateDraftSession(session.id, {
+                    bookSpec: newSpec,
+                    targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
+                    currency: newComms.currency || 'EUR',
+                    transportPricePerKg: newComms.transportPricePerKg ? Number(newComms.transportPricePerKg) : null,
+                    transportCurrency: newComms.transportCurrency || 'EUR',
+                    includesPaper: newComms.includesPaper,
+                    includesBinding: newComms.includesBinding,
+                    includesFinishing: newComms.includesFinishing,
+                    includesPackaging: newComms.includesPackaging
+                });
+                setSession(updated);
+            }
+            setConfirmedFields(Object.keys(newSpec).filter(k => newSpec[k] !== undefined && newSpec[k] !== null && newSpec[k] !== ''));
             setExtractedFields([]);
             setActiveProposal(null);
-            setSuccessMessage('Extracted specifications successfully applied to reference book.');
+            setSuccessMessage('Specifications verified and saved to calibration session.');
             setTimeout(() => setSuccessMessage(null), 4000);
         } catch (err: any) {
-            setError(err.message || 'Failed to update draft session');
+            setError(err.message || 'Failed to save calibration session');
         }
     };
 
-    // ── 3. Clarification Answer ──
+    // ── 3. Manual Save Draft Spec ──
+    const handleSaveManualDraft = async () => {
+        await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
+    };
+
+    // ── 4. Clarification Answer ──
     const handleClarificationAnswer = (field: string, answer: any) => {
         if (field.startsWith('includes')) {
             const val = typeof answer === 'string' ? answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') : Boolean(answer);
@@ -230,17 +247,25 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         }
     };
 
-    // ── 4. Ready to Calibrate Transition (193B) ──
+    // ── 5. Ready to Calibrate Transition (193B) ──
     const handleMarkReady = async () => {
-        if (!session?.id) return;
         setError(null);
+        // Ensure session exists
+        if (!session?.id) {
+            await handleSaveManualDraft();
+        }
+        if (!session?.id) {
+            setError('Please verify all mandatory fields and save before marking ready.');
+            return;
+        }
+
         try {
             // First save any unsaved draft fields
             await printhouseCalibrationApi.updateDraftSession(session.id, {
                 bookSpec: draftSpec,
-                targetManufacturingPrice: draftCommercials.targetManufacturingPrice,
+                targetManufacturingPrice: Number(draftCommercials.targetManufacturingPrice),
                 currency: draftCommercials.currency,
-                transportPricePerKg: draftCommercials.transportPricePerKg,
+                transportPricePerKg: draftCommercials.transportPricePerKg ? Number(draftCommercials.transportPricePerKg) : null,
                 transportCurrency: draftCommercials.transportCurrency,
                 includesPaper: draftCommercials.includesPaper,
                 includesBinding: draftCommercials.includesBinding,
@@ -391,7 +416,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                             Quick Pricing Calibration
                         </h3>
                         <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                            {session?.status || 'INITIALIZING'}
+                            {session?.status || 'LOCAL_DRAFT'}
                         </span>
                     </div>
                     <p className="text-xs text-zinc-500 mt-1">
@@ -410,12 +435,19 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     </button>
                     <button
                         type="button"
-                        onClick={initSession}
-                        disabled={loadingSession}
+                        onClick={() => {
+                            setSession(null);
+                            setActiveRun(null);
+                            setMessages([]);
+                            setExtractedFields([]);
+                            setConfirmedFields([]);
+                            setSuccessMessage('Local calibration workspace reset.');
+                            setTimeout(() => setSuccessMessage(null), 3000);
+                        }}
                         className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl transition-colors shadow-2xs"
                         title="Reset calibration session"
                     >
-                        <RefreshCw size={14} className={loadingSession ? 'animate-spin' : ''} />
+                        <RefreshCw size={14} />
                     </button>
                 </div>
             </div>
