@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CalibrationConversation } from './CalibrationConversation';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
+import { CountrySelect } from '../../../common/CountrySelect';
 import { getCountryDisplayName } from '../../../../lib/countryCatalog';
 
 interface GuidedCalibrationWizardProps {
@@ -249,80 +250,231 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                 </div>
             )}
 
-            {/* STEP 2: We understood this (Review Card) */}
+            {/* STEP 2: We understood this (Editable Structured Review) */}
             {step === 2 && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 2 of 5</span>
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-1">
-                            We understood this specification
-                        </h3>
-                        <p className="text-xs text-zinc-500 mt-1">
-                            Review what PrintPriceOS extracted from your description. If anything is missing or incorrect, you can edit it directly.
-                        </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                        <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 2 of 5</span>
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-0.5">
+                                Review & Edit Specification
+                            </h3>
+                            <p className="text-xs text-zinc-500 mt-0.5">
+                                PrintPriceOS extracted these specifications. You can adjust any field directly below without calling the assistant again.
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs">
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Quantity</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.copies ? `${draftSpec.copies.toLocaleString()} copies` : 'Missing'}
-                            </strong>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                        {/* Quantity */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Quantity (Copies) *
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={draftSpec.copies || ''}
+                                onChange={e => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setDraftSpec((p: any) => ({ ...p, copies: isNaN(val) ? undefined : val }));
+                                }}
+                                placeholder="e.g. 500"
+                                className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                            />
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Trim Dimensions</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.book_width_mm && draftSpec.book_height_mm ? `${draftSpec.book_width_mm} × ${draftSpec.book_height_mm} mm` : 'Missing'}
-                            </strong>
+
+                        {/* Trim Dimensions */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Trim Dimensions (W × H mm) *
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="50"
+                                    max="500"
+                                    value={draftSpec.book_width_mm || ''}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setDraftSpec((p: any) => ({ ...p, book_width_mm: isNaN(val) ? undefined : val }));
+                                    }}
+                                    placeholder="Width"
+                                    className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                />
+                                <span className="text-zinc-400 font-bold">×</span>
+                                <input
+                                    type="number"
+                                    min="50"
+                                    max="700"
+                                    value={draftSpec.book_height_mm || ''}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setDraftSpec((p: any) => ({ ...p, book_height_mm: isNaN(val) ? undefined : val }));
+                                    }}
+                                    placeholder="Height"
+                                    className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Interior Pages</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.interior_pages ? `${draftSpec.interior_pages} pages (${draftSpec.interior_print || '4/4'})` : 'Missing'}
-                            </strong>
+
+                        {/* Interior Pages & Print */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Interior Pages & Print *
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={draftSpec.interior_pages || ''}
+                                    onChange={e => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setDraftSpec((p: any) => ({ ...p, interior_pages: isNaN(val) ? undefined : val }));
+                                    }}
+                                    placeholder="Pages"
+                                    className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                />
+                                <select
+                                    value={draftSpec.interior_print || '4/4'}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, interior_print: e.target.value }))}
+                                    className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                >
+                                    <option value="4/4">4/4 Full Colour</option>
+                                    <option value="1/1">1/1 Black</option>
+                                    <option value="2/2">2/2 Two Colour</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Interior Paper</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.paper_weight_interior ? `${draftSpec.paper_weight_interior}gsm ${draftSpec.paper_type_interior || 'offset'}` : 'Missing'}
-                            </strong>
+
+                        {/* Interior Paper */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Interior Paper *
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="40"
+                                    max="400"
+                                    value={draftSpec.paper_weight_interior || ''}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setDraftSpec((p: any) => ({ ...p, paper_weight_interior: isNaN(val) ? undefined : val }));
+                                    }}
+                                    placeholder="Weight (gsm)"
+                                    className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                />
+                                <select
+                                    value={draftSpec.paper_type_interior || 'offset'}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_interior: e.target.value }))}
+                                    className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                >
+                                    <option value="offset">Offset</option>
+                                    <option value="mc">Coated (MC)</option>
+                                    <option value="lux">Lux Paper</option>
+                                    <option value="munken">Munken</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Cover Specification</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.paper_weight_cover ? `${draftSpec.paper_weight_cover}gsm ${draftSpec.paper_type_cover || 'mc'} (${draftSpec.cover_print || '4/0'})` : 'Missing'}
-                            </strong>
+
+                        {/* Cover Specification */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Cover Weight & Paper *
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="100"
+                                    max="600"
+                                    value={draftSpec.paper_weight_cover || ''}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setDraftSpec((p: any) => ({ ...p, paper_weight_cover: isNaN(val) ? undefined : val }));
+                                    }}
+                                    placeholder="Weight (gsm)"
+                                    className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                />
+                                <select
+                                    value={draftSpec.paper_type_cover || 'mc'}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_cover: e.target.value }))}
+                                    className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                >
+                                    <option value="mc">Coated (MC)</option>
+                                    <option value="artboard">Artboard</option>
+                                    <option value="offset">Offset</option>
+                                    <option value="wfmc">WFMC</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Binding Method</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm capitalize">
-                                {draftSpec.binding_method || 'Missing'}
-                            </strong>
+
+                        {/* Cover Print & Lamination */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Cover Print & Finishing
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={draftSpec.cover_print || '4/0'}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, cover_print: e.target.value }))}
+                                    className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                >
+                                    <option value="4/0">4/0 Front Only</option>
+                                    <option value="4/4">4/4 Both Sides</option>
+                                    <option value="1/0">1/0 Front Black</option>
+                                    <option value="1/1">1/1 Black Both</option>
+                                </select>
+                                <select
+                                    value={draftSpec.lamination || ''}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, lamination: e.target.value || null }))}
+                                    className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                                >
+                                    <option value="">No Lamination</option>
+                                    <option value="matt">Matt Lam</option>
+                                    <option value="gloss">Gloss Lam</option>
+                                    <option value="varnish">Varnish</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Finishing / Lamination</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm capitalize">
-                                {draftSpec.lamination ? `${draftSpec.lamination} lamination` : 'None'}
-                            </strong>
+
+                        {/* Binding Method */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Binding Method *
+                            </label>
+                            <select
+                                value={draftSpec.binding_method || 'perfect bound'}
+                                onChange={e => setDraftSpec((p: any) => ({ ...p, binding_method: e.target.value }))}
+                                className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
+                            >
+                                <option value="perfect bound">Perfect Bound (Paperback)</option>
+                                <option value="saddle stitch">Saddle Stitch (Booklet)</option>
+                                <option value="thread sewn">Thread Sewn</option>
+                                <option value="hardcover">Hardcover (Case Bound)</option>
+                                <option value="wire-o">Wire-O</option>
+                                <option value="spiral">Spiral</option>
+                            </select>
                         </div>
-                        <div>
-                            <span className="text-zinc-500 block text-[11px]">Destination Region</span>
-                            <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.delivery_country ? getCountryDisplayName(draftSpec.delivery_country) : 'Not specified'}
-                            </strong>
+
+                        {/* Destination Country */}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                            <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                Destination Region / Country
+                            </label>
+                            <CountrySelect
+                                value={draftSpec.delivery_country || ''}
+                                onChange={(code) => setDraftSpec((p: any) => ({ ...p, delivery_country: code || undefined }))}
+                                placeholder="Select destination (e.g. Poland, Japan)..."
+                            />
                         </div>
                     </div>
 
                     {!isStep1Complete && (
                         <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
-                            <span className="font-semibold">Complete the missing job details before continuing to manufacturing cost.</span>
-                            <button
-                                type="button"
-                                onClick={() => setStep(1)}
-                                className="font-bold text-[#dc0000] hover:underline ml-2"
-                            >
-                                Edit Description
-                            </button>
+                            <span className="font-semibold">Fill in the required fields marked with (*) above to continue.</span>
                         </div>
                     )}
 
@@ -333,7 +485,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold flex items-center gap-1.5"
                         >
                             <ArrowLeft size={14} />
-                            <span>Edit Description</span>
+                            <span>Redo AI Description</span>
                         </button>
 
                         <button
@@ -348,7 +500,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             disabled={!isStep1Complete}
                             className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
                         >
-                            <span>Looks Right — Continue</span>
+                            <span>Confirm Specification & Continue</span>
                             <ArrowRight size={14} />
                         </button>
                     </div>
