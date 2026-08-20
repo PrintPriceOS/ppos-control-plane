@@ -560,10 +560,10 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
         if (rawJson.specPatch && typeof rawJson.specPatch === 'object') {
             // Map common AI aliases into canonical keys
             const raw = rawJson.specPatch;
-            const preNormalized: Record<string, any> = {};
+            const preNormalized = {};
 
             // Aliases map
-            const aliasMap: Record<string, string> = {
+            const aliasMap = {
                 quantity: 'copies',
                 run_length: 'copies',
                 width_mm: 'book_width_mm',
