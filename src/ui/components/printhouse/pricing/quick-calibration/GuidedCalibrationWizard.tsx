@@ -78,24 +78,81 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         return 1;
     });
 
-    const isSpecComplete = Boolean(
-        draftSpec.copies && 
-        draftSpec.book_width_mm && 
-        draftSpec.book_height_mm && 
-        draftSpec.interior_pages && 
-        draftSpec.interior_print
+    // ── Phase 193H.6 Canonical Step Completion Predicates ──
+    const [reviewConfirmed, setReviewConfirmed] = useState<boolean>(false);
+    const [lastConfirmedSpecSnapshot, setLastConfirmedSpecSnapshot] = useState<string>('');
+
+    // Invalidate review confirmation if physical spec changes after confirmation
+    const currentSpecSnapshot = JSON.stringify(draftSpec);
+    const isReviewValid = reviewConfirmed && (lastConfirmedSpecSnapshot === currentSpecSnapshot);
+
+    const isStep1Complete = Boolean(
+        draftSpec.copies && draftSpec.copies > 0 &&
+        draftSpec.book_width_mm && draftSpec.book_width_mm > 0 &&
+        draftSpec.book_height_mm && draftSpec.book_height_mm > 0 &&
+        draftSpec.interior_pages && draftSpec.interior_pages > 0 &&
+        draftSpec.interior_print &&
+        draftSpec.paper_type_interior &&
+        draftSpec.paper_weight_interior && draftSpec.paper_weight_interior > 0 &&
+        draftSpec.paper_type_cover &&
+        draftSpec.paper_weight_cover && draftSpec.paper_weight_cover > 0 &&
+        draftSpec.binding_method
     );
 
-    const isCostComplete = Boolean(
-        draftCommercials.targetManufacturingPrice && 
-        draftCommercials.targetManufacturingPrice > 0 &&
+    const isStep2Complete = Boolean(
+        isStep1Complete && isReviewValid
+    );
+
+    const isStep3Complete = Boolean(
+        isStep1Complete &&
+        isStep2Complete &&
+        draftCommercials.targetManufacturingPrice &&
+        Number(draftCommercials.targetManufacturingPrice) > 0 &&
         draftCommercials.includesPaper !== null &&
         draftCommercials.includesBinding !== null
     );
 
+    const isStep4Complete = Boolean(
+        isStep1Complete &&
+        isStep2Complete &&
+        isStep3Complete &&
+        (isAccepted || isCalculated)
+    );
+
+    const isStep5Complete = Boolean(
+        isStep1Complete &&
+        isStep2Complete &&
+        isStep3Complete &&
+        isStep4Complete &&
+        isAccepted
+    );
+
+    // Predicate map for 1..5
+    const isStepComplete = (stepNum: number): boolean => {
+        switch (stepNum) {
+            case 1: return isStep1Complete;
+            case 2: return isStep2Complete;
+            case 3: return isStep3Complete;
+            case 4: return isStep4Complete;
+            case 5: return isStep5Complete;
+            default: return false;
+        }
+    };
+
+    // Forward dependency chain: Step N+1 is navigable only if all predecessors 1..N are complete
+    const canNavigateToStep = (targetStep: number): boolean => {
+        if (targetStep === 1) return true;
+        if (targetStep <= step) return true; // Backward navigation to already reached step allowed
+        if (targetStep === 2) return isStep1Complete;
+        if (targetStep === 3) return isStep1Complete && isStep2Complete;
+        if (targetStep === 4) return isStep1Complete && isStep2Complete && isStep3Complete;
+        if (targetStep === 5) return isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
+        return false;
+    };
+
     return (
         <div className="space-y-6">
-            {/* Stepper Indicator */}
+            {/* Stepper Indicator (Phase 193H.6 Visited vs Completed Gate) */}
             <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xs">
                 <div className="flex items-center justify-between max-w-2xl mx-auto text-xs font-semibold">
                     {[
@@ -104,37 +161,50 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         { num: 3, label: 'Manufacturing Cost' },
                         { num: 4, label: 'Calibrate' },
                         { num: 5, label: 'Test Pricing' }
-                    ].map((s, idx) => (
-                        <React.Fragment key={s.num}>
-                            <button
-                                type="button"
-                                onClick={() => setStep(s.num)}
-                                className={`flex items-center gap-2 transition-colors ${
-                                    step === s.num
-                                        ? 'text-[#dc0000] font-bold'
-                                        : step > s.num
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : 'text-zinc-400 dark:text-zinc-600'
-                                }`}
-                            >
-                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                                    step === s.num
-                                        ? 'bg-[#dc0000] text-white shadow-2xs'
-                                        : step > s.num
-                                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                                }`}>
-                                    {step > s.num ? '✓' : s.num}
-                                </span>
-                                <span className="hidden sm:inline">{s.label}</span>
-                            </button>
-                            {idx < 4 && (
-                                <div className={`flex-1 h-0.5 mx-2 ${
-                                    step > s.num ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'
-                                }`} />
-                            )}
-                        </React.Fragment>
-                    ))}
+                    ].map((s, idx) => {
+                        const isCurrent = step === s.num;
+                        const isCompleted = isStepComplete(s.num);
+                        const isNavigable = canNavigateToStep(s.num);
+
+                        return (
+                            <React.Fragment key={s.num}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isNavigable) setStep(s.num);
+                                    }}
+                                    disabled={!isNavigable}
+                                    className={`flex items-center gap-2 transition-colors ${
+                                        isCurrent
+                                            ? 'text-[#dc0000] font-bold'
+                                            : isCompleted
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : isNavigable
+                                            ? 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
+                                            : 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-60'
+                                    }`}
+                                >
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                                        isCurrent
+                                            ? 'bg-[#dc0000] text-white shadow-2xs'
+                                            : isCompleted
+                                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                            : isNavigable
+                                            ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700'
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600'
+                                    }`}>
+                                        {isCompleted ? '✓' : isCurrent ? '●' : s.num}
+                                    </span>
+                                    <span className="hidden sm:inline">{s.label}</span>
+                                </button>
+                                {idx < 4 && (
+                                    <div className={`flex-1 h-0.5 mx-2 ${
+                                        isCompleted ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'
+                                    }`} />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -168,7 +238,8 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <button
                             type="button"
                             onClick={() => setStep(2)}
-                            className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                            disabled={!isStep1Complete}
+                            className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
                         >
                             <span>Continue to Review</span>
                             <ArrowRight size={14} />
@@ -241,6 +312,19 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         </div>
                     </div>
 
+                    {!isStep1Complete && (
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
+                            <span className="font-semibold">Complete the missing job details before continuing to manufacturing cost.</span>
+                            <button
+                                type="button"
+                                onClick={() => setStep(1)}
+                                className="font-bold text-[#dc0000] hover:underline ml-2"
+                            >
+                                Edit Description
+                            </button>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2">
                         <button
                             type="button"
@@ -253,9 +337,15 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
 
                         <button
                             type="button"
-                            onClick={() => setStep(3)}
-                            disabled={!isSpecComplete}
-                            className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                            onClick={() => {
+                                if (isStep1Complete) {
+                                    setReviewConfirmed(true);
+                                    setLastConfirmedSpecSnapshot(JSON.stringify(draftSpec));
+                                    setStep(3);
+                                }
+                            }}
+                            disabled={!isStep1Complete}
+                            className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
                         >
                             <span>Looks Right — Continue</span>
                             <ArrowRight size={14} />
