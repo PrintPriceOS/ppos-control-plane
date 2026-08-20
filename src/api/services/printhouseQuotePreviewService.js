@@ -145,9 +145,13 @@ class PrinthouseQuotePreviewService {
 
         try {
             const regions = await shippingRegionService.listShippingRegions(tenantId, node.id);
-            const matchingRegion = (regions || []).find(r => r.enabled && Array.isArray(r.countries) && r.countries.includes(deliveryCountry));
-            if (matchingRegion) {
-                estimatedDeliveryDays = matchingRegion.standardTransitDays || 2;
+            const matchingRegions = (regions || []).filter(r => r.enabled && Array.isArray(r.countries) && r.countries.map(c => c.toUpperCase()).includes(deliveryCountry));
+            if (matchingRegions.length === 1) {
+                estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
+            } else if (matchingRegions.length > 1) {
+                shippingStatus = 'AMBIGUOUS_SHIPPING_REGION';
+                warnings.push(`Destination country '${deliveryCountry}' is configured in multiple active regions (${matchingRegions.map(r => r.name).join(', ')}).`);
+                estimatedDeliveryDays = matchingRegions[0].standardTransitDays || 2;
             } else {
                 shippingStatus = 'DESTINATION_NOT_IN_ACTIVE_SHIPPING_REGIONS';
                 warnings.push(`Destination country '${deliveryCountry}' is not explicitly mapped in active shipping regions.`);

@@ -13,6 +13,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
+import { getCountryName } from '../../../../lib/countryCatalog';
 import { 
     Calculator, CheckCircle2, AlertTriangle, Info, ChevronDown, 
     ChevronUp, RefreshCw, ShieldCheck, Layers, Package, Truck, Sparkles 
@@ -50,6 +51,17 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [quoteResult, setQuoteResult] = useState<any | null>(null);
     const [showTrace, setShowTrace] = useState(false);
+
+    // List of active configured destinations for this printhouse node
+    const [availableDestinations, setAvailableDestinations] = useState<Array<{ code: string; name: string; regionName?: string }>>([
+        { code: 'ES', name: 'Spain', regionName: 'Domestic' },
+        { code: 'DE', name: 'Germany', regionName: 'European Union' },
+        { code: 'FR', name: 'France', regionName: 'European Union' },
+        { code: 'IT', name: 'Italy', regionName: 'European Union' },
+        { code: 'PT', name: 'Portugal', regionName: 'European Union' },
+        { code: 'GB', name: 'United Kingdom', regionName: 'Europe (Non-EU)' },
+        { code: 'TR', name: 'Turkey', regionName: 'Eurasia' }
+    ]);
 
     // Update spec if initialSpec changes (e.g. upon calibration acceptance)
     useEffect(() => {
@@ -272,21 +284,21 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     </div>
                 </div>
 
-                {/* Destination Country */}
+                {/* Destination Region & Country */}
                 <div>
                     <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Destination
+                        Destination ({availableDestinations.length} configured)
                     </label>
                     <select
-                        value={spec.delivery_country || 'ES'}
+                        value={spec.delivery_country || (availableDestinations[0]?.code || 'ES')}
                         onChange={e => setSpec(prev => ({ ...prev, delivery_country: e.target.value }))}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     >
-                        <option value="ES">Spain (ES)</option>
-                        <option value="FR">France (FR)</option>
-                        <option value="DE">Germany (DE)</option>
-                        <option value="IT">Italy (IT)</option>
-                        <option value="PT">Portugal (PT)</option>
+                        {availableDestinations.map(d => (
+                            <option key={d.code} value={d.code}>
+                                {d.name} ({d.code}) {d.regionName ? `— ${d.regionName}` : ''}
+                            </option>
+                        ))}
                     </select>
                 </div>
             </form>

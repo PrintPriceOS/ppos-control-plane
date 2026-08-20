@@ -4,7 +4,8 @@
  * Phase 193H.3 — Clarification Choice Controlled Interaction UX
  */
 import React, { useState } from 'react';
-import { HelpCircle, Check, ArrowRight } from 'lucide-react';
+import { HelpCircle, Check, ArrowRight, Search } from 'lucide-react';
+import { getCountryName } from '../../../../lib/countryCatalog';
 
 interface Question {
     field: string;
@@ -62,12 +63,64 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
             <form onSubmit={handleContinue} className="space-y-3">
                 {questions.map((q, idx) => {
                     const currentSelected = selectedAnswers[q.field];
+                    const isDestinationField = q.field === 'delivery_country' || q.field === 'destination' || q.field === 'transport_destination' || q.question.toLowerCase().includes('destination') || q.question.toLowerCase().includes('country');
                     return (
                         <div key={idx} className="p-3.5 bg-white dark:bg-zinc-900 rounded-xl border border-amber-200/80 dark:border-amber-800/50 text-xs space-y-2.5">
                             <div className="font-bold text-zinc-900 dark:text-zinc-100">
                                 {q.question}
                             </div>
-                            {q.options && q.options.length > 0 ? (
+                            {/* Special UX for destination / delivery country questions */}
+                            {isDestinationField ? (
+                                <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                            type="button"
+                                            aria-pressed={currentSelected === 'Transport not included'}
+                                            onClick={() => handleOptionSelect(q.field, 'Transport not included')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border shadow-2xs ${
+                                                currentSelected === 'Transport not included'
+                                                    ? 'bg-amber-600 text-white border-amber-700 dark:bg-amber-600 dark:border-amber-500 font-bold'
+                                                    : 'bg-zinc-50 hover:bg-amber-100/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                                            }`}
+                                        >
+                                            {currentSelected === 'Transport not included' && <Check size={13} className="stroke-[3]" />}
+                                            <span>Transport not included</span>
+                                        </button>
+
+                                        {['ES', 'DE', 'FR', 'IT', 'PT', 'GB', 'TR'].map(code => {
+                                            const isSelected = currentSelected === code || currentSelected === getCountryName(code);
+                                            return (
+                                                <button
+                                                    key={code}
+                                                    type="button"
+                                                    aria-pressed={isSelected}
+                                                    onClick={() => handleOptionSelect(q.field, code)}
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 border shadow-2xs ${
+                                                        isSelected
+                                                            ? 'bg-amber-600 text-white border-amber-700 dark:bg-amber-600 dark:border-amber-500 font-bold'
+                                                            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
+                                                    }`}
+                                                >
+                                                    {isSelected && <Check size={11} className="stroke-[3]" />}
+                                                    <span>{getCountryName(code)} ({code})</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Searchable input for other countries */}
+                                    <div className="relative">
+                                        <Search size={13} className="absolute left-3 top-2.5 text-zinc-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Or search another destination country (e.g. Poland, Kazakhstan, Switzerland)..."
+                                            value={textInputs[q.field] || ''}
+                                            onChange={(e) => handleTextInputChange(q.field, e.target.value)}
+                                            className="w-full text-xs pl-8 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
+                                    </div>
+                                </div>
+                            ) : q.options && q.options.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
                                     {q.options.map((opt, oIdx) => {
                                         const isSelected = currentSelected === opt;
