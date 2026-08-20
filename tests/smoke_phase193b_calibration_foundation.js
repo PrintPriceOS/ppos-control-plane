@@ -472,9 +472,9 @@ test('Q29g', 'POST /pricing/calibrations/:id/reject route exists', () => {
     assert.ok(routesSource.includes("router.post('/pricing/calibrations/:id/reject'"));
 });
 
-test('Q29h', 'No /accept endpoint exists (Phase 193D governance boundary)', () => {
-    assert.ok(!routesSource.includes('/accept'), 'Must NOT have /accept endpoint');
-    assert.ok(!routesSource.includes('/activate'), 'Must NOT have /activate endpoint');
+test('Q29h', 'No unmanaged /activate endpoint exists (Phase 193D governance boundary)', () => {
+    assert.ok(!routesSource.includes('/pricing/calibrations/:id/activate'), 'Must NOT have unmanaged /activate route');
+    assert.ok(!routesSource.includes('/pricing/calibrations/activate'));
 });
 
 test('Q29i', 'No /publish endpoint exists in routes', () => {

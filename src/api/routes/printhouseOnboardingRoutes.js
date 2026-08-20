@@ -475,4 +475,17 @@ router.post('/pricing/calibrations/:id/assistant/explain-run', wrapHandler(async
     res.status(200).json({ ok: true, data: result });
 }));
 
+
+// ──── 8. Canonical Governed Quote Preview Smoke Test (Phase 193H) ─────────────
+const quotePreviewService = require('../services/printhouseQuotePreviewService');
+
+// POST /api/printhouse/onboarding/pricing/quote-preview — Read-Only Canonical BPE Quote Preview
+router.post('/pricing/quote-preview', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const jobSpec = req.body.jobSpec || req.body;
+    const printerNodeId = req.body.printerNodeId || null;
+    const result = await quotePreviewService.generateQuotePreview(tenantId, jobSpec, printerNodeId);
+    res.status(200).json({ ok: true, data: result });
+}));
+
 module.exports = router;

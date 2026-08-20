@@ -216,5 +216,42 @@ export const printhouseCalibrationApi = {
             warnings: any[];
             source?: string;
         }>(res);
+    },
+
+    // ── Phase 193H: Governed Quote Preview Smoke Test (Canonical BPE) ─────────
+    async previewQuote(jobSpec: any, printerNodeId?: string) {
+        const res = await fetch(`${BASE_URL}/quote-preview`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ jobSpec, printerNodeId })
+        });
+        return handleResponse<{
+            ok: boolean;
+            currency: string;
+            quantity: number;
+            totals: {
+                manufacturing: number;
+                finishing: number;
+                binding: number;
+                packaging: number;
+                transport: number;
+                commercialMarkup: number;
+                tax: number;
+                finalSellingPrice: number;
+            };
+            unitPrice: number;
+            breakdown: Array<{ label: string; amount: number }>;
+            productionLeadDays: number;
+            estimatedDeliveryDays: number;
+            shippingStatus: string;
+            taxStatus: string;
+            configurationTrace: string[];
+            warnings: string[];
+            engine: {
+                package: string;
+                version: string;
+                forwardMethod: string;
+            };
+        }>(res);
     }
 };

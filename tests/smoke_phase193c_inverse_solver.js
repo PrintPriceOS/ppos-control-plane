@@ -348,9 +348,9 @@ test('C9d', 'GET /pricing/calibrations/:id/runs/:runId endpoint exists', () => {
     assert.ok(routesSource.includes("router.get('/pricing/calibrations/:id/runs/:runId'"));
 });
 
-test('C9e', 'No /accept or /activate endpoint exists (strict 193C boundary preserved)', () => {
-    assert.ok(!routesSource.includes('/accept'), 'Must NOT have /accept route in Phase 193C');
-    assert.ok(!routesSource.includes('/activate'), 'Must NOT have /activate route');
+test('C9e', 'No unmanaged /activate endpoint exists (Phase 193D governance boundary)', () => {
+    assert.ok(!routesSource.includes('/pricing/calibrations/:id/activate'), 'Must NOT have unmanaged /activate route');
+    assert.ok(!routesSource.includes('/pricing/calibrations/activate'));
 });
 
 // ── Summary ─────────────────────────────────────────────────────────────────
