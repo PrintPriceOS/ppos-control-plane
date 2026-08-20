@@ -342,4 +342,80 @@ router.get('/sites/:siteId/leadtimes/estimate', verifySiteAccess, wrapHandler(as
     res.json({ ok: true, estimated_completion: estimatedCompletion });
 }));
 
+
+// ──── 4. Calibration Session REST Endpoints (Phase 193B) ──────────────────
+const calibrationService = require('../services/calibrationSessionService');
+
+// POST /api/printhouse/onboarding/pricing/calibrations — Create DRAFT session
+router.post('/pricing/calibrations', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const user = { id: req.user.id, email: req.user.email, role: req.user.role };
+    const session = await calibrationService.createSession(tenantId, user, req.body);
+    res.status(201).json({ ok: true, data: session });
+}));
+
+// GET /api/printhouse/onboarding/pricing/calibrations — List sessions for tenant
+router.get('/pricing/calibrations', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const sessions = await calibrationService.listSessions(tenantId);
+    res.json({ ok: true, data: sessions });
+}));
+
+// GET /api/printhouse/onboarding/pricing/calibrations/:id — Get single session
+router.get('/pricing/calibrations/:id', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const session = await calibrationService.getSession(tenantId, req.params.id);
+    res.json({ ok: true, data: session });
+}));
+
+// PUT /api/printhouse/onboarding/pricing/calibrations/:id — Update DRAFT session
+router.put('/pricing/calibrations/:id', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const session = await calibrationService.updateSession(tenantId, req.params.id, req.body);
+    res.json({ ok: true, data: session });
+}));
+
+// POST /api/printhouse/onboarding/pricing/calibrations/:id/ready — Promote to READY
+router.post('/pricing/calibrations/:id/ready', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const session = await calibrationService.promoteToReady(tenantId, req.params.id);
+    res.json({ ok: true, data: session });
+}));
+
+// POST /api/printhouse/onboarding/pricing/calibrations/:id/reject — Reject session
+router.post('/pricing/calibrations/:id/reject', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const reason = req.body.reason || null;
+    const session = await calibrationService.rejectSession(tenantId, req.params.id, reason);
+    res.json({ ok: true, data: session });
+}));
+
+
+// ──── 5. Calibration Runs & Deterministic Solver REST Endpoints (Phase 193C) ─
+const calibrationRunService = require('../services/calibrationRunService');
+
+// POST /api/printhouse/onboarding/pricing/calibrations/:id/calculate — Execute solver run
+router.post('/pricing/calibrations/:id/calculate', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const user = { id: req.user.id, email: req.user.email, role: req.user.role };
+    const run = await calibrationRunService.executeRun(tenantId, req.params.id, user, req.body);
+    res.status(201).json({ ok: true, data: run });
+}));
+
+// GET /api/printhouse/onboarding/pricing/calibrations/:id/runs — List runs for session
+router.get('/pricing/calibrations/:id/runs', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const runs = await calibrationRunService.listRuns(tenantId, req.params.id);
+    res.json({ ok: true, data: runs });
+}));
+
+// GET /api/printhouse/onboarding/pricing/calibrations/:id/runs/:runId — Get specific run
+router.get('/pricing/calibrations/:id/runs/:runId', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const run = await calibrationRunService.getRun(tenantId, req.params.id, req.params.runId);
+    res.json({ ok: true, data: run });
+}));
+
 module.exports = router;
+
+

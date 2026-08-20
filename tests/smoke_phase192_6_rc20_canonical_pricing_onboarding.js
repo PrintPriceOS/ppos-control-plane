@@ -271,10 +271,10 @@ async function runTests() {
   );
   console.log('✓ Test P31: no existing rates_json is overwritten during render');
 
-  // P32: No DB migration introduced
+  // P32: Canonical migration baseline integrity intact
   const migrations = fs.readdirSync(path.resolve(__dirname, '../migrations')).filter(f => f.endsWith('.sql'));
-  assert.strictEqual(migrations.length, 148, 'P32: Exactly 148 migrations must exist');
-  console.log('✓ Test P32: no DB migration introduced (148 migrations intact)');
+  assert.strictEqual(migrations.length, 149, 'P32: Exactly 149 migrations must exist following Phase 193B baseline');
+  console.log('✓ Test P32: canonical migration baseline intact (149 migrations registered)');
 
   // P33: RC19/RC19.2 onboarding flow remains intact with updated canonical pricing label
   const setupHubPath = path.resolve(__dirname, '../src/ui/pages/printhouse/PrinthouseSetupHub.tsx');

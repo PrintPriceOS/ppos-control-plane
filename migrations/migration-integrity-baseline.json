@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-07T00:31:49.111Z",
+  "generatedAt": "2026-08-20T08:21:23.098Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -1910,7 +1910,8 @@
       "containsDml": true,
       "containsTransaction": false,
       "statementTypes": [
-        "CREATE_TABLE"
+        "CREATE_TABLE",
+        "CREATE_TRIGGER"
       ]
     },
     {
@@ -1960,6 +1961,19 @@
       "sizeBytes": 1638,
       "containsDdl": true,
       "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/146_phase193b_calibration_session_foundation.sql",
+      "prefix": "146",
+      "canonicalSha256": "207718aa15f73fb1293e84ea85ba7d6c60010f4237a06190a276227e93400cba",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2526,
+      "containsDdl": true,
+      "containsDml": true,
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
