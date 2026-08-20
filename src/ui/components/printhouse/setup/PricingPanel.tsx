@@ -12,7 +12,8 @@ import { CanonicalIndustrialPricingEditor } from '../pricing/CanonicalIndustrial
 import { PriceBookForm } from './PriceBookForm';
 import { PricingRuleBuilder } from './PricingRuleBuilder';
 import { PricingPreview } from './PricingPreview';
-import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibrationPanel';
+import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 interface PricingPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -407,21 +408,38 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                 </div>
             )}
 
-            {/* PRIMARY: CANONICAL INDUSTRIAL PRICING (rates_json) */}
-            <CanonicalIndustrialPricingEditor
-                mode="ONBOARDING"
-                initialNodeData={industrialData ? {
-                    id: industrialData.nodeId,
-                    name: '',
-                    signatures: industrialData.signatures,
-                    delivery_time: industrialData.deliveryTime,
-                    production_lead_days: industrialData.productionLeadDays,
-                    limits: industrialData.limits,
-                    rates: industrialData.rates
-                } : undefined}
-                onSave={handleSaveIndustrialPricing}
-                saving={savingIndustrial}
+            {/* 1. QUICK PRICING CALIBRATION (AI-Assisted Workflow — Phase 193F) */}
+            <QuickCalibrationPanel
+                printerNodeId={industrialData?.nodeId}
+                printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                onAccepted={() => {
+                    fetchIndustrialPricing();
+                    onSaved?.();
+                }}
             />
+
+            {/* 2. MANUAL INDUSTRIAL PRICING (Canonical rates_json Fallback & Advanced Editor) */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                        Manual Rate Card Configuration (Advanced / Fallback)
+                    </span>
+                </div>
+                <CanonicalIndustrialPricingEditor
+                    mode="ONBOARDING"
+                    initialNodeData={industrialData ? {
+                        id: industrialData.nodeId,
+                        name: '',
+                        signatures: industrialData.signatures,
+                        delivery_time: industrialData.deliveryTime,
+                        production_lead_days: industrialData.productionLeadDays,
+                        limits: industrialData.limits,
+                        rates: industrialData.rates
+                    } : undefined}
+                    onSave={handleSaveIndustrialPricing}
+                    saving={savingIndustrial}
+                />
+            </div>
 
             {/* DOWNSTREAM / OPTIONAL: COMMERCIAL PRICING POLICIES & CATALOGS */}
             <div className="bg-white dark:bg-[#18181b] rounded-xl border border-zinc-200 dark:border-[#27272a] overflow-hidden transition-colors">

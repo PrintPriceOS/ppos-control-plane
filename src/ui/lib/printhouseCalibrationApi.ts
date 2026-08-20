@@ -1,0 +1,184 @@
+/**
+ * src/ui/lib/printhouseCalibrationApi.ts
+ *
+ * Phase 193F Frontend API Client.
+ * Communicates exclusively with canonical backend endpoints from Phases 193B, 193C, 193D, 193E.
+ *
+ * Invariants:
+ * 1. Uses canonical getAuthToken() helper (never reads localStorage directly).
+ * 2. Zero client-side pricing calculations or formula logic.
+ * 3. Zero rate patch derivation on client.
+ * 4. Zero activation grants mutation.
+ */
+import { getAuthToken } from './authStore';
+
+const BASE_URL = '/api/printhouse/onboarding/pricing';
+
+function getHeaders(): HeadersInit {
+    const token = getAuthToken();
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+}
+
+async function handleResponse<T>(res: Response): Promise<T> {
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+        const error = new Error(json.error || json.message || `HTTP ${res.status}`);
+        (error as any).status = res.status;
+        (error as any).code = json.code;
+        (error as any).details = json.details;
+        throw error;
+    }
+    return json.data;
+}
+
+export const printhouseCalibrationApi = {
+    // ── Phase 193B: Reference Book & Calibration Sessions ───────────────────
+    async createSession(printerNodeId: string, referenceBookName?: string) {
+        const res = await fetch(`${BASE_URL}/calibrations`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ printerNodeId, referenceBookName })
+        });
+        return handleResponse<any>(res);
+    },
+
+    async getSession(sessionId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async updateDraftSession(sessionId: string, payload: {
+        referenceBookName?: string;
+        bookSpec?: any;
+        targetManufacturingPrice?: number | null;
+        currency?: string;
+        transportPricePerKg?: number | null;
+        transportCurrency?: string;
+        includesPaper?: boolean | null;
+        includesBinding?: boolean | null;
+        includesFinishing?: boolean | null;
+        includesPackaging?: boolean | null;
+        notes?: string;
+    }) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+        return handleResponse<any>(res);
+    },
+
+    async markSessionReady(sessionId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/ready`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async rejectSession(sessionId: string, reason?: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/reject`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ reason })
+        });
+        return handleResponse<any>(res);
+    },
+
+    // ── Phase 193C: Deterministic Inverse Solver Runs ────────────────────────
+    async calculateCalibration(sessionId: string, tolerancePolicy?: any) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/calculate`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ tolerancePolicy })
+        });
+        return handleResponse<any>(res);
+    },
+
+    async listRuns(sessionId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/runs`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any[]>(res);
+    },
+
+    async getRun(sessionId: string, runId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/runs/${runId}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    // ── Phase 193D: Governed Calibration Acceptance & Immutable Revisions ───
+    async acceptCalibrationRun(sessionId: string, runId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/accept`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ runId })
+        });
+        return handleResponse<any>(res);
+    },
+
+    async listRevisions(printerNodeId?: string) {
+        const query = printerNodeId ? `?printerNodeId=${encodeURIComponent(printerNodeId)}` : '';
+        const res = await fetch(`${BASE_URL}/revisions${query}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any[]>(res);
+    },
+
+    async getRevision(revisionId: string) {
+        const res = await fetch(`${BASE_URL}/revisions/${revisionId}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    // ── Phase 193E: AI Conversational Calibration Assistant (Zero-Write) ────
+    async assistantChat(sessionId: string, message: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/assistant/chat`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ message })
+        });
+        return handleResponse<{
+            ok: boolean;
+            sessionId: string;
+            proposal: {
+                intent: string;
+                specPatch: any;
+                declaredCommercials: any;
+                clarificationQuestions: Array<{ field: string; question: string; options?: string[] }>;
+                explanation: string;
+                warnings: string[];
+                readyForValidation: boolean;
+            };
+            model: string;
+            latencyMs: number;
+        }>(res);
+    },
+
+    async explainRun(sessionId: string, runId: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/assistant/explain-run`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ runId })
+        });
+        return handleResponse<{
+            ok: boolean;
+            runId: string;
+            status: string;
+            explanation: string;
+            targetManufacturingPrice: number;
+            predictedManufacturingPrice: number;
+            absoluteResidual: number;
+            warnings: any[];
+            source?: string;
+        }>(res);
+    }
+};

@@ -1272,13 +1272,13 @@ UNRESTRICTED_PRODUCTION:
 - Verified recovery against a real MySQL 8 container reproducing the exact production schema layout and data rows, passing all integrity gates.
 - Pushed tag `phase-192-controlled-beta-rc6` to origin.
 
+---
 
-
-
-
-
-
-
-
-
-
+## Phase 193 — Printhouse Quick Pricing Calibration
+- **Phase 193A.3 (Adapter Audit)**: Sealed & Tagged (`phase-193a.3-control-plane-calibration-adapter-audit`).
+- **Phase 193B (Reference Book Foundation)**: Sealed & Tagged (`phase-193b-reference-book-calibration-foundation`).
+- **Phase 193C (Deterministic Inverse Solver)**: Sealed & Tagged (`phase-193c-deterministic-inverse-solver`).
+- **Phase 193D (Governed Calibration Acceptance)**: Sealed & Tagged (`phase-193d-governed-calibration-acceptance`).
+- **Phase 193E (AI Conversational Assistant Backend)**: Sealed & Tagged (`phase-193e-conversational-calibration-assistant`).
+- **Phase 193F.1 (Frontend Quick Calibration UX Integration Audit)**: **COMPLETED** (`docs/audits/PHASE_193F_QUICK_CALIBRATION_UX_ARCHITECTURE.md`).
+- **Phase 193F.2 (Frontend Quick Calibration UI Implementation)**: **QUEUED / PENDING AUTHORIZATION**.
