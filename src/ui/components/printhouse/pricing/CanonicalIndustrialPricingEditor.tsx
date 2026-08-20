@@ -15,8 +15,19 @@ import {
     SUGGESTED_RATES_METADATA, BINDING_TS_STEP_MEANS, COMMON_OPERATIONAL_CONFIG 
 } from './printhouseSuggestedRates';
 import { 
-    Tag, CheckCircle2, Info, AlertTriangle, Sparkles, Check, ChevronRight, RefreshCw 
+    Tag, CheckCircle2, Info, AlertTriangle, Sparkles, Check, ChevronRight, RefreshCw, X 
 } from 'lucide-react';
+import { CountrySelect } from '../../common/CountrySelect';
+import { getCountryDisplayName } from '../../../lib/countryCatalog';
+
+export const HISTORICAL_TRANSPORT_SUGGESTIONS: Record<string, number> = {
+    es: 0.95,
+    be: 1.145,
+    nl: 1.189,
+    de: 1.165,
+    fr: 1.178,
+    at: 1.225
+};
 
 export type FormTab = 'Basic' | 'Operational' | 'Interior' | 'Cover & Endpapers' | 'Lamination & UV' | 'Binding' | 'Paper Costs' | 'Transport';
 const FORM_TABS: FormTab[] = ['Basic', 'Operational', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'];
@@ -926,39 +937,126 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {/* ── 8. TRANSPORT ── */}
                 {tab === 'Transport' && (
                     <div className="space-y-6 max-w-2xl">
-                        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-                            <h3 className="text-sm font-bold text-zinc-900 mb-3">Country-Specific Shipping (€/kg)</h3>
-                            <div className="space-y-3">
-                                {[
-                                    { code: 'es', label: 'Spain (ES)', suggest: 0.95 },
-                                    { code: 'be', label: 'Belgium (BE)', suggest: 1.145 },
-                                    { code: 'nl', label: 'Netherlands (NL)', suggest: 1.189 },
-                                    { code: 'de', label: 'Germany (DE)', suggest: 1.165 },
-                                    { code: 'fr', label: 'France (FR)', suggest: 1.178 },
-                                    { code: 'at', label: 'Austria (AT)', suggest: 1.225 }
-                                ].map(({ code, label, suggest }) => (
-                                    <div key={code} className="grid grid-cols-2 gap-4 items-center">
-                                        <label className="text-xs font-semibold text-zinc-700">{label}</label>
-                                        <div>
-                                            <input
-                                                type="number"
-                                                step="0.001"
-                                                value={form.rates.transport_costs?.[code] ?? 0}
-                                                onChange={e => setRates(r => ({
+                        <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 bg-white dark:bg-zinc-900 shadow-xs">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Country-Specific Shipping (€/kg)</h3>
+                                    <p className="text-xs text-zinc-500 mt-0.5">
+                                        Configure destination transport rates per kilogram across all canonical global destinations.
+                                    </p>
+                                </div>
+                                <div className="text-xs text-zinc-500 font-medium">
+                                    {Object.keys(form.rates.transport_costs || {}).length} configured
+                                </div>
+                            </div>
+
+                            {/* Add Country Control */}
+                            <div className="mb-5 p-3.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-2">
+                                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                    Add Destination Country Rate
+                                </label>
+                                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                                    <div className="flex-1">
+                                        <CountrySelect
+                                            value=""
+                                            onChange={(code) => {
+                                                if (!code) return;
+                                                const lower = code.toLowerCase();
+                                                const existingVal = form.rates.transport_costs?.[lower];
+                                                if (existingVal !== undefined) return;
+                                                const defaultSuggest = HISTORICAL_TRANSPORT_SUGGESTIONS[lower];
+                                                setRates(r => ({
                                                     ...r,
                                                     transport_costs: {
                                                         ...r.transport_costs,
-                                                        [code]: parseFloat(e.target.value) || 0
+                                                        [lower]: defaultSuggest !== undefined ? defaultSuggest : 0
                                                     }
-                                                }))}
-                                                className={inputClass}
-                                            />
-                                            <div className="mt-1 text-[11px] text-amber-800 font-medium">
-                                                Suggested starting value · Historical reference (n=13)
-                                            </div>
-                                        </div>
+                                                }));
+                                            }}
+                                            placeholder="Search canonical catalog to add country (e.g. Poland, Sweden, Japan)..."
+                                        />
                                     </div>
-                                ))}
+                                </div>
+                            </div>
+
+                            {/* Configured Country Rows */}
+                            <div className="space-y-3">
+                                {Object.keys(form.rates.transport_costs || {}).length === 0 ? (
+                                    <div className="py-8 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
+                                        No country transport rates configured. Use the selector above to add countries.
+                                    </div>
+                                ) : (
+                                    Object.entries(form.rates.transport_costs || {}).map(([rawCode, val]) => {
+                                        const lowerCode = rawCode.toLowerCase();
+                                        const upperCode = rawCode.toUpperCase();
+                                        const displayName = getCountryDisplayName(upperCode);
+                                        const hasSuggestion = HISTORICAL_TRANSPORT_SUGGESTIONS[lowerCode] !== undefined;
+
+                                        return (
+                                            <div key={lowerCode} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 bg-zinc-50/70 dark:bg-zinc-800/30 border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl">
+                                                <div className="sm:col-span-6">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{displayName}</span>
+                                                    </div>
+                                                    <div className="mt-0.5 text-[11px]">
+                                                        {hasSuggestion ? (
+                                                            <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                                                Historical reference: {HISTORICAL_TRANSPORT_SUGGESTIONS[lowerCode].toFixed(3)} €/kg
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-zinc-400">
+                                                                Custom configured rate (no historical baseline)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="sm:col-span-5 flex items-center gap-2">
+                                                    <div className="relative flex-1">
+                                                        <input
+                                                            type="number"
+                                                            step="0.001"
+                                                            min="0"
+                                                            value={val === null || val === undefined ? '' : val}
+                                                            onChange={e => {
+                                                                const raw = e.target.value;
+                                                                const parsed = raw === '' ? 0 : parseFloat(raw);
+                                                                setRates(r => ({
+                                                                    ...r,
+                                                                    transport_costs: {
+                                                                        ...r.transport_costs,
+                                                                        [lowerCode]: isNaN(parsed) ? 0 : parsed
+                                                                    }
+                                                                }));
+                                                            }}
+                                                            className={inputClass}
+                                                            placeholder="0.000"
+                                                        />
+                                                        <span className="absolute right-3 top-2 text-xs text-zinc-400 font-medium">€/kg</span>
+                                                    </div>
+                                                </div>
+                                                <div className="sm:col-span-1 flex justify-end">
+                                                    <button
+                                                        type="button"
+                                                        title={`Remove ${displayName}`}
+                                                        onClick={() => {
+                                                            setRates(r => {
+                                                                const nextCosts = { ...r.transport_costs };
+                                                                delete nextCosts[lowerCode];
+                                                                return {
+                                                                    ...r,
+                                                                    transport_costs: nextCosts
+                                                                };
+                                                            });
+                                                        }}
+                                                        className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
+                                                    >
+                                                        <X size={15} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </div>
                     </div>
