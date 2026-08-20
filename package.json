@@ -21,6 +21,7 @@
         "@fastify/static": "^9.1.0",
         "@headlessui/react": "^2.2.9",
         "@heroicons/react": "^2.2.0",
+        "@ppos/pricing-engine": "git+https://github.com/PrintPriceOS/ppos-pricing-engine.git#8d324290d64b5bf17325ff1098db7ebb5f646b5d",
         "@ppos/shared-contracts": "file:../ppos-shared-contracts-phase-10-intelligence-layer",
         "@ppos/shared-infra": "file:../ppos-shared-infra",
         "@stripe/stripe-js": "^9.8.0",

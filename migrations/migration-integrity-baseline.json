@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-20T08:21:23.098Z",
+  "generatedAt": "2026-08-20T08:25:49.866Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -1974,6 +1974,19 @@
       "sizeBytes": 2526,
       "containsDdl": true,
       "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/147_phase193c_calibration_runs.sql",
+      "prefix": "147",
+      "canonicalSha256": "d9982a7f13f28f6d1a0e6481be4c74a851de4624efa3396f49964fbca1e37b0e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2544,
+      "containsDdl": true,
+      "containsDml": false,
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
