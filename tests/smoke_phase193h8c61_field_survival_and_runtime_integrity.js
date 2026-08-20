@@ -71,12 +71,17 @@ test('H8C.6.1-01', 'Runtime symbol safety: getCountryDisplayName and getCountryN
     assert.ok(wizardSrc.includes('CountrySelect'), 'wizardSrc imports CountrySelect');
 });
 
-// T2: getCountryDisplayName resolves Poland, Réunion, Japan accurately
-test('H8C.6.1-02', 'getCountryDisplayName resolves canonical country display strings without runtime error', () => {
-    assert.strictEqual(getCountryDisplayName('PL'), 'Poland');
-    assert.strictEqual(getCountryDisplayName('RE'), 'Réunion');
-    assert.strictEqual(getCountryDisplayName('JP'), 'Japan');
-    assert.strictEqual(getCountryDisplayName('ES'), 'Spain');
+// T2: getCountryDisplayName and getCountryName resolve canonical contracts
+test('H8C.6.1-02', 'getCountryDisplayName and getCountryName resolve canonical country display strings without runtime error', () => {
+    assert.strictEqual(getCountryDisplayName('PL'), 'Poland (PL)');
+    assert.strictEqual(getCountryDisplayName('RE'), 'Réunion (RE)');
+    assert.strictEqual(getCountryDisplayName('JP'), 'Japan (JP)');
+    assert.strictEqual(getCountryDisplayName('ES'), 'Spain (ES)');
+
+    assert.strictEqual(getCountryName('PL'), 'Poland');
+    assert.strictEqual(getCountryName('RE'), 'Réunion');
+    assert.strictEqual(getCountryName('JP'), 'Japan');
+    assert.strictEqual(getCountryName('ES'), 'Spain');
 });
 
 // T3: Backend normalization of AI raw aliases
