@@ -239,44 +239,49 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         }
     };
 
-    // ── 3. Clarification Answer & Apply (Phase 193H.3) ──
+    // ── 3. Clarification Answer & Apply (Phase 193H.4 Merge Preservation) ──
     const handleApplyClarifications = (answers: Record<string, string>) => {
         const readableSummaryParts: string[] = [];
 
-        Object.entries(answers).forEach(([field, answer]) => {
-            if (!answer || !answer.trim()) return;
+        setDraftSpec((prevSpec: any) => {
+            const updatedSpec = { ...prevSpec };
 
-            readableSummaryParts.push(answer);
+            setDraftCommercials((prevComms: any) => {
+                const updatedComms = { ...prevComms };
 
-            if (field.startsWith('includes')) {
-                const val = answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') || answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
-                setDraftCommercials((prev: any) => ({ ...prev, [field]: val }));
-            } else if (field === 'cover_structure' || field === 'cover_type') {
-                if (answer.toLowerCase().includes('self-cover') || answer.toLowerCase().includes('self cover')) {
-                    setDraftSpec((prev: any) => ({
-                        ...prev,
-                        paper_weight_cover: prev.paper_weight_interior || 130,
-                        paper_type_cover: prev.paper_type_interior || 'mc',
-                        cover_print: prev.interior_print || '4/4'
-                    }));
-                } else if (answer.toLowerCase().includes('separate') || answer.toLowerCase().includes('300')) {
-                    setDraftSpec((prev: any) => ({
-                        ...prev,
-                        paper_weight_cover: 300,
-                        paper_type_cover: 'mc',
-                        cover_print: '4/0'
-                    }));
-                }
-            } else if (field === 'price_vat' || field === 'tax_inclusion') {
-                // Net vs Gross
-                const isNet = answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
-                setDraftCommercials((prev: any) => ({
-                    ...prev,
-                    isNetPrice: isNet
-                }));
-            } else {
-                setDraftSpec((prev: any) => ({ ...prev, [field]: answer }));
-            }
+                Object.entries(answers).forEach(([field, answer]) => {
+                    if (!answer || !answer.trim()) return;
+
+                    readableSummaryParts.push(answer);
+
+                    if (field.startsWith('includes')) {
+                        const val = answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') || answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                        updatedComms[field] = val;
+                    } else if (field === 'cover_structure' || field === 'cover_type') {
+                        if (answer.toLowerCase().includes('self-cover') || answer.toLowerCase().includes('self cover')) {
+                            updatedSpec.paper_weight_cover = updatedSpec.paper_weight_interior || 130;
+                            updatedSpec.paper_type_cover = updatedSpec.paper_type_interior || 'mc';
+                            updatedSpec.cover_print = updatedSpec.interior_print || '4/4';
+                        } else if (answer.toLowerCase().includes('separate') || answer.toLowerCase().includes('300')) {
+                            updatedSpec.paper_weight_cover = 300;
+                            updatedSpec.paper_type_cover = 'mc';
+                            updatedSpec.cover_print = '4/0';
+                        }
+                    } else if (field === 'price_vat' || field === 'tax_inclusion') {
+                        const isNet = answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                        updatedComms.isNetPrice = isNet;
+                    } else if (field === 'delivery_country' || field === 'destination') {
+                        const match = answer.match(/\b([A-Z]{2})\b/i);
+                        updatedSpec.delivery_country = match ? match[1].toUpperCase() : answer;
+                    } else {
+                        updatedSpec[field] = answer;
+                    }
+                });
+
+                return updatedComms;
+            });
+
+            return updatedSpec;
         });
 
         // Add human-readable user message trace to conversation
