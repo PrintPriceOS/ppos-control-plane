@@ -41,6 +41,16 @@ function normalizeIso2Country(code) {
     return upper;
 }
 
+function filterCountries(query, sourceList = COUNTRIES) {
+    if (!query || typeof query !== 'string' || !query.trim()) {
+        return sourceList;
+    }
+    const q = query.trim().toLowerCase();
+    return sourceList.filter(c => 
+        c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+}
+
 module.exports = {
     COUNTRIES,
     ISO_COUNTRY_CODES_SET,
@@ -51,5 +61,6 @@ module.exports = {
     getCountryName,
     getCountryDisplayName,
     isValidIso2Country,
-    normalizeIso2Country
+    normalizeIso2Country,
+    filterCountries
 };

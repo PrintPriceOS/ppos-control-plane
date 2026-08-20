@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { HelpCircle, Check, ArrowRight, Search } from 'lucide-react';
-import { getCountryName } from '../../../../lib/countryCatalog';
+import { getCountryName, filterCountries } from '../../../../lib/countryCatalog';
 
 interface Question {
     field: string;
@@ -119,6 +119,35 @@ export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPan
                                             className="w-full text-xs pl-8 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                         />
                                     </div>
+
+                                    {/* Dynamic filtered country list when search query is active */}
+                                    {textInputs[q.field] && textInputs[q.field].trim().length > 0 && (
+                                        <div className="flex flex-wrap gap-1 p-2 bg-zinc-100/70 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 rounded-lg max-h-32 overflow-y-auto">
+                                            {filterCountries(textInputs[q.field]).slice(0, 12).map(c => {
+                                                const isSelected = currentSelected === c.code;
+                                                return (
+                                                    <button
+                                                        key={c.code}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            handleOptionSelect(q.field, c.code);
+                                                            setTextInputs(prev => ({ ...prev, [q.field]: `${c.name} (${c.code})` }));
+                                                        }}
+                                                        className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 border ${
+                                                            isSelected
+                                                                ? 'bg-amber-600 text-white border-amber-700 font-bold'
+                                                                : 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50'
+                                                        }`}
+                                                    >
+                                                        <span>{c.name} ({c.code})</span>
+                                                    </button>
+                                                );
+                                            })}
+                                            {filterCountries(textInputs[q.field]).length === 0 && (
+                                                <span className="text-[11px] text-zinc-400 py-1 px-2">No matching country found</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ) : q.options && q.options.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">

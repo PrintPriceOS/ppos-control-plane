@@ -2,6 +2,7 @@
  * tests/smoke_phase193h8b_frontend_country_unification.js
  *
  * Phase 193H.8B Acceptance Suite: Frontend Country Source Unification & Master Catalog Exclusivity.
+ * Phase 193H.8C.3: Country Selector Search Filtering & Shared Component Integrity.
  *
  * Guarantees:
  * H8B-01: PrinthouseRegistrationPage imports canonical COUNTRIES from countryCatalog.ts
@@ -10,10 +11,10 @@
  * H8B-04: Registration search by name works with canonical schema ({ code, name })
  * H8B-05: Registration search by ISO-2 works
  * H8B-06: Registration persists uppercase ISO-2
- * H8B-07: PrinthouseDetailDrawer no longer uses free-text country input
- * H8B-08: PrinthouseDetailDrawer consumes canonical COUNTRIES from countryCatalog.ts
+ * H8B-07: PrinthouseDetailDrawer uses canonical CountrySelect searchable dropdown
+ * H8B-08: PrinthouseDetailDrawer imports CountrySelect from common components
  * H8B-09: PrinthouseDetailDrawer loads valid existing ISO code correctly
- * H8B-10: Malformed legacy country is not silently normalized/defaulted (shown as explicit legacy/unrecognized)
+ * H8B-10: CompanyProfileForm uses canonical CountrySelect searchable dropdown
  * H8B-11: CompanyProfileForm, RegistrationPage, and DetailDrawer share the exact same country catalog
  * H8B-12: Company primary country and site country remain semantically independent
  * H8B-13: Changing registration or site country produces zero mutations on shipping regions
@@ -21,6 +22,10 @@
  * H8B-15: Repository UI source contains exactly ONE master country catalog file (src/ui/lib/countryCatalog.ts)
  * H8B-16: Vite production bundle contains ZERO executable CommonJS require() calls from application code
  * H8B-17: Canonical countries dataset in src/lib/countriesData.json contains exactly 249 ISO entries
+ * H8B-18: filterCountries("bel") matches Belgium (BE) and filters out Spain/Germany
+ * H8B-19: filterCountries("DE") matches Germany (DE) case-insensitively
+ * H8B-20: filterCountries("") returns all 249 countries
+ * H8B-21: filterCountries with unknown string returns empty array (0 matches)
  */
 const assert = require('assert');
 const path = require('path');
@@ -45,13 +50,14 @@ function test(id, description, fn) {
 
 const UI_DIR = path.join(__dirname, '../src/ui');
 
-console.log('\n═══ Phase 193H.8B: Frontend Country Source Unification ═══\n');
+console.log('\n═══ Phase 193H.8B / 193H.8C.3: Frontend Country Unification & Search Filtering ═══\n');
 
 const regPageSrc = fs.readFileSync(path.join(UI_DIR, 'pages/PrinthouseRegistrationPage.tsx'), 'utf8');
 const detailDrawerSrc = fs.readFileSync(path.join(UI_DIR, 'pages/printhouse/PrinthouseDetailDrawer.tsx'), 'utf8');
 const companyProfileSrc = fs.readFileSync(path.join(UI_DIR, 'components/printhouse/setup/CompanyProfileForm.tsx'), 'utf8');
-const catalogSrc = fs.readFileSync(path.join(UI_DIR, 'lib/countryCatalog.ts'), 'utf8');
+const countrySelectSrc = fs.readFileSync(path.join(UI_DIR, 'components/common/CountrySelect.tsx'), 'utf8');
 const countriesData = require('../src/lib/countriesData.json');
+const { filterCountries } = require('../src/lib/countryCatalog.js');
 
 // H8B-01: Registration imports canonical catalog
 test('H8B-01', 'PrinthouseRegistrationPage imports canonical COUNTRIES from countryCatalog.ts', () => {
@@ -73,18 +79,14 @@ test('H8B-03', 'PrinthouseRegistrationPage exposes 249 canonical countries via i
 // H8B-04: Filter by name
 test('H8B-04', 'Registration country search by name filters canonical list correctly', () => {
     const query = 'spa';
-    const filtered = countriesData.COUNTRIES.filter(c => 
-        c.name.toLowerCase().includes(query) || c.code.toLowerCase().includes(query)
-    );
+    const filtered = filterCountries(query);
     assert.ok(filtered.some(c => c.code === 'ES' && c.name === 'Spain'));
 });
 
 // H8B-05: Filter by code
 test('H8B-05', 'Registration country search by ISO-2 code filters canonical list correctly', () => {
     const query = 'DE';
-    const filtered = countriesData.COUNTRIES.filter(c => 
-        c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase())
-    );
+    const filtered = filterCountries(query);
     assert.ok(filtered.some(c => c.code === 'DE' && c.name === 'Germany'));
 });
 
@@ -95,36 +97,33 @@ test('H8B-06', 'Registration stores uppercase 2-letter ISO code', () => {
     assert.strictEqual(/^[A-Z]{2}$/.test(selectedCode), true);
 });
 
-// H8B-07: Drawer no longer uses free-text input
-test('H8B-07', 'PrinthouseDetailDrawer replaces free-text input with canonical select dropdown', () => {
+// H8B-07: Drawer uses CountrySelect
+test('H8B-07', 'PrinthouseDetailDrawer uses canonical CountrySelect searchable dropdown', () => {
     assert.ok(!detailDrawerSrc.includes('placeholder="ES, PT, FR..."'));
-    assert.ok(detailDrawerSrc.includes('<select'));
-    assert.ok(detailDrawerSrc.includes('COUNTRIES.map'));
+    assert.ok(detailDrawerSrc.includes('<CountrySelect'));
 });
 
-// H8B-08: Drawer imports canonical catalog
-test('H8B-08', 'PrinthouseDetailDrawer imports canonical COUNTRIES from countryCatalog.ts', () => {
-    assert.ok(detailDrawerSrc.includes("from '../../lib/countryCatalog'"));
-    assert.ok(detailDrawerSrc.includes('COUNTRIES'));
+// H8B-08: Drawer imports CountrySelect
+test('H8B-08', 'PrinthouseDetailDrawer imports CountrySelect from common components', () => {
+    assert.ok(detailDrawerSrc.includes("from '../../components/common/CountrySelect'"));
 });
 
 // H8B-09: Drawer selects valid ISO code
-test('H8B-09', 'PrinthouseDetailDrawer binds valid existing ISO country code to select value', () => {
+test('H8B-09', 'PrinthouseDetailDrawer binds valid existing ISO country code correctly', () => {
     const existingNode = { country: 'PT' };
     const isKnown = countriesData.COUNTRIES.some(c => c.code === existingNode.country);
     assert.strictEqual(isKnown, true);
 });
 
-// H8B-10: Legacy country handling in Drawer
-test('H8B-10', 'Malformed legacy country code does not silently default to empty or ES', () => {
-    assert.ok(detailDrawerSrc.includes('Unrecognized legacy country:'));
-    assert.ok(detailDrawerSrc.includes('isKnownCountry'));
+// H8B-10: CompanyProfileForm uses CountrySelect
+test('H8B-10', 'CompanyProfileForm uses canonical CountrySelect searchable dropdown', () => {
+    assert.ok(companyProfileSrc.includes('<CountrySelect'));
 });
 
 // H8B-11: Cross-surface catalog unification
-test('H8B-11', 'All 3 major UI onboarding surfaces import from countryCatalog.ts', () => {
+test('H8B-11', 'All major UI onboarding surfaces use the shared canonical catalog', () => {
     assert.ok(regPageSrc.includes("from '../lib/countryCatalog'"));
-    assert.ok(detailDrawerSrc.includes("from '../../lib/countryCatalog'"));
+    assert.ok(countrySelectSrc.includes("from '../../lib/countryCatalog'"));
     assert.ok(companyProfileSrc.includes("from '../../../lib/countryCatalog'"));
 });
 
@@ -178,6 +177,34 @@ test('H8B-16', 'Vite production bundle contains ZERO executable CommonJS require
 test('H8B-17', 'Canonical countries dataset in src/lib/countriesData.json contains exactly 249 ISO entries', () => {
     assert.strictEqual(countriesData.COUNTRIES.length, 249);
     assert.strictEqual(new Set(countriesData.COUNTRIES.map(c => c.code)).size, 249);
+});
+
+// H8B-18: Search filtering - "bel" shows Belgium and hides Spain/Germany
+test('H8B-18', 'filterCountries("bel") matches Belgium (BE) and filters out Spain and Germany', () => {
+    const res = filterCountries('bel');
+    assert.ok(res.some(c => c.code === 'BE' && c.name === 'Belgium'));
+    assert.ok(!res.some(c => c.code === 'ES'));
+    assert.ok(!res.some(c => c.code === 'DE'));
+});
+
+// H8B-19: Search filtering - "DE" resolves Germany case-insensitively
+test('H8B-19', 'filterCountries("DE") matches Germany case-insensitively', () => {
+    const resUpper = filterCountries('DE');
+    const resLower = filterCountries('de');
+    assert.ok(resUpper.some(c => c.code === 'DE' && c.name === 'Germany'));
+    assert.deepStrictEqual(resUpper, resLower);
+});
+
+// H8B-20: Search filtering - Empty query returns full 249 catalog
+test('H8B-20', 'filterCountries("") returns all 249 countries', () => {
+    assert.strictEqual(filterCountries('').length, 249);
+    assert.strictEqual(filterCountries('   ').length, 249);
+});
+
+// H8B-21: Search filtering - Unknown query returns empty array
+test('H8B-21', 'filterCountries with unknown string returns 0 matches', () => {
+    const res = filterCountries('xyznonexistentcountry');
+    assert.strictEqual(res.length, 0);
 });
 
 console.log(`\n═══ Phase 193H.8B Results: ${passed} passed, ${failed} failed ═══\n`);

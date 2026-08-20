@@ -5,9 +5,9 @@
  */
 import React, { useState } from 'react';
 import { FieldGuidance } from './FieldGuidance';
-import { Save, CheckCircle, AlertCircle, ChevronDown, Search } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
 import { COUNTRIES, getCountryDisplayName, getCountryName } from '../../../lib/countryCatalog';
+import { CountrySelect } from '../../common/CountrySelect';
 
 interface CompanyData {
     companyName: string;
@@ -119,24 +119,15 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                     />
                 </div>
 
-                <div className="relative">
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        Primary Country
-                        <FieldGuidance title="Primary Country" description="Main country of registration and legal operations." />
-                    </label>
-                    <div className="relative">
-                        <select
-                            value={form.country}
-                            onChange={(e) => setForm({ ...form, country: e.target.value })}
-                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
-                        >
-                            {COUNTRIES.map(c => (
-                                <option key={c.code} value={c.code}>
-                                    {c.name} ({c.code})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                <div>
+                    <CountrySelect
+                        id="company-primary-country"
+                        label="Primary Country"
+                        required
+                        value={form.country}
+                        onChange={(code) => setForm({ ...form, country: code })}
+                        helperText={<FieldGuidance title="Primary Country" description="Main country of registration and legal operations." />}
+                    />
                 </div>
 
                 <div>

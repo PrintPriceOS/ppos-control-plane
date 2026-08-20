@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CalibrationConversation } from './CalibrationConversation';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
+import { getCountryDisplayName } from '../../../../lib/countryCatalog';
 
 interface GuidedCalibrationWizardProps {
     printerNodeId?: string;
@@ -307,7 +308,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <div>
                             <span className="text-zinc-500 block text-[11px]">Destination Region</span>
                             <strong className="text-zinc-900 dark:text-white text-sm">
-                                {draftSpec.delivery_country || 'ES'}
+                                {draftSpec.delivery_country ? getCountryDisplayName(draftSpec.delivery_country) : 'Not specified'}
                             </strong>
                         </div>
                     </div>

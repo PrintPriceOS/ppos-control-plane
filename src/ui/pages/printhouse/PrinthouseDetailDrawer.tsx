@@ -9,6 +9,7 @@ import { SlaProfileEditor } from './SlaProfileEditor';
 import { PrinthouseReadinessPanel } from './PrinthouseReadinessPanel';
 import { CapabilityAuditTimeline } from './CapabilityAuditTimeline';
 import { COUNTRIES, getCountryDisplayName } from '../../lib/countryCatalog';
+import { CountrySelect } from '../../components/common/CountrySelect';
 
 interface PrinthouseDetailDrawerProps {
     printhouse: Printhouse | null;
@@ -180,25 +181,12 @@ export const PrinthouseDetailDrawer: React.FC<PrinthouseDetailDrawerProps> = ({
                             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b ppos-border pb-2 mt-6">Location details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Country</label>
-                                    <select 
+                                    <CountrySelect
+                                        label="Country"
                                         value={form.country || ''}
-                                        onChange={e => setForm({ ...form, country: e.target.value })}
-                                        className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-primary"
-                                    >
-                                        <option value="">Select country...</option>
-                                        {/* If existing country is not in catalog (legacy malformed), render it as explicit invalid option */}
-                                        {form.country && !COUNTRIES.some(c => c.code === form.country) && (
-                                            <option value={form.country}>
-                                                Legacy / Unrecognized ({form.country})
-                                            </option>
-                                        )}
-                                        {COUNTRIES.map(c => (
-                                            <option key={c.code} value={c.code}>
-                                                {c.name} ({c.code})
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={code => setForm({ ...form, country: code })}
+                                        placeholder="Select country..."
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Region</label>

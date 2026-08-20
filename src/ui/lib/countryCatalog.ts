@@ -51,3 +51,13 @@ export function normalizeIso2Country(code: string): string | null {
     if (!isValidIso2Country(upper)) return null;
     return upper;
 }
+
+export function filterCountries(query: string, sourceList: CountryItem[] = COUNTRIES): CountryItem[] {
+    if (!query || typeof query !== 'string' || !query.trim()) {
+        return sourceList;
+    }
+    const q = query.trim().toLowerCase();
+    return sourceList.filter(c => 
+        c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+}
