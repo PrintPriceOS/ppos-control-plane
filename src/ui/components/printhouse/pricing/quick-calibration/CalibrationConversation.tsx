@@ -21,7 +21,7 @@ interface CalibrationConversationProps {
     sending: boolean;
     activeProposal: any | null;
     onApplyProposal: (proposal: any) => void;
-    onClarificationAnswer: (field: string, answer: any) => void;
+    onApplyClarifications?: (answers: Record<string, string>) => void;
     aiUnavailable?: boolean;
 }
 
@@ -31,7 +31,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
     sending,
     activeProposal,
     onApplyProposal,
-    onClarificationAnswer,
+    onApplyClarifications,
     aiUnavailable = false
 }) => {
     const [input, setInput] = useState('');
@@ -67,7 +67,10 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
 
             {/* AI Offline / Busy Banner (Phase 193H.2 UX Hardening) */}
             {aiUnavailable && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-xs space-y-2">
+                <div 
+                    aria-label="AI Assistant is currently offline"
+                    className="p-4 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-xs space-y-2"
+                >
                     <div className="flex items-start gap-2.5">
                         <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                         <div>
@@ -140,11 +143,11 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                     ))
                 )}
 
-                {/* Clarification Questions */}
-                {activeProposal?.clarificationQuestions && activeProposal.clarificationQuestions.length > 0 && (
+                {/* Clarification Questions (Phase 193H.3 Controlled Interaction) */}
+                {activeProposal?.clarificationQuestions && activeProposal.clarificationQuestions.length > 0 && onApplyClarifications && (
                     <CalibrationClarificationPanel
                         questions={activeProposal.clarificationQuestions}
-                        onAnswer={onClarificationAnswer}
+                        onApplyAnswers={onApplyClarifications}
                     />
                 )}
 

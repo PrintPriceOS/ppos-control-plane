@@ -4,7 +4,7 @@
  * Phase 193H — Capability-Aware Governed Quote Smoke Test Component.
  *
  * Calls the canonical backend preview endpoint (POST /pricing/quote-preview)
- * and displays the exact selling price produced by @ppos/pricing-engine buildPrice().
+ * and displays the exact selling price calculated on the backend.
  *
  * Security & Governance Invariants:
  * - ZERO client-side arithmetic or margin math.

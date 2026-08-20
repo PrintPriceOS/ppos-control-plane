@@ -1,10 +1,10 @@
 /**
  * src/ui/components/printhouse/pricing/quick-calibration/CalibrationClarificationPanel.tsx
  *
- * Phase 193F — Clarification & Ambiguity Questions UX
+ * Phase 193H.3 — Clarification Choice Controlled Interaction UX
  */
-import React from 'react';
-import { HelpCircle, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { HelpCircle, Check, ArrowRight } from 'lucide-react';
 
 interface Question {
     field: string;
@@ -14,50 +14,107 @@ interface Question {
 
 interface CalibrationClarificationPanelProps {
     questions: Question[];
-    onAnswer: (field: string, answer: any) => void;
+    onApplyAnswers: (answers: Record<string, string>) => void;
 }
 
 export const CalibrationClarificationPanel: React.FC<CalibrationClarificationPanelProps> = ({
     questions,
-    onAnswer
+    onApplyAnswers
 }) => {
+    // ── Controlled selection state: { [field]: selectedOptionOrText } ──
+    const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+    const [textInputs, setTextInputs] = useState<Record<string, string>>({});
+
     if (!questions || questions.length === 0) return null;
 
+    const handleOptionSelect = (field: string, opt: string) => {
+        setSelectedAnswers(prev => ({
+            ...prev,
+            [field]: opt
+        }));
+    };
+
+    const handleTextInputChange = (field: string, val: string) => {
+        setTextInputs(prev => ({ ...prev, [field]: val }));
+        setSelectedAnswers(prev => ({ ...prev, [field]: val }));
+    };
+
+    const hasAnyAnswers = Object.keys(selectedAnswers).some(k => Boolean(selectedAnswers[k]?.trim()));
+
+    const handleContinue = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!hasAnyAnswers) return;
+        onApplyAnswers(selectedAnswers);
+    };
+
     return (
-        <div className="p-4 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
-                <HelpCircle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>Clarification Required Before Calculation:</span>
+        <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl space-y-4 animate-in fade-in duration-200 shadow-xs">
+            <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-950 dark:text-amber-100">
+                    <HelpCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>We just need a few more details</span>
+                </div>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-1">
+                    Choose an option where available, or type the missing information below.
+                </p>
             </div>
 
-            <div className="space-y-2.5">
-                {questions.map((q, idx) => (
-                    <div key={idx} className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-amber-200/70 dark:border-amber-800/40 text-xs">
-                        <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                            {q.question}
+            <form onSubmit={handleContinue} className="space-y-3">
+                {questions.map((q, idx) => {
+                    const currentSelected = selectedAnswers[q.field];
+                    return (
+                        <div key={idx} className="p-3.5 bg-white dark:bg-zinc-900 rounded-xl border border-amber-200/80 dark:border-amber-800/50 text-xs space-y-2.5">
+                            <div className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {q.question}
+                            </div>
+                            {q.options && q.options.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {q.options.map((opt, oIdx) => {
+                                        const isSelected = currentSelected === opt;
+                                        return (
+                                            <button
+                                                key={oIdx}
+                                                type="button"
+                                                aria-pressed={isSelected}
+                                                onClick={() => handleOptionSelect(q.field, opt)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border shadow-2xs ${
+                                                    isSelected
+                                                        ? 'bg-amber-600 text-white border-amber-700 dark:bg-amber-600 dark:border-amber-500 font-bold'
+                                                        : 'bg-zinc-50 hover:bg-amber-100/60 dark:bg-zinc-800 dark:hover:bg-zinc-700/60 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                                                }`}
+                                            >
+                                                {isSelected && <Check size={13} className="stroke-[3]" />}
+                                                <span>{opt}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter details here..."
+                                        value={textInputs[q.field] || ''}
+                                        onChange={(e) => handleTextInputChange(q.field, e.target.value)}
+                                        className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                </div>
+                            )}
                         </div>
-                        {q.options && q.options.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                                {q.options.map((opt, oIdx) => (
-                                    <button
-                                        key={oIdx}
-                                        type="button"
-                                        onClick={() => onAnswer(q.field, opt)}
-                                        className="px-2.5 py-1 bg-amber-100/70 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-800/50 text-amber-900 dark:text-amber-200 font-medium rounded text-[11px] transition-colors flex items-center gap-1"
-                                    >
-                                        <span>{opt}</span>
-                                        <ChevronRight size={12} className="opacity-60" />
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-[11px] text-zinc-500">
-                                Please specify this in the chat or structured summary.
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+                    );
+                })}
+
+                <div className="pt-1 flex justify-end">
+                    <button
+                        type="submit"
+                        disabled={!hasAnyAnswers}
+                        className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                        <span>Continue with these answers</span>
+                        <ArrowRight size={14} />
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };

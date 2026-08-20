@@ -30,7 +30,7 @@ interface GuidedCalibrationWizardProps {
     activeProposal: any;
     aiUnavailable: boolean;
     onApplyProposal: (proposal: any) => Promise<void>;
-    onClarificationAnswer: (field: string, answer: any) => void;
+    onApplyClarifications?: (answers: Record<string, string>) => void;
     session: any;
     activeRun: any;
     isReady: boolean;
@@ -56,7 +56,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     activeProposal,
     aiUnavailable,
     onApplyProposal,
-    onClarificationAnswer,
+    onApplyClarifications,
     session,
     activeRun,
     isReady,
@@ -160,7 +160,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             await onApplyProposal(proposal);
                             setStep(2);
                         }}
-                        onClarificationAnswer={onClarificationAnswer}
+                        onApplyClarifications={onApplyClarifications}
                         aiUnavailable={aiUnavailable}
                     />
 

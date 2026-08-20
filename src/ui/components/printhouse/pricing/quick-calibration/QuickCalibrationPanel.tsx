@@ -239,14 +239,64 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         }
     };
 
-    // ── 3. Clarification Answer ──
-    const handleClarificationAnswer = (field: string, answer: any) => {
-        if (field.startsWith('includes')) {
-            const val = typeof answer === 'string' ? answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') : Boolean(answer);
-            setDraftCommercials((prev: any) => ({ ...prev, [field]: val }));
-        } else {
-            setDraftSpec((prev: any) => ({ ...prev, [field]: answer }));
+    // ── 3. Clarification Answer & Apply (Phase 193H.3) ──
+    const handleApplyClarifications = (answers: Record<string, string>) => {
+        const readableSummaryParts: string[] = [];
+
+        Object.entries(answers).forEach(([field, answer]) => {
+            if (!answer || !answer.trim()) return;
+
+            readableSummaryParts.push(answer);
+
+            if (field.startsWith('includes')) {
+                const val = answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') || answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                setDraftCommercials((prev: any) => ({ ...prev, [field]: val }));
+            } else if (field === 'cover_structure' || field === 'cover_type') {
+                if (answer.toLowerCase().includes('self-cover') || answer.toLowerCase().includes('self cover')) {
+                    setDraftSpec((prev: any) => ({
+                        ...prev,
+                        paper_weight_cover: prev.paper_weight_interior || 130,
+                        paper_type_cover: prev.paper_type_interior || 'mc',
+                        cover_print: prev.interior_print || '4/4'
+                    }));
+                } else if (answer.toLowerCase().includes('separate') || answer.toLowerCase().includes('300')) {
+                    setDraftSpec((prev: any) => ({
+                        ...prev,
+                        paper_weight_cover: 300,
+                        paper_type_cover: 'mc',
+                        cover_print: '4/0'
+                    }));
+                }
+            } else if (field === 'price_vat' || field === 'tax_inclusion') {
+                // Net vs Gross
+                const isNet = answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                setDraftCommercials((prev: any) => ({
+                    ...prev,
+                    isNetPrice: isNet
+                }));
+            } else {
+                setDraftSpec((prev: any) => ({ ...prev, [field]: answer }));
+            }
+        });
+
+        // Add human-readable user message trace to conversation
+        if (readableSummaryParts.length > 0) {
+            const userMsg = {
+                role: 'user' as const,
+                text: readableSummaryParts.join('; '),
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, userMsg]);
         }
+
+        // Dismiss answered clarification questions from active proposal
+        setActiveProposal((prev: any) => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                clarificationQuestions: []
+            };
+        });
     };
 
     // ── 4. Mark Ready (193B Transition) ──
@@ -397,7 +447,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                             Guided Pricing Setup
                         </h3>
                         <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                            {isAccepted ? 'PRICING CALIBRATED' : isCalculated ? 'READY FOR ACCEPTANCE' : 'GUIDED WIZARD'}
+                            {isAccepted ? 'PRICING CALIBRATED' : isCalculated ? 'READY FOR ACCEPTANCE' : session?.status || 'LOCAL_DRAFT'}
                         </span>
                     </div>
                     <p className="text-xs text-zinc-500 mt-1">
@@ -458,7 +508,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 activeProposal={activeProposal}
                 aiUnavailable={aiUnavailable}
                 onApplyProposal={handleApplyProposal}
-                onClarificationAnswer={handleClarificationAnswer}
+                onApplyClarifications={handleApplyClarifications}
                 session={session}
                 activeRun={activeRun}
                 isReady={isReadyForCalculation}
