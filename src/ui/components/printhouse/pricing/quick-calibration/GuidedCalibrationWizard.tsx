@@ -366,10 +366,11 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 />
                                 <select
-                                    value={draftSpec.paper_type_interior || 'offset'}
-                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_interior: e.target.value }))}
+                                    value={draftSpec.paper_type_interior || ''}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_interior: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
+                                    <option value="">Select Paper</option>
                                     <option value="offset">Offset</option>
                                     <option value="mc">Coated (MC)</option>
                                     <option value="lux">Lux Paper</option>
@@ -398,10 +399,11 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     className="w-1/2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 />
                                 <select
-                                    value={draftSpec.paper_type_cover || 'mc'}
-                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_cover: e.target.value }))}
+                                    value={draftSpec.paper_type_cover || ''}
+                                    onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_cover: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
+                                    <option value="">Select Cover Paper</option>
                                     <option value="mc">Coated (MC)</option>
                                     <option value="artboard">Artboard</option>
                                     <option value="offset">Offset</option>

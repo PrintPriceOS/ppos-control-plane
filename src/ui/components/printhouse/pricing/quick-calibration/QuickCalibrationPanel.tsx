@@ -273,6 +273,9 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     } else if (field === 'delivery_country' || field === 'destination') {
                         const match = answer.match(/\b([A-Z]{2})\b/i);
                         updatedSpec.delivery_country = match ? match[1].toUpperCase() : answer;
+                    } else if (field === 'cover_print' || field === 'coverPrint') {
+                        const match = answer.match(/\b([1-5]\/[0-5])\b/);
+                        updatedSpec.cover_print = match ? match[1] : answer;
                     } else {
                         updatedSpec[field] = answer;
                     }

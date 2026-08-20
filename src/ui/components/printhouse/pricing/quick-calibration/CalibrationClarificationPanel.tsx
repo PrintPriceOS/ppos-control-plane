@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { HelpCircle, Check, ArrowRight, Search } from 'lucide-react';
-import { getCountryName, filterCountries } from '../../../../lib/countryCatalog';
+import { getCountryName, getCountryDisplayName, filterCountries } from '../../../../lib/countryCatalog';
 
 interface Question {
     field: string;

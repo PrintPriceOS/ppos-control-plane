@@ -91,11 +91,24 @@ CRITICAL BOUNDARIES & INVARIANTS:
 2. You DO NOT generate, infer, or output pricing rates (rates_json).
 3. You extract ONLY declared physical specifications and declared commercial totals from manager text.
 4. If manager says "It costs 2450 €", extract 2450 as declared amount, but ask clarification questions about whether it includes VAT, transport, paper, binding, or finishing if not explicitly confirmed.
-5. All taxonomy must strictly follow canonical values:
-   - interior_print: "1/1", "2/2", "4/4"
-   - cover_print: "4/0", "4/4", "1/0", "1/1", etc.
-   - binding_method: "perfect bound", "saddle stitch", "thread sewn", "hardcover", "wire-o", "spiral"
-   - delivery_country: 2-letter uppercase ISO (e.g. "ES", "DE", "FR")
+5. All taxonomy and field names must strictly follow canonical values:
+   - Physical spec fields:
+     * copies: number (e.g. 1000, 250)
+     * book_width_mm: number in mm (e.g. 170, 210)
+     * book_height_mm: number in mm (e.g. 240, 297)
+     * interior_pages: number (e.g. 128, 200)
+     * interior_print: "1/1", "2/2", "4/4"
+     * paper_type_interior: "offset", "mc", "lux", "munken", "other"
+     * paper_weight_interior: number in gsm (e.g. 80, 150)
+     * paper_type_cover: "mc", "artboard", "offset", "wfmc", "other"
+     * paper_weight_cover: number in gsm (e.g. 300, 350)
+     * cover_print: "4/0", "4/4", "1/0", "1/1", etc.
+     * binding_method: "perfect bound", "saddle stitch", "thread sewn", "hardcover", "wire-o", "spiral"
+     * lamination: "gloss", "matt", "varnish", null
+     * delivery_country: 2-letter uppercase ISO (e.g. "ES", "DE", "FR", "PL", "RE", "JP")
+   - Declared commercial fields:
+     * targetManufacturingPrice: number | null (e.g. 2450)
+     * currency: string (e.g. "EUR")
 6. NEVER use internal rate selectors like "one", "two", "full", "pb", "ss", "ts", "hc", "wo", "sp".
 7. Prefer asking clarification questions over inventing unsupported values.
 8. Output MUST be valid JSON strictly adhering to the schema below.
@@ -103,7 +116,21 @@ CRITICAL BOUNDARIES & INVARIANTS:
 JSON RESPONSE SCHEMA:
 {
   "intent": "SPEC_EXTRACTION" | "CLARIFICATION_NEEDED" | "EXPLANATION" | "GENERAL_INQUIRY",
-  "specPatch": { ...only valid physical fields... },
+  "specPatch": {
+    "copies": number,
+    "book_width_mm": number,
+    "book_height_mm": number,
+    "interior_pages": number,
+    "interior_print": string,
+    "paper_type_interior": string,
+    "paper_weight_interior": number,
+    "paper_type_cover": string,
+    "paper_weight_cover": number,
+    "cover_print": string,
+    "binding_method": string,
+    "lamination": string | null,
+    "delivery_country": string
+  },
   "declaredCommercials": {
     "targetManufacturingPrice": number | null,
     "currency": string | null,
@@ -531,11 +558,57 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
 
         // 1. Filter and validate physical specPatch
         if (rawJson.specPatch && typeof rawJson.specPatch === 'object') {
-            for (const key of Object.keys(rawJson.specPatch)) {
+            // Map common AI aliases into canonical keys
+            const raw = rawJson.specPatch;
+            const preNormalized: Record<string, any> = {};
+
+            // Aliases map
+            const aliasMap: Record<string, string> = {
+                quantity: 'copies',
+                run_length: 'copies',
+                width_mm: 'book_width_mm',
+                trim_width_mm: 'book_width_mm',
+                widthMm: 'book_width_mm',
+                height_mm: 'book_height_mm',
+                trim_height_mm: 'book_height_mm',
+                heightMm: 'book_height_mm',
+                pages: 'interior_pages',
+                interiorPages: 'interior_pages',
+                interiorPrint: 'interior_print',
+                interior_print_specification: 'interior_print',
+                interior_paper_type: 'paper_type_interior',
+                interiorPaperType: 'paper_type_interior',
+                paper_type: 'paper_type_interior',
+                interior_paper_weight: 'paper_weight_interior',
+                interiorPaperWeight: 'paper_weight_interior',
+                interior_gsm: 'paper_weight_interior',
+                gsm: 'paper_weight_interior',
+                cover_paper_type: 'paper_type_cover',
+                coverPaperType: 'paper_type_cover',
+                cover_paper_weight: 'paper_weight_cover',
+                coverPaperWeight: 'paper_weight_cover',
+                cover_gsm: 'paper_weight_cover',
+                cover_print_specification: 'cover_print',
+                coverPrint: 'cover_print',
+                binding: 'binding_method',
+                bindingMethod: 'binding_method',
+                finishing: 'lamination',
+                destination_country: 'delivery_country',
+                destination: 'delivery_country'
+            };
+
+            for (const k of Object.keys(raw)) {
+                const targetKey = aliasMap[k] || k;
+                if (preNormalized[targetKey] === undefined) {
+                    preNormalized[targetKey] = raw[k];
+                }
+            }
+
+            for (const key of Object.keys(preNormalized)) {
                 // Strict allowlist
                 if (!ALLOWED_SPEC_FIELDS.includes(key)) continue;
 
-                const val = rawJson.specPatch[key];
+                let val = preNormalized[key];
                 if (val === null || val === undefined) continue;
 
                 // Type & Taxonomy Validation
@@ -548,20 +621,50 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     if (!isNaN(num) && (!guard || (num >= guard.min && num <= guard.max))) {
                         normalized.specPatch[key] = num;
                     }
-                } else if (key === 'interior_print' && VALID_INTERIOR_PRINT.includes(val)) {
-                    normalized.specPatch[key] = val;
-                } else if (key === 'cover_print' && VALID_COVER_PRINT.includes(String(val))) {
-                    normalized.specPatch[key] = String(val);
-                } else if (key === 'binding_method' && VALID_BINDING_METHOD.includes(val)) {
-                    normalized.specPatch[key] = val;
-                } else if (key === 'paper_type_interior' && VALID_PAPER_TYPE_INTERIOR.includes(val)) {
-                    normalized.specPatch[key] = val;
-                } else if (key === 'paper_type_cover' && VALID_PAPER_TYPE_COVER.includes(val)) {
-                    normalized.specPatch[key] = val;
+                } else if (key === 'interior_print') {
+                    const s = String(val).trim();
+                    if (VALID_INTERIOR_PRINT.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    }
+                } else if (key === 'cover_print') {
+                    const s = String(val).trim();
+                    if (VALID_COVER_PRINT.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    }
+                } else if (key === 'binding_method') {
+                    const s = String(val).toLowerCase().trim();
+                    if (VALID_BINDING_METHOD.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    } else if (s === 'perfect' || s === 'pb') {
+                        normalized.specPatch[key] = 'perfect bound';
+                    } else if (s === 'sewn' || s === 'thread-sewn') {
+                        normalized.specPatch[key] = 'thread sewn';
+                    } else if (s === 'case' || s === 'casebound' || s === 'hardback') {
+                        normalized.specPatch[key] = 'hardcover';
+                    }
+                } else if (key === 'paper_type_interior') {
+                    const s = String(val).toLowerCase().trim();
+                    if (VALID_PAPER_TYPE_INTERIOR.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    } else if (s === 'coated' || s === 'gloss' || s === 'matt') {
+                        normalized.specPatch[key] = 'mc';
+                    } else if (s === 'uncoated' || s === 'woodfree') {
+                        normalized.specPatch[key] = 'offset';
+                    }
+                } else if (key === 'paper_type_cover') {
+                    const s = String(val).toLowerCase().trim();
+                    if (VALID_PAPER_TYPE_COVER.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    } else if (s === 'coated') {
+                        normalized.specPatch[key] = 'mc';
+                    }
                 } else if (key === 'paper_type_endpapers' && VALID_PAPER_TYPE_ENDPAPER.includes(val)) {
                     normalized.specPatch[key] = val;
-                } else if (key === 'lamination' && VALID_LAMINATION.includes(val)) {
-                    normalized.specPatch[key] = val;
+                } else if (key === 'lamination') {
+                    const s = String(val).toLowerCase().trim();
+                    if (VALID_LAMINATION.includes(s)) {
+                        normalized.specPatch[key] = s;
+                    }
                 } else if (key === 'orientation' && VALID_ORIENTATION.includes(val)) {
                     normalized.specPatch[key] = val;
                 } else if (key === 'delivery_country') {
