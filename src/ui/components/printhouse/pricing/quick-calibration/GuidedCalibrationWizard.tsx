@@ -9,7 +9,7 @@
  * Step 4: Calibrate (Deterministic solver execution & governed acceptance).
  * Step 5: Test your pricing (Capability-aware Governed Quote Smoke Test).
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     Sparkles, ArrowRight, ArrowLeft, CheckCircle2, Calculator, 
     ShieldCheck, Edit3, ChevronDown, ChevronUp, AlertCircle, RefreshCw 
