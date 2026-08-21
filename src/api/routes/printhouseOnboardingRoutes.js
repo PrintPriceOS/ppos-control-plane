@@ -378,7 +378,8 @@ router.post('/pricing/calibrations', wrapHandler(async (req, res) => {
 // GET /api/printhouse/onboarding/pricing/calibrations — List sessions for tenant
 router.get('/pricing/calibrations', wrapHandler(async (req, res) => {
     const tenantId = req.user.tenantId;
-    const sessions = await calibrationService.listSessions(tenantId);
+    const printerNodeId = req.query.printerNodeId || null;
+    const sessions = await calibrationService.listSessions(tenantId, printerNodeId);
     res.json({ ok: true, data: sessions });
 }));
 

@@ -659,8 +659,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         ? 'Pricing Calibrated & Active'
                                         : activeRun?.status === 'ACCEPTABLE_CANDIDATE'
                                         ? 'Calibration Candidate Within Governed Tolerance'
-                                        : isCalculated 
+                                        : isCalculated && isRunAcceptanceEligible
                                         ? 'Calibration Calculated — Awaiting Acceptance' 
+                                        : isCalculated && (!activeRun || !isRunAcceptanceEligible)
+                                        ? 'Calibration State Inconsistent'
                                         : (activeRun && !isRunAcceptanceEligible)
                                         ? 'Calibration Did Not Converge'
                                         : 'Ready to Run Calibration'}

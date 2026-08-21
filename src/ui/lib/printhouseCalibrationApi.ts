@@ -89,6 +89,14 @@ export const printhouseCalibrationApi = {
         return handleResponse<any>(res);
     },
 
+    async listSessions(printerNodeId?: string) {
+        const query = printerNodeId ? `?printerNodeId=${encodeURIComponent(printerNodeId)}` : '';
+        const res = await fetch(`${BASE_URL}/calibrations${query}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any[]>(res);
+    },
+
     async getSession(sessionId: string) {
         const res = await fetch(`${BASE_URL}/calibrations/${sessionId}`, {
             headers: getHeaders()

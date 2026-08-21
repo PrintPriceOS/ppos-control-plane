@@ -101,6 +101,81 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [accepting, setAccepting] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
 
+    // ── Session and Active Run Rehydration (Phase 193H.8C.6.11.3) ──
+    useEffect(() => {
+        let isCancelled = false;
+
+        const rehydrateSession = async () => {
+            if (!printerNodeId) return;
+
+            setLoadingSession(true);
+            try {
+                const sessionList = await printhouseCalibrationApi.listSessions(printerNodeId);
+                if (isCancelled) return;
+
+                if (Array.isArray(sessionList) && sessionList.length > 0) {
+                    // Filter for this printerNodeId if present
+                    const nodeSessions = sessionList.filter((s: any) => !printerNodeId || s.printerNodeId === printerNodeId);
+                    
+                    // Recency-First Selection: Evaluate newest session (nodeSessions is ordered updated_at DESC, created_at DESC)
+                    const chosenSession = nodeSessions[0];
+
+                    if (chosenSession) {
+                        setSession(chosenSession);
+
+                        // Populate local draft state from restored session
+                        if (chosenSession.bookSpec) {
+                            setDraftSpec(chosenSession.bookSpec);
+                            setExtractedFields(Object.keys(chosenSession.bookSpec));
+                            setConfirmedFields(Object.keys(chosenSession.bookSpec));
+                        }
+                        setDraftCommercials({
+                            targetManufacturingPrice: chosenSession.targetManufacturingPrice ?? null,
+                            currency: chosenSession.currency || 'EUR',
+                            transportPricePerKg: chosenSession.transportPricePerKg ?? null,
+                            transportCurrency: chosenSession.transportCurrency || 'EUR',
+                            includesPaper: chosenSession.includesPaper ?? null,
+                            includesBinding: chosenSession.includesBinding ?? null,
+                            includesFinishing: chosenSession.includesFinishing ?? null,
+                            includesPackaging: chosenSession.includesPackaging ?? null
+                        });
+
+                        // Rehydrate runs for CALCULATED, READY, or ACCEPTED sessions
+                        if (chosenSession.status === 'CALCULATED' || chosenSession.status === 'READY' || chosenSession.status === 'ACCEPTED') {
+                            try {
+                                const runs = await printhouseCalibrationApi.listRuns(chosenSession.id);
+                                if (!isCancelled && Array.isArray(runs) && runs.length > 0) {
+                                    // Runs are ordered started_at DESC; latest run is runs[0]
+                                    const latestRun = runs[0];
+                                    setActiveRun(latestRun);
+                                }
+                            } catch (runErr) {
+                                console.error('Failed to rehydrate calibration runs:', runErr);
+                            }
+                        }
+                    }
+                }
+            } catch (err: any) {
+                if (!isCancelled) {
+                    console.error('Failed to rehydrate calibration session:', err);
+                }
+            } finally {
+                if (!isCancelled) {
+                    setLoadingSession(false);
+                }
+            }
+        };
+
+        // Reset state on node change and rehydrate
+        setSession(null);
+        setActiveRun(null);
+        rehydrateSession();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [printerNodeId]);
+
     // Helper: Normalizes bookSpec taxonomy fields to canonical backend contract
     const canonicalizeBookSpec = (spec: any) => {
         if (!spec || typeof spec !== 'object') return spec;

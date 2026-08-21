@@ -459,16 +459,20 @@ class CalibrationSessionService {
     }
 
     /**
-     * Lists all calibration sessions for a tenant. B5: tenant-scoped.
+     * Lists all calibration sessions for a tenant, optionally filtered by printer node. B5: tenant-scoped.
      */
-    async listSessions(tenantId) {
-        const rows = await db.query(
-            `SELECT * FROM printhouse_pricing_calibration_sessions
-             WHERE tenant_id = ?
-             ORDER BY created_at DESC`,
-            [tenantId]
-        );
+    async listSessions(tenantId, printerNodeId = null) {
+        let sql = `SELECT * FROM printhouse_pricing_calibration_sessions WHERE tenant_id = ?`;
+        const params = [tenantId];
 
+        if (printerNodeId) {
+            sql += ` AND printer_node_id = ?`;
+            params.push(printerNodeId);
+        }
+
+        sql += ` ORDER BY updated_at DESC, created_at DESC`;
+
+        const rows = await db.query(sql, params);
         return rows.map(r => this._deserializeSession(r));
     }
 
