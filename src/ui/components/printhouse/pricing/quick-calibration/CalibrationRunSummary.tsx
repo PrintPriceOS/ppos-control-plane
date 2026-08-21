@@ -59,7 +59,7 @@ export const CalibrationRunSummary: React.FC<CalibrationRunSummaryProps> = ({
                         <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                             Pricing Calibration Proposal
                             <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                                {run.status}
+                                {run.status ? run.status : 'UNKNOWN_STATUS'}
                             </span>
                         </h4>
                         <p className="text-xs text-zinc-500 m-0">

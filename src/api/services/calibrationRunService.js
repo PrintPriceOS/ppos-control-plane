@@ -16,7 +16,7 @@ const db = require('./mysqlClient');
 const calibrationSessionService = require('./calibrationSessionService');
 const solver = require('./deterministicInversePricingSolver');
 const logger = require('./logger').child('calibration-runs');
-const { CANONICAL_ACCEPTABLE_RUN_STATUSES } = require('./calibrationGovernanceTolerances');
+const { CANONICAL_ACCEPTABLE_RUN_STATUSES, ALL_CANONICAL_PERSISTED_RUN_STATUSES } = require('./calibrationGovernanceTolerances');
 
 class CalibrationRunService {
 
@@ -41,6 +41,15 @@ class CalibrationRunService {
 
         // 3. Execute pure in-memory deterministic solver
         const solverResult = solver.solve(session);
+
+        // Application-side defense: Ensure solver output status is within canonical DB domain
+        if (!solverResult || !ALL_CANONICAL_PERSISTED_RUN_STATUSES.includes(solverResult.status)) {
+            const statusErr = new Error('INVALID_SOLVER_RUN_STATUS');
+            statusErr.code = 'INVALID_SOLVER_RUN_STATUS';
+            statusErr.statusCode = 500;
+            statusErr.details = `Solver returned unknown or unpersisted status: ${solverResult?.status}`;
+            throw statusErr;
+        }
 
         // 4. Create and persist run record
         const runId = `crun-${uuidv4().substring(0, 8)}`;

@@ -733,7 +733,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Status</span>
                                     <div className={`font-bold ${!isRunAcceptanceEligible ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                        {activeRun.status || 'CONVERGED'}
+                                        {activeRun.status ? activeRun.status : 'UNKNOWN_STATUS'}
                                     </div>
                                 </div>
                             </div>

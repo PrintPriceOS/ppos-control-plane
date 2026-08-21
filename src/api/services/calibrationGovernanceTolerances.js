@@ -19,6 +19,19 @@ const CANONICAL_ACCEPTABLE_RUN_STATUSES = Object.freeze([
     'ACCEPTABLE_CANDIDATE'
 ]);
 
+// All Persisted Run Statuses (DB Domain Contract)
+const ALL_CANONICAL_PERSISTED_RUN_STATUSES = Object.freeze([
+    'PENDING',
+    'RUNNING',
+    'SUCCEEDED',
+    'CONVERGED',
+    'UNDERDETERMINED_ANCHOR',
+    'ACCEPTABLE_CANDIDATE',
+    'NO_SOLUTION',
+    'AMBIGUOUS',
+    'FAILED'
+]);
+
 /**
  * Pure canonical helper to compute effective governance tolerance.
  * effectiveTolerance = max(absoluteTolerance, targetPrice * percentTolerance)
@@ -43,5 +56,6 @@ module.exports = {
     DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE,
     DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT,
     CANONICAL_ACCEPTABLE_RUN_STATUSES,
+    ALL_CANONICAL_PERSISTED_RUN_STATUSES,
     computeGovernanceTolerance
 };

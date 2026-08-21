@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-20T09:05:52.373Z",
+  "generatedAt": "2026-08-21T15:07:08.265Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2003,6 +2003,19 @@
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/149_phase193h8c6111_calibration_run_status_domain_expansion.sql",
+      "prefix": "149",
+      "canonicalSha256": "3aae26488e2a49daed8a600e730a9f3edf26ba105d33f15eaa847450a365fc34",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 902,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
       ]
     }
   ]
