@@ -27,6 +27,8 @@ const calibrationSessionService = require('./calibrationSessionService');
 const adapter = require('./buildPriceCalibrationAdapter');
 const logger = require('./logger').child('calibration-acceptance');
 
+const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];
+
 // Governance Acceptance Tolerances (Distinct from solver numerical convergence thresholds)
 const DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE = 0.50; // 0.50 EUR
 const DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT = 0.005;  // 0.50%
@@ -162,11 +164,11 @@ class CalibrationAcceptanceService {
                 throw err;
             }
 
-            if (run.status !== 'SUCCEEDED') {
+            if (!CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(run.status)) {
                 const err = new Error('CANNOT_ACCEPT_UNSUCCESSFUL_RUN');
                 err.code = 'CANNOT_ACCEPT_UNSUCCESSFUL_RUN';
                 err.statusCode = 409;
-                err.details = `Run status is ${run.status}. Only SUCCEEDED runs may be accepted.`;
+                err.details = `Run status is ${run.status}. Only acceptance-eligible runs (${CANONICAL_ACCEPTABLE_RUN_STATUSES.join(', ')}) may be accepted.`;
                 throw err;
             }
 

@@ -509,9 +509,11 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         return items;
     };
 
-    const isReadyForCalculation = session?.status === 'READY' || session?.status === 'CALCULATED';
-    const isCalculated = session?.status === 'CALCULATED' || activeRun !== null;
+    const isReadyForCalculation = session?.status === 'READY';
+    const isCalculated = session?.status === 'CALCULATED';
     const isAccepted = session?.status === 'ACCEPTED';
+    const isRunAcceptanceEligible = activeRun?.status === 'SUCCEEDED' || activeRun?.status === 'CONVERGED' || activeRun?.status === 'UNDERDETERMINED_ANCHOR';
+    const canAccept = isCalculated && isRunAcceptanceEligible;
 
     // Canonical finite number helper
     const targetPriceVal = Number(activeRun?.targetPrice ?? activeRun?.target_price ?? draftCommercials.targetManufacturingPrice ?? 0);
@@ -596,6 +598,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 isReady={isReadyForCalculation}
                 isCalculated={isCalculated}
                 isAccepted={isAccepted}
+                canAccept={canAccept}
+                isRunAcceptanceEligible={isRunAcceptanceEligible}
                 onMarkReady={handleMarkReady}
                 onCalculate={handleCalculate}
                 onAccept={() => setShowAcceptModal(true)}

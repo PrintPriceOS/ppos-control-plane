@@ -118,11 +118,15 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
             </div>
 
             {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-3">
-                    <AlertTriangle size={16} className="text-red-600 mt-0.5 shrink-0" />
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-3">
+                    <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
                     <div>
-                        <p className="font-bold">Quote Calculation Error</p>
-                        <p className="mt-0.5">{error}</p>
+                        <p className="font-bold">Production Rates Notice</p>
+                        <p className="mt-0.5">
+                            {error.includes('MANUFACTURING_RATES_NOT_CONFIGURED') || error.includes('RATES_NOT_CONFIGURED')
+                                ? 'Active production rates have not yet been accepted and published to this printer node. Complete and accept a calibration run above to activate rates.'
+                                : error}
+                        </p>
                     </div>
                 </div>
             )}

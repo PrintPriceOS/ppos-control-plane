@@ -17,6 +17,8 @@ const calibrationSessionService = require('./calibrationSessionService');
 const solver = require('./deterministicInversePricingSolver');
 const logger = require('./logger').child('calibration-runs');
 
+const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];
+
 class CalibrationRunService {
 
     /**
@@ -50,53 +52,74 @@ class CalibrationRunService {
             timestamp: new Date().toISOString()
         };
 
-        await db.query(
-            `INSERT INTO printhouse_pricing_calibration_runs
-            (id, tenant_id, calibration_session_id, printer_node_id,
-             solver_version, solver_config_json, status,
-             session_input_checksum, rate_snapshot_checksum,
-             evaluations_count, execution_duration_ms,
-             engine_price_before, engine_price_after, target_price,
-             absolute_residual, percent_residual,
-             active_rate_paths_json, proposed_patch_json, proposed_patch_checksum, candidate_parameters_json,
-             identifiability_report_json, warnings_json, created_by_json, completed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
-            [
-                runId,
-                tenantId,
-                sessionId,
-                session.printerNodeId,
-                solverResult.solverVersion,
-                JSON.stringify(solverResult.solverConfig),
-                solverResult.status,
-                sessionChecksum,
-                snapshotChecksum,
-                solverResult.evaluationsCount,
-                solverResult.executionDurationMs,
-                solverResult.enginePriceBefore,
-                solverResult.enginePriceAfter,
-                solverResult.targetPrice,
-                solverResult.absoluteResidual,
-                solverResult.percentResidual,
-                JSON.stringify(solverResult.activeRatePaths),
-                JSON.stringify(solverResult.proposedPatch),
-                solverResult.proposedPatchChecksum,
-                JSON.stringify(solverResult.candidateParameters),
-                JSON.stringify(solverResult.identifiabilityReport),
-                JSON.stringify(solverResult.warnings),
-                JSON.stringify(actorJson)
-            ]
-        );
+        const isAcceptableStatus = CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(solverResult.status);
 
-        // 5. If solver succeeded and is acceptance-eligible, transition session READY -> CALCULATED
-        const isAcceptableStatus = solverResult.status === 'CONVERGED' || solverResult.status === 'UNDERDETERMINED_ANCHOR';
-        if (isAcceptableStatus) {
-            await db.query(
-                `UPDATE printhouse_pricing_calibration_sessions
-                 SET status = 'CALCULATED', updated_at = NOW(6)
-                 WHERE id = ? AND tenant_id = ? AND status = 'READY'`,
-                [sessionId, tenantId]
+        const connection = await db.getPool().getConnection();
+        try {
+            await connection.beginTransaction();
+
+            await connection.query(
+                `INSERT INTO printhouse_pricing_calibration_runs
+                (id, tenant_id, calibration_session_id, printer_node_id,
+                 solver_version, solver_config_json, status,
+                 session_input_checksum, rate_snapshot_checksum,
+                 evaluations_count, execution_duration_ms,
+                 engine_price_before, engine_price_after, target_price,
+                 absolute_residual, percent_residual,
+                 active_rate_paths_json, proposed_patch_json, proposed_patch_checksum, candidate_parameters_json,
+                 identifiability_report_json, warnings_json, created_by_json, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                [
+                    runId,
+                    tenantId,
+                    sessionId,
+                    session.printerNodeId,
+                    solverResult.solverVersion,
+                    JSON.stringify(solverResult.solverConfig),
+                    solverResult.status,
+                    sessionChecksum,
+                    snapshotChecksum,
+                    solverResult.evaluationsCount,
+                    solverResult.executionDurationMs,
+                    solverResult.enginePriceBefore,
+                    solverResult.enginePriceAfter,
+                    solverResult.targetPrice,
+                    solverResult.absoluteResidual,
+                    solverResult.percentResidual,
+                    JSON.stringify(solverResult.activeRatePaths),
+                    JSON.stringify(solverResult.proposedPatch),
+                    solverResult.proposedPatchChecksum,
+                    JSON.stringify(solverResult.candidateParameters),
+                    JSON.stringify(solverResult.identifiabilityReport),
+                    JSON.stringify(solverResult.warnings),
+                    JSON.stringify(actorJson)
+                ]
             );
+
+            // 5. If solver succeeded and is acceptance-eligible, transition session READY -> CALCULATED
+            if (isAcceptableStatus) {
+                const [updateResult] = await connection.query(
+                    `UPDATE printhouse_pricing_calibration_sessions
+                     SET status = 'CALCULATED', updated_at = NOW(6)
+                     WHERE id = ? AND tenant_id = ? AND status = 'READY'`,
+                    [sessionId, tenantId]
+                );
+
+                if (!updateResult || updateResult.affectedRows !== 1) {
+                    const conflictErr = new Error('SESSION_STATE_TRANSITION_CONFLICT');
+                    conflictErr.code = 'SESSION_STATE_TRANSITION_CONFLICT';
+                    conflictErr.statusCode = 409;
+                    conflictErr.details = `Could not promote session ${sessionId} from READY to CALCULATED. Concurrent state change or invalid session state.`;
+                    throw conflictErr;
+                }
+            }
+
+            await connection.commit();
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
         }
 
         logger.info({

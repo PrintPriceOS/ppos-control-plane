@@ -38,6 +38,8 @@ interface GuidedCalibrationWizardProps {
     isReady: boolean;
     isCalculated: boolean;
     isAccepted: boolean;
+    canAccept?: boolean;
+    isRunAcceptanceEligible?: boolean;
     onMarkReady: () => Promise<void>;
     onCalculate: () => Promise<void>;
     onAccept: () => void;
@@ -64,6 +66,8 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     isReady,
     isCalculated,
     isAccepted,
+    canAccept = false,
+    isRunAcceptanceEligible = false,
     onMarkReady,
     onCalculate,
     onAccept,
@@ -651,7 +655,13 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                                    {isCalculated ? 'Calibration Converged Successfully' : 'Ready to Run Calibration'}
+                                    {isAccepted 
+                                        ? 'Pricing Calibrated & Active'
+                                        : isCalculated 
+                                        ? 'Calibration Calculated — Awaiting Acceptance' 
+                                        : (activeRun && !isRunAcceptanceEligible)
+                                        ? 'Calibration Did Not Converge'
+                                        : 'Ready to Run Calibration'}
                                 </span>
                                 <p className="text-xs text-zinc-500 mt-0.5">
                                     Target Price: <strong className="text-zinc-800 dark:text-zinc-200">€ {draftCommercials.targetManufacturingPrice}</strong> for {draftSpec.copies?.toLocaleString()} copies.
@@ -659,7 +669,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             </div>
 
                             <div className="flex items-center gap-3">
-                                {!isCalculated && (
+                                {!isCalculated && !isAccepted && (
                                     <button
                                         type="button"
                                         onClick={onCalculate}
@@ -667,11 +677,11 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-400 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
                                     >
                                         <Calculator size={15} />
-                                        <span>{calculating ? 'Running Calibration...' : 'Run Pricing Calibration'}</span>
+                                        <span>{calculating ? 'Running Calibration...' : (activeRun && !isRunAcceptanceEligible) ? 'Re-run Pricing Calibration' : 'Run Pricing Calibration'}</span>
                                     </button>
                                 )}
 
-                                {isCalculated && !isAccepted && (
+                                {canAccept && !isAccepted && (
                                     <button
                                         type="button"
                                         onClick={onAccept}
@@ -684,6 +694,13 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             </div>
                         </div>
 
+                        {/* Diagnostics & Outcome Message */}
+                        {activeRun && !isRunAcceptanceEligible && (
+                            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-medium">
+                                Calibration could not produce an acceptance-eligible solution within governed tolerances. You can adjust the reference job specifications or inspect rates.
+                            </div>
+                        )}
+
                         {activeRun && (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-700/60 text-xs">
                                 <div>
@@ -694,19 +711,21 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Predicted Cost</span>
-                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    <div className={`font-bold ${!isRunAcceptanceEligible ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                         € {Number(activeRun.enginePriceAfter ?? activeRun.predicted_manufacturing_price ?? 0).toFixed(2)}
                                     </div>
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Residual</span>
                                     <div className="font-bold text-zinc-900 dark:text-white">
-                                        € {Number(activeRun.absoluteResidual ?? activeRun.absolute_residual ?? 0).toFixed(2)}
+                                        € {Number(activeRun.absoluteResidual ?? activeRun.absolute_residual ?? 0).toFixed(2)} ({Number(activeRun.percentResidual ?? activeRun.percent_residual ?? 0).toFixed(2)}%)
                                     </div>
                                 </div>
                                 <div>
                                     <span className="text-zinc-500 text-[11px]">Status</span>
-                                    <div className="font-bold text-emerald-600 dark:text-emerald-400">{activeRun.status || 'CONVERGED'}</div>
+                                    <div className={`font-bold ${!isRunAcceptanceEligible ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                        {activeRun.status || 'CONVERGED'}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -728,7 +747,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 onClick={() => setStep(5)}
                                 className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
                             >
-                                <span>Test My Pricing</span>
+                                <span>Verify Pricing</span>
                                 <ArrowRight size={14} />
                             </button>
                         )}
@@ -747,7 +766,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     Pricing Calibrated & Active
                                 </h4>
                                 <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                                    Your manufacturing rates are calibrated. Use the tool below to verify what PrintPriceOS will quote.
+                                    Your manufacturing rates are calibrated and active. Use the tool below to verify what PrintPriceOS will quote.
                                 </p>
                             </div>
                         </div>
