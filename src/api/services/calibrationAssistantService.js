@@ -179,11 +179,11 @@ class CalibrationAssistantService {
 
         // 1. Fetch session (Tenant Isolation)
         const [session] = await db.query(
-            `SELECT id, tenant_id, printer_node_id, reference_book_name,
+            `SELECT id, tenant_id, printer_node_id, printer_node_name_snapshot,
                     book_spec_json, target_manufacturing_price, currency,
                     transport_price_per_kg, transport_currency,
                     includes_paper, includes_binding, includes_finishing, includes_packaging,
-                    status, chat_history_json
+                    status
              FROM printhouse_pricing_calibration_sessions
              WHERE id = ? AND tenant_id = ?`,
             [sessionId, tenantId]
@@ -196,21 +196,8 @@ class CalibrationAssistantService {
             throw err;
         }
 
-        // 2. Parse and bound chat history
-        let history = [];
-        if (session.chat_history_json) {
-            try {
-                history = typeof session.chat_history_json === 'string'
-                    ? JSON.parse(session.chat_history_json)
-                    : session.chat_history_json;
-            } catch (e) {
-                history = [];
-            }
-        }
-        if (!Array.isArray(history)) history = [];
-
-        // Apply bounded history policy
-        const boundedHistory = history.slice(-MAX_HISTORY_MESSAGES);
+        // 2. Chat history (in-memory / stateless for assistantChat)
+        const boundedHistory = [];
 
         // 3. Build minimal sanitized AI context
         const currentSpec = session.book_spec_json
@@ -229,7 +216,7 @@ class CalibrationAssistantService {
         };
 
         const contextPrompt = `CURRENT SESSION STATE:
-Reference Book Name: ${session.reference_book_name || 'Untitled Reference Book'}
+Reference Book: ${session.printer_node_name_snapshot ? `Printer Node ${session.printer_node_name_snapshot}` : 'Reference Book'}
 Current Physical Specification: ${JSON.stringify(currentSpec)}
 Current Commercial Inclusions: ${JSON.stringify(currentCommercials)}
 Session Status: ${session.status}
@@ -385,7 +372,7 @@ MANAGER MESSAGE:
         // Fetch session and run (Tenant Isolation)
         const [run] = await db.query(
             `SELECT id, tenant_id, calibration_session_id, printer_node_id,
-                    target_price, predicted_manufacturing_price, absolute_residual, percent_residual,
+                    target_price, engine_price_after, absolute_residual, percent_residual,
                     evaluations_count, status, warnings_json, identifiability_report_json
              FROM printhouse_pricing_calibration_runs
              WHERE id = ? AND tenant_id = ? AND calibration_session_id = ?`,
@@ -419,7 +406,7 @@ MANAGER MESSAGE:
         const prompt = `EXPLAIN THIS CALIBRATION RUN TO A PRINTING MANAGER:
 Status: ${run.status}
 Target Manufacturing Price: ${run.target_price} EUR
-Predicted Manufacturing Price: ${run.predicted_manufacturing_price} EUR
+Predicted Manufacturing Price: ${run.engine_price_after} EUR
 Absolute Residual: ${run.absolute_residual} EUR (${(Number(run.percent_residual) * 100).toFixed(2)}%)
 Convergence Evaluations: ${run.evaluations_count}
 Identifiability Classification: ${identifiability.classification || 'STANDARD'}
