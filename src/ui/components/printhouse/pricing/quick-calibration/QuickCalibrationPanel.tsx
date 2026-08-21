@@ -653,34 +653,44 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 </div>
             )}
 
-            {/* Primary Guided Stepper View (Phase 193H) */}
-            <GuidedCalibrationWizard
-                printerNodeId={printerNodeId}
-                printerNodeName={printerNodeName}
-                draftSpec={draftSpec}
-                setDraftSpec={setDraftSpec}
-                draftCommercials={draftCommercials}
-                setDraftCommercials={setDraftCommercials}
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                sendingChat={sendingChat}
-                activeProposal={activeProposal}
-                aiUnavailable={aiUnavailable}
-                onApplyProposal={handleApplyProposal}
-                onApplyClarifications={handleApplyClarifications}
-                session={session}
-                activeRun={activeRun}
-                isReady={isReadyForCalculation}
-                isCalculated={isCalculated}
-                isAccepted={isAccepted}
-                canAccept={canAccept}
-                isRunAcceptanceEligible={isRunAcceptanceEligible}
-                onMarkReady={handleMarkReady}
-                onCalculate={handleCalculate}
-                onAccept={() => setShowAcceptModal(true)}
-                calculating={calculating}
-                error={error}
-            />
+            {/* Loading / Rehydrating State Gate */}
+            {loadingSession ? (
+                <div className="p-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 min-h-[280px]">
+                    <div className="w-7 h-7 border-2 border-[#dc0000] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        Restoring calibration workspace...
+                    </span>
+                </div>
+            ) : (
+                /* Primary Guided Stepper View (Phase 193H) */
+                <GuidedCalibrationWizard
+                    printerNodeId={printerNodeId}
+                    printerNodeName={printerNodeName}
+                    draftSpec={draftSpec}
+                    setDraftSpec={setDraftSpec}
+                    draftCommercials={draftCommercials}
+                    setDraftCommercials={setDraftCommercials}
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    sendingChat={sendingChat}
+                    activeProposal={activeProposal}
+                    aiUnavailable={aiUnavailable}
+                    onApplyProposal={handleApplyProposal}
+                    onApplyClarifications={handleApplyClarifications}
+                    session={session}
+                    activeRun={activeRun}
+                    isReady={isReadyForCalculation}
+                    isCalculated={isCalculated}
+                    isAccepted={isAccepted}
+                    canAccept={canAccept}
+                    isRunAcceptanceEligible={isRunAcceptanceEligible}
+                    onMarkReady={handleMarkReady}
+                    onCalculate={handleCalculate}
+                    onAccept={() => setShowAcceptModal(true)}
+                    calculating={calculating}
+                    error={error}
+                />
+            )}
 
             {/* Advanced / Power User Drawer (Progressive Disclosure) */}
             {showAdvanced && (

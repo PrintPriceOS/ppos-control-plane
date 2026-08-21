@@ -84,6 +84,15 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         return 1;
     });
 
+    // Synchronize step when rehydrated session or run resolves asynchronously
+    useEffect(() => {
+        if (isAccepted) {
+            setStep(5);
+        } else if (isCalculated || isReady) {
+            setStep(4);
+        }
+    }, [isAccepted, isCalculated, isReady]);
+
     // ── Phase 193H.6 Canonical Step Completion Predicates ──
     const [reviewConfirmed, setReviewConfirmed] = useState<boolean>(false);
     const [lastConfirmedSpecSnapshot, setLastConfirmedSpecSnapshot] = useState<string>('');
