@@ -16,8 +16,7 @@ const db = require('./mysqlClient');
 const calibrationSessionService = require('./calibrationSessionService');
 const solver = require('./deterministicInversePricingSolver');
 const logger = require('./logger').child('calibration-runs');
-
-const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];
+const { CANONICAL_ACCEPTABLE_RUN_STATUSES } = require('./calibrationGovernanceTolerances');
 
 class CalibrationRunService {
 

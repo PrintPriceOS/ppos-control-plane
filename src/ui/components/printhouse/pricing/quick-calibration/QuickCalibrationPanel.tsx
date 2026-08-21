@@ -512,7 +512,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const isReadyForCalculation = session?.status === 'READY';
     const isCalculated = session?.status === 'CALCULATED';
     const isAccepted = session?.status === 'ACCEPTED';
-    const isRunAcceptanceEligible = activeRun?.status === 'SUCCEEDED' || activeRun?.status === 'CONVERGED' || activeRun?.status === 'UNDERDETERMINED_ANCHOR';
+    const isRunAcceptanceEligible = activeRun?.status === 'SUCCEEDED' || activeRun?.status === 'CONVERGED' || activeRun?.status === 'UNDERDETERMINED_ANCHOR' || activeRun?.status === 'ACCEPTABLE_CANDIDATE';
     const canAccept = isCalculated && isRunAcceptanceEligible;
 
     // Canonical finite number helper

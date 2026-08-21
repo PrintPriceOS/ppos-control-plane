@@ -26,12 +26,12 @@ const db = require('./mysqlClient');
 const calibrationSessionService = require('./calibrationSessionService');
 const adapter = require('./buildPriceCalibrationAdapter');
 const logger = require('./logger').child('calibration-acceptance');
-
-const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];
-
-// Governance Acceptance Tolerances (Distinct from solver numerical convergence thresholds)
-const DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE = 0.50; // 0.50 EUR
-const DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT = 0.005;  // 0.50%
+const {
+    DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE,
+    DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT,
+    CANONICAL_ACCEPTABLE_RUN_STATUSES,
+    computeGovernanceTolerance
+} = require('./calibrationGovernanceTolerances');
 
 function isPlainObject(obj) {
     return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
@@ -291,10 +291,11 @@ class CalibrationAcceptanceService {
             const percentResidual = Number((absoluteResidual / targetManufacturingPrice).toFixed(6));
 
             // 8. ACCEPTANCE TOLERANCE POLICY (D10)
-            const effectiveTolerance = Number(Math.max(
+            const effectiveTolerance = computeGovernanceTolerance(
+                targetManufacturingPrice,
                 configuredAbsTolerance,
-                targetManufacturingPrice * configuredPctTolerance
-            ).toFixed(4));
+                configuredPctTolerance
+            );
 
             if (absoluteResidual > effectiveTolerance) {
                 const err = new Error('CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED');
@@ -559,4 +560,14 @@ class CalibrationAcceptanceService {
     }
 }
 
-module.exports = new CalibrationAcceptanceService();
+const serviceInstance = new CalibrationAcceptanceService();
+serviceInstance.computeGovernanceTolerance = computeGovernanceTolerance;
+serviceInstance.DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE = DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE;
+serviceInstance.DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT = DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT;
+serviceInstance.CANONICAL_ACCEPTABLE_RUN_STATUSES = CANONICAL_ACCEPTABLE_RUN_STATUSES;
+
+module.exports = serviceInstance;
+module.exports.computeGovernanceTolerance = computeGovernanceTolerance;
+module.exports.DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE = DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE;
+module.exports.DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT = DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT;
+module.exports.CANONICAL_ACCEPTABLE_RUN_STATUSES = CANONICAL_ACCEPTABLE_RUN_STATUSES;

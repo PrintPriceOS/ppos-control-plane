@@ -14,6 +14,7 @@
  * 5. NO RANDOMNESS: Zero Math.random(), zero stochastic iterations.
  */
 const adapter = require('./buildPriceCalibrationAdapter');
+const { computeGovernanceTolerance } = require('./calibrationGovernanceTolerances');
 
 // Governed Search Bounds & Convergence Tolerances
 const SOLVER_CONFIG = {
@@ -235,8 +236,20 @@ class DeterministicInversePricingSolver {
         const pctResidual = (absResidual / targetMfgPrice) * 100.0;
 
         // 5. Solution Classification
+        const isFinitePrice = Number.isFinite(finalPredicted) && finalPredicted > 0;
+        const isFiniteResidual = Number.isFinite(absResidual);
+        const governanceTolerance = computeGovernanceTolerance(targetMfgPrice);
+
         let status = 'SUCCEEDED';
-        if (absResidual > SOLVER_CONFIG.toleranceAbsEur && pctResidual > SOLVER_CONFIG.tolerancePct) {
+        if (!isFinitePrice || !isFiniteResidual) {
+            status = 'NO_SOLUTION';
+        } else if (absResidual <= SOLVER_CONFIG.toleranceAbsEur || pctResidual <= SOLVER_CONFIG.tolerancePct) {
+            // Strict numerical convergence
+            status = 'SUCCEEDED';
+        } else if (absResidual <= governanceTolerance) {
+            // Governed acceptance candidate
+            status = 'ACCEPTABLE_CANDIDATE';
+        } else {
             status = 'NO_SOLUTION';
         }
 

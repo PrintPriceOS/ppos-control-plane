@@ -657,6 +657,8 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 <span className="text-xs font-bold text-zinc-900 dark:text-white">
                                     {isAccepted 
                                         ? 'Pricing Calibrated & Active'
+                                        : activeRun?.status === 'ACCEPTABLE_CANDIDATE'
+                                        ? 'Calibration Candidate Within Governed Tolerance'
                                         : isCalculated 
                                         ? 'Calibration Calculated — Awaiting Acceptance' 
                                         : (activeRun && !isRunAcceptanceEligible)
@@ -693,6 +695,13 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 )}
                             </div>
                         </div>
+
+                        {/* Candidate Diagnostics / Informational Note */}
+                        {activeRun?.status === 'ACCEPTABLE_CANDIDATE' && isCalculated && !isAccepted && (
+                            <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-900 dark:text-blue-200 font-medium">
+                                The optimizer did not reach its strict numerical convergence threshold, but the best deterministic candidate is within the governed publishing tolerance and can be reviewed for acceptance.
+                            </div>
+                        )}
 
                         {/* Diagnostics & Outcome Message */}
                         {activeRun && !isRunAcceptanceEligible && (

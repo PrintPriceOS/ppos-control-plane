@@ -59,9 +59,14 @@ const quickPanelSrc = fs.readFileSync(path.join(__dirname, '../src/ui/components
 
 // T1: Verify Single Canonical Acceptance-Eligible Run Status Set Parity
 test('H8C.6.10.1-01', 'Single canonical acceptance-eligible status set parity across backend and frontend', () => {
-    assert.ok(runServiceSrc.includes("const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];"), 'Defined in runService');
-    assert.ok(acceptanceServiceSrc.includes("const CANONICAL_ACCEPTABLE_RUN_STATUSES = ['SUCCEEDED', 'CONVERGED', 'UNDERDETERMINED_ANCHOR'];"), 'Defined in acceptanceService');
-    assert.ok(quickPanelSrc.includes("activeRun?.status === 'SUCCEEDED' || activeRun?.status === 'CONVERGED' || activeRun?.status === 'UNDERDETERMINED_ANCHOR'"), 'Aligned in frontend');
+    const { CANONICAL_ACCEPTABLE_RUN_STATUSES } = require('../src/api/services/calibrationGovernanceTolerances');
+    assert.ok(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes('SUCCEEDED'));
+    assert.ok(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes('CONVERGED'));
+    assert.ok(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes('UNDERDETERMINED_ANCHOR'));
+    assert.ok(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes('ACCEPTABLE_CANDIDATE'));
+    assert.ok(runServiceSrc.includes("require('./calibrationGovernanceTolerances')"), 'Imported in runService');
+    assert.ok(acceptanceServiceSrc.includes("require('./calibrationGovernanceTolerances')"), 'Imported in acceptanceService');
+    assert.ok(quickPanelSrc.includes("activeRun?.status === 'ACCEPTABLE_CANDIDATE'"), 'Aligned in frontend');
 });
 
 // T2: Promotion Transaction Success (affectedRows === 1 -> Commit)
