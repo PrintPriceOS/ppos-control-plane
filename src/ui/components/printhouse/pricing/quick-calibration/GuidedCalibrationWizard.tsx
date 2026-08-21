@@ -671,7 +671,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             </div>
 
                             <div className="flex items-center gap-3">
-                                {!isCalculated && !isAccepted && (
+                                {isReady && !isCalculated && !isAccepted && (
                                     <button
                                         type="button"
                                         onClick={onCalculate}
@@ -690,7 +690,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
                                     >
                                         <ShieldCheck size={16} />
-                                        <span>Accept Calibrated Pricing</span>
+                                        <span>Accept Pricing Revision</span>
                                     </button>
                                 )}
                             </div>
