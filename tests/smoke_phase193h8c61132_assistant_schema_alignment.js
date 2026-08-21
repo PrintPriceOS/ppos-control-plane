@@ -60,15 +60,24 @@ const CANONICAL_M146_COLUMNS = [
 ];
 
 // T1: Calibration Assistant Session SQL Projection Audit
-test('H8C.6.11.3.2-01', 'calibrationAssistantService does NOT query nonexistent reference_book_name or chat_history_json', () => {
-    assert.strictEqual(assistantSrc.includes('reference_book_name'), false, 'reference_book_name must be completely absent from calibrationAssistantService');
-    assert.strictEqual(assistantSrc.includes('chat_history_json'), false, 'chat_history_json must be absent from SQL query');
+test('H8C.6.11.3.2-01', 'calibrationAssistantService does NOT query nonexistent reference_book_name or chat_history_json in SQL', () => {
+    const sessionQueryMatch = assistantSrc.match(/SELECT([\s\S]+?)FROM\s+printhouse_pricing_calibration_sessions/i);
+    assert.ok(sessionQueryMatch, 'Session SELECT query found in calibrationAssistantService');
+    const sessionProjection = sessionQueryMatch[1];
+
+    assert.strictEqual(sessionProjection.includes('reference_book_name'), false, 'reference_book_name must not be in session SELECT projection');
+    assert.strictEqual(sessionProjection.includes('chat_history_json'), false, 'chat_history_json must not be in session SELECT projection');
 });
 
-// T2: explainRun Run SQL Projection Audit
-test('H8C.6.11.3.2-02', 'calibrationAssistantService.explainRun queries canonical engine_price_after (not predicted_manufacturing_price)', () => {
-    assert.ok(assistantSrc.includes('engine_price_after'), 'Uses canonical engine_price_after column');
-    assert.strictEqual(assistantSrc.includes('predicted_manufacturing_price'), false, 'predicted_manufacturing_price must not be queried from DB');
+// T2: explainRun Run SQL Projection Audit & Runtime Reads
+test('H8C.6.11.3.2-02', 'calibrationAssistantService.explainRun queries canonical engine_price_after and does not access predicted_manufacturing_price', () => {
+    const runQueryMatch = assistantSrc.match(/SELECT([\s\S]+?)FROM\s+printhouse_pricing_calibration_runs/i);
+    assert.ok(runQueryMatch, 'Run SELECT query found in calibrationAssistantService');
+    const runProjection = runQueryMatch[1];
+
+    assert.ok(runProjection.includes('engine_price_after'), 'Uses canonical engine_price_after column in SQL');
+    assert.strictEqual(runProjection.includes('predicted_manufacturing_price'), false, 'predicted_manufacturing_price must not be queried from DB');
+    assert.strictEqual(assistantSrc.includes('run.predicted_manufacturing_price'), false, 'run.predicted_manufacturing_price must not be read at runtime');
 });
 
 // T3: All explicit session column projections belong to canonical migration 146

@@ -432,7 +432,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 ok: true,
                 runId,
                 status: run.status,
-                explanation: `Calibration run ${run.id} finished with status ${run.status}. Target price: ${run.target_price} EUR, predicted price: ${run.predicted_manufacturing_price} EUR, absolute residual: ${run.absolute_residual} EUR. Active categories calibrated: ${(identifiability.activeCategories || []).join(', ')}.`,
+                explanation: `Calibration run ${run.id} finished with status ${run.status}. Target price: ${run.target_price} EUR, predicted price: ${run.engine_price_after} EUR, absolute residual: ${run.absolute_residual} EUR. Active categories calibrated: ${(identifiability.activeCategories || []).join(', ')}.`,
                 source: 'DETERMINISTIC_FALLBACK'
             };
         }
@@ -449,7 +449,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             status: run.status,
             explanation: aiResult.json?.explanation || aiResult.rawText,
             targetManufacturingPrice: run.target_price,
-            predictedManufacturingPrice: run.predicted_manufacturing_price,
+            predictedManufacturingPrice: run.engine_price_after,
             absoluteResidual: run.absolute_residual,
             warnings
         };
