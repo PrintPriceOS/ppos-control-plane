@@ -88,7 +88,7 @@ class CalibrationAcceptanceService {
             : DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT;
 
         // Execute inside single database transaction with lock
-        const connection = await db.getConnection();
+        const connection = await db.getPool().getConnection();
         try {
             await connection.beginTransaction();
 
