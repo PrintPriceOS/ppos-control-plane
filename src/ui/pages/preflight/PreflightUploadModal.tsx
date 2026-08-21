@@ -310,7 +310,6 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({ isOp
                         <XMarkIcon className="w-6 h-6" />
                       </button>
                     </div>
-                  </div>
 
                   {/* Forensic Context Strip */}
                   <div className="px-8 py-3 bg-slate-100/60 dark:bg-[#161618]/60 border-b ppos-border flex flex-wrap items-center justify-between gap-4 text-xs">
