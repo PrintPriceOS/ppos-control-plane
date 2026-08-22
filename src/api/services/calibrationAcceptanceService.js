@@ -360,7 +360,7 @@ class CalibrationAcceptanceService {
             // b. Update printer_nodes.rates_json with complete resulting document
             await connection.query(
                 `UPDATE printer_nodes
-                 SET rates_json = ?, updated_at = NOW(6)
+                 SET rates_json = ?
                  WHERE id = ? AND tenant_id = ?`,
                 [JSON.stringify(resultingRates), session.printer_node_id, tenantId]
             );
@@ -420,7 +420,7 @@ class CalibrationAcceptanceService {
             // d. Transition session: CALCULATED -> ACCEPTED (Terminal)
             await connection.query(
                 `UPDATE printhouse_pricing_calibration_sessions
-                 SET status = 'ACCEPTED', updated_at = NOW(6)
+                 SET status = 'ACCEPTED', accepted_at = NOW(6), updated_at = NOW(6)
                  WHERE id = ? AND tenant_id = ?`,
                 [sessionId, tenantId]
             );
