@@ -104,18 +104,38 @@ test('H8C.6.11.3.6.1-03', 'Residual 0.14 EUR fails strict absolute tolerance (0.
     assert.strictEqual(result.identifiabilityReport.classification, 'PRIOR_ANCHORED_CANDIDATE');
 });
 
-// T4: Perfect Strict Convergence Still Produces SUCCEEDED
+// T4: Perfect Strict Convergence Produces SUCCEEDED (Controlled Non-Zero Snapshot)
 test('H8C.6.11.3.6.1-04', 'When residual satisfies both <= 0.05 EUR and <= 0.01%, status returns SUCCEEDED', () => {
-    // Session calibrated to exact baseline price (residual = 0)
-    const exactSession = {
-        ...session,
-        targetManufacturingPrice: 235.36
+    // Controlled non-zero baseline snapshot (zero prior injection)
+    const fullSnapshot = {
+        paper_price_interior_by_kilo: { offset: 1.252 },
+        paper_price_cover_by_kilo: { artboard: 2.515 },
+        interior_full_colour_fixed: { '16p': 80.31, '32p': 80.31 },
+        interior_full_colour_var: { '16p': 8.12, '32p': 8.12 },
+        cover_fixed_by_colours: { '4': 66 },
+        cover_var_per_1000_by_colours: { '4': 12.5 },
+        lam_fixed: { gloss: 6 },
+        lam_var_per_1000: { gloss: 25 },
+        binding_pb_fixed_by_sections: { '8': 0.164, '4': 0.164 },
+        binding_pb_var_per_1000_by_sections: { '8': 117.6, '4': 117.6 }
     };
+
     const nodeConfig = { id: 'node-329a3bc4', signatures: [16, 8, 4] };
+    const forwardBaseline = adapter.evaluateForwardPrice(bookSpec2000, fullSnapshot, {}, nodeConfig);
+    const targetPrice = forwardBaseline.predictedManufacturingPrice; // Exactly 2222.21 EUR
+
+    const exactSession = {
+        bookSpec: bookSpec2000,
+        currentRatesSnapshot: fullSnapshot,
+        targetManufacturingPrice: targetPrice
+    };
+
     const result = solver.solve(exactSession, nodeConfig);
 
     assert.strictEqual(result.status, 'SUCCEEDED');
-    assert.strictEqual(result.absoluteResidual, 0);
+    assert.strictEqual(result.absoluteResidual <= 0.05, true);
+    assert.strictEqual(result.percentResidual <= 0.01, true);
+    assert.deepStrictEqual(result.identifiabilityReport.priorsInjected, []);
 });
 
 console.log(`\n═══ Phase 193H.8C.6.11.3.6.1 Results: ${passed} passed, ${failed} failed ═══\n`);
