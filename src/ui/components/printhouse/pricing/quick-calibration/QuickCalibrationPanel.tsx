@@ -503,6 +503,17 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
             const run = await printhouseCalibrationApi.calculateCalibration(readySession.id);
             setActiveRun(run);
+
+            // Synchronously refresh session state from server to capture transition to CALCULATED
+            try {
+                const refreshedSession = await printhouseCalibrationApi.getSession(readySession.id);
+                if (refreshedSession) {
+                    setSession(refreshedSession);
+                }
+            } catch (sessionFetchErr) {
+                console.warn('Failed to refresh session after calculate:', sessionFetchErr);
+            }
+
             setSuccessMessage(`Calibration completed with residual of ${run.absolute_residual} EUR.`);
             setTimeout(() => setSuccessMessage(null), 4000);
         } catch (err: any) {
