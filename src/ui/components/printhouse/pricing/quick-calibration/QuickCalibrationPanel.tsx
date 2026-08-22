@@ -467,11 +467,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     // ── 4. Mark Ready (193B Transition) ──
     const handleMarkReady = async (): Promise<any | null> => {
         setError(null);
-        let workingSession = session;
-
-        if (!workingSession?.id) {
-            workingSession = await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
-        }
+        // Persist latest draft values first (create if none, or update DRAFT if existing)
+        const workingSession = await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
 
         if (!workingSession?.id) return null;
 

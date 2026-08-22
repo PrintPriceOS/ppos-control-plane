@@ -634,8 +634,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <button
                             type="button"
                             onClick={async () => {
-                                await onApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
-                                setStep(4);
+                                const readySession = await onMarkReady();
+                                if (readySession && readySession.status === 'READY') {
+                                    setStep(4);
+                                }
                             }}
                             disabled={!isStep3Complete}
                             className="px-6 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
@@ -674,7 +676,9 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         ? 'Calibration State Inconsistent'
                                         : (activeRun && !isRunAcceptanceEligible)
                                         ? 'Calibration Did Not Converge'
-                                        : 'Ready to Run Calibration'}
+                                        : isReady
+                                        ? 'Ready to Run Calibration'
+                                        : 'Calibration Setup Incomplete'}
                                 </span>
                                 <p className="text-xs text-zinc-500 mt-0.5">
                                     Target Price: <strong className="text-zinc-800 dark:text-zinc-200">€ {draftCommercials.targetManufacturingPrice}</strong> for {draftSpec.copies?.toLocaleString()} copies.
