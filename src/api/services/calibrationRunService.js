@@ -39,8 +39,11 @@ class CalibrationRunService {
         const sessionChecksum = calibrationSessionService.computeRatesChecksum(session.bookSpec);
         const snapshotChecksum = session.currentRatesChecksum || calibrationSessionService.computeRatesChecksum(session.currentRatesSnapshot || {});
 
-        // 3. Execute pure in-memory deterministic solver
-        const solverResult = solver.solve(session);
+        // 2b. Resolve canonical printer node pricing context
+        const nodeConfig = await calibrationSessionService.resolveNodeOwnership(tenantId, session.printerNodeId);
+
+        // 3. Execute pure in-memory deterministic solver with actual node configuration
+        const solverResult = solver.solve(session, nodeConfig);
 
         // Application-side defense: Ensure solver output status is within canonical DB domain
         if (!solverResult || !ALL_CANONICAL_PERSISTED_RUN_STATUSES.includes(solverResult.status)) {

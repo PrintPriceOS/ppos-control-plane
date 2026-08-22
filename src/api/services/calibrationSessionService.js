@@ -323,7 +323,7 @@ class CalibrationSessionService {
         }
 
         const rows = await db.query(
-            'SELECT id, name FROM printer_nodes WHERE id = ? AND tenant_id = ?',
+            'SELECT id, name, signatures, limits, production_lead_days, delivery_time FROM printer_nodes WHERE id = ? AND tenant_id = ?',
             [printerNodeId, tenantId]
         );
 
@@ -334,7 +334,27 @@ class CalibrationSessionService {
             throw err;
         }
 
-        return rows[0];
+        const node = rows[0];
+        let signatures = null;
+        if (node.signatures) {
+            try {
+                const parsedSig = typeof node.signatures === 'string' ? JSON.parse(node.signatures) : node.signatures;
+                if (Array.isArray(parsedSig) && parsedSig.length > 0) {
+                    signatures = parsedSig;
+                }
+            } catch (e) {
+                signatures = null;
+            }
+        }
+
+        return {
+            id: node.id,
+            name: node.name,
+            signatures,
+            limits: typeof node.limits === 'string' ? JSON.parse(node.limits || '{}') : (node.limits || {}),
+            productionLeadDays: node.production_lead_days || 7,
+            shippingDays: node.delivery_time || 2
+        };
     }
 
     // ── CRUD Operations ─────────────────────────────────────────────────────

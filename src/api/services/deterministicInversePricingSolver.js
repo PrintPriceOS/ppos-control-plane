@@ -34,8 +34,8 @@ class DeterministicInversePricingSolver {
      * Identifies the active rate card paths participating in the reference book job.
      * Transport is strictly excluded from manufacturing active paths.
      */
-    extractActiveRatePaths(bookSpec) {
-        const p = adapter.adaptBookSpec(bookSpec);
+    extractActiveRatePaths(bookSpec, options = {}) {
+        const p = adapter.adaptBookSpec(bookSpec, options);
         const sigKey = `${p.signatureSize}p`;
         const secKey = String(Math.min(24, Math.max(1, p.sectionsCount)));
 
@@ -66,8 +66,8 @@ class DeterministicInversePricingSolver {
      * Builds candidate overrides JSON from an active rate map.
      * Manufacturing rates ONLY. Transport is never patched into rates_json.
      */
-    buildPatchFromActiveRates(bookSpec, activeRates) {
-        const p = adapter.adaptBookSpec(bookSpec);
+    buildPatchFromActiveRates(bookSpec, activeRates, options = {}) {
+        const p = adapter.adaptBookSpec(bookSpec, options);
         const sigKey = `${p.signatureSize}p`;
         const secKey = String(Math.min(24, Math.max(1, p.sectionsCount)));
 
@@ -110,9 +110,10 @@ class DeterministicInversePricingSolver {
      * Evaluates MANUFACTURING COST ONLY. Transport price per kg is informational and decoupled.
      *
      * @param {Object} session - Calibration session (bookSpec, targets, snapshot)
+     * @param {Object} [nodeConfig] - Optional printer node configuration
      * @returns {Object} Solution result with residuals, candidate patch, and provenance
      */
-    solve(session) {
+    solve(session, nodeConfig = {}) {
         const startTime = Date.now();
         const bookSpec = session.bookSpec;
         const snapshot = session.currentRatesSnapshot || {};
@@ -127,12 +128,18 @@ class DeterministicInversePricingSolver {
         let evaluationCount = 0;
 
         // 1. Initial Evaluation at baseline θ0 (before calibration)
-        const initialForward = adapter.evaluateForwardPrice(bookSpec, snapshot, {});
+        const initialForward = adapter.evaluateForwardPrice(bookSpec, snapshot, {}, nodeConfig);
         evaluationCount++;
         const priceBefore = initialForward.predictedManufacturingPrice;
 
+        // Derived signature and section options from canonical BPE forward evaluation
+        const sigOptions = {
+            signatureSize: initialForward.signature,
+            sectionsCount: initialForward.sections
+        };
+
         // 2. Base Active Rates Extraction & Prior Validation
-        const p = adapter.adaptBookSpec(bookSpec);
+        const p = adapter.adaptBookSpec(bookSpec, sigOptions);
         const sigKey = `${p.signatureSize}p`;
         const secKey = String(Math.min(24, Math.max(1, p.sectionsCount)));
 
@@ -196,8 +203,8 @@ class DeterministicInversePricingSolver {
                 candidateActive[k] = Number((v * midAlpha).toFixed(6));
             }
 
-            const candidatePatch = this.buildPatchFromActiveRates(bookSpec, candidateActive);
-            const forwardResult = adapter.evaluateForwardPrice(bookSpec, snapshot, candidatePatch);
+            const candidatePatch = this.buildPatchFromActiveRates(bookSpec, candidateActive, sigOptions);
+            const forwardResult = adapter.evaluateForwardPrice(bookSpec, snapshot, candidatePatch, nodeConfig);
             evaluationCount++;
 
             const currentPredicted = forwardResult.predictedManufacturingPrice;
@@ -227,8 +234,8 @@ class DeterministicInversePricingSolver {
             finalActiveRates[k] = Number((v * bestAlpha).toFixed(4));
         }
 
-        const proposedPatch = this.buildPatchFromActiveRates(bookSpec, finalActiveRates);
-        const finalForward = adapter.evaluateForwardPrice(bookSpec, snapshot, proposedPatch);
+        const proposedPatch = this.buildPatchFromActiveRates(bookSpec, finalActiveRates, sigOptions);
+        const finalForward = adapter.evaluateForwardPrice(bookSpec, snapshot, proposedPatch, nodeConfig);
         evaluationCount++;
 
         const finalPredicted = finalForward.predictedManufacturingPrice;
@@ -254,7 +261,7 @@ class DeterministicInversePricingSolver {
         }
 
         const executionDurationMs = Date.now() - startTime;
-        const activeRatePaths = this.extractActiveRatePaths(bookSpec);
+        const activeRatePaths = this.extractActiveRatePaths(bookSpec, sigOptions);
         const proposedPatchChecksum = adapter.computeChecksum ? adapter.computeChecksum(proposedPatch) : require('crypto').createHash('sha256').update(JSON.stringify(proposedPatch)).digest('hex');
 
         return {

@@ -70,15 +70,15 @@ class BuildPriceCalibrationAdapter {
      * @param {Object} bookSpec - Physical job specification from calibration session
      * @returns {Object} Normalized parameters for BPE buildPrice
      */
-    adaptBookSpec(bookSpec) {
+    adaptBookSpec(bookSpec, options = {}) {
         if (!bookSpec || typeof bookSpec !== 'object') {
             throw new Error('INVALID_BOOK_SPEC_FOR_ADAPTER');
         }
 
         const copies = Number(bookSpec.copies) || 1;
         const interiorPages = Number(bookSpec.interior_pages) || 1;
-        const signatureSize = 16; // Standard canonical industrial signature size
-        const sectionsCount = Math.max(1, Math.ceil(interiorPages / signatureSize));
+        const signatureSize = Number(options.signatureSize) || 16; // Dynamic signature from BPE evaluation or canonical 16p
+        const sectionsCount = Number(options.sectionsCount) || Math.max(1, Math.ceil(interiorPages / signatureSize));
 
         // Physical color mapping to internal rate selectors
         let interiorColorKey = 'one';
@@ -187,7 +187,7 @@ class BuildPriceCalibrationAdapter {
         const syntheticHouse = {
             id: nodeConfig.id || 'calibration-node',
             name: nodeConfig.name || 'Calibration Node',
-            signatures: Array.isArray(nodeConfig.signatures) && nodeConfig.signatures.length > 0 ? nodeConfig.signatures : [16, 24, 32, 8, 4],
+            signatures: Array.isArray(nodeConfig.signatures) && nodeConfig.signatures.length > 0 ? nodeConfig.signatures : null,
             production_lead_days: nodeConfig.production_lead_days || 7,
             shipping_days: nodeConfig.shipping_days || 2,
             rates: mergedRates
