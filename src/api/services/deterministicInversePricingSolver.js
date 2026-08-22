@@ -14,6 +14,7 @@
  * 5. NO RANDOMNESS: Zero Math.random(), zero stochastic iterations.
  */
 const adapter = require('./buildPriceCalibrationAdapter');
+const calibrationSessionService = require('./calibrationSessionService');
 const { computeGovernanceTolerance } = require('./calibrationGovernanceTolerances');
 
 // Governed Search Bounds & Convergence Tolerances
@@ -287,7 +288,7 @@ class DeterministicInversePricingSolver {
 
         const executionDurationMs = Date.now() - startTime;
         const activeRatePaths = this.extractActiveRatePaths(bookSpec, sigOptions);
-        const proposedPatchChecksum = adapter.computeChecksum ? adapter.computeChecksum(proposedPatch) : require('crypto').createHash('sha256').update(JSON.stringify(proposedPatch)).digest('hex');
+        const proposedPatchChecksum = calibrationSessionService.computeRatesChecksum(proposedPatch);
 
         return {
             status,
