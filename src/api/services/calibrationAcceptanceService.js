@@ -425,20 +425,20 @@ class CalibrationAcceptanceService {
                 [sessionId, tenantId]
             );
 
-            // e. Write audit log event
+            // e. Write audit log event (canonical api_audit_logs schema)
             await connection.query(
                 `INSERT INTO api_audit_logs
-                 (id, tenant_id, actor_id, event_type, resource_type, resource_id, payload_json, created_at)
-                 VALUES (?, ?, ?, 'CALIBRATION_ACCEPTED', 'pricing_calibration_session', ?, ?, NOW(6))`,
+                 (event_type, tenant_id, user_id, status, metadata_json, created_at)
+                 VALUES ('CALIBRATION_ACCEPTED', ?, ?, 'SUCCESS', ?, NOW(6))`,
                 [
-                    `audit-${uuidv4().substring(0, 8)}`,
                     tenantId,
-                    actor.id || 'system',
-                    sessionId,
+                    actor.id || null,
                     JSON.stringify({
+                        sessionId,
                         runId,
                         revisionId,
                         acceptanceId,
+                        printerNodeId: session.printer_node_id,
                         resultingRatesChecksum,
                         verifiedManufacturingPrice,
                         targetManufacturingPrice,
