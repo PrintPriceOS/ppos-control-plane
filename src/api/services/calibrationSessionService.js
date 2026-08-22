@@ -699,7 +699,8 @@ class CalibrationSessionService {
 
     /**
      * Supersedes an existing CALCULATED calibration session and creates a fresh READY session.
-     * Preserves immutable historical evidence while allowing safe governed recalculation.
+     * Executes atomically inside a single database transaction with SELECT ... FOR UPDATE locking.
+     * Preserves immutable historical evidence while preventing race conditions or partial mutations.
      *
      * @param {string} tenantId - From authenticated JWT context
      * @param {string} sessionId - Existing CALCULATED session ID to supersede
@@ -708,58 +709,146 @@ class CalibrationSessionService {
      * @returns {Promise<{ oldSession: Object, newSession: Object }>}
      */
     async supersedeAndRecalibrateSession(tenantId, sessionId, user, reason = 'SUPERSEDED_BY_NEW_PRICING_MODEL') {
-        const oldSession = await this.getSession(tenantId, sessionId);
+        const pool = db.getPool();
+        const connection = await pool.getConnection();
 
-        if (oldSession.status !== 'CALCULATED') {
-            const err = new Error('SESSION_CANNOT_BE_SUPERSEDED');
-            err.code = 'SESSION_CANNOT_BE_SUPERSEDED';
-            err.statusCode = 409;
-            err.details = `Only CALCULATED sessions can be superseded. Current status is ${oldSession.status}.`;
-            throw err;
-        }
-
-        // 1. Reject old session transactionally
-        await this.rejectSession(tenantId, sessionId, reason);
-
-        // 2. Create fresh session copying specification & commercials
-        const newSessionDraft = await this.createDraftSession(tenantId, user, {
-            printerNodeId: oldSession.printerNodeId,
-            bookSpec: oldSession.bookSpec,
-            targetManufacturingPrice: oldSession.targetManufacturingPrice,
-            currency: oldSession.currency,
-            transportPricePerKg: oldSession.transportPricePerKg,
-            transportCurrency: oldSession.transportCurrency,
-            includesPaper: oldSession.includesPaper,
-            includesBinding: oldSession.includesBinding,
-            includesFinishing: oldSession.includesFinishing,
-            includesPackaging: oldSession.includesPackaging
-        });
-
-        // 3. Promote new session to READY (snapshots fresh rates from node)
-        let promotedSession = newSessionDraft;
         try {
-            promotedSession = await this.promoteToReady(tenantId, newSessionDraft.id);
-        } catch (promoteErr) {
-            logger.warn({
-                event: 'superseded_session_promotion_deferred',
-                newSessionId: newSessionDraft.id,
-                error: promoteErr.message
+            await connection.beginTransaction();
+
+            // 1. Lock and validate old session (SELECT ... FOR UPDATE)
+            const [oldRows] = await connection.query(
+                `SELECT * FROM printhouse_pricing_calibration_sessions
+                 WHERE id = ? AND tenant_id = ? FOR UPDATE`,
+                [sessionId, tenantId]
+            );
+
+            if (!oldRows || oldRows.length === 0) {
+                const err = new Error('CALIBRATION_SESSION_NOT_FOUND');
+                err.code = 'CALIBRATION_SESSION_NOT_FOUND';
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const rawOld = oldRows[0];
+            const oldSession = this._deserializeSession(rawOld);
+
+            if (oldSession.status !== 'CALCULATED') {
+                const err = new Error('SESSION_CANNOT_BE_SUPERSEDED');
+                err.code = 'SESSION_CANNOT_BE_SUPERSEDED';
+                err.statusCode = 409;
+                err.details = `Only CALCULATED sessions can be superseded. Current status is ${oldSession.status}.`;
+                throw err;
+            }
+
+            // 2. Resolve printer node ownership and read current node rates inside transaction
+            const [nodeRows] = await connection.query(
+                `SELECT id, name, rates_json, signatures, limits, production_lead_days, delivery_time
+                 FROM printer_nodes
+                 WHERE id = ? AND tenant_id = ? FOR UPDATE`,
+                [oldSession.printerNodeId, tenantId]
+            );
+
+            if (!nodeRows || nodeRows.length === 0) {
+                const err = new Error('NODE_NOT_FOUND_OR_NOT_OWNED');
+                err.code = 'NODE_NOT_FOUND_OR_NOT_OWNED';
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const node = nodeRows[0];
+            const rawRates = node.rates_json;
+            const freshSnapshot = rawRates ? (typeof rawRates === 'string' ? JSON.parse(rawRates) : rawRates) : null;
+            const freshChecksum = this.computeRatesChecksum(freshSnapshot);
+
+            // 3. Preflight readiness validation on the specification
+            const validation = this.validateBookSpec(oldSession.bookSpec);
+            if (!validation.valid) {
+                const err = new Error('INVALID_BOOK_SPEC');
+                err.code = 'INVALID_BOOK_SPEC';
+                err.statusCode = 400;
+                err.details = validation.errors;
+                throw err;
+            }
+
+            const ambiguity = this.checkAmbiguity(oldSession);
+            if (!ambiguity.ready) {
+                const err = new Error('AMBIGUITY_PREVENTS_READY');
+                err.code = 'AMBIGUITY_PREVENTS_READY';
+                err.statusCode = 409;
+                err.details = ambiguity.blockingFields;
+                throw err;
+            }
+
+            // 4. Create fresh session in READY status directly with fresh baseline snapshot
+            const newSessionId = `cal-${uuidv4().substring(0, 8)}`;
+            const actorJson = {
+                id: user.id || null,
+                email: user.email || null,
+                role: user.role || null
+            };
+
+            await connection.query(
+                `INSERT INTO printhouse_pricing_calibration_sessions
+                 (id, tenant_id, printer_node_id, printer_node_name_snapshot, created_by_json,
+                  status, book_spec_json, target_manufacturing_price, currency,
+                  transport_price_per_kg, transport_currency,
+                  includes_paper, includes_binding, includes_finishing, includes_packaging,
+                  current_rates_snapshot_json, current_rates_checksum, rates_snapshot_at)
+                 VALUES (?, ?, ?, ?, ?, 'READY', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                [
+                    newSessionId,
+                    tenantId,
+                    oldSession.printerNodeId,
+                    node.name || null,
+                    JSON.stringify(actorJson),
+                    JSON.stringify(oldSession.bookSpec),
+                    oldSession.targetManufacturingPrice,
+                    oldSession.currency,
+                    oldSession.transportPricePerKg,
+                    oldSession.transportCurrency,
+                    oldSession.includesPaper,
+                    oldSession.includesBinding,
+                    oldSession.includesFinishing,
+                    oldSession.includesPackaging,
+                    freshSnapshot ? JSON.stringify(freshSnapshot) : null,
+                    freshChecksum
+                ]
+            );
+
+            // 5. Terminalize old session (CALCULATED -> REJECTED)
+            await connection.query(
+                `UPDATE printhouse_pricing_calibration_sessions
+                 SET status = 'REJECTED',
+                     rejected_at = NOW(6),
+                     rejection_reason = ?
+                 WHERE id = ? AND tenant_id = ? AND status = 'CALCULATED'`,
+                [reason, sessionId, tenantId]
+            );
+
+            await connection.commit();
+
+            logger.info({
+                event: 'calibration_session_superseded_atomic',
+                tenantId,
+                oldSessionId: sessionId,
+                newSessionId,
+                newStatus: 'READY'
             });
+
+            // Fetch refreshed sessions outside transaction
+            const refreshedOld = await this.getSession(tenantId, sessionId);
+            const createdNew = await this.getSession(tenantId, newSessionId);
+
+            return {
+                oldSession: refreshedOld,
+                newSession: createdNew
+            };
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
         }
-
-        logger.info({
-            event: 'calibration_session_superseded',
-            tenantId,
-            oldSessionId: sessionId,
-            newSessionId: promotedSession.id,
-            newStatus: promotedSession.status
-        });
-
-        const refreshedOld = await this.getSession(tenantId, sessionId);
-        return {
-            oldSession: refreshedOld,
-            newSession: promotedSession
-        };
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
