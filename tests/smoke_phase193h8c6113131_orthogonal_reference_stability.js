@@ -56,30 +56,22 @@ async function runAsyncTest(id, description, fn) {
     const calibrationSessionService = require('../src/api/services/calibrationSessionService');
     const solver = require('../src/api/services/deterministicInversePricingSolver');
 
-    // 1. Current Active Baseline Rates (from prev-ffb9b4a5 / eab7707c...)
+    // 1. Current Active Baseline Rates (Canonical Active Rate Card from prev-ffb9b4a5 / eab7707c...)
     const currentActiveRates = {
-        sheet_feed: { '16p': 0.046896, '24p': 0.0, '32p': 0.0, '4p': 0.0, '8p': 0.0 },
-        make_ready: { '16p': 109.843058, '24p': 0.0, '32p': 0.0, '4p': 0.0, '8p': 0.0 },
-        interior_full_colour_fixed: { '16p': 109.8431 },
-        interior_full_colour_var: { '16p': 11.1068 },
+        paper_price_interior_by_kilo: { offset: 2.5577, mc: 0.0 },
+        paper_price_cover_by_kilo: { artboard: 5.1378, mc: 0.0 },
+        interior_full_colour_fixed: { '16p': 164.0616, '32p': 0.0 },
+        interior_full_colour_var: { '16p': 16.588, '32p': 0.0 },
         interior_one_colour_fixed: { '16p': 0.0 },
         interior_one_colour_var: { '16p': 0.0 },
-        cover_fixed_by_colours: { '4': 48.749, '1': 0.0 },
-        cover_var_per_1000_by_colours: { '4': 974.9801, '1': 0.0 },
-        binding_pb_fixed_by_sections: { '8': 0.164, '3': 0.164 },
-        binding_pb_var_per_1000_by_sections: { '8': 14.7, '3': 14.7 },
+        cover_fixed_by_colours: { '4': 134.8284, '1': 0.0 },
+        cover_var_per_1000_by_colours: { '4': 25.5357, '1': 0.0 },
+        lam_fixed: { gloss: 12.2571, matt: 0.0 },
+        lam_var_per_1000: { gloss: 51.0714, matt: 0.0 },
+        binding_pb_fixed_by_sections: { '4': 0.164, '8': 0.335 },
+        binding_pb_var_per_1000_by_sections: { '4': 117.6, '8': 240.2397 },
         binding_ss_fixed_by_sections: { '3': 0.0 },
-        binding_ss_var_per_1000_by_sections: { '3': 0.0 },
-        paper_price_per_kg: {
-            offset: { '80': 1.674844 },
-            mc: { '300': 1.831872, '130': 0.0 }
-        },
-        paper_price_interior_by_kilo: { offset: 1.674844, mc: 0.0 },
-        paper_price_cover_by_kilo: { mc: 1.831872 },
-        lam_fixed: { matt: 7.3124, gloss: 0.0 },
-        lam_var_per_1000: { matt: 30.4681, gloss: 0.0 },
-        binding_perfect_bound_fixed: 117.76,
-        binding_perfect_bound_unit: 0.285871
+        binding_ss_var_per_1000_by_sections: { '3': 0.0 }
     };
 
     const nodeConfig = {
@@ -99,15 +91,15 @@ async function runAsyncTest(id, description, fn) {
         interior_print: '4/4',
         paper_type_interior: 'offset',
         paper_weight_interior: 80,
-        cover_print: '4/0',
-        paper_type_cover: 'mc',
+        paper_type_cover: 'artboard',
         paper_weight_cover: 300,
-        lamination: 'matt',
+        cover_print: '4/0',
         binding_method: 'perfect bound',
+        lamination: 'gloss',
         delivery_country: 'ES'
     };
 
-    // Reference Job B (Orthogonal Catalog: 1000 copies, 48 pages, 1/1 black interior, mc 130g interior, 1/0 cover, artboard 300g cover, gloss lamination, saddle stitch)
+    // Reference Job B (Orthogonal Catalog: 1000 copies, 48 pages, 1/1 black interior, mc 130g interior, 1/0 cover, mc 130g cover, matt lamination, saddle stitch)
     const jobBSpec = {
         copies: 1000,
         book_width_mm: 210,
@@ -117,9 +109,9 @@ async function runAsyncTest(id, description, fn) {
         paper_type_interior: 'mc',
         paper_weight_interior: 130,
         cover_print: '1/0',
-        paper_type_cover: 'artboard',
-        paper_weight_cover: 300,
-        lamination: 'gloss',
+        paper_type_cover: 'mc',
+        paper_weight_cover: 130,
+        lamination: 'matt',
         binding_method: 'saddle stitch',
         delivery_country: 'ES'
     };
@@ -155,10 +147,10 @@ async function runAsyncTest(id, description, fn) {
         assert.ok(pathsB.includes('binding_ss_fixed_by_sections.3'));
         assert.ok(pathsA.includes('paper_price_interior_by_kilo.offset'));
         assert.ok(pathsB.includes('paper_price_interior_by_kilo.mc'));
-        assert.ok(pathsA.includes('paper_price_cover_by_kilo.mc'));
-        assert.ok(pathsB.includes('paper_price_cover_by_kilo.artboard'));
-        assert.ok(pathsA.includes('lam_fixed.matt'));
-        assert.ok(pathsB.includes('lam_fixed.gloss'));
+        assert.ok(pathsA.includes('paper_price_cover_by_kilo.artboard'));
+        assert.ok(pathsB.includes('paper_price_cover_by_kilo.mc'));
+        assert.ok(pathsA.includes('lam_fixed.gloss'));
+        assert.ok(pathsB.includes('lam_fixed.matt'));
     });
 
     // T4: Deterministic Solver Run on Orthogonal Job B
