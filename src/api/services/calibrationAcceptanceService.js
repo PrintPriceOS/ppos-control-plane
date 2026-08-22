@@ -174,7 +174,7 @@ class CalibrationAcceptanceService {
 
             // 3. Fetch and lock printer node (SELECT ... FOR UPDATE)
             const [nodeRows] = await connection.query(
-                `SELECT id, tenant_id, rates_json, signatures, production_lead_days, shipping_days
+                `SELECT id, tenant_id, rates_json, signatures, production_lead_days, delivery_time
                  FROM printer_nodes
                  WHERE id = ? FOR UPDATE`,
                 [session.printer_node_id]
@@ -276,11 +276,25 @@ class CalibrationAcceptanceService {
                     : session.book_spec_json;
             }
 
+            let signatures = null;
+            if (printerNode.signatures) {
+                try {
+                    const parsedSig = typeof printerNode.signatures === 'string'
+                        ? JSON.parse(printerNode.signatures)
+                        : printerNode.signatures;
+                    if (Array.isArray(parsedSig) && parsedSig.length > 0) {
+                        signatures = parsedSig;
+                    }
+                } catch (e) {
+                    signatures = null;
+                }
+            }
+
             const nodeConfig = {
                 id: printerNode.id,
-                signatures: printerNode.signatures ? JSON.parse(printerNode.signatures) : [16, 24, 32, 8, 4],
+                signatures,
                 production_lead_days: printerNode.production_lead_days || 7,
-                shipping_days: printerNode.shipping_days || 2
+                shipping_days: printerNode.delivery_time || 2
             };
 
             const forwardResult = adapter.evaluateForwardPrice(bookSpec, resultingRates, {}, nodeConfig);
