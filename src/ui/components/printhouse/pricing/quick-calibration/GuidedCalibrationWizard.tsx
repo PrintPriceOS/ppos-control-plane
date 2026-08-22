@@ -136,7 +136,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         isStep1Complete &&
         isStep2Complete &&
         isStep3Complete &&
-        (isAccepted || isCalculated)
+        isAccepted
     );
 
     const isStep5Complete = Boolean(
@@ -166,7 +166,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         if (targetStep === 2) return Boolean(draftSpec.copies) || isStep1Complete;
         if (targetStep === 3) return isStep1Complete && isStep2Complete;
         if (targetStep === 4) return isStep1Complete && isStep2Complete && isStep3Complete;
-        if (targetStep === 5) return isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
+        if (targetStep === 5) return isStep1Complete && isStep2Complete && isStep3Complete && isAccepted;
         return false;
     };
 
