@@ -149,16 +149,41 @@ class DeterministicInversePricingSolver {
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
 
         // Historical safe calibration priors (n=13 validated benchmarks)
+        // Rate Classification Policy:
+        // 1. ESSENTIAL_ZERO_WITH_GOVERNED_PRIOR: Required positive physical/industrial components (paper, interior print)
+        // 2. MISSING_WITH_PRIOR: Missing paths where a governed benchmark exists
+        // 3. LEGITIMATE_ZERO_ALLOWED: Intentionally zero options (e.g. UV varnish default inactive)
         const priorsUsed = [];
-        const resolveActiveRate = (pathKey, subKey, safePrior) => {
+        const resolveActiveRate = (pathKey, subKey, safePrior, isEssential = false) => {
             const container = snapshot[pathKey];
-            if (container !== undefined && container[subKey] !== undefined) {
-                return Number(container[subKey]); // Explicit zero or explicit value preserved
-            }
-            if (safePrior !== undefined && safePrior !== null) {
-                priorsUsed.push({ path: `${pathKey}.${subKey}`, priorValue: safePrior });
+            const hasExplicitValue = container !== undefined && container[subKey] !== undefined;
+            const numericVal = hasExplicitValue ? Number(container[subKey]) : undefined;
+
+            // Check if rate is explicitly 0 for an essential physical component
+            if (hasExplicitValue && numericVal === 0 && isEssential && safePrior !== undefined && safePrior !== null && safePrior > 0) {
+                priorsUsed.push({
+                    path: `${pathKey}.${subKey}`,
+                    originalValue: 0,
+                    priorValue: safePrior,
+                    reason: 'ZERO_ANCHOR_PROMOTION'
+                });
                 return safePrior;
             }
+
+            if (hasExplicitValue) {
+                return numericVal; // Preserves legitimate explicit values (including 0 when not essential)
+            }
+
+            if (safePrior !== undefined && safePrior !== null) {
+                priorsUsed.push({
+                    path: `${pathKey}.${subKey}`,
+                    originalValue: null,
+                    priorValue: safePrior,
+                    reason: 'MISSING_RATE_PRIOR'
+                });
+                return safePrior;
+            }
+
             const err = new Error(`MISSING_ACTIVE_RATE_NO_SAFE_PRIOR: ${pathKey}.${subKey}`);
             err.code = 'MISSING_ACTIVE_RATE_NO_SAFE_PRIOR';
             err.ratePath = `${pathKey}.${subKey}`;
@@ -166,23 +191,23 @@ class DeterministicInversePricingSolver {
         };
 
         const baseActive = {
-            [intFixedKey]: resolveActiveRate(intFixedKey, sigKey, 80.31),
-            [intVarKey]: resolveActiveRate(intVarKey, sigKey, 8.12),
-            cover_fixed_by_colours: resolveActiveRate('cover_fixed_by_colours', p.coverColorKey, 40.0),
-            cover_var_per_1000_by_colours: resolveActiveRate('cover_var_per_1000_by_colours', p.coverColorKey, 800.0),
-            [bindFixedKey]: resolveActiveRate(bindFixedKey, secKey, 0.164),
-            [bindVarKey]: resolveActiveRate(bindVarKey, secKey, 14.7),
-            paper_price_interior_by_kilo: resolveActiveRate('paper_price_interior_by_kilo', p.paperTypeInterior, 1.252),
-            paper_price_cover_by_kilo: resolveActiveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515)
+            [intFixedKey]: resolveActiveRate(intFixedKey, sigKey, 80.31, true),
+            [intVarKey]: resolveActiveRate(intVarKey, sigKey, 8.12, true),
+            cover_fixed_by_colours: resolveActiveRate('cover_fixed_by_colours', p.coverColorKey, 40.0, true),
+            cover_var_per_1000_by_colours: resolveActiveRate('cover_var_per_1000_by_colours', p.coverColorKey, 800.0, true),
+            [bindFixedKey]: resolveActiveRate(bindFixedKey, secKey, 0.164, true),
+            [bindVarKey]: resolveActiveRate(bindVarKey, secKey, 14.7, true),
+            paper_price_interior_by_kilo: resolveActiveRate('paper_price_interior_by_kilo', p.paperTypeInterior, 1.252, true),
+            paper_price_cover_by_kilo: resolveActiveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515, true)
         };
 
         if (p.laminationType) {
-            baseActive.lam_fixed = resolveActiveRate('lam_fixed', p.laminationType, 6.0);
-            baseActive.lam_var_per_1000 = resolveActiveRate('lam_var_per_1000', p.laminationType, 25.0);
+            baseActive.lam_fixed = resolveActiveRate('lam_fixed', p.laminationType, 6.0, true);
+            baseActive.lam_var_per_1000 = resolveActiveRate('lam_var_per_1000', p.laminationType, 25.0, true);
         }
         if (p.uvVarnishActive) {
-            baseActive.uv_fixed = resolveActiveRate('uv_varnish', 'fixed', 0.0);
-            baseActive.uv_var = resolveActiveRate('uv_varnish', 'var', 0.0);
+            baseActive.uv_fixed = resolveActiveRate('uv_varnish', 'fixed', 0.0, false);
+            baseActive.uv_var = resolveActiveRate('uv_varnish', 'var', 0.0, false);
         }
 
         // 3. Regularized Proportional Search (Binary Search for Scale Factor alpha*)
@@ -250,11 +275,11 @@ class DeterministicInversePricingSolver {
         let status = 'SUCCEEDED';
         if (!isFinitePrice || !isFiniteResidual) {
             status = 'NO_SOLUTION';
-        } else if (absResidual <= SOLVER_CONFIG.toleranceAbsEur || pctResidual <= SOLVER_CONFIG.tolerancePct) {
-            // Strict numerical convergence
+        } else if (absResidual <= SOLVER_CONFIG.toleranceAbsEur && pctResidual <= SOLVER_CONFIG.tolerancePct) {
+            // Strict numerical convergence requires satisfying BOTH absolute (0.05 EUR) and relative (0.01%) thresholds
             status = 'SUCCEEDED';
         } else if (absResidual <= governanceTolerance) {
-            // Governed acceptance candidate
+            // Governed acceptance candidate (satisfies governance threshold without claiming strict numerical equivalence)
             status = 'ACCEPTABLE_CANDIDATE';
         } else {
             status = 'NO_SOLUTION';
