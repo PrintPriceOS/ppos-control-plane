@@ -142,6 +142,15 @@ export const printhouseCalibrationApi = {
         return handleResponse<any>(res);
     },
 
+    async supersedeSession(sessionId: string, reason?: string) {
+        const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/supersede`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ reason })
+        });
+        return handleResponse<{ oldSession: any, newSession: any }>(res);
+    },
+
     // ── Phase 193C: Deterministic Inverse Solver Runs ────────────────────────
     async calculateCalibration(sessionId: string, tolerancePolicy?: any) {
         const res = await fetch(`${BASE_URL}/calibrations/${sessionId}/calculate`, {

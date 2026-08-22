@@ -535,16 +535,42 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             setSuccessMessage(`Calibration run accepted! Immutable revision created.`);
             setTimeout(() => setSuccessMessage(null), 5000);
             onAccepted?.();
-        } catch (err: any) {
-            let userMsg = err.message || 'Failed to accept calibration run';
             if (err.code === 'BASELINE_DRIFT_DETECTED') {
                 userMsg = 'Underlying rates have changed since this calibration run was calculated. Please re-run calibration.';
             } else if (err.code === 'CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED') {
                 userMsg = 'Proposal residual exceeds permitted acceptance tolerance.';
+            } else if (err.code === 'PROPOSED_PATCH_INTEGRITY_FAILURE' || String(err.message).includes('PROPOSED_PATCH_INTEGRITY_FAILURE')) {
+                userMsg = 'This calculation was created with an older pricing model and cannot be accepted safely. Recalculate it using the current pricing model.';
+                setShowSupersedeAction(true);
             }
             setError(userMsg);
         } finally {
             setAccepting(false);
+        }
+    };
+
+    // ── 7. Governed Supersession & Recalibration Flow (Phase 193H.8C.6.11.3.6.6) ──
+    const [superseding, setSuperseding] = useState(false);
+    const [showSupersedeAction, setShowSupersedeAction] = useState(false);
+
+    const handleSupersedeAndRecalibrate = async () => {
+        if (!session?.id) return;
+        setSuperseding(true);
+        setError(null);
+        try {
+            const result = await printhouseCalibrationApi.supersedeSession(session.id, 'SUPERSEDED_BY_NEW_PRICING_MODEL');
+            if (result?.newSession) {
+                setSession(result.newSession);
+                setActiveRun(null);
+                setShowAcceptModal(false);
+                setShowSupersedeAction(false);
+                setSuccessMessage('Previous calculation superseded. Ready to run new calibration with current pricing model.');
+                setTimeout(() => setSuccessMessage(null), 5000);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to supersede calibration session');
+        } finally {
+            setSuperseding(false);
         }
     };
 
@@ -648,7 +674,34 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             </div>
 
             {/* Notifications */}
-            {error && (
+            {showSupersedeAction && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-xl space-y-3">
+                    <div className="flex items-start gap-2.5">
+                        <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                Pricing Model Upgrade Required
+                            </h4>
+                            <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                                This calibration calculation was computed with a legacy pricing engine contract and cannot be accepted safely under current integrity rules. Supersede this calculation to generate a new run using current zero-anchor recovery and dynamic signature paths.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={handleSupersedeAndRecalibrate}
+                            disabled={superseding}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-400 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
+                        >
+                            <RefreshCw size={14} className={superseding ? 'animate-spin' : ''} />
+                            <span>{superseding ? 'Upgrading Session...' : 'Recalculate with Current Pricing Model'}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {error && !showSupersedeAction && (
                 <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-900 dark:text-red-200 flex items-center gap-2 font-medium">
                     <AlertTriangle size={16} className="text-red-600 shrink-0" />
                     <span>{error}</span>

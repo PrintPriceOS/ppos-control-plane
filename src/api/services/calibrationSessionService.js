@@ -697,6 +697,71 @@ class CalibrationSessionService {
         return this.getSession(tenantId, sessionId);
     }
 
+    /**
+     * Supersedes an existing CALCULATED calibration session and creates a fresh READY session.
+     * Preserves immutable historical evidence while allowing safe governed recalculation.
+     *
+     * @param {string} tenantId - From authenticated JWT context
+     * @param {string} sessionId - Existing CALCULATED session ID to supersede
+     * @param {Object} user - Authenticated user context
+     * @param {string} [reason='SUPERSEDED_BY_NEW_PRICING_MODEL'] - Audit reason
+     * @returns {Promise<{ oldSession: Object, newSession: Object }>}
+     */
+    async supersedeAndRecalibrateSession(tenantId, sessionId, user, reason = 'SUPERSEDED_BY_NEW_PRICING_MODEL') {
+        const oldSession = await this.getSession(tenantId, sessionId);
+
+        if (oldSession.status !== 'CALCULATED') {
+            const err = new Error('SESSION_CANNOT_BE_SUPERSEDED');
+            err.code = 'SESSION_CANNOT_BE_SUPERSEDED';
+            err.statusCode = 409;
+            err.details = `Only CALCULATED sessions can be superseded. Current status is ${oldSession.status}.`;
+            throw err;
+        }
+
+        // 1. Reject old session transactionally
+        await this.rejectSession(tenantId, sessionId, reason);
+
+        // 2. Create fresh session copying specification & commercials
+        const newSessionDraft = await this.createDraftSession(tenantId, user, {
+            printerNodeId: oldSession.printerNodeId,
+            bookSpec: oldSession.bookSpec,
+            targetManufacturingPrice: oldSession.targetManufacturingPrice,
+            currency: oldSession.currency,
+            transportPricePerKg: oldSession.transportPricePerKg,
+            transportCurrency: oldSession.transportCurrency,
+            includesPaper: oldSession.includesPaper,
+            includesBinding: oldSession.includesBinding,
+            includesFinishing: oldSession.includesFinishing,
+            includesPackaging: oldSession.includesPackaging
+        });
+
+        // 3. Promote new session to READY (snapshots fresh rates from node)
+        let promotedSession = newSessionDraft;
+        try {
+            promotedSession = await this.promoteToReady(tenantId, newSessionDraft.id);
+        } catch (promoteErr) {
+            logger.warn({
+                event: 'superseded_session_promotion_deferred',
+                newSessionId: newSessionDraft.id,
+                error: promoteErr.message
+            });
+        }
+
+        logger.info({
+            event: 'calibration_session_superseded',
+            tenantId,
+            oldSessionId: sessionId,
+            newSessionId: promotedSession.id,
+            newStatus: promotedSession.status
+        });
+
+        const refreshedOld = await this.getSession(tenantId, sessionId);
+        return {
+            oldSession: refreshedOld,
+            newSession: promotedSession
+        };
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /**

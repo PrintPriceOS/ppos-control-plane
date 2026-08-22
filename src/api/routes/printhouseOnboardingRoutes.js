@@ -412,6 +412,15 @@ router.post('/pricing/calibrations/:id/reject', wrapHandler(async (req, res) => 
     res.json({ ok: true, data: session });
 }));
 
+// POST /api/printhouse/onboarding/pricing/calibrations/:id/supersede — Supersede & create fresh session
+router.post('/pricing/calibrations/:id/supersede', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const user = { id: req.user.id, email: req.user.email, role: req.user.role };
+    const reason = req.body.reason || 'SUPERSEDED_BY_NEW_PRICING_MODEL';
+    const result = await calibrationService.supersedeAndRecalibrateSession(tenantId, req.params.id, user, reason);
+    res.status(201).json({ ok: true, data: result });
+}));
+
 
 // ──── 5. Calibration Runs & Deterministic Solver REST Endpoints (Phase 193C) ─
 const calibrationRunService = require('../services/calibrationRunService');
