@@ -319,6 +319,20 @@ class CalibrationAcceptanceService {
                 throw err;
             }
 
+            // 8b. RESOLVE PREVIOUS PARENT REVISION (Explicit Lineage)
+            // Finds the immediate prior revision matching the verified baseline rates checksum for this tenant & node
+            let parentRevisionId = null;
+            const [parentRows] = await connection.query(
+                `SELECT id FROM printhouse_pricing_revisions
+                 WHERE tenant_id = ? AND printer_node_id = ? AND rates_checksum = ?
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1`,
+                [tenantId, session.printer_node_id, run.rate_snapshot_checksum]
+            );
+            if (parentRows && parentRows.length > 0) {
+                parentRevisionId = parentRows[0].id;
+            }
+
             // 9. ATOMIC DATABASE MUTATIONS (D12)
             const revisionId = `prev-${uuidv4().substring(0, 8)}`;
             const acceptanceId = `pacc-${uuidv4().substring(0, 8)}`;
@@ -334,17 +348,18 @@ class CalibrationAcceptanceService {
             await connection.query(
                 `INSERT INTO printhouse_pricing_revisions
                  (id, tenant_id, printer_node_id, source_type,
-                  source_calibration_session_id, source_calibration_run_id,
+                  source_calibration_session_id, source_calibration_run_id, parent_revision_id,
                   rates_json, rates_checksum, baseline_rates_checksum, proposed_patch_checksum,
                   engine_package, engine_version, engine_commit, solver_version,
                   created_by_json, created_at)
-                 VALUES (?, ?, ?, 'CALIBRATION_ACCEPTANCE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                 VALUES (?, ?, ?, 'CALIBRATION_ACCEPTANCE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
                 [
                     revisionId,
                     tenantId,
                     session.printer_node_id,
                     sessionId,
                     runId,
+                    parentRevisionId,
                     JSON.stringify(resultingRates),
                     resultingRatesChecksum,
                     run.rate_snapshot_checksum,
