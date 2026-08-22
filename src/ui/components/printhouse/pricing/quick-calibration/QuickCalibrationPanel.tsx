@@ -467,20 +467,25 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     // ── 4. Mark Ready (193B Transition) ──
     const handleMarkReady = async (): Promise<any | null> => {
         setError(null);
-        // Persist latest draft values first (create if none, or update DRAFT if existing)
+        if (!session?.id) return null;
+
+        // Strict guard: Only DRAFT sessions can ever transition to READY
+        if (session.status !== 'DRAFT') {
+            return session;
+        }
+
+        // Persist latest draft values first (update DRAFT)
         const workingSession = await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
 
         if (!workingSession?.id) return null;
+        if (workingSession.status !== 'DRAFT') return workingSession;
 
         try {
-            if (workingSession.status !== 'READY') {
-                const updated = await printhouseCalibrationApi.markSessionReady(workingSession.id);
-                setSession(updated);
-                setSuccessMessage('Session marked READY. You can now calculate pricing.');
-                setTimeout(() => setSuccessMessage(null), 3000);
-                return updated;
-            }
-            return workingSession;
+            const updated = await printhouseCalibrationApi.markSessionReady(workingSession.id);
+            setSession(updated);
+            setSuccessMessage('Session marked READY. You can now calculate pricing.');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            return updated;
         } catch (err: any) {
             setError(err.message || 'Failed to mark session ready');
             return null;
@@ -489,11 +494,12 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
     // ── 5. Calculate Starting Pricing (193C Deterministic Solver) ──
     const handleCalculate = async () => {
+        if (calculating) return;
         setCalculating(true);
         setError(null);
         try {
             let readySession = session;
-            if (!readySession?.id || readySession.status !== 'READY') {
+            if (readySession?.status === 'DRAFT') {
                 readySession = await handleMarkReady();
             }
 
@@ -525,7 +531,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
     // ── 6. Governed Acceptance (193D Revision Creation) ──
     const handleAcceptanceConfirm = async () => {
-        if (!session?.id || !activeRun?.id) return;
+        if (!session?.id || !activeRun?.id || accepting) return;
         setAccepting(true);
         setError(null);
         try {
@@ -535,6 +541,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             setSuccessMessage(`Calibration run accepted! Immutable revision created.`);
             setTimeout(() => setSuccessMessage(null), 5000);
             onAccepted?.();
+        } catch (err: any) {
+            let userMsg = err.message || 'Failed to accept calibration run';
             if (err.code === 'BASELINE_DRIFT_DETECTED') {
                 userMsg = 'Underlying rates have changed since this calibration run was calculated. Please re-run calibration.';
             } else if (err.code === 'CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED') {
