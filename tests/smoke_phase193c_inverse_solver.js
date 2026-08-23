@@ -207,31 +207,90 @@ test('C4', 'Extracts correct active rate paths for given book spec (manufacturin
 });
 
 test('C5', 'Synthetic round-trip: Known scaled target recovers exact target with residual < 0.05 EUR', () => {
-    // 1. Compute target price at 1.5x scale
-    const scaledActive = {};
-    for (const [k, v] of Object.entries(BASELINE_SNAPSHOT)) {
-        scaledActive[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
-    }
-    scaledActive.interior_full_colour_fixed['16p'] = 180.0;
-    scaledActive.interior_full_colour_var['16p'] = 27.0;
+    const baselineForward = adapter.evaluateForwardPrice(
+        VALID_BOOK_SPEC,
+        BASELINE_SNAPSHOT,
+        {}
+    );
 
-    const baselineForward = adapter.evaluateForwardPrice(VALID_BOOK_SPEC, BASELINE_SNAPSHOT, {});
-    const targetMfgPrice = Number((baselineForward.predictedManufacturingPrice * 1.35).toFixed(2));
+    const sigOptions = {
+        signatureSize: baselineForward.signature,
+        sectionsCount: baselineForward.sections
+    };
+
+    const p = adapter.adaptBookSpec(VALID_BOOK_SPEC, sigOptions);
+    const sigKey = `${p.signatureSize}p`;
+    const secKey = String(Math.min(24, Math.max(1, p.sectionsCount)));
+
+    const intFixedKey = `interior_${p.interiorColorKey}_colour_fixed`;
+    const intVarKey = `interior_${p.interiorColorKey}_colour_var`;
+    const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
+    const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
+
+    const alpha = 1.35;
+
+    const scaledActive = {
+        [intFixedKey]: BASELINE_SNAPSHOT[intFixedKey][sigKey] * alpha,
+        [intVarKey]: BASELINE_SNAPSHOT[intVarKey][sigKey] * alpha,
+        cover_fixed_by_colours:
+            BASELINE_SNAPSHOT.cover_fixed_by_colours[p.coverColorKey] * alpha,
+        cover_var_per_1000_by_colours:
+            BASELINE_SNAPSHOT.cover_var_per_1000_by_colours[p.coverColorKey] * alpha,
+        [bindFixedKey]:
+            BASELINE_SNAPSHOT[bindFixedKey][secKey] * alpha,
+        [bindVarKey]:
+            BASELINE_SNAPSHOT[bindVarKey][secKey] * alpha,
+        paper_price_interior_by_kilo:
+            BASELINE_SNAPSHOT.paper_price_interior_by_kilo[p.paperTypeInterior] * alpha,
+        paper_price_cover_by_kilo:
+            BASELINE_SNAPSHOT.paper_price_cover_by_kilo[p.paperTypeCover] * alpha
+    };
+
+    if (p.laminationType) {
+        scaledActive.lam_fixed =
+            BASELINE_SNAPSHOT.lam_fixed[p.laminationType] * alpha;
+        scaledActive.lam_var_per_1000 =
+            BASELINE_SNAPSHOT.lam_var_per_1000[p.laminationType] * alpha;
+    }
+
+    const syntheticPatch = solver.buildPatchFromActiveRates(
+        VALID_BOOK_SPEC,
+        scaledActive,
+        sigOptions
+    );
+
+    const syntheticForward = adapter.evaluateForwardPrice(
+        VALID_BOOK_SPEC,
+        BASELINE_SNAPSHOT,
+        syntheticPatch
+    );
 
     const session = {
         bookSpec: VALID_BOOK_SPEC,
         currentRatesSnapshot: BASELINE_SNAPSHOT,
-        targetManufacturingPrice: targetMfgPrice,
+        targetManufacturingPrice: syntheticForward.predictedManufacturingPrice,
         transportPricePerKg: 1.15
     };
 
     const solution = solver.solve(session);
 
     assert.strictEqual(solution.status, 'SUCCEEDED');
-    assert.ok(solution.absoluteResidual <= 0.05, `Absolute residual ${solution.absoluteResidual} must be <= 0.05`);
-    assert.ok(solution.evaluationsCount <= 50, `Evaluation count ${solution.evaluationsCount} must be bounded`);
-    assert.strictEqual(solution.identifiabilityReport.classification, 'PRIOR_ANCHORED_CANDIDATE');
-    assert.strictEqual(solution.identifiabilityReport.transportCalibration, 'EXTERNAL_REFERENCE_ONLY');
+    assert.ok(
+        solution.absoluteResidual <= 0.05,
+        `Absolute residual ${solution.absoluteResidual} must be <= 0.05`
+    );
+    assert.ok(
+        solution.evaluationsCount <= 50,
+        `Evaluation count ${solution.evaluationsCount} must be bounded`
+    );
+    assert.strictEqual(
+        solution.identifiabilityReport.classification,
+        'PRIOR_ANCHORED_CANDIDATE'
+    );
+    assert.strictEqual(
+        solution.identifiabilityReport.transportCalibration,
+        'EXTERNAL_REFERENCE_ONLY'
+    );
 });
 
 test('C6', 'Determinism guarantee: Two consecutive solves return identical candidate and residuals', () => {
