@@ -366,6 +366,18 @@ router.get('/sites/:siteId/leadtimes/estimate', verifySiteAccess, wrapHandler(as
 
 // ──── 4. Calibration Session REST Endpoints (Phase 193B) ──────────────────
 const calibrationService = require('../services/calibrationSessionService');
+const calibrationReachabilityService = require('../services/calibrationReachabilityService');
+
+// POST /api/printhouse/onboarding/pricing/calibrations/reachability — Read-only Pre-Calibration Reachability Gate (Phase 193H.8C.6.13.2.5D)
+router.post('/pricing/calibrations/reachability', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const payload = {
+        ...req.body,
+        tenantId
+    };
+    const report = await calibrationReachabilityService.analyzeReachability(payload);
+    res.json({ ok: true, data: report });
+}));
 
 // POST /api/printhouse/onboarding/pricing/calibrations — Create DRAFT session
 router.post('/pricing/calibrations', wrapHandler(async (req, res) => {
