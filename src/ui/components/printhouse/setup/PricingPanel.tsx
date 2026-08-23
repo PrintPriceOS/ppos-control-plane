@@ -13,7 +13,8 @@ import { PriceBookForm } from './PriceBookForm';
 import { PricingRuleBuilder } from './PricingRuleBuilder';
 import { PricingPreview } from './PricingPreview';
 import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibrationPanel';
-import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
+import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders } from 'lucide-react';
 
 interface PricingPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -23,6 +24,10 @@ interface PricingPanelProps {
 type PricingSubTab = 'RULES' | 'SIMULATOR';
 
 export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) => {
+    // ── Workflow Selection State (Phase 193H Choice-First UX) ──
+    const [selectedWorkflow, setSelectedWorkflow] = useState<PricingWorkflow>('assistant');
+    const [isSecondaryExpanded, setIsSecondaryExpanded] = useState<boolean>(false);
+
     // ── Industrial Pricing State ──
     const [industrialData, setIndustrialData] = useState<any | null>(null);
     const [loadingIndustrial, setLoadingIndustrial] = useState(true);
@@ -408,38 +413,170 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                 </div>
             )}
 
-            {/* 1. QUICK PRICING CALIBRATION (AI-Assisted Workflow — Phase 193F) */}
-            <QuickCalibrationPanel
-                printerNodeId={industrialData?.nodeId}
-                printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
-                onAccepted={() => {
-                    fetchIndustrialPricing();
-                    onSaved?.();
+            {/* CHOICE-FIRST WORKFLOW SELECTOR (Phase 193H) */}
+            <PricingWorkflowSelector
+                selectedWorkflow={selectedWorkflow}
+                onSelectWorkflow={(wf) => {
+                    setSelectedWorkflow(wf);
+                    setIsSecondaryExpanded(false);
                 }}
             />
 
-            {/* 2. MANUAL INDUSTRIAL PRICING (Canonical rates_json Fallback & Advanced Editor) */}
-            <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                        Manual Rate Card Configuration (Advanced / Fallback)
-                    </span>
-                </div>
-                <CanonicalIndustrialPricingEditor
-                    mode="ONBOARDING"
-                    initialNodeData={industrialData ? {
-                        id: industrialData.nodeId,
-                        name: '',
-                        signatures: industrialData.signatures,
-                        delivery_time: industrialData.deliveryTime,
-                        production_lead_days: industrialData.productionLeadDays,
-                        limits: industrialData.limits,
-                        rates: industrialData.rates
-                    } : undefined}
-                    onSave={handleSaveIndustrialPricing}
-                    saving={savingIndustrial}
-                />
-            </div>
+            {/* PRIMARY & SECONDARY WORKFLOWS BASED ON SELECTION */}
+            {selectedWorkflow === 'assistant' ? (
+                <>
+                    {/* 1. PRIMARY: Pricing Calibration Assistant */}
+                    <div className="space-y-3">
+                        <QuickCalibrationPanel
+                            printerNodeId={industrialData?.nodeId}
+                            printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                            onAccepted={() => {
+                                fetchIndustrialPricing();
+                                onSaved?.();
+                            }}
+                        />
+                    </div>
+
+                    {/* 2. SECONDARY / COLLAPSED: Manual Rate Card Configuration */}
+                    <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all shadow-2xs">
+                        <div
+                            onClick={() => setIsSecondaryExpanded(!isSecondaryExpanded)}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer bg-zinc-50/70 dark:bg-zinc-900/60 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-colors border-b border-zinc-200/60 dark:border-zinc-800/60"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0">
+                                    <Calculator size={18} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                                            Manual Rate Card Configuration
+                                        </h3>
+                                        <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-200/80 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                                            {isSecondaryExpanded ? 'Expanded' : 'Collapsed'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                        Open if you prefer manual configuration instead of the assistant.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-end sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsSecondaryExpanded(!isSecondaryExpanded);
+                                    }}
+                                    className="px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                    <span>{isSecondaryExpanded ? 'Close Manual Setup' : 'Open Manual Setup'}</span>
+                                    {isSecondaryExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {isSecondaryExpanded && (
+                            <div className="p-5 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-in fade-in duration-200">
+                                <CanonicalIndustrialPricingEditor
+                                    mode="ONBOARDING"
+                                    initialNodeData={industrialData ? {
+                                        id: industrialData.nodeId,
+                                        name: '',
+                                        signatures: industrialData.signatures,
+                                        delivery_time: industrialData.deliveryTime,
+                                        production_lead_days: industrialData.productionLeadDays,
+                                        limits: industrialData.limits,
+                                        rates: industrialData.rates
+                                    } : undefined}
+                                    onSave={handleSaveIndustrialPricing}
+                                    saving={savingIndustrial}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </>
+            ) : (
+                <>
+                    {/* 1. PRIMARY: Manual Rate Card Configuration */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                                Industrial Manufacturing Cost & Rate Cards
+                            </span>
+                        </div>
+                        <CanonicalIndustrialPricingEditor
+                            mode="ONBOARDING"
+                            initialNodeData={industrialData ? {
+                                id: industrialData.nodeId,
+                                name: '',
+                                signatures: industrialData.signatures,
+                                delivery_time: industrialData.deliveryTime,
+                                production_lead_days: industrialData.productionLeadDays,
+                                limits: industrialData.limits,
+                                rates: industrialData.rates
+                            } : undefined}
+                            onSave={handleSaveIndustrialPricing}
+                            saving={savingIndustrial}
+                        />
+                    </div>
+
+                    {/* 2. SECONDARY / COLLAPSED: Assistant-Guided Pricing */}
+                    <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all shadow-2xs">
+                        <div
+                            onClick={() => setIsSecondaryExpanded(!isSecondaryExpanded)}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer bg-zinc-50/70 dark:bg-zinc-900/60 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-colors border-b border-zinc-200/60 dark:border-zinc-800/60"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-red-100 dark:bg-red-950/60 text-[#dc0000] dark:text-red-400 shrink-0">
+                                    <Sparkles size={18} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                                            Assistant-Guided Pricing
+                                        </h3>
+                                        <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-200/80 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                                            {isSecondaryExpanded ? 'Expanded' : 'Collapsed'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                        Use a real completed job to calibrate your pricing with the assistant.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-end sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsSecondaryExpanded(!isSecondaryExpanded);
+                                    }}
+                                    className="px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                    <span>{isSecondaryExpanded ? 'Close Assistant' : 'Open Assistant'}</span>
+                                    {isSecondaryExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {isSecondaryExpanded && (
+                            <div className="p-5 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-in fade-in duration-200">
+                                <QuickCalibrationPanel
+                                    printerNodeId={industrialData?.nodeId}
+                                    printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                                    onAccepted={() => {
+                                        fetchIndustrialPricing();
+                                        onSaved?.();
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
 
             {/* DOWNSTREAM / OPTIONAL: COMMERCIAL PRICING POLICIES & CATALOGS */}
             <div className="bg-white dark:bg-[#18181b] rounded-xl border border-zinc-200 dark:border-[#27272a] overflow-hidden transition-colors">
