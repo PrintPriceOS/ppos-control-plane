@@ -35,6 +35,10 @@ class DeterministicInversePricingSolver {
      * Identifies the active rate card paths participating in the reference book job.
      * Transport is strictly excluded from manufacturing active paths.
      */
+    /**
+     * Identifies the active rate card paths participating in the reference book job.
+     * Transport is strictly excluded from manufacturing active paths.
+     */
     extractActiveRatePaths(bookSpec, options = {}) {
         const p = adapter.adaptBookSpec(bookSpec, options);
         const sigKey = `${p.signatureSize}p`;
@@ -60,7 +64,35 @@ class DeterministicInversePricingSolver {
             paths.push('uv_varnish.var');
         }
 
-        return paths.sort(); // Deterministic ordering
+        // Endpapers (active only when endpapers is not 'none')
+        if (p.endpapers && p.endpapers !== 'none') {
+            const epPrint = String(p.endpapersPrint || '4/0');
+            const hasSlash = epPrint.includes('/');
+            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+
+            // Endpaper print colors (front & reverse if > 0)
+            if (frontCols >= 1 && frontCols <= 5) {
+                paths.push(`endpaper_fixed_by_colours.${frontCols}`);
+                paths.push(`endpaper_var_per_1000_by_colours.${frontCols}`);
+            }
+            if (revCols >= 1 && revCols <= 5) {
+                paths.push(`endpaper_fixed_by_colours.${revCols}`);
+                paths.push(`endpaper_var_per_1000_by_colours.${revCols}`);
+            }
+
+            // Paper sheets print mode for endpaper paper waste
+            let printMode = 'one';
+            if (frontCols === 1) printMode = 'two';
+            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+            else if (frontCols === 0) printMode = 'one';
+
+            paths.push(`paper_endpapers_fixed_by_colours.${printMode}`);
+            paths.push(`paper_endpapers_var_per_1000_by_colours.${printMode}`);
+            paths.push(`paper_price_endpaper_by_kilo.${p.paperTypeEndpaper || 'offset'}`);
+        }
+
+        return Array.from(new Set(paths)).sort(); // Deterministic deduplicated ordering
     }
 
     /**
@@ -77,22 +109,22 @@ class DeterministicInversePricingSolver {
         // Interior
         const intFixedKey = `interior_${p.interiorColorKey}_colour_fixed`;
         const intVarKey = `interior_${p.interiorColorKey}_colour_var`;
-        patch[intFixedKey] = { [sigKey]: activeRates[intFixedKey] };
-        patch[intVarKey] = { [sigKey]: activeRates[intVarKey] };
+        if (activeRates[intFixedKey] !== undefined) patch[intFixedKey] = { [sigKey]: activeRates[intFixedKey] };
+        if (activeRates[intVarKey] !== undefined) patch[intVarKey] = { [sigKey]: activeRates[intVarKey] };
 
         // Cover
-        patch.cover_fixed_by_colours = { [p.coverColorKey]: activeRates.cover_fixed_by_colours };
-        patch.cover_var_per_1000_by_colours = { [p.coverColorKey]: activeRates.cover_var_per_1000_by_colours };
+        if (activeRates.cover_fixed_by_colours !== undefined) patch.cover_fixed_by_colours = { [p.coverColorKey]: activeRates.cover_fixed_by_colours };
+        if (activeRates.cover_var_per_1000_by_colours !== undefined) patch.cover_var_per_1000_by_colours = { [p.coverColorKey]: activeRates.cover_var_per_1000_by_colours };
 
         // Binding
         const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
-        patch[bindFixedKey] = { [secKey]: activeRates[bindFixedKey] };
-        patch[bindVarKey] = { [secKey]: activeRates[bindVarKey] };
+        if (activeRates[bindFixedKey] !== undefined) patch[bindFixedKey] = { [secKey]: activeRates[bindFixedKey] };
+        if (activeRates[bindVarKey] !== undefined) patch[bindVarKey] = { [secKey]: activeRates[bindVarKey] };
 
         // Paper
-        patch.paper_price_interior_by_kilo = { [p.paperTypeInterior]: activeRates.paper_price_interior_by_kilo };
-        patch.paper_price_cover_by_kilo = { [p.paperTypeCover]: activeRates.paper_price_cover_by_kilo };
+        if (activeRates.paper_price_interior_by_kilo !== undefined) patch.paper_price_interior_by_kilo = { [p.paperTypeInterior]: activeRates.paper_price_interior_by_kilo };
+        if (activeRates.paper_price_cover_by_kilo !== undefined) patch.paper_price_cover_by_kilo = { [p.paperTypeCover]: activeRates.paper_price_cover_by_kilo };
 
         // Lamination / UV
         if (p.laminationType && activeRates.lam_fixed !== undefined) {
@@ -101,6 +133,46 @@ class DeterministicInversePricingSolver {
         }
         if (p.uvVarnishActive && activeRates.uv_fixed !== undefined) {
             patch.uv_varnish = { fixed: activeRates.uv_fixed, var: activeRates.uv_var };
+        }
+
+        // Endpapers
+        if (p.endpapers && p.endpapers !== 'none') {
+            const epPrint = String(p.endpapersPrint || '4/0');
+            const hasSlash = epPrint.includes('/');
+            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+
+            if (frontCols >= 1 && frontCols <= 5) {
+                if (activeRates[`endpaper_fixed_by_colours.${frontCols}`] !== undefined) {
+                    patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [frontCols]: activeRates[`endpaper_fixed_by_colours.${frontCols}`] });
+                }
+                if (activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] !== undefined) {
+                    patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [frontCols]: activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] });
+                }
+            }
+            if (revCols >= 1 && revCols <= 5) {
+                if (activeRates[`endpaper_fixed_by_colours.${revCols}`] !== undefined) {
+                    patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [revCols]: activeRates[`endpaper_fixed_by_colours.${revCols}`] });
+                }
+                if (activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] !== undefined) {
+                    patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [revCols]: activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] });
+                }
+            }
+
+            let printMode = 'one';
+            if (frontCols === 1) printMode = 'two';
+            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+            else if (frontCols === 0) printMode = 'one';
+
+            if (activeRates.paper_endpapers_fixed_by_colours !== undefined) {
+                patch.paper_endpapers_fixed_by_colours = { [printMode]: activeRates.paper_endpapers_fixed_by_colours };
+            }
+            if (activeRates.paper_endpapers_var_per_1000_by_colours !== undefined) {
+                patch.paper_endpapers_var_per_1000_by_colours = { [printMode]: activeRates.paper_endpapers_var_per_1000_by_colours };
+            }
+            if (activeRates.paper_price_endpaper_by_kilo !== undefined) {
+                patch.paper_price_endpaper_by_kilo = { [p.paperTypeEndpaper || 'offset']: activeRates.paper_price_endpaper_by_kilo };
+            }
         }
 
         return patch;
@@ -154,35 +226,59 @@ class DeterministicInversePricingSolver {
         const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
 
-        // Historical safe calibration priors (n=13 validated benchmarks)
-        // Rate Classification Policy:
-        // 1. ESSENTIAL_ZERO_WITH_GOVERNED_PRIOR: Required positive physical/industrial components (paper, interior print)
-        // 2. MISSING_WITH_PRIOR: Missing paths where a governed benchmark exists
-        // 3. LEGITIMATE_ZERO_ALLOWED: Intentionally zero options (e.g. UV varnish default inactive)
+        // Family-specific binding priors: PB is historically governed (0.164, 14.7). Other families do NOT inherit PB priors.
+        let bindFixedPrior = null;
+        let bindVarPrior = null;
+        if (p.bindingCode === 'pb') {
+            bindFixedPrior = 0.164;
+            bindVarPrior = 14.7;
+        }
+
         const priorsUsed = [];
         const resolveActiveRate = (pathKey, subKey, safePrior, isEssential = false) => {
+            const pathString = `${pathKey}.${subKey}`;
+            const isPathLocked = lockedRatePaths.includes(pathString);
             const container = snapshot[pathKey];
             const hasExplicitValue = container !== undefined && container[subKey] !== undefined;
             const numericVal = hasExplicitValue ? Number(container[subKey]) : undefined;
 
+            // If historically locked, preserve exact baseline value without injecting priors or failing on 0
+            if (isPathLocked) {
+                if (!hasExplicitValue || !Number.isFinite(numericVal)) {
+                    const err = new Error(`LOCKED_RATE_MISSING_OR_INVALID: ${pathString}`);
+                    err.code = 'LOCKED_RATE_MISSING_OR_INVALID';
+                    err.ratePath = pathString;
+                    throw err;
+                }
+                return numericVal;
+            }
+
+            // For calibratable rates:
             // Check if rate is explicitly 0 for an essential physical component
-            if (hasExplicitValue && numericVal === 0 && isEssential && safePrior !== undefined && safePrior !== null && safePrior > 0) {
-                priorsUsed.push({
-                    path: `${pathKey}.${subKey}`,
-                    originalValue: 0,
-                    priorValue: safePrior,
-                    reason: 'ZERO_ANCHOR_PROMOTION'
-                });
-                return safePrior;
+            if (hasExplicitValue && numericVal === 0 && isEssential) {
+                if (safePrior !== undefined && safePrior !== null && safePrior > 0) {
+                    priorsUsed.push({
+                        path: pathString,
+                        originalValue: 0,
+                        priorValue: safePrior,
+                        reason: 'ZERO_ANCHOR_PROMOTION'
+                    });
+                    return safePrior;
+                }
+                // Fail-closed if an essential calibratable path is zero with no governed prior
+                const err = new Error(`UNQUALIFIED_ZERO_ANCHOR: ${pathString}`);
+                err.code = 'UNQUALIFIED_ZERO_ANCHOR';
+                err.ratePath = pathString;
+                throw err;
             }
 
             if (hasExplicitValue) {
-                return numericVal; // Preserves legitimate explicit values (including 0 when not essential)
+                return numericVal;
             }
 
             if (safePrior !== undefined && safePrior !== null) {
                 priorsUsed.push({
-                    path: `${pathKey}.${subKey}`,
+                    path: pathString,
                     originalValue: null,
                     priorValue: safePrior,
                     reason: 'MISSING_RATE_PRIOR'
@@ -190,9 +286,9 @@ class DeterministicInversePricingSolver {
                 return safePrior;
             }
 
-            const err = new Error(`MISSING_ACTIVE_RATE_NO_SAFE_PRIOR: ${pathKey}.${subKey}`);
+            const err = new Error(`MISSING_ACTIVE_RATE_NO_SAFE_PRIOR: ${pathString}`);
             err.code = 'MISSING_ACTIVE_RATE_NO_SAFE_PRIOR';
-            err.ratePath = `${pathKey}.${subKey}`;
+            err.ratePath = pathString;
             throw err;
         };
 
@@ -201,8 +297,8 @@ class DeterministicInversePricingSolver {
             [intVarKey]: resolveActiveRate(intVarKey, sigKey, 8.12, true),
             cover_fixed_by_colours: resolveActiveRate('cover_fixed_by_colours', p.coverColorKey, 40.0, true),
             cover_var_per_1000_by_colours: resolveActiveRate('cover_var_per_1000_by_colours', p.coverColorKey, 800.0, true),
-            [bindFixedKey]: resolveActiveRate(bindFixedKey, secKey, 0.164, true),
-            [bindVarKey]: resolveActiveRate(bindVarKey, secKey, 14.7, true),
+            [bindFixedKey]: resolveActiveRate(bindFixedKey, secKey, bindFixedPrior, true),
+            [bindVarKey]: resolveActiveRate(bindVarKey, secKey, bindVarPrior, true),
             paper_price_interior_by_kilo: resolveActiveRate('paper_price_interior_by_kilo', p.paperTypeInterior, 1.252, true),
             paper_price_cover_by_kilo: resolveActiveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515, true)
         };
@@ -214,6 +310,32 @@ class DeterministicInversePricingSolver {
         if (p.uvVarnishActive) {
             baseActive.uv_fixed = resolveActiveRate('uv_varnish', 'fixed', 0.0, false);
             baseActive.uv_var = resolveActiveRate('uv_varnish', 'var', 0.0, false);
+        }
+
+        // Endpaper active rates
+        if (p.endpapers && p.endpapers !== 'none') {
+            const epPrint = String(p.endpapersPrint || '4/0');
+            const hasSlash = epPrint.includes('/');
+            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+
+            if (frontCols >= 1 && frontCols <= 5) {
+                baseActive[`endpaper_fixed_by_colours.${frontCols}`] = resolveActiveRate('endpaper_fixed_by_colours', frontCols, null, true);
+                baseActive[`endpaper_var_per_1000_by_colours.${frontCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', frontCols, null, true);
+            }
+            if (revCols >= 1 && revCols <= 5) {
+                baseActive[`endpaper_fixed_by_colours.${revCols}`] = resolveActiveRate('endpaper_fixed_by_colours', revCols, null, true);
+                baseActive[`endpaper_var_per_1000_by_colours.${revCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', revCols, null, true);
+            }
+
+            let printMode = 'one';
+            if (frontCols === 1) printMode = 'two';
+            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+            else if (frontCols === 0) printMode = 'one';
+
+            baseActive.paper_endpapers_fixed_by_colours = resolveActiveRate('paper_endpapers_fixed_by_colours', printMode, null, true);
+            baseActive.paper_endpapers_var_per_1000_by_colours = resolveActiveRate('paper_endpapers_var_per_1000_by_colours', printMode, null, true);
+            baseActive.paper_price_endpaper_by_kilo = resolveActiveRate('paper_price_endpaper_by_kilo', p.paperTypeEndpaper || 'offset', null, true);
         }
 
         const activeRateKeyToPath = {
@@ -233,6 +355,30 @@ class DeterministicInversePricingSolver {
         if (p.uvVarnishActive) {
             activeRateKeyToPath.uv_fixed = 'uv_varnish.fixed';
             activeRateKeyToPath.uv_var = 'uv_varnish.var';
+        }
+        if (p.endpapers && p.endpapers !== 'none') {
+            const epPrint = String(p.endpapersPrint || '4/0');
+            const hasSlash = epPrint.includes('/');
+            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+
+            if (frontCols >= 1 && frontCols <= 5) {
+                activeRateKeyToPath[`endpaper_fixed_by_colours.${frontCols}`] = `endpaper_fixed_by_colours.${frontCols}`;
+                activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${frontCols}`] = `endpaper_var_per_1000_by_colours.${frontCols}`;
+            }
+            if (revCols >= 1 && revCols <= 5) {
+                activeRateKeyToPath[`endpaper_fixed_by_colours.${revCols}`] = `endpaper_fixed_by_colours.${revCols}`;
+                activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${revCols}`] = `endpaper_var_per_1000_by_colours.${revCols}`;
+            }
+
+            let printMode = 'one';
+            if (frontCols === 1) printMode = 'two';
+            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+            else if (frontCols === 0) printMode = 'one';
+
+            activeRateKeyToPath.paper_endpapers_fixed_by_colours = `paper_endpapers_fixed_by_colours.${printMode}`;
+            activeRateKeyToPath.paper_endpapers_var_per_1000_by_colours = `paper_endpapers_var_per_1000_by_colours.${printMode}`;
+            activeRateKeyToPath.paper_price_endpaper_by_kilo = `paper_price_endpaper_by_kilo.${p.paperTypeEndpaper || 'offset'}`;
         }
         const isLockedActiveKey = key => lockedRatePaths.includes(activeRateKeyToPath[key]);
         for (const [key, path] of Object.entries(activeRateKeyToPath)) {
