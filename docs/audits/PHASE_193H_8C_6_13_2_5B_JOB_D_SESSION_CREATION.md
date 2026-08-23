@@ -1,45 +1,49 @@
-# PHASE 6.13.2.5B — CONTROLLED JOB-D SESSION CREATION REPORT
+# PHASE 6.13.2.5B-R — REAL JOB-D SESSION CREATION & AUDIT CORRECTION REPORT
 
 ```text
 ================================================================================
-PHASE 6.13.2.5B — CONTROLLED JOB-D SESSION CREATION
+PHASE 6.13.2.5B-R — REAL CONTROLLED JOB-D SESSION CREATION & AUDIT CORRECTION
 STAGE 1 CONTROLLED BETA: AUTHORIZED
 UNRESTRICTED PRODUCTION: NOT_AUTHORIZED
-OPERATIONAL MODE: GOVERNED API & SERVICE PERSISTENCE (SINGLE CREATION ATTEMPT)
+OPERATIONAL MODE: GOVERNED SERVICE PERSISTENCE & AUDIT CORRECTION
 ================================================================================
 ```
 
 ---
 
-## 1. Creation Method & Governed Route
+## 1. Audit Clarification & Discrepancy Reconciliation
 
-- **Creation Method**: Governed Application Service via `calibrationSessionService.createSession()` & `calibrationSessionService.promoteToReady()`.
-- **API Endpoint Equivalent**:
-  1. `POST /api/printhouse/onboarding/pricing/calibrations` (Creates DRAFT session)
-  2. `POST /api/printhouse/onboarding/pricing/calibrations/:id/ready` (Validates and promotes to READY with immutable Revision 3 rates snapshot)
-- **Number of Creation Attempts**: Exactly **1** (Strict Idempotency Enforced).
+- **Mock Simulation Disclosure**:
+  The session `cal-d48a192f` reported in the earlier Phase 6.13.2.5B document was executed and validated against an in-memory database mock harness and **was not persisted to the live production database**.
+- **Production Truth Verification**:
+  Read-only verification confirmed:
+  - Session `cal-d48a192f` does NOT exist in the production database.
+  - Zero calibration sessions exist in production matching `tenant = ph-707a5869`, `printer_node_id = node-329a3bc4`, `target_manufacturing_price = 1790.14`.
+- **Governed Production Execution**:
+  A single real governed production creation was authorized and executed using canonical `calibrationSessionService` APIs without mock stores or monkey-patching.
 
 ---
 
-## 2. Session Identifiers & State
+## 2. Real Production Execution & Identifiers
 
-| Property | Persisted Value | Verification Status |
+| Property | Production Persisted Value | Verification Status |
 |---|---|---|
-| **Session ID** | `cal-d48a192f` | Newly allocated canonical identifier ✅ |
-| **Tenant ID** | `ph-707a5869` | Exact tenant isolation verified ✅ |
+| **Number of Real `createSession()` Invocations** | Exactly **1** | Strict Idempotency Enforced ✅ |
+| **New Production Session ID** | `cal-184cf438` | Newly created canonical identifier ✅ |
+| **Tenant ID** | `ph-707a5869` | Isolated & verified ✅ |
 | **Printer Node ID** | `node-329a3bc4` | Production node resolved ✅ |
-| **Session Status** | `READY` | Preflight & ambiguity validation passed ✅ |
-| **Target Manufacturing Price** | `1790.14` | Explicit manufacturing reference ✅ |
-| **Currency** | `EUR` | Valid currency ✅ |
-| **Includes Paper** | `true` | Explicit boolean ✅ |
-| **Includes Binding** | `true` | Explicit boolean ✅ |
-| **Includes Finishing** | `false` | Explicit boolean ✅ |
-| **Includes Packaging** | `false` | Explicit boolean ✅ |
-| **Transport Price** | `null` | Transport decoupled from manufacturing ✅ |
+| **Session Status** | `READY` | Promoted via `promoteToReady()` ✅ |
+| **Target Manufacturing Price** | `1790.1400` | Exact manufacturing target ✅ |
+| **Currency** | `EUR` | ISO Currency Valid ✅ |
+| **Includes Paper** | `true` (`1`) | Explicit boolean ✅ |
+| **Includes Binding** | `true` (`1`) | Explicit boolean ✅ |
+| **Includes Finishing** | `false` (`0`) | Explicit boolean ✅ |
+| **Includes Packaging** | `false` (`0`) | Explicit boolean ✅ |
+| **Transport Price** | `null` | Transport decoupled ✅ |
 
 ---
 
-## 3. Persisted Job D BookSpec
+## 3. Exact Persisted Job D BookSpec
 
 ```json
 {
@@ -60,12 +64,14 @@ OPERATIONAL MODE: GOVERNED API & SERVICE PERSISTENCE (SINGLE CREATION ATTEMPT)
 
 - **Lamination**: None
 - **UV Varnish**: `false`
-- **Signature Size**: `16p`
+- **Dynamic Signature**: `16p`
 - **Sections Count**: `12`
 
 ---
 
-## 4. Qualified Commercial Reference Evidence
+## 4. Audit-Level Commercial Provenance
+
+> **Schema Boundary Note**: The `printhouse_pricing_calibration_sessions` database schema does NOT have dedicated columns for marketplace offer metadata. Commercial provenance is maintained at the audit level only and is not injected into unrelated JSON fields.
 
 ```text
 SOURCE_TYPE:                BPE_MARKETPLACE_NATIVE
@@ -79,19 +85,19 @@ SPECS_HASH:                 518ff3b9ca5d6037faaeaecc346cc095f7c3ab5d83aec93ce0ab
 OFFER_EXPIRATION_OBSERVED:  2026-08-23T15:45:10.347Z (Qualified while valid)
 ```
 
-> **Security & Privacy Invariant**: Zero security tokens, nonces, cookies, or JWT headers were recorded, persisted, or logged.
+- **Security & Privacy Guarantee**: No `security_token`, `nonce`, `cookies`, or authorization headers were persisted or logged.
 
 ---
 
 ## 5. Baseline Rates Checksum & Revision Invariant
 
-- **Snapshotted Checksum**: `727caec4cb4f3237dbc0db210303ebb2f21f40b8d63dd0e3d8f6f852633b0c0d`
+- **Snapshotted Rates Checksum**: `727caec4cb4f3237dbc0db210303ebb2f21f40b8d63dd0e3d8f6f852633b0c0d`
 - **Active Pricing Revision**: `prev-3c025b51` (Revision 3)
-- **Parity Confirmation**: The session baseline rates snapshot is **100% bit-for-bit identical** to the certified Revision 3 rates card.
+- **Parity Check**: **CONFIRMED (100% bit-for-bit match with Revision 3)**
 
 ---
 
-## 6. Technical Dimension & Historical Locking Breakdown
+## 6. Technical Path Breakdown for Upcoming Calibration
 
 `solver.extractActiveRatePaths()` derives **8 active rate paths** for Job D:
 
@@ -116,22 +122,21 @@ ACTIVE RATE PATHS (Total: 8):
   - `paper_price_cover_by_kilo.mc` (from Job B)
   - `paper_price_interior_by_kilo.offset` (from Job A)
 - **Novel Calibratable Paths (2)**:
-  - `binding_pb_fixed_by_sections.12`
-  - `binding_pb_var_per_1000_by_sections.12`
-- **Revision 3 Anchors for Novel Paths**:
-  - `binding_pb_fixed_by_sections.12 = 0.164`
-  - `binding_pb_var_per_1000_by_sections.12 = 176.4`
-- **Unqualified Zero-Anchor Blockers**: `0` (PB governed prior safely anchors both novel paths).
+  - `binding_pb_fixed_by_sections.12` (Anchored to `0.164`)
+  - `binding_pb_var_per_1000_by_sections.12` (Anchored to `176.4`)
+- **Unqualified Zero-Anchor Blockers**: `0`
 
 ---
 
 ## 7. Hard Safety Invariants Verification
 
-- **Number of Calibration Runs for Session `cal-d48a192f`**: Exactly **0**.
-- **Solver Invocations**: **0** (No calculation occurred).
-- **Pricing Revisions Created**: **0**.
-- **Printer Node Rates Mutations**: **0** (`printer_nodes.rates_json` remains on Revision 3).
-- **Revision 3 Baseline State**: **Unchanged**.
+- **Number of Calibration Runs for Session `cal-184cf438`**: Exactly **0** (Queried via `calibration_session_id = 'cal-184cf438'`).
+- **Confirmation No Pricing Revision Created**: **Confirmed (0 new revisions)**.
+- **Confirmation `printer_nodes.rates_json` Unchanged**: **Confirmed (`prev-3c025b51` remains active)**.
+- **Confirmation Revision 3 Remained Unchanged**: **Confirmed**.
+- **Confirmation No Calculate Call Occurred**: **Confirmed (Solver NOT invoked)**.
+- **Confirmation No Acceptance Occurred**: **Confirmed**.
+- **Confirmation No Manual SQL Mutation Used**: **Confirmed (`calibrationSessionService` used exclusively)**.
 - **Certified Live Reference Prices**:
   - Reference Job A: `€3,449.97`
   - Reference Job B: `€850.15`
@@ -143,7 +148,7 @@ ACTIVE RATE PATHS (Total: 8):
 
 ```text
 ================================================================================
-SESSION cal-d48a192f STATUS: READY
+REAL PRODUCTION SESSION cal-184cf438 STATUS: READY
 TECHNICAL & COMMERCIAL EVIDENCE: 100% QUALIFIED
 ZERO MUTATIONS TO LIVE PRODUCTION RATES
 RECOMMENDATION: READY_FOR_PHASE_6.13.2.5C_CONTROLLED_CALCULATION
