@@ -127,6 +127,21 @@ class BuildPriceCalibrationAdapter {
 
         const countryCode = COUNTRY_NAME_MAP[countryIsoUpper] || countryIsoUpper.toLowerCase();
 
+        // Endpaper semantics
+        let endpapers = bookSpec.endpapers !== undefined ? bookSpec.endpapers : null;
+        let endpapersPrint = bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : null;
+        let paperTypeEndpaper = bookSpec.paper_type_endpaper || 'offset';
+        let paperWeightEndpapers = Number(bookSpec.paper_weight_endpapers) || 115;
+
+        // Hardcover defaults matching canonical PriceEngine / Normalizer
+        if (bindingCode === 'hc') {
+            if (endpapers === null || endpapers === undefined) endpapers = 'standard';
+            if (!endpapersPrint) endpapersPrint = '4/0';
+        } else if (endpapers === null || endpapers === undefined) {
+            endpapers = 'none';
+            if (!endpapersPrint) endpapersPrint = 'none';
+        }
+
         return {
             copies,
             interiorPages,
@@ -137,8 +152,12 @@ class BuildPriceCalibrationAdapter {
             bindingCode,
             laminationType,
             uvVarnishActive,
+            endpapers,
+            endpapersPrint,
             paperTypeInterior: bookSpec.paper_type_interior || 'offset',
             paperTypeCover: bookSpec.paper_type_cover || 'mc',
+            paperTypeEndpaper,
+            paperWeightEndpapers,
             deliveryCountry: countryCode,
             deliveryCountryIso: countryIsoUpper
         };
@@ -180,6 +199,10 @@ class BuildPriceCalibrationAdapter {
             binding_method: bookSpec.binding_method || 'perfect bound',
             finishing_options: bookSpec.lamination ? `${bookSpec.lamination} lamination` : 'none',
             uv_varnish: Boolean(bookSpec.uv_varnish),
+            endpapers: bookSpec.endpapers !== undefined ? bookSpec.endpapers : (bookSpec.binding_method === 'hardcover' ? 'standard' : 'none'),
+            endpapers_print: bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : (bookSpec.binding_method === 'hardcover' ? '4/0' : 'none'),
+            paper_type_endpaper: bookSpec.paper_type_endpaper || 'offset',
+            paper_weight_endpapers: Number(bookSpec.paper_weight_endpapers) || 115,
             delivery_country: bookSpec.delivery_country || 'ES'
         };
 
