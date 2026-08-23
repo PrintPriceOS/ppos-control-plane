@@ -1,8 +1,8 @@
-# PHASE 193H.8C.6.13.2.5F — GOVERNED JOB-D ACCEPTANCE & REVISION 4 CLOSURE
+# PHASE 193H.8C.6.13.2.5F — GOVERNED JOB D (PB/4 ALTERNATIVE) ACCEPTANCE & REVISION 4 CLOSURE
 
 ```text
 ================================================================================
-PHASE 193H.8C.6.13.2.5F: GOVERNED JOB-D ACCEPTANCE & REVISION 4 CLOSURE
+PHASE 193H.8C.6.13.2.5F: GOVERNED JOB D (PB/4 ALTERNATIVE) ACCEPTANCE CLOSURE
 STATUS: PASS / CLOSED ✅
 STAGE 1 CONTROLLED BETA: AUTHORIZED
 UNRESTRICTED PRODUCTION: NOT_AUTHORIZED
@@ -12,13 +12,10 @@ OPERATIONAL MODE: CANONICAL PRODUCTION EVIDENCE & REVISION 4 SEALING
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary & Job D Disambiguation
 
-Phase 6.13.2.5E/F successfully resolved the Job D reachability challenge through pre-calibration analysis, identification and correction of an upstream Budget assistant parser defect, and execution of a governed calibration and acceptance workflow in production.
-
-- **Phase 6.13.2.5D**: `PASS` (Pre-Calibration Reachability Gate implemented and active).
-- **Phase 6.13.2.5E**: `PASS` (Reachability-guided reference qualification completed).
-- **Phase 6.13.2.5F**: `PASS / CLOSED` (Governed calibration and acceptance promoted to Revision 4).
+- **Original Job D (192 pages / 12 sections)**: Evaluated in Phase 6.13.2.5C with target €1,790.14 against Revision 3. It correctly failed closed with `BELOW_REACHABLE_FLOOR` because the target fell below the immutable locked paper cost floor (€1,999.21).
+- **Job D — Reachability-Guided PB/4 Alternative (64 pages / 4 sections)**: Selected via the Phase 6.13.2.5D Pre-Calibration Reachability Gate, evaluated with real BPE commercial target **€939.66**, successfully calibrated in `crun-70aa6d5c`, and accepted into **Revision 4** (`prev-1b6d9af1`).
 
 ---
 
@@ -48,10 +45,10 @@ A frontend semantic bug was identified and remediated in the Budget interface (`
   - **Binding Method**: `perfect bound`
   - **Lamination / Endpapers**: None (`endpapers = "none"`, `endpapers_print = "none"`)
   - **Delivery Country**: `ES`
-- **Marketplace Offers**:
-  - ADV (adv-2025): `€831.38`
-  - DAR (dar-direct): `€845.94`
-  - POZ (poz-print): `€939.66`
+- **Canonical Marketplace Offers**:
+  - ADV (`adv-2025`): `€831.38`
+  - DAR (`dar-2025`): `€845.94`
+  - POZ (`poz-2025`): `€939.66`
 - **Selected Calibration Target**: **`€939.66`**
 
 ---
@@ -80,10 +77,10 @@ Evaluated against active baseline **Revision 3** (`prev-3c025b51` / `727caec4...
 - **Absolute Residual**: `€0.03`
 - **Percent Residual**: `0.0032%`
 - **Evaluations Count**: `14`
-- **Proposed Patch**:
+- **Proposed & Accepted Patch**:
   - `binding_pb_fixed_by_sections.4`: `0.1640 → 0.4285`
   - `binding_pb_var_per_1000_by_sections.4`: `58.8000 → 153.6329`
-- **Locked Path Isolation**: 100% verified (All 6 historical paths preserved bit-for-bit).
+- **Locked Path Governance**: All 6 historical locked paths were excluded from the accepted patch and remained protected by incremental-locking governance.
 
 ---
 
@@ -121,7 +118,7 @@ prev-1b6d9af1 (Revision 4)  ← ACTIVE CANONICAL BASELINE
 
 ## 7. Governance Policy & Baseline Freezing
 
-1. **Deprecated Synthetic Evidence**: The earlier analytical candidate explore table utilizing synthetic `overrideRates` is deprecated and superseded by real production evidence above.
+1. **Deprecated Synthetic Evidence**: The earlier exploratory candidate explore table utilizing synthetic `overrideRates` is deprecated and superseded by canonical production evidence above.
 2. **Canonical Working Baseline**: All subsequent work must treat **Revision 4** (`prev-1b6d9af1` / `39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a`) as the canonical active baseline.
 3. **Immutability of Historical Evidence**: Session `cal-adc1df15` is terminally `ACCEPTED` and locked.
 4. **Stage Boundary**: Stage 1 Controlled Beta remains **AUTHORIZED**; Unrestricted Production remains **NOT_AUTHORIZED**.
