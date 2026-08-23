@@ -114,7 +114,7 @@ class DeterministicInversePricingSolver {
      * @param {Object} [nodeConfig] - Optional printer node configuration
      * @returns {Object} Solution result with residuals, candidate patch, and provenance
      */
-    solve(session, nodeConfig = {}) {
+    solve(session, nodeConfig = {}, options = {}) {
         const startTime = Date.now();
         const bookSpec = session.bookSpec;
         const snapshot = session.currentRatesSnapshot || {};
@@ -138,6 +138,11 @@ class DeterministicInversePricingSolver {
             signatureSize: initialForward.signature,
             sectionsCount: initialForward.sections
         };
+
+        const activeRatePaths = this.extractActiveRatePaths(bookSpec, sigOptions);
+        const requestedLockedPaths = Array.isArray(options.lockedRatePaths) ? options.lockedRatePaths : [];
+        const lockedRatePaths = activeRatePaths.filter(path => requestedLockedPaths.includes(path)).sort();
+        const calibratableRatePaths = activeRatePaths.filter(path => lockedRatePaths.indexOf(path) === -1).sort();
 
         // 2. Base Active Rates Extraction & Prior Validation
         const p = adapter.adaptBookSpec(bookSpec, sigOptions);
@@ -211,6 +216,48 @@ class DeterministicInversePricingSolver {
             baseActive.uv_var = resolveActiveRate('uv_varnish', 'var', 0.0, false);
         }
 
+        const activeRateKeyToPath = {
+            [intFixedKey]: `${intFixedKey}.${sigKey}`,
+            [intVarKey]: `${intVarKey}.${sigKey}`,
+            cover_fixed_by_colours: `cover_fixed_by_colours.${p.coverColorKey}`,
+            cover_var_per_1000_by_colours: `cover_var_per_1000_by_colours.${p.coverColorKey}`,
+            [bindFixedKey]: `${bindFixedKey}.${secKey}`,
+            [bindVarKey]: `${bindVarKey}.${secKey}`,
+            paper_price_interior_by_kilo: `paper_price_interior_by_kilo.${p.paperTypeInterior}`,
+            paper_price_cover_by_kilo: `paper_price_cover_by_kilo.${p.paperTypeCover}`
+        };
+        if (p.laminationType) {
+            activeRateKeyToPath.lam_fixed = `lam_fixed.${p.laminationType}`;
+            activeRateKeyToPath.lam_var_per_1000 = `lam_var_per_1000.${p.laminationType}`;
+        }
+        if (p.uvVarnishActive) {
+            activeRateKeyToPath.uv_fixed = 'uv_varnish.fixed';
+            activeRateKeyToPath.uv_var = 'uv_varnish.var';
+        }
+        const isLockedActiveKey = key => lockedRatePaths.includes(activeRateKeyToPath[key]);
+        for (const [key, path] of Object.entries(activeRateKeyToPath)) {
+            if (!lockedRatePaths.includes(path)) continue;
+
+            const dot = path.lastIndexOf('.');
+            const parentKey = path.slice(0, dot);
+            const leafKey = path.slice(dot + 1);
+            const lockedValue = Number(snapshot[parentKey]?.[leafKey]);
+
+            if (!Number.isFinite(lockedValue)) {
+                const err = new Error(`LOCKED_RATE_MISSING_OR_INVALID: ${path}`);
+                err.code = 'LOCKED_RATE_MISSING_OR_INVALID';
+                err.ratePath = path;
+                throw err;
+            }
+
+            baseActive[key] = lockedValue;
+        }
+
+        for (let i = priorsUsed.length - 1; i >= 0; i--) {
+            if (lockedRatePaths.includes(priorsUsed[i].path)) {
+                priorsUsed.splice(i, 1);
+            }
+        }
         // 3. Regularized Proportional Search (Binary Search for Scale Factor alpha*)
         let lowAlpha = SOLVER_CONFIG.scaleMin;
         let highAlpha = SOLVER_CONFIG.scaleMax;
@@ -226,7 +273,7 @@ class DeterministicInversePricingSolver {
             // Generate candidate rates scaled by alpha
             const candidateActive = {};
             for (const [k, v] of Object.entries(baseActive)) {
-                candidateActive[k] = Number((v * midAlpha).toFixed(6));
+                candidateActive[k] = isLockedActiveKey(k) ? v : Number((v * midAlpha).toFixed(6));
             }
 
             const candidatePatch = this.buildPatchFromActiveRates(bookSpec, candidateActive, sigOptions);
@@ -257,10 +304,19 @@ class DeterministicInversePricingSolver {
         // 4. Construct Final Prior-Anchored Solution Patch
         const finalActiveRates = {};
         for (const [k, v] of Object.entries(baseActive)) {
-            finalActiveRates[k] = Number((v * bestAlpha).toFixed(4));
+            finalActiveRates[k] = isLockedActiveKey(k) ? v : Number((v * bestAlpha).toFixed(4));
         }
 
         const proposedPatch = this.buildPatchFromActiveRates(bookSpec, finalActiveRates, sigOptions);
+        for (const lockedPath of lockedRatePaths) {
+            const dot = lockedPath.lastIndexOf('.');
+            const parentKey = lockedPath.slice(0, dot);
+            const leafKey = lockedPath.slice(dot + 1);
+            if (proposedPatch[parentKey] && typeof proposedPatch[parentKey] === 'object') {
+                delete proposedPatch[parentKey][leafKey];
+                if (Object.keys(proposedPatch[parentKey]).length === 0) delete proposedPatch[parentKey];
+            }
+        }
         const finalForward = adapter.evaluateForwardPrice(bookSpec, snapshot, proposedPatch, nodeConfig);
         evaluationCount++;
 
@@ -287,7 +343,6 @@ class DeterministicInversePricingSolver {
         }
 
         const executionDurationMs = Date.now() - startTime;
-        const activeRatePaths = this.extractActiveRatePaths(bookSpec, sigOptions);
         const proposedPatchChecksum = calibrationSessionService.computeRatesChecksum(proposedPatch);
 
         return {
@@ -306,6 +361,8 @@ class DeterministicInversePricingSolver {
             absoluteResidual: Number(absResidual.toFixed(6)),
             percentResidual: Number(pctResidual.toFixed(4)),
             activeRatePaths,
+            lockedRatePaths,
+            calibratableRatePaths,
             proposedPatch,
             proposedPatchChecksum,
             candidateParameters: finalActiveRates,
@@ -315,6 +372,8 @@ class DeterministicInversePricingSolver {
                 anchoredToSnapshot: true,
                 scaleMultiplierApplied: Number(bestAlpha.toFixed(6)),
                 priorsInjected: priorsUsed,
+                lockedRatePaths,
+                calibratableRatePaths,
                 transportCalibration: 'EXTERNAL_REFERENCE_ONLY',
                 referenceTransportPricePerKg: referenceTransPricePerKg,
                 notice: 'Single-job calibration outputs are prior-anchored candidate configurations; they are not proof of uniquely identified underlying production rates.'

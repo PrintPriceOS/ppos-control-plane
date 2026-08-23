@@ -324,7 +324,86 @@ test('C8d', 'Unsupported transport country does NOT fall back to arbitrary non-z
     assert.strictEqual(forwardResult.predictedTransportPrice, 0.0, 'Unknown transport country must produce 0 transport without breaking manufacturing price');
     assert.ok(forwardResult.predictedManufacturingPrice > 0, 'Manufacturing price must remain calculated');
 });
+test('C8e', 'Incremental calibration locks previously established active paths and calibrates only novel paths', () => {
+    const incrementalBookSpec = {
+        copies: 500,
+        interior_pages: 320,
+        cover_pages: 4,
+        book_width_mm: 148,
+        book_height_mm: 210,
+        orientation: 'portrait',
+        interior_print: '2/2',
+        cover_print: '4/0',
+        paper_type_interior: 'lux',
+        paper_weight_interior: 80,
+        paper_type_cover: 'offset',
+        paper_weight_cover: 120,
+        binding_method: 'thread sewn',
+        uv_varnish: true,
+        delivery_country: 'ES'
+    };
 
+    const incrementalSnapshot = {
+        ...JSON.parse(JSON.stringify(BASELINE_SNAPSHOT)),
+        interior_two_colour_fixed: { '16p': 0 },
+        interior_two_colour_var: { '16p': 0 },
+        binding_ts_fixed_by_sections: { '20': 59.85 },
+        binding_ts_var_per_1000_by_sections: { '20': 210.12 },
+        paper_price_interior_by_kilo: {
+            ...BASELINE_SNAPSHOT.paper_price_interior_by_kilo,
+            lux: 0
+        },
+        paper_price_cover_by_kilo: {
+            ...BASELINE_SNAPSHOT.paper_price_cover_by_kilo,
+            offset: 0
+        },
+        uv_varnish: { fixed: 0, var: 0 }
+    };
+
+    const session = {
+        bookSpec: incrementalBookSpec,
+        currentRatesSnapshot: incrementalSnapshot,
+        targetManufacturingPrice: 1802.84
+    };
+
+    const lockedRatePaths = [
+        'cover_fixed_by_colours.4',
+        'cover_var_per_1000_by_colours.4'
+    ];
+
+    const solution = solver.solve(
+        session,
+        { signatures: [16] },
+        { lockedRatePaths }
+    );
+
+    assert.deepStrictEqual(
+        solution.lockedRatePaths,
+        lockedRatePaths.sort(),
+        'Expected the two historically established cover paths to remain locked'
+    );
+
+    assert.strictEqual(
+        solution.calibratableRatePaths.length,
+        8,
+        'Expected exactly 8 novel C-prime rate paths'
+    );
+
+    assert.ok(
+        !solution.proposedPatch.cover_fixed_by_colours,
+        'Locked cover_fixed_by_colours.4 must not appear in proposedPatch'
+    );
+
+    assert.ok(
+        !solution.proposedPatch.cover_var_per_1000_by_colours,
+        'Locked cover_var_per_1000_by_colours.4 must not appear in proposedPatch'
+    );
+
+    assert.ok(
+        solution.absoluteResidual <= 1802.84 * 0.005,
+        `Residual ${solution.absoluteResidual} must remain within governance tolerance`
+    );
+});
 // ── 4. Route Wiring & API Contract Tests ─────────────────────────────────────
 
 console.log('\n═══ Phase 193C: Route Wiring Validation ═══\n');

@@ -15,6 +15,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const calibrationSessionService = require('./calibrationSessionService');
 const solver = require('./deterministicInversePricingSolver');
+const calibrationEstablishedPathsService = require('./calibrationEstablishedPathsService');
 const logger = require('./logger').child('calibration-runs');
 const { CANONICAL_ACCEPTABLE_RUN_STATUSES, ALL_CANONICAL_PERSISTED_RUN_STATUSES } = require('./calibrationGovernanceTolerances');
 
@@ -42,8 +43,15 @@ class CalibrationRunService {
         // 2b. Resolve canonical printer node pricing context
         const nodeConfig = await calibrationSessionService.resolveNodeOwnership(tenantId, session.printerNodeId);
 
-        // 3. Execute pure in-memory deterministic solver with actual node configuration
-        const solverResult = solver.solve(session, nodeConfig);
+        // 3. Resolve historically established calibration paths for this exact baseline
+        const lockedRatePaths = await calibrationEstablishedPathsService.resolveLockedPaths(
+            tenantId,
+            session.printerNodeId,
+            snapshotChecksum
+        );
+
+        // 4. Execute pure in-memory deterministic solver with actual node configuration
+        const solverResult = solver.solve(session, nodeConfig, { lockedRatePaths });
 
         // Application-side defense: Ensure solver output status is within canonical DB domain
         if (!solverResult || !ALL_CANONICAL_PERSISTED_RUN_STATUSES.includes(solverResult.status)) {
