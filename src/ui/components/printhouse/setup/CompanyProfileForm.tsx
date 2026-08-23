@@ -8,6 +8,7 @@ import { FieldGuidance } from './FieldGuidance';
 import { getAuthToken } from '../../../lib/authStore';
 import { COUNTRIES, getCountryDisplayName, getCountryName } from '../../../lib/countryCatalog';
 import { CountrySelect } from '../../common/CountrySelect';
+import { Save } from 'lucide-react';
 
 interface CompanyData {
     companyName: string;
