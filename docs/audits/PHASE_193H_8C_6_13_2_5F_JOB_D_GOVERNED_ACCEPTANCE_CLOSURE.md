@@ -14,7 +14,7 @@ OPERATIONAL MODE: CANONICAL PRODUCTION EVIDENCE & REVISION 4 SEALING
 
 ## 1. Executive Summary & Job D Disambiguation
 
-- **Original Job D (192 pages / 12 sections)**: Evaluated in Phase 6.13.2.5C with target €1,790.14 against Revision 3. It correctly failed closed with `BELOW_REACHABLE_FLOOR` because the target fell below the immutable locked paper cost floor (€1,999.21).
+- **Original Job D (192 pages / 12 sections)**: Evaluated in Phase 6.13.2.5C with target €1,790.14 against Revision 3. It correctly failed closed with `BELOW_REACHABLE_FLOOR` because the target fell below the demonstrated minimum reachable price of **€2,091.40** (target: €1,790.14, current: €2,259.13, minimumReachablePrice: €2,091.40, maximumReachablePrice: €3,848.21, distance to reachable range: €301.26). Session `cal-ad0bd0d5` and Run `crun-a8203c3d` remain immutable historical records.
 - **Job D — Reachability-Guided PB/4 Alternative (64 pages / 4 sections)**: Selected via the Phase 6.13.2.5D Pre-Calibration Reachability Gate, evaluated with real BPE commercial target **€939.66**, successfully calibrated in `crun-70aa6d5c`, and accepted into **Revision 4** (`prev-1b6d9af1`).
 
 ---
@@ -118,10 +118,11 @@ prev-1b6d9af1 (Revision 4)  ← ACTIVE CANONICAL BASELINE
 
 ## 7. Governance Policy & Baseline Freezing
 
-1. **Deprecated Synthetic Evidence**: The earlier exploratory candidate explore table utilizing synthetic `overrideRates` is deprecated and superseded by canonical production evidence above.
-2. **Canonical Working Baseline**: All subsequent work must treat **Revision 4** (`prev-1b6d9af1` / `39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a`) as the canonical active baseline.
-3. **Immutability of Historical Evidence**: Session `cal-adc1df15` is terminally `ACCEPTED` and locked.
-4. **Stage Boundary**: Stage 1 Controlled Beta remains **AUTHORIZED**; Unrestricted Production remains **NOT_AUTHORIZED**.
+1. **Governed Production Rates Mutation**: One authorized governed production rates mutation occurred as part of Revision 4 acceptance (`UPDATE printer_nodes SET rates_json = ...`). Zero additional calibrations or rate mutations occurred after Revision 4 acceptance.
+2. **Deprecated Synthetic Evidence**: The earlier exploratory candidate explore table utilizing synthetic `overrideRates` is deprecated and superseded by canonical production evidence above.
+3. **Canonical Working Baseline**: All subsequent work must treat **Revision 4** (`prev-1b6d9af1` / `39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a`) as the canonical active baseline.
+4. **Immutability of Historical Evidence**: Session `cal-adc1df15` is terminally `ACCEPTED` and locked.
+5. **Stage Boundary**: Stage 1 Controlled Beta remains **AUTHORIZED**; Unrestricted Production remains **NOT_AUTHORIZED**.
 
 ---
 
