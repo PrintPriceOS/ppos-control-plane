@@ -91,46 +91,72 @@ export const PricingRevisionHistoryModal: React.FC<PricingRevisionHistoryModalPr
                             </p>
                         </div>
                     ) : (
-                        revisions.map((rev, idx) => (
-                            <div
-                                key={rev.id || idx}
-                                className="p-4 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5 text-xs"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                                        <Tag size={13} className="text-[#dc0000]" />
-                                        Revision #{revisions.length - idx}
-                                    </span>
-                                    <span className="text-[11px] font-mono text-zinc-400">
-                                        {rev.rates_checksum ? rev.rates_checksum.substring(0, 12) + '...' : ''}
-                                    </span>
-                                </div>
+                        revisions.map((rev, idx) => {
+                            const createdAt = rev.createdAt || rev.created_at;
+                            const createdDate = createdAt ? new Date(createdAt) : null;
+                            const validDate = createdDate && !isNaN(createdDate.getTime()) 
+                                ? createdDate.toLocaleString() 
+                                : 'Timestamp recorded';
+                            
+                            const author = typeof rev.createdBy === 'object' && rev.createdBy !== null
+                                ? (rev.createdBy.email || rev.createdBy.id || 'System')
+                                : (rev.created_by_email || rev.created_by || rev.createdBy || 'System');
 
-                                <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
-                                    <div className="flex items-center gap-1.5">
-                                        <Clock size={12} className="text-zinc-400" />
-                                        <span>{new Date(rev.created_at).toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <User size={12} className="text-zinc-400" />
-                                        <span>{rev.created_by_email || rev.created_by || 'System'}</span>
-                                    </div>
-                                </div>
+                            const ratesChecksum = rev.ratesChecksum || rev.rates_checksum;
+                            const sourceType = rev.sourceType || rev.source_type || rev.source;
+                            const engineVersion = rev.engineVersion || rev.engine_version;
+                            const enginePackage = rev.enginePackage || rev.engine_package;
 
-                                <div className="p-2 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200/70 dark:border-zinc-700/50 flex justify-between items-center text-[11px]">
-                                    <span className="text-zinc-500">Source:</span>
-                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                                        {rev.source === 'CALIBRATION' ? 'Quick Calibration (193D)' : rev.source || 'MANUAL_SAVE'}
-                                    </span>
-                                </div>
+                            const sourceLabel = sourceType === 'CALIBRATION_ACCEPTANCE' || sourceType === 'CALIBRATION'
+                                ? 'Quick Calibration (Assistant)'
+                                : sourceType === 'MANUAL_SAVE'
+                                ? 'Manual Rate Card Save'
+                                : sourceType || 'System';
 
-                                {rev.engine_version && (
-                                    <div className="text-[10px] text-zinc-400">
-                                        Engine: {rev.engine_version}
+                            return (
+                                <div
+                                    key={rev.id || idx}
+                                    className="p-4 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5 text-xs"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                            <Tag size={13} className="text-[#dc0000]" />
+                                            Revision #{revisions.length - idx}
+                                        </span>
+                                        {ratesChecksum && (
+                                            <span className="text-[11px] font-mono text-zinc-400" title={ratesChecksum}>
+                                                {ratesChecksum.substring(0, 12)}...
+                                            </span>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        ))
+
+                                    <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+                                        <div className="flex items-center gap-1.5">
+                                            <Clock size={12} className="text-zinc-400 shrink-0" />
+                                            <span className="truncate">{validDate}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <User size={12} className="text-zinc-400 shrink-0" />
+                                            <span className="truncate" title={author}>{author}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-2 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200/70 dark:border-zinc-700/50 flex justify-between items-center text-[11px]">
+                                        <span className="text-zinc-500">Source:</span>
+                                        <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                                            {sourceLabel}
+                                        </span>
+                                    </div>
+
+                                    {engineVersion && (
+                                        <div className="text-[10px] text-zinc-400 flex items-center justify-between">
+                                            <span>Engine: {enginePackage ? `${enginePackage}@${engineVersion}` : engineVersion}</span>
+                                            {rev.id && <span className="font-mono text-zinc-400">{rev.id}</span>}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
                     )}
                 </div>
 

@@ -28,11 +28,12 @@ import { CalibrationRateComparison } from './CalibrationRateComparison';
 import { CalibrationWarnings } from './CalibrationWarnings';
 import { CalibrationAcceptanceModal } from './CalibrationAcceptanceModal';
 import { PricingRevisionHistoryModal } from './PricingRevisionHistoryModal';
+import { CalibrationSessionsHistoryModal } from './CalibrationSessionsHistoryModal';
 import { isValidIso2Country } from '../../../../lib/countryCatalog';
 import { 
     Sparkles, RefreshCw, Calculator, ShieldCheck, CheckCircle2, 
     AlertTriangle, History, ArrowRight, X, Layers, CheckCircle, 
-    Sliders, ChevronDown, ChevronUp 
+    Sliders, ChevronDown, ChevronUp, BookOpen 
 } from 'lucide-react';
 
 interface QuickCalibrationPanelProps {
@@ -100,6 +101,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [showAcceptModal, setShowAcceptModal] = useState(false);
     const [accepting, setAccepting] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showSessionsModal, setShowSessionsModal] = useState(false);
 
     // ── Session and Active Run Rehydration (Phase 193H.8C.6.11.3) ──
     useEffect(() => {
@@ -656,11 +658,20 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setShowSessionsModal(true)}
+                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                        <BookOpen size={14} className="text-[#dc0000]" />
+                        <span>Calibrated Books</span>
+                    </button>
+
                     <button
                         type="button"
                         onClick={() => setShowAdvanced(!showAdvanced)}
-                        className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs ${
+                        className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer ${
                             showAdvanced 
                                 ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white' 
                                 : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200'
@@ -673,7 +684,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     <button
                         type="button"
                         onClick={() => setShowHistoryModal(true)}
-                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs"
+                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                         <History size={14} className="text-zinc-500" />
                         <span>Revisions</span>
@@ -835,6 +846,13 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             <PricingRevisionHistoryModal
                 isOpen={showHistoryModal}
                 onClose={() => setShowHistoryModal(false)}
+                printerNodeId={printerNodeId}
+            />
+
+            {/* Read-Only Calibration Sessions & Books History Drawer */}
+            <CalibrationSessionsHistoryModal
+                isOpen={showSessionsModal}
+                onClose={() => setShowSessionsModal(false)}
                 printerNodeId={printerNodeId}
             />
         </div>
