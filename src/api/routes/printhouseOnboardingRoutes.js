@@ -87,6 +87,7 @@ router.get('/pricing/industrial', requireAuth, async (req, res) => {
             ok: true,
             data: {
                 nodeId: node.id,
+                nodeName: node.name || 'Primary Production Node',
                 configured: isConfigured,
                 signatures: typeof node.signatures === 'string' ? JSON.parse(node.signatures) : (node.signatures || [16]),
                 deliveryTime: node.delivery_time || '14 days',
@@ -278,6 +279,35 @@ const wrapHandler = (fn) => async (req, res, next) => {
         next(err);
     }
 };
+
+// ──── 0.1 Company Profile & Production Sites Endpoints ─────────────────
+router.patch('/company-profile', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const actor = { userId: req.user.id, role: req.user.role };
+    const updated = await onboardingService.updateCompanyProfile(tenantId, req.body, actor);
+    res.json({ ok: true, data: updated });
+}));
+
+router.post('/sites', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const actor = { userId: req.user.id, role: req.user.role };
+    const site = await onboardingService.createProductionSite(tenantId, req.body, actor);
+    res.status(201).json({ ok: true, data: site });
+}));
+
+router.patch('/sites/:siteId', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const actor = { userId: req.user.id, role: req.user.role };
+    const site = await onboardingService.updateProductionSite(tenantId, req.params.siteId, req.body, actor);
+    res.json({ ok: true, data: site });
+}));
+
+router.delete('/sites/:siteId', wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const actor = { userId: req.user.id, role: req.user.role };
+    const result = await onboardingService.deleteProductionSite(tenantId, req.params.siteId, actor);
+    res.json({ ok: true, data: result });
+}));
 
 // ──── 1. Materials REST Endpoints ─────────────────────────────────────
 router.get('/sites/:siteId/materials', verifySiteAccess, wrapHandler(async (req, res) => {
