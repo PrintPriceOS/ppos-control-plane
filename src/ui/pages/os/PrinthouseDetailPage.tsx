@@ -425,7 +425,7 @@ export const PrinthouseDetailPage: React.FC = () => {
     const statePh = (location.state as { printhouse?: Printhouse })?.printhouse;
     const q = useAdminQuery<Printhouse[]>('printhouses', getPrinthouses);
 
-    const ph: Printhouse | undefined = statePh ?? q.data?.find(p => p._id === id);
+    const ph: Printhouse | undefined = statePh ?? q.data?.find(p => p._id === id || p.id === id);
 
     if (!ph && q.status === 'loading') {
         return (
