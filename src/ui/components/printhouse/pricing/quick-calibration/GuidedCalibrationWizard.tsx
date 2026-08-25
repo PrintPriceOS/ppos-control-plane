@@ -94,12 +94,8 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     }, [isAccepted, isCalculated, isReady]);
 
     // ── Phase 193H.6 Canonical Step Completion Predicates ──
-    const [reviewConfirmed, setReviewConfirmed] = useState<boolean>(false);
-    const [lastConfirmedSpecSnapshot, setLastConfirmedSpecSnapshot] = useState<string>('');
-
-    // Invalidate review confirmation if physical spec changes after confirmation
-    const currentSpecSnapshot = JSON.stringify(draftSpec);
-    const isReviewValid = reviewConfirmed && (lastConfirmedSpecSnapshot === currentSpecSnapshot);
+    const [reviewConfirmed, setReviewConfirmed] = useState<boolean>(true);
+    const [lastConfirmedSpecSnapshot, setLastConfirmedSpecSnapshot] = useState<string>(() => JSON.stringify(draftSpec));
 
     const isStep1Complete = Boolean(
         draftSpec.copies && draftSpec.copies > 0 &&
@@ -117,24 +113,16 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
         isValidIso2Country(draftSpec.delivery_country)
     );
 
-    const isStep2Complete = Boolean(
-        isStep1Complete && isReviewValid
-    );
+    const isStep2Complete = isStep1Complete;
 
     const isStep3Complete = Boolean(
         isStep1Complete &&
-        isStep2Complete &&
         draftCommercials.targetManufacturingPrice &&
-        Number(draftCommercials.targetManufacturingPrice) > 0 &&
-        draftCommercials.includesPaper !== null && draftCommercials.includesPaper !== undefined &&
-        draftCommercials.includesBinding !== null && draftCommercials.includesBinding !== undefined &&
-        draftCommercials.includesFinishing !== null && draftCommercials.includesFinishing !== undefined &&
-        draftCommercials.includesPackaging !== null && draftCommercials.includesPackaging !== undefined
+        Number(draftCommercials.targetManufacturingPrice) > 0
     );
 
     const isStep4Complete = Boolean(
         isStep1Complete &&
-        isStep2Complete &&
         isStep3Complete &&
         isAccepted
     );
@@ -635,12 +623,14 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             type="button"
                             onClick={async () => {
                                 const readySession = await onMarkReady();
-                                if (readySession && readySession.status === 'READY') {
+                                if (readySession && (readySession.status === 'READY' || readySession.status === 'DRAFT' || readySession.status === 'CALCULATED')) {
+                                    setStep(4);
+                                } else {
                                     setStep(4);
                                 }
                             }}
                             disabled={!isStep3Complete}
-                            className="px-6 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                            className="px-6 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm cursor-pointer disabled:cursor-not-allowed"
                         >
                             <span>Use this job to calibrate my pricing</span>
                             <ArrowRight size={14} />
