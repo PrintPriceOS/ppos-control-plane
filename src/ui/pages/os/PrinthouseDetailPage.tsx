@@ -429,11 +429,12 @@ export const PrinthouseDetailPage: React.FC = () => {
     const [tab, setTab] = useState<DetailTab>('Basic');
     const [editOpen, setEditOpen] = useState(false);
 
-    // Use state passed from list, or fetch all and filter
+    // Use fresh API query data if available, falling back to state passed from list
     const statePh = (location.state as { printhouse?: Printhouse })?.printhouse;
     const q = useAdminQuery<Printhouse[]>('printhouses', getPrinthouses);
 
-    const ph: Printhouse | undefined = statePh ?? q.data?.find(p => p._id === id || p.id === id);
+    const freshPh = q.data?.find(p => p._id === id || p.id === id);
+    const ph: Printhouse | undefined = freshPh ?? statePh;
 
     if (!ph && q.status === 'loading') {
         return (
