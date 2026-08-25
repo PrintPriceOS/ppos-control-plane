@@ -494,6 +494,8 @@ class DeterministicInversePricingSolver {
         return {
             status,
             solverVersion: SOLVER_CONFIG.version,
+            selectedSignature: sigOptions.signatureSize || initialForward.signature,
+            selectedSections: sigOptions.sectionsCount || initialForward.sections,
             solverConfig: {
                 ...SOLVER_CONFIG,
                 optimalScaleFactor: Number(bestAlpha.toFixed(6)),
