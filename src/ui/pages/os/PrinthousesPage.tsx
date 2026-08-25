@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getPrinthouses, createPrinthouse, updatePrinthouse, deletePrinthouse } from '../../lib/adminApi';
 import { CanonicalIndustrialPricingEditor } from '../../components/printhouse/pricing/CanonicalIndustrialPricingEditor';
+import { PrinthousePricingGovernance } from '../../types/printhousePricing';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface PrinthouseLimits { min_copies: number; max_pages: number; }
@@ -49,6 +50,7 @@ export interface PrinthouseRates {
     percentage_technical_costs: ByCountry;
     transport_costs: ByCountry;
 }
+
 export type PrinthouseStatus = 'Active' | 'Under Maintenance' | 'Inactive';
 export interface Printhouse {
     _id: string; id: string; name: string;
@@ -57,6 +59,7 @@ export interface Printhouse {
     signatures: number[]; delivery_time: string;
     production_lead_days: number; limits: PrinthouseLimits;
     rates?: PrinthouseRates;
+    pricingGovernance?: PrinthousePricingGovernance | null;
     // Phase 24 Geolocation
     region?: string;
     latitude?: number;

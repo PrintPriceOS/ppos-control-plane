@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../services/mysqlClient');
 const { resolveActorContext, requireApprovedPrinthouse } = require('../middleware/auth');
 const printhouseService = require('../services/printhouseService');
+const printhousePricingGovernanceService = require('../services/printhousePricingGovernanceService');
 
 const router = express.Router();
 
@@ -15,12 +16,17 @@ router.get('/', async (req, res) => {
         if (!context.isSuperAdmin) {
             sql += ' AND tenant_id = ?';
             params.push(context.tenantId);
-
         }
 
         const rows = await db.query(sql, params);
         
         const STATUS_DB_TO_UI = { 'ACTIVE': 'Active', 'PENDING': 'Under Maintenance', 'SUSPENDED': 'Inactive' };
+
+        // Batched retrieval of pricing governance metadata
+        const governanceMap = await printhousePricingGovernanceService.getGovernanceMetadataByNodes(
+            context.isSuperAdmin ? null : context.tenantId,
+            rows
+        );
 
         // Post-process JSON fields for UI compatibility
         const formatted = rows.map(row => ({
@@ -29,6 +35,16 @@ router.get('/', async (req, res) => {
             signatures: typeof row.signatures === 'string' ? JSON.parse(row.signatures) : (row.signatures || []),
             limits: typeof row.limits === 'string' ? JSON.parse(row.limits) : (row.limits || {}),
             rates: typeof row.rates_json === 'string' ? JSON.parse(row.rates_json) : (row.rates_json || null),
+            pricingGovernance: governanceMap[row.id] || {
+                activeRevisionId: null,
+                activeRevisionChecksum: null,
+                latestRevisionId: null,
+                lastCalibrationAt: null,
+                lastAcceptedRunId: null,
+                lastAcceptanceId: null,
+                lastVerifiedManufacturingPrice: null,
+                lastVerifiedManufacturingPriceAt: null
+            },
             _id: row.id // Map id to _id for UI consistency if needed
         }));
 

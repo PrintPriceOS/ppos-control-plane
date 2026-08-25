@@ -30,6 +30,7 @@ interface PricingHawkEyePanelProps {
 
 export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, onNavigateTab }) => {
     const state = getPricingHawkEyeState(ph.rates);
+    const gov = ph.pricingGovernance;
 
     // Formatting helper for rate numbers with precision preservation
     const formatRate = (val: number | null | undefined): string => {
@@ -37,6 +38,20 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
         if (val === 0) return '0.0000';
         return val.toFixed(4);
     };
+
+    const activeRevId = gov?.activeRevisionId || null;
+    const latestRevId = gov?.latestRevisionId || null;
+    const displayRevId = activeRevId || latestRevId || null;
+    const activeRevSubtitle = activeRevId
+        ? 'Active revision (verified)'
+        : latestRevId
+        ? 'Latest created revision'
+        : 'Not exposed in Admin API';
+
+    const lastCalDate = gov?.lastCalibrationAt ? new Date(gov.lastCalibrationAt).toLocaleDateString() : null;
+    const verifiedPriceFormatted = gov?.lastVerifiedManufacturingPrice !== null && gov?.lastVerifiedManufacturingPrice !== undefined
+        ? `€${gov.lastVerifiedManufacturingPrice.toFixed(2)}`
+        : null;
 
     return (
         <div className="space-y-4">
@@ -135,15 +150,23 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
                 {/* E. Active Revision */}
                 <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3.5 flex flex-col justify-between shadow-none">
                     <div className="flex items-center justify-between mb-2">
-                        <div className="w-7 h-7 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center">
+                        <div className={`w-7 h-7 flex items-center justify-center ${activeRevId ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
                             <DocumentTextIcon className="w-4 h-4" />
                         </div>
-                        <span className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                        {activeRevId ? (
+                            <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
+                        ) : latestRevId ? (
+                            <span className="w-2 h-2 rounded-full bg-amber-400" title="Latest created revision (not live checksum verified)" />
+                        ) : (
+                            <span className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                        )}
                     </div>
                     <div>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Active Revision</p>
-                        <p className="text-base font-black text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">Not exposed</p>
-                        <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">Not exposed in Admin API</p>
+                        <p className={`text-base font-black truncate mt-0.5 ${displayRevId ? 'text-zinc-900 dark:text-zinc-100 font-mono' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                            {displayRevId || 'Not exposed'}
+                        </p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">{activeRevSubtitle}</p>
                     </div>
                 </div>
 
@@ -329,15 +352,25 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
                             </div>
                             <div className="flex justify-between items-center pt-1.5">
                                 <span className="text-zinc-400 font-medium">Active revision</span>
-                                <span className="text-zinc-400 dark:text-zinc-500 font-medium">Not exposed</span>
+                                <span className={`font-medium ${activeRevId ? 'text-zinc-900 dark:text-zinc-100 font-mono' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                    {activeRevId || (latestRevId ? `${latestRevId} (Unverified)` : 'Not exposed')}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center pt-1.5">
                                 <span className="text-zinc-400 font-medium">Calibration metadata</span>
-                                <span className="text-zinc-400 dark:text-zinc-500 font-medium">Not exposed</span>
+                                <span className={`font-medium ${lastCalDate ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                    {lastCalDate ? `${lastCalDate}${gov?.lastAcceptedRunId ? ` (${gov.lastAcceptedRunId})` : ''}` : 'Not exposed'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1.5">
+                                <span className="text-zinc-400 font-medium">Verified calibration price</span>
+                                <span className={`font-medium ${verifiedPriceFormatted ? 'text-zinc-900 dark:text-zinc-100 font-mono font-bold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                    {verifiedPriceFormatted || 'Not exposed'}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center pt-1.5">
                                 <span className="text-zinc-400 font-medium">Quote capability</span>
-                                <span className={`font-medium ${state.quoteCapability === 'Available' ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                                <span className={`font-medium ${state.quoteCapability === 'Available' ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-zinc-400'}`}>
                                     {state.quoteCapability}
                                 </span>
                             </div>
