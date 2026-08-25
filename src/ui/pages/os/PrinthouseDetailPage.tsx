@@ -12,6 +12,7 @@ import {
     SIG_KEYS, COLOUR_KEYS, SECTIONS, COUNTRIES, BINDING_CONFIGS, BindingKey,
 } from './PrinthousesPage';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
+import { PricingHawkEyePanel } from '../../components/printhouse/pricing/PricingHawkEyePanel';
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
@@ -156,36 +157,42 @@ function EligibilityCheck({ label, passed }: { label: string, passed: boolean })
     );
 }
 
-function BasicTab({ ph }: { ph: Printhouse }) {
+function BasicTab({ ph, onNavigateTab }: { ph: Printhouse; onNavigateTab?: (t: DetailTab) => void }) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={card}>
-                <h3 className={sectionTitle}>Identity</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <Cell label="Name">{ph.name}</Cell>
-                    <Cell label="ID">{ph.id}</Cell>
-                    <Cell label="Country">{ph.country || '—'}</Cell>
-                    <Cell label="City">{ph.city || '—'}</Cell>
-                    <Cell label="Delivery Time">{ph.delivery_time}</Cell>
-                    <Cell label="Production Lead Days">{ph.production_lead_days}d</Cell>
-                    <div>
-                        <p className={lbl}>Status</p>
-                        <StatusBadge status={ph.status ?? 'Active'} />
+        <div className="space-y-6">
+            {/* 1. Primary: Pricing Hawk-Eye */}
+            <PricingHawkEyePanel ph={ph} onNavigateTab={onNavigateTab} />
+
+            {/* 2. Secondary: Identity & Limits */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={card}>
+                    <h3 className={sectionTitle}>Identity</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Cell label="Name">{ph.name}</Cell>
+                        <Cell label="ID">{ph.id}</Cell>
+                        <Cell label="Country">{ph.country || '—'}</Cell>
+                        <Cell label="City">{ph.city || '—'}</Cell>
+                        <Cell label="Delivery Time">{ph.delivery_time}</Cell>
+                        <Cell label="Production Lead Days">{ph.production_lead_days}d</Cell>
+                        <div>
+                            <p className={lbl}>Status</p>
+                            <StatusBadge status={ph.status ?? 'Active'} />
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div className={card}>
-                <h3 className={sectionTitle}>Limits</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <Cell label="Min Copies">{(ph.limits?.min_copies ?? 0).toLocaleString()}</Cell>
-                    <Cell label="Max Pages">{(ph.limits?.max_pages ?? 0).toLocaleString()}</Cell>
-                </div>
-                <div className="pt-2">
-                    <p className={lbl}>Signatures</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                        {(ph.signatures ?? []).map(s => (
-                            <span key={s} className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-transparent dark:border-zinc-700 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
-                        ))}
+                <div className={card}>
+                    <h3 className={sectionTitle}>Limits</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Cell label="Min Copies">{(ph.limits?.min_copies ?? 0).toLocaleString()}</Cell>
+                        <Cell label="Max Pages">{(ph.limits?.max_pages ?? 0).toLocaleString()}</Cell>
+                    </div>
+                    <div className="pt-2">
+                        <p className={lbl}>Signatures</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(ph.signatures ?? []).map(s => (
+                                <span key={s} className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-transparent dark:border-zinc-700 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -410,8 +417,9 @@ function TransportTab({ r }: { r: PrinthouseRates }) {
 
 // ── Detail Page ──────────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['Basic', 'Operational Geography', 'Machines', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
-type DetailTab = typeof DETAIL_TABS[number];
+export const DETAIL_TABS = ['Basic', 'Operational Geography', 'Machines', 'Interior', 'Cover & Endpapers', 'Lamination & UV', 'Binding', 'Paper Costs', 'Transport'] as const;
+export type DetailTab = typeof DETAIL_TABS[number];
+export type { PrinthouseRates } from './PrinthousesPage';
 
 export const PrinthouseDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -503,7 +511,7 @@ export const PrinthouseDetailPage: React.FC = () => {
 
             {/* Tab content */}
             <div>
-                {tab === 'Basic' && <BasicTab ph={ph} />}
+                {tab === 'Basic' && <BasicTab ph={ph} onNavigateTab={setTab} />}
                 {tab === 'Operational Geography' && <OperationalTab ph={ph} />}
                 {tab === 'Machines' && (
                     <MachineCapabilityEditor 
