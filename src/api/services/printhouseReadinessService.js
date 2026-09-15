@@ -11,6 +11,13 @@ const capabilityService = require('./printhouseCapabilityOnboardingService');
 
 class PrinthouseReadinessService {
     /**
+     * Compute operational readiness status for a given tenant (public alias for computeReadiness).
+     */
+    async computeOperationalReadiness(tenantId, siteId = null) {
+        return this.computeReadiness(tenantId);
+    }
+
+    /**
      * Compute full readiness status for a given tenant.
      */
     async computeReadiness(tenantId) {
