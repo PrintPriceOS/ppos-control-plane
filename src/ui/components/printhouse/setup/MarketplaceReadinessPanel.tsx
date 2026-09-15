@@ -60,7 +60,9 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
                 loadData();
                 if (onSaved) onSaved();
             } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to submit for review' });
+                const detailMsgs = Array.isArray(data.details) ? data.details.map((d: any) => d.message || d.code).join('; ') : '';
+                const fullText = detailMsgs ? `${data.error || 'Readiness incomplete'}: ${detailMsgs}` : (data.error || 'Failed to submit for review');
+                setMessage({ type: 'error', text: fullText });
             }
         } catch (err: any) {
             setMessage({ type: 'error', text: err.message || 'Error submitting for review' });
@@ -74,7 +76,10 @@ export const MarketplaceReadinessPanel: React.FC<MarketplaceReadinessPanelProps>
     }
 
     const currentStatus = reviewStatus?.status || 'DRAFT';
-    const blockers = readiness?.accountSetup?.blockingIssues || [];
+    const accountBlockers = readiness?.accountSetup?.blockingIssues || [];
+    const opBlockers = readiness?.operationalConfiguration?.blockingIssues || [];
+    const pricingBlockers = readiness?.pricingReadiness?.blockingIssues || [];
+    const blockers = [...accountBlockers, ...opBlockers, ...pricingBlockers];
     const canSubmit = blockers.length === 0 && ['DRAFT', 'CHANGES_REQUESTED', 'REJECTED'].includes(currentStatus);
 
     return (
