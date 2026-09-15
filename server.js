@@ -329,12 +329,18 @@ const start = async () => {
             
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
+            fastify.use('/api/admin/printhouse-reviews', require('./src/api/routes/printhouseAdminReviewRoutes'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
+            fastify.use('/api/printhouse/onboarding/shipping', require('./src/api/routes/printhouseShippingRoutes'));
+            fastify.use('/api/printhouse/onboarding/integrations', require('./src/api/routes/printhouseIntegrationRoutes'));
             fastify.use('/api/printhouse/onboarding/pricing', require('./src/api/routes/printhousePricingRoutes'));
             fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseMachinesRoutes'));
+            fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseMarketplaceOnboardingRoutes'));
             fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseOnboardingRoutes'));
+            fastify.use('/api/printhouse/dashboard', require('./src/api/routes/printhouseDashboard'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
+            fastify.use('/api/marketplace/quotes', require('./src/api/routes/printhouseQuoteEligibilityRoutes'));
             fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
