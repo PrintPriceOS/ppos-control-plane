@@ -1,5 +1,5 @@
 /**
- * PrintPrice OS — Control Plane (v1.9.0)
+ * PrintPrice OS — Control Plane (v1.9.5 - Phase 193H)
  * 
  * Centralized governance, visibility, and multi-region coordination.
  */
@@ -187,7 +187,7 @@ fastify.get('/health', async () => {
         status: (mode === 'ISOLATED' || dependencies.mysql === 'UNCONFIGURED') ? 'DEGRADED' : 'UP',
         mode,
         service: 'ppos-control-plane',
-        version: '1.9.0',
+        version: '1.9.5',
         industrial_readiness: {
             swarm_consensus: 'READY',
             autonomous_orchestration: 'READY',

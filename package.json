@@ -1,7 +1,7 @@
 {
     "name": "@ppos/control-plane",
-    "version": "1.0.0",
-    "description": "PrintPrice OS — Control Plane (Phase 113: Controlled Financial Operations Production Activation Gate)",
+    "version": "1.9.5",
+    "description": "PrintPrice OS — Control Plane (Phase 193H: Printhouse Onboarding Hub, Shipping Regions & Hawkeye Pricing Engine)",
     "main": "server.js",
     "private": true,
     "scripts": {
