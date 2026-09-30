@@ -340,5 +340,8 @@ router.post('/quote-evidence/validate', async (req, res) => {
     }
 });
 
+const quoteEvidenceUploadRoutes = require('./quoteEvidenceUploadRoutes');
+router.use('/quote-evidence', quoteEvidenceUploadRoutes);
+
 module.exports = router;
 

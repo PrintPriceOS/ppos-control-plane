@@ -770,6 +770,66 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             logger.warn('Audit log write failed (non-fatal):', e.message);
         }
     }
+
+    /**
+     * Processes an uploaded quote evidence document and formats structured conversational review
+     * in the user's conversational language (e.g. 'es', 'en', 'de').
+     */
+    async processQuoteEvidenceForChat(tenantId, evidenceId, userChatLanguage = 'en') {
+        const docs = await db.query(
+            `SELECT d.id, d.tenant_id, d.file_name, d.file_hash_sha256, d.detected_language, d.raw_extracted_text,
+                    e.id as extraction_id, e.extraction_status, e.validation_status, e.normalized_quote_json, e.translated_text, e.confidence_status
+             FROM printhouse_quote_evidence_documents d
+             LEFT JOIN printhouse_quote_evidence_extractions e ON d.id = e.document_id
+             WHERE d.id = ? AND d.tenant_id = ?`,
+            [evidenceId, tenantId]
+        );
+
+        if (!docs || docs.length === 0) {
+            const err = new Error('QUOTE_EVIDENCE_NOT_FOUND');
+            err.code = 'QUOTE_EVIDENCE_NOT_FOUND';
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const doc = docs[0];
+        const normalized = typeof doc.normalized_quote_json === 'string'
+            ? JSON.parse(doc.normalized_quote_json)
+            : doc.normalized_quote_json;
+
+        // Build localized human-readable response text
+        const isEs = userChatLanguage === 'es';
+        const isDe = userChatLanguage === 'de';
+
+        let header = isEs ? `Presupuesto procesado: ${doc.file_name}` : (isDe ? `Angebot verarbeitet: ${doc.file_name}` : `Processed quote: ${doc.file_name}`);
+        let langNotice = isEs ? `Idioma detectado en el documento: ${doc.detected_language.toUpperCase()}` : (isDe ? `Erkannte Dokumentensprache: ${doc.detected_language.toUpperCase()}` : `Detected document language: ${doc.detected_language.toUpperCase()}`);
+
+        let summaryText = `${header}\n${langNotice}\n\n`;
+        summaryText += isEs ? `Proveedor: ${normalized.printhouseName}\n` : `Supplier: ${normalized.printhouseName}\n`;
+
+        if (Array.isArray(normalized.offers)) {
+            summaryText += isEs ? `Puntos de cantidad extraídos (${normalized.offers.length}):\n` : `Extracted quantity points (${normalized.offers.length}):\n`;
+            for (const off of normalized.offers) {
+                const statusLabel = off.validationStatus === 'CONSISTENT'
+                    ? (isEs ? 'Correcto' : 'Consistent')
+                    : (isEs ? 'Inconsistencia detectada' : 'Inconsistent unit price');
+                summaryText += `- ${off.quantity} copies -> Mfg: €${off.manufacturingPrice}, Transport: €${off.transportPrice}, Total: €${off.quotedTotalPrice} [Unit Quoted: €${off.quotedUnitPrice} | Status: ${statusLabel}]\n`;
+            }
+        }
+
+        return {
+            ok: true,
+            evidenceId: doc.id,
+            documentSha256: doc.file_hash_sha256,
+            filename: doc.file_name,
+            detectedLanguage: doc.detected_language,
+            userChatLanguage,
+            chatSummary: summaryText,
+            normalizedQuote: normalized,
+            validationStatus: doc.validation_status,
+            confidenceStatus: doc.confidence_status
+        };
+    }
 }
 
 module.exports = new CalibrationAssistantService();
