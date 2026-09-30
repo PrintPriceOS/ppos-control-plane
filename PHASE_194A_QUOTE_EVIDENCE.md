@@ -50,7 +50,7 @@ Tested against the 5 real-world quotation PDFs in `C:\Users\KIKE\Downloads\preci
 - **500 copies:** manufacturing €4,321 + transport €325 = €4,646 total $\rightarrow$ unit €9.29 $\implies$ **`CONSISTENT`**
 - **600 copies:** manufacturing €4,604 + transport €325 = €4,929 total $\rightarrow$ unit €8.22 $\implies$ **`CONSISTENT`**
 - **700 copies:** manufacturing €4,846 + transport €325 = €5,171 total $\rightarrow$ unit €7.39 $\implies$ **`CONSISTENT`**
-- **Curve observation:** Total manufacturing price increases (€4321 < €4604 < €4846) while unit price decreases (€9.29 > €8.22 > €7.39).
+- **Curve observation:** Manufacturing price increases (€4321 < €4604 < €4846), delivered total price increases (€4646 < €4929 < €5171), while unit price decreases (€9.29 > €8.22 > €7.39).
 
 ### 2. Fixture B: `Stutensee_Mit_Margot_durch_das_Gartenjahr_04.09.2026 (1).pdf`
 - **250 copies:** manufacturing €1,283 + transport €190 = €1,473 total $\rightarrow$ unit €5.89 $\implies$ **`CONSISTENT`**
