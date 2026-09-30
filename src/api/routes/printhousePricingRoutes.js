@@ -284,4 +284,61 @@ router.post('/preview', async (req, res) => {
     }
 });
 
+/**
+ * POST /quote-evidence
+ * Ingests quotation document evidence and performs deterministic validation.
+ */
+router.post('/quote-evidence', async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const quoteEvidenceService = require('../services/quoteEvidenceService');
+        const documentRecord = await quoteEvidenceService.createQuoteDocument(tenantId, req.body, req.user);
+        
+        let extraction = null;
+        if (req.body.normalizedQuote) {
+            extraction = await quoteEvidenceService.createExtraction(
+                tenantId,
+                documentRecord.id,
+                req.body.extractedJson || req.body.normalizedQuote,
+                req.body.normalizedQuote
+            );
+        }
+        
+        res.json({ ok: true, data: { document: documentRecord, extraction } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /quote-evidence/:id
+ * Retrieves quotation evidence document record.
+ */
+router.get('/quote-evidence/:id', async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const quoteEvidenceService = require('../services/quoteEvidenceService');
+        const doc = await quoteEvidenceService.getQuoteDocument(tenantId, req.params.id);
+        if (!doc) return res.status(404).json({ error: 'DOCUMENT_NOT_FOUND' });
+        res.json({ ok: true, data: doc });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /quote-evidence/validate
+ * Pure in-memory deterministic arithmetic validation of a normalized quote structure.
+ */
+router.post('/quote-evidence/validate', async (req, res) => {
+    try {
+        const quoteEvidenceService = require('../services/quoteEvidenceService');
+        const validation = quoteEvidenceService.validateNormalizedQuote(req.body);
+        res.json({ ok: true, data: validation });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
+
