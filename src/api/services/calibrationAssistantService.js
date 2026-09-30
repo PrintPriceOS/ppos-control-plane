@@ -777,10 +777,10 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
      */
     async processQuoteEvidenceForChat(tenantId, evidenceId, userChatLanguage = 'en') {
         const docs = await db.query(
-            `SELECT d.id, d.tenant_id, d.file_name, d.file_hash_sha256, d.detected_language, d.raw_extracted_text,
-                    e.id as extraction_id, e.extraction_status, e.validation_status, e.normalized_quote_json, e.translated_text, e.confidence_status
-             FROM printhouse_quote_evidence_documents d
-             LEFT JOIN printhouse_quote_evidence_extractions e ON d.id = e.document_id
+            `SELECT d.id, d.tenant_id, d.original_filename as file_name, d.document_sha256 as file_hash_sha256, d.detected_language, d.raw_text as raw_extracted_text,
+                    e.id as extraction_id, e.validation_status, e.normalized_json as normalized_quote_json, e.translated_text, e.confidence_status
+             FROM quote_evidence_documents d
+             LEFT JOIN quote_evidence_extractions e ON d.id = e.quote_evidence_document_id
              WHERE d.id = ? AND d.tenant_id = ?`,
             [evidenceId, tenantId]
         );

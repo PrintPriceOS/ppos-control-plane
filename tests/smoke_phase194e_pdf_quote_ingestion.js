@@ -24,7 +24,7 @@ async function runTests() {
     // 194E-01: valid text PDF accepted
     {
         console.log('Running 194E-01: Valid text PDF accepted...');
-        const result = pdfExtractor.extractPdfQuote(samplePdfHeader, 'quote.pdf');
+        const result = await pdfExtractor.extractPdfQuote(samplePdfHeader, 'quote.pdf');
         assert.strictEqual(result.ok, true);
         assert.strictEqual(result.status, 'SUCCESS');
         assert.strictEqual(typeof result.documentSha256, 'string');
@@ -35,7 +35,7 @@ async function runTests() {
     {
         console.log('Running 194E-02: Non-PDF rejected...');
         try {
-            pdfExtractor.extractPdfQuote(Buffer.from('Hello world txt content'), 'quote.txt', 'text/plain');
+            await pdfExtractor.extractPdfQuote(Buffer.from('Hello world txt content'), 'quote.txt', 'text/plain');
             assert.fail('Should have rejected non-PDF');
         } catch (err) {
             assert.strictEqual(err.code, 'INVALID_FILE_TYPE');
@@ -47,7 +47,7 @@ async function runTests() {
     {
         console.log('Running 194E-03: Fake PDF extension rejected...');
         try {
-            pdfExtractor.extractPdfQuote(Buffer.from('NOT A REAL PDF HEADER'), 'fake.pdf', 'application/pdf');
+            await pdfExtractor.extractPdfQuote(Buffer.from('NOT A REAL PDF HEADER'), 'fake.pdf', 'application/pdf');
             assert.fail('Should have rejected fake PDF magic bytes');
         } catch (err) {
             assert.strictEqual(err.code, 'PDF_MALFORMED');
@@ -60,7 +60,7 @@ async function runTests() {
         console.log('Running 194E-04: Oversized PDF rejected...');
         try {
             const bigBuf = Buffer.alloc(11 * 1024 * 1024); // 11 MB > 10 MB
-            pdfExtractor.extractPdfQuote(bigBuf, 'large.pdf');
+            await pdfExtractor.extractPdfQuote(bigBuf, 'large.pdf');
             assert.fail('Should have rejected oversized PDF');
         } catch (err) {
             assert.strictEqual(err.code, 'FILE_TOO_LARGE');
@@ -160,7 +160,7 @@ async function runTests() {
     // 194E-15: Natur extracted quantity points
     {
         console.log('Running 194E-15: Natur extracted quantity points...');
-        const mockExtraction = { filename: 'Natur_31.08.2026.pdf', combinedText: 'Natur 500 Ex. 4.321,00 € + 325,00 € Fracht = 4.646,00 €', documentSha256: 'sha_natur' };
+        const mockExtraction = { filename: 'Natur.pdf', combinedText: 'Produkt Natur\n500 Stück 4321 Euro + 325 Euro (Transport) = 4646 Euro / 9.29 Euro pro Stück\n600 Stück 4604 Euro + 325 Euro (Transport) = 4929 Euro / 8.22 Euro pro Stück\n700 Stück 4846 Euro + 325 Euro (Transport) = 5171 Euro / 7.39 Euro pro Stück', documentSha256: 'sha_natur' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.printhouseName, 'Natur');
         assert.strictEqual(interp.offers.length, 3);
@@ -171,7 +171,7 @@ async function runTests() {
     // 194E-16: Natur arithmetic consistency passes
     {
         console.log('Running 194E-16: Natur arithmetic consistency passes...');
-        const mockExtraction = { filename: 'Natur_31.08.2026.pdf', combinedText: 'Natur', documentSha256: 'sha_natur' };
+        const mockExtraction = { filename: 'Natur.pdf', combinedText: 'Produkt Natur\n500 Stück 4321 Euro + 325 Euro (Transport) = 4646 Euro / 9.29 Euro pro Stück\n600 Stück 4604 Euro + 325 Euro (Transport) = 4929 Euro / 8.22 Euro pro Stück\n700 Stück 4846 Euro + 325 Euro (Transport) = 5171 Euro / 7.39 Euro pro Stück', documentSha256: 'sha_natur' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.hasInconsistentOffers, false);
         assert.strictEqual(interp.offers[0].validationStatus, 'CONSISTENT');
@@ -181,7 +181,7 @@ async function runTests() {
     // 194E-17: Stutensee 250 passes
     {
         console.log('Running 194E-17: Stutensee 250 passes...');
-        const mockExtraction = { filename: 'Stutensee_04.09.2026.pdf', combinedText: 'Stutensee', documentSha256: 'sha_stutensee' };
+        const mockExtraction = { filename: 'Stutensee.pdf', combinedText: 'Produkt Stutensee\n250 Stück 1283 Euro + 190 Euro (Versand) = 1473 Euro / 5.89 Euro pro Stück\n300 Stück 1335 Euro + 190 Euro (Versand) = 1525 Euro / 3.05 Euro pro Stück', documentSha256: 'sha_stutensee' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.offers[0].quantity, 250);
         assert.strictEqual(interp.offers[0].validationStatus, 'CONSISTENT');
@@ -191,7 +191,7 @@ async function runTests() {
     // 194E-18: Stutensee 300 flags unit-price inconsistency
     {
         console.log('Running 194E-18: Stutensee 300 flags unit-price inconsistency...');
-        const mockExtraction = { filename: 'Stutensee_04.09.2026.pdf', combinedText: 'Stutensee', documentSha256: 'sha_stutensee' };
+        const mockExtraction = { filename: 'Stutensee.pdf', combinedText: 'Produkt Stutensee\n250 Stück 1283 Euro + 190 Euro (Versand) = 1473 Euro / 5.89 Euro pro Stück\n300 Stück 1335 Euro + 190 Euro (Versand) = 1525 Euro / 3.05 Euro pro Stück', documentSha256: 'sha_stutensee' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.offers[1].quantity, 300);
         assert.strictEqual(interp.offers[1].validationStatus, 'INCONSISTENT_UNIT_PRICE');
@@ -202,7 +202,7 @@ async function runTests() {
     // 194E-19: source €3.05 remains preserved
     {
         console.log('Running 194E-19: Source €3.05 remains preserved...');
-        const mockExtraction = { filename: 'Stutensee_04.09.2026.pdf', combinedText: 'Stutensee', documentSha256: 'sha_stutensee' };
+        const mockExtraction = { filename: 'Stutensee.pdf', combinedText: 'Produkt Stutensee\n250 Stück 1283 Euro + 190 Euro (Versand) = 1473 Euro / 5.89 Euro pro Stück\n300 Stück 1335 Euro + 190 Euro (Versand) = 1525 Euro / 3.05 Euro pro Stück', documentSha256: 'sha_stutensee' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.offers[1].quotedUnitPrice, 3.05);
         assert.strictEqual(interp.offers[1].computedUnitPrice, 5.083333);
@@ -212,7 +212,7 @@ async function runTests() {
     // 194E-20: Fussel manufacturing/transport separation
     {
         console.log('Running 194E-20: Fussel manufacturing/transport separation...');
-        const mockExtraction = { filename: 'Fussel_08.09.2026.pdf', combinedText: 'Fussel', documentSha256: 'sha_fussel' };
+        const mockExtraction = { filename: 'Fussel.pdf', combinedText: 'Produkt Fussel\n2000 Stück 3095 Euro + 600 Euro (Transport) = 3695 Euro / 1.85 Euro pro Stück\n2000 Stück 3095 Euro + 200 Euro (Transport) = 3295 Euro / 1.65 Euro pro Stück', documentSha256: 'sha_fussel' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.printhouseName, 'Fussel');
         assert.strictEqual(interp.offers[0].manufacturingPrice, 3095);
@@ -225,7 +225,7 @@ async function runTests() {
     // 194E-21: Fährmann variants remain distinct
     {
         console.log('Running 194E-21: Fährmann variants remain distinct...');
-        const mockExtraction = { filename: 'Fährmann_07.09.2026.pdf', combinedText: 'Fährmann', documentSha256: 'sha_faehrmann' };
+        const mockExtraction = { filename: 'Fährmann.pdf', combinedText: 'Produkt Fährmann\nAuflage 3000 pc\nMunken Print Cream 1.5\n6048 Euro + 435 Euro (Transport) = 6483 Euro / 2.16 Euro pro Stück\nMunken Premium Cream 1.3\n6184 Euro + 435 Euro (Transport) = 6619 Euro / 2.21 Euro pro Stück', documentSha256: 'sha_faehrmann' };
         const interp = interpreter.interpretDocument(mockExtraction);
         assert.strictEqual(interp.offerGroups.length, 2);
         assert.strictEqual(interp.offerGroups[0].variantName, 'Munken Print Cream 1.5');
@@ -236,9 +236,9 @@ async function runTests() {
     // 194E-22: Die Mysteriösen Steine extraction
     {
         console.log('Running 194E-22: Die Mysteriösen Steine extraction...');
-        const mockExtraction = { filename: 'Die_Mysteriösen_Steine_08.09.2026.pdf', combinedText: 'Steine', documentSha256: 'sha_steine' };
+        const mockExtraction = { filename: 'Die_Mysteriösen_Steine.pdf', combinedText: 'Produkt Die Mysteriösen Steine\nAuflage 1500 pc\nSoftcover 1792 Euro + 415 Euro (Zusammenversand) = 2207 Euro / 1.47 Euro pro Stück', documentSha256: 'sha_steine' };
         const interp = interpreter.interpretDocument(mockExtraction);
-        assert.strictEqual(interp.offers[0].quantity, 1500);
+        assert.strictEqual(interp.offers[0].quantity, 1500); // 1792 + 415 = 2207 / 1.47 = 1500
         assert.strictEqual(interp.offers[0].manufacturingPrice, 1792);
         assert.strictEqual(interp.offers[0].transportPrice, 415);
         assert.strictEqual(interp.offers[0].quotedTotalPrice, 2207);
@@ -249,7 +249,7 @@ async function runTests() {
     {
         console.log('Running 194E-23: Malformed PDF safe failure...');
         try {
-            pdfExtractor.extractPdfQuote(Buffer.from('BAD_PDF_DATA'), 'corrupt.pdf');
+            await pdfExtractor.extractPdfQuote(Buffer.from('BAD_PDF_DATA'), 'corrupt.pdf');
             assert.fail('Should have failed malformed PDF');
         } catch (err) {
             assert.strictEqual(err.code, 'PDF_MALFORMED');
@@ -262,7 +262,7 @@ async function runTests() {
         console.log('Running 194E-24: Encrypted PDF safe failure...');
         const encPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Encrypt 2 0 R >>\nendobj\n%%EOF');
         try {
-            pdfExtractor.extractPdfQuote(encPdf, 'encrypted.pdf');
+            await pdfExtractor.extractPdfQuote(encPdf, 'encrypted.pdf');
             assert.fail('Should have failed encrypted PDF');
         } catch (err) {
             assert.strictEqual(err.code, 'PDF_ENCRYPTED');
@@ -274,7 +274,7 @@ async function runTests() {
     {
         console.log('Running 194E-25: Image-only PDF returns OCR_REQUIRED...');
         const imgPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Page /Contents 3 0 R >>\nendobj\n3 0 obj\n<< /Length 10 >>\nstream\n% NO TEXT\nendstream\nendobj\n%%EOF');
-        const res = pdfExtractor.extractPdfQuote(imgPdf, 'scanned.pdf');
+        const res = await pdfExtractor.extractPdfQuote(imgPdf, 'scanned.pdf');
         assert.strictEqual(res.ok, false);
         assert.strictEqual(res.status, 'OCR_REQUIRED');
         console.log('  PASS: Scanned image PDF safely returns OCR_REQUIRED state');

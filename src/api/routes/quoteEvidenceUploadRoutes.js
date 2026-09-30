@@ -57,7 +57,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     try {
         // 1. PDF Extraction
-        const extraction = pdfExtractor.extractPdfQuote(req.file.buffer, req.file.originalname, req.file.mimetype);
+        const extraction = await pdfExtractor.extractPdfQuote(req.file.buffer, req.file.originalname, req.file.mimetype);
 
         if (extraction.status === 'OCR_REQUIRED') {
             return res.status(422).json({
@@ -69,7 +69,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         // 2. Check Document Idempotency (Duplicate Detection per Tenant)
         const existingDocs = await db.query(
-            `SELECT id FROM printhouse_quote_evidence_documents WHERE tenant_id = ? AND file_hash_sha256 = ?`,
+            `SELECT id FROM quote_evidence_documents WHERE tenant_id = ? AND document_sha256 = ?`,
             [tenantId, extraction.documentSha256]
         );
 
@@ -91,9 +91,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const extractionId = `qext-${uuidv4().substring(0, 8)}`;
 
         await db.query(
-            `INSERT INTO printhouse_quote_evidence_documents
-             (id, tenant_id, file_name, file_hash_sha256, document_type, detected_language, raw_extracted_text, page_count, extraction_method, extraction_version, processing_status, created_at)
-             VALUES (?, ?, ?, ?, 'PDF_QUOTATION', ?, ?, ?, ?, ?, 'COMPLETED', NOW(6))`,
+            `INSERT INTO quote_evidence_documents
+             (id, tenant_id, source_type, original_filename, document_sha256, detected_language, raw_text, status, created_by_json, page_count, extraction_method, extraction_version, processing_status, created_at)
+             VALUES (?, ?, 'PDF', ?, ?, ?, ?, 'INGESTED', ?, ?, ?, ?, 'COMPLETED', NOW(6))`,
             [
                 documentId,
                 tenantId,
@@ -101,6 +101,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 extraction.documentSha256,
                 interpretation.detectedLanguage,
                 extraction.combinedText,
+                JSON.stringify({ userId: req.user.id }),
                 extraction.pageCount,
                 extraction.extractionMethod,
                 extraction.extractionVersion
@@ -108,22 +109,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         );
 
         await db.query(
-            `INSERT INTO printhouse_quote_evidence_extractions
-             (id, tenant_id, document_id, extraction_status, validation_status, normalized_quote_json, warnings_json, translated_text, confidence_status, interpretation_version, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+            `INSERT INTO quote_evidence_extractions
+             (id, quote_evidence_document_id, tenant_id, extracted_json, normalized_json, validation_status, translated_text, confidence_status, interpretation_version, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
             [
                 extractionId,
-                tenantId,
                 documentId,
-                interpretation.status,
-                interpretation.hasInconsistentOffers ? 'REQUIRES_REVIEW' : 'VERIFIED',
+                tenantId,
+                JSON.stringify({
+                    filename: extraction.filename,
+                    combinedText: extraction.combinedText,
+                    pages: extraction.pages
+                }),
                 JSON.stringify({
                     printhouseName: interpretation.printhouseName,
                     offerGroups: interpretation.offerGroups,
                     offers: interpretation.offers,
                     normalizedTerms: interpretation.normalizedTerms
                 }),
-                JSON.stringify(extraction.extractionWarnings),
+                interpretation.hasInconsistentOffers ? 'REQUIRES_REVIEW' : 'CONSISTENT',
                 interpretation.translatedText,
                 interpretation.confidenceStatus,
                 interpretation.interpretationVersion
@@ -171,10 +175,10 @@ router.get('/:id', async (req, res) => {
 
     try {
         const docs = await db.query(
-            `SELECT d.id, d.tenant_id, d.file_name, d.file_hash_sha256, d.detected_language, d.raw_extracted_text, d.page_count, d.created_at,
-                    e.id as extraction_id, e.extraction_status, e.validation_status, e.normalized_quote_json, e.translated_text, e.confidence_status, e.operator_corrections_json
-             FROM printhouse_quote_evidence_documents d
-             LEFT JOIN printhouse_quote_evidence_extractions e ON d.id = e.document_id
+            `SELECT d.id, d.tenant_id, d.original_filename, d.document_sha256, d.detected_language, d.raw_text, d.page_count, d.created_at,
+                    e.id as extraction_id, e.validation_status, e.normalized_json, e.translated_text, e.confidence_status, e.operator_corrections_json
+             FROM quote_evidence_documents d
+             LEFT JOIN quote_evidence_extractions e ON d.id = e.quote_evidence_document_id
              WHERE d.id = ? AND d.tenant_id = ?`,
             [documentId, tenantId]
         );
@@ -184,20 +188,19 @@ router.get('/:id', async (req, res) => {
         }
 
         const doc = docs[0];
-        const normalizedJson = typeof doc.normalized_quote_json === 'string' ? JSON.parse(doc.normalized_quote_json) : doc.normalized_quote_json;
+        const normalizedJson = typeof doc.normalized_json === 'string' ? JSON.parse(doc.normalized_json) : doc.normalized_json;
         const operatorCorrections = doc.operator_corrections_json ? (typeof doc.operator_corrections_json === 'string' ? JSON.parse(doc.operator_corrections_json) : doc.operator_corrections_json) : null;
 
         return res.json({
             ok: true,
             evidenceId: doc.id,
             tenantId: doc.tenant_id,
-            filename: doc.file_name,
-            documentSha256: doc.file_hash_sha256,
+            filename: doc.original_filename,
+            documentSha256: doc.document_sha256,
             detectedLanguage: doc.detected_language,
             pageCount: doc.page_count,
-            rawExtractedText: doc.raw_extracted_text,
+            rawExtractedText: doc.raw_text,
             translatedText: doc.translated_text,
-            extractionStatus: doc.extraction_status,
             validationStatus: doc.validation_status,
             confidenceStatus: doc.confidence_status,
             normalizedQuote: normalizedJson,
@@ -223,7 +226,7 @@ router.put('/:id/corrections', async (req, res) => {
 
     try {
         const docs = await db.query(
-            `SELECT id FROM printhouse_quote_evidence_documents WHERE id = ? AND tenant_id = ?`,
+            `SELECT id FROM quote_evidence_documents WHERE id = ? AND tenant_id = ?`,
             [documentId, tenantId]
         );
 
@@ -238,9 +241,9 @@ router.put('/:id/corrections', async (req, res) => {
         };
 
         await db.query(
-            `UPDATE printhouse_quote_evidence_extractions
+            `UPDATE quote_evidence_extractions
              SET operator_corrections_json = ?
-             WHERE document_id = ? AND tenant_id = ?`,
+             WHERE quote_evidence_document_id = ? AND tenant_id = ?`,
             [JSON.stringify(correctionEntry), documentId, tenantId]
         );
 

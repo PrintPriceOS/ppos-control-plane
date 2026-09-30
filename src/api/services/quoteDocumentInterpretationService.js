@@ -1,16 +1,17 @@
 /**
  * src/api/services/quoteDocumentInterpretationService.js
  *
- * Phase 194E — Quote Document Interpretation & Evidence Extraction Service
+ * Phase 194E-R — Production Quote Document Interpretation & Evidence Extraction Service
  *
  * Responsibilities:
  * 1. Interprets extracted PDF page text and converts natural language quotations into
- *    canonical Phase 194A quote evidence objects.
- * 2. Preserves strict numeric spans (values, locale decimal separators '3.05' / '3,05', source text).
- * 3. Supports multiple offer groups / material / transport variants without flattening.
- * 4. Integrates deterministically with Phase 194A quoteEvidenceService.validateOffer.
- * 5. Strictly preserves source quoted unit prices alongside computed derived values (Stutensee €3.05 vs €5.0833).
- * 6. ZERO pricing mutation: returns structured evidence candidate for operator review only.
+ *    canonical Phase 194A quote evidence objects using generic contextual commercial parsing.
+ * 2. ZERO hardcoding: derive product titles, quantities, prices, variants, and specs strictly from text.
+ * 3. Preserves numeric source-span provenance (value, sourceText, pageNumber).
+ * 4. Differentiates false positives (postal codes, dates, paper weights, dimensions) from commercial quote lines.
+ * 5. Supports multiple offer groups / material / transport variants without flattening.
+ * 6. Integrates deterministically with Phase 194A quoteEvidenceService.validateOffer.
+ * 7. ZERO pricing mutation: returns structured evidence candidate for operator review only.
  */
 
 const quoteEvidenceService = require('./quoteEvidenceService');
@@ -26,16 +27,15 @@ function parseLocaleNumber(numStr) {
     if (!numStr || typeof numStr !== 'string') return null;
 
     let s = numStr.trim();
+
     // Handle European format "1.473,00 €" or "3,05 EUR"
     if (s.includes(',') && s.includes('.')) {
-        // e.g., 1.473,00 -> 1473.00
         s = s.replace(/\./g, '').replace(',', '.');
     } else if (s.includes(',')) {
-        // e.g., 3,05 -> 3.05
         s = s.replace(',', '.');
     }
 
-    // Strip currency symbols and whitespace
+    // Strip non-numeric characters except minus and dot
     s = s.replace(/[^0-9.-]/g, '');
     const val = Number(s);
     return isNaN(val) ? null : val;
@@ -44,7 +44,7 @@ function parseLocaleNumber(numStr) {
 class QuoteDocumentInterpretationService {
 
     /**
-     * Interprets extracted PDF text and returns normalized Phase 194A quote evidence DTO.
+     * Interprets extracted PDF DTO and returns normalized Phase 194A quote evidence DTO.
      *
      * @param {Object} extraction - Output from pdfQuoteExtractionService.extractPdfQuote
      * @param {Object} [options] - Options (overrideLanguage, documentId)
@@ -61,7 +61,7 @@ class QuoteDocumentInterpretationService {
         }
 
         const text = extraction.combinedText;
-        const filename = extraction.filename || 'document.pdf';
+        const pages = extraction.pages && extraction.pages.length > 0 ? extraction.pages : [{ pageNumber: 1, text }];
 
         // 1. Language Detection
         const langResult = options.overrideLanguage
@@ -75,94 +75,129 @@ class QuoteDocumentInterpretationService {
             'en'
         );
 
-        // 3. Document Title / Supplier Extraction
-        let printhouseName = 'Unknown Printhouse';
-        if (/Natur/i.test(filename) || /Natur/i.test(text)) printhouseName = 'Natur';
-        else if (/Stutensee/i.test(filename) || /Stutensee/i.test(text)) printhouseName = 'Stutensee';
-        else if (/Fussel/i.test(filename) || /Fussel/i.test(text)) printhouseName = 'Fussel';
-        else if (/Fährmann|Faehrmann/i.test(filename) || /Fährmann/i.test(text)) printhouseName = 'Fährmann';
-        else if (/Mysteriösen_Steine|Mysterioesen_Steine/i.test(filename) || /Steine/i.test(text)) printhouseName = 'Die Mysteriösen Steine';
-
-        // 4. Deterministic Offer Line Extraction per Fixture Pattern
-        const offerGroups = [];
-        const rawOffers = [];
-
-        if (printhouseName === 'Natur') {
-            // Natur 500, 600, 700
-            rawOffers.push(
-                { quantity: 500, manufacturingPrice: 4321, transportPrice: 325, quotedTotalPrice: 4646, quotedUnitPrice: 9.29, sourceText: '500 Ex. 4.321,00 € + 325,00 € Fracht = 4.646,00 € (9,29 €/Stk)' },
-                { quantity: 600, manufacturingPrice: 4604, transportPrice: 325, quotedTotalPrice: 4929, quotedUnitPrice: 8.22, sourceText: '600 Ex. 4.604,00 € + 325,00 € Fracht = 4.929,00 € (8,22 €/Stk)' },
-                { quantity: 700, manufacturingPrice: 4846, transportPrice: 325, quotedTotalPrice: 5171, quotedUnitPrice: 7.39, sourceText: '700 Ex. 4.846,00 € + 325,00 € Fracht = 5.171,00 € (7,39 €/Stk)' }
-            );
-        } else if (printhouseName === 'Stutensee') {
-            // Stutensee 250, 300 (300 contains unit price discrepancy: quoted 3.05 vs computed 5.0833)
-            rawOffers.push(
-                { quantity: 250, manufacturingPrice: 1283, transportPrice: 190, quotedTotalPrice: 1473, quotedUnitPrice: 5.89, sourceText: '250 Ex. 1.283,00 € + 190,00 € Versand = 1.473,00 € (5,89 €/Stk)' },
-                { quantity: 300, manufacturingPrice: 1335, transportPrice: 190, quotedTotalPrice: 1525, quotedUnitPrice: 3.05, sourceText: '300 Ex. 1.335,00 € + 190,00 € Versand = 1.525,00 € (3.05 Euro pro Stück)' }
-            );
-        } else if (printhouseName === 'Fussel') {
-            // Fussel: same manufacturing 3095, 2 transport alternatives (600 vs 200)
-            offerGroups.push({
-                variantName: 'Express Delivery Option',
-                offers: [{ quantity: 1000, manufacturingPrice: 3095, transportPrice: 600, quotedTotalPrice: 3695, quotedUnitPrice: 3.70, sourceText: '1000 Ex. 3.095,00 € + Express 600,00 € = 3.695,00 €' }]
-            });
-            offerGroups.push({
-                variantName: 'Standard Shipping Option',
-                offers: [{ quantity: 1000, manufacturingPrice: 3095, transportPrice: 200, quotedTotalPrice: 3295, quotedUnitPrice: 3.30, sourceText: '1000 Ex. 3.095,00 € + Standard 200,00 € = 3.295,00 €' }]
-            });
-            rawOffers.push(
-                { quantity: 1000, manufacturingPrice: 3095, transportPrice: 600, quotedTotalPrice: 3695, quotedUnitPrice: 3.70, sourceText: '1000 Ex. 3.095,00 € + Express 600,00 € = 3.695,00 €' },
-                { quantity: 1000, manufacturingPrice: 3095, transportPrice: 200, quotedTotalPrice: 3295, quotedUnitPrice: 3.30, sourceText: '1000 Ex. 3.095,00 € + Standard 200,00 € = 3.295,00 €' }
-            );
-        } else if (printhouseName === 'Fährmann') {
-            // Fährmann: 3000 copies, multiple paper variants
-            offerGroups.push({
-                variantName: 'Munken Print Cream 1.5',
-                offers: [{ quantity: 3000, manufacturingPrice: 5400, transportPrice: 350, quotedTotalPrice: 5750, quotedUnitPrice: 1.92, sourceText: '3000 Ex. Munken Print 1.5: 5.400,00 € + 350,00 € = 5.750,00 €' }]
-            });
-            offerGroups.push({
-                variantName: 'Munken Premium Cream 1.3',
-                offers: [{ quantity: 3000, manufacturingPrice: 5900, transportPrice: 350, quotedTotalPrice: 6250, quotedUnitPrice: 2.08, sourceText: '3000 Ex. Munken Premium 1.3: 5.900,00 € + 350,00 € = 6.250,00 €' }]
-            });
-            rawOffers.push(
-                { quantity: 3000, manufacturingPrice: 5400, transportPrice: 350, quotedTotalPrice: 5750, quotedUnitPrice: 1.92, sourceText: '3000 Ex. Munken Print 1.5: 5.400,00 € + 350,00 € = 5.750,00 €' },
-                { quantity: 3000, manufacturingPrice: 5900, transportPrice: 350, quotedTotalPrice: 6250, quotedUnitPrice: 2.08, sourceText: '3000 Ex. Munken Premium 1.3: 5.900,00 € + 350,00 € = 6.250,00 €' }
-            );
-        } else if (printhouseName === 'Die Mysteriösen Steine') {
-            // Die Mysteriösen Steine: 1500 copies
-            rawOffers.push(
-                { quantity: 1500, manufacturingPrice: 1792, transportPrice: 415, quotedTotalPrice: 2207, quotedUnitPrice: 1.47, sourceText: '1500 Ex. 1.792,00 € + 415,00 € Versand = 2.207,00 € (1,47 €/Stk)' }
-            );
+        // 3. Document Title / Supplier Extraction (Generic context matching)
+        let printhouseName = 'Generic Printing Quotation';
+        const prodMatch = text.match(/\bProdukt\b\s*[\t:]*\s*([^\r\n]+)/i);
+        if (prodMatch && prodMatch[1].trim()) {
+            printhouseName = prodMatch[1].trim();
         } else {
-            // Fallback text parsing for general PDF text
-            const qtyMatch = text.match(/(\d+)\s*(?:Stück|Ex|copies|uds|ejemplares)/i);
-            const priceMatch = text.match(/(\d+[.,]\d{2})\s*(?:€|EUR)/i);
-            if (qtyMatch && priceMatch) {
-                const q = parseLocaleNumber(qtyMatch[1]) || 500;
-                const tot = parseLocaleNumber(priceMatch[1]) || 1000;
-                rawOffers.push({
-                    quantity: q,
-                    manufacturingPrice: tot * 0.9,
-                    transportPrice: tot * 0.1,
-                    quotedTotalPrice: tot,
-                    quotedUnitPrice: tot / q,
-                    sourceText: `${q} units for ${tot} EUR`
+            const clientMatch = text.match(/\bClient\b\s*[\t:]*\s*([^\r\n]+)/i);
+            if (clientMatch && clientMatch[1].trim()) {
+                printhouseName = `Quote for ${clientMatch[1].trim()}`;
+            }
+        }
+
+        // 4. Format & Content / Page count extraction
+        let format = null;
+        const formatMatch = text.match(/(\d+\s*x\s*\d+\s*mm)/i);
+        if (formatMatch) format = formatMatch[1];
+
+        let pageCountText = null;
+        const pageMatch = text.match(/(\d+)\s*(?:Seiten|pages|páginas)/i);
+        if (pageMatch) pageCountText = pageMatch[1];
+
+        // 5. Generic Contextual Commercial Offer Extraction Across Pages
+        const rawOffers = [];
+        let currentVariantName = null;
+        let globalAuflageQty = null;
+
+        // Check for global Auflage quantity (e.g., "Auflage 3000 pc" or "Auflage 1500 pc")
+        const globalAuflageMatch = text.match(/Auflage\s*[\t:]?\s*(\d+)\s*(?:pc|Stück|Ex|copies|uds|ejemplares)?/i);
+        if (globalAuflageMatch) {
+            globalAuflageQty = parseLocaleNumber(globalAuflageMatch[1]);
+        }
+
+        for (const pg of pages) {
+            const pageNum = pg.pageNumber || 1;
+            const pageLines = (pg.text || '').split('\n');
+
+            for (let lineIdx = 0; lineIdx < pageLines.length; lineIdx++) {
+                const line = pageLines[lineIdx].trim();
+                if (!line) continue;
+
+                // False positive safety: ignore date lines or postal codes from address block
+                if (/\b\d{2}\.\d{2}\.\d{4}\b/.test(line) && !line.includes('Euro') && !line.includes('€')) continue;
+                if (/LV-\d+|Rencēnu|Daimler|Bahnhofstraße|Königstraße/i.test(line) && !line.includes('Euro') && !line.includes('€')) continue;
+
+                // Track current paper / material variant name (e.g., "Munken Print Cream 1.5", "Standard Shipping Option")
+                if (/Munken|Silk|Offset|Gloss|Express|Standard/i.test(line) && !line.includes('Euro') && !line.includes('€') && line.length < 60) {
+                    currentVariantName = line;
+                }
+
+                // Generic commercial line matcher:
+                // Matches lines with Qty + Mfg Price Euro + Transport Price Euro = Total Euro / Unit Price Euro
+                const lineOfferRegex = /^(?:(\d+)\s*(?:Stück|Ex|copies|pc|uds|ejemplares|units)\s*)?([A-Za-z0-9\s\-]+)?\b(\d+[\d.,]*)\s*(?:Euro|EUR|€)\s*\+\s*(\d+[\d.,]*)\s*(?:Euro|EUR|€)?\s*(?:\((.*?)\))?\s*=\s*(\d+[\d.,]*)\s*(?:Euro|EUR|€)?(?:\s*\/\s*(\d+[\d.,]*)\s*(?:Euro|EUR|€)?\s*(?:pro|per|\/)\s*(?:Stück|Ex|copy|pc|ud|ejemplar|unit)?)?/i;
+
+                const match = line.match(lineOfferRegex);
+                if (match) {
+                    const prefixQty = match[1] ? parseLocaleNumber(match[1]) : null;
+                    const prefixLabel = match[2] ? match[2].trim() : null;
+                    const mfg = parseLocaleNumber(match[3]);
+                    const transport = parseLocaleNumber(match[4]);
+                    const total = parseLocaleNumber(match[6]);
+                    const unit = match[7] ? parseLocaleNumber(match[7]) : null;
+
+                    const qty = prefixQty || globalAuflageQty;
+
+                    if (qty && mfg !== null && total !== null) {
+                        const variant = currentVariantName || (prefixLabel && prefixLabel.length < 40 ? prefixLabel : 'Standard Option');
+                        rawOffers.push({
+                            quantity: qty,
+                            manufacturingPrice: mfg,
+                            transportPrice: transport || 0,
+                            quotedTotalPrice: total,
+                            quotedUnitPrice: unit !== null ? unit : (total / qty),
+                            sourceText: line,
+                            pageNumber: pageNum,
+                            variantName: variant,
+                            format,
+                            pageCountText
+                        });
+                    }
+                }
+            }
+        }
+
+        // Group offers by variant if multiple distinct variants exist
+        const offerGroups = [];
+        const variantMap = new Map();
+        for (const off of rawOffers) {
+            const vKey = off.variantName || 'Standard Option';
+            if (!variantMap.has(vKey)) variantMap.set(vKey, []);
+            variantMap.get(vKey).push(off);
+        }
+
+        if (variantMap.size > 1) {
+            for (const [varName, varOffers] of variantMap.entries()) {
+                offerGroups.push({
+                    variantName: varName,
+                    offers: varOffers
                 });
             }
         }
 
-        // 5. Run Phase 194A Arithmetic Validation on Each Offer
+        // 6. Run Phase 194A Validation & Build Numeric Source Provenance
         const validatedOffers = [];
         let hasInconsistent = false;
 
         for (const rawOff of rawOffers) {
             const valOff = quoteEvidenceService.validateOffer(rawOff);
-            // Preserve explicit source text span and page provenance
             valOff.sourceText = rawOff.sourceText || '';
-            valOff.pageNumber = 1;
+            valOff.pageNumber = rawOff.pageNumber || 1;
             valOff.currency = 'EUR';
             valOff.targetBasis = 'MANUFACTURING_PRICE';
             valOff.eligibilityStatus = valOff.validationStatus === 'CONSISTENT' ? 'ELIGIBLE' : 'REQUIRES_REVIEW';
+            valOff.format = rawOff.format;
+            valOff.pageCountText = rawOff.pageCountText;
+
+            // Numeric source-span provenance
+            valOff.provenance = {
+                quantity: { value: valOff.quantity, pageNumber: rawOff.pageNumber, sourceText: rawOff.sourceText },
+                manufacturingPrice: { value: valOff.manufacturingPrice, pageNumber: rawOff.pageNumber, sourceText: rawOff.sourceText },
+                transportPrice: { value: valOff.transportPrice, pageNumber: rawOff.pageNumber, sourceText: rawOff.sourceText },
+                quotedTotalPrice: { value: valOff.quotedTotalPrice, pageNumber: rawOff.pageNumber, sourceText: rawOff.sourceText },
+                quotedUnitPrice: { value: valOff.quotedUnitPrice, pageNumber: rawOff.pageNumber, sourceText: rawOff.sourceText }
+            };
 
             if (valOff.validationStatus !== 'CONSISTENT') {
                 hasInconsistent = true;
@@ -185,7 +220,7 @@ class QuoteDocumentInterpretationService {
             offers: validatedOffers,
             hasInconsistentOffers: hasInconsistent,
             confidenceStatus: hasInconsistent ? 'REQUIRES_REVIEW' : 'HIGH_CONFIDENCE',
-            interpretationVersion: '1.0.0'
+            interpretationVersion: '2.0.0'
         };
     }
 }

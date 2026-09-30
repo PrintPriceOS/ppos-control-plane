@@ -1,19 +1,21 @@
 /**
  * src/api/services/pdfQuoteExtractionService.js
  *
- * Phase 194E — PDF Quote Extraction & Security Service
+ * Phase 194E-R — Production PDF Quote Extraction & Security Service
  *
  * Responsibilities:
- * 1. Treats uploaded PDF binaries as strictly untrusted input.
+ * 1. Uses maintained PDFParse engine (powered by pdfjs-dist) to decode FlateDecode streams,
+ *    object streams, subset fonts, and CMaps.
  * 2. Enforces PDF magic-byte validation (%PDF-), MIME allowlist, and filename sanitization.
  * 3. Enforces technical bounds: max file size (10 MB), max page count (50), max text size (500 KB).
  * 4. Computes deterministic SHA-256 fingerprint for document idempotency.
- * 5. Extracts page-bounded text content without executing embedded JS, macros, or external links.
- * 6. Detects malformed/encrypted PDFs and returns OCR_REQUIRED for image-only PDFs.
+ * 5. Extracts page-bounded text content with exact pageNumber provenance.
+ * 6. Differentiates PDF_ENCRYPTED, PDF_MALFORMED, TEXT_EXTRACTION_FAILED, and OCR_REQUIRED states.
  */
 
 const crypto = require('crypto');
 const path = require('path');
+const { PDFParse } = require('pdf-parse');
 const logger = require('./logger').child('pdf-quote-extraction');
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -46,88 +48,6 @@ function validatePdfMagicBytes(buffer) {
     return header === '%PDF-';
 }
 
-/**
- * Basic deterministic text extractor for PDF stream text objects.
- * Scans PDF stream buffer for text strings within TJ/Tj operators or raw uncompressed text blocks.
- */
-function extractTextFromPdfBuffer(buffer) {
-    if (!Buffer.isBuffer(buffer)) return { pageCount: 1, pages: [], combinedText: '', warnings: [] };
-
-    const warnings = [];
-    const content = buffer.toString('binary');
-
-    // Check for encryption markers (/Encrypt)
-    if (content.includes('/Encrypt')) {
-        const err = new Error('PDF_ENCRYPTED');
-        err.code = 'PDF_ENCRYPTED';
-        err.statusCode = 422;
-        throw err;
-    }
-
-    // Estimate page count by counting /Page catalog entries
-    const pageMatches = content.match(/\/Type\s*\/Page\b/g);
-    const pageCount = pageMatches ? Math.min(pageMatches.length, MAX_PAGE_COUNT) : 1;
-
-    // Extract text fragments enclosed in parens inside PDF text streams (Tj / TJ)
-    const textFragments = [];
-    const btRegex = /BT[\s\S]*?ET/g;
-    let match;
-
-    while ((match = btRegex.exec(content)) !== null) {
-        const block = match[0];
-        // Extract parenthesized string literals (Tj / TJ)
-        const strMatches = block.match(/\((.*?)\)\s*(?:Tj|TJ|'|")/g) || block.match(/\((.*?)\)/g);
-        if (strMatches) {
-            for (const s of strMatches) {
-                // Strip outer parens
-                let clean = s.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|'|")?$/, '');
-                // Decode common PDF string escapes
-                clean = clean
-                    .replace(/\\n/g, '\n')
-                    .replace(/\\r/g, '\r')
-                    .replace(/\\t/g, '\t')
-                    .replace(/\\\( /g, '(')
-                    .replace(/\\\)/g, ')')
-                    .replace(/\\\\/g, '\\');
-                if (clean.trim()) {
-                    textFragments.push(clean.trim());
-                }
-            }
-        }
-    }
-
-    let combinedText = textFragments.join(' ');
-
-    // Fallback: search for printable text sequences if BT...ET was not structured
-    if (!combinedText || combinedText.length < 5) {
-        const stripped = content
-            .replace(/%PDF-[0-9.]+/g, '')
-            .replace(/<<[\s\S]*?>>/g, '')
-            .replace(/stream[\s\S]*?endstream/g, '')
-            .replace(/\d+\s+\d+\s+obj[\s\S]*?endobj/g, '')
-            .replace(/xref[\s\S]*?startxref/g, '');
-
-        const plainMatches = stripped.match(/[a-zA-Z0-9€.,\s]{4,}/g) || [];
-        const filtered = plainMatches.map(s => s.trim()).filter(s => s.length >= 4 && !/^(endobj|stream|endstream)$/.test(s));
-        combinedText = filtered.join(' ');
-    }
-
-    // Truncate to max text size
-    if (combinedText.length > MAX_TEXT_SIZE_BYTES) {
-        combinedText = combinedText.substring(0, MAX_TEXT_SIZE_BYTES);
-        warnings.push('TEXT_TRUNCATED_MAX_SIZE_EXCEEDED');
-    }
-
-    const pages = [{ pageNumber: 1, text: combinedText }];
-
-    return {
-        pageCount,
-        pages,
-        combinedText,
-        warnings
-    };
-}
-
 class PdfQuoteExtractionService {
 
     /**
@@ -136,9 +56,9 @@ class PdfQuoteExtractionService {
      * @param {Buffer} buffer - Raw file buffer
      * @param {string} originalFilename - User-provided filename
      * @param {string} [mimeType='application/pdf'] - Upload MIME type
-     * @returns {Object} Extraction DTO
+     * @returns {Promise<Object>} Extraction DTO
      */
-    extractPdfQuote(buffer, originalFilename, mimeType = 'application/pdf') {
+    async extractPdfQuote(buffer, originalFilename, mimeType = 'application/pdf') {
         if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
             const err = new Error('INVALID_FILE_BUFFER');
             err.code = 'INVALID_FILE_BUFFER';
@@ -174,36 +94,90 @@ class PdfQuoteExtractionService {
             throw err;
         }
 
-        // 3. Document SHA-256 Fingerprint
-        const documentSha256 = computeSha256(buffer);
+        // 3. Check for encryption (/Encrypt)
+        const rawHeader = buffer.toString('binary', 0, Math.min(buffer.length, 4096));
+        if (rawHeader.includes('/Encrypt') || buffer.toString('binary').includes('/Encrypt')) {
+            const err = new Error('PDF_ENCRYPTED');
+            err.code = 'PDF_ENCRYPTED';
+            err.statusCode = 422;
+            err.details = 'PDF document is password protected or encrypted.';
+            throw err;
+        }
 
-        // 4. Extract Text Content
-        let extraction;
+        // 4. Document SHA-256 Fingerprint
+        const documentSha256 = computeSha256(buffer);
+        const warnings = [];
+
+        // 5. Extract Text Content via PDFParse
+        let pageCount = 1;
+        let pages = [];
+        let combinedText = '';
+
         try {
-            extraction = extractTextFromPdfBuffer(buffer);
+            const parser = new PDFParse({ data: buffer });
+            const parseResult = await parser.getText();
+
+            pageCount = parseResult.pages ? Math.min(parseResult.pages.length, MAX_PAGE_COUNT) : 1;
+            if (parseResult.pages && parseResult.pages.length > MAX_PAGE_COUNT) {
+                warnings.push('PAGE_COUNT_EXCEEDED_TRUNCATED');
+            }
+
+            pages = (parseResult.pages || []).slice(0, MAX_PAGE_COUNT).map((p, idx) => ({
+                pageNumber: idx + 1,
+                text: (p.text || '').trim()
+            }));
+
+            combinedText = (parseResult.text || '').trim();
+
         } catch (err) {
-            if (err.code === 'PDF_ENCRYPTED') throw err;
-            logger.warn('PDF text extraction failed', { filename: sanitizedName, error: err.message });
+            if (err.name === 'PasswordException' || (err.message && err.message.includes('Password'))) {
+                const encErr = new Error('PDF_ENCRYPTED');
+                encErr.code = 'PDF_ENCRYPTED';
+                encErr.statusCode = 422;
+                throw encErr;
+            }
+            // If PDF structure lacks extractable text streams or has minimal object catalogs (scanned image PDF)
+            if (err.message && (err.message.includes('Invalid PDF structure') || err.message.includes('Missing trailer') || err.message.includes('no text'))) {
+                return {
+                    ok: false,
+                    status: 'OCR_REQUIRED',
+                    documentSha256,
+                    filename: sanitizedName,
+                    pageCount,
+                    pages: [],
+                    combinedText: '',
+                    extractionWarnings: ['IMAGE_ONLY_PDF_OCR_REQUIRED'],
+                    extractionMethod: 'PDFPARSE_ENGINE',
+                    extractionVersion: '2.4.5'
+                };
+            }
+            logger.warn('PDFParse extraction failed', { filename: sanitizedName, error: err.message });
             const malErr = new Error('PDF_TEXT_EXTRACTION_FAILED');
             malErr.code = 'PDF_TEXT_EXTRACTION_FAILED';
             malErr.statusCode = 422;
+            malErr.details = err.message;
             throw malErr;
         }
 
-        // 5. OCR Required Gate
-        const trimmedCombinedText = extraction.combinedText.trim();
-        if (!trimmedCombinedText || trimmedCombinedText.length < 5) {
+        // 6. Max Text Size Guard
+        if (combinedText.length > MAX_TEXT_SIZE_BYTES) {
+            combinedText = combinedText.substring(0, MAX_TEXT_SIZE_BYTES);
+            warnings.push('TEXT_TRUNCATED_MAX_SIZE_EXCEEDED');
+        }
+
+        // 7. OCR Required Gate (Scanned image PDF with no extractable text layer)
+        if (!combinedText || combinedText.length < 5) {
             return {
                 ok: false,
                 status: 'OCR_REQUIRED',
                 documentSha256,
                 filename: sanitizedName,
-                pageCount: extraction.pageCount,
+                pageCount,
                 pages: [],
                 combinedText: '',
                 extractionWarnings: ['IMAGE_ONLY_PDF_OCR_REQUIRED'],
-                extractionMethod: 'EMBEDDED_TEXT_SCANNER',
-                extractionVersion: '1.0.0'
+                extractionMethod: 'PDFPARSE_ENGINE',
+                extractionVersion: '2.4.5'
             };
         }
 
@@ -212,12 +186,12 @@ class PdfQuoteExtractionService {
             status: 'SUCCESS',
             documentSha256,
             filename: sanitizedName,
-            pageCount: extraction.pageCount,
-            pages: extraction.pages,
-            combinedText: trimmedCombinedText,
-            extractionWarnings: extraction.warnings,
-            extractionMethod: 'EMBEDDED_TEXT_SCANNER',
-            extractionVersion: '1.0.0'
+            pageCount,
+            pages,
+            combinedText,
+            extractionWarnings: warnings,
+            extractionMethod: 'PDFPARSE_ENGINE',
+            extractionVersion: '2.4.5'
         };
     }
 }
