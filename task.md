@@ -1291,5 +1291,7 @@ UNRESTRICTED_PRODUCTION:
 
 - **Phase 194A (Quote Evidence Ingestion)**: **VALIDATED / CLOSED** (SHA `a7bd9c1e7a57a8bfec32205510dd169cce32cbff`). Ingests PDF/quote evidence with explicit source vs derived breakdown and arithmetic verification.
 - **Phase 194B (Quantity Economics Model)**: **VALIDATED / CLOSED** (SHA `d32bff25b1285257a44fef2b4d909b9f9aa4cb41`). Piecewise total price function domain model.
-- **Phase 194C (Multi-Quantity Calibration)**: **VALIDATED / CLOSED**. Multi-target deterministic curve calibration over manufacturing-only targets without mutating active rates or violating governed acceptance boundaries.
+- **Phase 194C (Multi-Quantity Calibration)**: **VALIDATED / CLOSED** (SHA `4394968ab453a470ded9b240a82b94285e0378d7`). Multi-target deterministic curve calibration over manufacturing-only targets without mutating active rates or violating governed acceptance boundaries.
+- **Phase 194D (Governed Quantity Curve Acceptance)**: **VALIDATED / CLOSED**. 2-level curve governance, point-level tolerances, total monotonicity, unit cost direction, adjacent marginal costs, midpoint structural probes, declared/undeclared discontinuity handling, identifiability gate, evidence range safety, and immutable revision creation.
+
 

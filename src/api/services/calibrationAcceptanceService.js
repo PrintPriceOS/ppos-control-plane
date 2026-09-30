@@ -268,7 +268,7 @@ class CalibrationAcceptanceService {
             const resultingRates = safeDeepMergeRates(currentRates, proposedPatch);
             const resultingRatesChecksum = calibrationSessionService.computeRatesChecksum(resultingRates);
 
-            // 7. FORWARD BPE VERIFICATION (D9)
+            // 7. FORWARD BPE VERIFICATION & CURVE ACCEPTANCE EVALUATION (D9 & 194D)
             let bookSpec = {};
             if (session.book_spec_json) {
                 bookSpec = typeof session.book_spec_json === 'string'
@@ -299,19 +299,39 @@ class CalibrationAcceptanceService {
 
             const forwardResult = adapter.evaluateForwardPrice(bookSpec, resultingRates, {}, nodeConfig);
             const verifiedManufacturingPrice = forwardResult.predictedManufacturingPrice;
-            const targetManufacturingPrice = Number(session.target_manufacturing_price);
+            const targetManufacturingPrice = Number(session.target_manufacturing_price || 0);
 
             const absoluteResidual = Number(Math.abs(verifiedManufacturingPrice - targetManufacturingPrice).toFixed(6));
-            const percentResidual = Number((absoluteResidual / targetManufacturingPrice).toFixed(6));
+            const percentResidual = targetManufacturingPrice > 0 ? Number((absoluteResidual / targetManufacturingPrice).toFixed(6)) : 0;
 
-            // 8. ACCEPTANCE TOLERANCE POLICY (D10)
+            // 8. MULTI-QUANTITY CURVE EVALUATION & GOVERNANCE POLICY (Phase 194D)
+            const curveEvaluation = this.evaluateCurveAcceptance(session, run, resultingRates, bookSpec, nodeConfig, options);
+
             const effectiveTolerance = computeGovernanceTolerance(
-                targetManufacturingPrice,
+                targetManufacturingPrice || (curveEvaluation.pointResults[0]?.targetManufacturingPrice || 0),
                 configuredAbsTolerance,
                 configuredPctTolerance
             );
 
-            if (absoluteResidual > effectiveTolerance) {
+            if (curveEvaluation.status === 'REJECTED' && !options.skipCurveValidation) {
+                const err = new Error('GOVERNANCE_CURVE_REJECTED');
+                err.code = 'GOVERNANCE_CURVE_REJECTED';
+                err.statusCode = 422;
+                err.details = curveEvaluation.reasons;
+                err.curveEvaluation = curveEvaluation;
+                throw err;
+            }
+
+            if (curveEvaluation.status === 'REQUIRES_REVIEW' && !options.allowReviewOverride && !options.skipCurveValidation) {
+                const err = new Error('GOVERNANCE_CURVE_REQUIRES_REVIEW');
+                err.code = 'GOVERNANCE_CURVE_REQUIRES_REVIEW';
+                err.statusCode = 422;
+                err.details = curveEvaluation.reasons;
+                err.curveEvaluation = curveEvaluation;
+                throw err;
+            }
+
+            if (absoluteResidual > effectiveTolerance && session.target_manufacturing_price && !options.skipCurveValidation) {
                 const err = new Error('CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED');
                 err.code = 'CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED';
                 err.statusCode = 422;
@@ -391,7 +411,8 @@ class CalibrationAcceptanceService {
                 tolerancePolicy: {
                     configuredAbsoluteTolerance: configuredAbsTolerance,
                     configuredPercentTolerance: configuredPctTolerance
-                }
+                },
+                curveEvaluation
             };
 
             let warnings = [];
@@ -407,8 +428,8 @@ class CalibrationAcceptanceService {
                   baseline_checksum, proposed_patch_checksum, resulting_rates_checksum,
                   target_manufacturing_price, verified_manufacturing_price, absolute_residual, percent_residual,
                   acceptance_tolerance_absolute, acceptance_tolerance_percent, effective_acceptance_tolerance,
-                  warnings_json, verification_json, accepted_by_json, accepted_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                  warnings_json, verification_json, curve_acceptance_json, acceptance_mode, accepted_by_json, accepted_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
                 [
                     acceptanceId,
                     tenantId,
@@ -428,6 +449,8 @@ class CalibrationAcceptanceService {
                     effectiveTolerance,
                     JSON.stringify(warnings),
                     JSON.stringify(verificationJson),
+                    JSON.stringify(curveEvaluation),
+                    curveEvaluation.mode,
                     JSON.stringify(actorJson)
                 ]
             );
@@ -585,6 +608,284 @@ class CalibrationAcceptanceService {
             solverVersion: r.solver_version,
             createdBy: typeof r.created_by_json === 'string' ? JSON.parse(r.created_by_json) : r.created_by_json,
             createdAt: r.created_at
+        };
+    }
+
+    /**
+     * Evaluates structural multi-quantity curve acceptance for a candidate run.
+     * Performs point-level tolerance evaluation, curve structural checks (monotonicity, unit cost direction,
+     * adjacent marginal costs, midpoint structural probes, breakpoint/discontinuity governance,
+     * evidence range, identifiability gate, and evidence lineage).
+     */
+    evaluateCurveAcceptance(session, run, candidateRates, bookSpec, nodeConfig, options = {}) {
+        const configuredAbsTol = typeof options.absoluteTolerance === 'number'
+            ? options.absoluteTolerance
+            : DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE;
+        const configuredPctTol = typeof options.percentTolerance === 'number'
+            ? options.percentTolerance
+            : DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT;
+
+        // Parse targets from session or options
+        let targets = [];
+        if (session.multi_targets_json) {
+            targets = typeof session.multi_targets_json === 'string'
+                ? JSON.parse(session.multi_targets_json)
+                : session.multi_targets_json;
+        } else if (Array.isArray(options.calibrationTargets)) {
+            targets = options.calibrationTargets;
+        } else if (session.target_manufacturing_price) {
+            targets = [{
+                quantity: Number(bookSpec?.quantity || 1),
+                targetManufacturingPrice: Number(session.target_manufacturing_price),
+                currency: session.currency || 'EUR',
+                targetBasis: 'MANUFACTURING_PRICE',
+                eligibilityStatus: 'ELIGIBLE'
+            }];
+        }
+
+        // Sort targets by quantity ascending
+        const sortedTargets = [...targets].sort((a, b) => Number(a.quantity) - Number(b.quantity));
+
+        // 1. Point-level evaluation
+        const pointResults = [];
+        let acceptedCount = 0;
+        let totalAbsRes = 0;
+        let maxAbsRes = 0;
+        let totalPctRes = 0;
+        let maxPctRes = 0;
+
+        for (const target of sortedTargets) {
+            const q = Number(target.quantity);
+            const targetM = Number(target.targetManufacturingPrice);
+            const specForQ = { ...bookSpec, quantity: q };
+
+            const evalResult = adapter.evaluateForwardPrice(specForQ, candidateRates, {}, nodeConfig);
+            const predM = evalResult.predictedManufacturingPrice;
+
+            const absRes = Number(Math.abs(predM - targetM).toFixed(6));
+            const pctRes = targetM > 0 ? Number((absRes / targetM).toFixed(6)) : 0;
+            const effTol = computeGovernanceTolerance(targetM, configuredAbsTol, configuredPctTol);
+            const withinTol = absRes <= effTol;
+
+            if (withinTol) acceptedCount++;
+            totalAbsRes += absRes;
+            if (absRes > maxAbsRes) maxAbsRes = absRes;
+            totalPctRes += pctRes;
+            if (pctRes > maxPctRes) maxPctRes = pctRes;
+
+            pointResults.push({
+                quantity: q,
+                targetManufacturingPrice: targetM,
+                predictedManufacturingPrice: predM,
+                absoluteResidual: absRes,
+                percentageResidual: pctRes,
+                absoluteTolerance: configuredAbsTol,
+                percentageTolerance: configuredPctTol,
+                effectiveTolerance: effTol,
+                withinTolerance: withinTol,
+                eligibilityStatus: target.eligibilityStatus || 'ELIGIBLE',
+                sourceEvidenceId: target.sourceEvidenceId || null,
+                sourceOfferIndex: target.sourceOfferIndex ?? null
+            });
+        }
+
+        const pointCount = sortedTargets.length;
+        const rejectedCount = pointCount - acceptedCount;
+        const meanAbsRes = pointCount > 0 ? Number((totalAbsRes / pointCount).toFixed(6)) : 0;
+        const meanPctRes = pointCount > 0 ? Number((totalPctRes / pointCount).toFixed(6)) : 0;
+        const allPointsWithinTolerance = pointCount > 0 && acceptedCount === pointCount;
+
+        // Calculate Objective Value sum( (pred - target)/max(target, 1e-6) )^2
+        let objValue = 0;
+        for (const p of pointResults) {
+            const denom = Math.max(p.targetManufacturingPrice, 1e-6);
+            const r = (p.predictedManufacturingPrice - p.targetManufacturingPrice) / denom;
+            objValue += r * r;
+        }
+        objValue = Number(objValue.toFixed(6));
+
+        // 2. Monotonicity & Direction Checks
+        let totalPriceMonotonic = true;
+        let unitCostNonIncreasing = true;
+        const marginalCosts = [];
+        let negativeMarginalCostDetected = false;
+
+        for (let i = 0; i < pointResults.length - 1; i++) {
+            const p1 = pointResults[i];
+            const p2 = pointResults[i + 1];
+
+            if (p2.predictedManufacturingPrice < p1.predictedManufacturingPrice || p2.targetManufacturingPrice < p1.targetManufacturingPrice) {
+                totalPriceMonotonic = false;
+            }
+
+            const unit1 = p1.predictedManufacturingPrice / p1.quantity;
+            const unit2 = p2.predictedManufacturingPrice / p2.quantity;
+            const targetUnit1 = p1.targetManufacturingPrice / p1.quantity;
+            const targetUnit2 = p2.targetManufacturingPrice / p2.quantity;
+
+            if (unit2 > unit1 + 1e-6 || targetUnit2 > targetUnit1 + 1e-6) {
+                unitCostNonIncreasing = false;
+            }
+
+            const dq = p2.quantity - p1.quantity;
+            const dm = p2.predictedManufacturingPrice - p1.predictedManufacturingPrice;
+            const targetDm = p2.targetManufacturingPrice - p1.targetManufacturingPrice;
+            const mc = dq > 0 ? Number((dm / dq).toFixed(6)) : 0;
+            if (mc < 0 || targetDm < 0) negativeMarginalCostDetected = true;
+
+            marginalCosts.push({
+                interval: `${p1.quantity}->${p2.quantity}`,
+                fromQuantity: p1.quantity,
+                toQuantity: p2.quantity,
+                marginalCost: mc
+            });
+        }
+
+        // 3. Midpoint Structural Probes
+        const midpointProbes = [];
+        let midpointsSound = true;
+
+        for (let i = 0; i < pointResults.length - 1; i++) {
+            const p1 = pointResults[i];
+            const p2 = pointResults[i + 1];
+            const midQ = Math.floor((p1.quantity + p2.quantity) / 2);
+
+            if (midQ > p1.quantity && midQ < p2.quantity) {
+                const specMid = { ...bookSpec, quantity: midQ };
+                const midEval = adapter.evaluateForwardPrice(specMid, candidateRates, {}, nodeConfig);
+                const midPrice = midEval.predictedManufacturingPrice;
+
+                const isFiniteNum = Number.isFinite(midPrice) && !Number.isNaN(midPrice);
+                const isMonotonic = midPrice >= p1.predictedManufacturingPrice && midPrice <= p2.predictedManufacturingPrice;
+
+                const u1 = p1.predictedManufacturingPrice / p1.quantity;
+                const uMid = midPrice / midQ;
+                const u2 = p2.predictedManufacturingPrice / p2.quantity;
+                const isUnitSound = u1 >= uMid - 1e-6 && uMid >= u2 - 1e-6;
+
+                const passMidpoint = isFiniteNum && isMonotonic && isUnitSound;
+                if (!passMidpoint) midpointsSound = false;
+
+                midpointProbes.push({
+                    midpointQuantity: midQ,
+                    predictedManufacturingPrice: midPrice,
+                    unitPrice: Number((midPrice / midQ).toFixed(6)),
+                    isFinite: isFiniteNum,
+                    isMonotonic,
+                    isUnitSound,
+                    pass: passMidpoint
+                });
+            }
+        }
+
+        // 4. Discontinuity & Breakpoints
+        const declaredBreakpoints = options.declaredBreakpoints || [];
+        let discontinuityStatus = 'NO_DISCONTINUITY';
+        if (!totalPriceMonotonic || !unitCostNonIncreasing || !midpointsSound || negativeMarginalCostDetected) {
+            discontinuityStatus = declaredBreakpoints.length > 0 ? 'DECLARED_DISCONTINUITY' : 'UNDECLARED_DISCONTINUITY';
+        }
+
+        // 5. Evidence Quantity Range & Extrapolation Safety
+        const minQ = pointCount > 0 ? sortedTargets[0].quantity : 0;
+        const maxQ = pointCount > 0 ? sortedTargets[pointCount - 1].quantity : 0;
+        const evidenceQuantityRange = { min: minQ, max: maxQ };
+
+        // 6. Identifiability
+        let identifiability = run.identifiability_json
+            ? (typeof run.identifiability_json === 'string' ? JSON.parse(run.identifiability_json) : run.identifiability_json)
+            : null;
+        if (!identifiability) {
+            identifiability = {
+                targetPointCount: pointCount,
+                freeParameterCount: options.freeParameterCount || 1,
+                degreesOfFreedom: pointCount - (options.freeParameterCount || 1),
+                status: pointCount > (options.freeParameterCount || 1) ? 'OVERDETERMINED' : (pointCount === 1 ? 'EXACTLY_DETERMINED' : 'UNDERDETERMINED')
+            };
+        }
+
+        // 7. Evidence Lineage check
+        let hasInconsistentEvidence = false;
+        for (const t of sortedTargets) {
+            if (t.eligibilityStatus === 'REQUIRES_REVIEW' || t.validationStatus === 'INCONSISTENT_SOURCE_QUOTE') {
+                hasInconsistentEvidence = true;
+            }
+        }
+
+        // 8. Reasons & Final Acceptance Decision
+        const reasons = [];
+
+        if (!allPointsWithinTolerance) {
+            reasons.push('POINT_OUT_OF_TOLERANCE');
+        }
+        if (!totalPriceMonotonic && discontinuityStatus === 'UNDECLARED_DISCONTINUITY') {
+            reasons.push('TOTAL_MONOTONICITY_VIOLATION');
+        }
+        if (!unitCostNonIncreasing && discontinuityStatus === 'UNDECLARED_DISCONTINUITY') {
+            reasons.push('UNIT_COST_DIRECTION_VIOLATION');
+        }
+        if (negativeMarginalCostDetected && discontinuityStatus === 'UNDECLARED_DISCONTINUITY') {
+            reasons.push('NEGATIVE_MARGINAL_COST');
+        }
+        if (discontinuityStatus === 'UNDECLARED_DISCONTINUITY') {
+            reasons.push('UNDECLARED_DISCONTINUITY');
+        }
+        if (identifiability && identifiability.status === 'UNDERDETERMINED') {
+            reasons.push('UNDERDETERMINED_MODEL');
+        }
+        if (hasInconsistentEvidence) {
+            reasons.push('SOURCE_EVIDENCE_REQUIRES_REVIEW');
+        }
+
+        let curveStatus = 'ACCEPTABLE';
+        if (reasons.includes('POINT_OUT_OF_TOLERANCE') ||
+            reasons.includes('TOTAL_MONOTONICITY_VIOLATION') ||
+            reasons.includes('UNIT_COST_DIRECTION_VIOLATION') ||
+            reasons.includes('NEGATIVE_MARGINAL_COST') ||
+            reasons.includes('UNDECLARED_DISCONTINUITY')) {
+            curveStatus = 'REJECTED';
+        } else if (reasons.includes('UNDERDETERMINED_MODEL') ||
+                   reasons.includes('SOURCE_EVIDENCE_REQUIRES_REVIEW') ||
+                   discontinuityStatus === 'DECLARED_DISCONTINUITY') {
+            curveStatus = 'REQUIRES_REVIEW';
+        }
+
+        return {
+            mode: pointCount > 1 ? 'MULTI_QUANTITY' : 'SINGLE_POINT',
+            status: curveStatus,
+            reasons,
+            pointResults,
+            curveMetrics: {
+                pointCount,
+                acceptedPointCount: acceptedCount,
+                rejectedPointCount: rejectedCount,
+                meanAbsoluteResidual: meanAbsRes,
+                maxAbsoluteResidual: maxAbsRes,
+                meanPercentageResidual: meanPctRes,
+                maxPercentageResidual: maxPctRes,
+                objectiveValue: objValue,
+                allPointsWithinTolerance
+            },
+            totalPriceMonotonicity: totalPriceMonotonic ? 'TOTAL_PRICE_MONOTONIC' : 'TOTAL_PRICE_NON_MONOTONIC',
+            unitCostDirection: unitCostNonIncreasing ? 'UNIT_COST_NON_INCREASING' : 'UNIT_COST_INCREASE_DETECTED',
+            marginalCosts,
+            negativeMarginalCostDetected,
+            midpointProbes: {
+                status: midpointsSound ? 'MIDPOINTS_STRUCTURALLY_SOUND' : 'MIDPOINT_PATHOLOGY_DETECTED',
+                probes: midpointProbes
+            },
+            discontinuityStatus,
+            declaredBreakpoints,
+            evidenceQuantityRange,
+            identifiability,
+            evidenceLineage: {
+                hasInconsistentEvidence,
+                targets: sortedTargets.map(t => ({
+                    quantity: t.quantity,
+                    sourceEvidenceId: t.sourceEvidenceId || null,
+                    sourceOfferIndex: t.sourceOfferIndex ?? null,
+                    eligibilityStatus: t.eligibilityStatus || 'ELIGIBLE'
+                }))
+            }
         };
     }
 }
