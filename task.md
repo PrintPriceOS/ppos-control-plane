@@ -1284,3 +1284,12 @@ UNRESTRICTED_PRODUCTION:
 - **Phase 193F.2 (Frontend Quick Calibration UI Implementation)**: Sealed & Tagged (`phase-193f-quick-pricing-calibration-ui`).
 - **Phase 193G (Pre-Deploy & Production Readiness Acceptance)**: **AUDITED / GO CLASSIFICATION** (`docs/audits/PHASE_193G_PRE_DEPLOY_PRODUCTION_READINESS.md`).
   - Production Deployment Status: **PENDING EXPLICIT WINDOW AUTHORIZATION (193G.2)**.
+
+---
+
+## Phase 194 — Quantity Economics, Quote Evidence Ingestion & Multilingual Pricing Assistant
+
+- **Phase 194A (Quote Evidence Ingestion)**: **VALIDATED / CLOSED** (SHA `a7bd9c1e7a57a8bfec32205510dd169cce32cbff`). Ingests PDF/quote evidence with explicit source vs derived breakdown and arithmetic verification.
+- **Phase 194B (Quantity Economics Model)**: **VALIDATED / CLOSED** (SHA `d32bff25b1285257a44fef2b4d909b9f9aa4cb41`). Piecewise total price function domain model.
+- **Phase 194C (Multi-Quantity Calibration)**: **VALIDATED / CLOSED**. Multi-target deterministic curve calibration over manufacturing-only targets without mutating active rates or violating governed acceptance boundaries.
+

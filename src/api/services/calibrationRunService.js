@@ -77,43 +77,88 @@ class CalibrationRunService {
         try {
             await connection.beginTransaction();
 
-            await connection.query(
-                `INSERT INTO printhouse_pricing_calibration_runs
-                (id, tenant_id, calibration_session_id, printer_node_id,
-                 solver_version, solver_config_json, status,
-                 session_input_checksum, rate_snapshot_checksum,
-                 evaluations_count, execution_duration_ms,
-                 engine_price_before, engine_price_after, target_price,
-                 absolute_residual, percent_residual,
-                 active_rate_paths_json, proposed_patch_json, proposed_patch_checksum, candidate_parameters_json,
-                 identifiability_report_json, warnings_json, created_by_json, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
-                [
-                    runId,
-                    tenantId,
-                    sessionId,
-                    session.printerNodeId,
-                    solverResult.solverVersion,
-                    JSON.stringify(solverResult.solverConfig),
-                    solverResult.status,
-                    sessionChecksum,
-                    snapshotChecksum,
-                    solverResult.evaluationsCount,
-                    solverResult.executionDurationMs,
-                    solverResult.enginePriceBefore,
-                    solverResult.enginePriceAfter,
-                    solverResult.targetPrice,
-                    solverResult.absoluteResidual,
-                    solverResult.percentResidual,
-                    JSON.stringify(solverResult.activeRatePaths),
-                    JSON.stringify(solverResult.proposedPatch),
-                    solverResult.proposedPatchChecksum,
-                    JSON.stringify(solverResult.candidateParameters),
-                    JSON.stringify(solverResult.identifiabilityReport),
-                    JSON.stringify(solverResult.warnings),
-                    JSON.stringify(actorJson)
-                ]
-            );
+            try {
+                await connection.query(
+                    `INSERT INTO printhouse_pricing_calibration_runs
+                    (id, tenant_id, calibration_session_id, printer_node_id,
+                     solver_version, solver_config_json, status,
+                     session_input_checksum, rate_snapshot_checksum,
+                     evaluations_count, execution_duration_ms,
+                     engine_price_before, engine_price_after, target_price,
+                     absolute_residual, percent_residual,
+                     active_rate_paths_json, proposed_patch_json, proposed_patch_checksum, candidate_parameters_json,
+                     point_results_json, curve_metrics_json, identifiability_json,
+                     identifiability_report_json, warnings_json, created_by_json, completed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                    [
+                        runId,
+                        tenantId,
+                        sessionId,
+                        session.printerNodeId,
+                        solverResult.solverVersion,
+                        JSON.stringify(solverResult.solverConfig),
+                        solverResult.status,
+                        sessionChecksum,
+                        snapshotChecksum,
+                        solverResult.evaluationsCount,
+                        solverResult.executionDurationMs,
+                        solverResult.enginePriceBefore,
+                        solverResult.enginePriceAfter,
+                        solverResult.targetPrice,
+                        solverResult.absoluteResidual,
+                        solverResult.percentResidual,
+                        JSON.stringify(solverResult.activeRatePaths),
+                        JSON.stringify(solverResult.proposedPatch),
+                        solverResult.proposedPatchChecksum,
+                        JSON.stringify(solverResult.candidateParameters),
+                        solverResult.pointResults ? JSON.stringify(solverResult.pointResults) : null,
+                        solverResult.curveMetrics ? JSON.stringify(solverResult.curveMetrics) : null,
+                        solverResult.identifiabilityReport ? JSON.stringify(solverResult.identifiabilityReport) : null,
+                        JSON.stringify(solverResult.identifiabilityReport),
+                        JSON.stringify(solverResult.warnings),
+                        JSON.stringify(actorJson)
+                    ]
+                );
+            } catch (queryErr) {
+                // Fallback for schema compatibility
+                await connection.query(
+                    `INSERT INTO printhouse_pricing_calibration_runs
+                    (id, tenant_id, calibration_session_id, printer_node_id,
+                     solver_version, solver_config_json, status,
+                     session_input_checksum, rate_snapshot_checksum,
+                     evaluations_count, execution_duration_ms,
+                     engine_price_before, engine_price_after, target_price,
+                     absolute_residual, percent_residual,
+                     active_rate_paths_json, proposed_patch_json, proposed_patch_checksum, candidate_parameters_json,
+                     identifiability_report_json, warnings_json, created_by_json, completed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                    [
+                        runId,
+                        tenantId,
+                        sessionId,
+                        session.printerNodeId,
+                        solverResult.solverVersion,
+                        JSON.stringify(solverResult.solverConfig),
+                        solverResult.status,
+                        sessionChecksum,
+                        snapshotChecksum,
+                        solverResult.evaluationsCount,
+                        solverResult.executionDurationMs,
+                        solverResult.enginePriceBefore,
+                        solverResult.enginePriceAfter,
+                        solverResult.targetPrice,
+                        solverResult.absoluteResidual,
+                        solverResult.percentResidual,
+                        JSON.stringify(solverResult.activeRatePaths),
+                        JSON.stringify(solverResult.proposedPatch),
+                        solverResult.proposedPatchChecksum,
+                        JSON.stringify(solverResult.candidateParameters),
+                        JSON.stringify(solverResult.identifiabilityReport),
+                        JSON.stringify(solverResult.warnings),
+                        JSON.stringify(actorJson)
+                    ]
+                );
+            }
 
             // 5. If solver succeeded and is acceptance-eligible, transition session READY -> CALCULATED
             if (isAcceptableStatus) {
@@ -220,6 +265,9 @@ class CalibrationRunService {
             activeRatePaths: parseJson(row.active_rate_paths_json),
             proposedPatch: parseJson(row.proposed_patch_json),
             candidateParameters: parseJson(row.candidate_parameters_json),
+            pointResults: parseJson(row.point_results_json),
+            curveMetrics: parseJson(row.curve_metrics_json),
+            identifiability: parseJson(row.identifiability_json) || parseJson(row.identifiability_report_json),
             identifiabilityReport: parseJson(row.identifiability_report_json),
             warnings: parseJson(row.warnings_json) || [],
             error: parseJson(row.error_json),

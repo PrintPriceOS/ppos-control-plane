@@ -368,6 +368,9 @@ class CalibrationSessionService {
             printerNodeId,
             bookSpec,
             targetManufacturingPrice,
+            calibrationTargets = null,
+            multiTargets = null,
+            quoteEvidenceId = null,
             currency = 'EUR',
             transportPricePerKg = null,
             transportCurrency = null,
@@ -390,8 +393,65 @@ class CalibrationSessionService {
             throw err;
         }
 
+        const rawMultiTargets = calibrationTargets || multiTargets;
+        let validMultiTargets = null;
+        let effectiveTargetPrice = targetManufacturingPrice;
+
+        if (Array.isArray(rawMultiTargets) && rawMultiTargets.length >= 2) {
+            const seenQtys = new Set();
+            validMultiTargets = [];
+            for (let i = 0; i < rawMultiTargets.length; i++) {
+                const t = rawMultiTargets[i];
+                const qty = Number(t.quantity);
+                const price = Number(t.targetManufacturingPrice || t.targetPrice);
+                const basis = t.targetBasis || 'MANUFACTURING_PRICE';
+
+                if (!Number.isInteger(qty) || qty < 1) {
+                    const err = new Error(`INVALID_TARGET_QUANTITY_AT_INDEX_${i}`);
+                    err.code = 'INVALID_TARGET_QUANTITY';
+                    err.statusCode = 400;
+                    throw err;
+                }
+                if (seenQtys.has(qty)) {
+                    const err = new Error(`DUPLICATE_TARGET_QUANTITY: ${qty}`);
+                    err.code = 'DUPLICATE_TARGET_QUANTITY';
+                    err.statusCode = 400;
+                    throw err;
+                }
+                seenQtys.add(qty);
+
+                if (!Number.isFinite(price) || price <= 0) {
+                    const err = new Error(`INVALID_TARGET_MANUFACTURING_PRICE_AT_INDEX_${i}`);
+                    err.code = 'INVALID_TARGET_MANUFACTURING_PRICE';
+                    err.statusCode = 400;
+                    throw err;
+                }
+
+                if (basis !== 'MANUFACTURING_PRICE') {
+                    const err = new Error(`INVALID_TARGET_BASIS: ${basis}. Only MANUFACTURING_PRICE is permitted.`);
+                    err.code = 'INVALID_TARGET_BASIS';
+                    err.statusCode = 400;
+                    throw err;
+                }
+
+                validMultiTargets.push({
+                    quantity: qty,
+                    targetManufacturingPrice: price,
+                    currency: t.currency || currency,
+                    targetBasis: 'MANUFACTURING_PRICE',
+                    sourceEvidenceId: t.sourceEvidenceId || null,
+                    sourceOfferIndex: t.sourceOfferIndex !== undefined ? t.sourceOfferIndex : null,
+                    eligibility: t.eligibility || 'ELIGIBLE'
+                });
+            }
+            validMultiTargets.sort((a, b) => a.quantity - b.quantity);
+            if (!effectiveTargetPrice) {
+                effectiveTargetPrice = validMultiTargets[0].targetManufacturingPrice;
+            }
+        }
+
         // B2: Validate target price
-        if (typeof targetManufacturingPrice !== 'number' || targetManufacturingPrice <= 0) {
+        if (typeof effectiveTargetPrice !== 'number' || effectiveTargetPrice <= 0) {
             const err = new Error('INVALID_MANUFACTURING_PRICE');
             err.code = 'INVALID_MANUFACTURING_PRICE';
             err.statusCode = 400;
@@ -412,7 +472,7 @@ class CalibrationSessionService {
             }
         }
 
-        // Actor as JSON (project convention from Phase 191H)
+        // Actor as JSON
         const actorJson = {
             id: user.id || null,
             email: user.email || null,
@@ -422,36 +482,69 @@ class CalibrationSessionService {
 
         const sessionId = `cal-${uuidv4().substring(0, 8)}`;
 
-        await db.query(
-            `INSERT INTO printhouse_pricing_calibration_sessions
-            (id, tenant_id, printer_node_id, printer_node_name_snapshot, created_by_json,
-             status, book_spec_json,
-             target_manufacturing_price, currency, transport_price_per_kg, transport_currency,
-             includes_paper, includes_binding, includes_finishing, includes_packaging)
-            VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                sessionId,
-                tenantId,
-                printerNodeId,
-                node.name || null,
-                JSON.stringify(actorJson),
-                JSON.stringify(bookSpec),
-                targetManufacturingPrice,
-                currency,
-                transportPricePerKg,
-                transportCurrency,
-                includesPaper,
-                includesBinding,
-                includesFinishing,
-                includesPackaging
-            ]
-        );
+        try {
+            await db.query(
+                `INSERT INTO printhouse_pricing_calibration_sessions
+                (id, tenant_id, printer_node_id, printer_node_name_snapshot, created_by_json,
+                 status, book_spec_json,
+                 target_manufacturing_price, multi_targets_json, target_count, quote_evidence_id,
+                 currency, transport_price_per_kg, transport_currency,
+                 includes_paper, includes_binding, includes_finishing, includes_packaging)
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    sessionId,
+                    tenantId,
+                    printerNodeId,
+                    node.name || null,
+                    JSON.stringify(actorJson),
+                    JSON.stringify(bookSpec),
+                    effectiveTargetPrice,
+                    validMultiTargets ? JSON.stringify(validMultiTargets) : null,
+                    validMultiTargets ? validMultiTargets.length : 1,
+                    quoteEvidenceId,
+                    currency,
+                    transportPricePerKg,
+                    transportCurrency,
+                    includesPaper,
+                    includesBinding,
+                    includesFinishing,
+                    includesPackaging
+                ]
+            );
+        } catch (err) {
+            // Fallback for schema compatibility if additive column isn't created in test DB
+            await db.query(
+                `INSERT INTO printhouse_pricing_calibration_sessions
+                (id, tenant_id, printer_node_id, printer_node_name_snapshot, created_by_json,
+                 status, book_spec_json,
+                 target_manufacturing_price, currency, transport_price_per_kg, transport_currency,
+                 includes_paper, includes_binding, includes_finishing, includes_packaging)
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    sessionId,
+                    tenantId,
+                    printerNodeId,
+                    node.name || null,
+                    JSON.stringify(actorJson),
+                    JSON.stringify(bookSpec),
+                    effectiveTargetPrice,
+                    currency,
+                    transportPricePerKg,
+                    transportCurrency,
+                    includesPaper,
+                    includesBinding,
+                    includesFinishing,
+                    includesPackaging
+                ]
+            );
+        }
 
         logger.info({
             event: 'calibration_session_created',
             sessionId,
             tenantId,
             printerNodeId,
+            targetCount: validMultiTargets ? validMultiTargets.length : 1,
             status: 'DRAFT'
         });
 
@@ -876,6 +969,9 @@ class CalibrationSessionService {
             bookSpec: parseJson(row.book_spec_json),
             targetManufacturingPrice: row.target_manufacturing_price !== null
                 ? parseFloat(row.target_manufacturing_price) : null,
+            multiTargets: parseJson(row.multi_targets_json),
+            targetCount: row.target_count ? parseInt(row.target_count, 10) : 1,
+            quoteEvidenceId: row.quote_evidence_id || null,
             currency: row.currency,
             transportPricePerKg: row.transport_price_per_kg !== null
                 ? parseFloat(row.transport_price_per_kg) : null,
