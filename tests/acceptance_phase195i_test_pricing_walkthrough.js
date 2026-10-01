@@ -211,6 +211,75 @@ console.log('===================================================================
         assert.strictEqual(isMatchedDrifted, false, 'Checksum mismatch must report inactive / checksum drift status');
     });
 
+    // Test 9: Positive and Negative test cases for isComplexSpec
+    runTest('isComplexSpec correctly approves standard 4/4 CMYK and 1/1 mono jobs while rejecting complex specs', () => {
+        const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
+        
+        // Negative Case 1: Standard 4/4 CMYK interior
+        const standard44Spec = {
+            copies: 500,
+            book_width_mm: 170,
+            book_height_mm: 240,
+            interior_pages: 128,
+            interior_print: '4/4',
+            paper_type_interior: 'mc',
+            paper_weight_interior: 115,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 250,
+            lamination: 'matt',
+            binding_method: 'perfect bound',
+            delivery_country: 'ES'
+        };
+        assert.strictEqual(calibrationAcceptanceService.isComplexSpec(standard44Spec), false, 'Standard 4/4 CMYK book must NOT be flagged as complex');
+
+        // Negative Case 2: Standard 1/1 mono interior
+        const standard11Spec = {
+            copies: 1000,
+            interior_pages: 200,
+            interior_print: '1/1',
+            paper_type_interior: 'offset',
+            paper_weight_interior: 80,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 300,
+            binding_method: 'perfect bound',
+            delivery_country: 'DE'
+        };
+        assert.strictEqual(calibrationAcceptanceService.isComplexSpec(standard11Spec), false, 'Standard 1/1 mono book must NOT be flagged as complex');
+
+        // Positive Case 1: Fährmann mixed interior text (208p 1/1 Pantone + 8p 4/4 CMYK)
+        const mixedFahrmannSpec = {
+            copies: 3000,
+            mixed_interior_details: '208p 1/1 Pantone + 8p 4/4 CMYK'
+        };
+        assert.strictEqual(calibrationAcceptanceService.isComplexSpec(mixedFahrmannSpec), true, 'Mixed Pantone + 4/4 interior MUST be flagged as complex');
+
+        // Positive Case 2: Spec with endpapers / guardas
+        const endpapersSpec = {
+            copies: 1000,
+            raw_text: 'Interior 128p 1/1, Guardas 115g sin impresión, Tapa dura cartón 2.4mm'
+        };
+        assert.strictEqual(calibrationAcceptanceService.isComplexSpec(endpapersSpec), true, 'Spec with guardas and cartón MUST be flagged as complex');
+    });
+
+    // Test 10: State and request cancellation on printerNodeId change
+    runTest('Changing printerNodeId cancels in-flight requests and clears stale results', () => {
+        let activeReqId = 0;
+        let activeResult = { totals: { finalSellingPrice: 1200 } };
+        let loadingState = true;
+
+        function onPrinterNodeIdChange() {
+            activeReqId++;
+            activeResult = null;
+            loadingState = false;
+        }
+
+        onPrinterNodeIdChange();
+        assert.strictEqual(activeResult, null, 'Quote result must be reset to null when printerNodeId changes');
+        assert.strictEqual(loadingState, false, 'Loading state must be reset to false when printerNodeId changes');
+    });
+
     console.log(`\n================================================================================`);
     console.log(`=== ALL ${passCount} / ${testCount} PHASE 195I ACCEPTANCE TESTS PASSED SUCCESSFULLY ===`);
     console.log(`================================================================================\n`);

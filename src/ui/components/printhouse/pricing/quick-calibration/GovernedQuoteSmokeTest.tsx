@@ -95,6 +95,14 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         { code: 'TR', name: 'Turkey', regionName: 'Eurasia' }
     ]);
 
+    // Reset quote result and cancel in-flight requests if printerNodeId changes
+    useEffect(() => {
+        activeRequestIdRef.current++;
+        setQuoteResult(null);
+        setError(null);
+        setLoading(false);
+    }, [printerNodeId]);
+
     // Update spec if initialSpec changes (only if user has not modified fields or when initialSpec gets populated)
     useEffect(() => {
         if (initialSpec && Object.keys(initialSpec).length > 0) {

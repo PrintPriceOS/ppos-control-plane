@@ -61,18 +61,58 @@ function safeDeepMergeRates(target, source) {
     return result;
 }
 
-function isComplexSpec(spec) {
-    if (!spec || typeof spec !== 'object') return false;
-    if (Boolean(spec.has_mixed_interior || spec.has_spot_uv)) return true;
-    if (Array.isArray(spec.unsupported_features) && spec.unsupported_features.length > 0) return true;
-    const detailsStr = String(spec.mixed_interior_details || '').toLowerCase();
-    if (detailsStr.includes('pantone') || detailsStr.includes('cmyk') || detailsStr.includes('guardas') || detailsStr.includes('cartón') || detailsStr.includes('relieve') || detailsStr.includes('spot')) {
+function isComplexSpec(specOrEvidence) {
+    if (!specOrEvidence || typeof specOrEvidence !== 'object') return false;
+
+    // Explicit boolean or array flags
+    if (Boolean(specOrEvidence.has_mixed_interior || specOrEvidence.has_spot_uv)) return true;
+    if (Array.isArray(specOrEvidence.unsupported_features) && specOrEvidence.unsupported_features.length > 0) return true;
+
+    // Combine ALL text sources without short-circuiting ||
+    const textSources = [
+        specOrEvidence.mixed_interior_details,
+        specOrEvidence.raw_text,
+        specOrEvidence.rawText,
+        specOrEvidence.unsupportedDetails,
+        typeof specOrEvidence.extracted_json === 'object' ? JSON.stringify(specOrEvidence.extracted_json) : '',
+        typeof specOrEvidence.extractedJson === 'object' ? JSON.stringify(specOrEvidence.extractedJson) : ''
+    ];
+
+    const combinedText = textSources.filter(Boolean).map(s => String(s).toLowerCase()).join(' ');
+
+    if (!combinedText) return false;
+
+    // Direct complexity keywords (pantone, guardas, cartón, relieve, spot uv, barniz, mixed interior)
+    if (
+        combinedText.includes('pantone') ||
+        combinedText.includes('guardas') ||
+        combinedText.includes('cartón') ||
+        combinedText.includes('relieve') ||
+        combinedText.includes('spot uv') ||
+        combinedText.includes('barniz') ||
+        combinedText.includes('mixed interior') ||
+        combinedText.includes('interior mixto')
+    ) {
         return true;
     }
+
+    // Combination of 1/1 (or mono) AND 4/4 (or cmyk) within mixed interior text
+    const hasMonoSignal = combinedText.includes('1/1') || combinedText.includes('1+1') || combinedText.includes('mono');
+    const hasCmykSignal = combinedText.includes('4/4') || combinedText.includes('4+4') || combinedText.includes('cmyk');
+    const hasPlusOrMixed = combinedText.includes('+') || combinedText.includes('consecutiva') || combinedText.includes('mixed');
+
+    if (hasMonoSignal && hasCmykSignal && hasPlusOrMixed) {
+        return true;
+    }
+
     return false;
 }
 
 class CalibrationAcceptanceService {
+
+    isComplexSpec(specOrEvidence) {
+        return isComplexSpec(specOrEvidence);
+    }
 
     /**
      * Executes governed acceptance of a calibration run.
@@ -943,8 +983,8 @@ class CalibrationAcceptanceService {
             throw err;
         }
 
-        // SERVER-SIDE GUARD FOR UNSUPPORTED COMPLEX SPECIFICATIONS
-        if (isComplexSpec(bookSpec)) {
+        // SERVER-SIDE GUARD FOR UNSUPPORTED COMPLEX SPECIFICATIONS (derived from bookSpec or DB quoteEvidence)
+        if (isComplexSpec(bookSpec) || isComplexSpec(quoteEvidence)) {
             const err = new Error('UNSUPPORTED_COMPLEX_SPECIFICATION');
             err.code = 'UNSUPPORTED_COMPLEX_SPECIFICATION';
             err.statusCode = 422;

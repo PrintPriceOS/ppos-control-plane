@@ -777,10 +777,12 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                                    Pricing Calibrated & Active
+                                    {isAccepted ? 'Pricing Calibrated & Active' : 'Pricing Calibration Test Preview'}
                                 </h4>
                                 <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                                    Your manufacturing rates are calibrated and active. Use the tool below to verify what PrintPriceOS will quote.
+                                    {isAccepted
+                                        ? 'Your manufacturing rates are calibrated and confirmed active by server verification.'
+                                        : 'Previewing pricing calculations against current rates without active revision commitment.'}
                                 </p>
                             </div>
                         </div>
