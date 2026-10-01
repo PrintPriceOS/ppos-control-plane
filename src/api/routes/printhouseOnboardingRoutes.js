@@ -561,4 +561,39 @@ router.post('/pricing/quote-preview', wrapHandler(async (req, res) => {
     res.status(200).json({ ok: true, data: result });
 }));
 
+
+// ──── 9. Governed Machine-Specific Pricing Profiles (Phase 195B) ────────────
+const machinePricingService = require('../services/printhouseMachinePricingService');
+
+// GET /api/printhouse/onboarding/machines/:machineId/pricing — List machine pricing profiles & active profile
+router.get('/machines/:machineId/pricing', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const machineId = req.params.machineId;
+    const active = await machinePricingService.getActiveMachinePricingProfile(tenantId, machineId);
+    const history = await machinePricingService.listMachinePricingProfiles(tenantId, machineId);
+    const readiness = active ? machinePricingService.evaluateReadiness(active) : { status: 'NOT_CONFIGURED', missingFields: ['costs'] };
+
+    res.json({
+        ok: true,
+        data: {
+            machineId,
+            readiness,
+            activeProfile: active,
+            history
+        }
+    });
+}));
+
+// POST /api/printhouse/onboarding/machines/:machineId/pricing — Create/Update versioned machine pricing profile
+router.post('/machines/:machineId/pricing', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const machineId = req.params.machineId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
+
+    const profile = await machinePricingService.createMachinePricingProfile(tenantId, printhouseId, machineId, req.body, actor);
+    res.status(201).json({ ok: true, data: profile });
+}));
+
 module.exports = router;
+
