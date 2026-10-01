@@ -92,10 +92,12 @@ Supported cost bases:
 
 ## 6. Onboarding API & UI Integration
 
-- **REST Endpoints:**
+- **MACHINE_PRICING_API:** `IMPLEMENTED` (`API_READY`)
   - `GET /api/printhouse/onboarding/machines/:machineId/pricing`
   - `POST /api/printhouse/onboarding/machines/:machineId/pricing`
-- Integrated into `printhouseOnboardingRoutes.js` with strict tenant boundary verification.
+  - Integrated into `printhouseOnboardingRoutes.js` with strict tenant boundary verification.
+- **MACHINE_PRICING_UI:** `NOT_IMPLEMENTED` (`UI_PENDING`)
+  - Dedicated UI components (e.g. extending `MachineFleetPanel.tsx`) are pending frontend implementation in subsequent sub-phase.
 
 ---
 
@@ -107,7 +109,14 @@ Supported cost bases:
 
 ---
 
-## 8. Handoff to Phase 195C (Production Route Selection)
+## 8. Hawk-Eye & Read-Model Status
 
-Phase 195B completes machine cost ownership and governance.
-Proceed to **Phase 195C — Production Route Selection**, which will define how forward pricing compares eligible machine routes and selects the optimal press for a given job specification and quantity.
+- **HAWKEYE_MACHINE_PRICING_VISIBILITY:** `NOT_IMPLEMENTED` (Service DTOs export `forwardPricingConsumed: false`, but Hawk-Eye dashboard aggregator endpoint `/api/admin/hawk-eye` UI read-model integration is pending).
+
+---
+
+## 9. Handoff to Phase 195C (Production Route Selection)
+
+Phase 195B completes machine cost ownership and governance API.
+Proceed to **Phase 195C — Production Route Selection**, which will define how forward pricing compares eligible machine routes in diagnostic SHADOW mode without modifying active node rates or hardcoding quantity thresholds.
+
