@@ -394,6 +394,13 @@ async function runStakeholderDemoWalkthrough() {
         console.log(`  DB Verification:`);
         console.log(`    - Active DB Checksum: ${checksumZ}`);
         console.log(`    - Revisions Count: ${DB_REVISIONS.length} (Unchanged)`);
+
+        const postMutateNodesList = [{ id: printerNodeId, tenant_id: tenantId, rates_json: dbNodeState.rates_json }];
+        const postMutateGovMetaMap = await governanceService.getGovernanceMetadataByNodes(tenantId, postMutateNodesList);
+        const postMutateNodeGovMeta = postMutateGovMetaMap[printerNodeId];
+        assert.strictEqual(postMutateNodeGovMeta.activeRevisionId, null, 'Active revision ID must be null when active rates_checksum Z matches no stored revision');
+        assert.strictEqual(postMutateNodeGovMeta.activeRevisionChecksum, null);
+        console.log(`    - Hawk-Eye Active Revision ID: null (Truthfully reports unmatched active rates Checksum Z)`);
     }
     console.log(`  RESULT: Stale proposal correctly rejected with HTTP 409. Active DB rates remained 100% intact.\n`);
 

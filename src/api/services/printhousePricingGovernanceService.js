@@ -33,6 +33,14 @@ function canonicalStringify(obj) {
 }
 
 /**
+ * Normalizes checksum strings with sha256: prefix for robust equality checks.
+ */
+function normChecksum(cs) {
+    if (!cs) return null;
+    return cs.startsWith('sha256:') ? cs : 'sha256:' + cs;
+}
+
+/**
  * Computes a deterministic SHA-256 checksum of rates JSON.
  */
 function computeRatesChecksum(ratesJson) {
@@ -118,7 +126,6 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
                     }
 
                     // Strict matching: active revision MUST match the live rates_checksum
-                    const normChecksum = cs => cs ? (cs.startsWith('sha256:') ? cs : 'sha256:' + cs) : null;
                     if (!result[nodeId].activeRevisionId && nodeChecksumMap[nodeId] && normChecksum(r.rates_checksum) === normChecksum(nodeChecksumMap[nodeId])) {
                         result[nodeId].activeRevisionId = r.id;
                         result[nodeId].activeRevisionChecksum = r.rates_checksum;
