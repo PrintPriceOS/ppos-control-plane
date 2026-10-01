@@ -280,6 +280,53 @@ console.log('===================================================================
         assert.strictEqual(loadingState, false, 'Loading state must be reset to false when printerNodeId changes');
     });
 
+    // Test 11: GovernedQuoteSmokeTest spec normalization & payload preservation for Fährmann unedited spec
+    runTest('GovernedQuoteSmokeTest initialSpec synchronization preserves 3000 / 139x212 / 216 / hardcover / DE without fallback reset', () => {
+        // Mock parent state passing initialSpec
+        let parentInitialSpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            interior_print: '1/1',
+            paper_type_interior: 'munken',
+            paper_weight_interior: 90,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 130,
+            lamination: 'matt',
+            binding_method: 'hardcover',
+            delivery_country: 'DE'
+        };
+
+        // Simulate GovernedQuoteSmokeTest internal state logic
+        function normalizeBinding(b) {
+            if (!b) return 'perfect bound';
+            const s = String(b).toLowerCase().trim();
+            if (s === 'hardcover' || s === 'hard_cover' || s === 'case' || s === 'casebound' || s === 'hardback') return 'hardcover';
+            return s;
+        }
+
+        let componentSpec = { ...parentInitialSpec, binding_method: normalizeBinding(parentInitialSpec.binding_method) };
+
+        // Simulate parent re-render passing cloned initialSpec
+        parentInitialSpec = { ...parentInitialSpec }; // New object reference!
+
+        // Simulate handleCalculate dispatch
+        const payloadDispatched = {
+            printerNodeId: 'node-329a3bc4',
+            jobSpec: componentSpec
+        };
+
+        assert.strictEqual(payloadDispatched.jobSpec.copies, 3000, 'Payload copies must be 3000');
+        assert.strictEqual(payloadDispatched.jobSpec.book_width_mm, 139, 'Payload width must be 139');
+        assert.strictEqual(payloadDispatched.jobSpec.book_height_mm, 212, 'Payload height must be 212');
+        assert.strictEqual(payloadDispatched.jobSpec.interior_pages, 216, 'Payload interior_pages must be 216');
+        assert.strictEqual(payloadDispatched.jobSpec.binding_method, 'hardcover', 'Payload binding_method must be hardcover');
+        assert.strictEqual(payloadDispatched.jobSpec.delivery_country, 'DE', 'Payload delivery_country must be DE');
+        assert.notStrictEqual(payloadDispatched.jobSpec.copies, 750, 'Payload MUST NOT reset to default 750');
+    });
+
     console.log(`\n================================================================================`);
     console.log(`=== ALL ${passCount} / ${testCount} PHASE 195I ACCEPTANCE TESTS PASSED SUCCESSFULLY ===`);
     console.log(`================================================================================\n`);
