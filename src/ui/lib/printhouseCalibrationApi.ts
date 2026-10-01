@@ -332,5 +332,40 @@ export const printhouseCalibrationApi = {
             body: JSON.stringify(corrections)
         });
         return handleResponse<any>(res);
+    },
+
+    // ── Phase 195F: Commercial Pricing Knobs & Quote Calibration Preview ──────
+    async previewCommercialKnobs(payload: {
+        printhouseId?: string;
+        bookSpec: any;
+        quantities?: number[];
+        adjustments?: any;
+        baselineRates?: any;
+        quoteEvidenceId?: string;
+        quotePoints?: Record<number, number>;
+    }) {
+        const res = await fetch(`${BASE_URL}/commercial-preview`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+        return handleResponse<any>(res);
+    },
+
+    async fitCommercialCurve(payload: {
+        printhouseId?: string;
+        bookSpec: any;
+        quantities?: number[];
+        baselineRates?: any;
+        quoteEvidenceId?: string;
+        quotePoints?: Record<number, number> | Array<{ quantity: number; manufacturingPrice: number }>;
+    }) {
+        const res = await fetch(`${BASE_URL}/commercial-fit`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+        return handleResponse<any>(res);
     }
 };
+

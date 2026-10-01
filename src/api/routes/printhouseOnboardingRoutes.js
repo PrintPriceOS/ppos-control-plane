@@ -686,5 +686,109 @@ router.post('/pricing/routes/intervals', requireAuth, wrapHandler(async (req, re
     res.json({ ok: true, data: intervals });
 }));
 
+// ──── 12. Commercial Pricing Knobs & Quote Calibration Preview (Phase 195F) ────
+const commercialKnobService = require('../services/commercialKnobService');
+const quoteEvidenceService = require('../services/quoteEvidenceService');
+
+// Helper to fetch node baseline rates or fallback to provided / default snapshot
+async function resolveBaselineRates(tenantId, printhouseId, providedRates) {
+    if (providedRates && typeof providedRates === 'object' && Object.keys(providedRates).length > 0) {
+        return providedRates;
+    }
+    try {
+        const [node] = await db.query('SELECT rates_json FROM print_nodes WHERE id = ? AND tenant_id = ?', [printhouseId, tenantId]);
+        if (node && node.rates_json) {
+            return typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
+        }
+    } catch (e) {
+        // Fallback for isolated tests or unseeded nodes
+    }
+    return providedRates || {};
+}
+
+// POST /api/printhouse/onboarding/pricing/commercial-preview — Non-mutating preview of commercial adjustments
+router.post('/pricing/commercial-preview', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || req.body;
+    const quantities = req.body.quantities || [500, 600, 700];
+    const adjustments = req.body.adjustments || {};
+
+    let quoteEvidence = null;
+    if (req.body.quoteEvidenceId) {
+        try {
+            quoteEvidence = await quoteEvidenceService.getEvidenceById(tenantId, req.body.quoteEvidenceId);
+        } catch (e) {
+            // Passive fallback if evidence lookup fails
+        }
+    } else if (req.body.quotePoints) {
+        quoteEvidence = { items: Object.keys(req.body.quotePoints).map(q => ({ quantity: Number(q), manufacturingPrice: req.body.quotePoints[q] })) };
+    }
+
+    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, req.body.baselineRates);
+
+    const result = commercialKnobService.previewCommercialAdjustments({
+        bookSpec,
+        quantities,
+        baselineRates,
+        adjustments,
+        quoteEvidence
+    });
+
+    res.json({
+        ok: true,
+        data: {
+            ...result,
+            metadata: {
+                phase: '195F',
+                status: 'NOT_ACTIVE',
+                machineRoutingRequired: false,
+                pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+            }
+        }
+    });
+}));
+
+// POST /api/printhouse/onboarding/pricing/commercial-fit — Deterministic 2-parameter commercial curve fit & suggestion
+router.post('/pricing/commercial-fit', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || req.body;
+    const quantities = req.body.quantities || [500, 600, 700];
+
+    let quotePoints = req.body.quotePoints || null;
+    if (!quotePoints && req.body.quoteEvidenceId) {
+        try {
+            const ev = await quoteEvidenceService.getEvidenceById(tenantId, req.body.quoteEvidenceId);
+            if (ev && Array.isArray(ev.items)) {
+                quotePoints = ev.items.filter(i => i.quantity && i.manufacturingPrice != null).map(i => ({ quantity: i.quantity, manufacturingPrice: i.manufacturingPrice }));
+            }
+        } catch (e) {}
+    }
+
+    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, req.body.baselineRates);
+
+    const result = commercialKnobService.fitCommercialCurve({
+        quotePoints,
+        quantities,
+        baselineRates,
+        bookSpec
+    });
+
+    res.json({
+        ok: true,
+        data: {
+            ...result,
+            metadata: {
+                phase: '195F',
+                status: 'NOT_ACTIVE',
+                machineRoutingRequired: false,
+                pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+            }
+        }
+    });
+}));
+
 module.exports = router;
+
 
