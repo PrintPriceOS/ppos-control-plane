@@ -364,6 +364,33 @@ export const printhouseCalibrationApi = {
             body: JSON.stringify(payload)
         });
         return handleResponse<any>(res);
+    },
+
+    async acceptCommercialCalibration(payload: {
+        printhouseId?: string;
+        printerNodeId?: string;
+        baselineRatesChecksum: string;
+        adjustments: any;
+        quoteEvidenceId?: string;
+        quotePoints?: Record<number, number> | Array<{ quantity: number; manufacturingPrice: number }>;
+        bookSpec?: any;
+        candidateRatesChecksum?: string;
+    }) {
+        const res = await fetch(`${BASE_URL}/commercial-accept`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+        return handleResponse<{
+            ok: boolean;
+            accepted: boolean;
+            revisionId: string;
+            acceptanceId: string;
+            activeRatesChecksum: string;
+            baselineRatesChecksum: string;
+            metrics: any;
+            acceptedAt: string;
+        }>(res);
     }
 };
 

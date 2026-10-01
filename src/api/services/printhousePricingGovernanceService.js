@@ -39,7 +39,7 @@ function computeRatesChecksum(ratesJson) {
     if (!ratesJson) return null;
     const parsed = typeof ratesJson === 'string' ? JSON.parse(ratesJson) : ratesJson;
     const canonical = canonicalStringify(parsed);
-    return crypto.createHash('sha256').update(canonical).digest('hex');
+    return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
 /**
@@ -75,6 +75,8 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
         result[node.id] = {
             activeRevisionId: null,
             activeRevisionChecksum: null,
+            activeSourceType: null,
+            acceptanceMode: null,
             latestRevisionId: null,
             lastCalibrationAt: null,
             lastAcceptedRunId: null,
@@ -88,7 +90,7 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
         // 1. Fetch revisions for all requested nodes with tenant scoping
         const revParams = [];
         let revSql = `
-            SELECT id, tenant_id, printer_node_id, rates_checksum, created_at
+            SELECT id, tenant_id, printer_node_id, source_type, rates_checksum, created_at
             FROM printhouse_pricing_revisions
             WHERE printer_node_id IN (?)
         `;
@@ -116,9 +118,11 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
                     }
 
                     // Strict matching: active revision MUST match the live rates_checksum
-                    if (!result[nodeId].activeRevisionId && nodeChecksumMap[nodeId] && r.rates_checksum === nodeChecksumMap[nodeId]) {
+                    const normChecksum = cs => cs ? (cs.startsWith('sha256:') ? cs : 'sha256:' + cs) : null;
+                    if (!result[nodeId].activeRevisionId && nodeChecksumMap[nodeId] && normChecksum(r.rates_checksum) === normChecksum(nodeChecksumMap[nodeId])) {
                         result[nodeId].activeRevisionId = r.id;
                         result[nodeId].activeRevisionChecksum = r.rates_checksum;
+                        result[nodeId].activeSourceType = r.source_type || 'MANUAL_EDIT';
                     }
                 }
             }
@@ -128,13 +132,13 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
         const accParams = [];
         let accSql = `
             SELECT a.id, a.tenant_id, a.printer_node_id, a.calibration_session_id, a.calibration_run_id,
-                   a.pricing_revision_id, a.resulting_rates_checksum, a.verified_manufacturing_price, a.accepted_at
+                   a.pricing_revision_id, a.resulting_rates_checksum, a.verified_manufacturing_price, a.acceptance_mode, a.accepted_at
             FROM printhouse_pricing_calibration_acceptances a
             INNER JOIN (
                 SELECT printer_node_id, MAX(accepted_at) AS max_accepted
                 FROM printhouse_pricing_calibration_acceptances
                 WHERE printer_node_id IN (?)
-        `;
+            `;
         accParams.push(nodeIds);
 
         if (tenantId) {
@@ -166,13 +170,14 @@ async function getGovernanceMetadataByNodes(tenantId, nodes) {
                     result[nodeId].lastAcceptanceId = a.id;
                     result[nodeId].lastAcceptedRunId = a.calibration_run_id || null;
                     result[nodeId].lastCalibrationAt = a.accepted_at ? new Date(a.accepted_at).toISOString() : null;
+                    result[nodeId].acceptanceMode = a.acceptance_mode || null;
                     result[nodeId].lastVerifiedManufacturingPrice = a.verified_manufacturing_price !== null && a.verified_manufacturing_price !== undefined
                         ? Number(a.verified_manufacturing_price)
                         : null;
                     result[nodeId].lastVerifiedManufacturingPriceAt = a.accepted_at ? new Date(a.accepted_at).toISOString() : null;
 
                     // If active revision was not resolved via checksum match, check if acceptance resulting checksum matches live node
-                    if (!result[nodeId].activeRevisionId && nodeChecksumMap[nodeId] && a.resulting_rates_checksum === nodeChecksumMap[nodeId] && a.pricing_revision_id) {
+                    if (!result[nodeId].activeRevisionId && nodeChecksumMap[nodeId] && normChecksum(a.resulting_rates_checksum) === normChecksum(nodeChecksumMap[nodeId]) && a.pricing_revision_id) {
                         result[nodeId].activeRevisionId = a.pricing_revision_id;
                         result[nodeId].activeRevisionChecksum = a.resulting_rates_checksum;
                     }

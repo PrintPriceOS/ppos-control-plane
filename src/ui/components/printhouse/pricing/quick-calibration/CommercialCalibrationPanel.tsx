@@ -73,6 +73,11 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
     const [error, setError] = useState<string | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    // ── Phase 195G Acceptance Modal State ──
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [accepting, setAccepting] = useState(false);
+    const [acceptanceResult, setAcceptanceResult] = useState<any | null>(null);
+
     // Initial load & calculation
     useEffect(() => {
         executePreview(adjustments);
@@ -164,6 +169,49 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
         executePreview(neutral);
     };
 
+    // ── Phase 195G Governed Acceptance Execution ──
+    const handleConfirmAcceptance = async () => {
+        if (!previewData?.metadata?.baselineRatesChecksum || accepting) return;
+        setAccepting(true);
+        setError(null);
+        try {
+            const rawAdjustments = {
+                printingSetupAdjustment: { type: 'MULTIPLIER', value: adjustments.printingSetupAdjustment || 1.0 },
+                printingRunMultiplier: { type: 'MULTIPLIER', value: adjustments.printingRunMultiplier || 1.0 },
+                paperCostMultiplier: { type: 'MULTIPLIER', value: adjustments.paperCostMultiplier || 1.0 },
+                bindingSetupAdjustment: { type: 'MULTIPLIER', value: adjustments.bindingSetupAdjustment || 1.0 },
+                bindingRunMultiplier: { type: 'MULTIPLIER', value: adjustments.bindingRunMultiplier || 1.0 },
+                laminationSetupAdjustment: { type: 'MULTIPLIER', value: adjustments.laminationSetupAdjustment || 1.0 },
+                laminationRunMultiplier: { type: 'MULTIPLIER', value: adjustments.laminationRunMultiplier || 1.0 }
+            };
+
+            const result = await printhouseCalibrationApi.acceptCommercialCalibration({
+                printhouseId: printerNodeId,
+                printerNodeId,
+                baselineRatesChecksum: previewData.metadata.baselineRatesChecksum,
+                adjustments: rawAdjustments,
+                quoteEvidenceId: quoteEvidence?.id,
+                quotePoints: quoteEvidence ? undefined : DEFAULT_QUOTE_POINTS,
+                bookSpec
+            });
+
+            setAcceptanceResult(result);
+            setShowAcceptModal(false);
+            // Re-run preview with freshly loaded DB baseline to reflect active state
+            await executePreview(adjustments);
+        } catch (err: any) {
+            let msg = err.message || 'Failed to accept commercial calibration';
+            if (err.code === 'STALE_COMMERCIAL_CALIBRATION_BASELINE') {
+                msg = 'Active rates have changed since preview was loaded. Please review current baseline.';
+            } else if (err.code === 'CANDIDATE_CHECKSUM_MISMATCH') {
+                msg = 'Candidate rates checksum mismatch. Please re-run preview.';
+            }
+            setError(msg);
+        } finally {
+            setAccepting(false);
+        }
+    };
+
     // Tolerance badge color helper
     const getToleranceBadge = (residualPct: number) => {
         const absPct = Math.abs(residualPct);
@@ -198,14 +246,20 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                     <div className="flex items-center gap-2">
                         <Sliders className="w-5 h-5 text-indigo-400" />
                         <h2 className="text-lg font-bold text-white tracking-wide">COMMERCIAL CALIBRATION PREVIEW</h2>
-                        <span className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            NOT ACTIVE
-                        </span>
+                        {acceptanceResult ? (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> ACTIVE ({acceptanceResult.revisionId})
+                            </span>
+                        ) : (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                NOT ACTIVE
+                            </span>
+                        )}
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                        No changes have been applied to live pricing • <span className="text-slate-300 font-mono">Node: {printerNodeId}</span>
+                        {acceptanceResult ? 'Governed revision active in database' : 'No changes have been applied to live pricing'} • <span className="text-slate-300 font-mono">Node: {printerNodeId}</span>
                         {previewData?.metadata?.baselineRatesChecksum && (
-                            <span className="ml-2 text-[11px] font-mono text-indigo-300">[{previewData.metadata.baselineRatesChecksum.substring(0, 15)}...]</span>
+                            <span className="ml-2 text-[11px] font-mono text-indigo-300">[Baseline: {previewData.metadata.baselineRatesChecksum.substring(0, 15)}...]</span>
                         )}
                     </p>
                 </div>
@@ -213,10 +267,18 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                     <button
                         onClick={handleSuggestFit}
                         disabled={loading}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white transition flex items-center gap-1.5"
                     >
                         <Sparkles className="w-3.5 h-3.5" />
                         Suggest Calibration
+                    </button>
+                    <button
+                        onClick={() => setShowAcceptModal(true)}
+                        disabled={loading || Boolean(acceptanceResult)}
+                        className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 cursor-pointer"
+                    >
+                        <Shield className="w-3.5 h-3.5" />
+                        Accept Calibration
                     </button>
                     <button
                         onClick={handleResetAll}
@@ -431,6 +493,87 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                     </div>
                 )}
             </div>
+
+            {/* Phase 195G Explicit Two-Step Acceptance Confirmation Modal */}
+            {showAcceptModal && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full p-6 text-slate-100 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-2">
+                                <Shield className="w-5 h-5 text-emerald-400" />
+                                <h3 className="text-base font-bold text-white">Governed Commercial Calibration Acceptance</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowAcceptModal(false)}
+                                className="text-slate-400 hover:text-white text-xs"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono">
+                                <div>Node: <strong className="text-slate-200">{printerNodeId}</strong></div>
+                                <div>Mode: <strong className="text-indigo-400">{quoteEvidence ? 'EVIDENCE_CALIBRATED' : 'OPERATOR_ADJUSTED'}</strong></div>
+                                <div className="truncate">Baseline: <strong className="text-slate-300">{previewData?.metadata?.baselineRatesChecksum ? `${previewData.metadata.baselineRatesChecksum.substring(0, 16)}...` : 'N/A'}</strong></div>
+                                <div className="truncate">Candidate: <strong className="text-emerald-400">{previewData?.metadata?.baselineRatesChecksum ? `${previewData.metadata.baselineRatesChecksum.substring(0, 16)}...` : 'RECOMPUTED'}</strong></div>
+                            </div>
+
+                            {/* Applied Adjustments Summary */}
+                            <div className="space-y-1">
+                                <h4 className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Applied Commercial Adjustments</h4>
+                                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                    {allKnobs.map((k: any) => {
+                                        const val = adjustments[k.id] !== undefined ? adjustments[k.id] : 1.0;
+                                        const pct = `${(val - 1.0) >= 0 ? '+' : ''}${((val - 1.0) * 100).toFixed(0)}%`;
+                                        return (
+                                            <div key={k.id} className="p-2 bg-slate-950 rounded border border-slate-800 flex justify-between">
+                                                <span className="text-slate-400">{k.label}:</span>
+                                                <span className={val !== 1.0 ? 'text-indigo-400 font-bold' : 'text-slate-400'}>{val.toFixed(2)}× ({pct})</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Benchmark Metrics */}
+                            {previewData?.metrics && (
+                                <div className="p-3 bg-indigo-950/40 border border-indigo-800/50 rounded-lg flex justify-between items-center text-xs">
+                                    <span>Baseline MAE: <strong>€{previewData.metrics.baselineMAE}</strong></span>
+                                    <span>Candidate MAE: <strong className="text-emerald-400">€{previewData.metrics.adjustedMAE}</strong></span>
+                                    <span>Candidate MAPE: <strong className="text-emerald-400">{previewData.metrics.adjustedMAPE}%</strong></span>
+                                </div>
+                            )}
+
+                            {/* Governance Warning */}
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-[11px] flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                                <span>
+                                    This will create a new immutable pricing revision, update printer_nodes.rates_json, and make it the current governed pricing configuration for node <strong className="font-mono text-white">{printerNodeId}</strong>.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+                            <button
+                                onClick={() => setShowAcceptModal(false)}
+                                disabled={accepting}
+                                className="px-4 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmAcceptance}
+                                disabled={accepting}
+                                className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                            >
+                                <CheckCircle2 className="w-4 h-4" />
+                                {accepting ? 'Activating Pricing Revision...' : 'Confirm & Activate Pricing Revision'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

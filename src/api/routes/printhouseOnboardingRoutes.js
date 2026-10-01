@@ -810,6 +810,64 @@ router.post('/pricing/commercial-fit', requireAuth, wrapHandler(async (req, res)
     });
 }));
 
+// POST /api/printhouse/onboarding/pricing/commercial-accept — Governed acceptance of commercial calibration adjustments (Phase 195G)
+const calibrationAcceptanceService = require('../services/calibrationAcceptanceService');
+
+router.post('/pricing/commercial-accept', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const baselineRatesChecksum = req.body.baselineRatesChecksum;
+    const adjustments = req.body.adjustments || {};
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || null;
+    const quoteEvidenceId = req.body.quoteEvidenceId || null;
+    const quotePoints = req.body.quotePoints || null;
+    const candidateRatesChecksum = req.body.candidateRatesChecksum || null;
+
+    let quoteEvidence = null;
+    if (quoteEvidenceId) {
+        try {
+            quoteEvidence = await quoteEvidenceService.getEvidenceById(tenantId, quoteEvidenceId);
+        } catch (e) {}
+    }
+
+    try {
+        const result = await calibrationAcceptanceService.acceptCommercialCalibration({
+            tenantId,
+            printerNodeId: printhouseId,
+            baselineRatesChecksum,
+            adjustments,
+            quoteEvidence,
+            quotePoints,
+            bookSpec,
+            candidateRatesChecksum,
+            actor: {
+                id: req.user.id || req.user.sub || 'operator-1',
+                email: req.user.email || 'operator@printhouse.com',
+                role: req.user.role || 'PRICING_OPERATOR'
+            }
+        });
+
+        res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        if (err.code === 'STALE_COMMERCIAL_CALIBRATION_BASELINE') {
+            return res.status(409).json({ ok: false, error: 'STALE_COMMERCIAL_CALIBRATION_BASELINE', message: err.message });
+        }
+        if (err.code === 'CANDIDATE_CHECKSUM_MISMATCH') {
+            return res.status(422).json({ ok: false, error: 'CANDIDATE_CHECKSUM_MISMATCH', message: err.message });
+        }
+        if (err.code === 'PRINTER_NODE_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'PRINTER_NODE_NOT_FOUND', message: err.message });
+        }
+        if (err.code === 'ACCESS_DENIED_FOREIGN_PRINTER_NODE') {
+            return res.status(403).json({ ok: false, error: 'ACCESS_DENIED_FOREIGN_PRINTER_NODE', message: err.message });
+        }
+        throw err;
+    }
+}));
+
 module.exports = router;
 
 

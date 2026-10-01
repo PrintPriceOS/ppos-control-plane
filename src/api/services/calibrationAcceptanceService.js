@@ -888,7 +888,277 @@ class CalibrationAcceptanceService {
             }
         };
     }
-}
+
+    /**
+     * Phase 195G — Governed Commercial Calibration Acceptance.
+     * Reconstructs candidate rates_json from DB canonical baseline and stored commercial adjustments,
+     * verifies baseline checksum against DB current state, recomputes candidate checksum,
+     * evaluates BPE forward pricing and curve metrics, and atomically commits an immutable revision
+     * and updates printer_nodes.rates_json inside a single DB transaction.
+     */
+    async acceptCommercialCalibration(params = {}) {
+        const {
+            tenantId,
+            printerNodeId = 'node-default-1',
+            baselineRatesChecksum,
+            adjustments = {},
+            quoteEvidence = null,
+            quotePoints = null,
+            bookSpec = null,
+            candidateRatesChecksum: clientCandidateChecksum = null,
+            actor = {}
+        } = params;
+
+        if (!tenantId || !printerNodeId || !baselineRatesChecksum) {
+            const err = new Error('MISSING_COMMERCIAL_ACCEPTANCE_PARAMETERS');
+            err.code = 'MISSING_COMMERCIAL_ACCEPTANCE_PARAMETERS';
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const commercialKnobService = require('./commercialKnobService');
+        const connection = await db.getPool().getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            // 1. Lock printer node (SELECT ... FOR UPDATE)
+            const [nodeRows] = await connection.query(
+                `SELECT id, tenant_id, rates_json, signatures, production_lead_days, delivery_time
+                 FROM printer_nodes
+                 WHERE id = ? FOR UPDATE`,
+                [printerNodeId]
+            );
+
+            if (!nodeRows || nodeRows.length === 0) {
+                const err = new Error('PRINTER_NODE_NOT_FOUND');
+                err.code = 'PRINTER_NODE_NOT_FOUND';
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const printerNode = nodeRows[0];
+            if (printerNode.tenant_id !== tenantId) {
+                const err = new Error('ACCESS_DENIED_FOREIGN_PRINTER_NODE');
+                err.code = 'ACCESS_DENIED_FOREIGN_PRINTER_NODE';
+                err.statusCode = 403;
+                throw err;
+            }
+
+            // Parse current baseline rates from DB
+            let currentBaselineRates = {};
+            if (printerNode.rates_json) {
+                currentBaselineRates = typeof printerNode.rates_json === 'string'
+                    ? JSON.parse(printerNode.rates_json)
+                    : printerNode.rates_json;
+            }
+
+            // 2. STALE BASELINE PROTECTION CHECK
+            const currentBaselineChecksum = commercialKnobService.computeRatesChecksum(currentBaselineRates);
+            if (currentBaselineChecksum !== baselineRatesChecksum) {
+                const err = new Error('STALE_COMMERCIAL_CALIBRATION_BASELINE');
+                err.code = 'STALE_COMMERCIAL_CALIBRATION_BASELINE';
+                err.statusCode = 409;
+                err.details = 'Active node rates have changed since this commercial preview was calculated. Regeneration against current baseline is required.';
+                throw err;
+            }
+
+            // 3. SERVER RECONSTRUCTS CANDIDATE
+            const sanitizedAdj = commercialKnobService.sanitizeAdjustments(adjustments);
+            const candidateRates = commercialKnobService.applyKnobAdjustments(currentBaselineRates, sanitizedAdj);
+            const candidateRatesChecksum = commercialKnobService.computeRatesChecksum(candidateRates);
+
+            // Verify client candidate checksum echo if provided
+            if (clientCandidateChecksum && clientCandidateChecksum !== candidateRatesChecksum) {
+                const err = new Error('CANDIDATE_CHECKSUM_MISMATCH');
+                err.code = 'CANDIDATE_CHECKSUM_MISMATCH';
+                err.statusCode = 422;
+                err.details = 'Client candidate checksum does not match server recomputed candidate checksum.';
+                throw err;
+            }
+
+            // 4. IDEMPOTENCY CHECK
+            const [existingActiveRev] = await connection.query(
+                `SELECT id, rates_checksum, created_at
+                 FROM printhouse_pricing_revisions
+                 WHERE tenant_id = ? AND printer_node_id = ? AND rates_checksum = ? AND source_type = 'COMMERCIAL_KNOB_CALIBRATION'
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1`,
+                [tenantId, printerNodeId, candidateRatesChecksum]
+            );
+
+            if (existingActiveRev && existingActiveRev.length > 0 && currentBaselineChecksum === candidateRatesChecksum) {
+                await connection.rollback();
+                return {
+                    accepted: true,
+                    idempotent: true,
+                    revisionId: existingActiveRev[0].id,
+                    activeRatesChecksum: candidateRatesChecksum,
+                    baselineRatesChecksum: currentBaselineChecksum,
+                    message: 'Commercial calibration proposal already active.'
+                };
+            }
+
+            // 5. EVALUATE FORWARD PRICING & RESIDUALS ON BENCHMARK POINTS
+            const benchmarkSpec = bookSpec || {
+                copies: 500,
+                book_width_mm: 170,
+                book_height_mm: 240,
+                interior_pages: 128,
+                interior_print: '4/4',
+                cover_print: '4/0',
+                paper_type_interior: 'offset',
+                paper_weight_interior: 90,
+                paper_type_cover: 'mc',
+                paper_weight_cover: 250,
+                lamination: 'matt',
+                binding_method: 'perfect bound',
+                delivery_country: 'ES'
+            };
+
+            const benchmarkQuantities = [500, 600, 700];
+            const previewResult = commercialKnobService.previewCommercialAdjustments({
+                bookSpec: benchmarkSpec,
+                quantities: benchmarkQuantities,
+                baselineRates: currentBaselineRates,
+                adjustments: sanitizedAdj,
+                quoteEvidence,
+                quotePoints
+            });
+
+            const fitResult = commercialKnobService.fitCommercialCurve({
+                quotePoints: quotePoints || (quoteEvidence?.items ? undefined : { 500: 4321, 600: 4604, 700: 4846 }),
+                quantities: benchmarkQuantities,
+                baselineRates: currentBaselineRates,
+                bookSpec: benchmarkSpec
+            });
+
+            // Evidence Calibration Mode
+            const hasQuoteEvidence = Boolean(quoteEvidence || quotePoints);
+            const calibrationMode = hasQuoteEvidence ? 'EVIDENCE_CALIBRATED' : 'OPERATOR_ADJUSTED';
+
+            // 6. RESOLVE PARENT REVISION ID
+            let parentRevisionId = null;
+            const [parentRows] = await connection.query(
+                `SELECT id FROM printhouse_pricing_revisions
+                 WHERE tenant_id = ? AND printer_node_id = ? AND rates_checksum = ?
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1`,
+                [tenantId, printerNodeId, currentBaselineChecksum]
+            );
+            if (parentRows && parentRows.length > 0) {
+                parentRevisionId = parentRows[0].id;
+            }
+
+            // 7. ATOMIC DATABASE MUTATIONS
+            const revisionId = `prev-${uuidv4().substring(0, 8)}`;
+            const acceptanceId = `pacc-${uuidv4().substring(0, 8)}`;
+
+            const actorJson = {
+                id: actor.id || 'operator-1',
+                email: actor.email || 'operator@printhouse.com',
+                role: actor.role || 'PRICING_OPERATOR',
+                timestamp: new Date().toISOString()
+            };
+
+            const metadataJson = {
+                commercialAdjustments: sanitizedAdj,
+                calibrationMode,
+                benchmarkQuantities,
+                metrics: previewResult.metrics,
+                fitMetrics: fitResult.fitMetrics,
+                commercialFixed: fitResult.commercialFixed,
+                commercialMarginal: fitResult.commercialMarginal,
+                curvatureDetected: fitResult.curvatureDetected,
+                quoteEvidenceId: quoteEvidence?.id || null
+            };
+
+            // a. Insert immutable pricing revision
+            await connection.query(
+                `INSERT INTO printhouse_pricing_revisions
+                 (id, tenant_id, printer_node_id, source_type,
+                  parent_revision_id, rates_json, rates_checksum,
+                  baseline_rates_checksum, proposed_patch_checksum,
+                  engine_package, engine_version, engine_commit, solver_version,
+                  created_by_json, created_at)
+                 VALUES (?, ?, ?, 'COMMERCIAL_KNOB_CALIBRATION', ?, ?, ?, ?, ?, ?, ?, ?, '195G_COMMERCIAL_SOLVER', ?, NOW(6))`,
+                [
+                    revisionId,
+                    tenantId,
+                    printerNodeId,
+                    parentRevisionId,
+                    JSON.stringify(candidateRates),
+                    candidateRatesChecksum,
+                    currentBaselineChecksum,
+                    candidateRatesChecksum,
+                    adapter.enginePackage,
+                    adapter.engineVersion,
+                    adapter.engineCommit,
+                    JSON.stringify(actorJson)
+                ]
+            );
+
+            // b. Update printer_nodes.rates_json
+            await connection.query(
+                `UPDATE printer_nodes
+                 SET rates_json = ?
+                 WHERE id = ? AND tenant_id = ?`,
+                [JSON.stringify(candidateRates), printerNodeId, tenantId]
+            );
+
+            // c. Insert calibration acceptance record
+            await connection.query(
+                `INSERT INTO printhouse_pricing_calibration_acceptances
+                 (id, tenant_id, printer_node_id, pricing_revision_id,
+                  baseline_checksum, proposed_patch_checksum, resulting_rates_checksum,
+                  target_manufacturing_price, verified_manufacturing_price, absolute_residual, percent_residual,
+                  acceptance_tolerance_absolute, acceptance_tolerance_percent, effective_acceptance_tolerance,
+                  warnings_json, verification_json, curve_acceptance_json, acceptance_mode, accepted_by_json, accepted_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                [
+                    acceptanceId,
+                    tenantId,
+                    printerNodeId,
+                    revisionId,
+                    currentBaselineChecksum,
+                    candidateRatesChecksum,
+                    candidateRatesChecksum,
+                    previewResult.quantities[0]?.quotedManufacturingPrice || previewResult.quantities[0]?.baselinePrice || 0,
+                    previewResult.quantities[0]?.adjustedPrice || 0,
+                    previewResult.metrics.adjustedMAE || 0,
+                    previewResult.metrics.adjustedMAPE || 0,
+                    50.0,
+                    0.05,
+                    50.0,
+                    JSON.stringify([]),
+                    JSON.stringify({ previewResult, metadataJson }),
+                    JSON.stringify(fitResult),
+                    calibrationMode,
+                    JSON.stringify(actorJson)
+                ]
+            );
+
+            await connection.commit();
+
+            return {
+                accepted: true,
+                revisionId,
+                acceptanceId,
+                printerNodeId,
+                calibrationMode,
+                activeRatesChecksum: candidateRatesChecksum,
+                baselineRatesChecksum: currentBaselineChecksum,
+                metrics: previewResult.metrics,
+                acceptedAt: new Date().toISOString()
+            };
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    }
+};
 
 const serviceInstance = new CalibrationAcceptanceService();
 serviceInstance.computeGovernanceTolerance = computeGovernanceTolerance;

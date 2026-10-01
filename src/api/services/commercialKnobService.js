@@ -45,11 +45,23 @@ function getNeutralAdjustments() {
     };
 }
 
+// Recursive sorted-key JSON serialization for canonical checksums
+function canonicalStringify(obj) {
+    if (obj === null || obj === undefined) return 'null';
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+        return '[' + obj.map(v => canonicalStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const pairs = keys.map(k => JSON.stringify(k) + ':' + canonicalStringify(obj[k]));
+    return '{' + pairs.join(',') + '}';
+}
+
 // Deterministic SHA-256 checksum over rates JSON
 function computeRatesChecksum(ratesObj) {
     if (!ratesObj || typeof ratesObj !== 'object') return 'sha256:0000000000000000';
-    const sortedStr = JSON.stringify(ratesObj, Object.keys(ratesObj).sort());
-    return 'sha256:' + crypto.createHash('sha256').update(sortedStr).digest('hex');
+    const canonical = canonicalStringify(ratesObj);
+    return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
 // Deep clone utility
