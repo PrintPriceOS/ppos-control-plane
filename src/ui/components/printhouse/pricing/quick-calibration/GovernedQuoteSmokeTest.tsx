@@ -30,27 +30,55 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
     printerNodeName = 'Production Node',
     initialSpec
 }) => {
+    const normalizeBinding = (b?: string) => {
+        if (!b) return 'perfect bound';
+        const s = String(b).toLowerCase().trim();
+        if (s === 'hardcover' || s === 'hard_cover' || s === 'case' || s === 'casebound' || s === 'hardback') return 'hardcover';
+        if (s === 'thread sewn' || s === 'sewn' || s === 'thread-sewn') return 'thread sewn';
+        if (s === 'perfect bound' || s === 'perfect' || s === 'pb') return 'perfect bound';
+        if (s === 'saddle stitch' || s === 'saddle' || s === 'st') return 'saddle stitch';
+        if (s === 'wire-o' || s === 'wire_o' || s === 'wireo') return 'wire-o';
+        if (s === 'spiral') return 'spiral';
+        return s;
+    };
+
+    const getInitialValue = (key: string, fallback: any) => {
+        if (initialSpec && initialSpec[key] !== undefined && initialSpec[key] !== null && initialSpec[key] !== '') {
+            return initialSpec[key];
+        }
+        return fallback;
+    };
+
     // Form Inputs (Pre-filled from reference book calibration if provided)
     const [spec, setSpec] = useState({
-        copies: initialSpec?.copies || 1000,
-        book_width_mm: initialSpec?.book_width_mm || 170,
-        book_height_mm: initialSpec?.book_height_mm || 240,
-        interior_pages: initialSpec?.interior_pages || 128,
-        interior_print: initialSpec?.interior_print || '4/4',
-        paper_type_interior: initialSpec?.paper_type_interior || 'offset',
-        paper_weight_interior: initialSpec?.paper_weight_interior || 80,
-        cover_print: initialSpec?.cover_print || '4/0',
-        paper_type_cover: initialSpec?.paper_type_cover || 'mc',
-        paper_weight_cover: initialSpec?.paper_weight_cover || 300,
-        lamination: initialSpec?.lamination || 'matt',
-        binding_method: initialSpec?.binding_method || 'perfect bound',
-        delivery_country: initialSpec?.delivery_country || ''
+        copies: getInitialValue('copies', 1000),
+        book_width_mm: getInitialValue('book_width_mm', 170),
+        book_height_mm: getInitialValue('book_height_mm', 240),
+        interior_pages: getInitialValue('interior_pages', 128),
+        interior_print: getInitialValue('interior_print', '4/4'),
+        paper_type_interior: getInitialValue('paper_type_interior', 'offset'),
+        paper_weight_interior: getInitialValue('paper_weight_interior', 80),
+        cover_print: getInitialValue('cover_print', '4/0'),
+        paper_type_cover: getInitialValue('paper_type_cover', 'mc'),
+        paper_weight_cover: getInitialValue('paper_weight_cover', 300),
+        lamination: getInitialValue('lamination', 'matt'),
+        binding_method: normalizeBinding(getInitialValue('binding_method', 'perfect bound')),
+        delivery_country: getInitialValue('delivery_country', '')
     });
 
+    const [userHasEdited, setUserHasEdited] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [quoteResult, setQuoteResult] = useState<any | null>(null);
     const [showTrace, setShowTrace] = useState(false);
+
+    // Helper to update spec field & invalidate previous quote result immediately
+    const updateSpecField = (field: string, value: any) => {
+        setUserHasEdited(true);
+        setQuoteResult(null);
+        setError(null);
+        setSpec(prev => ({ ...prev, [field]: value }));
+    };
 
     // List of active configured destinations for this printhouse node
     const [availableDestinations, setAvailableDestinations] = useState<Array<{ code: string; name: string; regionName?: string }>>([
@@ -63,10 +91,22 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         { code: 'TR', name: 'Turkey', regionName: 'Eurasia' }
     ]);
 
-    // Update spec if initialSpec changes (e.g. upon calibration acceptance)
+    // Update spec if initialSpec changes (only if user has not modified fields or when initialSpec gets populated)
     useEffect(() => {
         if (initialSpec && Object.keys(initialSpec).length > 0) {
-            setSpec(prev => ({ ...prev, ...initialSpec }));
+            setSpec(prev => {
+                const normalized = { ...prev };
+                for (const key of Object.keys(initialSpec)) {
+                    if (initialSpec[key] !== undefined && initialSpec[key] !== null && initialSpec[key] !== '') {
+                        if (key === 'binding_method') {
+                            normalized.binding_method = normalizeBinding(initialSpec.binding_method);
+                        } else {
+                            (normalized as any)[key] = initialSpec[key];
+                        }
+                    }
+                }
+                return normalized;
+            });
         }
     }, [initialSpec]);
 
@@ -85,6 +125,14 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
             setLoading(false);
         }
     };
+
+    const hasComplexSpec = Boolean(
+        initialSpec?.has_mixed_interior || 
+        initialSpec?.mixed_interior_details || 
+        initialSpec?.has_spot_uv || 
+        initialSpec?.has_endpapers || 
+        (initialSpec?.unsupported_features && initialSpec.unsupported_features.length > 0)
+    );
 
     return (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
@@ -117,6 +165,18 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 </button>
             </div>
 
+            {hasComplexSpec && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                    <AlertTriangle size={18} className="text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                        <p className="font-bold">Complex Specification Limitation Notice</p>
+                        <p className="mt-0.5 leading-relaxed">
+                            Original reference quotation contains complex features (e.g. Mixed Interior 1+1/4+4, Hardcover Board, Spot UV, or Endpapers). The canonical BPE test pricing preview evaluates standard single-interior configurations ({spec.interior_print}, {spec.binding_method}). Original extracted specifications are preserved without artificial rate padding.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {error && (
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-3">
                     <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
@@ -143,7 +203,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         min="1"
                         step="1"
                         value={spec.copies || ''}
-                        onChange={e => setSpec(prev => ({ ...prev, copies: parseInt(e.target.value, 10) || 0 }))}
+                        onChange={e => updateSpecField('copies', parseInt(e.target.value, 10) || 0)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     />
                 </div>
@@ -159,7 +219,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             min="50"
                             max="500"
                             value={spec.book_width_mm || ''}
-                            onChange={e => setSpec(prev => ({ ...prev, book_width_mm: parseInt(e.target.value, 10) || 0 }))}
+                            onChange={e => updateSpecField('book_width_mm', parseInt(e.target.value, 10) || 0)}
                             className="w-full px-2.5 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium text-center focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                             placeholder="W"
                         />
@@ -169,7 +229,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             min="50"
                             max="700"
                             value={spec.book_height_mm || ''}
-                            onChange={e => setSpec(prev => ({ ...prev, book_height_mm: parseInt(e.target.value, 10) || 0 }))}
+                            onChange={e => updateSpecField('book_height_mm', parseInt(e.target.value, 10) || 0)}
                             className="w-full px-2.5 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium text-center focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                             placeholder="H"
                         />
@@ -186,7 +246,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         min="4"
                         step="2"
                         value={spec.interior_pages || ''}
-                        onChange={e => setSpec(prev => ({ ...prev, interior_pages: parseInt(e.target.value, 10) || 0 }))}
+                        onChange={e => updateSpecField('interior_pages', parseInt(e.target.value, 10) || 0)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     />
                 </div>
@@ -198,7 +258,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     </label>
                     <select
                         value={spec.interior_print || '4/4'}
-                        onChange={e => setSpec(prev => ({ ...prev, interior_print: e.target.value }))}
+                        onChange={e => updateSpecField('interior_print', e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     >
                         <option value="4/4">4/4 Full Colour</option>
@@ -215,7 +275,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     <div className="flex items-center gap-1.5">
                         <select
                             value={spec.paper_type_interior || 'offset'}
-                            onChange={e => setSpec(prev => ({ ...prev, paper_type_interior: e.target.value }))}
+                            onChange={e => updateSpecField('paper_type_interior', e.target.value)}
                             className="w-2/3 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
                             <option value="offset">Offset</option>
@@ -227,7 +287,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             min="50"
                             max="300"
                             value={spec.paper_weight_interior || ''}
-                            onChange={e => setSpec(prev => ({ ...prev, paper_weight_interior: parseInt(e.target.value, 10) || 0 }))}
+                            onChange={e => updateSpecField('paper_weight_interior', parseInt(e.target.value, 10) || 0)}
                             className="w-1/3 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium text-center focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                             placeholder="gsm"
                         />
@@ -242,7 +302,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     <div className="flex items-center gap-1.5">
                         <select
                             value={spec.cover_print || '4/0'}
-                            onChange={e => setSpec(prev => ({ ...prev, cover_print: e.target.value }))}
+                            onChange={e => updateSpecField('cover_print', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
                             <option value="4/0">4/0 Front</option>
@@ -254,7 +314,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             min="150"
                             max="450"
                             value={spec.paper_weight_cover || ''}
-                            onChange={e => setSpec(prev => ({ ...prev, paper_weight_cover: parseInt(e.target.value, 10) || 0 }))}
+                            onChange={e => updateSpecField('paper_weight_cover', parseInt(e.target.value, 10) || 0)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium text-center focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                             placeholder="gsm"
                         />
@@ -269,16 +329,19 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     <div className="flex items-center gap-1.5">
                         <select
                             value={spec.binding_method || 'perfect bound'}
-                            onChange={e => setSpec(prev => ({ ...prev, binding_method: e.target.value }))}
+                            onChange={e => updateSpecField('binding_method', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
+                            <option value="hardcover">Hardcover</option>
+                            <option value="thread sewn">Thread Sewn</option>
                             <option value="perfect bound">Perfect Bound</option>
                             <option value="saddle stitch">Saddle Stitch</option>
-                            <option value="thread sewn">Thread Sewn</option>
+                            <option value="wire-o">Wire-O</option>
+                            <option value="spiral">Spiral</option>
                         </select>
                         <select
                             value={spec.lamination || 'matt'}
-                            onChange={e => setSpec(prev => ({ ...prev, lamination: e.target.value }))}
+                            onChange={e => updateSpecField('lamination', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
                             <option value="matt">Matt</option>
@@ -295,7 +358,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     </label>
                     <select
                         value={spec.delivery_country || ''}
-                        onChange={e => setSpec(prev => ({ ...prev, delivery_country: e.target.value }))}
+                        onChange={e => updateSpecField('delivery_country', e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     >
                         {!availableDestinations.some(d => d.code === spec.delivery_country) && spec.delivery_country && (
