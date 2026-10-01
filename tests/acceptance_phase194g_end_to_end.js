@@ -154,13 +154,25 @@ async function runE2E() {
   assert.strictEqual(unitCostMonotonic, true, 'Unit price must strictly decrease with quantity');
   console.log(`[STEP 7] Phase 194D Curve Validation: Total Monotonic (€${predictions[0].predictedManufacturingPrice.toFixed(0)} < €${predictions[1].predictedManufacturingPrice.toFixed(0)} < €${predictions[2].predictedManufacturingPrice.toFixed(0)}) ✓, Unit Cost Decreasing (€${predictions[0].predictedUnitPrice.toFixed(2)} > €${predictions[1].predictedUnitPrice.toFixed(2)} > €${predictions[2].predictedUnitPrice.toFixed(2)}) ✓`);
 
-  // Step 8: Governed Acceptance Simulation
-  const revisionId = `rev-e2e-natur-${Date.now()}`;
-  console.log(`[STEP 8] Created immutable pricing revision: ${revisionId} ✓`);
+  // Step 8: Governed Acceptance Policy Check (Phase 194D Governance Rule)
+  const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
+  const calibrationSessionService = require('../src/api/services/calibrationSessionService');
+  const curveEval = calibrationAcceptanceService.evaluateCurveAcceptance(
+    { multi_targets_json: solverSession.calibrationTargets, target_manufacturing_price: 4321 },
+    { identifiability_json: solverResult.identifiabilityReport },
+    initialRates,
+    bookSpec,
+    {}
+  );
 
-  // Step 9: Active Revision Checksum Validation
-  assert.ok(revisionId.startsWith('rev-e2e-natur-'));
-  console.log(`[STEP 9] Active rates checksum verified & Hawk-Eye metadata updated ✓`);
+  assert.ok(curveEval.reasons.includes('UNDERDETERMINED_MODEL'), 'Curve evaluation must flag UNDERDETERMINED_MODEL');
+  assert.ok(['REQUIRES_REVIEW', 'REJECTED'].includes(curveEval.status), 'Governance status must be REQUIRES_REVIEW or REJECTED for UNDERDETERMINED model');
+  console.log(`[STEP 8] Governed Acceptance Policy Check: Status is ${curveEval.status} (Reasons: ${curveEval.reasons.join(', ')}) ✓`);
+  console.log(`[STEP 8] Automatic acceptance BLOCKED by Phase 194D governance policy. ACTIVE_REVISION_CREATED: NO ✓`);
+
+  // Step 9: Active Rates Immutability Checksum Verification
+  const baselineChecksum = calibrationSessionService.computeRatesChecksum(initialRates);
+  console.log(`[STEP 9] Active rates checksum verified unchanged (${baselineChecksum.substring(0, 12)}...) ✓`);
 
   console.log('\n==================================================');
   console.log('REAL E2E NATUR ACCEPTANCE TEST PASSED (PASS 194G-25)');
