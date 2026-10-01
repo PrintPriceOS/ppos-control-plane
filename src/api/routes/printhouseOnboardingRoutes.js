@@ -630,7 +630,60 @@ router.post('/pricing/routes/evaluate', requireAuth, wrapHandler(async (req, res
         options
     );
 
-    res.json({ ok: true, data: evaluation });
+    // ──── 11. Governed Route Rules & Boundary Breakpoints (Phase 195D) ─────────
+const routeRuleService = require('../services/printhouseRouteRuleService');
+
+// POST /api/printhouse/onboarding/pricing/route-rules — Create governed route rule
+router.post('/pricing/route-rules', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
+
+    const rule = await routeRuleService.createRouteRule(tenantId, printhouseId, req.body, actor);
+    res.status(201).json({ ok: true, data: rule });
+}));
+
+// GET /api/printhouse/onboarding/pricing/route-rules — List governed route rules
+router.get('/pricing/route-rules', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.query.printhouseId || req.query.printerNodeId || 'node-default-1';
+
+    const rules = await routeRuleService.listRouteRules(tenantId, printhouseId);
+    res.json({ ok: true, data: rules });
+}));
+
+// POST /api/printhouse/onboarding/pricing/routes/probes — Evaluate q-1, q, q+1 boundary probes
+router.post('/pricing/routes/probes', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || req.body;
+    const targetQuantity = req.body.quantity || req.body.targetQuantity || 500;
+    const options = {
+        mockMachines: req.body.mockMachines || null,
+        mockProfiles: req.body.mockProfiles || null,
+        mockRules: req.body.mockRules || null
+    };
+
+    const probes = await routeSelectionService.evaluateBoundaryProbes(tenantId, printhouseId, bookSpec, targetQuantity, options);
+    res.json({ ok: true, data: probes });
+}));
+
+// POST /api/printhouse/onboarding/pricing/routes/intervals — Derive route intervals across quantity range
+router.post('/pricing/routes/intervals', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || req.body;
+    const minQ = req.body.minQuantity || 10;
+    const maxQ = req.body.maxQuantity || 2000;
+    const options = {
+        step: req.body.step || 50,
+        mockMachines: req.body.mockMachines || null,
+        mockProfiles: req.body.mockProfiles || null,
+        mockRules: req.body.mockRules || null
+    };
+
+    const intervals = await routeSelectionService.deriveRouteIntervals(tenantId, printhouseId, bookSpec, minQ, maxQ, options);
+    res.json({ ok: true, data: intervals });
 }));
 
 module.exports = router;

@@ -1,21 +1,26 @@
 /**
  * src/api/services/productionRouteSelectionService.js
  *
- * Phase 195C — Governed Production Route Selection & Press Comparison (SHADOW Mode)
+ * Phase 195D — Governed Route Boundaries & Machine Breakpoints (SHADOW Mode)
+ *
+ * SCIENTIFIC INVARIANT & CLARIFICATION:
+ * Shadow route selection evaluations represent model evidence based on current
+ * configured machine economic profiles. They DO NOT state or prove what physical
+ * machine a real supplier (e.g. Dardedze for Natur) actually used during production.
  *
  * Responsibilities:
- * 1. Evaluates physical & capability eligibility of active machines for a job.
- * 2. Computes deterministic manufacturing cost per eligible machine route using
- *    versioned machine pricing profiles (printhouse_machine_pricing_profiles).
- * 3. Discovers economic route crossovers (e.g. Digital vs Offset) dynamically from
- *    intersecting cost curves without hardcoding arbitrary quantity thresholds.
- * 4. Ranks eligible routes by manufacturing cost or respects operator-pinned machines.
- * 5. Executes in SHADOW_COMPARISON mode: legacy node rates_json remains 100% authoritative.
- * 6. ZERO rates_json mutations and ZERO pricing revision activations.
+ * 1. Formally distinguishes Boundary Taxonomy: CAPABILITY_LIMIT, ECONOMIC_CROSSOVER,
+ *    OPERATOR_RULE, COMMERCIAL_TIER, CAPACITY_CONSTRAINT, MAINTENANCE_CONSTRAINT, GOVERNED_ROUTE_OVERRIDE.
+ * 2. Enforces deterministic Rule Precedence: Tenant Isolation -> Physical Capability ->
+ *    Maintenance/Availability -> Operator Governed Constraint -> Economic Comparison -> Tie-Break Policy.
+ * 3. Derives Economic Crossovers analytically without hardcoded quantity thresholds.
+ * 4. Provides Crossover Tolerance & Tie-Zone logic to prevent route flapping/thrashing.
+ * 5. Evaluates Boundary Probes (q-1, q, q+1) and derives Route Intervals over quantity ranges.
+ * 6. Executes strictly in SHADOW_COMPARISON mode: legacy node rates_json remains 100% authoritative.
  */
 
-const machineService = require('./printhouseMachineService');
 const machinePricingService = require('./printhouseMachinePricingService');
+const routeRuleService = require('./printhouseRouteRuleService');
 const adapter = require('./buildPriceCalibrationAdapter');
 const telemetry = require('./phase194TelemetryService');
 const logger = require('./logger').child('production-route-selection');
@@ -23,7 +28,19 @@ const db = require('./mysqlClient');
 
 const ROUTE_SELECTION_MODES = Object.freeze({
   SHADOW: 'SHADOW_COMPARISON',
-  ACTIVE: 'ACTIVE_ROUTING' // Not used in 195C!
+  ACTIVE: 'ACTIVE_ROUTING' // Not used in 195D!
+});
+
+const BOUNDARY_TYPES = Object.freeze({
+  CAPABILITY_LIMIT: 'CAPABILITY_LIMIT',
+  ECONOMIC_CROSSOVER: 'ECONOMIC_CROSSOVER',
+  OPERATOR_RULE: 'OPERATOR_RULE',
+  COMMERCIAL_TIER: 'COMMERCIAL_TIER',
+  CAPACITY_CONSTRAINT: 'CAPACITY_CONSTRAINT',
+  MAINTENANCE_CONSTRAINT: 'MAINTENANCE_CONSTRAINT',
+  GOVERNED_ROUTE_OVERRIDE: 'GOVERNED_ROUTE_OVERRIDE',
+  ECONOMIC_TIE_ZONE: 'ECONOMIC_TIE_ZONE',
+  UNSTABLE_ROUTE_BOUNDARY: 'UNSTABLE_ROUTE_BOUNDARY'
 });
 
 const INELIGIBILITY_REASONS = Object.freeze({
@@ -34,8 +51,22 @@ const INELIGIBILITY_REASONS = Object.freeze({
   QUANTITY_ABOVE_MAX: 'QUANTITY_ABOVE_MAX',
   MACHINE_PROFILE_NOT_READY: 'MACHINE_PROFILE_NOT_READY',
   CROSS_TENANT_MISMATCH: 'CROSS_TENANT_MISMATCH',
-  MAINTENANCE_STATUS: 'MAINTENANCE_STATUS'
+  MAINTENANCE_STATUS: 'MAINTENANCE_STATUS',
+  OPERATOR_RULE_PROHIBITED: 'OPERATOR_RULE_PROHIBITED'
 });
+
+const PRECEDENCE_LEVELS = Object.freeze({
+  LEVEL_1_TENANT: 1,
+  LEVEL_2_PHYSICAL_CAPABILITY: 2,
+  LEVEL_3_MAINTENANCE: 3,
+  LEVEL_4_OPERATOR_GOVERNED_RULE: 4,
+  LEVEL_5_ECONOMIC_COMPARISON: 5,
+  LEVEL_6_TIE_BREAK_POLICY: 6
+});
+
+// Tolerances for tie-zone classification
+const CROSSOVER_TOLERANCE_ABS = 1.00; // €1.00 absolute cost difference
+const CROSSOVER_TOLERANCE_PCT = 0.005; // 0.5% relative cost difference
 
 function _isDbFallbackAllowed() {
   return process.env.NODE_ENV === 'test' ||
@@ -48,11 +79,13 @@ class ProductionRouteSelectionService {
 
   constructor() {
     this.MODES = ROUTE_SELECTION_MODES;
+    this.BOUNDARIES = BOUNDARY_TYPES;
     this.REASONS = INELIGIBILITY_REASONS;
+    this.PRECEDENCE = PRECEDENCE_LEVELS;
   }
 
   /**
-   * Evaluates capability eligibility for a given machine against job specifications.
+   * Evaluates physical capability eligibility for a given machine against job specifications.
    */
   evaluateMachineEligibility(machine, profile, bookSpec, quantity) {
     const reasons = [];
@@ -212,7 +245,37 @@ class ProductionRouteSelectionService {
   }
 
   /**
-   * Evaluates all candidate machine routes for a given job and quantity.
+   * Evaluates Operator Route Rules against job specification and candidate machine.
+   */
+  evaluateOperatorRuleForMachine(rule, machine, bookSpec, quantity) {
+    if (!rule || rule.status !== 'VALIDATED') return { matches: false };
+
+    const cond = rule.conditions_json || rule.conditions || {};
+    const act = rule.action_json || rule.action || {};
+    const q = Number(quantity);
+
+    let match = true;
+
+    if (typeof cond.minQuantity === 'number' && q < cond.minQuantity) match = false;
+    if (typeof cond.maxQuantity === 'number' && q > cond.maxQuantity) match = false;
+    if (cond.machineId && cond.machineId !== machine.id) match = false;
+    if (cond.paperWeightGsmMin && (bookSpec.interior_paper_weight_gsm || 0) < cond.paperWeightGsmMin) match = false;
+
+    if (!match) return { matches: false };
+
+    return {
+      matches: true,
+      ruleId: rule.id,
+      ruleName: rule.rule_name,
+      ruleType: rule.rule_type,
+      ruleChecksum: rule.checksum,
+      action: act.actionType || act.type || 'PROHIBIT',
+      forcedMachineId: act.targetMachineId || act.forcedMachineId || null
+    };
+  }
+
+  /**
+   * Evaluates all candidate machine routes for a given job and quantity with Precedence Hierarchy.
    */
   async evaluateRoutesForQuantity(tenantId, printhouseId, bookSpec, quantity, options = {}) {
     const q = Number(quantity);
@@ -230,15 +293,22 @@ class ProductionRouteSelectionService {
       logger.warn(`DB machine lookup skipped/failed: ${e.message}`);
     }
 
-    // Support mock machines in test mode
     if (machines.length === 0 && Array.isArray(options.mockMachines)) {
       machines = options.mockMachines.filter(m => m.tenant_id === tenantId);
     }
 
+    // Fetch active route rules
+    let routeRules = [];
+    if (Array.isArray(options.mockRules)) {
+      routeRules = options.mockRules.filter(r => r.tenant_id === tenantId && r.status === 'VALIDATED');
+    } else {
+      routeRules = await routeRuleService.getActiveRouteRules(tenantId, printhouseId);
+    }
+
     const routeResults = [];
+    let operatorAppliedRule = null;
 
     for (const machine of machines) {
-      // Fetch active profile or mock profile
       let profile = null;
       if (options.mockProfiles && options.mockProfiles[machine.id]) {
         profile = options.mockProfiles[machine.id];
@@ -246,53 +316,154 @@ class ProductionRouteSelectionService {
         profile = await machinePricingService.getActiveMachinePricingProfile(tenantId, machine.id);
       }
 
+      // Precedence Level 2 & 3: Physical Capability & Maintenance
       const eligibility = this.evaluateMachineEligibility(machine, profile, bookSpec, q);
 
       if (!eligibility.eligible) {
+        const primaryReason = eligibility.reasons.includes(INELIGIBILITY_REASONS.MAINTENANCE_STATUS)
+          ? BOUNDARY_TYPES.MAINTENANCE_CONSTRAINT
+          : BOUNDARY_TYPES.CAPABILITY_LIMIT;
+
         routeResults.push({
           machineId: machine.id,
           machineName: machine.machine_name || machine.id,
           technology: machine.machine_type || 'UNKNOWN',
           eligible: false,
           ineligibilityReasons: eligibility.reasons,
+          boundaryType: primaryReason,
+          precedenceLevel: eligibility.reasons.includes(INELIGIBILITY_REASONS.MAINTENANCE_STATUS)
+            ? PRECEDENCE_LEVELS.LEVEL_3_MAINTENANCE
+            : PRECEDENCE_LEVELS.LEVEL_2_PHYSICAL_CAPABILITY,
           manufacturingCost: null
         });
-      } else {
-        const costData = this.calculateRouteCost(machine, profile, bookSpec, q);
-        routeResults.push({
-          eligible: true,
-          ineligibilityReasons: [],
-          ...costData
-        });
+        continue;
       }
+
+      // Precedence Level 4: Operator Governed Rules
+      let ruleProhibited = false;
+      for (const rule of routeRules) {
+        const ruleEval = this.evaluateOperatorRuleForMachine(rule, machine, bookSpec, q);
+        if (ruleEval.matches) {
+          if (ruleEval.action === 'PROHIBIT') {
+            ruleProhibited = true;
+            operatorAppliedRule = ruleEval;
+            routeResults.push({
+              machineId: machine.id,
+              machineName: machine.machine_name || machine.id,
+              technology: machine.machine_type || 'UNKNOWN',
+              eligible: false,
+              ineligibilityReasons: [INELIGIBILITY_REASONS.OPERATOR_RULE_PROHIBITED],
+              boundaryType: BOUNDARY_TYPES.OPERATOR_RULE,
+              precedenceLevel: PRECEDENCE_LEVELS.LEVEL_4_OPERATOR_GOVERNED_RULE,
+              appliedRule: ruleEval,
+              manufacturingCost: null
+            });
+            break;
+          } else if (ruleEval.action === 'FORCE_MACHINE') {
+            operatorAppliedRule = ruleEval;
+          }
+        }
+      }
+
+      if (ruleProhibited) continue;
+
+      const costData = this.calculateRouteCost(machine, profile, bookSpec, q);
+      routeResults.push({
+        eligible: true,
+        ineligibilityReasons: [],
+        boundaryType: null,
+        precedenceLevel: PRECEDENCE_LEVELS.LEVEL_5_ECONOMIC_COMPARISON,
+        ...costData
+      });
     }
 
     // Rank eligible routes by manufacturingCost ascending
     const eligibleRoutes = routeResults.filter(r => r.eligible).sort((a, b) => a.manufacturingCost - b.manufacturingCost);
 
-    // Operator Pinned Machine Logic
     let recommendedRoute = null;
     let selectionReason = 'NO_ELIGIBLE_ROUTE';
+    let boundaryType = null;
+    let isTieZone = false;
+    let tieZoneDetails = null;
 
+    // Operator Pinned Machine or Governed Rule Override
     if (options.pinnedMachineId) {
       const pinned = routeResults.find(r => r.machineId === options.pinnedMachineId);
       if (pinned && pinned.eligible) {
         recommendedRoute = pinned;
         selectionReason = 'OPERATOR_PINNED_MACHINE';
+        boundaryType = BOUNDARY_TYPES.GOVERNED_ROUTE_OVERRIDE;
       } else {
         selectionReason = 'PINNED_MACHINE_INELIGIBLE';
+        boundaryType = BOUNDARY_TYPES.CAPABILITY_LIMIT;
       }
-    } else if (eligibleRoutes.length === 1) {
-      recommendedRoute = eligibleRoutes[0];
-      selectionReason = 'ONLY_ELIGIBLE_MACHINE';
-    } else if (eligibleRoutes.length > 1) {
-      recommendedRoute = eligibleRoutes[0];
-      selectionReason = 'LOWEST_VALID_MANUFACTURING_COST';
+    } else if (operatorAppliedRule && operatorAppliedRule.action === 'FORCE_MACHINE') {
+      const forced = routeResults.find(r => r.machineId === operatorAppliedRule.forcedMachineId);
+      if (forced && forced.eligible) {
+        recommendedRoute = forced;
+        selectionReason = 'OPERATOR_GOVERNED_RULE';
+        boundaryType = BOUNDARY_TYPES.OPERATOR_RULE;
+      }
+    }
+
+    // Economic Selection & Tie-Zone Evaluation
+    if (!recommendedRoute) {
+      if (eligibleRoutes.length === 1) {
+        recommendedRoute = eligibleRoutes[0];
+        selectionReason = 'ONLY_ELIGIBLE_MACHINE';
+        boundaryType = BOUNDARY_TYPES.CAPABILITY_LIMIT;
+      } else if (eligibleRoutes.length > 1) {
+        const top1 = eligibleRoutes[0];
+        const top2 = eligibleRoutes[1];
+        const diffAbs = Math.abs(top1.manufacturingCost - top2.manufacturingCost);
+        const diffPct = top1.manufacturingCost > 0 ? diffAbs / top1.manufacturingCost : 0;
+
+        if (diffAbs <= CROSSOVER_TOLERANCE_ABS || diffPct <= CROSSOVER_TOLERANCE_PCT) {
+          isTieZone = true;
+          boundaryType = BOUNDARY_TYPES.ECONOMIC_TIE_ZONE;
+          selectionReason = 'ECONOMIC_TIE_ZONE_RESOLVED';
+
+          // Deterministic Governed Tie-Break Policy: LOWER_SETUP -> LOWER_VARIABLE_COST -> STABLE_MACHINE_ID
+          const setup1 = top1.breakdown.fixedSetup + top1.breakdown.makeready + top1.breakdown.plateCost;
+          const setup2 = top2.breakdown.fixedSetup + top2.breakdown.makeready + top2.breakdown.plateCost;
+
+          if (setup1 !== setup2) {
+            recommendedRoute = setup1 < setup2 ? top1 : top2;
+          } else if (top1.unitManufacturingCost !== top2.unitManufacturingCost) {
+            recommendedRoute = top1.unitManufacturingCost < top2.unitManufacturingCost ? top1 : top2;
+          } else {
+            recommendedRoute = top1.machineId.localeCompare(top2.machineId) <= 0 ? top1 : top2;
+          }
+
+          tieZoneDetails = {
+            candidate1: top1.machineId,
+            candidate2: top2.machineId,
+            costDifferenceAbs: Number(diffAbs.toFixed(4)),
+            costDifferencePct: Number(diffPct.toFixed(6)),
+            resolvedBy: 'LOWER_SETUP_AND_STABLE_ID'
+          };
+
+          telemetry.startTimer('machine_route_tie_zone_detected', { tenantId, printerNodeId: printhouseId })
+            .finish('machine_route_tie_zone_detected', { quantity: q, machine1: top1.machineId, machine2: top2.machineId });
+        } else {
+          recommendedRoute = top1;
+          selectionReason = 'LOWEST_VALID_MANUFACTURING_COST';
+          boundaryType = BOUNDARY_TYPES.ECONOMIC_CROSSOVER;
+        }
+      }
+    }
+
+    if (operatorAppliedRule) {
+      telemetry.startTimer('machine_route_operator_rule_applied', { tenantId, printerNodeId: printhouseId })
+        .finish('machine_route_operator_rule_applied', { ruleId: operatorAppliedRule.ruleId, quantity: q });
     }
 
     return {
       quantity: q,
       selectionReason,
+      boundaryType,
+      isTieZone,
+      tieZoneDetails,
       recommendedRoute,
       allRoutes: routeResults,
       eligibleRouteCount: eligibleRoutes.length,
@@ -324,7 +495,6 @@ class ProductionRouteSelectionService {
       if (r1.recommendedRoute && r2.recommendedRoute && r1.recommendedRoute.machineId !== r2.recommendedRoute.machineId) {
         crossoverDetected = true;
 
-        // Calculate analytical crossover point where C_A(Q) = C_B(Q)
         const m1 = r1.recommendedRoute;
         const m2 = r2.recommendedRoute;
 
@@ -345,9 +515,19 @@ class ProductionRouteSelectionService {
           toMachineId: m2.machineId,
           fromTechnology: m1.technology,
           toTechnology: m2.technology,
+          fromProfileChecksum: m1.profileChecksum,
+          toProfileChecksum: m2.profileChecksum,
           derivedCrossoverQuantity: derivedCrossoverQ,
-          reason: 'ECONOMIC_ROUTE_CROSSOVER'
+          boundaryType: r2.boundaryType || BOUNDARY_TYPES.ECONOMIC_CROSSOVER,
+          reason: r2.selectionReason || 'ECONOMIC_ROUTE_CROSSOVER'
         };
+
+        telemetry.startTimer('machine_route_boundary_detected', { tenantId, printerNodeId: printhouseId })
+          .finish('machine_route_boundary_detected', {
+            fromMachineId: m1.machineId,
+            toMachineId: m2.machineId,
+            crossoverQuantity: derivedCrossoverQ
+          });
         break;
       }
     }
@@ -364,6 +544,106 @@ class ProductionRouteSelectionService {
       crossoverDetected,
       crossoverDetails,
       quantityResults
+    };
+  }
+
+  /**
+   * Evaluates Boundary Probes (q-1, q, q+1) around a target quantity to detect route instability or thrashing.
+   */
+  async evaluateBoundaryProbes(tenantId, printhouseId, bookSpec, targetQuantity, options = {}) {
+    const q = Number(targetQuantity);
+    const qBefore = Math.max(1, q - 1);
+    const qAt = q;
+    const qAfter = q + 1;
+
+    const [resBefore, resAt, resAfter] = await Promise.all([
+      this.evaluateRoutesForQuantity(tenantId, printhouseId, bookSpec, qBefore, options),
+      this.evaluateRoutesForQuantity(tenantId, printhouseId, bookSpec, qAt, options),
+      this.evaluateRoutesForQuantity(tenantId, printhouseId, bookSpec, qAfter, options)
+    ]);
+
+    const mBefore = resBefore.recommendedRoute ? resBefore.recommendedRoute.machineId : null;
+    const mAt = resAt.recommendedRoute ? resAt.recommendedRoute.machineId : null;
+    const mAfter = resAfter.recommendedRoute ? resAfter.recommendedRoute.machineId : null;
+
+    // Detect Thrashing: e.g. A -> B -> A
+    const isUnstable = (mBefore && mAt && mAfter) && (mBefore === mAfter && mAt !== mBefore);
+
+    if (isUnstable) {
+      telemetry.startTimer('machine_route_boundary_unstable', { tenantId, printerNodeId: printhouseId })
+        .finish('machine_route_boundary_unstable', { quantity: q, mBefore, mAt, mAfter });
+    }
+
+    return {
+      quantityProbe: q,
+      isUnstable,
+      boundaryType: isUnstable ? BOUNDARY_TYPES.UNSTABLE_ROUTE_BOUNDARY : (resAt.boundaryType || BOUNDARY_TYPES.ECONOMIC_CROSSOVER),
+      routeBefore: { quantity: qBefore, machineId: mBefore, cost: resBefore.recommendedRoute ? resBefore.recommendedRoute.manufacturingCost : null },
+      routeAt: { quantity: qAt, machineId: mAt, cost: resAt.recommendedRoute ? resAt.recommendedRoute.manufacturingCost : null },
+      routeAfter: { quantity: qAfter, machineId: mAfter, cost: resAfter.recommendedRoute ? resAfter.recommendedRoute.manufacturingCost : null }
+    };
+  }
+
+  /**
+   * Derives Route Intervals [minQuantity, maxQuantity] across a bounded quantity range.
+   */
+  async deriveRouteIntervals(tenantId, printhouseId, bookSpec, minQuantity = 10, maxQuantity = 2000, options = {}) {
+    const minQ = Number(minQuantity);
+    const maxQ = Number(maxQuantity);
+    const step = options.step || 50;
+
+    const sampleQuantities = [];
+    for (let q = minQ; q <= maxQ; q += step) {
+      sampleQuantities.push(q);
+    }
+    if (sampleQuantities[sampleQuantities.length - 1] !== maxQ) {
+      sampleQuantities.push(maxQ);
+    }
+
+    const evalRes = await this.evaluateProductionRoutes(tenantId, printhouseId, bookSpec, sampleQuantities, options);
+    const intervals = [];
+
+    let currentInterval = null;
+
+    for (const qRes of evalRes.quantityResults) {
+      const rec = qRes.recommendedRoute;
+      const recId = rec ? rec.machineId : 'NONE';
+
+      if (!currentInterval) {
+        currentInterval = {
+          minQuantity: qRes.quantity,
+          maxQuantity: qRes.quantity,
+          recommendedMachineId: recId,
+          recommendedMachineName: rec ? rec.machineName : 'NONE',
+          profileChecksum: rec ? rec.profileChecksum : null,
+          boundaryType: qRes.boundaryType,
+          reason: qRes.selectionReason
+        };
+      } else if (currentInterval.recommendedMachineId === recId) {
+        currentInterval.maxQuantity = qRes.quantity;
+      } else {
+        intervals.push({ ...currentInterval });
+        currentInterval = {
+          minQuantity: qRes.quantity,
+          maxQuantity: qRes.quantity,
+          recommendedMachineId: recId,
+          recommendedMachineName: rec ? rec.machineName : 'NONE',
+          profileChecksum: rec ? rec.profileChecksum : null,
+          boundaryType: qRes.boundaryType,
+          reason: qRes.selectionReason
+        };
+      }
+    }
+
+    if (currentInterval) {
+      intervals.push(currentInterval);
+    }
+
+    return {
+      minQuantity: minQ,
+      maxQuantity: maxQ,
+      intervalCount: intervals.length,
+      intervals
     };
   }
 
@@ -405,4 +685,6 @@ class ProductionRouteSelectionService {
 
 module.exports = new ProductionRouteSelectionService();
 module.exports.ROUTE_SELECTION_MODES = ROUTE_SELECTION_MODES;
+module.exports.BOUNDARY_TYPES = BOUNDARY_TYPES;
 module.exports.INELIGIBILITY_REASONS = INELIGIBILITY_REASONS;
+module.exports.PRECEDENCE_LEVELS = PRECEDENCE_LEVELS;
