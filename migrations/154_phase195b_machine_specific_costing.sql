@@ -3,7 +3,7 @@
 -- Establishes cost ownership, versioned pricing profiles, setup/run cost drivers, and readiness for individual machines.
 
 ALTER TABLE printhouse_machines
-  ADD UNIQUE INDEX IF NOT EXISTS uk_machines_id_tenant (id, tenant_id);
+  ADD UNIQUE INDEX uk_machines_id_tenant (id, tenant_id);
 
 CREATE TABLE IF NOT EXISTS printhouse_machine_pricing_profiles (
     id VARCHAR(64) PRIMARY KEY,
