@@ -376,6 +376,10 @@ class QuoteEvidenceService {
         return inMemoryDocs.get(`${tenantId}:${documentId}`) || null;
     }
 
+    async getEvidenceById(tenantId, documentId) {
+        return this.getQuoteDocument(tenantId, documentId);
+    }
+
     /**
      * List documents with strict tenant scoping.
      */

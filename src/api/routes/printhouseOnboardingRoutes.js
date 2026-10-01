@@ -826,9 +826,17 @@ router.post('/pricing/commercial-accept', requireAuth, requireRole('OPERATOR'), 
 
     let quoteEvidence = null;
     if (quoteEvidenceId) {
+        if (typeof quoteEvidenceId !== 'string' || quoteEvidenceId.trim().length === 0) {
+            return res.status(400).json({ ok: false, error: 'INVALID_QUOTE_EVIDENCE_ID', message: 'quoteEvidenceId must be a non-empty string' });
+        }
         try {
-            quoteEvidence = await quoteEvidenceService.getEvidenceById(tenantId, quoteEvidenceId);
-        } catch (e) {}
+            quoteEvidence = await quoteEvidenceService.getEvidenceById(tenantId, quoteEvidenceId.trim());
+        } catch (e) {
+            quoteEvidence = null;
+        }
+        if (!quoteEvidence) {
+            return res.status(404).json({ ok: false, error: 'QUOTE_EVIDENCE_NOT_FOUND', message: `Quote evidence document '${quoteEvidenceId}' was not found or does not belong to tenant '${tenantId}'` });
+        }
     }
 
     try {

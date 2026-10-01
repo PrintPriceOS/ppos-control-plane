@@ -113,12 +113,13 @@ flowchart TD
 
 ## 8. Verification & Test Results
 
-| Test Suite | Result | Cases |
-| :--- | :--- | :--- |
-| `tests/smoke_phase195g_commercial_acceptance.js` | **PASS** | 25 / 25 |
-| `tests/acceptance_phase195g_commercial_governance.js` | **PASS** | 13 / 13 |
-| Full Phase 193/194/195 Regression Suite | **PASS** | 100% Clean |
-| `npm run build` | **PASS** | Clean build |
+| Test Suite | Result | Cases | Scope |
+| :--- | :--- | :--- | :--- |
+| `tests/smoke_phase195g_commercial_acceptance.js` | **PASS** | 25 / 25 | Baseline checksum, candidate reconstruction, zero mutation, OPERATOR role guard |
+| `tests/acceptance_phase195g_commercial_governance.js` | **PASS** | 13 / 13 | Natur 500/600/700 E2E, 409 stale baseline, 422 candidate mismatch, rollback safety |
+| `tests/acceptance_phase195g_concurrent_mysql_acceptance.js` | **PASS** | 5 / 5 | MySQL concurrent proposal isolation (dual connection), fail-closed evidence validation |
+| Full Phase 193/194/195 Regression Suite | **PASS** | 100% Clean | Zero regressions across all governance boundaries |
+| `npm run build` | **PASS** | Clean build | Zero compilation/bundling errors |
 
 ---
 
@@ -126,3 +127,4 @@ flowchart TD
 
 - **PHASE_195G:** `PASS`
 - **COMMERCIAL_CALIBRATION_ACCEPTANCE:** `READY_FOR_CONTROLLED_BETA`
+
