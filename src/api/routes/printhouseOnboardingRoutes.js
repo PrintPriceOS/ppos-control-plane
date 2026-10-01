@@ -811,7 +811,6 @@ router.post('/pricing/commercial-fit', requireAuth, wrapHandler(async (req, res)
 }));
 
 // POST /api/printhouse/onboarding/pricing/commercial-accept — Governed acceptance of commercial calibration adjustments (Phase 195G)
-const calibrationAcceptanceService = require('../services/calibrationAcceptanceService');
 const { requireRole } = require('../middleware/auth');
 
 router.post('/pricing/commercial-accept', requireAuth, requireRole('OPERATOR'), wrapHandler(async (req, res) => {
