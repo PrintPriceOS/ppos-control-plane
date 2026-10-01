@@ -1297,7 +1297,10 @@ UNRESTRICTED_PRODUCTION:
 - **Phase 194F (Multilingual Pricing Assistant UX + Jev Decision Provider)**: **VALIDATED / CLOSED**. Multilingual conversational UX, accessible PDF upload, structured quote review cards, operator corrections, Jev decision provider abstraction with fallback and deterministic veto gates.
 - **Phase 194G (Evidence-to-Calibration Handoff & Governed Recalibration E2E)**: **VALIDATED / CLOSED** (SHA `482755f`). Ingested evidence to calibration target conversion, transport exclusion enforcement, same-BookSpec validation, single vs multi-quantity flow handoff, E2E validation against real Natur offer.
 - **Phase 194G FINAL VERIFY**: **PASS / CLOSED**. Empirically verified that Natur solver status `UNDERDETERMINED` is correctly blocked as `REQUIRES_REVIEW` with 0 rates_json mutations and 0 revision creation.
-- **Phase 194H (Operational Hardening, Telemetry & Launch Readiness)**: **VALIDATED / CLOSED**. Structured telemetry events (`durationMs`), error taxonomy standardization, feature flag kill switches, dependency degradation policies, readiness endpoints, transactional rollback protection, real PDF operational tests, all 20 launch readiness tests passed, and clean production build. CONTROLLED_BETA_STAGE_1: READY.
+## Phase 195 — Machine-Level Costing & Production Route Selection
+
+- **Phase 195A (Machine-Level Costing Audit)**: **AUDIT COMPLETE / CLOSED**. Architectural and empirical audit of machine-level vs node-level cost ownership, rate structures, forward pricing execution paths, onboarding capabilities, revision checksum scope, and Natur `UNDERDETERMINED` identifiability root cause. Confirmed zero code changes, zero DB migrations, zero pricing mutations. Detailed audit report published in `PHASE_195A_MACHINE_LEVEL_COSTING_AUDIT.md`.
+
 
 
 
