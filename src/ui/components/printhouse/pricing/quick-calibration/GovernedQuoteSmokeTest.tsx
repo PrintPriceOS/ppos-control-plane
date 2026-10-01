@@ -11,7 +11,7 @@
  * - ZERO persistent mutations (no orders, no jobs created).
  * - Only displays combinations supported by the printer node.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
 import { getCountryName } from '../../../../lib/countryCatalog';
 import { 
@@ -49,6 +49,9 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         return fallback;
     };
 
+    // Active async calculation request sequence ID to prevent out-of-order race conditions
+    const activeRequestIdRef = useRef(0);
+
     // Form Inputs (Pre-filled from reference book calibration if provided)
     const [spec, setSpec] = useState({
         copies: getInitialValue('copies', 1000),
@@ -74,6 +77,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
     // Helper to update spec field & invalidate previous quote result immediately
     const updateSpecField = (field: string, value: any) => {
+        activeRequestIdRef.current++; // Supersede in-flight requests
         setUserHasEdited(true);
         setQuoteResult(null);
         setError(null);
@@ -112,17 +116,24 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
     const handleCalculate = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        const currentReqId = ++activeRequestIdRef.current;
         setLoading(true);
         setError(null);
         setQuoteResult(null);
 
         try {
             const result = await printhouseCalibrationApi.previewQuote(spec, printerNodeId);
-            setQuoteResult(result);
+            if (currentReqId === activeRequestIdRef.current) {
+                setQuoteResult(result);
+            }
         } catch (err: any) {
-            setError(err.message || 'Failed to calculate quote preview.');
+            if (currentReqId === activeRequestIdRef.current) {
+                setError(err.message || 'Failed to calculate quote preview.');
+            }
         } finally {
-            setLoading(false);
+            if (currentReqId === activeRequestIdRef.current) {
+                setLoading(false);
+            }
         }
     };
 

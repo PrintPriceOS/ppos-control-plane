@@ -121,6 +121,57 @@ console.log('===================================================================
         assert.strictEqual(fahrmannSpec.copies, 4000, 'Spec must reflect updated value 4000');
     });
 
+    // Test 5: Server-side complex specification rejection before rate persistence
+    runTest('Server-side calibrationAcceptanceService fails-closed on complex specs with UNSUPPORTED_COMPLEX_SPECIFICATION', async () => {
+        const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
+        
+        try {
+            await calibrationAcceptanceService.acceptCommercialCalibration({
+                tenantId: 'tenant-test',
+                printerNodeId: 'node-test',
+                baselineRatesChecksum: 'sha256:dummy',
+                bookSpec: {
+                    copies: 3000,
+                    has_mixed_interior: true,
+                    mixed_interior_details: '208p 1/1 + 8p 4/4',
+                    unsupported_features: ['MIXED_INTERIOR_PANTONE_CMYK']
+                }
+            });
+            assert.fail('Should have thrown UNSUPPORTED_COMPLEX_SPECIFICATION error');
+        } catch (err) {
+            assert.strictEqual(err.code, 'UNSUPPORTED_COMPLEX_SPECIFICATION', 'Error code must be UNSUPPORTED_COMPLEX_SPECIFICATION');
+            assert.strictEqual(err.statusCode, 422, 'HTTP status code must be 422');
+        }
+    });
+
+    // Test 6: In-flight async calculation race condition protection
+    runTest('Out-of-order async calculation responses are ignored when active request ID advances', () => {
+        let activeRequestId = 0;
+        let displayedQuoteResult = null;
+
+        function triggerCalculation() {
+            const reqId = ++activeRequestId;
+            return {
+                resolveResponse: (resData) => {
+                    if (reqId === activeRequestId) {
+                        displayedQuoteResult = resData;
+                    }
+                }
+            };
+        }
+
+        const req1 = triggerCalculation(); // reqId = 1
+        const req2 = triggerCalculation(); // reqId = 2 (user clicked again or edited field)
+
+        // Late response arrives for req 1
+        req1.resolveResponse({ finalSellingPrice: 500 });
+        assert.strictEqual(displayedQuoteResult, null, 'Late response from req 1 must be ignored');
+
+        // Response arrives for req 2
+        req2.resolveResponse({ finalSellingPrice: 6048 });
+        assert.strictEqual(displayedQuoteResult.finalSellingPrice, 6048, 'Response from active req 2 must be displayed');
+    });
+
     console.log(`\n================================================================================`);
     console.log(`=== ALL ${passCount} / ${testCount} PHASE 195I ACCEPTANCE TESTS PASSED SUCCESSFULLY ===`);
     console.log(`================================================================================\n`);

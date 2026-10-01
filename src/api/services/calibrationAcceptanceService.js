@@ -916,6 +916,20 @@ class CalibrationAcceptanceService {
             throw err;
         }
 
+        // SERVER-SIDE GUARD FOR UNSUPPORTED COMPLEX SPECIFICATIONS
+        if (bookSpec && (
+            bookSpec.has_mixed_interior ||
+            bookSpec.mixed_interior_details ||
+            bookSpec.has_spot_uv ||
+            (Array.isArray(bookSpec.unsupported_features) && bookSpec.unsupported_features.length > 0)
+        )) {
+            const err = new Error('UNSUPPORTED_COMPLEX_SPECIFICATION');
+            err.code = 'UNSUPPORTED_COMPLEX_SPECIFICATION';
+            err.statusCode = 422;
+            err.details = 'Cannot automatically calibrate or persist pricing for complex specifications with mixed Pantone/CMYK interior, spot UV, or unsupported features. Operator review required.';
+            throw err;
+        }
+
         const commercialKnobService = require('./commercialKnobService');
         const connection = await db.getPool().getConnection();
 
