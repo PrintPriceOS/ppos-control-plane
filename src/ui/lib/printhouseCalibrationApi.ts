@@ -300,5 +300,37 @@ export const printhouseCalibrationApi = {
                 forwardMethod: string;
             };
         }>(res);
+    },
+
+    // ── Phase 194E / Phase 194F: PDF Quote Evidence Upload & Corrections ─────
+    async uploadQuoteEvidence(file: File) {
+        const token = getAuthToken();
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`${BASE_URL}/quote-evidence/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        return handleResponse<any>(res);
+    },
+
+    async getQuoteEvidence(id: string) {
+        const res = await fetch(`${BASE_URL}/quote-evidence/${id}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async saveOperatorCorrections(id: string, corrections: any) {
+        const res = await fetch(`${BASE_URL}/quote-evidence/${id}/corrections`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(corrections)
+        });
+        return handleResponse<any>(res);
     }
 };

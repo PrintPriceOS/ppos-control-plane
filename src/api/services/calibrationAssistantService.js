@@ -18,6 +18,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const aiAdapter = require('./aiProviderAdapter');
 const calibrationSessionService = require('./calibrationSessionService');
+const decisionProvider = require('./decisionProvider/decisionProvider');
 const { isValidIso2Country } = require('../../lib/countryCatalog');
 const logger = require('./logger').child('calibration-assistant');
 
@@ -775,7 +776,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
      * Processes an uploaded quote evidence document and formats structured conversational review
      * in the user's conversational language (e.g. 'es', 'en', 'de').
      */
-    async processQuoteEvidenceForChat(tenantId, evidenceId, userChatLanguage = 'en') {
+    async processQuoteEvidenceForChat(tenantId, evidenceId, userChatLanguage = 'es') {
         const docs = await db.query(
             `SELECT d.id, d.tenant_id, d.original_filename as file_name, d.document_sha256 as file_hash_sha256, d.detected_language, d.raw_text as raw_extracted_text,
                     e.id as extraction_id, e.validation_status, e.normalized_json as normalized_quote_json, e.translated_text, e.confidence_status
@@ -797,23 +798,79 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             ? JSON.parse(doc.normalized_quote_json)
             : doc.normalized_quote_json;
 
-        // Build localized human-readable response text
-        const isEs = userChatLanguage === 'es';
-        const isDe = userChatLanguage === 'de';
+        // Evaluate advisory eligibility decision using DecisionProvider
+        const decisionResult = await decisionProvider.evaluateDecision({
+            task: 'EVIDENCE_ELIGIBILITY_ASSIST',
+            state: { validationStatus: doc.validation_status },
+            choices: ['ELIGIBLE', 'REQUIRES_REVIEW'],
+            context: { snippet: doc.raw_extracted_text, documentLanguage: doc.detected_language }
+        });
 
-        let header = isEs ? `Presupuesto procesado: ${doc.file_name}` : (isDe ? `Angebot verarbeitet: ${doc.file_name}` : `Processed quote: ${doc.file_name}`);
-        let langNotice = isEs ? `Idioma detectado en el documento: ${doc.detected_language.toUpperCase()}` : (isDe ? `Erkannte Dokumentensprache: ${doc.detected_language.toUpperCase()}` : `Detected document language: ${doc.detected_language.toUpperCase()}`);
+        const docLangNames = {
+            es: { de: 'alemán', en: 'inglés', es: 'español' },
+            de: { de: 'Deutsch', en: 'Englisch', es: 'Spanisch' },
+            en: { de: 'German', en: 'English', es: 'Spanish' }
+        };
 
-        let summaryText = `${header}\n${langNotice}\n\n`;
-        summaryText += isEs ? `Proveedor: ${normalized.printhouseName}\n` : `Supplier: ${normalized.printhouseName}\n`;
+        const docLangName = (docLangNames[userChatLanguage] && docLangNames[userChatLanguage][doc.detected_language]) || doc.detected_language;
 
-        if (Array.isArray(normalized.offers)) {
-            summaryText += isEs ? `Puntos de cantidad extraídos (${normalized.offers.length}):\n` : `Extracted quantity points (${normalized.offers.length}):\n`;
-            for (const off of normalized.offers) {
-                const statusLabel = off.validationStatus === 'CONSISTENT'
-                    ? (isEs ? 'Correcto' : 'Consistent')
-                    : (isEs ? 'Inconsistencia detectada' : 'Inconsistent unit price');
-                summaryText += `- ${off.quantity} copies -> Mfg: €${off.manufacturingPrice}, Transport: €${off.transportPrice}, Total: €${off.quotedTotalPrice} [Unit Quoted: €${off.quotedUnitPrice} | Status: ${statusLabel}]\n`;
+        let summaryText = '';
+        if (userChatLanguage === 'es') {
+            summaryText += `Encontré un presupuesto en ${docLangName}.\n\n`;
+            if (normalized.printhouseName) summaryText += `Producto:\n${normalized.printhouseName}\n\n`;
+
+            const offerList = normalized.offers || [];
+            const offerCount = offerList.length;
+            summaryText += `He encontrado ${offerCount} tirada${offerCount !== 1 ? 's' : ''}.\n\n`;
+
+            for (const off of offerList) {
+                const isConsistent = off.validationStatus === 'CONSISTENT';
+                const statusLabel = isConsistent ? 'Correcto' : 'Inconsistencia detectada';
+                summaryText += `${off.quantity} uds:\n`;
+                summaryText += `Fabricación: €${off.manufacturingPrice}\n`;
+                summaryText += `Transporte: €${off.transportPrice || 0}\n`;
+                summaryText += `Total: €${off.quotedTotalPrice}\n`;
+                summaryText += `Precio unitario indicado: €${Number(off.quotedUnitPrice).toFixed(2).replace('.', ',')}\n`;
+                summaryText += `Precio unitario calculado: €${Number(off.computedUnitPrice || off.quotedUnitPrice).toFixed(2).replace('.', ',')}\n`;
+                summaryText += `Estado: ${statusLabel}\n\n`;
+            }
+        } else if (userChatLanguage === 'de') {
+            summaryText += `Ich habe ein Angebot auf ${docLangName} gefunden.\n\n`;
+            if (normalized.printhouseName) summaryText += `Produkt:\n${normalized.printhouseName}\n\n`;
+
+            const offerList = normalized.offers || [];
+            const offerCount = offerList.length;
+            summaryText += `${offerCount} Auflage${offerCount !== 1 ? 'n' : ''} gefunden.\n\n`;
+
+            for (const off of offerList) {
+                const isConsistent = off.validationStatus === 'CONSISTENT';
+                const statusLabel = isConsistent ? 'Korrekt' : 'Inkonsistenz erkannt';
+                summaryText += `${off.quantity} Stk:\n`;
+                summaryText += `Herstellung: €${off.manufacturingPrice}\n`;
+                summaryText += `Transport: €${off.transportPrice || 0}\n`;
+                summaryText += `Gesamt: €${off.quotedTotalPrice}\n`;
+                summaryText += `Angegebener Einzelpreis: €${Number(off.quotedUnitPrice).toFixed(2).replace('.', ',')}\n`;
+                summaryText += `Berechneter Einzelpreis: €${Number(off.computedUnitPrice || off.quotedUnitPrice).toFixed(2).replace('.', ',')}\n`;
+                summaryText += `Status: ${statusLabel}\n\n`;
+            }
+        } else {
+            summaryText += `Found a quotation in ${docLangName}.\n\n`;
+            if (normalized.printhouseName) summaryText += `Product:\n${normalized.printhouseName}\n\n`;
+
+            const offerList = normalized.offers || [];
+            const offerCount = offerList.length;
+            summaryText += `Found ${offerCount} quantity point${offerCount !== 1 ? 's' : ''}.\n\n`;
+
+            for (const off of offerList) {
+                const isConsistent = off.validationStatus === 'CONSISTENT';
+                const statusLabel = isConsistent ? 'Valid' : 'Inconsistency detected';
+                summaryText += `${off.quantity} copies:\n`;
+                summaryText += `Manufacturing: €${off.manufacturingPrice}\n`;
+                summaryText += `Transport: €${off.transportPrice || 0}\n`;
+                summaryText += `Total: €${off.quotedTotalPrice}\n`;
+                summaryText += `Quoted unit price: €${Number(off.quotedUnitPrice).toFixed(2)}\n`;
+                summaryText += `Computed unit price: €${Number(off.computedUnitPrice || off.quotedUnitPrice).toFixed(2)}\n`;
+                summaryText += `Status: ${statusLabel}\n\n`;
             }
         }
 
@@ -824,10 +881,11 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             filename: doc.file_name,
             detectedLanguage: doc.detected_language,
             userChatLanguage,
-            chatSummary: summaryText,
+            chatSummary: summaryText.trim(),
             normalizedQuote: normalized,
             validationStatus: doc.validation_status,
-            confidenceStatus: doc.confidence_status
+            confidenceStatus: doc.confidence_status,
+            decisionResult
         };
     }
 }

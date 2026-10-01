@@ -1,18 +1,20 @@
 /**
  * src/ui/components/printhouse/pricing/quick-calibration/CalibrationConversation.tsx
  *
- * Phase 193F — Assistive Conversational Interface
- * Note: assistant/chat is strictly zero-write. Proposal changes require explicit Apply.
+ * Phase 194F — Assistive Conversational Interface with PDF File Upload & Structured Quote Review
  */
-import React, { useState } from 'react';
-import { Sparkles, Send, Loader2, Bot, User, Check, AlertTriangle, ArrowRight } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Sparkles, Send, Loader2, Bot, User, AlertTriangle, ArrowRight, Paperclip, X, FileText, CheckCircle2 } from 'lucide-react';
 import { CalibrationClarificationPanel } from './CalibrationClarificationPanel';
+import { StructuredQuoteReviewCard } from './StructuredQuoteReviewCard';
+import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
 
 interface Message {
     role: 'user' | 'assistant' | 'system';
     text: string;
     timestamp?: string;
     proposal?: any;
+    quoteEvidence?: any;
 }
 
 interface CalibrationConversationProps {
@@ -35,6 +37,12 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
     aiUnavailable = false
 }) => {
     const [input, setInput] = useState('');
+    const [uploadState, setUploadState] = useState<'IDLE' | 'FILE_SELECTED' | 'UPLOADING' | 'PROCESSING' | 'EXTRACTED' | 'ERROR'>('IDLE');
+    const [uploadStatusText, setUploadStatusText] = useState('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [activeQuoteEvidence, setActiveQuoteEvidence] = useState<any | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,6 +52,59 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
         await onSendMessage(msg);
     };
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+            setUploadError('Únicamente se admiten archivos en formato PDF.');
+            setUploadState('ERROR');
+            return;
+        }
+
+        setSelectedFile(file);
+        setUploadError(null);
+        setUploadState('UPLOADING');
+        setUploadStatusText('Subiendo presupuesto…');
+
+        try {
+            setUploadStatusText('Analizando PDF…');
+            setUploadState('PROCESSING');
+
+            const result = await printhouseCalibrationApi.uploadQuoteEvidence(file);
+
+            setUploadStatusText(`Documento detectado: ${result.detectedLanguage || 'alemán'}`);
+            setUploadState('EXTRACTED');
+
+            // Store evidence DTO
+            setActiveQuoteEvidence(result);
+
+            // Add assistant message with summary
+            const langNotice = result.detectedLanguage === 'de' ? 'alemán' : (result.detectedLanguage === 'es' ? 'español' : 'inglés');
+            const summaryMsg = `He analizado el documento PDF "${result.filename}" (Idioma detectado: ${langNotice}).\nEncontré ${result.offers?.length || 0} tirada(s).`;
+            
+            await onSendMessage(`[PDF subido]: ${result.filename}`);
+
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        } catch (err: any) {
+            setUploadError(err.message || 'Error al procesar el presupuesto PDF.');
+            setUploadState('ERROR');
+            setSelectedFile(null);
+        }
+    };
+
+    const triggerFilePicker = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handlePaperclipKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            triggerFilePicker();
+        }
+    };
+
     const starterPrompts = [
         "1,000 copies, 170x240mm, 128p 4/4 on 80g offset, 300g cover, perfect bound for €2,450",
         "500 copies of 210x297mm A4, 64 pages 4/4 coated 130g, saddle stitched for €1,200",
@@ -51,21 +112,21 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
     ];
 
     return (
-        <div className="flex flex-col h-[560px] bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl overflow-hidden shadow-sm">
+        <div className="flex flex-col h-[580px] bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl overflow-hidden shadow-sm">
             {/* Header */}
             <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900/70 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-[#dc0000]" />
                     <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                        Pricing Setup Assistant
+                        Multilingual Pricing Assistant
                     </span>
                 </div>
-                <span className="text-[11px] text-zinc-500">
-                    Conversational Job Intake
+                <span className="text-[11px] text-zinc-500 font-medium">
+                    Multilingual PDF Intake & Calibration
                 </span>
             </div>
 
-            {/* AI Offline / Busy Banner (Phase 193H.2 UX Hardening) */}
+            {/* AI Offline / Busy Banner */}
             {aiUnavailable && (
                 <div 
                     aria-label="AI Assistant is currently offline"
@@ -85,6 +146,38 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                 </div>
             )}
 
+            {/* Upload Progress Status Banner */}
+            {(uploadState === 'UPLOADING' || uploadState === 'PROCESSING') && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-center gap-2 font-medium">
+                    <Loader2 size={14} className="animate-spin text-blue-600 shrink-0" />
+                    <span>{uploadStatusText}</span>
+                </div>
+            )}
+
+            {uploadState === 'EXTRACTED' && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center justify-between font-medium">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                        <span>Extracción completada. Presupuesto listo para revisión.</span>
+                    </div>
+                    <button type="button" onClick={() => setUploadState('IDLE')} className="text-emerald-600 hover:text-emerald-800">
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+
+            {uploadError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-800 text-xs text-red-900 dark:text-red-200 flex items-center justify-between font-medium">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle size={14} className="text-red-600 shrink-0" />
+                        <span>{uploadError}</span>
+                    </div>
+                    <button type="button" onClick={() => setUploadError(null)} className="text-red-600 hover:text-red-800">
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
                 {messages.length === 0 ? (
@@ -93,9 +186,9 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                             <Sparkles size={20} />
                         </div>
                         <div>
-                            <h5 className="text-sm font-bold text-zinc-900 dark:text-white">Describe Your Reference Book</h5>
+                            <h5 className="text-sm font-bold text-zinc-900 dark:text-white">Multilingual Pricing Assistant</h5>
                             <p className="text-xs text-zinc-500 max-w-sm mt-1">
-                                Tell us the format, pages, paper stock, binding, and known cost. The assistant will extract the specifications for calibration.
+                                Chat in Spanish, English, or German, or upload a quote PDF document.
                             </p>
                         </div>
 
@@ -126,7 +219,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                                 </div>
                             )}
                             <div
-                                className={`p-3 rounded-xl text-xs max-w-[85%] leading-relaxed ${
+                                className={`p-3 rounded-xl text-xs max-w-[88%] leading-relaxed ${
                                     m.role === 'user'
                                         ? 'bg-[#dc0000] text-white rounded-br-none'
                                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-none border border-zinc-200 dark:border-zinc-700/60'
@@ -143,7 +236,20 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                     ))
                 )}
 
-                {/* Clarification Questions (Phase 193H.3 Controlled Interaction) */}
+                {/* Structured Quote Evidence Review Card */}
+                {activeQuoteEvidence && (
+                    <StructuredQuoteReviewCard
+                        evidenceId={activeQuoteEvidence.evidenceId}
+                        filename={activeQuoteEvidence.filename}
+                        documentLanguage={activeQuoteEvidence.detectedLanguage}
+                        printhouseName={activeQuoteEvidence.printhouseName}
+                        offers={activeQuoteEvidence.offers || []}
+                        normalizedTerms={activeQuoteEvidence.normalizedTerms || []}
+                        validationStatus={activeQuoteEvidence.hasInconsistentOffers ? 'INCONSISTENT_UNIT_PRICE' : 'CONSISTENT'}
+                    />
+                )}
+
+                {/* Clarification Questions */}
                 {activeProposal?.clarificationQuestions && activeProposal.clarificationQuestions.length > 0 && onApplyClarifications && (
                     <CalibrationClarificationPanel
                         questions={activeProposal.clarificationQuestions}
@@ -151,7 +257,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                     />
                 )}
 
-                {/* Pending Proposal Preview Banner (F2.9 Explicit Apply) */}
+                {/* Pending Proposal Preview Banner */}
                 {activeProposal && Object.keys(activeProposal.specPatch || {}).length > 0 && (
                     <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl space-y-2">
                         <div className="flex items-center justify-between text-xs">
@@ -185,16 +291,40 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                 )}
             </div>
 
+            {/* Hidden File Input */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                accept="application/pdf,.pdf"
+                onChange={handleFileChange}
+                className="hidden"
+                id="quote-pdf-upload-input"
+            />
+
             {/* Input Bar */}
-            <form onSubmit={handleSend} className="p-3 bg-zinc-50 dark:bg-zinc-900/80 border-t border-zinc-200 dark:border-zinc-800 flex gap-2">
+            <form onSubmit={handleSend} className="p-3 bg-zinc-50 dark:bg-zinc-900/80 border-t border-zinc-200 dark:border-zinc-800 flex gap-2 items-center">
+                {/* Accessible Attachment / Paperclip Control */}
+                <button
+                    type="button"
+                    onClick={triggerFilePicker}
+                    onKeyDown={handlePaperclipKeyDown}
+                    aria-label="Adjuntar presupuesto PDF"
+                    title="Adjuntar presupuesto PDF"
+                    disabled={sending || uploadState === 'UPLOADING' || uploadState === 'PROCESSING'}
+                    className="p-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#dc0000] disabled:opacity-50 transition-colors"
+                >
+                    <Paperclip size={16} />
+                </button>
+
                 <input
                     type="text"
-                    placeholder="Describe book format, paper, pages, price..."
+                    placeholder="Describe el libro o adjunta un PDF..."
                     value={input}
                     onChange={e => setInput(e.target.value)}
-                    disabled={sending || aiUnavailable}
+                    disabled={sending || aiUnavailable || uploadState === 'UPLOADING'}
                     className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000] disabled:opacity-50"
                 />
+
                 <button
                     type="submit"
                     disabled={!input.trim() || sending || aiUnavailable}
