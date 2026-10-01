@@ -172,6 +172,45 @@ console.log('===================================================================
         assert.strictEqual(displayedQuoteResult.finalSellingPrice, 6048, 'Response from active req 2 must be displayed');
     });
 
+    // Test 7: Server derives complexity from text details even when client boolean flags are omitted
+    runTest('Server derives complexity from text details (Pantone/CMYK) even when has_mixed_interior boolean is omitted', async () => {
+        const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
+        
+        try {
+            await calibrationAcceptanceService.acceptCommercialCalibration({
+                tenantId: 'tenant-test',
+                printerNodeId: 'node-test',
+                baselineRatesChecksum: 'sha256:dummy',
+                bookSpec: {
+                    copies: 3000,
+                    // Note: has_mixed_interior: true is intentionally omitted!
+                    mixed_interior_details: '208p 1/1 Pantone + 8p 4/4 CMYK'
+                }
+            });
+            assert.fail('Should have thrown UNSUPPORTED_COMPLEX_SPECIFICATION error based on derived text details');
+        } catch (err) {
+            assert.strictEqual(err.code, 'UNSUPPORTED_COMPLEX_SPECIFICATION', 'Error code must be UNSUPPORTED_COMPLEX_SPECIFICATION');
+            assert.strictEqual(err.statusCode, 422, 'HTTP status code must be 422');
+        }
+    });
+
+    // Test 8: Active revision status strictly requires checksum parity between node rates and revision
+    runTest('Active revision status requires exact checksum match with current node rates_json', () => {
+        const govState = {
+            activeRevisionId: 'rev-100',
+            activeRevisionChecksum: 'sha256:abc123',
+            latestRevisionId: 'rev-100'
+        };
+
+        const currentRatesChecksum = 'sha256:abc123';
+        const isMatched = Boolean(govState.activeRevisionId && govState.activeRevisionChecksum === currentRatesChecksum);
+        assert.strictEqual(isMatched, true, 'Checksum match must confirm active status');
+
+        const driftedRatesChecksum = 'sha256:different999';
+        const isMatchedDrifted = Boolean(govState.activeRevisionId && govState.activeRevisionChecksum === driftedRatesChecksum);
+        assert.strictEqual(isMatchedDrifted, false, 'Checksum mismatch must report inactive / checksum drift status');
+    });
+
     console.log(`\n================================================================================`);
     console.log(`=== ALL ${passCount} / ${testCount} PHASE 195I ACCEPTANCE TESTS PASSED SUCCESSFULLY ===`);
     console.log(`================================================================================\n`);

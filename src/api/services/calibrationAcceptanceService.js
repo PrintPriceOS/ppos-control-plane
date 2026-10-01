@@ -61,6 +61,17 @@ function safeDeepMergeRates(target, source) {
     return result;
 }
 
+function isComplexSpec(spec) {
+    if (!spec || typeof spec !== 'object') return false;
+    if (Boolean(spec.has_mixed_interior || spec.has_spot_uv)) return true;
+    if (Array.isArray(spec.unsupported_features) && spec.unsupported_features.length > 0) return true;
+    const detailsStr = String(spec.mixed_interior_details || '').toLowerCase();
+    if (detailsStr.includes('pantone') || detailsStr.includes('cmyk') || detailsStr.includes('guardas') || detailsStr.includes('cartón') || detailsStr.includes('relieve') || detailsStr.includes('spot')) {
+        return true;
+    }
+    return false;
+}
+
 class CalibrationAcceptanceService {
 
     /**
@@ -111,6 +122,22 @@ class CalibrationAcceptanceService {
             }
 
             const session = sessionRows[0];
+
+            // Server-side guard for complex specifications derived from stored session book spec
+            let sessionSpec = {};
+            if (session.book_spec_json) {
+                try {
+                    sessionSpec = typeof session.book_spec_json === 'string' ? JSON.parse(session.book_spec_json) : session.book_spec_json;
+                } catch (e) {}
+            }
+            if (isComplexSpec(sessionSpec)) {
+                await connection.rollback();
+                const err = new Error('UNSUPPORTED_COMPLEX_SPECIFICATION');
+                err.code = 'UNSUPPORTED_COMPLEX_SPECIFICATION';
+                err.statusCode = 422;
+                err.details = 'Cannot automatically calibrate or persist pricing for complex specifications with mixed Pantone/CMYK interior, spot UV, or unsupported features. Operator review required.';
+                throw err;
+            }
 
             // Tenant Isolation
             if (session.tenant_id !== tenantId) {
@@ -917,12 +944,7 @@ class CalibrationAcceptanceService {
         }
 
         // SERVER-SIDE GUARD FOR UNSUPPORTED COMPLEX SPECIFICATIONS
-        if (bookSpec && (
-            bookSpec.has_mixed_interior ||
-            bookSpec.mixed_interior_details ||
-            bookSpec.has_spot_uv ||
-            (Array.isArray(bookSpec.unsupported_features) && bookSpec.unsupported_features.length > 0)
-        )) {
+        if (isComplexSpec(bookSpec)) {
             const err = new Error('UNSUPPORTED_COMPLEX_SPECIFICATION');
             err.code = 'UNSUPPORTED_COMPLEX_SPECIFICATION';
             err.statusCode = 422;

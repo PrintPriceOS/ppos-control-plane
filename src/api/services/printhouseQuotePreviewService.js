@@ -231,10 +231,23 @@ class PrinthouseQuotePreviewService {
         if (transportCost > 0) breakdown.push({ label: 'Transport Reference', amount: Number(transportCost.toFixed(2)) });
         if (commercialMarkup > 0) breakdown.push({ label: 'Commercial Markup', amount: Number(commercialMarkup.toFixed(2)) });
 
+        const isMixedInterior = Boolean(
+            jobSpec.has_mixed_interior ||
+            jobSpec.mixed_interior_details ||
+            (Array.isArray(jobSpec.unsupported_features) && jobSpec.unsupported_features.includes('MIXED_INTERIOR_PANTONE_CMYK'))
+        );
+
+        if (isMixedInterior) {
+            const details = jobSpec.mixed_interior_details || 'Mixed Pantone/CMYK interior';
+            warnings.push(`SIMPLIFIED_INTERIOR_APPROXIMATION: Spec has complex interior (${details}) calculated using single-pass approximation.`);
+        }
+
         // 11. Build User-Safe Configuration Trace
         const configurationTrace = [
             `Printer Node: ${node.name} (${node.id})`,
-            `Interior: ${jobSpec.interior_pages || 128}p, Print ${jobSpec.interior_print || '4/4'}, Paper ${jobSpec.paper_weight_interior || 80}gsm ${jobSpec.paper_type_interior || 'offset'}`,
+            jobSpec.mixed_interior_details
+                ? `Interior Details (Complex): ${jobSpec.mixed_interior_details}`
+                : `Interior: ${jobSpec.interior_pages || 128}p, Print ${jobSpec.interior_print || '4/4'}, Paper ${jobSpec.paper_weight_interior || 80}gsm ${jobSpec.paper_type_interior || 'offset'}`,
             `Cover: Print ${jobSpec.cover_print || '4/0'}, Paper ${jobSpec.paper_weight_cover || 300}gsm ${jobSpec.paper_type_cover || 'mc'}`,
             `Binding: ${jobSpec.binding_method || 'perfect bound'}`,
             jobSpec.lamination ? `Lamination: ${jobSpec.lamination}` : 'Lamination: None',
@@ -246,6 +259,8 @@ class PrinthouseQuotePreviewService {
             ok: true,
             currency: 'EUR',
             quantity: copies,
+            isSimplifiedApproximation: isMixedInterior,
+            originalJobSpec: jobSpec,
             totals: {
                 manufacturing: Number(manufacturingCost.toFixed(2)),
                 finishing: Number(finishingCost.toFixed(2)),

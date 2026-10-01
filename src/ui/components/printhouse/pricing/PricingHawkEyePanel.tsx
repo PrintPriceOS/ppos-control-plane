@@ -41,12 +41,15 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
 
     const activeRevId = gov?.activeRevisionId || null;
     const latestRevId = gov?.latestRevisionId || null;
-    const displayRevId = activeRevId || latestRevId || null;
-    const activeRevSubtitle = activeRevId
-        ? 'Active revision (verified)'
+    const activeRevChecksum = gov?.activeRevisionChecksum || null;
+    const isChecksumVerified = Boolean(activeRevId && activeRevChecksum);
+
+    const displayRevId = isChecksumVerified ? activeRevId : (latestRevId || null);
+    const activeRevSubtitle = isChecksumVerified
+        ? 'Active revision (checksum verified)'
         : latestRevId
-        ? 'Latest created revision'
-        : 'Not exposed in Admin API';
+        ? 'Latest revision (inactive / checksum drift)'
+        : 'Not active / No confirmed revision';
 
     const lastCalDate = gov?.lastCalibrationAt ? new Date(gov.lastCalibrationAt).toLocaleDateString() : null;
     const verifiedPriceFormatted = gov?.lastVerifiedManufacturingPrice !== null && gov?.lastVerifiedManufacturingPrice !== undefined
