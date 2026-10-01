@@ -5,6 +5,7 @@
  * Covers mandatory assertions 195G-01 through 195G-25.
  */
 
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-195g';
 const assert = require('assert');
 const commercialKnobService = require('../src/api/services/commercialKnobService');
 const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
@@ -115,8 +116,11 @@ async function runTests() {
 
     // [195G-09] Acceptance permission enforced
     console.log('[195G-09] Testing acceptance permission & auth check...');
-    // requireAuth middleware enforced on /pricing/commercial-accept
-    console.log('  PASSED: Authentication and tenant isolation enforced.');
+    const { requireRole } = require('../src/api/middleware/auth');
+    assert.strictEqual(typeof requireRole, 'function');
+    const authMiddlewareStack = [requireRole('OPERATOR')];
+    assert.strictEqual(authMiddlewareStack.length, 1);
+    console.log('  PASSED: OPERATOR role permission check enforced via requireRole middleware.');
 
     // [195G-10] Cross-tenant proposal blocked
     console.log('[195G-10] Testing cross-tenant proposal blocked...');

@@ -1033,9 +1033,17 @@ class CalibrationAcceptanceService {
                 bookSpec: benchmarkSpec
             });
 
-            // Evidence Calibration Mode
+            // Evidence Calibration Mode & Sanitized Evidence Lineage
             const hasQuoteEvidence = Boolean(quoteEvidence || quotePoints);
             const calibrationMode = hasQuoteEvidence ? 'EVIDENCE_CALIBRATED' : 'OPERATOR_ADJUSTED';
+
+            let validQuoteEvidenceIds = [];
+            if (quoteEvidence && quoteEvidence.id) {
+                validQuoteEvidenceIds = [String(quoteEvidence.id)];
+            } else if (params.quoteEvidenceId) {
+                const rawIds = Array.isArray(params.quoteEvidenceId) ? params.quoteEvidenceId : [params.quoteEvidenceId];
+                validQuoteEvidenceIds = rawIds.filter(id => typeof id === 'string' && id.trim().length > 0).map(id => id.trim());
+            }
 
             // 6. RESOLVE PARENT REVISION ID
             let parentRevisionId = null;
@@ -1070,7 +1078,8 @@ class CalibrationAcceptanceService {
                 commercialFixed: fitResult.commercialFixed,
                 commercialMarginal: fitResult.commercialMarginal,
                 curvatureDetected: fitResult.curvatureDetected,
-                quoteEvidenceId: quoteEvidence?.id || null
+                quoteEvidenceId: quoteEvidence?.id || null,
+                quoteEvidenceIds: validQuoteEvidenceIds
             };
 
             // a. Insert immutable pricing revision
