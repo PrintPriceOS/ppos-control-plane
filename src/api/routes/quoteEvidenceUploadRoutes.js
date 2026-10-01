@@ -258,4 +258,28 @@ router.put('/:id/corrections', async (req, res) => {
     }
 });
 
+/**
+ * POST /:id/calibration-targets — Form normalized calibration targets from evidence
+ */
+router.post('/:id/calibration-targets', async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const documentId = req.params.id;
+    const { selectedOfferIndexes, operatorConfirmed, allowMixedVariants } = req.body || {};
+
+    try {
+        const result = await quoteEvidenceService.createCalibrationTargetsFromEvidence(
+            tenantId,
+            documentId,
+            selectedOfferIndexes,
+            { operatorConfirmed, allowMixedVariants }
+        );
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.code && err.statusCode) {
+            return res.status(err.statusCode).json({ error: err.code, message: err.message, details: err });
+        }
+        return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message: err.message });
+    }
+});
+
 module.exports = router;

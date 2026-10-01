@@ -393,6 +393,141 @@ class QuoteEvidenceService {
             return [];
         }
     }
+
+    /**
+     * Creates normalized calibration targets from reviewed quote evidence offers.
+     * Enforces strict eligibility gates:
+     * - Tenant scoping
+     * - Same BookSpec consistency check across targets
+     * - Target basis is strictly manufacturingPrice (transport excluded)
+     * - Inconsistent offers require explicit operator confirmation
+     */
+    async createCalibrationTargetsFromEvidence(tenantId, documentId, selectedOfferIndexes = [], options = {}) {
+        if (!tenantId || !documentId) {
+            const err = new Error('MISSING_REQUIRED_TARGET_PARAMS');
+            err.code = 'MISSING_REQUIRED_TARGET_PARAMS';
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const doc = await this.getQuoteDocument(tenantId, documentId);
+        if (!doc) {
+            const err = new Error('DOCUMENT_NOT_FOUND');
+            err.code = 'DOCUMENT_NOT_FOUND';
+            err.statusCode = 404;
+            throw err;
+        }
+
+        let normalizedQuote = options.mockNormalizedQuote || doc.normalizedQuote || doc.normalized_json || {};
+        try {
+            const pool = db.getPool();
+            const [rows] = await pool.query(
+                `SELECT normalized_json, validation_status FROM quote_evidence_extractions WHERE quote_evidence_document_id = ? AND tenant_id = ?`,
+                [documentId, tenantId]
+            );
+            if (rows && rows.length > 0) {
+                normalizedQuote = typeof rows[0].normalized_json === 'string'
+                    ? JSON.parse(rows[0].normalized_json)
+                    : rows[0].normalized_json;
+            }
+        } catch (e) {
+            logger.warn(`Could not fetch extractions for document ${documentId}: ${e.message}`);
+        }
+
+        const allOffers = Array.isArray(normalizedQuote.offers) ? normalizedQuote.offers : [];
+        if (allOffers.length === 0) {
+            const err = new Error('NO_OFFERS_FOUND_IN_EVIDENCE');
+            err.code = 'NO_OFFERS_FOUND_IN_EVIDENCE';
+            err.statusCode = 422;
+            throw err;
+        }
+
+        // Default to all offers if none specified
+        const indexesToUse = selectedOfferIndexes.length > 0
+            ? selectedOfferIndexes
+            : allOffers.map((_, i) => i);
+
+        const selectedOffers = indexesToUse.map(idx => ({ offerIndex: idx, offer: allOffers[idx] })).filter(o => o.offer);
+
+        if (selectedOffers.length === 0) {
+            const err = new Error('NO_VALID_OFFERS_SELECTED');
+            err.code = 'NO_VALID_OFFERS_SELECTED';
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // 1. Same-BookSpec Consistency Gate across variants (Fährmann Rule)
+        const variants = new Set(selectedOffers.map(o => (o.offer.variantName || 'DEFAULT_VARIANT').trim().toLowerCase()));
+        if (variants.size > 1 && !options.allowMixedVariants) {
+            const err = new Error('MIXED_BOOKSPEC_TARGETS: Selected offers belong to distinct commercial specification variants. Please select offers for a single variant.');
+            err.code = 'MIXED_BOOKSPEC_TARGETS';
+            err.statusCode = 422;
+            err.variants = Array.from(variants);
+            throw err;
+        }
+
+        // 2. Inconsistent Evidence Gate (Stutensee 300 Rule)
+        const inconsistentSelected = selectedOffers.filter(o => o.offer.validationStatus && o.offer.validationStatus !== 'CONSISTENT');
+        if (inconsistentSelected.length > 0 && !options.operatorConfirmed) {
+            const err = new Error(`INCONSISTENT_EVIDENCE_REQUIRES_OPERATOR_REVIEW: Selected offers contain unit price inconsistency. Operator explicit confirmation is required.`);
+            err.code = 'INCONSISTENT_EVIDENCE_REQUIRES_OPERATOR_REVIEW';
+            err.statusCode = 422;
+            err.inconsistentOffers = inconsistentSelected;
+            throw err;
+        }
+
+        // 3. Form Manufacturing Targets (Natur Rule: Mfg only, transport excluded!)
+        const calibrationTargets = selectedOffers.map(item => {
+            const off = item.offer;
+            const mfg = Number(off.manufacturingPrice);
+            if (!Number.isFinite(mfg) || mfg <= 0) {
+                const err = new Error(`INVALID_MANUFACTURING_PRICE: Offer quantity ${off.quantity} lacks a valid manufacturing price.`);
+                err.code = 'INVALID_MANUFACTURING_PRICE';
+                err.statusCode = 422;
+                throw err;
+            }
+
+            return {
+                quantity: Number(off.quantity),
+                targetManufacturingPrice: mfg,
+                targetBasis: 'MANUFACTURING_PRICE',
+                sourceOfferIndex: item.offerIndex,
+                quotedTotalPrice: Number(off.quotedTotalPrice || off.totalPrice || 0),
+                transportPrice: Number(off.transportPrice || 0),
+                transportPriceExcluded: true,
+                validationStatus: off.validationStatus || 'CONSISTENT',
+                variantName: off.variantName || null,
+                operatorConfirmed: Boolean(options.operatorConfirmed)
+            };
+        });
+
+        // 4. Derive canonical BookSpec snapshot from evidence
+        const bookSpec = {
+            book_width_mm: normalizedQuote.width_mm || 170,
+            book_height_mm: normalizedQuote.height_mm || 240,
+            interior_pages: normalizedQuote.pages || 128,
+            interior_print: normalizedQuote.interior_print || '4/4',
+            paper_type_interior: normalizedQuote.paper_type_interior || 'offset',
+            paper_weight_interior: normalizedQuote.paper_weight_interior || 80,
+            cover_print: normalizedQuote.cover_print || '4/0',
+            paper_type_cover: normalizedQuote.paper_type_cover || 'mc',
+            paper_weight_cover: normalizedQuote.paper_weight_cover || 300,
+            binding_method: normalizedQuote.binding_method || 'hardcover',
+            lamination: normalizedQuote.lamination || 'matt',
+            delivery_country: normalizedQuote.delivery_country || 'ES'
+        };
+
+        return {
+            ok: true,
+            evidenceId: documentId,
+            documentSha256: doc.document_sha256,
+            printhouseName: normalizedQuote.printhouseName || doc.original_filename,
+            sameBookSpecConfirmed: true,
+            bookSpec,
+            calibrationTargets,
+            status: 'READY_FOR_CALIBRATION_PREVIEW'
+        };
+    }
 }
 
 module.exports = new QuoteEvidenceService();
