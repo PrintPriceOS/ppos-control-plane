@@ -595,5 +595,43 @@ router.post('/machines/:machineId/pricing', requireAuth, wrapHandler(async (req,
     res.status(201).json({ ok: true, data: profile });
 }));
 
+
+// ──── 10. Production Route Selection & Press Comparison (Phase 195C) ─────────
+const routeSelectionService = require('../services/productionRouteSelectionService');
+
+// POST /api/printhouse/onboarding/pricing/routes/evaluate — Route Selection & Press Comparison (SHADOW Mode)
+router.post('/pricing/routes/evaluate', requireAuth, wrapHandler(async (req, res) => {
+    const tenantId = req.user.tenantId;
+    const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
+    const bookSpec = req.body.bookSpec || req.body.jobSpec || req.body;
+    const quantities = req.body.quantities || (bookSpec && bookSpec.copies ? [Number(bookSpec.copies)] : [500, 600, 700]);
+    const options = {
+        pinnedMachineId: req.body.pinnedMachineId || null,
+        mockMachines: req.body.mockMachines || null,
+        mockProfiles: req.body.mockProfiles || null
+    };
+
+    if (req.body.shadowMode || req.body.nodeRatesSnapshot) {
+        const shadowResult = await routeSelectionService.evaluateShadowRouting(
+            tenantId,
+            printhouseId,
+            bookSpec,
+            req.body.nodeRatesSnapshot || {},
+            { ...options, quantities }
+        );
+        return res.json({ ok: true, data: shadowResult });
+    }
+
+    const evaluation = await routeSelectionService.evaluateProductionRoutes(
+        tenantId,
+        printhouseId,
+        bookSpec,
+        quantities,
+        options
+    );
+
+    res.json({ ok: true, data: evaluation });
+}));
+
 module.exports = router;
 

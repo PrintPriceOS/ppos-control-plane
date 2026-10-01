@@ -1300,6 +1300,9 @@ UNRESTRICTED_PRODUCTION:
 ## Phase 195 — Machine-Level Costing & Production Route Selection
 
 - **Phase 195A (Machine-Level Costing Audit)**: **AUDIT COMPLETE / CLOSED**. Architectural and empirical audit of machine-level vs node-level cost ownership, rate structures, forward pricing execution paths, onboarding capabilities, revision checksum scope, and Natur `UNDERDETERMINED` identifiability root cause. Confirmed zero code changes, zero DB migrations, zero pricing mutations. Detailed audit report published in `PHASE_195A_MACHINE_LEVEL_COSTING_AUDIT.md`.
+- **Phase 195B (Versioned Machine Pricing Profiles)**: **VALIDATED / CLOSED**. Implemented versioned machine-level pricing profiles (`printhouse_machine_pricing_profiles`), readiness evaluation (`EVALUATE_READINESS`), version incrementing, SHA-256 checksums, supersede state machine, strict tenant isolation, and REST endpoints. Status: `MACHINE_PRICING_API: API_READY`, `MACHINE_PRICING_UI: UI_PENDING`, `HAWKEYE_MACHINE_PRICING_VISIBILITY: NOT_IMPLEMENTED`, `FORWARD_PRICING_CONSUMES_MACHINE_PROFILES: NO`.
+- **Phase 195C (Production Route Selection & Press Comparison - SHADOW Mode)**: **VALIDATED / CLOSED**. Implemented deterministic route evaluation service (`productionRouteSelectionService.js`), capability filtering (`FORMAT_UNSUPPORTED`, `BINDING_METHOD_UNSUPPORTED`, `QUANTITY_BELOW_MIN`/`MAX`, `MACHINE_PROFILE_NOT_READY`), dynamic economic crossover discovery from intersecting cost curves $C_{\text{Digital}}(Q) = C_{\text{Offset}}(Q)$, operator-pinned machine logic, REST endpoint `POST /api/printhouse/onboarding/pricing/routes/evaluate`, and full 24-test suite (`smoke_phase195c_production_route_selection.js`: 24/24 PASS). Forward pricing remains 100% governed by legacy node `rates_json` (`FORWARD_PRICING_AUTHORITY: LEGACY_NODE_RATES_JSON`). No rates_json mutations and no active revisions created (`ratesJsonMutated: false`).
+
 
 
 
