@@ -2,14 +2,33 @@
 -- Phase 195B: Governed Machine-Specific Costing & Setup Data Model
 -- Establishes cost ownership, versioned pricing profiles, setup/run cost drivers, and readiness for individual machines.
 
-ALTER TABLE printhouse_machines
-  ADD UNIQUE INDEX uk_machines_id_tenant (id, tenant_id);
+DELIMITER $$
+CREATE PROCEDURE AddUkMachinesIdTenantIndex()
+BEGIN
+    IF NOT EXISTS (
+        SELECT * FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'printhouse_machines'
+          AND INDEX_NAME = 'uk_machines_id_tenant'
+    ) AND NOT EXISTS (
+        SELECT * FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'printhouse_machines'
+          AND INDEX_NAME = 'uk_pm_id_tenant'
+    ) THEN
+        ALTER TABLE printhouse_machines ADD UNIQUE INDEX uk_machines_id_tenant (id, tenant_id);
+    END IF;
+END $$
+DELIMITER ;
+
+CALL AddUkMachinesIdTenantIndex();
+DROP PROCEDURE AddUkMachinesIdTenantIndex;
 
 CREATE TABLE IF NOT EXISTS printhouse_machine_pricing_profiles (
     id VARCHAR(64) PRIMARY KEY,
     tenant_id VARCHAR(64) NOT NULL,
-    printhouse_id VARCHAR(64) NOT NULL,
-    machine_id VARCHAR(64) NOT NULL,
+    printhouse_id VARCHAR(50) NOT NULL,
+    machine_id VARCHAR(50) NOT NULL,
     version INT NOT NULL DEFAULT 1,
     technology VARCHAR(64) NOT NULL DEFAULT 'DIGITAL_SHEETFED',
     currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
@@ -25,4 +44,4 @@ CREATE TABLE IF NOT EXISTS printhouse_machine_pricing_profiles (
     INDEX idx_printhouse_profiles_lookup (tenant_id, printhouse_id),
     FOREIGN KEY (machine_id, tenant_id) REFERENCES printhouse_machines (id, tenant_id) ON DELETE CASCADE,
     FOREIGN KEY (printhouse_id, tenant_id) REFERENCES printer_nodes (id, tenant_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

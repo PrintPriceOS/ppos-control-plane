@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-01T22:41:46.497Z",
+  "generatedAt": "2026-10-01T22:47:38.618Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2073,21 +2073,23 @@
     {
       "path": "migrations/154_phase195b_machine_specific_costing.sql",
       "prefix": "154",
-      "canonicalSha256": "d41ec01c1717223511daf784104ccc0505c548b8ad8922830abbcc978b0c0dfd",
+      "canonicalSha256": "81861b9177ff7e022010e891b8215adb4d8181a0d5c5a5fddbea00fd9dc103de",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 1334,
+      "sizeBytes": 1998,
       "containsDdl": true,
       "containsDml": false,
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE",
-        "ALTER_TABLE"
+        "ALTER_TABLE",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
       ]
     },
     {
       "path": "migrations/155_phase195d_machine_route_rules.sql",
       "prefix": "155",
-      "canonicalSha256": "159dc4e33aeb719df9a1355b9ad7f6e8748f6060fe72859de5314a87ac65d9cf",
+      "canonicalSha256": "0040400e9d28c94681ef5873c3afe5cb0fc0992e6c1c89ff5bae99cf0ed3bbbc",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 840,
       "containsDdl": true,
