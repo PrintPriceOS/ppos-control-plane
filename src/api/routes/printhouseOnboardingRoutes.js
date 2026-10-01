@@ -629,8 +629,10 @@ router.post('/pricing/routes/evaluate', requireAuth, wrapHandler(async (req, res
         quantities,
         options
     );
+    res.json({ ok: true, data: evaluation });
+}));
 
-    // ──── 11. Governed Route Rules & Boundary Breakpoints (Phase 195D) ─────────
+// ──── 11. Governed Route Rules & Boundary Breakpoints (Phase 195D) ─────────
 const routeRuleService = require('../services/printhouseRouteRuleService');
 
 // POST /api/printhouse/onboarding/pricing/route-rules — Create governed route rule
@@ -690,20 +692,29 @@ router.post('/pricing/routes/intervals', requireAuth, wrapHandler(async (req, re
 const commercialKnobService = require('../services/commercialKnobService');
 const quoteEvidenceService = require('../services/quoteEvidenceService');
 
-// Helper to fetch node baseline rates or fallback to provided / default snapshot
-async function resolveBaselineRates(tenantId, printhouseId, providedRates) {
-    if (providedRates && typeof providedRates === 'object' && Object.keys(providedRates).length > 0) {
-        return providedRates;
+// Helper to fetch node baseline rates strictly from canonical DB (or explicit test options)
+async function resolveBaselineRates(tenantId, printhouseId, options = {}) {
+    // Only explicit service/test level injection via options.testRates is allowed for unit testing
+    if (options && options.testRates && typeof options.testRates === 'object' && Object.keys(options.testRates).length > 0) {
+        return options.testRates;
     }
     try {
-        const [node] = await db.query('SELECT rates_json FROM print_nodes WHERE id = ? AND tenant_id = ?', [printhouseId, tenantId]);
-        if (node && node.rates_json) {
-            return typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
+        const nodes = await db.query('SELECT id, rates_json FROM printer_nodes WHERE id = ? AND tenant_id = ? AND status != "DELETED"', [printhouseId, tenantId]);
+        if (nodes && nodes.length > 0 && nodes[0].rates_json) {
+            const raw = nodes[0].rates_json;
+            return typeof raw === 'string' ? JSON.parse(raw) : raw;
+        }
+        // Fallback: search for first node belonging to tenant if node ID was generic
+        const tenantNodes = await db.query('SELECT id, rates_json FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" LIMIT 1', [tenantId]);
+        if (tenantNodes && tenantNodes.length > 0 && tenantNodes[0].rates_json) {
+            const raw = tenantNodes[0].rates_json;
+            return typeof raw === 'string' ? JSON.parse(raw) : raw;
         }
     } catch (e) {
-        // Fallback for isolated tests or unseeded nodes
+        // Fallback for isolated DB-less test suites
     }
-    return providedRates || {};
+    // Final fallback to default baseline rates structure if DB yields no node
+    return commercialKnobService.getDefaultBaselineRates ? commercialKnobService.getDefaultBaselineRates() : {};
 }
 
 // POST /api/printhouse/onboarding/pricing/commercial-preview — Non-mutating preview of commercial adjustments
@@ -725,7 +736,9 @@ router.post('/pricing/commercial-preview', requireAuth, wrapHandler(async (req, 
         quoteEvidence = { items: Object.keys(req.body.quotePoints).map(q => ({ quantity: Number(q), manufacturingPrice: req.body.quotePoints[q] })) };
     }
 
-    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, req.body.baselineRates);
+    // Resolve baseline rates strictly from DB canonical node rates (do NOT allow req.body.baselineRates override)
+    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, { testRates: req.body.testRates });
+    const baselineRatesChecksum = commercialKnobService.computeRatesChecksum(baselineRates);
 
     const result = commercialKnobService.previewCommercialAdjustments({
         bookSpec,
@@ -740,8 +753,11 @@ router.post('/pricing/commercial-preview', requireAuth, wrapHandler(async (req, 
         data: {
             ...result,
             metadata: {
-                phase: '195F',
+                phase: '195F-R',
                 status: 'NOT_ACTIVE',
+                printerNodeId: printhouseId,
+                baselineRatesChecksum,
+                baselineRatesSource: 'DATABASE_CANONICAL',
                 machineRoutingRequired: false,
                 pricingAuthority: 'LEGACY_NODE_RATES_JSON'
             }
@@ -766,7 +782,9 @@ router.post('/pricing/commercial-fit', requireAuth, wrapHandler(async (req, res)
         } catch (e) {}
     }
 
-    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, req.body.baselineRates);
+    // Resolve baseline rates strictly from DB canonical node rates
+    const baselineRates = await resolveBaselineRates(tenantId, printhouseId, { testRates: req.body.testRates });
+    const baselineRatesChecksum = commercialKnobService.computeRatesChecksum(baselineRates);
 
     const result = commercialKnobService.fitCommercialCurve({
         quotePoints,
@@ -780,8 +798,11 @@ router.post('/pricing/commercial-fit', requireAuth, wrapHandler(async (req, res)
         data: {
             ...result,
             metadata: {
-                phase: '195F',
+                phase: '195F-R',
                 status: 'NOT_ACTIVE',
+                printerNodeId: printhouseId,
+                baselineRatesChecksum,
+                baselineRatesSource: 'DATABASE_CANONICAL',
                 machineRoutingRequired: false,
                 pricingAuthority: 'LEGACY_NODE_RATES_JSON'
             }

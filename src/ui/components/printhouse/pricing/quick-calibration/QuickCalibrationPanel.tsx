@@ -29,6 +29,7 @@ import { CalibrationWarnings } from './CalibrationWarnings';
 import { CalibrationAcceptanceModal } from './CalibrationAcceptanceModal';
 import { PricingRevisionHistoryModal } from './PricingRevisionHistoryModal';
 import { CalibrationSessionsHistoryModal } from './CalibrationSessionsHistoryModal';
+import { CommercialCalibrationPanel } from './CommercialCalibrationPanel';
 import { isValidIso2Country } from '../../../../lib/countryCatalog';
 import { 
     Sparkles, RefreshCw, Calculator, ShieldCheck, CheckCircle2, 
@@ -102,6 +103,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [accepting, setAccepting] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [showSessionsModal, setShowSessionsModal] = useState(false);
+    const [showCommercialModal, setShowCommercialModal] = useState(false);
 
     // ── Session and Active Run Rehydration (Phase 193H.8C.6.11.3) ──
     useEffect(() => {
@@ -661,6 +663,19 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                     <button
                         type="button"
+                        onClick={() => setShowCommercialModal(!showCommercialModal)}
+                        className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                            showCommercialModal 
+                                ? 'bg-indigo-600 border-indigo-500 text-white' 
+                                : 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300'
+                        }`}
+                    >
+                        <Sliders size={14} className={showCommercialModal ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'} />
+                        <span>Calibrate from this quote</span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => setShowSessionsModal(true)}
                         className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
@@ -691,6 +706,17 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Commercial Calibration Panel (Phase 195F-R Mounted UI) */}
+            {showCommercialModal && (
+                <div className="animate-in fade-in duration-200">
+                    <CommercialCalibrationPanel
+                        printerNodeId={printerNodeId}
+                        bookSpec={draftSpec}
+                        onClose={() => setShowCommercialModal(false)}
+                    />
+                </div>
+            )}
 
             {/* Notifications */}
             {showSupersedeAction && (

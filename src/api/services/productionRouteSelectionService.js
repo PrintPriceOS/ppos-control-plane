@@ -410,7 +410,9 @@ class ProductionRouteSelectionService {
     if (!recommendedRoute) {
       if (eligibleRoutes.length === 1) {
         recommendedRoute = eligibleRoutes[0];
-        selectionReason = 'ONLY_ELIGIBLE_MACHINE';
+        if (selectionReason !== 'PINNED_MACHINE_INELIGIBLE') {
+          selectionReason = 'ONLY_ELIGIBLE_MACHINE';
+        }
         boundaryType = BOUNDARY_TYPES.CAPABILITY_LIMIT;
       } else if (eligibleRoutes.length > 1) {
         const top1 = eligibleRoutes[0];
@@ -421,7 +423,9 @@ class ProductionRouteSelectionService {
         if (diffAbs <= CROSSOVER_TOLERANCE_ABS || diffPct <= CROSSOVER_TOLERANCE_PCT) {
           isTieZone = true;
           boundaryType = BOUNDARY_TYPES.ECONOMIC_TIE_ZONE;
-          selectionReason = 'ECONOMIC_TIE_ZONE_RESOLVED';
+          if (selectionReason !== 'PINNED_MACHINE_INELIGIBLE') {
+            selectionReason = 'ECONOMIC_TIE_ZONE_RESOLVED';
+          }
 
           // Deterministic Governed Tie-Break Policy: LOWER_SETUP -> LOWER_VARIABLE_COST -> STABLE_MACHINE_ID
           const setup1 = top1.breakdown.fixedSetup + top1.breakdown.makeready + top1.breakdown.plateCost;

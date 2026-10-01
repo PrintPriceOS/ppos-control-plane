@@ -56,13 +56,13 @@ async function runTests() {
     assert.strictEqual(neutralEval.predictedManufacturingPrice, baseEval.predictedManufacturingPrice);
     console.log('  PASSED: Neutral knobs reproduce baseline price exactly.');
 
-    // [195F-02] Printing setup delta shifts fixed component
-    console.log('[195F-02] Testing printing setup delta shifts fixed component...');
-    const setupAdjRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { printingSetupAdjustment: { amount: 50 } });
+    // [195F-02] Printing setup multiplier shifts fixed component
+    console.log('[195F-02] Testing printing setup multiplier shifts fixed component...');
+    const setupAdjRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { printingSetupAdjustment: { value: 1.10 } });
     assert(setupAdjRates.interior_full_colour_fixed['32p'] > sampleBaselineRates.interior_full_colour_fixed['32p']);
     const setupEval = adapter.evaluateForwardPrice(sampleBookSpec, setupAdjRates);
     assert(setupEval.predictedManufacturingPrice > baseEval.predictedManufacturingPrice);
-    console.log('  PASSED: Printing setup delta shifts total fixed cost upward.');
+    console.log('  PASSED: Printing setup multiplier scales total fixed cost upward.');
 
     // [195F-03] Printing run multiplier changes slope
     console.log('[195F-03] Testing printing run multiplier changes slope...');
@@ -85,7 +85,7 @@ async function runTests() {
 
     // [195F-05] Binding setup adjustment scoped correctly
     console.log('[195F-05] Testing binding setup adjustment scoped correctly...');
-    const bindSetupRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { bindingSetupAdjustment: { amount: 30 } });
+    const bindSetupRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { bindingSetupAdjustment: { value: 1.15 } });
     assert(bindSetupRates.binding_pb_fixed_by_sections['4'] > sampleBaselineRates.binding_pb_fixed_by_sections['4']);
     assert.strictEqual(bindSetupRates.interior_full_colour_fixed['32p'], sampleBaselineRates.interior_full_colour_fixed['32p']);
     console.log('  PASSED: Binding setup adjustment targets binding fixed rates only.');
@@ -98,7 +98,7 @@ async function runTests() {
 
     // [195F-07] Lamination setup scoped correctly
     console.log('[195F-07] Testing lamination setup scoped correctly...');
-    const lamSetupRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { laminationSetupAdjustment: { amount: 15 } });
+    const lamSetupRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { laminationSetupAdjustment: { value: 1.10 } });
     assert(lamSetupRates.lam_fixed.matt > sampleBaselineRates.lam_fixed.matt);
     console.log('  PASSED: Lamination setup adjustment targets lamination fixed rates.');
 
@@ -111,9 +111,9 @@ async function runTests() {
     // [195F-09] Black/Full-colour relative structure preserved
     console.log('[195F-09] Testing black/full-colour relative structure preserved...');
     const ratioBefore = sampleBaselineRates.interior_full_colour_fixed['32p'] / sampleBaselineRates.interior_black_colour_fixed['32p'];
-    const setupMod = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { printingSetupAdjustment: { amount: 35 } });
+    const setupMod = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, { printingSetupAdjustment: { value: 1.20 } });
     const ratioAfter = setupMod.interior_full_colour_fixed['32p'] / setupMod.interior_black_colour_fixed['32p'];
-    assert(Math.abs(ratioAfter - ratioBefore) < 0.05);
+    assert(Math.abs(ratioAfter - ratioBefore) < 0.001);
     console.log('  PASSED: Relative black/full-colour setup proportions preserved.');
 
     // [195F-10] 8p/16p relative structure preserved
@@ -123,16 +123,16 @@ async function runTests() {
         interior_full_colour_fixed: { '32p': 200.0, '16p': 100.0 }
     };
     const sigRatioBefore = multiSigRates.interior_full_colour_fixed['32p'] / multiSigRates.interior_full_colour_fixed['16p'];
-    const sigSetupMod = commercialKnobService.applyKnobAdjustments(multiSigRates, { printingSetupAdjustment: { amount: 40 } });
+    const sigSetupMod = commercialKnobService.applyKnobAdjustments(multiSigRates, { printingSetupAdjustment: { value: 1.25 } });
     const sigRatioAfter = sigSetupMod.interior_full_colour_fixed['32p'] / sigSetupMod.interior_full_colour_fixed['16p'];
-    assert(Math.abs(sigRatioAfter - sigRatioBefore) < 0.05);
+    assert(Math.abs(sigRatioAfter - sigRatioBefore) < 0.001);
     console.log('  PASSED: Relative 32p vs 16p signature setup proportions preserved.');
 
     // [195F-11] No negative rate possible
     console.log('[195F-11] Testing no negative rate possible...');
     const extremeNegativeRates = commercialKnobService.applyKnobAdjustments(sampleBaselineRates, {
-        printingSetupAdjustment: { amount: -1000 },
-        bindingSetupAdjustment: { amount: -1000 }
+        printingSetupAdjustment: { value: 0.50 },
+        bindingSetupAdjustment: { value: 0.50 }
     });
     assert(extremeNegativeRates.interior_full_colour_fixed['32p'] >= 0);
     assert(extremeNegativeRates.binding_pb_fixed_by_sections['4'] >= 0);

@@ -55,14 +55,14 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
     baselineRates,
     onClose
 }) => {
-    // ── Local Knob Adjustments State ──
+    // ── Local Knob Adjustments State (All Option A Multipliers default to 1.0x) ──
     const [adjustments, setAdjustments] = useState<Record<string, number>>({
-        printingSetupAdjustment: 0,
+        printingSetupAdjustment: 1.0,
         printingRunMultiplier: 1.0,
         paperCostMultiplier: 1.0,
-        bindingSetupAdjustment: 0,
+        bindingSetupAdjustment: 1.0,
         bindingRunMultiplier: 1.0,
-        laminationSetupAdjustment: 0,
+        laminationSetupAdjustment: 1.0,
         laminationRunMultiplier: 1.0
     });
 
@@ -71,6 +71,7 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
     const [fitData, setFitData] = useState<any | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     // Initial load & calculation
     useEffect(() => {
@@ -82,12 +83,12 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
         setError(null);
         try {
             const rawAdjustments = {
-                printingSetupAdjustment: { type: 'DELTA', amount: currentAdj.printingSetupAdjustment || 0 },
+                printingSetupAdjustment: { type: 'MULTIPLIER', value: currentAdj.printingSetupAdjustment || 1.0 },
                 printingRunMultiplier: { type: 'MULTIPLIER', value: currentAdj.printingRunMultiplier || 1.0 },
                 paperCostMultiplier: { type: 'MULTIPLIER', value: currentAdj.paperCostMultiplier || 1.0 },
-                bindingSetupAdjustment: { type: 'DELTA', amount: currentAdj.bindingSetupAdjustment || 0 },
+                bindingSetupAdjustment: { type: 'MULTIPLIER', value: currentAdj.bindingSetupAdjustment || 1.0 },
                 bindingRunMultiplier: { type: 'MULTIPLIER', value: currentAdj.bindingRunMultiplier || 1.0 },
-                laminationSetupAdjustment: { type: 'DELTA', amount: currentAdj.laminationSetupAdjustment || 0 },
+                laminationSetupAdjustment: { type: 'MULTIPLIER', value: currentAdj.laminationSetupAdjustment || 1.0 },
                 laminationRunMultiplier: { type: 'MULTIPLIER', value: currentAdj.laminationRunMultiplier || 1.0 }
             };
 
@@ -96,7 +97,6 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                 bookSpec,
                 quantities,
                 adjustments: rawAdjustments,
-                baselineRates,
                 quotePoints: quoteEvidence ? undefined : DEFAULT_QUOTE_POINTS,
                 quoteEvidenceId: quoteEvidence?.id
             });
@@ -122,7 +122,6 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                 printhouseId: printerNodeId,
                 bookSpec,
                 quantities,
-                baselineRates,
                 quotePoints: quoteEvidence ? undefined : DEFAULT_QUOTE_POINTS,
                 quoteEvidenceId: quoteEvidence?.id
             });
@@ -132,12 +131,12 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
             if (fit && fit.suggestedAdjustments) {
                 const sugg = fit.suggestedAdjustments;
                 const newAdj = {
-                    printingSetupAdjustment: sugg.printingSetupAdjustment?.amount || 0,
+                    printingSetupAdjustment: sugg.printingSetupAdjustment?.value || 1.0,
                     printingRunMultiplier: sugg.printingRunMultiplier?.value || 1.0,
                     paperCostMultiplier: sugg.paperCostMultiplier?.value || 1.0,
-                    bindingSetupAdjustment: sugg.bindingSetupAdjustment?.amount || 0,
+                    bindingSetupAdjustment: sugg.bindingSetupAdjustment?.value || 1.0,
                     bindingRunMultiplier: sugg.bindingRunMultiplier?.value || 1.0,
-                    laminationSetupAdjustment: sugg.laminationSetupAdjustment?.amount || 0,
+                    laminationSetupAdjustment: sugg.laminationSetupAdjustment?.value || 1.0,
                     laminationRunMultiplier: sugg.laminationRunMultiplier?.value || 1.0
                 };
                 setAdjustments(newAdj);
@@ -152,12 +151,12 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
 
     const handleResetAll = () => {
         const neutral = {
-            printingSetupAdjustment: 0,
+            printingSetupAdjustment: 1.0,
             printingRunMultiplier: 1.0,
             paperCostMultiplier: 1.0,
-            bindingSetupAdjustment: 0,
+            bindingSetupAdjustment: 1.0,
             bindingRunMultiplier: 1.0,
-            laminationSetupAdjustment: 0,
+            laminationSetupAdjustment: 1.0,
             laminationRunMultiplier: 1.0
         };
         setAdjustments(neutral);
@@ -177,15 +176,18 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
         }
     };
 
-    const knobsList = previewData?.knobs || [
-        { id: 'printingSetupAdjustment', label: 'Printing Setup', unit: '€', type: 'DELTA', min: -500, max: 500, step: 5 },
-        { id: 'printingRunMultiplier', label: 'Printing Running Cost', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01 },
-        { id: 'paperCostMultiplier', label: 'Paper Cost', unit: '×', type: 'MULTIPLIER', min: 0.80, max: 1.20, step: 0.01 },
-        { id: 'bindingSetupAdjustment', label: 'Binding Setup', unit: '€', type: 'DELTA', min: -300, max: 300, step: 5 },
-        { id: 'bindingRunMultiplier', label: 'Binding Per Copy', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01 },
-        { id: 'laminationSetupAdjustment', label: 'Lamination Setup', unit: '€', type: 'DELTA', min: -150, max: 150, step: 5 },
-        { id: 'laminationRunMultiplier', label: 'Lamination Per Copy', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01 }
+    const allKnobs = previewData?.knobs || [
+        { id: 'printingSetupAdjustment', label: 'Printing Setup', unit: '×', type: 'MULTIPLIER', min: 0.50, max: 2.00, step: 0.05, category: 'PRIMARY', description: 'Adjusts printing setup rate table proportionally (+10% = 1.10×)' },
+        { id: 'printingRunMultiplier', label: 'Printing Running Cost', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01, category: 'PRIMARY', description: 'Scales print per-thousand running rates' },
+        { id: 'paperCostMultiplier', label: 'Paper Cost', unit: '×', type: 'MULTIPLIER', min: 0.80, max: 1.20, step: 0.01, category: 'ADVANCED', description: 'Scales interior and cover paper sheet prices' },
+        { id: 'bindingSetupAdjustment', label: 'Binding Setup', unit: '×', type: 'MULTIPLIER', min: 0.50, max: 2.00, step: 0.05, category: 'ADVANCED', description: 'Scales binding makeready setup table' },
+        { id: 'bindingRunMultiplier', label: 'Binding Per Copy', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01, category: 'ADVANCED', description: 'Scales per-copy binding and folding rates' },
+        { id: 'laminationSetupAdjustment', label: 'Lamination Setup', unit: '×', type: 'MULTIPLIER', min: 0.50, max: 2.00, step: 0.05, category: 'ADVANCED', description: 'Scales cover lamination setup rates' },
+        { id: 'laminationRunMultiplier', label: 'Lamination Per Copy', unit: '×', type: 'MULTIPLIER', min: 0.75, max: 1.25, step: 0.01, category: 'ADVANCED', description: 'Scales lamination per-copy running rates' }
     ];
+
+    const primaryKnobs = allKnobs.filter((k: any) => k.category === 'PRIMARY' || k.id === 'printingSetupAdjustment' || k.id === 'printingRunMultiplier');
+    const advancedKnobs = allKnobs.filter((k: any) => !primaryKnobs.some((pk: any) => pk.id === k.id));
 
     return (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-100 shadow-2xl space-y-6">
@@ -201,7 +203,10 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                         </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                        Commercial price reproduction & operator fine-tuning knobs • <span className="text-slate-300 font-mono">Machine routing: NOT REQUIRED</span>
+                        No changes have been applied to live pricing • <span className="text-slate-300 font-mono">Node: {printerNodeId}</span>
+                        {previewData?.metadata?.baselineRatesChecksum && (
+                            <span className="ml-2 text-[11px] font-mono text-indigo-300">[{previewData.metadata.baselineRatesChecksum.substring(0, 15)}...]</span>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -219,8 +224,16 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                         className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        Reset All Knobs
+                        Reset All
                     </button>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition"
+                        >
+                            Close
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -306,29 +319,39 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                 </div>
             )}
 
-            {/* Fine-Tuning Controls (Knobs) */}
+            {/* Fine-Tuning Controls (PRIMARY & ADVANCED UX Hierarchy) */}
             <div className="space-y-4 pt-2">
-                <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-indigo-400" />
-                    Simple Fine-Tuning Controls (7 Commercial Knobs)
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sliders className="w-4 h-4 text-indigo-400" />
+                        Primary Commercial Controls
+                    </h3>
+                    <button
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium underline flex items-center gap-1"
+                    >
+                        {showAdvanced ? 'Hide Advanced Controls' : 'Show Advanced Controls (Paper & Finishing)'}
+                    </button>
+                </div>
 
+                {/* Primary Knobs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {knobsList.map((knob: any) => {
-                        const currentVal = adjustments[knob.id] !== undefined ? adjustments[knob.id] : (knob.type === 'DELTA' ? 0 : 1.0);
-                        const isModified = knob.type === 'DELTA' ? currentVal !== 0 : currentVal !== 1.0;
+                    {primaryKnobs.map((knob: any) => {
+                        const currentVal = adjustments[knob.id] !== undefined ? adjustments[knob.id] : 1.0;
+                        const isModified = currentVal !== 1.0;
+                        const pctStr = `${(currentVal - 1.0) >= 0 ? '+' : ''}${((currentVal - 1.0) * 100).toFixed(0)}%`;
 
                         return (
-                            <div key={knob.id} className="p-3.5 bg-slate-950 border border-slate-800 rounded-lg space-y-2 hover:border-slate-700 transition">
+                            <div key={knob.id} className="p-4 bg-slate-950 border border-indigo-900/40 rounded-lg space-y-2 hover:border-indigo-700/60 transition shadow-inner">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="font-semibold text-slate-200">{knob.label}</span>
+                                    <span className="font-bold text-indigo-200">{knob.label}</span>
                                     <div className="flex items-center gap-2">
-                                        <span className={`font-mono font-bold ${isModified ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                            {knob.type === 'DELTA' ? `${currentVal >= 0 ? '+' : ''}€${currentVal}` : `${currentVal.toFixed(2)}×`}
+                                        <span className={`font-mono font-bold text-sm ${isModified ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                            {currentVal.toFixed(2)}× ({pctStr})
                                         </span>
                                         {isModified && (
                                             <button
-                                                onClick={() => handleKnobChange(knob.id, knob.type === 'DELTA' ? 0 : 1.0)}
+                                                onClick={() => handleKnobChange(knob.id, 1.0)}
                                                 className="text-[10px] text-slate-500 hover:text-slate-300 underline"
                                             >
                                                 Reset
@@ -336,7 +359,7 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-[11px] text-slate-400">{knob.description}</p>
+                                <p className="text-[11px] text-slate-400">{knob.description || 'Proportional rate table scaling'}</p>
                                 <input
                                     type="range"
                                     min={knob.min}
@@ -344,17 +367,69 @@ export const CommercialCalibrationPanel: React.FC<CommercialCalibrationPanelProp
                                     step={knob.step}
                                     value={currentVal}
                                     onChange={(e) => handleKnobChange(knob.id, parseFloat(e.target.value))}
-                                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                                 <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                                    <span>{knob.type === 'DELTA' ? `${knob.min}€` : `${knob.min}×`}</span>
-                                    <span>Baseline ({knob.type === 'DELTA' ? '0€' : '1.0×'})</span>
-                                    <span>{knob.type === 'DELTA' ? `+${knob.max}€` : `${knob.max}×`}</span>
+                                    <span>{knob.min}× (-50%)</span>
+                                    <span>Baseline (1.0×)</span>
+                                    <span>{knob.max}× (+100%)</span>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
+
+                {/* Advanced Knobs (Collapsible) */}
+                {showAdvanced && (
+                    <div className="space-y-3 pt-3 border-t border-slate-800">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            Advanced Secondary Controls
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {advancedKnobs.map((knob: any) => {
+                                const currentVal = adjustments[knob.id] !== undefined ? adjustments[knob.id] : 1.0;
+                                const isModified = currentVal !== 1.0;
+                                const pctStr = `${(currentVal - 1.0) >= 0 ? '+' : ''}${((currentVal - 1.0) * 100).toFixed(0)}%`;
+
+                                return (
+                                    <div key={knob.id} className="p-3 bg-slate-950 border border-slate-800 rounded-lg space-y-2 hover:border-slate-700 transition">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-semibold text-slate-300">{knob.label}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-mono font-bold ${isModified ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                                    {currentVal.toFixed(2)}× ({pctStr})
+                                                </span>
+                                                {isModified && (
+                                                    <button
+                                                        onClick={() => handleKnobChange(knob.id, 1.0)}
+                                                        className="text-[10px] text-slate-500 hover:text-slate-300 underline"
+                                                    >
+                                                        Reset
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400">{knob.description}</p>
+                                        <input
+                                            type="range"
+                                            min={knob.min}
+                                            max={knob.max}
+                                            step={knob.step}
+                                            value={currentVal}
+                                            onChange={(e) => handleKnobChange(knob.id, parseFloat(e.target.value))}
+                                            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                        />
+                                        <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                                            <span>{knob.min}×</span>
+                                            <span>Baseline (1.0×)</span>
+                                            <span>{knob.max}×</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

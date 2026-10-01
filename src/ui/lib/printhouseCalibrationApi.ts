@@ -334,13 +334,12 @@ export const printhouseCalibrationApi = {
         return handleResponse<any>(res);
     },
 
-    // ── Phase 195F: Commercial Pricing Knobs & Quote Calibration Preview ──────
+    // ── Phase 195F-R: Commercial Pricing Knobs & Quote Calibration Preview ──────
     async previewCommercialKnobs(payload: {
         printhouseId?: string;
         bookSpec: any;
         quantities?: number[];
         adjustments?: any;
-        baselineRates?: any;
         quoteEvidenceId?: string;
         quotePoints?: Record<number, number>;
     }) {
@@ -356,7 +355,6 @@ export const printhouseCalibrationApi = {
         printhouseId?: string;
         bookSpec: any;
         quantities?: number[];
-        baselineRates?: any;
         quoteEvidenceId?: string;
         quotePoints?: Record<number, number> | Array<{ quantity: number; manufacturingPrice: number }>;
     }) {

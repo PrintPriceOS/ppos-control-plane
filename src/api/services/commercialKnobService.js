@@ -1,46 +1,55 @@
 /**
  * src/api/services/commercialKnobService.js
  *
- * Phase 195F — Commercial Pricing Knobs & Quote Calibration Preview Service.
+ * Phase 195F-R — Commercial Pricing Knobs & Quote Calibration Preview Service (Remediated).
  *
- * Core Principles:
- * 1. OVERLAY & ADJUSTMENT LAYER: Commercial controls do not destructively overwrite
- *    rates_json lookup tables. They act as governed DELTA and MULTIPLIER adjustments.
- * 2. INTERNAL STRUCTURE PRESERVATION: Adjustments maintain relative proportions
- *    between 16p/8p signatures, black/full-colour, hardcover/softcover, etc.
- * 3. NEUTRAL BASELINE INVARIANT: When deltas = 0 and multipliers = 1.0, output rates
- *    and prices strictly equal baseline rates and prices.
+ * Core Principles & Invariants:
+ * 1. OPTION A PREDICTABLE SETUP KNOBS: Setup controls operate as proportional multipliers (1.0x neutral),
+ *    scaling fixed makeready rate tables predictably while preserving 16p vs 8p, mono vs CMYK,
+ *    section count bins, and lamination types.
+ * 2. NEUTRAL BASELINE INVARIANT: When all multipliers = 1.0x, output rates and prices strictly equal
+ *    baseline rates and prices.
+ * 3. CANONICAL SHA-256 CHECKSUM: Every preview/fit computes a deterministic baseline rates checksum
+ *    to support stale-proposal protection in Phase 195G.
  * 4. PURE IN-MEMORY PREVIEW: Zero database mutations, zero active rates modifications.
- * 5. SEPARATION OF CONCERNS: Commercial Fixed/Marginal components are observable
- *    commercial abstractions, not claimed physical machine setup/run costs.
+ * 5. AGGREGATE FIT SEMANTICS: Commercial Fixed ($C_{\text{fixed}}$) and Marginal ($C_{\text{marginal}}$)
+ *    are aggregate commercial curve fit parameters, not physical cost decompositions.
  */
 
+const crypto = require('crypto');
 const adapter = require('./buildPriceCalibrationAdapter');
 const db = require('./mysqlClient');
 const logger = require('./logger').child('commercial-knobs');
 
-// Conservative Safe Bounds
+// Bounded Safe Multiplier Limits for Option A
 const KNOB_BOUNDS = {
-    printingSetupAdjustment: { min: -500, max: 500, step: 5, unit: '€' },
-    printingRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×' },
-    paperCostMultiplier: { min: 0.80, max: 1.20, step: 0.01, unit: '×' },
-    bindingSetupAdjustment: { min: -300, max: 300, step: 5, unit: '€' },
-    bindingRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×' },
-    laminationSetupAdjustment: { min: -150, max: 150, step: 5, unit: '€' },
-    laminationRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×' }
+    printingSetupAdjustment: { min: 0.50, max: 2.00, step: 0.05, unit: '×', type: 'MULTIPLIER' },
+    printingRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×', type: 'MULTIPLIER' },
+    paperCostMultiplier: { min: 0.80, max: 1.20, step: 0.01, unit: '×', type: 'MULTIPLIER' },
+    bindingSetupAdjustment: { min: 0.50, max: 2.00, step: 0.05, unit: '×', type: 'MULTIPLIER' },
+    bindingRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×', type: 'MULTIPLIER' },
+    laminationSetupAdjustment: { min: 0.50, max: 2.00, step: 0.05, unit: '×', type: 'MULTIPLIER' },
+    laminationRunMultiplier: { min: 0.75, max: 1.25, step: 0.01, unit: '×', type: 'MULTIPLIER' }
 };
 
-// Default Neutral Adjustments
+// Default Neutral Adjustments (All 1.0x)
 function getNeutralAdjustments() {
     return {
-        printingSetupAdjustment: { type: 'DELTA', amount: 0 },
+        printingSetupAdjustment: { type: 'MULTIPLIER', value: 1.0 },
         printingRunMultiplier: { type: 'MULTIPLIER', value: 1.0 },
         paperCostMultiplier: { type: 'MULTIPLIER', value: 1.0 },
-        bindingSetupAdjustment: { type: 'DELTA', amount: 0 },
+        bindingSetupAdjustment: { type: 'MULTIPLIER', value: 1.0 },
         bindingRunMultiplier: { type: 'MULTIPLIER', value: 1.0 },
-        laminationSetupAdjustment: { type: 'DELTA', amount: 0 },
+        laminationSetupAdjustment: { type: 'MULTIPLIER', value: 1.0 },
         laminationRunMultiplier: { type: 'MULTIPLIER', value: 1.0 }
     };
+}
+
+// Deterministic SHA-256 checksum over rates JSON
+function computeRatesChecksum(ratesObj) {
+    if (!ratesObj || typeof ratesObj !== 'object') return 'sha256:0000000000000000';
+    const sortedStr = JSON.stringify(ratesObj, Object.keys(ratesObj).sort());
+    return 'sha256:' + crypto.createHash('sha256').update(sortedStr).digest('hex');
 }
 
 // Deep clone utility
@@ -51,67 +60,60 @@ function deepClone(obj) {
 
 class CommercialKnobService {
 
+    computeRatesChecksum(ratesObj) {
+        return computeRatesChecksum(ratesObj);
+    }
+
     /**
-     * Sanitizes and bounds input adjustments to prevent invalid, negative, or infinite values.
+     * Sanitizes and bounds input adjustments to prevent invalid or out-of-bound values.
      */
     sanitizeAdjustments(rawAdjustments = {}) {
-        const neutral = getNeutralAdjustments();
         const sanitized = {};
 
-        // Printing Setup
-        const ps = rawAdjustments.printingSetupAdjustment || {};
-        const psAmount = Number(ps.amount !== undefined ? ps.amount : (rawAdjustments.printingSetupDelta || 0));
-        sanitized.printingSetupAdjustment = {
-            type: 'DELTA',
-            amount: isNaN(psAmount) ? 0 : Math.max(KNOB_BOUNDS.printingSetupAdjustment.min, Math.min(KNOB_BOUNDS.printingSetupAdjustment.max, psAmount))
+        const parseVal = (objOrVal, bounds) => {
+            let num = 1.0;
+            if (typeof objOrVal === 'number') {
+                num = objOrVal;
+            } else if (objOrVal && typeof objOrVal === 'object') {
+                num = Number(objOrVal.value !== undefined ? objOrVal.value : (objOrVal.amount !== undefined ? objOrVal.amount : 1.0));
+            }
+            if (isNaN(num)) num = 1.0;
+            return Math.max(bounds.min, Math.min(bounds.max, Number(num.toFixed(4))));
         };
 
-        // Printing Run
-        const pr = rawAdjustments.printingRunMultiplier || {};
-        const prVal = Number(pr.value !== undefined ? pr.value : (rawAdjustments.printingRunMultiplierVal || 1.0));
+        sanitized.printingSetupAdjustment = {
+            type: 'MULTIPLIER',
+            value: parseVal(rawAdjustments.printingSetupAdjustment || rawAdjustments.printingSetupVal, KNOB_BOUNDS.printingSetupAdjustment)
+        };
+
         sanitized.printingRunMultiplier = {
             type: 'MULTIPLIER',
-            value: isNaN(prVal) ? 1.0 : Math.max(KNOB_BOUNDS.printingRunMultiplier.min, Math.min(KNOB_BOUNDS.printingRunMultiplier.max, prVal))
+            value: parseVal(rawAdjustments.printingRunMultiplier || rawAdjustments.printingRunVal, KNOB_BOUNDS.printingRunMultiplier)
         };
 
-        // Paper Cost
-        const pc = rawAdjustments.paperCostMultiplier || {};
-        const pcVal = Number(pc.value !== undefined ? pc.value : (rawAdjustments.paperCostMultiplierVal || 1.0));
         sanitized.paperCostMultiplier = {
             type: 'MULTIPLIER',
-            value: isNaN(pcVal) ? 1.0 : Math.max(KNOB_BOUNDS.paperCostMultiplier.min, Math.min(KNOB_BOUNDS.paperCostMultiplier.max, pcVal))
+            value: parseVal(rawAdjustments.paperCostMultiplier || rawAdjustments.paperCostVal, KNOB_BOUNDS.paperCostMultiplier)
         };
 
-        // Binding Setup
-        const bs = rawAdjustments.bindingSetupAdjustment || {};
-        const bsAmount = Number(bs.amount !== undefined ? bs.amount : (rawAdjustments.bindingSetupDelta || 0));
         sanitized.bindingSetupAdjustment = {
-            type: 'DELTA',
-            amount: isNaN(bsAmount) ? 0 : Math.max(KNOB_BOUNDS.bindingSetupAdjustment.min, Math.min(KNOB_BOUNDS.bindingSetupAdjustment.max, bsAmount))
+            type: 'MULTIPLIER',
+            value: parseVal(rawAdjustments.bindingSetupAdjustment || rawAdjustments.bindingSetupVal, KNOB_BOUNDS.bindingSetupAdjustment)
         };
 
-        // Binding Run
-        const br = rawAdjustments.bindingRunMultiplier || {};
-        const brVal = Number(br.value !== undefined ? br.value : (rawAdjustments.bindingRunMultiplierVal || 1.0));
         sanitized.bindingRunMultiplier = {
             type: 'MULTIPLIER',
-            value: isNaN(brVal) ? 1.0 : Math.max(KNOB_BOUNDS.bindingRunMultiplier.min, Math.min(KNOB_BOUNDS.bindingRunMultiplier.max, brVal))
+            value: parseVal(rawAdjustments.bindingRunMultiplier || rawAdjustments.bindingRunVal, KNOB_BOUNDS.bindingRunMultiplier)
         };
 
-        // Lamination Setup
-        const ls = rawAdjustments.laminationSetupAdjustment || {};
-        const lsAmount = Number(ls.amount !== undefined ? ls.amount : (rawAdjustments.laminationSetupDelta || 0));
         sanitized.laminationSetupAdjustment = {
-            type: 'DELTA',
-            amount: isNaN(lsAmount) ? 0 : Math.max(KNOB_BOUNDS.laminationSetupAdjustment.min, Math.min(KNOB_BOUNDS.laminationSetupAdjustment.max, lsAmount))
+            type: 'MULTIPLIER',
+            value: parseVal(rawAdjustments.laminationSetupAdjustment || rawAdjustments.laminationSetupVal, KNOB_BOUNDS.laminationSetupAdjustment)
         };
 
-        // Lamination Run
-        const lr = rawAdjustments.laminationRunMultiplier || {};
-        const lrVal = Number(lr.value !== undefined ? lr.value : (rawAdjustments.laminationRunMultiplierVal || 1.0));
         sanitized.laminationRunMultiplier = {
             type: 'MULTIPLIER',
-            value: isNaN(lrVal) ? 1.0 : Math.max(KNOB_BOUNDS.laminationRunMultiplier.min, Math.min(KNOB_BOUNDS.laminationRunMultiplier.max, lrVal))
+            value: parseVal(rawAdjustments.laminationRunMultiplier || rawAdjustments.laminationRunVal, KNOB_BOUNDS.laminationRunMultiplier)
         };
 
         return sanitized;
@@ -119,7 +121,8 @@ class CommercialKnobService {
 
     /**
      * Applies commercial knob adjustments onto a cloned rates_json object.
-     * Preserves relative internal rate distinctions and guarantees non-negative rates.
+     * Option A: All controls scale their target rate sub-maps proportionally as multipliers.
+     * Preserves internal rate distinctions (mono/CMYK, 16p/8p, section buckets) and guarantees non-negative rates.
      */
     applyKnobAdjustments(ratesSnapshot, adjustmentsInput = {}) {
         if (!ratesSnapshot || typeof ratesSnapshot !== 'object') {
@@ -128,23 +131,6 @@ class CommercialKnobService {
 
         const rates = deepClone(ratesSnapshot);
         const adj = this.sanitizeAdjustments(adjustmentsInput);
-
-        // Helper to apply DELTA across a numerical sub-object/map proportionally
-        const applyDeltaSubMap = (subMap, deltaAmount) => {
-            if (!subMap || typeof subMap !== 'object' || deltaAmount === 0) return;
-            const keys = Object.keys(subMap).filter(k => typeof subMap[k] === 'number');
-            if (keys.length === 0) return;
-
-            const sum = keys.reduce((acc, k) => acc + subMap[k], 0);
-            for (const k of keys) {
-                if (sum > 0) {
-                    const weight = subMap[k] / sum;
-                    subMap[k] = Math.max(0, Number((subMap[k] + deltaAmount * weight).toFixed(4)));
-                } else {
-                    subMap[k] = Math.max(0, Number((subMap[k] + deltaAmount / keys.length).toFixed(4)));
-                }
-            }
-        };
 
         // Helper to apply MULTIPLIER across a numerical sub-object/map
         const applyMultiplierSubMap = (subMap, multiplier) => {
@@ -155,28 +141,15 @@ class CommercialKnobService {
             }
         };
 
-        // 1. PRINTING SETUP (DELTA)
-        const psDelta = adj.printingSetupAdjustment.amount;
-        if (psDelta !== 0) {
+        // 1. PRINTING SETUP (MULTIPLIER)
+        const psMult = adj.printingSetupAdjustment.value;
+        if (psMult !== 1.0) {
             const intFixedKeys = ['interior_black_colour_fixed', 'interior_full_colour_fixed', 'interior_one_colour_fixed', 'interior_two_colour_fixed'];
-            let totalFixedSum = 0;
-            const activeMaps = [];
-
             for (const k of intFixedKeys) {
-                if (rates[k] && typeof rates[k] === 'object') {
-                    activeMaps.push(rates[k]);
-                    totalFixedSum += Object.values(rates[k]).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
-                }
+                if (rates[k]) applyMultiplierSubMap(rates[k], psMult);
             }
-            if (rates.cover_fixed_by_colours && typeof rates.cover_fixed_by_colours === 'object') {
-                activeMaps.push(rates.cover_fixed_by_colours);
-                totalFixedSum += Object.values(rates.cover_fixed_by_colours).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
-            }
-
-            for (const m of activeMaps) {
-                const mapSum = Object.values(m).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
-                const portion = totalFixedSum > 0 ? (mapSum / totalFixedSum) * psDelta : psDelta / activeMaps.length;
-                applyDeltaSubMap(m, portion);
+            if (rates.cover_fixed_by_colours) {
+                applyMultiplierSubMap(rates.cover_fixed_by_colours, psMult);
             }
         }
 
@@ -201,12 +174,12 @@ class CommercialKnobService {
             }
         }
 
-        // 4. BINDING SETUP (DELTA)
-        const bsDelta = adj.bindingSetupAdjustment.amount;
-        if (bsDelta !== 0) {
+        // 4. BINDING SETUP (MULTIPLIER)
+        const bsMult = adj.bindingSetupAdjustment.value;
+        if (bsMult !== 1.0) {
             const bindFixedKeys = ['binding_hc_fixed_by_sections', 'binding_pb_fixed_by_sections', 'binding_ss_fixed_by_sections', 'binding_ts_fixed_by_sections', 'binding_wo_fixed_by_sections', 'binding_sp_fixed_by_sections'];
             for (const k of bindFixedKeys) {
-                if (rates[k]) applyDeltaSubMap(rates[k], bsDelta);
+                if (rates[k]) applyMultiplierSubMap(rates[k], bsMult);
             }
         }
 
@@ -219,10 +192,10 @@ class CommercialKnobService {
             }
         }
 
-        // 6. LAMINATION SETUP (DELTA)
-        const lsDelta = adj.laminationSetupAdjustment.amount;
-        if (lsDelta !== 0 && rates.lam_fixed) {
-            applyDeltaSubMap(rates.lam_fixed, lsDelta);
+        // 6. LAMINATION SETUP (MULTIPLIER)
+        const lsMult = adj.laminationSetupAdjustment.value;
+        if (lsMult !== 1.0 && rates.lam_fixed) {
+            applyMultiplierSubMap(rates.lam_fixed, lsMult);
         }
 
         // 7. LAMINATION RUNNING COST (MULTIPLIER)
@@ -235,19 +208,21 @@ class CommercialKnobService {
     }
 
     /**
-     * Derives knob baseline metadata and current parameter values for UI presentation.
+     * Derives knob metadata with Primary vs Advanced tier classification.
      */
     deriveKnobMetadata(ratesSnapshot, bookSpec = {}) {
         const sanitized = this.sanitizeAdjustments({});
         return [
+            // ── PRIMARY CONTROLS ──
             {
                 id: 'printingSetupAdjustment',
                 label: 'Printing Setup',
-                description: 'Fixed makeready & prepress setup across interior & cover signatures',
-                unit: '€',
-                type: 'DELTA',
-                baseline: 0,
-                current: sanitized.printingSetupAdjustment.amount,
+                tier: 'PRIMARY',
+                description: 'Proportionally scales fixed makeready setup rates across interior & cover signatures',
+                unit: '×',
+                type: 'MULTIPLIER',
+                baseline: 1.0,
+                current: sanitized.printingSetupAdjustment.value,
                 min: KNOB_BOUNDS.printingSetupAdjustment.min,
                 max: KNOB_BOUNDS.printingSetupAdjustment.max,
                 step: KNOB_BOUNDS.printingSetupAdjustment.step,
@@ -256,7 +231,8 @@ class CommercialKnobService {
             {
                 id: 'printingRunMultiplier',
                 label: 'Printing Running Cost',
-                description: 'Variable impression run rate per 1,000 sheets/signatures',
+                tier: 'PRIMARY',
+                description: 'Proportionally scales variable impression run rates per 1,000 sheets/signatures',
                 unit: '×',
                 type: 'MULTIPLIER',
                 baseline: 1.0,
@@ -266,10 +242,12 @@ class CommercialKnobService {
                 step: KNOB_BOUNDS.printingRunMultiplier.step,
                 affectedCanonicalComponents: ['interior_*_var', 'cover_var_per_1000_by_colours']
             },
+            // ── ADVANCED CONTROLS ──
             {
                 id: 'paperCostMultiplier',
                 label: 'Paper Cost',
-                description: 'Raw paper substrate price per kg across interior & cover',
+                tier: 'ADVANCED',
+                description: 'Proportionally scales raw paper substrate price per kg across interior & cover',
                 unit: '×',
                 type: 'MULTIPLIER',
                 baseline: 1.0,
@@ -282,11 +260,12 @@ class CommercialKnobService {
             {
                 id: 'bindingSetupAdjustment',
                 label: 'Binding Setup',
-                description: 'Fixed setup charge for folding, gathering, and cover joining',
-                unit: '€',
-                type: 'DELTA',
-                baseline: 0,
-                current: sanitized.bindingSetupAdjustment.amount,
+                tier: 'ADVANCED',
+                description: 'Proportionally scales fixed setup rates for folding, gathering, and cover joining',
+                unit: '×',
+                type: 'MULTIPLIER',
+                baseline: 1.0,
+                current: sanitized.bindingSetupAdjustment.value,
                 min: KNOB_BOUNDS.bindingSetupAdjustment.min,
                 max: KNOB_BOUNDS.bindingSetupAdjustment.max,
                 step: KNOB_BOUNDS.bindingSetupAdjustment.step,
@@ -295,7 +274,8 @@ class CommercialKnobService {
             {
                 id: 'bindingRunMultiplier',
                 label: 'Binding Per Copy',
-                description: 'Variable binding & finishing execution charge per copy',
+                tier: 'ADVANCED',
+                description: 'Proportionally scales variable binding & finishing execution rates per copy',
                 unit: '×',
                 type: 'MULTIPLIER',
                 baseline: 1.0,
@@ -308,11 +288,12 @@ class CommercialKnobService {
             {
                 id: 'laminationSetupAdjustment',
                 label: 'Lamination Setup',
-                description: 'Fixed setup charge for surface lamination pass',
-                unit: '€',
-                type: 'DELTA',
-                baseline: 0,
-                current: sanitized.laminationSetupAdjustment.amount,
+                tier: 'ADVANCED',
+                description: 'Proportionally scales fixed setup rates for surface lamination pass',
+                unit: '×',
+                type: 'MULTIPLIER',
+                baseline: 1.0,
+                current: sanitized.laminationSetupAdjustment.value,
                 min: KNOB_BOUNDS.laminationSetupAdjustment.min,
                 max: KNOB_BOUNDS.laminationSetupAdjustment.max,
                 step: KNOB_BOUNDS.laminationSetupAdjustment.step,
@@ -321,7 +302,8 @@ class CommercialKnobService {
             {
                 id: 'laminationRunMultiplier',
                 label: 'Lamination Per Copy',
-                description: 'Variable surface finish rate per 1,000 copies',
+                tier: 'ADVANCED',
+                description: 'Proportionally scales variable surface finish rates per 1,000 copies',
                 unit: '×',
                 type: 'MULTIPLIER',
                 baseline: 1.0,
@@ -338,12 +320,13 @@ class CommercialKnobService {
      * Executes non-mutating preview of commercial adjustments across requested quantities.
      */
     previewCommercialAdjustments(params = {}) {
-        const { bookSpec, quantities = [500, 600, 700], baselineRates, adjustments = {}, quoteEvidence = null } = params;
+        const { bookSpec, quantities = [500, 600, 700], baselineRates, adjustments = {}, quoteEvidence = null, printerNodeId = 'node-default-1' } = params;
 
         if (!bookSpec || !baselineRates) {
             throw new Error('MISSING_PREVIEW_PARAMETERS');
         }
 
+        const baselineRatesChecksum = computeRatesChecksum(baselineRates);
         const sanitizedAdj = this.sanitizeAdjustments(adjustments);
         const adjustedRates = this.applyKnobAdjustments(baselineRates, sanitizedAdj);
 
@@ -371,7 +354,7 @@ class CommercialKnobService {
 
         for (const q of quantities) {
             const specQ = { ...bookSpec, copies: q };
-            
+
             // Baseline prediction
             const baseEval = adapter.evaluateForwardPrice(specQ, baselineRates);
             const baselinePrice = baseEval.predictedManufacturingPrice;
@@ -434,7 +417,15 @@ class CommercialKnobService {
             quantities: quantityResults,
             metrics,
             knobs: this.deriveKnobMetadata(baselineRates, bookSpec),
-            sanitizedAdjustments: sanitizedAdj
+            sanitizedAdjustments: sanitizedAdj,
+            metadata: {
+                phase: '195F',
+                status: 'NOT_ACTIVE',
+                printerNodeId,
+                baselineRatesChecksum,
+                machineRoutingRequired: false,
+                pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+            }
         };
     }
 
@@ -443,7 +434,7 @@ class CommercialKnobService {
      * using Least Squares for 3+ points, exact line for 2 points, or underdetermined for 1 point.
      */
     fitCommercialCurve(params = {}) {
-        const { quotePoints, quantities = [500, 600, 700], baselineRates, bookSpec } = params;
+        const { quotePoints, quantities = [500, 600, 700], baselineRates, bookSpec, printerNodeId = 'node-default-1' } = params;
 
         let points = [];
         if (Array.isArray(quotePoints)) {
@@ -455,6 +446,7 @@ class CommercialKnobService {
         points = points.filter(p => !isNaN(p.q) && p.q > 0 && !isNaN(p.price) && p.price > 0).sort((a, b) => a.q - b.q);
 
         const N = points.length;
+        const baselineRatesChecksum = baselineRates ? computeRatesChecksum(baselineRates) : 'sha256:0000000000000000';
 
         if (N === 0) {
             return {
@@ -462,7 +454,15 @@ class CommercialKnobService {
                 commercialFixed: 0,
                 commercialMarginal: 0,
                 fitMetrics: null,
-                suggestedAdjustments: getNeutralAdjustments()
+                suggestedAdjustments: getNeutralAdjustments(),
+                metadata: {
+                    phase: '195F',
+                    status: 'NOT_ACTIVE',
+                    printerNodeId,
+                    baselineRatesChecksum,
+                    machineRoutingRequired: false,
+                    pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+                }
             };
         }
 
@@ -472,7 +472,15 @@ class CommercialKnobService {
                 commercialFixed: 0,
                 commercialMarginal: 0,
                 fitMetrics: null,
-                suggestedAdjustments: getNeutralAdjustments()
+                suggestedAdjustments: getNeutralAdjustments(),
+                metadata: {
+                    phase: '195F',
+                    status: 'NOT_ACTIVE',
+                    printerNodeId,
+                    baselineRatesChecksum,
+                    machineRoutingRequired: false,
+                    pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+                }
             };
         }
 
@@ -583,13 +591,12 @@ class CommercialKnobService {
             const baseMarginal = baseDen > 0 ? baseNum / baseDen : 0;
             const baseFixed = baseMeanP - baseMarginal * baseMeanQ;
 
-            const fixedGap = commercialFixed - baseFixed;
-            const marginalMult = baseMarginal > 0 ? commercialMarginal / baseMarginal : 1.0;
+            const setupMult = baseFixed > 0 ? Math.max(0.50, Math.min(2.00, commercialFixed / baseFixed)) : 1.0;
+            const marginalMult = baseMarginal > 0 ? Math.max(0.75, Math.min(1.25, commercialMarginal / baseMarginal)) : 1.0;
 
             suggestedAdjustments = this.sanitizeAdjustments({
-                printingSetupAdjustment: { type: 'DELTA', amount: Number((fixedGap * 0.70).toFixed(2)) },
-                printingRunMultiplier: { type: 'MULTIPLIER', value: Number(marginalMult.toFixed(2)) },
-                bindingSetupAdjustment: { type: 'DELTA', amount: Number((fixedGap * 0.30).toFixed(2)) }
+                printingSetupAdjustment: { type: 'MULTIPLIER', value: Number(setupMult.toFixed(2)) },
+                printingRunMultiplier: { type: 'MULTIPLIER', value: Number(marginalMult.toFixed(2)) }
             });
         }
 
@@ -606,7 +613,15 @@ class CommercialKnobService {
                 maxResidual: Number(maxRes.toFixed(4))
             },
             predictions,
-            suggestedAdjustments
+            suggestedAdjustments,
+            metadata: {
+                phase: '195F',
+                status: 'NOT_ACTIVE',
+                printerNodeId,
+                baselineRatesChecksum,
+                machineRoutingRequired: false,
+                pricingAuthority: 'LEGACY_NODE_RATES_JSON'
+            }
         };
     }
 }
