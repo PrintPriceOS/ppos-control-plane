@@ -209,10 +209,15 @@ class CalibrationAssistantService {
             throw err;
         }
 
-        // 2. Chat history (in-memory / stateless for assistantChat)
+        // 2. Resolve Uploaded Document Evidence Context (if evidenceId provided)
+        const evidenceId = options.evidenceId || null;
+        const selectedVariantId = options.selectedVariantId || null;
+        const evidenceDoc = await this._resolveEvidenceDocument(tenantId, evidenceId, selectedVariantId);
+
+        // 3. Chat history (in-memory / stateless for assistantChat)
         const boundedHistory = [];
 
-        // 3. Build minimal sanitized AI context
+        // 4. Build minimal sanitized AI context
         const currentSpec = session.book_spec_json
             ? (typeof session.book_spec_json === 'string' ? JSON.parse(session.book_spec_json) : session.book_spec_json)
             : {};
@@ -228,16 +233,29 @@ class CalibrationAssistantService {
             includesPackaging: session.includes_packaging
         };
 
+        let evidencePromptBlock = '';
+        if (evidenceDoc) {
+            evidencePromptBlock = `\nUPLOADED QUOTE EVIDENCE DOCUMENT CONTEXT (Tenant Isolated):
+Document ID: ${evidenceDoc.evidenceId}
+Filename: ${evidenceDoc.filename}
+Raw Extracted Document Text:
+"""
+${evidenceDoc.rawTextSnippet}
+"""
+Extracted Offers: ${JSON.stringify(evidenceDoc.offers)}
+${evidenceDoc.selectedOffer ? `SERVER RESOLVED SELECTED VARIANT (from DB): ${JSON.stringify(evidenceDoc.selectedOffer)}` : ''}`;
+        }
+
         const contextPrompt = `CURRENT SESSION STATE:
 Reference Book: ${session.printer_node_name_snapshot ? `Printer Node ${session.printer_node_name_snapshot}` : 'Reference Book'}
 Current Physical Specification: ${JSON.stringify(currentSpec)}
 Current Commercial Inclusions: ${JSON.stringify(currentCommercials)}
-Session Status: ${session.status}
+Session Status: ${session.status}${evidencePromptBlock}
 
 MANAGER MESSAGE:
 "${sanitizedMessage}"`;
 
-        // 4. Invoke AI Provider Adapter
+        // 5. Invoke AI Provider Adapter
         let aiResult;
         const startTime = Date.now();
         try {
@@ -260,10 +278,10 @@ MANAGER MESSAGE:
             throw aiErr;
         }
 
-        // 5. Deterministic Schema & Allowlist Validation (Untrusted Data Gate)
-        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage, currentSpec);
+        // 6. Deterministic Schema & Allowlist Validation (Untrusted Data Gate)
+        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage, currentSpec, evidenceDoc);
 
-        // 6. Record Audit Log (without raw secrets)
+        // 7. Record Audit Log (without raw secrets)
         await this._logAudit(tenantId, actor, sessionId, 'CALIBRATION_AI_CHAT_INVOKED', {
             model: aiResult.model,
             latencyMs: aiResult.latencyMs,
@@ -274,9 +292,6 @@ MANAGER MESSAGE:
         });
 
         // S3: STRICTLY ZERO-WRITE CONTRACT.
-        // assistant.chat() returns the structured proposal purely in memory.
-        // It does NOT update chat_history_json, session status, or any database tables.
-
         return {
             ok: true,
             sessionId,
@@ -312,12 +327,30 @@ MANAGER MESSAGE:
             throw err;
         }
 
+        // Resolve Uploaded Document Evidence Context (if evidenceId provided)
+        const evidenceId = options.evidenceId || null;
+        const selectedVariantId = options.selectedVariantId || null;
+        const evidenceDoc = await this._resolveEvidenceDocument(tenantId, evidenceId, selectedVariantId);
+
+        let evidencePromptBlock = '';
+        if (evidenceDoc) {
+            evidencePromptBlock = `\nUPLOADED QUOTE EVIDENCE DOCUMENT CONTEXT (Tenant Isolated):
+Document ID: ${evidenceDoc.evidenceId}
+Filename: ${evidenceDoc.filename}
+Raw Extracted Document Text:
+"""
+${evidenceDoc.rawTextSnippet}
+"""
+Extracted Offers: ${JSON.stringify(evidenceDoc.offers)}
+${evidenceDoc.selectedOffer ? `SERVER RESOLVED SELECTED VARIANT (from DB): ${JSON.stringify(evidenceDoc.selectedOffer)}` : ''}`;
+        }
+
         // Build minimal pre-session prompt
         const contextPrompt = `CURRENT SESSION STATE:
 Reference Book Name: Pre-Session Calibration Workspace (Stateless)
 Current Physical Specification: {}
 Current Commercial Inclusions: {}
-Session Status: PRE_SESSION
+Session Status: PRE_SESSION${evidencePromptBlock}
 
 MANAGER MESSAGE:
 "${sanitizedMessage}"`;
@@ -344,7 +377,7 @@ MANAGER MESSAGE:
         }
 
         // Deterministic Schema & Allowlist Validation (Untrusted Data Gate - Reused 100%)
-        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage);
+        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage, null, evidenceDoc);
 
         // Record Audit Log (Metadata-only)
         await this._logAudit(tenantId, actor, null, 'CALIBRATION_AI_PRESESSION_INTERPRET_INVOKED', {
@@ -474,7 +507,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
      * If ANY forbidden control/economic field appears anywhere in the raw response,
      * the entire response is REJECTED (specPatch = {}, declaredCommercials = {}, readyForValidation = false).
      */
-    _validateAndNormalizeAIResponse(rawJson, rawUserMessage = null, existingSessionSpec = null) {
+    _validateAndNormalizeAIResponse(rawJson, rawUserMessage = null, existingSessionSpec = null, evidenceDoc = null) {
         const existingRawText = (existingSessionSpec && existingSessionSpec.raw_text)
             ? existingSessionSpec.raw_text
             : ((existingSessionSpec && existingSessionSpec.rawText) ? existingSessionSpec.rawText : null);
@@ -768,23 +801,63 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 if (!negated) normalized.specPatch.has_endpapers = true;
             }
         }
-        if (!normalized.specPatch.has_spot_uv) {
-            if (combinedText.includes('barniz') || combinedText.includes('spot uv') || combinedText.includes('uvi')) {
-                const negated = /(barniz|spot_?uv|uvi)\s*[:=]\s*(none|false|no|null)|(sin|no)\s+(barniz|spot_?uv|uvi)/i.test(combinedText);
-                if (!negated) normalized.specPatch.has_spot_uv = true;
+        const hasReliefVarnish = combinedText.includes('relieflack') || combinedText.includes('relieve');
+        const hasExplicitUV = combinedText.includes('spot uv') || combinedText.includes('uvi') || combinedText.includes('uv-lack') || combinedText.includes('uv varnish');
+
+        if (hasReliefVarnish && !hasExplicitUV) {
+            normalized.specPatch.has_spot_uv = false;
+        } else if (!normalized.specPatch.has_spot_uv && hasExplicitUV) {
+            const negated = /(spot_?uv|uvi)\s*[:=]\s*(none|false|no|null)|(sin|no)\s+(spot_?uv|uvi)/i.test(combinedText);
+            if (!negated) normalized.specPatch.has_spot_uv = true;
+        }
+
+        if (hasReliefVarnish) {
+            if (!Array.isArray(normalized.specPatch.unsupported_features)) {
+                normalized.specPatch.unsupported_features = [];
+            }
+            if (!normalized.specPatch.unsupported_features.includes('partieller_relieflack') &&
+                !normalized.specPatch.unsupported_features.includes('PARTIELLER_RELIEFLACK')) {
+                normalized.specPatch.unsupported_features.push('partieller_relieflack');
             }
         }
 
-        // 3. Filter clarification questions
+        // 3. Filter clarification questions (stripping redundant questions for already resolved fields)
         if (Array.isArray(rawJson.clarificationQuestions)) {
             for (const q of rawJson.clarificationQuestions) {
                 if (q && typeof q.question === 'string' && q.question.trim()) {
+                    const field = typeof q.field === 'string' ? q.field.toLowerCase() : 'general';
+                    const textL = q.question.toLowerCase();
+
+                    // Check if question asks about copies/quantity when copies are already resolved
+                    const isCopiesResolved = normalized.specPatch.copies != null && Number(normalized.specPatch.copies) > 0;
+                    const isCopiesQuestion = field === 'copies' || field === 'quantity' || textL.includes('how many copies') || textL.includes('cuántos ejemplares') || textL.includes('cuantas copias') || textL.includes('tirada');
+
+                    // Check if question asks about price when price is already resolved
+                    const isPriceResolved = normalized.declaredCommercials.targetManufacturingPrice != null && Number(normalized.declaredCommercials.targetManufacturingPrice) > 0;
+                    const isPriceQuestion = field === 'targetmanufacturingprice' || field === 'price' || textL.includes('target price') || textL.includes('precio de fabricación') || textL.includes('precio');
+
+                    if ((isCopiesResolved && isCopiesQuestion) || (isPriceResolved && isPriceQuestion)) {
+                        // Skip redundant question
+                        continue;
+                    }
+
                     normalized.clarificationQuestions.push({
                         field: typeof q.field === 'string' ? q.field : 'general',
                         question: q.question.trim(),
                         options: Array.isArray(q.options) ? q.options.map(String) : []
                     });
                 }
+            }
+        }
+
+        // Server-side override from tenant-isolated evidence document & selected variant
+        if (evidenceDoc && evidenceDoc.selectedOffer) {
+            normalized.declaredCommercials.targetManufacturingPrice = Number(evidenceDoc.selectedOffer.manufacturingPrice);
+            if (evidenceDoc.selectedOffer.transportPrice != null) {
+                normalized.declaredCommercials.targetTransportPrice = Number(evidenceDoc.selectedOffer.transportPrice);
+            }
+            if (evidenceDoc.selectedOffer.quantity) {
+                normalized.specPatch.copies = Number(evidenceDoc.selectedOffer.quantity);
             }
         }
 
@@ -803,6 +876,67 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
         }
 
         return normalized;
+    }
+
+    /**
+     * Resolves an uploaded quote evidence document for context prompt injection.
+     * Enforces strict tenant isolation: queries quote_evidence_documents WHERE id = ? AND tenant_id = ?.
+     * Throws 404 QUOTE_EVIDENCE_NOT_FOUND if not found or belongs to another tenant.
+     * Also resolves server-side offer amounts for options.selectedVariantId directly from DB.
+     */
+    async _resolveEvidenceDocument(tenantId, evidenceId, selectedVariantId = null) {
+        if (!evidenceId) return null;
+
+        const docs = await db.query(
+            `SELECT d.id, d.tenant_id, d.original_filename as file_name, d.document_sha256, d.detected_language, d.raw_text,
+                    e.validation_status, e.normalized_json as normalized_quote_json
+             FROM quote_evidence_documents d
+             LEFT JOIN quote_evidence_extractions e ON d.id = e.quote_evidence_document_id
+             WHERE d.id = ? AND d.tenant_id = ?`,
+            [evidenceId, tenantId]
+        );
+
+        if (!docs || docs.length === 0) {
+            const err = new Error('QUOTE_EVIDENCE_NOT_FOUND');
+            err.code = 'QUOTE_EVIDENCE_NOT_FOUND';
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const doc = docs[0];
+        const rawJsonStr = doc.normalized_quote_json || doc.normalized_json || '{}';
+        const normalized = typeof rawJsonStr === 'string'
+            ? JSON.parse(rawJsonStr || '{}')
+            : (rawJsonStr || {});
+
+        const offers = normalized.offers || [];
+        let selectedOffer = null;
+
+        if (selectedVariantId !== null && selectedVariantId !== undefined && selectedVariantId !== '') {
+            selectedOffer = offers.find((off, idx) =>
+                off.variantId === selectedVariantId ||
+                off.variantName === selectedVariantId ||
+                `variant-${idx}` === selectedVariantId ||
+                String(idx) === String(selectedVariantId) ||
+                off.id === selectedVariantId
+            ) || null;
+
+            if (!selectedOffer && offers.length > 0) {
+                const err = new Error(`QUOTE_VARIANT_NOT_FOUND: Variant '${selectedVariantId}' not found in evidence document`);
+                err.code = 'QUOTE_VARIANT_NOT_FOUND';
+                err.statusCode = 400;
+                throw err;
+            }
+        }
+
+        return {
+            evidenceId: doc.id,
+            filename: doc.file_name,
+            rawTextSnippet: doc.raw_text ? doc.raw_text.slice(0, 3000) : '',
+            normalizedQuote: normalized,
+            offers,
+            selectedOffer
+        };
     }
 
     /**

@@ -1931,4 +1931,60 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(attachBtnES).toHaveAttribute('title', 'Adjuntar un PDF');
         expect(attachBtnES).toHaveClass('w-[44px]', 'h-[44px]', 'bg-[#dc0000]', 'text-white');
     });
+
+    it('30. CalibrationConversation retains evidenceId and selectedVariantId across subsequent chat messages', async () => {
+        const sentCalls: Array<{ text: string; evidenceId?: string; selectedVariantId?: string }> = [];
+        const handleSendMock = async (text: string, evidenceId?: string, selectedVariantId?: string) => {
+            sentCalls.push({ text, evidenceId, selectedVariantId });
+        };
+
+        const activeEvidence = {
+            evidenceId: 'qdoc-test-123',
+            filename: 'TestQuote.pdf',
+            detectedLanguage: 'es',
+            offers: [
+                { variantId: 'variant-0', variantName: 'Opción 1', quantity: 3000, manufacturingPrice: 6048, transportPrice: 435, unitPrice: 2.16 },
+                { variantId: 'variant-1', variantName: 'Opción 2', quantity: 3000, manufacturingPrice: 6184, transportPrice: 435, unitPrice: 2.20 }
+            ]
+        };
+
+        rtlRender(
+            <LocaleProvider initialLocale="es">
+                <CalibrationConversation
+                    messages={[
+                        { role: 'assistant', text: 'Document extracted', quoteEvidence: activeEvidence }
+                    ]}
+                    onSendMessage={handleSendMock}
+                    sending={false}
+                    activeProposal={null}
+                    onApplyProposal={() => {}}
+                />
+            </LocaleProvider>
+        );
+
+        // Simulate file upload setting active evidence inside component
+        // Or render with activeQuoteEvidence in state by clicking variant button
+        // Locate select button for Opción 2 (€6184)
+        // First we simulate variant selection
+        const variantButtons = screen.getAllByRole('button', { name: /selectThisVariant|Seleccionar/i });
+        expect(variantButtons.length).toBeGreaterThanOrEqual(2);
+        fireEvent.click(variantButtons[1]);
+
+        expect(sentCalls.length).toBe(1);
+        expect(sentCalls[0].evidenceId).toBe('qdoc-test-123');
+        expect(sentCalls[0].selectedVariantId).toBe('variant-1');
+
+        // Now type a normal message in the input box
+        const inputEl = screen.getByPlaceholderText('Describe el libro o adjunta un PDF…');
+        fireEvent.change(inputEl, { target: { value: 'Confirming option 2 specs' } });
+
+        // Submit form
+        const sendBtn = screen.getByRole('button', { name: /Send/i });
+        fireEvent.click(sendBtn);
+
+        expect(sentCalls.length).toBe(2);
+        expect(sentCalls[1].text).toBe('Confirming option 2 specs');
+        expect(sentCalls[1].evidenceId).toBe('qdoc-test-123');
+        expect(sentCalls[1].selectedVariantId).toBe('variant-1');
+    });
 });

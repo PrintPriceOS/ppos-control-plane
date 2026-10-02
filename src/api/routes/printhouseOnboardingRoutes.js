@@ -717,8 +717,9 @@ const calibrationAssistantService = require('../services/calibrationAssistantSer
 router.post('/pricing/calibration-assistant/interpret', wrapHandler(async (req, res) => {
     const tenantId = req.user.tenantId;
     const message = req.body.message;
+    const evidenceId = req.body.evidenceId;
     const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
-    const result = await calibrationAssistantService.interpret(tenantId, message, actor);
+    const result = await calibrationAssistantService.interpret(tenantId, message, actor, { evidenceId });
     res.status(200).json({ ok: true, data: result });
 }));
 
@@ -726,8 +727,9 @@ router.post('/pricing/calibration-assistant/interpret', wrapHandler(async (req, 
 router.post('/pricing/calibrations/:id/assistant/chat', wrapHandler(async (req, res) => {
     const tenantId = req.user.tenantId;
     const message = req.body.message;
+    const evidenceId = req.body.evidenceId;
     const actor = { id: req.user.id, email: req.user.email, role: req.user.role };
-    const result = await calibrationAssistantService.chat(tenantId, req.params.id, message, actor);
+    const result = await calibrationAssistantService.chat(tenantId, req.params.id, message, actor, { evidenceId });
     res.status(200).json({ ok: true, data: result });
 }));
 

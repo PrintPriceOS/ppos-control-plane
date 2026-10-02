@@ -283,7 +283,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     };
 
     // ── 1. Conversational Chat (193E Zero-Write) ──
-    const handleSendMessage = async (text: string) => {
+    const handleSendMessage = async (text: string, evidenceId?: string, selectedVariantId?: string) => {
         setSendingChat(true);
         setError(null);
 
@@ -294,9 +294,9 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
         try {
             let result: any;
             if (session?.id && session.status !== 'ACCEPTED' && session.status !== 'REJECTED') {
-                result = await printhouseCalibrationApi.assistantChat(session.id, text);
+                result = await printhouseCalibrationApi.assistantChat(session.id, text, evidenceId, selectedVariantId);
             } else {
-                result = await printhouseCalibrationApi.interpretPreSession(text);
+                result = await printhouseCalibrationApi.interpretPreSession(text, evidenceId, selectedVariantId);
             }
 
             setAiUnavailable(false);

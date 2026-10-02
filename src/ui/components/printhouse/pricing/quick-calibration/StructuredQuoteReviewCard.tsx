@@ -51,6 +51,7 @@ interface StructuredQuoteReviewCardProps {
     uncalibratedRates?: string[];
     onReadyForCalibration?: (evidenceId: string) => void;
     onIgnoreDocument?: (evidenceId: string) => void;
+    onSelectVariant?: (offer: any, variantId: string) => void;
 }
 
 export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps> = ({
@@ -60,7 +61,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     pageCount = 1,
     printhouseName = 'Quotation Document',
     format = 'Custom Format',
-    binding = 'Standard Binding',
+    binding,
     finishing = 'Standard Finish',
     offers = [],
     normalizedTerms = [],
@@ -71,8 +72,10 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     quoteStatus = 'VALID_COMMERCIAL_QUOTE',
     uncalibratedRates = [],
     onReadyForCalibration,
-    onIgnoreDocument
+    onIgnoreDocument,
+    onSelectVariant
 }) => {
+    const defaultBinding = binding || 'Not Specified';
     const { t } = useLocale();
     const [showDetails, setShowDetails] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -209,61 +212,83 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
 
                 {/* Offers Table */}
                 <div className="space-y-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                        Extracted Commercial Quantities & Prices ({offers.length})
-                    </span>
+                    {(() => {
+                        const isAllSameQuantity = offers.length > 1 && offers.every(o => Number(o.quantity) === Number(offers[0].quantity));
+                        return (
+                            <>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                                    {isAllSameQuantity
+                                        ? `Extracted Commercial Offer Variants for ${offers[0]?.quantity} copies (${offers.length} variants)`
+                                        : `Extracted Commercial Quantities & Prices (${offers.length})`}
+                                </span>
 
-                    <div className="space-y-2">
-                        {offers.map((off, idx) => {
-                            const isOk = off.validationStatus === 'CONSISTENT';
-                            const computedUnit = off.computedUnitPrice || (off.quotedTotalPrice / off.quantity);
-                            const quotedUnit = off.quotedUnitPrice;
+                                <div className="space-y-2">
+                                    {offers.map((off, idx) => {
+                                        const isOk = off.validationStatus === 'CONSISTENT';
+                                        const computedUnit = off.computedUnitPrice || (off.quotedTotalPrice / off.quantity);
+                                        const quotedUnit = off.quotedUnitPrice;
 
-                            return (
-                                <div
-                                    key={idx}
-                                    className={`p-3 rounded-xl border transition-colors ${
-                                        isOk 
-                                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' 
-                                            : 'bg-red-50/50 dark:bg-red-950/20 border-red-300 dark:border-red-800/80'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between font-bold mb-1.5">
-                                        <span className="text-zinc-900 dark:text-white">
-                                            {off.quantity} units {off.variantName ? `(${off.variantName})` : ''}
-                                        </span>
-                                        <span className={isOk ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-red-700 dark:text-red-400 font-bold'}>
-                                            {isOk ? '✓ Correct' : '⚠ Inconsistency Detected'}
-                                        </span>
-                                    </div>
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`p-3 rounded-xl border transition-colors ${
+                                                    isOk
+                                                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                                                        : 'bg-red-50/50 dark:bg-red-950/20 border-red-300 dark:border-red-800/80'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between font-bold mb-1.5">
+                                                    <span className="text-zinc-900 dark:text-white text-xs">
+                                                        {isAllSameQuantity ? `Opción ${idx + 1}: €${off.manufacturingPrice} (Fabricación)` : `${off.quantity} unidades`} {off.variantName ? `(${off.variantName})` : ''}
+                                                    </span>
+                                                    <span className={isOk ? 'text-emerald-700 dark:text-emerald-300 font-semibold text-xs' : 'text-red-700 dark:text-red-400 font-bold text-xs'}>
+                                                        {isOk ? '✓ Correct' : '⚠ Inconsistency Detected'}
+                                                    </span>
+                                                </div>
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
-                                        <div>
-                                            <span>Mfg Price:</span> <strong className="text-zinc-900 dark:text-white">€{off.manufacturingPrice}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Transport:</span> <strong className="text-zinc-900 dark:text-white">€{off.transportPrice || 0}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Quoted Total:</span> <strong className="text-zinc-900 dark:text-white">€{off.quotedTotalPrice}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Unit (Quoted / Computed):</span>{' '}
-                                            <strong className={isOk ? 'text-zinc-900 dark:text-white' : 'text-red-600 font-bold'}>
-                                                €{Number(quotedUnit).toFixed(2)} / €{Number(computedUnit).toFixed(2)}
-                                            </strong>
-                                        </div>
-                                    </div>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+                                                    <div>
+                                                        <span>Precio Ofertado Fabricación:</span> <strong className="text-zinc-900 dark:text-white">€{off.manufacturingPrice}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Transporte Separado:</span> <strong className="text-zinc-900 dark:text-white">€{off.transportPrice || 0}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Total Ofertado Proveedor:</span> <strong className="text-zinc-900 dark:text-white">€{off.quotedTotalPrice}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span>Unitario Ofertado:</span>{' '}
+                                                        <strong className={isOk ? 'text-zinc-900 dark:text-white' : 'text-red-600 font-bold'}>
+                                                            €{Number(quotedUnit).toFixed(2)}
+                                                        </strong>
+                                                    </div>
+                                                </div>
 
-                                    {!isOk && (
-                                        <p className="text-[11px] text-red-700 dark:text-red-300 font-medium m-0 mt-1.5">
-                                            Indicated unit price (€{Number(quotedUnit).toFixed(2)}) differs from calculated total divided by quantity (€{Number(computedUnit).toFixed(2)}).
-                                        </p>
-                                    )}
+                                                {onSelectVariant && (
+                                                    <div className="mt-2 flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                                                        <span className="text-[10px] text-zinc-500 italic">Precio ofertado por el proveedor • Coste interno se calcula tras calibración</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onSelectVariant(off, `variant-${idx}`)}
+                                                            className="px-2.5 py-1 bg-[#dc0000] hover:bg-[#b00000] text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            {t('selectThisVariant') ? `${t('selectThisVariant')} (€${off.manufacturingPrice})` : `Seleccionar variante (€${off.manufacturingPrice})`}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {!isOk && (
+                                                    <p className="text-[11px] text-red-700 dark:text-red-300 font-medium m-0 mt-1.5">
+                                                        Indicated unit price (€{Number(quotedUnit).toFixed(2)}) differs from calculated total divided by quantity (€{Number(computedUnit).toFixed(2)}).
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </>
+                        );
+                    })()}
                 </div>
 
                 {/* Expandable Original / Translated / Normalized Toggle */}

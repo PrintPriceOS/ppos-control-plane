@@ -20,7 +20,7 @@ interface Message {
 
 interface CalibrationConversationProps {
     messages: Message[];
-    onSendMessage: (text: string) => Promise<void>;
+    onSendMessage: (text: string, evidenceId?: string, selectedVariantId?: string) => Promise<void>;
     sending: boolean;
     activeProposal: any | null;
     onApplyProposal: (proposal: any) => void;
@@ -44,14 +44,18 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [activeQuoteEvidence, setActiveQuoteEvidence] = useState<any | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(undefined);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const lastMsgWithEvidence = [...messages].reverse().find(m => m.quoteEvidence);
+    const effectiveEvidence = activeQuoteEvidence || lastMsgWithEvidence?.quoteEvidence;
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || sending) return;
         const msg = input.trim();
         setInput('');
-        await onSendMessage(msg);
+        await onSendMessage(msg, effectiveEvidence?.evidenceId, selectedVariantId);
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +89,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
             const langNotice = result.detectedLanguage === 'de' ? 'alemán' : (result.detectedLanguage === 'es' ? 'español' : 'inglés');
             const summaryMsg = `He analizado el documento PDF "${result.filename}" (Idioma detectado: ${langNotice}).\nEncontré ${result.offers?.length || 0} tirada(s).`;
             
-            await onSendMessage(`[PDF subido]: ${result.filename}`);
+            await onSendMessage(`[PDF subido]: ${result.filename}`, result.evidenceId);
 
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -239,18 +243,22 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                 )}
 
                 {/* Structured Quote Evidence Review Card */}
-                {activeQuoteEvidence && (
+                {effectiveEvidence && (
                     <StructuredQuoteReviewCard
-                        evidenceId={activeQuoteEvidence.evidenceId}
-                        filename={activeQuoteEvidence.filename}
-                        documentLanguage={activeQuoteEvidence.detectedLanguage}
-                        printhouseName={activeQuoteEvidence.printhouseName}
-                        format={activeQuoteEvidence.format || (activeQuoteEvidence.width_mm && activeQuoteEvidence.height_mm ? `${activeQuoteEvidence.width_mm} × ${activeQuoteEvidence.height_mm} mm` : undefined)}
-                        binding={activeQuoteEvidence.binding || activeQuoteEvidence.binding_method}
-                        finishing={activeQuoteEvidence.finishing || activeQuoteEvidence.lamination}
-                        offers={activeQuoteEvidence.offers || []}
-                        normalizedTerms={activeQuoteEvidence.normalizedTerms || []}
-                        validationStatus={activeQuoteEvidence.hasInconsistentOffers ? 'INCONSISTENT_UNIT_PRICE' : 'CONSISTENT'}
+                        evidenceId={effectiveEvidence.evidenceId}
+                        filename={effectiveEvidence.filename}
+                        documentLanguage={effectiveEvidence.detectedLanguage}
+                        printhouseName={effectiveEvidence.printhouseName}
+                        format={effectiveEvidence.format || (effectiveEvidence.width_mm && effectiveEvidence.height_mm ? `${effectiveEvidence.width_mm} × ${effectiveEvidence.height_mm} mm` : undefined)}
+                        binding={effectiveEvidence.binding || effectiveEvidence.binding_method}
+                        finishing={effectiveEvidence.finishing || effectiveEvidence.lamination}
+                        offers={effectiveEvidence.offers || []}
+                        normalizedTerms={effectiveEvidence.normalizedTerms || []}
+                        validationStatus={effectiveEvidence.hasInconsistentOffers ? 'INCONSISTENT_UNIT_PRICE' : 'CONSISTENT'}
+                        onSelectVariant={(off, variantId) => {
+                            setSelectedVariantId(variantId);
+                            onSendMessage(`[Variante seleccionada]: ${off.variantName || `Variante ${variantId}`}`, effectiveEvidence.evidenceId, variantId);
+                        }}
                     />
                 )}
 

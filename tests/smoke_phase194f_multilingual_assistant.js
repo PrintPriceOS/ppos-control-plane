@@ -201,6 +201,174 @@ async function runTests() {
   assert.ok(!cardCode.includes('acceptCalibrationRun'), 'Review card must not invoke governed acceptance');
   console.log('✓ PASS 194F-23 & 194F-24');
 
+  // Test 194F-25: PDF extraction to chat context flow does not re-ask known data & preserves original specs & variant continuity
+  console.log('\n[TEST 194F-25] PDF extraction -> assistant chat context flow & variant continuity...');
+  const fahrmannRawText = `Produkt Fährmann (VVA/10 Muster)
+Format 139 x 212 mm
+Inhalt 208 (1+1) + 8 (4+4) Seiten + Umschlag
+Angaben Hardcover, gerader Rücken, Fadenheftung, weiß kapitalt, Mattfolie plus partieller Relieflack, nicht eingeschweißt, auf Palette
+Auflage 3000 pc
+Inhalt Munken Print Cream 1.5 90 g / Munken Premium Cream 1.3 90 g
+Vorsatz/Nachsatz Munken Print Cream 1.5 115 g / Munken Premium Cream 1.3 115 g
+Inhalt 1+1 Pantone 4+4 8 Seiten am Stück
+Vorsatz/Nachsatz 0+0
+Umschlag 4+0
+Option 1: 3000 Stück 6.048 Euro + 435 Euro Transport = 6.483 Euro
+Option 2: 3000 Stück 6.184 Euro + 435 Euro Transport = 6.619 Euro
+Option 3: 3000 Stück 6.298 Euro + 435 Euro Transport = 6.733 Euro
+Option 4: 3000 Stück 6.582 Euro + 435 Euro Transport = 7.017 Euro`;
+
+  const fahrmannOffers = [
+    { variantId: 'variant-0', quantity: 3000, manufacturingPrice: 6048, transportPrice: 435, quotedTotalPrice: 6483, quotedUnitPrice: 2.16, validationStatus: 'CONSISTENT', variantName: 'Opción 1' },
+    { variantId: 'variant-1', quantity: 3000, manufacturingPrice: 6184, transportPrice: 435, quotedTotalPrice: 6619, quotedUnitPrice: 2.21, validationStatus: 'CONSISTENT', variantName: 'Opción 2' },
+    { variantId: 'variant-2', quantity: 3000, manufacturingPrice: 6298, transportPrice: 435, quotedTotalPrice: 6733, quotedUnitPrice: 2.24, validationStatus: 'CONSISTENT', variantName: 'Opción 3' },
+    { variantId: 'variant-3', quantity: 3000, manufacturingPrice: 6582, transportPrice: 435, quotedTotalPrice: 7017, quotedUnitPrice: 2.34, validationStatus: 'CONSISTENT', variantName: 'Opción 4' }
+  ];
+
+  db.query = async (sql, params) => {
+    if (sql.includes('FROM quote_evidence_documents')) {
+      if (params && params[0] === 'qdoc-fahrmann-194f' && params[1] === 'tenant-es-1') {
+        return [{
+          id: 'qdoc-fahrmann-194f',
+          tenant_id: 'tenant-es-1',
+          file_name: 'Fährmann_(VVA_10_Muster)_07.09.2026.pdf',
+          detected_language: 'de',
+          raw_text: fahrmannRawText,
+          normalized_json: JSON.stringify({ printhouseName: 'Fährmann (VVA/10 Muster)', offers: fahrmannOffers }),
+          normalized_quote_json: JSON.stringify({ printhouseName: 'Fährmann (VVA/10 Muster)', offers: fahrmannOffers })
+        }];
+      }
+      return []; // Returns empty array for wrong tenant
+    }
+    return [];
+  };
+
+  const aiAdapter = require('../src/api/services/aiProviderAdapter');
+  let capturedUserPrompts = [];
+  const originalGenerate = aiAdapter.generateStructuredCompletion.bind(aiAdapter);
+
+  aiAdapter.generateStructuredCompletion = async (opts) => {
+    capturedUserPrompts.push(opts.userPrompt);
+    return originalGenerate(opts);
+  };
+
+  try {
+    const mockFahrmannAiResponse = {
+      intent: 'SPEC_EXTRACTION',
+      specPatch: {
+        copies: 3000,
+        book_width_mm: 139,
+        book_height_mm: 212,
+        interior_pages: 216,
+        paper_type_interior: 'munken',
+        paper_weight_interior: 90,
+        binding_method: 'hardcover',
+        has_mixed_interior: true,
+        mixed_interior_details: '208 (1+1) + 8 (4+4) Seiten',
+        has_endpapers: true,
+        endpapers_details: '115 g/m² sin impresión (0+0)',
+        has_spot_uv: false,
+        spot_uv_details: 'partieller Relieflack (barniz de relieve parcial)',
+        unsupported_features: ['partieller_relieflack']
+      },
+      declaredCommercials: {
+        targetManufacturingPrice: 6048,
+        targetTransportPrice: 435,
+        currency: 'EUR',
+        includesPaper: true,
+        includesBinding: true,
+        includesFinishing: true,
+        includesPackaging: true
+      },
+      clarificationQuestions: [
+        { field: 'copies', question: 'How many copies do you want?' },
+        { field: 'targetManufacturingPrice', question: 'What is your target price?' }
+      ],
+      explanation: 'Extracted PDF document Fährmann_(VVA_10_Muster)_07.09.2026.pdf with 4 offer variants for 3,000 copies.',
+      warnings: [],
+      readyForValidation: true
+    };
+
+    // Turn 1: Initial upload interpretation via calibrationAssistantService.interpret (real service method)
+    const res1 = await calibrationAssistantService.interpret('tenant-es-1', '[PDF subido]: Fährmann_(VVA_10_Muster)_07.09.2026.pdf', { id: 'u1' }, { evidenceId: 'qdoc-fahrmann-194f', mockResponse: mockFahrmannAiResponse });
+    const prop1 = res1.proposal || res1;
+
+    // Assertions on Captured AI Context Prompt (verifying reception of exact extracted document specs)
+    assert.ok(capturedUserPrompts.length > 0, 'Must capture context prompt passed to AI adapter');
+    const contextPrompt1 = capturedUserPrompts[0];
+    assert.ok(contextPrompt1.includes('Fährmann_(VVA_10_Muster)_07.09.2026.pdf'), 'Context prompt must contain original PDF filename');
+    assert.ok(contextPrompt1.includes('Vorsatz/Nachsatz 0+0'), 'Context prompt must contain unprinted endpapers 0+0 from PDF text');
+    assert.ok(contextPrompt1.includes('208 (1+1) + 8 (4+4) Seiten'), 'Context prompt must contain mixed interior details from PDF text');
+    assert.ok(contextPrompt1.includes('Hardcover, gerader Rücken, Fadenheftung'), 'Context prompt must contain Hardcover thread sewn binding from PDF text');
+    assert.ok(contextPrompt1.includes('partieller Relieflack'), 'Context prompt must contain partial relief varnish without forcing UV assumption');
+
+    assert.strictEqual(prop1.specPatch.copies, 3000, 'Must extract 3000 copies');
+    assert.strictEqual(prop1.specPatch.book_width_mm, 139, 'Must extract width 139mm');
+    assert.strictEqual(prop1.specPatch.book_height_mm, 212, 'Must extract height 212mm');
+    assert.strictEqual(prop1.specPatch.interior_pages, 216, 'Must extract 216 interior pages');
+    assert.strictEqual(prop1.specPatch.paper_type_interior, 'munken', 'Must preserve Munken paper');
+    assert.strictEqual(prop1.specPatch.binding_method, 'hardcover', 'Must preserve Hardcover binding');
+    assert.strictEqual(prop1.specPatch.has_mixed_interior, true, 'Must preserve mixed interior');
+    assert.strictEqual(prop1.specPatch.endpapers_details, '115 g/m² sin impresión (0+0)', 'Must preserve unprinted 115g endpapers spec');
+    assert.strictEqual(prop1.specPatch.has_spot_uv, false, 'Must NOT set has_spot_uv=true for unconfirmed UV technology');
+    assert.ok(Array.isArray(prop1.specPatch.unsupported_features) && prop1.specPatch.unsupported_features.includes('partieller_relieflack'), 'Must track partieller_relieflack in unsupported_features');
+    assert.strictEqual(prop1.specPatch.spot_uv_details, 'partieller Relieflack (barniz de relieve parcial)', 'Must preserve partial relief varnish details');
+
+    // Verify deterministic filter strips redundant clarification questions when fields are already resolved
+    assert.strictEqual(prop1.clarificationQuestions.length, 0, 'Deterministic filter must strip redundant questions for already resolved copies and target price');
+
+    // Turn 2: Selected Variant Continuity via selectedVariantId: 'variant-1' (User selects Option 2: €6,184 + €435)
+    // Pass DELIBERATELY WRONG numbers in AI mock to prove server-side DB override!
+    const mockWrongVariant2AiResponse = {
+      intent: 'SPEC_EXTRACTION',
+      specPatch: { ...prop1.specPatch, copies: 1000 },
+      declaredCommercials: {
+        targetManufacturingPrice: 6048, // Intentionally wrong (Option 1 price)
+        targetTransportPrice: 0,       // Intentionally wrong
+        currency: 'EUR',
+        includesPaper: true,
+        includesBinding: true,
+        includesFinishing: true,
+        includesPackaging: true
+      },
+      clarificationQuestions: [],
+      explanation: 'User selected Variant 2 (6184 EUR manufacturing + 435 EUR transport).',
+      warnings: [],
+      readyForValidation: true
+    };
+
+    const res2 = await calibrationAssistantService.interpret('tenant-es-1', '[Variante seleccionada]: Opción 2', { id: 'u1' }, { evidenceId: 'qdoc-fahrmann-194f', selectedVariantId: 'variant-1', mockResponse: mockWrongVariant2AiResponse });
+    const prop2 = res2.proposal || res2;
+
+    // Verify server-side resolution from DB record forces exact stored variant-1 values
+    assert.strictEqual(prop2.declaredCommercials.targetManufacturingPrice, 6184, 'Server MUST override AI mock price with stored variant 6184 EUR');
+    assert.strictEqual(prop2.declaredCommercials.targetTransportPrice, 435, 'Server MUST override AI mock transport with stored variant 435 EUR');
+    assert.strictEqual(prop2.specPatch.copies, 3000, 'Server MUST override AI mock copies with stored variant 3000 copies');
+    assert.strictEqual(prop2.specPatch.endpapers_details, '115 g/m² sin impresión (0+0)', 'Must preserve unprinted endpapers across turns');
+
+    // Turn 3: Subsequent turn maintains selected variant (does not revert to 6048 EUR or change variants)
+    const res3 = await calibrationAssistantService.interpret('tenant-es-1', 'Confirming this selection', { id: 'u1' }, { evidenceId: 'qdoc-fahrmann-194f', selectedVariantId: 'variant-1', mockResponse: mockWrongVariant2AiResponse });
+    const prop3 = res3.proposal || res3;
+
+    assert.strictEqual(prop3.declaredCommercials.targetManufacturingPrice, 6184, 'Turn 3 must maintain selected variant 6184 EUR without reverting');
+
+    // Verify invalid selectedVariantId produces a controlled 400 error without picking another offer
+    let invalidErrorThrown = false;
+    try {
+      await calibrationAssistantService.interpret('tenant-es-1', 'Test invalid variant', { id: 'u1' }, { evidenceId: 'qdoc-fahrmann-194f', selectedVariantId: 'non-existent-variant-999', mockResponse: mockWrongVariant2AiResponse });
+    } catch (err) {
+      invalidErrorThrown = true;
+      assert.strictEqual(err.statusCode || err.status, 400, 'Invalid variantId must produce 400 error');
+      assert.strictEqual(err.code, 'QUOTE_VARIANT_NOT_FOUND', 'Error code must be QUOTE_VARIANT_NOT_FOUND');
+    }
+    assert.ok(invalidErrorThrown, 'Must throw error when non-existent variantId is provided');
+
+    console.log('✓ PASS 194F-25');
+  } finally {
+    // Restore original generateStructuredCompletion method in all execution paths
+    aiAdapter.generateStructuredCompletion = originalGenerate;
+  }
+
   console.log('\n==================================================');
   console.log('ALL PHASE 194F MULTILINGUAL ASSISTANT TESTS PASSED!');
   console.log('==================================================');
