@@ -358,4 +358,15 @@ export const es = {
   'admin.errors.lastSeen': 'Última Observación',
   'common.loading': 'Cargando secuencia...',
   'common.na': 'N/D',
+
+  // Quote preview & incomplete rates warnings
+  partialCalculationTitle: 'Cálculo parcial: tarifas incompletas',
+  governedQuoteIncompleteRatesNotice: 'Esta simulación no constituye un precio comercial válido debido a tarifas de fabricación ausentes o no calibradas en el nodo:',
+  reviewCardIncompleteRatesNotice: 'Esta cotización no se presenta como un precio comercial válido debido a tarifas de fabricación ausentes o no calibradas:',
+  realQuotationOutcome: 'Resultado de Cotización Real',
+  diagnosticOutcome: 'Resultado Diagnóstico',
+  customerPriceBeforeTax: 'Precio al Cliente (Antes de Impuestos)',
+  partialDiagnosticSubtotalTitle: 'Subtotal Parcial Diagnóstico (Tarifas Incompletas)',
+  partialDiagnosticSubtotalBadge: 'Subtotal Parcial Diagnóstico',
+  perCopyNet: '€ {{price}} / ej. (Neto)',
 } as const;

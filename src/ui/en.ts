@@ -360,6 +360,17 @@ export const en = {
   'admin.errors.lastSeen': 'Last Observed',
   'common.loading': 'Loading sequence...',
   'common.na': 'N/A',
+
+  // Quote preview & incomplete rates warnings
+  partialCalculationTitle: 'Partial calculation: incomplete rates',
+  governedQuoteIncompleteRatesNotice: 'This simulation does not constitute a valid commercial price due to missing or uncalibrated manufacturing rates on the node:',
+  reviewCardIncompleteRatesNotice: 'This quote is not presented as a valid commercial price due to missing or uncalibrated manufacturing rates:',
+  realQuotationOutcome: 'Real Quotation Outcome',
+  diagnosticOutcome: 'Diagnostic Outcome',
+  customerPriceBeforeTax: 'Customer Price (Before Tax)',
+  partialDiagnosticSubtotalTitle: 'Partial Diagnostic Subtotal (Incomplete Rates)',
+  partialDiagnosticSubtotalBadge: 'Partial Diagnostic Subtotal',
+  perCopyNet: '€ {{price}} / copy (Net)',
 } as const;
 
 export type TranslationKeys = keyof typeof en;

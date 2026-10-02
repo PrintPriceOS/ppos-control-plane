@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { printhouseCalibrationApi, QuotePreviewResponse } from '../../../../lib/printhouseCalibrationApi';
 import { getCountryName } from '../../../../lib/countryCatalog';
+import { useLocale } from '../../../../i18n';
 import { 
     Calculator, CheckCircle2, AlertTriangle, Info, ChevronDown, 
     ChevronUp, RefreshCw, ShieldCheck, Layers, Package, Truck, Sparkles 
@@ -30,6 +31,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
     printerNodeName = 'Production Node',
     initialSpec
 }) => {
+    const { t } = useLocale();
     const normalizeBinding = (b?: string) => {
         if (!b) return 'perfect bound';
         const s = String(b).toLowerCase().trim();
@@ -465,10 +467,10 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         <div className="p-4 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700 rounded-xl text-xs space-y-1.5 text-amber-900 dark:text-amber-200">
                             <div className="flex items-center gap-2 font-bold text-sm">
                                 <AlertTriangle size={18} className="text-amber-600 shrink-0" />
-                                <span>Cálculo parcial: tarifas incompletas</span>
+                                <span>{t('partialCalculationTitle')}</span>
                             </div>
                             <p className="m-0 text-xs text-amber-800 dark:text-amber-300">
-                                Esta simulación no constituye un precio comercial válido debido a tarifas de fabricación ausentes o no calibradas en el nodo:
+                                {t('governedQuoteIncompleteRatesNotice')}
                             </p>
                             {Array.isArray(quoteResult.uncalibratedRates) && quoteResult.uncalibratedRates.length > 0 && (
                                 <ul className="list-disc list-inside text-xs font-mono text-amber-950 dark:text-amber-100 font-bold space-y-0.5 mt-1">
@@ -483,10 +485,10 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200/60 dark:border-zinc-700/60 pb-5">
                         <div>
                             <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">
-                                {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? 'Real Quotation Outcome' : 'Diagnostic Outcome'}
+                                {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? t('realQuotationOutcome') : t('diagnosticOutcome')}
                             </span>
                             <h3 className="text-xl font-extrabold text-zinc-900 dark:text-white mt-0.5">
-                                {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? 'Customer Price (Before Tax)' : 'Subtotal Parcial Diagnóstico (Tarifas Incompletas)'}
+                                {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? t('customerPriceBeforeTax') : t('partialDiagnosticSubtotalTitle')}
                             </h3>
                             <p className="text-xs text-zinc-500 mt-1">
                                 For {quoteResult.quantity.toLocaleString()} copies ({spec.book_width_mm}×{spec.book_height_mm}mm, {spec.interior_pages} pages) • Tax calculated at checkout
@@ -499,11 +501,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             </div>
                             {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? (
                                 <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                    € {quoteResult.unitPrice.toFixed(2)} / copy (Net)
+                                    {t('perCopyNet', { price: quoteResult.unitPrice.toFixed(2) })}
                                 </div>
                             ) : (
                                 <div className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                    Subtotal Parcial Diagnóstico
+                                    {t('partialDiagnosticSubtotalBadge')}
                                 </div>
                             )}
                         </div>

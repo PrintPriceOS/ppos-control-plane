@@ -18,6 +18,7 @@ import {
     ChevronDown, ChevronUp, Edit3, Check, X, ArrowRight, ShieldCheck 
 } from 'lucide-react';
 import { printhouseCalibrationApi, QuoteStatus } from '../../../../lib/printhouseCalibrationApi';
+import { useLocale } from '../../../../i18n';
 
 interface OfferPoint {
     quantity: number;
@@ -72,6 +73,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     onReadyForCalibration,
     onIgnoreDocument
 }) => {
+    const { t } = useLocale();
     const [showDetails, setShowDetails] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [correctedTitle, setCorrectedTitle] = useState(printhouseName);
@@ -160,10 +162,10 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                     <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs space-y-1 text-amber-900 dark:text-amber-200">
                         <div className="flex items-center gap-1.5 font-bold">
                             <AlertTriangle size={14} className="text-amber-600 shrink-0" />
-                            <span>Cálculo parcial: tarifas incompletas</span>
+                            <span>{t('partialCalculationTitle')}</span>
                         </div>
                         <p className="m-0 text-[11px] text-amber-800 dark:text-amber-300">
-                            Esta cotización no se presenta como un precio comercial válido debido a tarifas de fabricación ausentes o no calibradas:
+                            {t('reviewCardIncompleteRatesNotice')}
                         </p>
                         {uncalibratedRates.length > 0 && (
                             <ul className="list-disc list-inside text-[11px] font-mono text-amber-900 dark:text-amber-200 font-semibold space-y-0.5 mt-1">

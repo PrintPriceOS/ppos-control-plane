@@ -1,11 +1,20 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GovernedQuoteSmokeTest } from '../src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest';
 import { QuickCalibrationPanel } from '../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel';
 import { StructuredQuoteReviewCard } from '../src/ui/components/printhouse/pricing/quick-calibration/StructuredQuoteReviewCard';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../src/ui/lib/printhouseCalibrationApi';
+import { LocaleProvider } from '../src/ui/i18n';
+
+const render = (ui: React.ReactElement, options?: any) => {
+    const res = rtlRender(<LocaleProvider>{ui}</LocaleProvider>, options);
+    return {
+        ...res,
+        rerender: (newUi: React.ReactElement) => res.rerender(<LocaleProvider>{newUi}</LocaleProvider>)
+    };
+};
 
 describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite', () => {
     const fahrmannSpec = {
@@ -1252,35 +1261,69 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(resultB.rateDetails.some((r: any) => r.status === 'UNKNOWN_MODE')).toBe(true);
     });
 
-    it('20. StructuredQuoteReviewCard renders "Cálculo parcial: tarifas incompletas" and lists affected rates when isValidCommercialQuote is false', () => {
+    it('20a. StructuredQuoteReviewCard renders "Partial calculation: incomplete rates" in English locale and lists raw rate keys', () => {
         render(
-            <StructuredQuoteReviewCard
-                evidenceId="ev-123"
-                filename="Quote_Faehrmann.pdf"
-                documentLanguage="de"
-                isValidCommercialQuote={false}
-                quoteStatus="INVALID_INCOMPLETE_RATES"
-                uncalibratedRates={['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p']}
-                offers={[
-                    {
-                        quantity: 3000,
-                        manufacturingPrice: 294.69,
-                        transportPrice: 0,
-                        quotedTotalPrice: 294.69,
-                        quotedUnitPrice: 0.098,
-                        validationStatus: 'CONSISTENT'
-                    }
-                ]}
-            />
+            <LocaleProvider initialLocale="en">
+                <StructuredQuoteReviewCard
+                    evidenceId="ev-123"
+                    filename="Quote_Faehrmann.pdf"
+                    documentLanguage="de"
+                    isValidCommercialQuote={false}
+                    quoteStatus="INVALID_INCOMPLETE_RATES"
+                    uncalibratedRates={['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p']}
+                    offers={[
+                        {
+                            quantity: 3000,
+                            manufacturingPrice: 294.69,
+                            transportPrice: 0,
+                            quotedTotalPrice: 294.69,
+                            quotedUnitPrice: 0.098,
+                            validationStatus: 'CONSISTENT'
+                        }
+                    ]}
+                />
+            </LocaleProvider>
         );
 
-        // Verify partial calculation warning banner is displayed
-        expect(screen.getByText(/Cálculo parcial: tarifas incompletas/i)).toBeInTheDocument();
+        // Verify partial calculation warning banner is displayed in English
+        expect(screen.getByText(/Partial calculation: incomplete rates/i)).toBeInTheDocument();
+        expect(screen.getByText(/This quote is not presented as a valid commercial price/i)).toBeInTheDocument();
         expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
         expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
     });
 
-    it('21. GovernedQuoteSmokeTest UI component hides Customer Price and displays "Cálculo parcial: tarifas incompletas" when quote is invalid', async () => {
+    it('20b. StructuredQuoteReviewCard renders "Cálculo parcial: tarifas incompletas" in Spanish locale and lists raw rate keys', () => {
+        render(
+            <LocaleProvider initialLocale="es">
+                <StructuredQuoteReviewCard
+                    evidenceId="ev-123"
+                    filename="Quote_Faehrmann.pdf"
+                    documentLanguage="de"
+                    isValidCommercialQuote={false}
+                    quoteStatus="INVALID_INCOMPLETE_RATES"
+                    uncalibratedRates={['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p']}
+                    offers={[
+                        {
+                            quantity: 3000,
+                            manufacturingPrice: 294.69,
+                            transportPrice: 0,
+                            quotedTotalPrice: 294.69,
+                            quotedUnitPrice: 0.098,
+                            validationStatus: 'CONSISTENT'
+                        }
+                    ]}
+                />
+            </LocaleProvider>
+        );
+
+        // Verify partial calculation warning banner is displayed in Spanish
+        expect(screen.getByText(/Cálculo parcial: tarifas incompletas/i)).toBeInTheDocument();
+        expect(screen.getByText(/Esta cotización no se presenta como un precio comercial válido/i)).toBeInTheDocument();
+        expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
+        expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
+    });
+
+    it('21a. GovernedQuoteSmokeTest UI component renders English localized banners and suppresses commercial prices when quote is invalid', async () => {
         const previewQuoteSpy = vi.spyOn(printhouseCalibrationApi, 'previewQuote').mockResolvedValue({
             ok: true,
             currency: 'EUR',
@@ -1306,11 +1349,78 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             productionLeadDays: 7,
             estimatedDeliveryDays: 2,
             shippingStatus: 'CONFIGURED',
+            taxStatus: 'EXCLUDED',
             configurationTrace: ['Printer Node: node-329a3bc4'],
-            warnings: ['INVALID_INCOMPLETE_RATES: Mandatory manufacturing rates evaluate to zero.']
+            warnings: ['INVALID_INCOMPLETE_RATES: Mandatory manufacturing rates evaluate to zero.'],
+            engine: { package: '@ppos/pricing-engine', version: '1.9.5', forwardMethod: 'evaluateForwardPrice' }
         });
 
-        render(<GovernedQuoteSmokeTest printerNodeId="node-329a3bc4" initialSpec={fahrmannSpec} />);
+        render(
+            <LocaleProvider initialLocale="en">
+                <GovernedQuoteSmokeTest printerNodeId="node-329a3bc4" initialSpec={fahrmannSpec} />
+            </LocaleProvider>
+        );
+
+        const calcBtn = screen.getByRole('button', { name: /Calculate Test Quote/i });
+        fireEvent.click(calcBtn);
+
+        await waitFor(() => {
+            expect(previewQuoteSpy).toHaveBeenCalled();
+            expect(screen.getByText(/Partial calculation: incomplete rates/i)).toBeInTheDocument();
+        });
+
+        // 1. Verify affected raw rate keys are listed
+        expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
+        expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
+
+        // 2. Verify English Outcome labels & header
+        expect(screen.getByText(/Diagnostic Outcome/i)).toBeInTheDocument();
+        expect(screen.getByText(/Partial Diagnostic Subtotal \(Incomplete Rates\)/i)).toBeInTheDocument();
+        expect(screen.queryByText(/Real Quotation Outcome/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Customer Price \(Before Tax\)/i)).not.toBeInTheDocument();
+
+        // 3. Verify per-copy price text is suppressed and Partial Diagnostic Subtotal badge shown
+        expect(screen.queryByText(/\/ copy \(Net\)/i)).not.toBeInTheDocument();
+        expect(screen.getAllByText(/Partial Diagnostic Subtotal/i).length).toBeGreaterThan(0);
+    });
+
+    it('21b. GovernedQuoteSmokeTest UI component renders Spanish localized banners and suppresses commercial prices when quote is invalid', async () => {
+        const previewQuoteSpy = vi.spyOn(printhouseCalibrationApi, 'previewQuote').mockResolvedValue({
+            ok: true,
+            currency: 'EUR',
+            quantity: 3000,
+            isValidCommercialQuote: false,
+            quoteStatus: 'INVALID_INCOMPLETE_RATES',
+            uncalibratedRates: ['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p'],
+            totals: {
+                manufacturing: 294.69,
+                finishing: 0,
+                binding: 1.25,
+                packaging: 0,
+                transport: 0,
+                commercialMarkup: 0,
+                tax: 0,
+                finalSellingPrice: 294.69
+            },
+            unitPrice: 0.098,
+            breakdown: [
+                { label: 'Manufacturing & Print', amount: 293.44 },
+                { label: 'Binding', amount: 1.25 }
+            ],
+            productionLeadDays: 7,
+            estimatedDeliveryDays: 2,
+            shippingStatus: 'CONFIGURED',
+            taxStatus: 'EXCLUDED',
+            configurationTrace: ['Printer Node: node-329a3bc4'],
+            warnings: ['INVALID_INCOMPLETE_RATES: Mandatory manufacturing rates evaluate to zero.'],
+            engine: { package: '@ppos/pricing-engine', version: '1.9.5', forwardMethod: 'evaluateForwardPrice' }
+        });
+
+        render(
+            <LocaleProvider initialLocale="es">
+                <GovernedQuoteSmokeTest printerNodeId="node-329a3bc4" initialSpec={fahrmannSpec} />
+            </LocaleProvider>
+        );
 
         const calcBtn = screen.getByRole('button', { name: /Calculate Test Quote/i });
         fireEvent.click(calcBtn);
@@ -1320,16 +1430,18 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             expect(screen.getByText(/Cálculo parcial: tarifas incompletas/i)).toBeInTheDocument();
         });
 
-        // 1. Verify affected rate keys are listed
+        // 1. Verify affected raw rate keys are listed
         expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
         expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
 
-        // 2. Verify "Customer Price" is NOT present (replaced by Subtotal Parcial Diagnóstico)
-        expect(screen.queryByText(/Customer Price \(Before Tax\)/i)).not.toBeInTheDocument();
+        // 2. Verify Spanish Outcome labels & header
+        expect(screen.getByText(/Resultado Diagnóstico/i)).toBeInTheDocument();
         expect(screen.getByText(/Subtotal Parcial Diagnóstico \(Tarifas Incompletas\)/i)).toBeInTheDocument();
+        expect(screen.queryByText(/Resultado de Cotización Real/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Precio al Cliente \(Antes de Impuestos\)/i)).not.toBeInTheDocument();
 
-        // 3. Verify commercial per-copy price (€ 0.10 / copy (Net)) is NOT displayed
-        expect(screen.queryByText(/\/ copy \(Net\)/i)).not.toBeInTheDocument();
+        // 3. Verify per-copy price text is suppressed and Subtotal Parcial Diagnóstico badge shown
+        expect(screen.queryByText(/\/ ej\. \(Neto\)/i)).not.toBeInTheDocument();
         expect(screen.getAllByText(/Subtotal Parcial Diagnóstico/i).length).toBeGreaterThan(0);
     });
 

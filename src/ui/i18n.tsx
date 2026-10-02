@@ -13,8 +13,8 @@ interface LocaleContextType {
 
 const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
-export const LocaleProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [locale, setLocale] = useState<Locale>('en');
+export const LocaleProvider: React.FC<{ children: ReactNode; initialLocale?: Locale }> = ({ children, initialLocale = 'en' }) => {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
 
   const t = useMemo(() => (key: string, params?: Record<string, any>): string => {
     const dict = translations[locale];
