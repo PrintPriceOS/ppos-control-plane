@@ -168,7 +168,7 @@ test('C1c', 'Parity: Adapter forward price matches direct canonical buildPrice c
 test('C1d', 'Provenance: Adapter binds to immutable git-pinned BPE metadata', () => {
     assert.strictEqual(adapter.enginePackage, '@ppos/pricing-engine');
     assert.strictEqual(adapter.engineVersion, '1.0.0');
-    assert.strictEqual(adapter.engineCommit, '8d324290d64b5bf17325ff1098db7ebb5f646b5d');
+    assert.strictEqual(adapter.engineCommit, 'dba8d4874cee939de901640e9981e09d2fefdf73');
     assert.strictEqual(adapter.engineSource, 'git-pinned');
 });
 

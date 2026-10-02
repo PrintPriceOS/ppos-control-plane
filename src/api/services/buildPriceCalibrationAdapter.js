@@ -16,11 +16,11 @@
  * 7. ZERO development fallbacks: strictly requires @ppos/pricing-engine with fail-closed semantics.
  */
 
-// Load canonical BPE package (git-pinned to 8d324290d64b5bf17325ff1098db7ebb5f646b5d)
+// Load canonical BPE package (git-pinned to dba8d4874cee939de901640e9981e09d2fefdf73)
 let canonicalPricingEngine = null;
 const enginePackage = '@ppos/pricing-engine';
 const engineVersion = '1.0.0';
-const engineCommit = '8d324290d64b5bf17325ff1098db7ebb5f646b5d';
+const engineCommit = 'dba8d4874cee939de901640e9981e09d2fefdf73';
 const engineSource = 'git-pinned';
 
 try {

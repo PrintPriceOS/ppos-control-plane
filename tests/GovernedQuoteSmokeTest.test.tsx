@@ -1517,4 +1517,79 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(res4p.uncalibratedRates).toContain('interior_full_colour_fixed.4p');
         expect(res4p.uncalibratedRates).not.toContain('interior_full_colour_fixed.16p');
     });
+
+    it('25. REAL BPE ENGINE INTEGRATION (unmocked): observed live rates + Case A (Fährmann) spec produce 506.13 € total cost and preview maintains INVALID_INCOMPLETE_RATES for Munken/24p', async () => {
+        vi.restoreAllMocks();
+
+        const db = require('../src/api/services/mysqlClient');
+        const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+
+        // Live node-329a3bc4 observed rates snapshot
+        const node329ObservedRates = {
+            paper_price_interior_by_kilo: { munken: 0, offset: 1.5 },
+            paper_price_cover_by_kilo: { mc: 4.0756 },
+            interior_full_colour_fixed: { '24p': 0 },
+            interior_full_colour_var: { '24p': 0 },
+            cover_fixed_by_colours: { '4': 134.8284 },
+            cover_var_per_1000_by_colours: { '4': 25.5357 },
+            binding_hc_fixed_by_sections: { '9': 1.25 },
+            binding_hc_var_per_1000_by_sections: { '9': 0 },
+            endpaper_fixed_by_colours: { '4': 50.0 },
+            endpaper_var_per_1000_by_colours: { '4': 10.0 }
+        };
+
+        const fakeNode = {
+            id: 'node-329a3bc4',
+            tenant_id: 'tenant-test',
+            name: 'philologica.ai Printhouse',
+            rates_json: JSON.stringify(node329ObservedRates),
+            signatures: JSON.stringify([24]),
+            limits: JSON.stringify({ min_copies: 100, max_copies: 10000, min_pages: 8, max_pages: 2000 }),
+            production_lead_days: 7,
+            delivery_time: '9 days'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printer_nodes')) {
+                return [fakeNode];
+            }
+            return [];
+        });
+
+        const fahrmannCaseASpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            interior_print: '4/4',
+            paper_type_interior: 'munken',
+            paper_weight_interior: 90,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 130,
+            binding_method: 'hardcover',
+            lamination: 'matt',
+            endpapers: 'none',
+            endpapers_print: 'none',
+            delivery_country: 'DE'
+        };
+
+        // Note: evaluateForwardPrice & buildPrice are NOT mocked here. They execute canonical @ppos/pricing-engine (commit dba8d48)
+        const result = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', fahrmannCaseASpec, 'node-329a3bc4');
+
+        // 1. Unmocked Engine Calculation Assertions
+        expect(result.ok).toBe(true);
+        expect(result.totals.manufacturing).toBe(506.13); // Cover paper (293.44 €) + Cover print (211.44 €) + Binding (1.25 €)
+        expect(result.totals.finalSellingPrice).toBe(506.13);
+
+        // Verify un-mocked BPE breakdown component lines
+        const coverPaperLine = result.breakdown.find((b: any) => b.label === 'Manufacturing & Print');
+        expect(coverPaperLine).toBeDefined();
+
+        // 2. Incomplete Rate Validation Assertions
+        expect(result.isValidCommercialQuote).toBe(false);
+        expect(result.quoteStatus).toBe('INVALID_INCOMPLETE_RATES');
+        expect(result.uncalibratedRates).toContain('paper_price_interior_by_kilo.munken');
+        expect(result.uncalibratedRates).toContain('interior_full_colour_fixed.24p');
+    });
 });

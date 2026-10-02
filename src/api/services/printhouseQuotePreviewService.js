@@ -181,7 +181,7 @@ class PrinthouseQuotePreviewService {
 
                     /**
                      * 1:1 replica of internal un-exported sectionsArray() from @ppos/pricing-engine
-                     * (git-pinned to 8d324290d64b5bf17325ff1098db7ebb5f646b5d).
+                     * (git-pinned to dba8d4874cee939de901640e9981e09d2fefdf73).
                      * Decomposes pages into section counts for signature 24 or standard signatures (32/16/8/4).
                      */
                     function getSectionsArray(pages, sig) {
