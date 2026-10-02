@@ -18,7 +18,7 @@
  * - Uses canonical getAuthToken().
  */
 import React, { useState, useEffect } from 'react';
-import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
+import { printhouseCalibrationApi, computeBookSpecChecksum } from '../../../../lib/printhouseCalibrationApi';
 import { GuidedCalibrationWizard } from './GuidedCalibrationWizard';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
 import { CalibrationStructuredSummary } from './CalibrationStructuredSummary';
@@ -144,18 +144,32 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                             includesPackaging: chosenSession.includesPackaging ?? null
                         });
 
-                        // Rehydrate runs for CALCULATED, READY, or ACCEPTED sessions
-                        if (chosenSession.status === 'CALCULATED' || chosenSession.status === 'READY' || chosenSession.status === 'ACCEPTED') {
+                        // Rehydrate runs ONLY for CALCULATED or READY sessions when checksum matches
+                        if (chosenSession.status === 'CALCULATED' || chosenSession.status === 'READY') {
                             try {
                                 const runs = await printhouseCalibrationApi.listRuns(chosenSession.id);
                                 if (!isCancelled && Array.isArray(runs) && runs.length > 0) {
                                     // Runs are ordered started_at DESC; latest run is runs[0]
                                     const latestRun = runs[0];
-                                    setActiveRun(latestRun);
+                                    const expectedChecksum = await computeBookSpecChecksum(chosenSession.bookSpec);
+                                    if (!isCancelled) {
+                                        const runChecksum = latestRun.sessionInputChecksum || latestRun.session_input_checksum;
+                                        if (!expectedChecksum || !runChecksum || expectedChecksum !== runChecksum) {
+                                            setActiveRun(null);
+                                        } else {
+                                            setActiveRun(latestRun);
+                                        }
+                                    }
+                                } else if (!isCancelled) {
+                                    setActiveRun(null);
                                 }
                             } catch (runErr) {
                                 console.error('Failed to rehydrate calibration runs:', runErr);
+                                if (!isCancelled) setActiveRun(null);
                             }
+                        } else if (!isCancelled) {
+                            // ACCEPTED or DRAFT sessions for new offers do NOT present an old active run
+                            setActiveRun(null);
                         }
                     }
                 }
@@ -279,7 +293,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
         try {
             let result: any;
-            if (session?.id) {
+            if (session?.id && session.status !== 'ACCEPTED' && session.status !== 'REJECTED') {
                 result = await printhouseCalibrationApi.assistantChat(session.id, text);
             } else {
                 result = await printhouseCalibrationApi.interpretPreSession(text);
@@ -347,11 +361,11 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
         try {
             let persistedSession: any;
-            if (!session?.id) {
-                // Explicit creation with complete Phase 193B payload
+            if (!session?.id || session.status === 'ACCEPTED' || session.status === 'REJECTED') {
+                // Explicit creation of a separate DRAFT session for new quote offer
                 persistedSession = await printhouseCalibrationApi.createSession({
                     printerNodeId,
-                    referenceBookName: 'Quick Calibration Book',
+                    referenceBookName: proposal?.referenceBookName || draftSpec.referenceBookName || 'New Quote Offer Calibration',
                     bookSpec: newSpec,
                     targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
                     currency: newComms.currency || 'EUR',
@@ -363,6 +377,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     includesPackaging: newComms.includesPackaging
                 });
                 setSession(persistedSession);
+                setActiveRun(null);
             } else if (session.status === 'DRAFT') {
                 // Guard: Only update if session is in editable DRAFT status
                 persistedSession = await printhouseCalibrationApi.updateDraftSession(session.id, {
@@ -378,7 +393,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 });
                 setSession(persistedSession);
             } else {
-                // Session is already READY, CALCULATED, or ACCEPTED — do NOT mutate or call updateDraftSession
+                // Session is READY or CALCULATED
                 persistedSession = session;
             }
             setConfirmedFields(Object.keys(newSpec).filter(k => newSpec[k] !== undefined && newSpec[k] !== null && newSpec[k] !== ''));

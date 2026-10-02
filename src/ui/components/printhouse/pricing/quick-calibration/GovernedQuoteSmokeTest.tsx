@@ -506,6 +506,18 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         </div>
                     </div>
 
+                    {/* Warnings List */}
+                    {quoteResult.warnings && quoteResult.warnings.length > 0 && (
+                        <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl space-y-1.5 text-xs text-amber-900 dark:text-amber-200">
+                            {quoteResult.warnings.map((w: string, idx: number) => (
+                                <div key={idx} className="font-semibold flex items-center gap-1.5">
+                                    <AlertTriangle size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                                    <span>{w}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Trace Drawer Toggle */}
                     <div>
                         <button

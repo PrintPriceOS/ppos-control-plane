@@ -42,7 +42,18 @@ const ALLOWED_SPEC_FIELDS = [
     'endpapers',
     'paper_type_endpapers',
     'paper_weight_endpapers',
-    'delivery_country'
+    'delivery_country',
+    'has_mixed_interior',
+    'mixed_interior_details',
+    'has_spot_uv',
+    'spot_uv',
+    'spot_uv_details',
+    'has_endpapers',
+    'endpapers_details',
+    'has_hardcover_board',
+    'unsupported_features',
+    'raw_text',
+    'rawText'
 ];
 
 // ── Strict Allowlist: Declared Commercial Fields (Canonical Phase 193B) ──────
@@ -677,8 +688,19 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 } else if (key === 'delivery_country') {
                     const code = String(val).toUpperCase().trim();
                     if (isValidIso2Country(code)) normalized.specPatch[key] = code;
-                } else if (key === 'uv_varnish' || key === 'endpapers') {
-                    normalized.specPatch[key] = Boolean(val);
+                } else if (key === 'uv_varnish' || key === 'endpapers' || key === 'has_mixed_interior' || key === 'has_spot_uv' || key === 'spot_uv' || key === 'has_endpapers' || key === 'has_hardcover_board') {
+                    const s = String(val).toLowerCase().trim();
+                    if (s === 'none' || s === 'false' || s === 'no' || s === 'null' || s === 'undefined' || s === '0' || s === '') {
+                        normalized.specPatch[key] = false;
+                    } else if (val === true || s === 'true' || s === 'yes' || s === '1') {
+                        normalized.specPatch[key] = true;
+                    } else {
+                        normalized.specPatch[key] = s;
+                    }
+                } else if (key === 'mixed_interior_details' || key === 'spot_uv_details' || key === 'endpapers_details' || key === 'raw_text' || key === 'rawText') {
+                    normalized.specPatch[key] = String(val);
+                } else if (key === 'unsupported_features' && Array.isArray(val)) {
+                    normalized.specPatch[key] = val.map(String);
                 }
             }
         }

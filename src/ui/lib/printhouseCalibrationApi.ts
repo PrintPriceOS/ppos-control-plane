@@ -394,3 +394,37 @@ export const printhouseCalibrationApi = {
     }
 };
 
+export function canonicalStringify(obj: any): string {
+    if (obj === null || obj === undefined) return 'null';
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+        return '[' + obj.map(v => canonicalStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalStringify(obj[k])).join(',') + '}';
+}
+
+export async function computeBookSpecChecksum(spec: any): Promise<string | null> {
+    if (!spec || typeof spec !== 'object') return null;
+    const str = canonicalStringify(spec);
+
+    // 1. Web Crypto API in browser / modern JS environment
+    if (typeof crypto !== 'undefined' && crypto?.subtle && typeof TextEncoder !== 'undefined') {
+        try {
+            const msgUint8 = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {}
+    }
+
+    // 2. Node.js fallback (if Web Crypto is unavailable)
+    if (typeof process !== 'undefined' && process?.versions?.node) {
+        try {
+            const cryptoModule = require('crypto');
+            return cryptoModule.createHash('sha256').update(str).digest('hex');
+        } catch (e) {}
+    }
+
+    return null;
+}

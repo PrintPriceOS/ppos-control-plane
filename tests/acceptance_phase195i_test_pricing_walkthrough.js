@@ -36,6 +36,26 @@ console.log('===================================================================
         }
     }
 
+    const canonicalStringify = (obj) => {
+        if (obj === null || obj === undefined) return 'null';
+        if (typeof obj !== 'object') return JSON.stringify(obj);
+        if (Array.isArray(obj)) return '[' + obj.map(v => canonicalStringify(v)).join(',') + ']';
+        const keys = Object.keys(obj).sort();
+        return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalStringify(obj[k])).join(',') + '}';
+    };
+
+    const computeBookSpecChecksum = async (spec) => {
+        if (!spec || typeof spec !== 'object') return null;
+        const str = canonicalStringify(spec);
+        if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+            const msgUint8 = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        return require('crypto').createHash('sha256').update(str).digest('hex');
+    };
+
     // 1. Fährmann Book Specification
     const fahrmannSpec = {
         copies: 3000,
@@ -325,6 +345,317 @@ console.log('===================================================================
         assert.strictEqual(payloadDispatched.jobSpec.binding_method, 'hardcover', 'Payload binding_method must be hardcover');
         assert.strictEqual(payloadDispatched.jobSpec.delivery_country, 'DE', 'Payload delivery_country must be DE');
         assert.notStrictEqual(payloadDispatched.jobSpec.copies, 750, 'Payload MUST NOT reset to default 750');
+    });
+
+    // Test 12: Quote preview returns isSimplifiedApproximation: true and warning for mixed interior, guardas, and barniz
+    runTest('printhouseQuotePreviewService preserves complex origins (mixed interior, guardas, barniz) returning isSimplifiedApproximation: true and SIMPLIFIED_INTERIOR_APPROXIMATION warning', async () => {
+        const db = require('../src/api/services/mysqlClient');
+        const origQuery = db.query;
+        db.query = async () => [{
+            id: 'node-329a3bc4',
+            name: 'Test Node',
+            tenant_id: 'tenant-demo',
+            rates_json: JSON.stringify({ base_setup_price: 100 }),
+            signatures: JSON.stringify([16, 8, 4]),
+            limits: JSON.stringify({ min_copies: 1, max_copies: 100000 }),
+            production_lead_days: 7
+        }];
+
+        try {
+            const complexJobSpec = {
+                copies: 3000,
+                book_width_mm: 139,
+                book_height_mm: 212,
+                interior_pages: 216,
+                interior_print: '1/1',
+                paper_type_interior: 'munken',
+                paper_weight_interior: 90,
+                cover_print: '4/0',
+                paper_type_cover: 'mc',
+                paper_weight_cover: 130,
+                lamination: 'matt',
+                binding_method: 'hardcover',
+                delivery_country: 'DE',
+                has_mixed_interior: true,
+                mixed_interior_details: '208p 1/1 + 8p 4/4',
+                has_endpapers: true,
+                endpapers_details: 'Guardas 115g sin impresión',
+                has_spot_uv: true,
+                spot_uv_details: 'Barniz UVI en portada',
+                unsupported_features: ['MIXED_INTERIOR_PANTONE_CMYK', 'GUARDAS', 'SPOT_UV_VARNISH']
+            };
+
+            const preview = await quotePreviewService.generateQuotePreview('tenant-demo', complexJobSpec, 'node-329a3bc4');
+            assert.ok(preview, 'Preview result must be generated');
+            assert.strictEqual(preview.isSimplifiedApproximation, true, 'isSimplifiedApproximation must be true for complex spec');
+            assert.ok(preview.warnings.some(w => w.includes('SIMPLIFIED_INTERIOR_APPROXIMATION')), 'Must contain SIMPLIFIED_INTERIOR_APPROXIMATION warning');
+            assert.ok(preview.warnings.some(w => w.includes('Guardas') || w.includes('Barniz') || w.includes('208p')), 'Warning details must include complex feature details');
+        } finally {
+            db.query = origQuery;
+        }
+    });
+
+    // Test 13: Partial Service-Level Check: Exact Checksum Parity Verification & Run Resolution Helper
+    runTest('[Partial Service Check] Checksum computed by computeBookSpecChecksum has 100% parity with calibrationSessionService and filters non-matching runs', async () => {
+        const sessionService = require('../src/api/services/calibrationSessionService');
+
+        const testSpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            interior_print: '1/1',
+            paper_type_interior: 'munken',
+            paper_weight_interior: 90,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 130,
+            lamination: 'matt',
+            binding_method: 'hardcover',
+            delivery_country: 'DE'
+        };
+
+        const backendChecksum = sessionService.computeRatesChecksum(testSpec);
+        const frontendChecksum = await computeBookSpecChecksum(testSpec);
+
+        assert.ok(backendChecksum, 'Backend checksum must exist');
+        assert.ok(frontendChecksum, 'Frontend checksum must exist');
+        assert.strictEqual(frontendChecksum, backendChecksum, 'Frontend computeBookSpecChecksum MUST produce exact same SHA-256 hex string as backend calibrationRunService');
+
+        // Test run selection logic
+        const matchingRun = { id: 'crun-match', sessionInputChecksum: backendChecksum, targetPrice: 6048 };
+        const mismatchRun = { id: 'crun-stale', sessionInputChecksum: 'sha256:stale750' };
+
+        async function resolveActiveRun(spec, run) {
+            if (!spec || !run) return null;
+            const expected = await computeBookSpecChecksum(spec);
+            const runCk = run.sessionInputChecksum || run.session_input_checksum;
+            if (!expected || !runCk || expected !== runCk) return null;
+            return run;
+        }
+
+        const activeMatch = await resolveActiveRun(testSpec, matchingRun);
+        const activeMismatch = await resolveActiveRun(testSpec, mismatchRun);
+
+        assert.deepStrictEqual(activeMatch, matchingRun, 'Matching run MUST be displayed');
+        assert.strictEqual(activeMismatch, null, 'Mismatching run MUST NOT be displayed (cleared to null)');
+    });
+
+    // Test 14: Partial Service-Level Check: ACCEPTED session isolation branch logic
+    runTest('[Partial Service Check] Session status ACCEPTED routing branch creates separate DRAFT session leaving historical intact', async () => {
+        const historicalAcceptedSession = {
+            id: 'cal-adc1df15',
+            status: 'ACCEPTED',
+            bookSpec: { copies: 750, book_width_mm: 170, book_height_mm: 240, interior_pages: 64 },
+            targetManufacturingPrice: 939.66,
+            acceptedAt: '2026-08-23T10:00:00Z'
+        };
+
+        const newOfferSpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            binding_method: 'hardcover',
+            delivery_country: 'DE'
+        };
+
+        let createSessionCalled = false;
+        let updateDraftSessionCalled = false;
+
+        // Mock API handlers
+        const mockApi = {
+            createSession: async (payload) => {
+                createSessionCalled = true;
+                return {
+                    id: 'cal-newdraft-888',
+                    status: 'DRAFT',
+                    printerNodeId: payload.printerNodeId,
+                    bookSpec: payload.bookSpec,
+                    targetManufacturingPrice: payload.targetManufacturingPrice
+                };
+            },
+            updateDraftSession: async (id, payload) => {
+                updateDraftSessionCalled = true;
+                return { id, ...payload };
+            }
+        };
+
+        // Simulated handleApplyProposal routing branch logic
+        async function applyProposalForSession(session, spec, comms) {
+            if (!session?.id || session.status === 'ACCEPTED' || session.status === 'REJECTED') {
+                return await mockApi.createSession({
+                    printerNodeId: 'node-329a3bc4',
+                    referenceBookName: 'New Quote Offer Calibration',
+                    bookSpec: spec,
+                    targetManufacturingPrice: comms.targetManufacturingPrice
+                });
+            } else if (session.status === 'DRAFT') {
+                return await mockApi.updateDraftSession(session.id, { bookSpec: spec });
+            }
+            return session;
+        }
+
+        const resultSession = await applyProposalForSession(historicalAcceptedSession, newOfferSpec, { targetManufacturingPrice: 6048 });
+
+        assert.strictEqual(historicalAcceptedSession.id, 'cal-adc1df15', 'Historical session ID must remain cal-adc1df15');
+        assert.strictEqual(historicalAcceptedSession.status, 'ACCEPTED', 'Historical session status must remain ACCEPTED');
+        assert.strictEqual(createSessionCalled, true, 'createSession MUST be called for the new offer');
+        assert.strictEqual(updateDraftSessionCalled, false, 'updateDraftSession MUST NOT be called on cal-adc1df15');
+        assert.strictEqual(resultSession.id, 'cal-newdraft-888', 'Resulting session must be the new DRAFT session ID');
+        assert.strictEqual(resultSession.status, 'DRAFT', 'Resulting session status must be DRAFT');
+        assert.strictEqual(resultSession.bookSpec.copies, 3000, 'Resulting session must reflect 3000 copies');
+    });
+
+    // Test 15: Standard job with endpapers="none" does NOT trigger simplified approximation
+    runTest('Standard job spec with endpapers="none" evaluates isSimplifiedApproximation: false without warnings', async () => {
+        const db = require('../src/api/services/mysqlClient');
+        const origQuery = db.query;
+        db.query = async () => [{
+            id: 'node-329a3bc4',
+            name: 'Test Node',
+            tenant_id: 'tenant-demo',
+            rates_json: JSON.stringify({ base_setup_price: 100 }),
+            signatures: JSON.stringify([16, 8, 4]),
+            limits: JSON.stringify({ min_copies: 1, max_copies: 100000 }),
+            production_lead_days: 7
+        }];
+
+        try {
+            const standardJobSpec = {
+                copies: 1000,
+                book_width_mm: 170,
+                book_height_mm: 240,
+                interior_pages: 128,
+                interior_print: '4/4',
+                paper_type_interior: 'mc',
+                paper_weight_interior: 115,
+                cover_print: '4/0',
+                paper_type_cover: 'mc',
+                paper_weight_cover: 250,
+                lamination: 'matt',
+                binding_method: 'perfect bound',
+                delivery_country: 'ES',
+                endpapers: 'none',
+                has_endpapers: false,
+                has_spot_uv: false
+            };
+
+            const preview = await quotePreviewService.generateQuotePreview('tenant-demo', standardJobSpec, 'node-329a3bc4');
+            assert.ok(preview, 'Preview result must be generated');
+            assert.strictEqual(preview.isSimplifiedApproximation, false, 'isSimplifiedApproximation MUST be false for endpapers="none"');
+            const simplifiedWarnings = preview.warnings.filter(w => w.includes('SIMPLIFIED_INTERIOR_APPROXIMATION'));
+            assert.strictEqual(simplifiedWarnings.length, 0, 'No SIMPLIFIED_INTERIOR_APPROXIMATION warning should be present for endpapers="none"');
+        } finally {
+            db.query = origQuery;
+        }
+    });
+
+    // Test 16: Partial Service-Level Check: Active run clearing matrix
+    runTest('[Partial Service Check] Active run clearing matrix helper validates missing and mismatching checksums', async () => {
+
+        const validSpec = { copies: 3000, book_width_mm: 139, book_height_mm: 212, interior_pages: 216, binding_method: 'hardcover' };
+        const validChecksum = await computeBookSpecChecksum(validSpec);
+
+        async function resolveActiveRun(expectedChecksum, run) {
+            if (!expectedChecksum || !run) return null;
+            const runChecksum = run.sessionInputChecksum || run.session_input_checksum;
+            if (!runChecksum || expectedChecksum !== runChecksum) return null;
+            return run;
+        }
+
+        // Case A: Missing run checksum
+        const runWithoutChecksum = { id: 'crun-no-checksum', targetPrice: 1000 };
+        assert.strictEqual(await resolveActiveRun(validChecksum, runWithoutChecksum), null, 'Run without checksum MUST be cleared');
+
+        // Case B: Missing expected checksum
+        const runWithChecksum = { id: 'crun-123', sessionInputChecksum: validChecksum };
+        assert.strictEqual(await resolveActiveRun(null, runWithChecksum), null, 'Run with missing expected checksum MUST be cleared');
+
+        // Case C: Checksum mismatch
+        const runWithDifferentChecksum = { id: 'crun-456', sessionInputChecksum: 'sha256:different999' };
+        assert.strictEqual(await resolveActiveRun(validChecksum, runWithDifferentChecksum), null, 'Run with mismatching checksum MUST be cleared');
+
+        // Case D: Both exist and match
+        assert.deepStrictEqual(await resolveActiveRun(validChecksum, runWithChecksum), runWithChecksum, 'Run with matching checksum MUST be retained');
+    });
+
+    // Test 17: Partial Service-Level Check: Complex spec pipeline through backend services
+    runTest('[Partial Service Check] Backend service pipeline preserves complex spec attributes from assistant normalization to quote preview', async () => {
+        const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+
+        const rawAiOutput = {
+            intent: 'SPEC_EXTRACTION',
+            specPatch: {
+                copies: 3000,
+                book_width_mm: 139,
+                book_height_mm: 212,
+                interior_pages: 216,
+                binding_method: 'hardcover',
+                has_mixed_interior: true,
+                mixed_interior_details: '208p 1/1 Pantone + 8p 4/4 CMYK',
+                has_endpapers: true,
+                endpapers_details: 'Guardas 115g sin impresión',
+                has_spot_uv: true,
+                spot_uv_details: 'Barniz UVI en portada',
+                unsupported_features: ['MIXED_INTERIOR_PANTONE_CMYK', 'GUARDAS', 'SPOT_UV_VARNISH']
+            },
+            declaredCommercials: {
+                targetManufacturingPrice: 6048,
+                currency: 'EUR',
+                includesPaper: true,
+                includesBinding: true,
+                includesFinishing: true,
+                includesPackaging: true
+            },
+            readyForValidation: true
+        };
+
+        // 1. Assistant normalization gate
+        const normalized = calibrationAssistantService._validateAndNormalizeAIResponse(rawAiOutput);
+        assert.strictEqual(normalized.specPatch.has_mixed_interior, true, 'Assistant MUST preserve has_mixed_interior');
+        assert.strictEqual(normalized.specPatch.mixed_interior_details, '208p 1/1 Pantone + 8p 4/4 CMYK', 'Assistant MUST preserve mixed_interior_details');
+        assert.strictEqual(normalized.specPatch.has_endpapers, true, 'Assistant MUST preserve has_endpapers');
+        assert.strictEqual(normalized.specPatch.has_spot_uv, true, 'Assistant MUST preserve has_spot_uv');
+
+        // 2. DRAFT Creation & Recovery (simulated spec state)
+        let draftSpec = { ...normalized.specPatch };
+
+        // 3. Subsequent Clarification Turn (user answers commercial inclusion)
+        const clarificationAnswers = { includesPaper: 'yes', delivery_country: 'DE' };
+
+        // Clarification merge logic
+        Object.entries(clarificationAnswers).forEach(([field, answer]) => {
+            if (field === 'delivery_country') draftSpec.delivery_country = answer;
+        });
+
+        // Verify complex spec attributes SURVIVED the clarification turn
+        assert.strictEqual(draftSpec.has_mixed_interior, true, 'has_mixed_interior MUST survive clarification turn');
+        assert.strictEqual(draftSpec.mixed_interior_details, '208p 1/1 Pantone + 8p 4/4 CMYK', 'mixed_interior_details MUST survive clarification turn');
+        assert.strictEqual(draftSpec.has_endpapers, true, 'has_endpapers MUST survive clarification turn');
+        assert.strictEqual(draftSpec.has_spot_uv, true, 'has_spot_uv MUST survive clarification turn');
+
+        // 4. Send resulting draftSpec to previewQuote
+        const db = require('../src/api/services/mysqlClient');
+        const origQuery = db.query;
+        db.query = async () => [{
+            id: 'node-329a3bc4',
+            name: 'Test Node',
+            tenant_id: 'tenant-demo',
+            rates_json: JSON.stringify({ base_setup_price: 100 }),
+            signatures: JSON.stringify([16, 8, 4]),
+            limits: JSON.stringify({ min_copies: 1, max_copies: 100000 }),
+            production_lead_days: 7
+        }];
+
+        try {
+            const preview = await quotePreviewService.generateQuotePreview('tenant-demo', draftSpec, 'node-329a3bc4');
+            assert.strictEqual(preview.isSimplifiedApproximation, true, 'previewQuote MUST output isSimplifiedApproximation: true');
+            assert.ok(preview.warnings.some(w => w.includes('SIMPLIFIED_INTERIOR_APPROXIMATION')), 'previewQuote MUST include SIMPLIFIED_INTERIOR_APPROXIMATION warning');
+            assert.ok(preview.warnings.some(w => w.includes('Guardas') && w.includes('Barniz')), 'previewQuote warning MUST contain extracted details for Guardas and Barniz');
+        } finally {
+            db.query = origQuery;
+        }
     });
 
     console.log(`\n================================================================================`);

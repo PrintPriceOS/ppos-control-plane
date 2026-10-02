@@ -231,15 +231,87 @@ class PrinthouseQuotePreviewService {
         if (transportCost > 0) breakdown.push({ label: 'Transport Reference', amount: Number(transportCost.toFixed(2)) });
         if (commercialMarkup > 0) breakdown.push({ label: 'Commercial Markup', amount: Number(commercialMarkup.toFixed(2)) });
 
-        const isMixedInterior = Boolean(
-            jobSpec.has_mixed_interior ||
-            jobSpec.mixed_interior_details ||
-            (Array.isArray(jobSpec.unsupported_features) && jobSpec.unsupported_features.includes('MIXED_INTERIOR_PANTONE_CMYK'))
+        function parseEffectiveBoolean(val) {
+            if (val === true) return true;
+            if (val === false || val === null || val === undefined) return false;
+            if (typeof val === 'string') {
+                const s = val.trim().toLowerCase();
+                if (s === 'none' || s === 'false' || s === 'no' || s === 'null' || s === 'undefined' || s === '0' || s === '') {
+                    return false;
+                }
+                return true;
+            }
+            return Boolean(val);
+        }
+
+        function parseMeaningfulText(val) {
+            if (!val) return null;
+            const s = String(val).trim();
+            const lower = s.toLowerCase();
+            if (lower === '' || lower === 'none' || lower === 'false' || lower === 'null' || lower === 'undefined' || lower === 'no' || lower === 'n/a') {
+                return null;
+            }
+            return s;
+        }
+
+        const hasEffectiveMixedInterior = parseEffectiveBoolean(jobSpec.has_mixed_interior) || Boolean(parseMeaningfulText(jobSpec.mixed_interior_details));
+        const hasEffectiveSpotUv = parseEffectiveBoolean(jobSpec.has_spot_uv) || parseEffectiveBoolean(jobSpec.spot_uv) || Boolean(parseMeaningfulText(jobSpec.spot_uv_details));
+        const hasEffectiveEndpapers = parseEffectiveBoolean(jobSpec.has_endpapers) || parseEffectiveBoolean(jobSpec.endpapers) || Boolean(parseMeaningfulText(jobSpec.endpapers_details));
+        const hasEffectiveHardcoverBoard = parseEffectiveBoolean(jobSpec.has_hardcover_board);
+
+        const unsupportedFeaturesList = Array.isArray(jobSpec.unsupported_features)
+            ? jobSpec.unsupported_features.filter(f => parseMeaningfulText(f) !== null)
+            : [];
+        const hasEffectiveUnsupportedFeatures = unsupportedFeaturesList.length > 0;
+
+        const isComplexSpec = Boolean(
+            hasEffectiveMixedInterior ||
+            hasEffectiveSpotUv ||
+            hasEffectiveEndpapers ||
+            hasEffectiveHardcoverBoard ||
+            hasEffectiveUnsupportedFeatures
         );
 
-        if (isMixedInterior) {
-            const details = jobSpec.mixed_interior_details || 'Mixed Pantone/CMYK interior';
-            warnings.push(`SIMPLIFIED_INTERIOR_APPROXIMATION: Spec has complex interior (${details}) calculated using single-pass approximation.`);
+        const textSources = [
+            parseMeaningfulText(jobSpec.mixed_interior_details),
+            parseMeaningfulText(jobSpec.endpapers_details),
+            parseMeaningfulText(jobSpec.spot_uv_details),
+            parseMeaningfulText(jobSpec.raw_text),
+            parseMeaningfulText(jobSpec.rawText),
+            parseMeaningfulText(jobSpec.unsupportedDetails),
+            parseMeaningfulText(jobSpec.notes),
+            parseMeaningfulText(jobSpec.comments),
+            parseMeaningfulText(jobSpec.referenceBookName)
+        ];
+
+        const rawTextCombined = textSources.filter(Boolean).join(' ').toLowerCase();
+
+        let hasComplexTextSignal = false;
+        if (rawTextCombined) {
+            const keywords = ['pantone', 'guardas', 'endpapers', 'cartón', 'carton', 'relieve', 'spot uv', 'barniz', 'mixed interior', 'interior mixto'];
+            for (const kw of keywords) {
+                if (rawTextCombined.includes(kw)) {
+                    const negationRegex = new RegExp(`(${kw}|endpapers?|guardas?|spot_?uv|barniz|mixed_?interior)\\s*[:=]\\s*(none|false|no|null)|(sin|no)\\s+(${kw})`, 'i');
+                    if (!negationRegex.test(rawTextCombined)) {
+                        hasComplexTextSignal = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const isSimplifiedApproximation = isComplexSpec || hasComplexTextSignal;
+
+        if (isSimplifiedApproximation) {
+            const complexDetailsParts = [];
+            if (parseMeaningfulText(jobSpec.mixed_interior_details)) complexDetailsParts.push(jobSpec.mixed_interior_details);
+            if (parseMeaningfulText(jobSpec.endpapers_details)) complexDetailsParts.push(`Guardas: ${jobSpec.endpapers_details}`);
+            else if (hasEffectiveEndpapers) complexDetailsParts.push('Guardas / endpapers');
+            if (parseMeaningfulText(jobSpec.spot_uv_details)) complexDetailsParts.push(`Barniz/UV: ${jobSpec.spot_uv_details}`);
+            else if (hasEffectiveSpotUv) complexDetailsParts.push('Barniz / Spot UV');
+
+            const details = complexDetailsParts.length > 0 ? complexDetailsParts.join('; ') : 'Complex interior, guardas or spot UV/barniz features';
+            warnings.push(`SIMPLIFIED_INTERIOR_APPROXIMATION: Spec has complex features (${details}) calculated using single-pass approximation.`);
         }
 
         // 11. Build User-Safe Configuration Trace
@@ -259,7 +331,7 @@ class PrinthouseQuotePreviewService {
             ok: true,
             currency: 'EUR',
             quantity: copies,
-            isSimplifiedApproximation: isMixedInterior,
+            isSimplifiedApproximation,
             originalJobSpec: jobSpec,
             totals: {
                 manufacturing: Number(manufacturingCost.toFixed(2)),
