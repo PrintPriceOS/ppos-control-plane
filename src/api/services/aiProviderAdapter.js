@@ -15,12 +15,57 @@ const axios = require('axios');
 const logger = require('./logger').child('ai-provider-adapter');
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const MIN_TIMEOUT_MS = 1000;
+const MAX_TIMEOUT_MS = 120000;
 const GEMINI_API_VERSION = 'v1beta';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 
 class AIProviderAdapter {
     constructor() {
-        this.timeoutMs = DEFAULT_TIMEOUT_MS;
+        this._overrideTimeoutMs = undefined;
+    }
+
+    /**
+     * Retrieves and validates the configured AI timeout in milliseconds.
+     * Checks PPOS_AI_TIMEOUT_MS environment variable with fallback to DEFAULT_TIMEOUT_MS (15000ms).
+     * Validates that timeout is an integer between 1000 and 120000 ms.
+     * @returns {number}
+     */
+    getTimeoutMs() {
+        if (this._overrideTimeoutMs !== undefined && this._overrideTimeoutMs !== null) {
+            return this._overrideTimeoutMs;
+        }
+
+        const raw = process.env.PPOS_AI_TIMEOUT_MS;
+        if (raw === undefined || raw === null || String(raw).trim() === '') {
+            return DEFAULT_TIMEOUT_MS;
+        }
+
+        const val = String(raw).trim();
+        if (!/^\d+$/.test(val)) {
+            const err = new Error(`Invalid PPOS_AI_TIMEOUT_MS configuration: "${raw}". Must be an integer between 1000 and 120000 ms.`);
+            err.code = 'INVALID_AI_TIMEOUT_CONFIG';
+            err.statusCode = 500;
+            throw err;
+        }
+
+        const num = parseInt(val, 10);
+        if (num < MIN_TIMEOUT_MS || num > MAX_TIMEOUT_MS) {
+            const err = new Error(`Invalid PPOS_AI_TIMEOUT_MS configuration: ${num}. Must be an integer between 1000 and 120000 ms.`);
+            err.code = 'INVALID_AI_TIMEOUT_CONFIG';
+            err.statusCode = 500;
+            throw err;
+        }
+
+        return num;
+    }
+
+    get timeoutMs() {
+        return this.getTimeoutMs();
+    }
+
+    set timeoutMs(val) {
+        this._overrideTimeoutMs = val;
     }
 
     /**
@@ -36,7 +81,7 @@ class AIProviderAdapter {
      * @returns {string}
      */
     getConfiguredModel() {
-        return process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+        return process.env.GEMINI_MODEL || 'gemini-3.5-flash';
     }
 
     /**
@@ -67,6 +112,7 @@ class AIProviderAdapter {
     }) {
         const startTime = Date.now();
         const selectedModel = model || this.getConfiguredModel();
+        const effectiveTimeoutMs = this.getTimeoutMs();
 
         // 1. Support deterministic mock injection for unit/integration tests
         if (mockResponse) {
@@ -126,7 +172,7 @@ class AIProviderAdapter {
         try {
             const response = await axios.post(url, requestBody, {
                 headers: { 'Content-Type': 'application/json' },
-                timeout: this.timeoutMs
+                timeout: effectiveTimeoutMs
             });
 
             const latencyMs = Date.now() - startTime;
@@ -174,8 +220,20 @@ class AIProviderAdapter {
         } catch (err) {
             const latencyMs = Date.now() - startTime;
 
-            if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-                const timeoutErr = new Error(`AI provider request timed out after ${this.timeoutMs}ms`);
+            if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout')) {
+                const timeoutDiagnostics = {
+                    model: targetModel,
+                    timeoutMs: effectiveTimeoutMs,
+                    latencyMs
+                };
+
+                logger.warn({
+                    event: 'ai_provider_timeout',
+                    message: `AI provider request timed out after ${effectiveTimeoutMs}ms`,
+                    metadata: timeoutDiagnostics
+                });
+
+                const timeoutErr = new Error(`AI provider request timed out after ${effectiveTimeoutMs}ms`);
                 timeoutErr.code = 'AI_PROVIDER_TIMEOUT';
                 timeoutErr.statusCode = 504;
                 timeoutErr.latencyMs = latencyMs;
@@ -197,7 +255,11 @@ class AIProviderAdapter {
                     providerMessage: errorData.message || 'Error reported by provider'
                 };
 
-                logger.warn('AI provider request failed with error response', sanitizedDiagnostics);
+                logger.warn({
+                    event: 'ai_provider_error',
+                    message: 'AI provider request failed with error response',
+                    metadata: sanitizedDiagnostics
+                });
 
                 if (status === 429) {
                     const rateErr = new Error('AI provider rate limit exceeded');

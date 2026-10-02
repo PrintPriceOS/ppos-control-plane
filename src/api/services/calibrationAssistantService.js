@@ -638,12 +638,6 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     const s = String(val).toLowerCase().trim();
                     if (VALID_BINDING_METHOD.includes(s)) {
                         normalized.specPatch[key] = s;
-                    } else if (s === 'perfect' || s === 'pb') {
-                        normalized.specPatch[key] = 'perfect bound';
-                    } else if (s === 'sewn' || s === 'thread-sewn') {
-                        normalized.specPatch[key] = 'thread sewn';
-                    } else if (s === 'case' || s === 'casebound' || s === 'hardback') {
-                        normalized.specPatch[key] = 'hardcover';
                     }
                 } else if (key === 'paper_type_interior') {
                     const s = String(val).toLowerCase().trim();
