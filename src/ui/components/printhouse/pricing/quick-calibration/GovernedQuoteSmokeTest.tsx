@@ -81,6 +81,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         setUserHasEdited(true);
         setQuoteResult(null);
         setError(null);
+        setLoading(false);
         setSpec(prev => ({ ...prev, [field]: value }));
     };
 
@@ -103,9 +104,55 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
         setLoading(false);
     }, [printerNodeId]);
 
-    // Update spec if initialSpec changes (only if user has not modified fields or when initialSpec gets populated)
+    // Track previous initialSpec reference to detect effective specification changes versus identical re-renders
+    const prevInitialSpecRef = useRef<any>(null);
+
+    const hasEffectiveSpecChange = (prevSpec: any, nextSpec: any) => {
+        if (!prevSpec && !nextSpec) return false;
+        if (!prevSpec || !nextSpec) return true;
+        for (const key of Object.keys(nextSpec)) {
+            if (nextSpec[key] !== undefined && nextSpec[key] !== null && nextSpec[key] !== '') {
+                if (prevSpec[key] !== nextSpec[key]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    // Update spec if initialSpec changes (only on effective changes or initial mount, preserving manual edits on identical re-renders)
     useEffect(() => {
-        if (initialSpec && Object.keys(initialSpec).length > 0) {
+        if (!initialSpec || Object.keys(initialSpec).length === 0) {
+            return;
+        }
+
+        const isFirstMount = prevInitialSpecRef.current === null;
+        const isEffectiveChange = !isFirstMount && hasEffectiveSpecChange(prevInitialSpecRef.current, initialSpec);
+
+        prevInitialSpecRef.current = initialSpec;
+
+        if (isEffectiveChange) {
+            // Effective specification change from parent: invalidate pending requests, reset result/error/loading and userHasEdited
+            activeRequestIdRef.current++;
+            setQuoteResult(null);
+            setError(null);
+            setLoading(false);
+            setUserHasEdited(false);
+
+            setSpec(prev => {
+                const normalized = { ...prev };
+                for (const key of Object.keys(initialSpec)) {
+                    if (initialSpec[key] !== undefined && initialSpec[key] !== null && initialSpec[key] !== '') {
+                        if (key === 'binding_method') {
+                            normalized.binding_method = normalizeBinding(initialSpec.binding_method);
+                        } else {
+                            (normalized as any)[key] = initialSpec[key];
+                        }
+                    }
+                }
+                return normalized;
+            });
+        } else if (isFirstMount) {
             setSpec(prev => {
                 const normalized = { ...prev };
                 for (const key of Object.keys(initialSpec)) {
@@ -214,10 +261,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
             <form onSubmit={handleCalculate} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
                 {/* Quantity */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="input-copies" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Quantity (Copies)
                     </label>
                     <input
+                        id="input-copies"
                         type="number"
                         min="1"
                         step="1"
@@ -229,11 +277,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Dimensions */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="input-book-width" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Trim Size (W × H mm)
                     </label>
                     <div className="flex items-center gap-1.5">
                         <input
+                            id="input-book-width"
                             type="number"
                             min="50"
                             max="500"
@@ -244,6 +293,8 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         />
                         <span className="text-zinc-400">×</span>
                         <input
+                            id="input-book-height"
+                            aria-label="Book Height mm"
                             type="number"
                             min="50"
                             max="700"
@@ -257,10 +308,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Pages */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="input-interior-pages" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Interior Pages
                     </label>
                     <input
+                        id="input-interior-pages"
                         type="number"
                         min="4"
                         step="2"
@@ -272,10 +324,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Interior Print Mode */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="select-interior-print" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Interior Print
                     </label>
                     <select
+                        id="select-interior-print"
                         value={spec.interior_print || '4/4'}
                         onChange={e => updateSpecField('interior_print', e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
@@ -288,11 +341,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Interior Paper */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="select-paper-type" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Interior Paper
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
+                            id="select-paper-type"
                             value={spec.paper_type_interior || 'offset'}
                             onChange={e => updateSpecField('paper_type_interior', e.target.value)}
                             className="w-2/3 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
@@ -302,6 +356,8 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             <option value="munken">Munken</option>
                         </select>
                         <input
+                            id="input-paper-weight"
+                            aria-label="Interior Paper Weight"
                             type="number"
                             min="50"
                             max="300"
@@ -315,11 +371,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Cover Spec */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="select-cover-print" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Cover (Print / GSM)
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
+                            id="select-cover-print"
                             value={spec.cover_print || '4/0'}
                             onChange={e => updateSpecField('cover_print', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
@@ -329,6 +386,8 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             <option value="1/0">1/0 B&W</option>
                         </select>
                         <input
+                            id="input-cover-weight"
+                            aria-label="Cover Paper Weight"
                             type="number"
                             min="150"
                             max="450"
@@ -342,11 +401,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Binding & Lamination */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="select-binding-method" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Binding / Finish
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
+                            id="select-binding-method"
                             value={spec.binding_method || 'perfect bound'}
                             onChange={e => updateSpecField('binding_method', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
@@ -359,6 +419,8 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             <option value="spiral">Spiral</option>
                         </select>
                         <select
+                            id="select-lamination"
+                            aria-label="Lamination"
                             value={spec.lamination || 'matt'}
                             onChange={e => updateSpecField('lamination', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
@@ -372,10 +434,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
 
                 {/* Destination Region & Country */}
                 <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="select-delivery-country" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
                         Destination ({availableDestinations.length} configured)
                     </label>
                     <select
+                        id="select-delivery-country"
                         value={spec.delivery_country || ''}
                         onChange={e => updateSpecField('delivery_country', e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
