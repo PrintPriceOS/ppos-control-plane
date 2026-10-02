@@ -331,8 +331,6 @@ router.put('/pricing/industrial', requireAuth, async (req, res) => {
             ]
         );
 
-        await connection.commit();
-
         const newBaselineChecksum = computeNodeStateChecksum({
             signatures: nextSignatures,
             delivery_time: nextDeliveryTime,
@@ -340,6 +338,8 @@ router.put('/pricing/industrial', requireAuth, async (req, res) => {
             limits: nextLimits,
             rates: nextRates
         });
+
+        await connection.commit();
 
         return res.json({
             ok: true,

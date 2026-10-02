@@ -357,4 +357,30 @@ El estado `VALID_COMMERCIAL_QUOTE` (`isValidCommercialQuote === true`) certifica
 3. **Calibración Gobernada:** La verificación de costes industriales reales requiere el flujo de calibración con registro inmutable en `printhouse_pricing_revisions` y linaje auditado.
 
 ---
-*Report compiled for Phase 195E Commercial Cost Model Audit.*
+
+## 18. Phase 195K Technical Verification & Audit Closure
+
+### 1. Mandatory `nodeId` & Baseline Payload Integrity
+- `GET /api/printhouse/onboarding/pricing/industrial` returns `nodeId` and `baselineChecksum`.
+- `handleSaveIndustrialPricing` in `PricingPanel.tsx` strictly enforces `if (!industrialData?.nodeId) throw err;` (rejecting save attempt with code `INVALID_NODE_ID` and status 400 if no node is loaded).
+- Payload structure enforces `{ ...payload, nodeId: industrialData.nodeId }` guaranteeing `nodeId` matches the loaded node context.
+
+### 2. Pre-COMMIT Baseline Checksum Calculation
+- In `printhouseOnboardingRoutes.js` (PUT handler), `newBaselineChecksum` is calculated and verified BEFORE `await connection.commit()`. If checksum calculation fails or throws, transaction automatically rolls back in `catch` block without committing partial changes.
+
+### 3. Verification of Auth JWT Role Issuance
+- `PRINTHOUSE_ADMIN` and `SUPER_ADMIN` write permissions are issued during authentication:
+  - `POST /api/auth/login` (in `authRoutes.js`): normalizes `userRole = (user.role || 'VIEWER').toUpperCase()`. Issues JWT with `role: userRole` (or `'SUPER_ADMIN'` for break-glass login).
+  - `POST /api/auth/printhouse/register` (in `authRoutes.js`): calls `printhouseService.selfRegister()`, creating user with role `'PRINTHOUSE_ADMIN'` and issuing JWT with `role: 'PRINTHOUSE_ADMIN'`.
+  - `POST /api/auth/printhouse/activate` (in `printhouseActivationService.js`): creates user with `userService.createUser(email, 'PRINTHOUSE_ADMIN', ...)`, writing `'PRINTHOUSE_ADMIN'` to `control_users` table and signing JWT with `role: 'PRINTHOUSE_ADMIN'`.
+
+### 4. Comprehensive Test Suite Execution Summary
+
+| Test Suite | Execution Environment | Test Cases Covered | Result |
+| :--- | :--- | :--- | :---: |
+| **`tests/GovernedQuoteSmokeTest.test.tsx` (Test 28)** | Frontend React RTL + Mock HTTP | End-to-end `PricingPanel` + `CanonicalIndustrialPricingEditor` integration: GET loads `nodeId` & baseline, PUT transmits both, 409 conflict preserves user draft, Reload button updates rates & baseline together, subsequent save transmits new baseline. | **28/28 PASSED** |
+| **`tests/smoke_phase195k_governed_manual_pricing_save.js`** | Standalone Node Unit Suite | Checksum determinism & field sensitivity, SHA-256 / `nodeId` input validation rules, write role permissions (`PRINTHOUSE_ADMIN`, `SUPER_ADMIN`). | **3/3 PASSED** |
+| **`tests/smoke_phase195k_mysql_isolated_governed_save.js`** | **Real Isolated MySQL 8.0** (`localhost:3308`) | **1. Real Concurrency:** 2 connections save same node with same baseline $\rightarrow$ 1st succeeds, 2nd gets 409 conflict.<br>**2. Real Transactional Rollback:** Failure after revision `INSERT` $\rightarrow$ `ROLLBACK` guarantees 0 revisions and 0 node modifications persist in DB.<br>**3. Real Foreign Tenant Isolation:** Request for node belonging to foreign tenant $\rightarrow$ 0 writes, 0 revisions. | **3/3 PASSED** |
+
+---
+*Report compiled for Phase 195K Governed Industrial Pricing Save.*

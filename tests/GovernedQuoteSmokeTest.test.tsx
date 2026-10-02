@@ -6,6 +6,7 @@ import { GovernedQuoteSmokeTest } from '../src/ui/components/printhouse/pricing/
 import { QuickCalibrationPanel } from '../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel';
 import { StructuredQuoteReviewCard } from '../src/ui/components/printhouse/pricing/quick-calibration/StructuredQuoteReviewCard';
 import { CanonicalIndustrialPricingEditor } from '../src/ui/components/printhouse/pricing/CanonicalIndustrialPricingEditor';
+import { PricingPanel } from '../src/ui/components/printhouse/setup/PricingPanel';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../src/ui/lib/printhouseCalibrationApi';
 import { LocaleProvider } from '../src/ui/i18n';
 
@@ -1741,6 +1742,8 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
 
     it('28. PricingPanel end-to-end flow: GET returns nodeId & baseline, PUT transmits both, 409 preserves draft, reload gets new baseline, 2nd save uses updated baseline', async () => {
         let currentServerChecksum = 'b'.repeat(64);
+        let currentServerMattRate = 9.7231;
+        let currentServerDeliveryTime = '14 days';
         let saveCallCount = 0;
         let lastPutBody: any = null;
 
@@ -1793,54 +1796,37 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
                             nodeName: 'Primary Production Node',
                             configured: true,
                             signatures: [24],
-                            deliveryTime: '14 days',
+                            deliveryTime: currentServerDeliveryTime,
                             productionLeadDays: 11,
                             limits: { min_copies: 50, max_pages: 1500 },
-                            rates: { lam_fixed: { matt: 9.7231 } },
+                            rates: { lam_fixed: { matt: currentServerMattRate } },
                             baselineChecksum: currentServerChecksum
                         }
                     })
                 } as any;
             }
-            return { ok: true, status: 200, json: async () => ({ ok: true }) } as any;
+            return { ok: true, status: 200, json: async () => ({ ok: true, data: [] }) } as any;
         });
 
-        // 1. Render editor with initial baseline 'b'*64
-        const initialNodeData = {
-            id: 'node-329a3bc4',
-            signatures: [24],
-            delivery_time: '14 days',
-            production_lead_days: 11,
-            limits: { min_copies: 50, max_pages: 1500 },
-            rates: { lam_fixed: { matt: 9.7231 } },
-            baselineChecksum: 'b'.repeat(64)
-        };
+        // 1. Render PricingPanel real component directly
+        render(<PricingPanel sites={[]} />);
 
-        const onSaveProxy = async (payload: any) => {
-            const fullPayload = { nodeId: 'node-329a3bc4', ...payload };
-            const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(fullPayload)
-            });
-            const json = await res.json();
-            if (!res.ok || !json.ok) {
-                const err: any = new Error(json.error?.message || 'Save failed');
-                err.code = json.error?.code || 'SAVE_ERROR';
-                err.status = res.status;
-                throw err;
-            }
-        };
+        // Switch to Manual Rate Card Setup workflow
+        await waitFor(() => {
+            expect(screen.getByText(/Choose Your Pricing Workflow/i)).toBeInTheDocument();
+        });
 
-        render(
-            <CanonicalIndustrialPricingEditor
-                mode="ONBOARDING"
-                initialNodeData={initialNodeData}
-                onSave={onSaveProxy}
-            />
-        );
+        const manualBtn = screen.getByRole('button', { name: /Use Manual Setup/i });
+        await act(async () => {
+            fireEvent.click(manualBtn);
+        });
 
-        // First Save -> expected_baseline_checksum matches currentServerChecksum 'b'*64
+        // Wait for GET to complete and Save button to be rendered
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /Save Industrial Pricing Rates/i })).toBeInTheDocument();
+        });
+
+        // First Save -> expected_baseline_checksum matches currentServerChecksum 'b'*64, nodeId is 'node-329a3bc4'
         const saveButton = screen.getByRole('button', { name: /Save Industrial Pricing Rates/i });
         await act(async () => {
             fireEvent.click(saveButton);
@@ -1851,16 +1837,55 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(lastPutBody.expected_baseline_checksum).toBe('b'.repeat(64));
         expect(screen.getByText(/Industrial pricing configuration saved successfully/i)).toBeInTheDocument();
 
-        // Simulate external modification on server -> server checksum becomes 'd'*64
+        // 2. Simulate external modification on server -> server checksum becomes 'd'*64
         currentServerChecksum = 'd'.repeat(64);
 
-        // Second Save with stale checksum 'b'*64 -> Triggers 409 Conflict
+        // Edit form field before 2nd save to test unsubmitted draft conservation
+        const deliveryInput = screen.getByDisplayValue('14 days');
+        fireEvent.change(deliveryInput, { target: { value: '21 days express' } });
+        expect(screen.getByDisplayValue('21 days express')).toBeInTheDocument();
+
+        // Second Save -> uses updated baseline 'c'*64 from 1st save, but server is now 'd'*64 -> Triggers 409 Conflict
         await act(async () => {
             fireEvent.click(saveButton);
         });
 
         expect(saveCallCount).toBe(2);
-        expect(lastPutBody.expected_baseline_checksum).toBe('b'.repeat(64));
+        expect(lastPutBody.nodeId).toBe('node-329a3bc4');
+        expect(lastPutBody.expected_baseline_checksum).toBe('c'.repeat(64));
+        expect(lastPutBody.delivery_time).toBe('21 days express');
         expect(screen.getByText(/CONCURRENCY CONFLICT \(409\)/i)).toBeInTheDocument();
+
+        // Verify un-submitted draft edit remains EXACTLY preserved in form after 409 conflict
+        expect(screen.getByDisplayValue('21 days express')).toBeInTheDocument();
+
+        // 3. Update server data for reload test (value 12.5)
+        currentServerMattRate = 12.5;
+        currentServerDeliveryTime = '12.5 days express';
+        const reloadButton = screen.getByRole('button', { name: /Reload Server Rates/i });
+        expect(reloadButton).toBeInTheDocument();
+
+        // Click Reload Server Rates button
+        await act(async () => {
+            fireEvent.click(reloadButton);
+        });
+
+        // Wait for reload GET to finish and verify new data & baseline ('d'*64) loaded together
+        await waitFor(() => {
+            expect(screen.queryByText(/CONCURRENCY CONFLICT \(409\)/i)).not.toBeInTheDocument();
+        });
+
+        // Verify value 12.5 is rendered visible in form
+        expect(screen.getByDisplayValue('12.5 days express')).toBeInTheDocument();
+
+        // Perform 3rd Save after reload -> transmits 12.5 value & updated baseline 'd'*64
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(saveCallCount).toBe(3);
+        expect(lastPutBody.nodeId).toBe('node-329a3bc4');
+        expect(lastPutBody.delivery_time).toBe('12.5 days express');
+        expect(lastPutBody.expected_baseline_checksum).toBe('d'.repeat(64));
     });
 });

@@ -6,7 +6,7 @@
  * Primary Experience: Canonical Industrial Manufacturing Pricing (rates_json)
  * Downstream Experience: Commercial Price Books, Rules, and Simulations.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { CanonicalIndustrialPricingEditor } from '../pricing/CanonicalIndustrialPricingEditor';
 import { PriceBookForm } from './PriceBookForm';
@@ -23,7 +23,7 @@ interface PricingPanelProps {
 
 type PricingSubTab = 'RULES' | 'SIMULATOR';
 
-export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) => {
+export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved }) => {
     // ── Workflow Selection State (Phase 193H Choice-First UX) ──
     const [selectedWorkflow, setSelectedWorkflow] = useState<PricingWorkflow>('assistant');
     const [isSecondaryExpanded, setIsSecondaryExpanded] = useState<boolean>(false);
@@ -32,6 +32,20 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
     const [industrialData, setIndustrialData] = useState<any | null>(null);
     const [loadingIndustrial, setLoadingIndustrial] = useState(true);
     const [savingIndustrial, setSavingIndustrial] = useState(false);
+
+    const initialNodeDataMemo = useMemo(() => {
+        if (!industrialData) return undefined;
+        return {
+            id: industrialData.nodeId,
+            name: industrialData.nodeName || '',
+            signatures: industrialData.signatures,
+            delivery_time: industrialData.deliveryTime,
+            production_lead_days: industrialData.productionLeadDays,
+            limits: industrialData.limits,
+            rates: industrialData.rates,
+            baselineChecksum: industrialData.baselineChecksum
+        };
+    }, [industrialData]);
 
     // ── Downstream Commercial Policies State ──
     const [showCommercialPolicy, setShowCommercialPolicy] = useState(false);
@@ -84,11 +98,17 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
     };
 
     const handleSaveIndustrialPricing = async (payload: any) => {
+        if (!industrialData?.nodeId) {
+            const err: any = new Error('No node loaded to save pricing for');
+            err.code = 'INVALID_NODE_ID';
+            err.status = 400;
+            throw err;
+        }
         setSavingIndustrial(true);
         try {
             const fullPayload = {
-                nodeId: industrialData?.nodeId || payload.id || payload.nodeId,
-                ...payload
+                ...payload,
+                nodeId: industrialData.nodeId
             };
             const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
                 method: 'PUT',
@@ -503,16 +523,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                             <div className="p-5 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-in fade-in duration-200">
                                 <CanonicalIndustrialPricingEditor
                                     mode="ONBOARDING"
-                                    initialNodeData={industrialData ? {
-                                        id: industrialData.nodeId,
-                                        name: '',
-                                        signatures: industrialData.signatures,
-                                        delivery_time: industrialData.deliveryTime,
-                                        production_lead_days: industrialData.productionLeadDays,
-                                        limits: industrialData.limits,
-                                        rates: industrialData.rates,
-                                        baselineChecksum: industrialData.baselineChecksum
-                                    } : undefined}
+                                    initialNodeData={initialNodeDataMemo}
                                     onSave={handleSaveIndustrialPricing}
                                     onReloadRequest={fetchIndustrialPricing}
                                     saving={savingIndustrial}
@@ -532,16 +543,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                         </div>
                         <CanonicalIndustrialPricingEditor
                             mode="ONBOARDING"
-                            initialNodeData={industrialData ? {
-                                id: industrialData.nodeId,
-                                name: '',
-                                signatures: industrialData.signatures,
-                                delivery_time: industrialData.deliveryTime,
-                                production_lead_days: industrialData.productionLeadDays,
-                                limits: industrialData.limits,
-                                rates: industrialData.rates,
-                                baselineChecksum: industrialData.baselineChecksum
-                            } : undefined}
+                            initialNodeData={initialNodeDataMemo}
                             onSave={handleSaveIndustrialPricing}
                             onReloadRequest={fetchIndustrialPricing}
                             saving={savingIndustrial}
