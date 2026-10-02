@@ -331,4 +331,19 @@ For tomorrow's demonstration:
    Build `CommercialKnobAdapterService` to provide bi-directional conversion between operator knobs and `rates_json`, wrap it in a minimal preview API, and connect it to the onboarding UX shell. Preserve all Phase 195B-195D shadow machine code untouched.
 
 ---
+
+## 16. Benchmark Node Fixtures Breakdown (`node-329a3bc4` — Fährmann Case A)
+
+| Component | Base Calculation / Rates | Subtotal (Sin Plastificado, 506.13 €) | Full Production Subtotal (Con Plastificado Mate, 637.39 €) |
+| :--- | :--- | :---: | :---: |
+| **Papel Cubierta** | MC 130g, 4 páginas (`paper_price_cover_by_kilo.mc = 4.0756`) | 293,44 € | 293,44 € |
+| **Impresión Cubierta (4/0)** | `cover_fixed_by_colours["4"] = 134.8284`, `cover_var_per_1000["4"] = 25.5357` ($134.8284 + 3 \times 25.5357$) | 211,44 € | 211,44 € |
+| **Plastificado Mate** | `lam_fixed.matt = 9.7231`, `lam_var_per_1000.matt = 40.5131` ($9.7231 + 3 \times 40.5131$) | 0,00 € (Sin tarifa lam) | 131,26 € |
+| **Encuadernación** | Hardcover 9 pliegos (`binding_hc_fixed_by_sections["9"] = 1.25`) | 1,25 € | 1,25 € |
+| **Papel e Impresión Interior** | Munken 90g, 216p, 4/4 (`paper_price_interior...munken = 0`, `interior_full_colour_fixed.24p = 0`) | 0,00 € (Tarifas 0) | 0,00 € (Tarifas 0) |
+| **Línea BPE `Cover print`** | `cost_print_cov` (Agrupa Impresión Cubierta + Plastificado) | 211,44 € | **342,70 €** ($211.44 + 131.26$) |
+| **Subtotal Fabricación Total** | **Suma Total Componentes** | **506,13 €** | **637,39 €** |
+| **Estado Cotización** | `isValidCommercialQuote` / `quoteStatus` | `false` / `INVALID_INCOMPLETE_RATES` | `false` / `INVALID_INCOMPLETE_RATES` |
+
+---
 *Report compiled for Phase 195E Commercial Cost Model Audit.*

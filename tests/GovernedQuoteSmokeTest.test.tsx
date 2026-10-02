@@ -1518,14 +1518,15 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(res4p.uncalibratedRates).not.toContain('interior_full_colour_fixed.16p');
     });
 
-    it('25. REAL BPE ENGINE INTEGRATION (unmocked): observed live rates + Case A (Fährmann) spec produce 506.13 € total cost and preview maintains INVALID_INCOMPLETE_RATES for Munken/24p', async () => {
+    it('25. REAL BPE ENGINE INTEGRATION (unmocked base fixture without lamination rates): observed base rates produce 506.13 € subtotal, 211.44 € cover print, and INVALID_INCOMPLETE_RATES for Munken/24p', async () => {
         vi.restoreAllMocks();
 
         const db = require('../src/api/services/mysqlClient');
         const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+        const buildPriceCalibrationAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
 
-        // Live node-329a3bc4 observed rates snapshot
-        const node329ObservedRates = {
+        // Base node-329a3bc4 rates snapshot (without lamination rates)
+        const node329BaseRates = {
             paper_price_interior_by_kilo: { munken: 0, offset: 1.5 },
             paper_price_cover_by_kilo: { mc: 4.0756 },
             interior_full_colour_fixed: { '24p': 0 },
@@ -1542,7 +1543,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             id: 'node-329a3bc4',
             tenant_id: 'tenant-test',
             name: 'philologica.ai Printhouse',
-            rates_json: JSON.stringify(node329ObservedRates),
+            rates_json: JSON.stringify(node329BaseRates),
             signatures: JSON.stringify([24]),
             limits: JSON.stringify({ min_copies: 100, max_copies: 10000, min_pages: 8, max_pages: 2000 }),
             production_lead_days: 7,
@@ -1556,7 +1557,86 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             return [];
         });
 
-        const fahrmannCaseASpec = {
+        const fahrmannBaseSpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            interior_print: '4/4',
+            paper_type_interior: 'munken',
+            paper_weight_interior: 90,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 130,
+            binding_method: 'hardcover',
+            finishing_options: 'none',
+            endpapers: 'none',
+            endpapers_print: 'none',
+            delivery_country: 'DE'
+        };
+
+        // Note: evaluateForwardPrice & buildPrice are NOT mocked here. They execute canonical @ppos/pricing-engine (commit dba8d48)
+        const result = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', fahrmannBaseSpec, 'node-329a3bc4');
+
+        // 1. Unmocked Engine Base Calculation Assertions (506.13 € subtotal)
+        expect(result.ok).toBe(true);
+        expect(result.totals.manufacturing).toBe(506.13); // Cover paper (293.44 €) + Cover print 4/0 (211.44 €) + Binding (1.25 €)
+        expect(result.totals.finalSellingPrice).toBe(506.13);
+
+        const bpeDirect = buildPriceCalibrationAdapter.evaluateForwardPrice(fahrmannBaseSpec, node329BaseRates, {}, { signatures: [24] });
+        const coverPrintLine = bpeDirect.lines.find((l: any) => String(l.item).startsWith('Cover print'));
+        expect(coverPrintLine).toBeDefined();
+        expect(coverPrintLine.line_total).toBe(211.44);
+
+        // 2. Incomplete Rate Validation Assertions
+        expect(result.isValidCommercialQuote).toBe(false);
+        expect(result.quoteStatus).toBe('INVALID_INCOMPLETE_RATES');
+        expect(result.uncalibratedRates).toContain('paper_price_interior_by_kilo.munken');
+        expect(result.uncalibratedRates).toContain('interior_full_colour_fixed.24p');
+    });
+
+    it('26. REAL BPE ENGINE INTEGRATION (unmocked complete production fixture with matt lamination): observed production rates produce 637.39 € subtotal, 342.70 € Cover print line, and INVALID_INCOMPLETE_RATES for Munken/24p', async () => {
+        vi.restoreAllMocks();
+
+        const db = require('../src/api/services/mysqlClient');
+        const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+        const buildPriceCalibrationAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
+
+        // Full production node-329a3bc4 rates snapshot (including matt lamination rates: lam_fixed.matt = 9.7231, lam_var_per_1000.matt = 40.5131)
+        const node329ProductionRates = {
+            paper_price_interior_by_kilo: { munken: 0, offset: 1.5 },
+            paper_price_cover_by_kilo: { mc: 4.0756 },
+            interior_full_colour_fixed: { '24p': 0 },
+            interior_full_colour_var: { '24p': 0 },
+            cover_fixed_by_colours: { '4': 134.8284 },
+            cover_var_per_1000_by_colours: { '4': 25.5357 },
+            binding_hc_fixed_by_sections: { '9': 1.25 },
+            binding_hc_var_per_1000_by_sections: { '9': 0 },
+            endpaper_fixed_by_colours: { '4': 50.0 },
+            endpaper_var_per_1000_by_colours: { '4': 10.0 },
+            lam_fixed: { matt: 9.7231 },
+            lam_var_per_1000: { matt: 40.5131 }
+        };
+
+        const fakeNode = {
+            id: 'node-329a3bc4',
+            tenant_id: 'tenant-test',
+            name: 'philologica.ai Printhouse',
+            rates_json: JSON.stringify(node329ProductionRates),
+            signatures: JSON.stringify([24]),
+            limits: JSON.stringify({ min_copies: 100, max_copies: 10000, min_pages: 8, max_pages: 2000 }),
+            production_lead_days: 7,
+            delivery_time: '9 days'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printer_nodes')) {
+                return [fakeNode];
+            }
+            return [];
+        });
+
+        const fahrmannProductionSpec = {
             copies: 3000,
             book_width_mm: 139,
             book_height_mm: 212,
@@ -1575,16 +1655,19 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         };
 
         // Note: evaluateForwardPrice & buildPrice are NOT mocked here. They execute canonical @ppos/pricing-engine (commit dba8d48)
-        const result = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', fahrmannCaseASpec, 'node-329a3bc4');
+        const result = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', fahrmannProductionSpec, 'node-329a3bc4');
 
-        // 1. Unmocked Engine Calculation Assertions
+        // 1. Unmocked Engine Production Calculation Assertions
+        // Paper Cover (293.44 €) + Cover Print 4/0 (211.44 €) + Matt Lamination (131.26 €) + Binding (1.25 €) = 637.39 €
         expect(result.ok).toBe(true);
-        expect(result.totals.manufacturing).toBe(506.13); // Cover paper (293.44 €) + Cover print (211.44 €) + Binding (1.25 €)
-        expect(result.totals.finalSellingPrice).toBe(506.13);
+        expect(result.totals.manufacturing).toBe(637.39);
+        expect(result.totals.finalSellingPrice).toBe(637.39);
 
-        // Verify un-mocked BPE breakdown component lines
-        const coverPaperLine = result.breakdown.find((b: any) => b.label === 'Manufacturing & Print');
-        expect(coverPaperLine).toBeDefined();
+        // Verify Cover print line in BPE engine breakdown (211.44 € print + 131.26 € lamination = 342.70 €)
+        const bpeDirect = buildPriceCalibrationAdapter.evaluateForwardPrice(fahrmannProductionSpec, node329ProductionRates, {}, { signatures: [24] });
+        const coverPrintLine = bpeDirect.lines.find((l: any) => String(l.item).startsWith('Cover print'));
+        expect(coverPrintLine).toBeDefined();
+        expect(coverPrintLine.line_total).toBe(342.70);
 
         // 2. Incomplete Rate Validation Assertions
         expect(result.isValidCommercialQuote).toBe(false);
