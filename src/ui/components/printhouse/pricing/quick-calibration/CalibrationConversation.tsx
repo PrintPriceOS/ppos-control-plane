@@ -8,6 +8,7 @@ import { Sparkles, Send, Loader2, Bot, User, AlertTriangle, ArrowRight, Papercli
 import { CalibrationClarificationPanel } from './CalibrationClarificationPanel';
 import { StructuredQuoteReviewCard } from './StructuredQuoteReviewCard';
 import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
+import { useLocale } from '../../../../i18n';
 
 interface Message {
     role: 'user' | 'assistant' | 'system';
@@ -36,6 +37,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
     onApplyClarifications,
     aiUnavailable = false
 }) => {
+    const { t } = useLocale();
     const [input, setInput] = useState('');
     const [uploadState, setUploadState] = useState<'IDLE' | 'FILE_SELECTED' | 'UPLOADING' | 'PROCESSING' | 'EXTRACTED' | 'ERROR'>('IDLE');
     const [uploadStatusText, setUploadStatusText] = useState('');
@@ -311,27 +313,31 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                     type="button"
                     onClick={triggerFilePicker}
                     onKeyDown={handlePaperclipKeyDown}
-                    aria-label="Adjuntar presupuesto PDF"
-                    title="Adjuntar presupuesto PDF"
+                    aria-label={t('attachPdfTooltip')}
+                    title={t('attachPdfTooltip')}
                     disabled={sending || uploadState === 'UPLOADING' || uploadState === 'PROCESSING'}
-                    className="p-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#dc0000] disabled:opacity-50 transition-colors"
+                    className="w-[44px] h-[44px] shrink-0 rounded-lg bg-[#dc0000] hover:bg-[#b00000] disabled:opacity-50 text-white flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#dc0000] focus:ring-offset-1 transition-colors"
                 >
-                    <Paperclip size={16} />
+                    {uploadState === 'UPLOADING' || uploadState === 'PROCESSING' ? (
+                        <Loader2 size={20} className="animate-spin text-white" />
+                    ) : (
+                        <Paperclip size={20} className="text-white" />
+                    )}
                 </button>
 
                 <input
                     type="text"
-                    placeholder="Describe el libro o adjunta un PDF..."
+                    placeholder={t('chatInputPlaceholder')}
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     disabled={sending || aiUnavailable || uploadState === 'UPLOADING'}
-                    className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000] disabled:opacity-50"
+                    className="flex-1 min-w-0 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000] disabled:opacity-50"
                 />
 
                 <button
                     type="submit"
                     disabled={!input.trim() || sending || aiUnavailable}
-                    className="px-3.5 py-2 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                    className="px-3.5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0"
                 >
                     <span>Send</span>
                     <Send size={12} />

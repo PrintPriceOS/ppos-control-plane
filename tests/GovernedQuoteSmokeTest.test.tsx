@@ -8,6 +8,7 @@ import { StructuredQuoteReviewCard } from '../src/ui/components/printhouse/prici
 import { CanonicalIndustrialPricingEditor } from '../src/ui/components/printhouse/pricing/CanonicalIndustrialPricingEditor';
 import { PricingPanel } from '../src/ui/components/printhouse/setup/PricingPanel';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../src/ui/lib/printhouseCalibrationApi';
+import { CalibrationConversation } from '../src/ui/components/printhouse/pricing/quick-calibration/CalibrationConversation';
 import { LocaleProvider } from '../src/ui/i18n';
 
 const render = (ui: React.ReactElement, options?: any) => {
@@ -465,11 +466,11 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         fireEvent.click(step1Btn);
 
         await waitFor(() => {
-            expect(screen.getByPlaceholderText(/Describe el libro o adjunta un PDF/i)).toBeInTheDocument();
+            expect(screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i)).toBeInTheDocument();
         });
 
         // Type in conversational chat and click Send
-        const input = screen.getByPlaceholderText(/Describe el libro o adjunta un PDF/i);
+        const input = screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i);
         fireEvent.change(input, { target: { value: 'New quote proposal for Fährmann 3000 copies 6048 EUR' } });
 
         const sendBtn = screen.getByRole('button', { name: /Send/i });
@@ -745,7 +746,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         const step1Btn = screen.getByRole('button', { name: /Describe Job/i });
         fireEvent.click(step1Btn);
 
-        const input = screen.getByPlaceholderText(/Describe el libro o adjunta un PDF/i);
+        const input = screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i);
         fireEvent.change(input, { target: { value: 'Proposal with mixed interior, endpapers and spot UV' } });
         fireEvent.click(screen.getByRole('button', { name: /Send/i }));
 
@@ -838,7 +839,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         // Navigate to Step 1 to answer a clarification via the real UI
         fireEvent.click(screen.getByRole('button', { name: /Describe Job/i }));
 
-        const chatInput2 = screen.getByPlaceholderText(/Describe el libro o adjunta un PDF/i);
+        const chatInput2 = screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i);
         fireEvent.change(chatInput2, { target: { value: 'Clarify destination country' } });
         fireEvent.click(screen.getByRole('button', { name: /Send/i }));
 
@@ -1887,5 +1888,47 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(lastPutBody.nodeId).toBe('node-329a3bc4');
         expect(lastPutBody.delivery_time).toBe('12.5 days express');
         expect(lastPutBody.expected_baseline_checksum).toBe('d'.repeat(64));
+    });
+
+    it('29. CalibrationConversation i18n placeholder and 44x44px red attach button (EN & ES)', () => {
+        const dummyProps = {
+            messages: [],
+            onSendMessage: async () => {},
+            sending: false,
+            activeProposal: null,
+            onApplyProposal: () => {},
+        };
+
+        // Render in English
+        const { unmount: unmountEN } = rtlRender(
+            <LocaleProvider initialLocale="en">
+                <CalibrationConversation {...dummyProps} />
+            </LocaleProvider>
+        );
+
+        const inputEN = screen.getByPlaceholderText('Describe your book or attach a PDF…');
+        expect(inputEN).toBeInTheDocument();
+
+        const attachBtnEN = screen.getByRole('button', { name: 'Attach a PDF' });
+        expect(attachBtnEN).toBeInTheDocument();
+        expect(attachBtnEN).toHaveAttribute('title', 'Attach a PDF');
+        expect(attachBtnEN).toHaveClass('w-[44px]', 'h-[44px]', 'bg-[#dc0000]', 'text-white');
+
+        unmountEN();
+
+        // Render in Spanish
+        rtlRender(
+            <LocaleProvider initialLocale="es">
+                <CalibrationConversation {...dummyProps} />
+            </LocaleProvider>
+        );
+
+        const inputES = screen.getByPlaceholderText('Describe el libro o adjunta un PDF…');
+        expect(inputES).toBeInTheDocument();
+
+        const attachBtnES = screen.getByRole('button', { name: 'Adjuntar un PDF' });
+        expect(attachBtnES).toBeInTheDocument();
+        expect(attachBtnES).toHaveAttribute('title', 'Adjuntar un PDF');
+        expect(attachBtnES).toHaveClass('w-[44px]', 'h-[44px]', 'bg-[#dc0000]', 'text-white');
     });
 });

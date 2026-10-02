@@ -108,7 +108,9 @@ async function runTests() {
   const apiCode = fs.readFileSync(path.join(__dirname, '../src/ui/lib/printhouseCalibrationApi.ts'), 'utf8');
   assert.ok(conversationCode.includes('Paperclip'), 'CalibrationConversation must include Paperclip icon');
   assert.ok(conversationCode.includes('accept="application/pdf,.pdf"'), 'CalibrationConversation must accept PDF');
-  assert.ok(conversationCode.includes('aria-label="Adjuntar presupuesto PDF"'), 'Paperclip must have accessible aria-label');
+  assert.ok(conversationCode.includes("aria-label={t('attachPdfTooltip')}"), 'Paperclip must have accessible aria-label from i18n');
+  assert.ok(conversationCode.includes("w-[44px] h-[44px]"), 'Paperclip button must be 44x44px');
+  assert.ok(conversationCode.includes("bg-[#dc0000]"), 'Paperclip button must use brand red background');
   assert.ok(apiCode.includes('/quote-evidence/upload'), 'printhouseCalibrationApi must contain uploadQuoteEvidence');
   console.log('✓ PASS 194F-05 & 194F-06');
 

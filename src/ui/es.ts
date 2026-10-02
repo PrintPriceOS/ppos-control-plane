@@ -369,4 +369,8 @@ export const es = {
   partialDiagnosticSubtotalTitle: 'Subtotal Parcial Diagnóstico (Tarifas Incompletas)',
   partialDiagnosticSubtotalBadge: 'Subtotal Parcial Diagnóstico',
   perCopyNet: '€ {{price}} / ej. (Neto)',
+
+  // Assistant chat input
+  chatInputPlaceholder: 'Describe el libro o adjunta un PDF…',
+  attachPdfTooltip: 'Adjuntar un PDF',
 } as const;

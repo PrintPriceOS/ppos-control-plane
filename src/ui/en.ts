@@ -371,6 +371,10 @@ export const en = {
   partialDiagnosticSubtotalTitle: 'Partial Diagnostic Subtotal (Incomplete Rates)',
   partialDiagnosticSubtotalBadge: 'Partial Diagnostic Subtotal',
   perCopyNet: '€ {{price}} / copy (Net)',
+
+  // Assistant chat input
+  chatInputPlaceholder: 'Describe your book or attach a PDF…',
+  attachPdfTooltip: 'Attach a PDF',
 } as const;
 
 export type TranslationKeys = keyof typeof en;
