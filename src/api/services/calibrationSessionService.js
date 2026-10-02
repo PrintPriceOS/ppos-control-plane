@@ -231,10 +231,10 @@ class CalibrationSessionService {
             }
         });
 
-        // Transport price if provided must be non-negative
+        // Transport price if provided must be non-negative number
         if (session.transportPricePerKg !== null && session.transportPricePerKg !== undefined) {
-            if (session.transportPricePerKg < 0) {
-                blockingFields.push('transport_price_per_kg cannot be negative');
+            if (typeof session.transportPricePerKg !== 'number' || isNaN(session.transportPricePerKg) || session.transportPricePerKg < 0) {
+                blockingFields.push('transport_price_per_kg must be a valid non-negative number or null');
             }
             if (session.transportCurrency && !VALID_CURRENCIES.includes(session.transportCurrency)) {
                 blockingFields.push(`transport_currency must be one of: ${VALID_CURRENCIES.join(', ')}`);

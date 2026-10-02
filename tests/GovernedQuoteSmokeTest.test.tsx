@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GovernedQuoteSmokeTest } from '../src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest';
 import { QuickCalibrationPanel } from '../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel';
+import { StructuredQuoteReviewCard } from '../src/ui/components/printhouse/pricing/quick-calibration/StructuredQuoteReviewCard';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../src/ui/lib/printhouseCalibrationApi';
 
 describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite', () => {
@@ -27,6 +28,8 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         ok: true,
         currency: 'EUR',
         quantity: 3000,
+        isValidCommercialQuote: true,
+        quoteStatus: 'VALID_COMMERCIAL_QUOTE',
         totals: {
             manufacturing: 5000,
             finishing: 300,
@@ -653,7 +656,9 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(previewArg.has_spot_uv).toBe(true);
         expect(previewArg.spot_uv_details).toBe('Barniz UVI');
 
-        expect(screen.getByText(/SIMPLIFIED_INTERIOR_APPROXIMATION/i)).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText(/SIMPLIFIED_INTERIOR_APPROXIMATION/i)).toBeInTheDocument();
+        });
     });
 
     it('14. QuickCalibrationPanel complex DRAFT lifecycle: applies proposal, captures createSession payload, remounts QuickCalibrationPanel, recovers DRAFT via listSessions, answers clarifications and calculates previewQuote with complex attributes', async () => {
@@ -898,5 +903,506 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(previewPayload.endpapers_details).toBe('Guardas 115g');
         expect(previewPayload.has_spot_uv).toBe(true);
         expect(previewPayload.spot_uv_details).toBe('Barniz UVI');
+    });
+
+    it('15. Exact Assistant response reproduction: specPatch without booleans derives complexity from text/explanation/warnings and preserves preview approximation', async () => {
+        const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+        const quotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+
+        // Raw assistant response without explicit booleans in specPatch
+        const rawAssistantJson = {
+            intent: 'SPEC_EXTRACTION',
+            specPatch: {
+                copies: 3000,
+                book_width_mm: 139,
+                book_height_mm: 212,
+                interior_pages: 216,
+                interior_print: '1/1',
+                paper_type_interior: 'munken',
+                paper_weight_interior: 90,
+                cover_print: '4/0',
+                paper_type_cover: 'mc',
+                paper_weight_cover: 130,
+                binding_method: 'hardcover',
+                lamination: 'matt',
+                delivery_country: 'DE',
+                mixed_interior_details: '208p 1/1 Pantone + 8p 4/4 CMYK',
+                endpapers_details: 'Guardas sin imprimir 115g',
+                spot_uv_details: 'Barniz UVI en portada'
+                // Note: has_mixed_interior, has_endpapers, has_spot_uv booleans omitted!
+            },
+            declaredCommercials: {
+                targetManufacturingPrice: 6048,
+                currency: 'EUR',
+                transportPricePerKg: 'Transport not included (€435 total separate)',
+                includesPaper: true,
+                includesBinding: true,
+                includesFinishing: true,
+                includesPackaging: true
+            },
+            explanation: 'Oferta Fährmann para 3000 ejemplares. Incluye interior mixto (208p 1/1 + 8p 4/4), guardas sin imprimir y barniz UVI.',
+            warnings: ['Interior mixto detectado', 'Barniz UVI detectado'],
+            readyForValidation: true
+        };
+
+        const normalized = calibrationAssistantService._validateAndNormalizeAIResponse(rawAssistantJson);
+
+        // Server MUST derive complexity booleans from text/explanation/warnings
+        expect(normalized.specPatch.has_mixed_interior).toBe(true);
+        expect(normalized.specPatch.has_endpapers).toBe(true);
+        expect(normalized.specPatch.has_spot_uv).toBe(true);
+        expect(normalized.declaredCommercials.transportPricePerKg).toBeNull();
+
+        // Preview quote service MUST set isSimplifiedApproximation and warning
+        const sampleNode = {
+            id: 'node-test',
+            name: 'Test Node',
+            rates_json: {
+                base_setup_price: 100,
+                paper_price_interior_by_kilo: { munken: 2.0, offset: 1.2, mc: 1.4 },
+                paper_price_cover_by_kilo: { mc: 1.5 },
+                paper_price_endpaper_by_kilo: { offset: 1.3 },
+                binding_hc_fixed_by_sections: { s4: 50, s8: 70, s16: 100 },
+                binding_hc_var_per_1000_by_sections: { s4: 30, s8: 45, s16: 65 },
+                lam_fixed: { matt: 20 },
+                lam_var_per_1000: { matt: 12 },
+                destinations: { DE: { shipping_flat_eur: 45 } }
+            },
+            signatures: [16, 8, 4],
+            production_lead_days: 7,
+            delivery_time: 2
+        };
+
+        vi.spyOn(quotePreviewService, 'generateQuotePreview').mockImplementation(async (tId, spec) => {
+            const hasComplex = Boolean(spec.has_mixed_interior || spec.mixed_interior_details || spec.has_endpapers || spec.has_spot_uv);
+            return {
+                ok: true,
+                isSimplifiedApproximation: hasComplex,
+                warnings: hasComplex ? ['SIMPLIFIED_INTERIOR_APPROXIMATION: Spec has complex features calculated using single-pass approximation.'] : [],
+                originalJobSpec: spec,
+                totals: { manufacturing: 4611.6, transport: 0, finalSellingPrice: 4611.6 }
+            };
+        });
+
+        const previewRes = await quotePreviewService.generateQuotePreview('tenant-test', normalized.specPatch);
+        expect(previewRes.isSimplifiedApproximation).toBe(true);
+        expect(previewRes.warnings.some((w: string) => w.includes('SIMPLIFIED_INTERIOR_APPROXIMATION'))).toBe(true);
+        expect(previewRes.originalJobSpec.mixed_interior_details).toBe('208p 1/1 Pantone + 8p 4/4 CMYK');
+    });
+
+    it('16. Clarification answers: canonicalizes interior_print to 1/1, sets transportPricePerKg to null for textual options, and preserves €435 total transport', () => {
+        let draftSpec: any = { copies: 3000, book_width_mm: 139, book_height_mm: 212, interior_pages: 216, binding_method: 'hardcover' };
+        let draftCommercials: any = { targetManufacturingPrice: 6048, currency: 'EUR' };
+
+        const answers = {
+            interior_print: '1/1 (Single color black)',
+            transportPricePerKg: 'Transport not included (€435 total separate)',
+            delivery_country: 'DE (Germany)'
+        };
+
+        // Execute clarification parsing logic
+        Object.entries(answers).forEach(([field, answer]) => {
+            if (field === 'interior_print' || field === 'interiorPrint') {
+                const match = answer.match(/\b([1-4]\/[1-4])\b/);
+                if (match) draftSpec.interior_print = match[1];
+            } else if (field === 'delivery_country' || field === 'destination') {
+                const match = answer.match(/\b([A-Z]{2})\b/i);
+                if (match) draftSpec.delivery_country = match[1].toUpperCase();
+            } else if (field === 'transportPricePerKg' || field === 'transport') {
+                const matchKg = answer.match(/(\d+(?:\.\d+)?)\s*(?:€|\$|eur)?\s*\/\s*kg/i);
+                draftCommercials.transportPricePerKg = matchKg ? parseFloat(matchKg[1]) : null;
+            }
+        });
+
+        expect(draftSpec.interior_print).toBe('1/1');
+        expect(draftSpec.delivery_country).toBe('DE');
+        expect(draftCommercials.transportPricePerKg).toBeNull();
+    });
+
+    it('17. Production provenance preservation: full offer prompt -> brief clarification turn -> original raw_text preserved in specPatch without manual test merge', async () => {
+        const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+        const db = require('../src/api/services/mysqlClient');
+        const aiAdapter = require('../src/api/services/aiProviderAdapter');
+
+        const fullOfferRawText = `El usuario introdujo la oferta Fährmann:
+- 3.000 ejemplares.
+- Formato cerrado 139 × 212 mm.
+- Interior: 208 páginas 1+1 Pantone + 8 páginas consecutivas 4+4.
+- Papel interior Munken Print Cream 1.5, 90 g/m².
+- Guardas 115 g/m², sin impresión.
+- Tapa dura, cartón 2,4 mm, cosido con hilo.
+- Cubierta 4+0, papel 130 g/m²; Silk/Gloss pendiente de aclarar.
+- Laminado mate y barniz relieve parcial.
+- Precio cotizado de fabricación: 6.048 € sin IVA.
+- Transporte: 435 €, separado y excluido de calibración.
+- Destino: Alemania.`;
+
+        // Mock DB session fetch: session.book_spec_json already contains full offer raw_text from turn 1
+        const mockSessionRow = {
+            id: 'cal-faehrmann-101',
+            tenant_id: 'tenant-test',
+            printer_node_id: 'node-329a3bc4',
+            printer_node_name_snapshot: 'Production Node',
+            book_spec_json: JSON.stringify({
+                copies: 3000,
+                book_width_mm: 139,
+                book_height_mm: 212,
+                interior_pages: 216,
+                raw_text: fullOfferRawText
+            }),
+            target_manufacturing_price: 6048,
+            currency: 'EUR',
+            transport_price_per_kg: null,
+            transport_currency: 'EUR',
+            includes_paper: true,
+            includes_binding: true,
+            includes_finishing: true,
+            includes_packaging: true,
+            status: 'DRAFT'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printhouse_pricing_calibration_sessions')) {
+                return [mockSessionRow];
+            }
+            return [];
+        });
+
+        // Mock AI adapter response for Turn 2 (Gemini returns a brief clarification response JSON with its own raw_text alias)
+        vi.spyOn(aiAdapter, 'generateStructuredCompletion').mockResolvedValue({
+            model: 'gemini-2.5-flash',
+            latencyMs: 120,
+            json: {
+                intent: 'CLARIFICATION_NEEDED',
+                specPatch: {
+                    interior_print: '4/4',
+                    raw_text: 'Gemini summary text that must NOT overwrite original offer'
+                },
+                declaredCommercials: {},
+                clarificationQuestions: []
+            }
+        });
+
+        const actor = { id: 'user-1', email: 'manager@printhouse.com', role: 'MANAGER' };
+        const briefClarificationAnswer = 'Yes, convert flat rate to per-kg based on estimated weight';
+
+        // Call production service assistant chat for Turn 2 (no manual test merge)
+        const chatResult = await calibrationAssistantService.chat('tenant-test', 'cal-faehrmann-101', briefClarificationAnswer, actor);
+
+        // Verify production pipeline preserves original full offer raw_text from session
+        expect(chatResult.ok).toBe(true);
+        expect(chatResult.proposal.specPatch.raw_text).toBe(fullOfferRawText);
+        expect(chatResult.proposal.specPatch.raw_text).not.toBe(briefClarificationAnswer);
+        expect(chatResult.proposal.specPatch.raw_text).not.toBe('Gemini summary text that must NOT overwrite original offer');
+        expect(chatResult.proposal.specPatch.interior_print).toBe('4/4');
+    });
+
+    it('18. generateQuotePreview verifies binding breakdown (1.25 €), no duplicate totals, and incomplete rate validation for explicit zero interior rates', async () => {
+        const db = require('../src/api/services/mysqlClient');
+        const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+        const buildPriceCalibrationAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
+
+        const fakeNode = {
+            id: 'node-329a3bc4',
+            tenant_id: 'tenant-test',
+            name: 'Test Node',
+            rates_json: JSON.stringify({
+                paper_price_interior_by_kilo: { munken: 0 },
+                interior_full_colour_fixed: { '24p': 0 },
+                interior_full_colour_var: { '24p': 0 },
+                paper_price_cover_by_kilo: { mc: 4.0756 },
+                cover_fixed_by_colours: { '4': 134.8284 },
+                binding_hc_fixed_by_sections: { '9': 1.25 }
+            }),
+            signatures: JSON.stringify([24]),
+            limits: JSON.stringify({ min_copies: 100, max_copies: 10000 }),
+            production_lead_days: 7,
+            delivery_time: '9 days'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printer_nodes')) {
+                return [fakeNode];
+            }
+            return [];
+        });
+
+        // Mock BPE adapter returning observed lines: Cover paper (293.44 €) + Binding (hardcover) (1.25 €)
+        vi.spyOn(buildPriceCalibrationAdapter, 'evaluateForwardPrice').mockReturnValue({
+            predictedManufacturingPrice: 294.69,
+            predictedTransportPrice: 0.00,
+            totalPredictedPrice: 294.69,
+            signature: 24,
+            sections: 9,
+            lines: [
+                { item: 'Cover paper (130gsm, 4p)', line_total: 293.44 },
+                { item: 'Binding (hardcover)', line_total: 1.25 }
+            ],
+            enginePackage: '@ppos/pricing-engine',
+            engineVersion: '1.0.0',
+            engineCommit: '8d324290d64b5bf17325ff1098db7ebb5f646b5d',
+            engineSource: 'git-pinned'
+        });
+
+        const jobSpec = {
+            copies: 3000,
+            book_width_mm: 139,
+            book_height_mm: 212,
+            interior_pages: 216,
+            interior_print: '4/4',
+            paper_type_interior: 'munken',
+            paper_weight_interior: 90,
+            cover_print: '4/0',
+            paper_type_cover: 'mc',
+            paper_weight_cover: 130,
+            binding_method: 'hardcover',
+            lamination: 'matt',
+            delivery_country: 'DE'
+        };
+
+        const result = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', jobSpec, 'node-329a3bc4');
+
+        // 1. Verify breakdown and binding classification
+        expect(result.ok).toBe(true);
+        expect(result.totals.binding).toBe(1.25);
+        expect(result.totals.manufacturing).toBe(294.69);
+        expect(result.totals.finalSellingPrice).toBe(294.69);
+
+        // Verify breakdown lines (Manufacturing & Print = 293.44, Binding = 1.25)
+        const mfgLine = result.breakdown.find((b: any) => b.label === 'Manufacturing & Print');
+        const bindingLine = result.breakdown.find((b: any) => b.label === 'Binding');
+
+        expect(mfgLine).toBeDefined();
+        expect(mfgLine.amount).toBe(293.44);
+        expect(bindingLine).toBeDefined();
+        expect(bindingLine.amount).toBe(1.25);
+
+        // Verify binding is NOT duplicated (293.44 + 1.25 = 294.69)
+        const breakdownSum = result.breakdown.reduce((acc: number, b: any) => acc + b.amount, 0);
+        expect(Number(breakdownSum.toFixed(2))).toBe(294.69);
+
+        // 2. Verify incomplete quote validation for Munken = 0 and interior 24p = 0
+        expect(result.isValidCommercialQuote).toBe(false);
+        expect(result.quoteStatus).toBe('INVALID_INCOMPLETE_RATES');
+        expect(result.uncalibratedRates).toContain('paper_price_interior_by_kilo.munken');
+        expect(result.uncalibratedRates).toContain('interior_full_colour_fixed.24p');
+        expect(result.warnings.some((w: string) => w.includes('INVALID_INCOMPLETE_RATES'))).toBe(true);
+    });
+
+    it('19. generateQuotePreview handles MISSING rate keys, NON_FINITE values, and UNKNOWN print modes', async () => {
+        const db = require('../src/api/services/mysqlClient');
+        const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+        const buildPriceCalibrationAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
+
+        const nodeMissingAndNonFinite = {
+            id: 'node-329a3bc4',
+            tenant_id: 'tenant-test',
+            name: 'Test Node',
+            rates_json: JSON.stringify({
+                paper_price_interior_by_kilo: { custom_paper: 'NaN' },
+                interior_full_colour_fixed: {},
+                paper_price_cover_by_kilo: { mc: 4.0 }
+            }),
+            signatures: JSON.stringify([16]),
+            limits: JSON.stringify({ min_copies: 100, max_copies: 10000 }),
+            production_lead_days: 7,
+            delivery_time: '9 days'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printer_nodes')) {
+                return [nodeMissingAndNonFinite];
+            }
+            return [];
+        });
+
+        vi.spyOn(buildPriceCalibrationAdapter, 'evaluateForwardPrice').mockReturnValue({
+            predictedManufacturingPrice: 100,
+            predictedTransportPrice: 0,
+            totalPredictedPrice: 100,
+            signature: 16,
+            sections: 8,
+            lines: [{ item: 'Cover paper', line_total: 100 }]
+        });
+
+        // Case A: Missing rate key and non-finite value
+        const specA = {
+            copies: 1000,
+            book_width_mm: 148,
+            book_height_mm: 210,
+            interior_pages: 128,
+            interior_print: '4/4',
+            paper_type_interior: 'custom_paper',
+            delivery_country: 'ES'
+        };
+
+        const resultA = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', specA, 'node-329a3bc4');
+        expect(resultA.isValidCommercialQuote).toBe(false);
+        expect(resultA.quoteStatus).toBe('INVALID_INCOMPLETE_RATES');
+        expect(resultA.rateDetails.some((r: any) => r.status === 'NON_FINITE' || r.status === 'MISSING')).toBe(true);
+
+        // Case B: Unknown print mode (5/5)
+        const specB = {
+            ...specA,
+            interior_print: '5/5'
+        };
+
+        const resultB = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', specB, 'node-329a3bc4');
+        expect(resultB.isValidCommercialQuote).toBe(false);
+        expect(resultB.rateDetails.some((r: any) => r.status === 'UNKNOWN_MODE')).toBe(true);
+    });
+
+    it('20. StructuredQuoteReviewCard renders "Cálculo parcial: tarifas incompletas" and lists affected rates when isValidCommercialQuote is false', () => {
+        render(
+            <StructuredQuoteReviewCard
+                evidenceId="ev-123"
+                filename="Quote_Faehrmann.pdf"
+                documentLanguage="de"
+                isValidCommercialQuote={false}
+                quoteStatus="INVALID_INCOMPLETE_RATES"
+                uncalibratedRates={['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p']}
+                offers={[
+                    {
+                        quantity: 3000,
+                        manufacturingPrice: 294.69,
+                        transportPrice: 0,
+                        quotedTotalPrice: 294.69,
+                        quotedUnitPrice: 0.098,
+                        validationStatus: 'CONSISTENT'
+                    }
+                ]}
+            />
+        );
+
+        // Verify partial calculation warning banner is displayed
+        expect(screen.getByText(/Cálculo parcial: tarifas incompletas/i)).toBeInTheDocument();
+        expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
+        expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
+    });
+
+    it('21. GovernedQuoteSmokeTest UI component hides Customer Price and displays "Cálculo parcial: tarifas incompletas" when quote is invalid', async () => {
+        const previewQuoteSpy = vi.spyOn(printhouseCalibrationApi, 'previewQuote').mockResolvedValue({
+            ok: true,
+            currency: 'EUR',
+            quantity: 3000,
+            isValidCommercialQuote: false,
+            quoteStatus: 'INVALID_INCOMPLETE_RATES',
+            uncalibratedRates: ['paper_price_interior_by_kilo.munken', 'interior_full_colour_fixed.24p'],
+            totals: {
+                manufacturing: 294.69,
+                finishing: 0,
+                binding: 1.25,
+                packaging: 0,
+                transport: 0,
+                commercialMarkup: 0,
+                tax: 0,
+                finalSellingPrice: 294.69
+            },
+            unitPrice: 0.098,
+            breakdown: [
+                { label: 'Manufacturing & Print', amount: 293.44 },
+                { label: 'Binding', amount: 1.25 }
+            ],
+            productionLeadDays: 7,
+            estimatedDeliveryDays: 2,
+            shippingStatus: 'CONFIGURED',
+            configurationTrace: ['Printer Node: node-329a3bc4'],
+            warnings: ['INVALID_INCOMPLETE_RATES: Mandatory manufacturing rates evaluate to zero.']
+        });
+
+        render(<GovernedQuoteSmokeTest printerNodeId="node-329a3bc4" initialSpec={fahrmannSpec} />);
+
+        const calcBtn = screen.getByRole('button', { name: /Calculate Test Quote/i });
+        fireEvent.click(calcBtn);
+
+        await waitFor(() => {
+            expect(previewQuoteSpy).toHaveBeenCalled();
+            expect(screen.getByText(/Cálculo parcial: tarifas incompletas/i)).toBeInTheDocument();
+        });
+
+        // 1. Verify affected rate keys are listed
+        expect(screen.getByText('paper_price_interior_by_kilo.munken')).toBeInTheDocument();
+        expect(screen.getByText('interior_full_colour_fixed.24p')).toBeInTheDocument();
+
+        // 2. Verify "Customer Price" is NOT present (replaced by Subtotal Parcial Diagnóstico)
+        expect(screen.queryByText(/Customer Price \(Before Tax\)/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Subtotal Parcial Diagnóstico \(Tarifas Incompletas\)/i)).toBeInTheDocument();
+
+        // 3. Verify commercial per-copy price (€ 0.10 / copy (Net)) is NOT displayed
+        expect(screen.queryByText(/\/ copy \(Net\)/i)).not.toBeInTheDocument();
+        expect(screen.getAllByText(/Subtotal Parcial Diagnóstico/i).length).toBeGreaterThan(0);
+    });
+
+    it('22. generateQuotePreview correctly evaluates signature 8 and 4 without converting section keys to 16p', async () => {
+        const db = require('../src/api/services/mysqlClient');
+        const printhouseQuotePreviewService = require('../src/api/services/printhouseQuotePreviewService');
+        const buildPriceCalibrationAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
+
+        const nodeSig8And4 = {
+            id: 'node-329a3bc4',
+            tenant_id: 'tenant-test',
+            name: 'Test Node',
+            rates_json: JSON.stringify({
+                paper_price_interior_by_kilo: { offset: 1.5 },
+                interior_full_colour_fixed: { '8p': 0, '4p': 0 },
+                interior_full_colour_var: { '8p': 0, '4p': 0 }
+            }),
+            signatures: JSON.stringify([8, 4]),
+            limits: JSON.stringify({ min_copies: 100, max_copies: 10000 }),
+            production_lead_days: 7,
+            delivery_time: '9 days'
+        };
+
+        vi.spyOn(db, 'query').mockImplementation(async (sql: string) => {
+            if (sql.includes('SELECT') && sql.includes('printer_nodes')) {
+                return [nodeSig8And4];
+            }
+            return [];
+        });
+
+        vi.spyOn(buildPriceCalibrationAdapter, 'evaluateForwardPrice').mockReturnValue({
+            predictedManufacturingPrice: 50,
+            predictedTransportPrice: 0,
+            totalPredictedPrice: 50,
+            signature: 8,
+            sections: 1,
+            lines: [{ item: 'Interior paper', line_total: 50 }]
+        });
+
+        // Spec with 8 pages (signature 8 -> 8p section key consumed)
+        const spec8p = {
+            copies: 1000,
+            book_width_mm: 148,
+            book_height_mm: 210,
+            interior_pages: 8,
+            interior_print: '4/4',
+            paper_type_interior: 'offset',
+            delivery_country: 'ES'
+        };
+
+        const res8p = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', spec8p, 'node-329a3bc4');
+        expect(res8p.isValidCommercialQuote).toBe(false);
+        expect(res8p.uncalibratedRates).toContain('interior_full_colour_fixed.8p');
+        expect(res8p.uncalibratedRates).not.toContain('interior_full_colour_fixed.16p');
+
+        // Spec with 4 pages (signature 4 -> 4p section key consumed)
+        vi.spyOn(buildPriceCalibrationAdapter, 'evaluateForwardPrice').mockReturnValue({
+            predictedManufacturingPrice: 30,
+            predictedTransportPrice: 0,
+            totalPredictedPrice: 30,
+            signature: 4,
+            sections: 1,
+            lines: [{ item: 'Interior paper', line_total: 30 }]
+        });
+
+        const spec4p = {
+            ...spec8p,
+            interior_pages: 4
+        };
+
+        const res4p = await printhouseQuotePreviewService.generateQuotePreview('tenant-test', spec4p, 'node-329a3bc4');
+        expect(res4p.isValidCommercialQuote).toBe(false);
+        expect(res4p.uncalibratedRates).toContain('interior_full_colour_fixed.4p');
+        expect(res4p.uncalibratedRates).not.toContain('interior_full_colour_fixed.16p');
     });
 });

@@ -658,6 +658,59 @@ console.log('===================================================================
         }
     });
 
+    // Test 18: Exact Assistant response with missing flags & textual transport options
+    runTest('Server derives complexity when Gemini booleans are omitted, sanitizes textual transport option to null, and canonicalizes interior_print', async () => {
+        const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+        const rawAiOutputMissingBooleans = {
+            intent: 'SPEC_EXTRACTION',
+            specPatch: {
+                copies: 3000,
+                book_width_mm: 139,
+                book_height_mm: 212,
+                interior_pages: 216,
+                interior_print: '1/1 (Single color black)',
+                paper_type_interior: 'munken',
+                paper_weight_interior: 90,
+                cover_print: '4/0',
+                paper_type_cover: 'mc',
+                paper_weight_cover: 130,
+                binding_method: 'hardcover',
+                lamination: 'matt',
+                delivery_country: 'DE (Germany)',
+                mixed_interior_details: '208p 1/1 Pantone + 8p 4/4 CMYK',
+                endpapers_details: 'Guardas 115g',
+                spot_uv_details: 'Barniz UVI'
+                // has_mixed_interior, has_endpapers, has_spot_uv booleans missing!
+            },
+            declaredCommercials: {
+                targetManufacturingPrice: 6048,
+                currency: 'EUR',
+                transportPricePerKg: 'Transport not included (€435 total separate)',
+                includesPaper: true,
+                includesBinding: true,
+                includesFinishing: true,
+                includesPackaging: true
+            },
+            explanation: 'Propuesta Fährmann con interior mixto, guardas y barniz.',
+            warnings: ['Interior mixto detectado', 'Barniz UVI detectado'],
+            readyForValidation: true
+        };
+
+        const normalized = calibrationAssistantService._validateAndNormalizeAIResponse(rawAiOutputMissingBooleans);
+
+        // Server MUST derive boolean flags from text/explanation/warnings
+        assert.strictEqual(normalized.specPatch.has_mixed_interior, true, 'Server MUST derive has_mixed_interior');
+        assert.strictEqual(normalized.specPatch.has_endpapers, true, 'Server MUST derive has_endpapers');
+        assert.strictEqual(normalized.specPatch.has_spot_uv, true, 'Server MUST derive has_spot_uv');
+
+        // Textual transport option must be sanitized to null
+        assert.strictEqual(normalized.declaredCommercials.transportPricePerKg, null, 'transportPricePerKg must be null when textual option string is provided');
+
+        // Canonical interior_print must be 1/1
+        assert.strictEqual(normalized.specPatch.interior_print, '1/1', 'interior_print must be canonical 1/1');
+        assert.strictEqual(normalized.specPatch.delivery_country, 'DE', 'delivery_country must be canonical DE');
+    });
+
     console.log(`\n================================================================================`);
     console.log(`=== ALL ${passCount} / ${testCount} PHASE 195I ACCEPTANCE TESTS PASSED SUCCESSFULLY ===`);
     console.log(`================================================================================\n`);

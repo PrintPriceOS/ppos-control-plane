@@ -59,6 +59,7 @@ const ALLOWED_SPEC_FIELDS = [
 // ── Strict Allowlist: Declared Commercial Fields (Canonical Phase 193B) ──────
 const ALLOWED_COMMERCIAL_FIELDS = [
     'targetManufacturingPrice',
+    'targetTransportPrice',
     'currency',
     'transportPricePerKg',
     'transportCurrency',
@@ -260,7 +261,7 @@ MANAGER MESSAGE:
         }
 
         // 5. Deterministic Schema & Allowlist Validation (Untrusted Data Gate)
-        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json);
+        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage, currentSpec);
 
         // 6. Record Audit Log (without raw secrets)
         await this._logAudit(tenantId, actor, sessionId, 'CALIBRATION_AI_CHAT_INVOKED', {
@@ -343,7 +344,7 @@ MANAGER MESSAGE:
         }
 
         // Deterministic Schema & Allowlist Validation (Untrusted Data Gate - Reused 100%)
-        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json);
+        const validatedResponse = this._validateAndNormalizeAIResponse(aiResult.json, sanitizedMessage);
 
         // Record Audit Log (Metadata-only)
         await this._logAudit(tenantId, actor, null, 'CALIBRATION_AI_PRESESSION_INTERPRET_INVOKED', {
@@ -473,11 +474,16 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
      * If ANY forbidden control/economic field appears anywhere in the raw response,
      * the entire response is REJECTED (specPatch = {}, declaredCommercials = {}, readyForValidation = false).
      */
-    _validateAndNormalizeAIResponse(rawJson) {
+    _validateAndNormalizeAIResponse(rawJson, rawUserMessage = null, existingSessionSpec = null) {
+        const existingRawText = (existingSessionSpec && existingSessionSpec.raw_text)
+            ? existingSessionSpec.raw_text
+            : ((existingSessionSpec && existingSessionSpec.rawText) ? existingSessionSpec.rawText : null);
+        const initialRawText = existingRawText || rawUserMessage || null;
+
         if (!rawJson || typeof rawJson !== 'object' || Array.isArray(rawJson)) {
             return {
                 intent: 'CLARIFICATION_NEEDED',
-                specPatch: {},
+                specPatch: initialRawText ? { raw_text: initialRawText } : {},
                 declaredCommercials: {},
                 clarificationQuestions: [{ field: 'general', question: 'Could you clarify the physical book details?' }],
                 explanation: 'I could not parse the book specifications. Could you please specify the format, pages, and quantity?',
@@ -534,7 +540,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             logger.warn('Untrusted AI response contained forbidden control fields, failing closed');
             return {
                 intent: 'CLARIFICATION_NEEDED',
-                specPatch: {},
+                specPatch: initialRawText ? { raw_text: initialRawText } : {},
                 declaredCommercials: {},
                 clarificationQuestions: [{ field: 'general', question: 'Please describe the physical book specifications and declared costs.' }],
                 explanation: 'The assistant generated invalid control or pricing parameters. All rate derivation must be handled through the deterministic calibration solver.',
@@ -547,7 +553,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
             intent: ['SPEC_EXTRACTION', 'CLARIFICATION_NEEDED', 'EXPLANATION', 'GENERAL_INQUIRY'].includes(rawJson.intent)
                 ? rawJson.intent
                 : 'SPEC_EXTRACTION',
-            specPatch: {},
+            specPatch: initialRawText ? { raw_text: initialRawText } : {},
             declaredCommercials: {},
             clarificationQuestions: [],
             explanation: typeof rawJson.explanation === 'string' ? rawJson.explanation : '',
@@ -686,7 +692,8 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 } else if (key === 'orientation' && VALID_ORIENTATION.includes(val)) {
                     normalized.specPatch[key] = val;
                 } else if (key === 'delivery_country') {
-                    const code = String(val).toUpperCase().trim();
+                    const match = String(val).match(/\b([A-Z]{2})\b/i);
+                    const code = match ? match[1].toUpperCase() : String(val).toUpperCase().trim();
                     if (isValidIso2Country(code)) normalized.specPatch[key] = code;
                 } else if (key === 'uv_varnish' || key === 'endpapers' || key === 'has_mixed_interior' || key === 'has_spot_uv' || key === 'spot_uv' || key === 'has_endpapers' || key === 'has_hardcover_board') {
                     const s = String(val).toLowerCase().trim();
@@ -697,8 +704,12 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     } else {
                         normalized.specPatch[key] = s;
                     }
-                } else if (key === 'mixed_interior_details' || key === 'spot_uv_details' || key === 'endpapers_details' || key === 'raw_text' || key === 'rawText') {
+                } else if (key === 'mixed_interior_details' || key === 'spot_uv_details' || key === 'endpapers_details') {
                     normalized.specPatch[key] = String(val);
+                } else if (key === 'raw_text' || key === 'rawText') {
+                    if (!normalized.specPatch.raw_text) {
+                        normalized.specPatch.raw_text = String(val);
+                    }
                 } else if (key === 'unsupported_features' && Array.isArray(val)) {
                     normalized.specPatch[key] = val.map(String);
                 }
@@ -716,15 +727,51 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     continue;
                 }
 
-                if (key === 'targetManufacturingPrice' || key === 'transportPricePerKg') {
+                if (key === 'targetManufacturingPrice' || key === 'targetTransportPrice') {
                     const num = Number(val);
-                    if (!isNaN(num) && num >= 0) normalized.declaredCommercials[key] = num;
+                    if (Number.isFinite(num) && num >= 0) normalized.declaredCommercials[key] = num;
+                    else normalized.declaredCommercials[key] = null;
+                } else if (key === 'transportPricePerKg') {
+                    if (typeof val === 'number' && Number.isFinite(val) && val >= 0) {
+                        normalized.declaredCommercials[key] = val;
+                    } else {
+                        normalized.declaredCommercials[key] = null;
+                    }
                 } else if (key === 'currency' || key === 'transportCurrency') {
                     const curr = String(val).toUpperCase().trim();
                     if (VALID_CURRENCIES.includes(curr)) normalized.declaredCommercials[key] = curr;
                 } else if (key.startsWith('includes')) {
                     normalized.declaredCommercials[key] = typeof val === 'boolean' ? val : null;
                 }
+            }
+        }
+
+        // 2b. Server-Side Complexity Derivation (independent of Gemini boolean output)
+        const combinedText = [
+            normalized.explanation,
+            ...normalized.warnings,
+            normalized.specPatch.mixed_interior_details,
+            normalized.specPatch.endpapers_details,
+            normalized.specPatch.spot_uv_details,
+            normalized.specPatch.raw_text,
+            normalized.specPatch.rawText
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (!normalized.specPatch.has_mixed_interior) {
+            if (combinedText.includes('interior mixto') || combinedText.includes('mixed interior') || combinedText.includes('pantone') || combinedText.includes('208p 1/1') || (normalized.specPatch.mixed_interior_details && String(normalized.specPatch.mixed_interior_details).trim().length > 0)) {
+                normalized.specPatch.has_mixed_interior = true;
+            }
+        }
+        if (!normalized.specPatch.has_endpapers) {
+            if (combinedText.includes('guardas') || combinedText.includes('endpaper')) {
+                const negated = /(guardas|endpapers?)\s*[:=]\s*(none|false|no|null)|(sin|no)\s+(guardas|endpapers?)/i.test(combinedText);
+                if (!negated) normalized.specPatch.has_endpapers = true;
+            }
+        }
+        if (!normalized.specPatch.has_spot_uv) {
+            if (combinedText.includes('barniz') || combinedText.includes('spot uv') || combinedText.includes('uvi')) {
+                const negated = /(barniz|spot_?uv|uvi)\s*[:=]\s*(none|false|no|null)|(sin|no)\s+(barniz|spot_?uv|uvi)/i.test(combinedText);
+                if (!negated) normalized.specPatch.has_spot_uv = true;
             }
         }
 

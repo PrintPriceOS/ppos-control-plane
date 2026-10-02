@@ -139,6 +139,135 @@ class PrinthouseQuotePreviewService {
         const manufacturingCost = bpeResult.predictedManufacturingPrice;
         let transportCost = bpeResult.predictedTransportPrice;
 
+        // 5b. Validate completeness & validity of mandatory interior manufacturing rates
+        const uncalibratedRates = [];
+        const rateDetails = [];
+        const paperTypeInt = String(jobSpec.paper_type_interior || 'offset').toLowerCase().trim();
+        const interiorPrintRaw = String(jobSpec.interior_print || '1/1').trim();
+
+        const printModeMap = { '4/4': 'full', '2/2': 'two', '1/1': 'one', 'none': 'none' };
+        const printModeKey = printModeMap[interiorPrintRaw];
+
+        if (interiorPages > 0) {
+            // 1. Paper Interior
+            if (paperTypeInt !== 'none') {
+                const paperKiloRates = ratesSnapshot.paper_price_interior_by_kilo;
+                const keyName = `paper_price_interior_by_kilo.${paperTypeInt}`;
+
+                if (!paperKiloRates || !(paperTypeInt in paperKiloRates)) {
+                    uncalibratedRates.push(keyName);
+                    rateDetails.push({ key: keyName, status: 'MISSING' });
+                } else {
+                    const rawVal = paperKiloRates[paperTypeInt];
+                    const numVal = Number(rawVal);
+                    if (!Number.isFinite(numVal)) {
+                        uncalibratedRates.push(keyName);
+                        rateDetails.push({ key: keyName, status: 'NON_FINITE' });
+                    } else if (numVal === 0) {
+                        uncalibratedRates.push(keyName);
+                        rateDetails.push({ key: keyName, status: 'EXPLICIT_ZERO' });
+                    }
+                }
+            }
+
+            // 2. Interior Print
+            if (interiorPrintRaw !== 'none') {
+                if (!printModeKey) {
+                    const keyName = `interior_print.${interiorPrintRaw}`;
+                    uncalibratedRates.push(keyName);
+                    rateDetails.push({ key: keyName, status: 'UNKNOWN_MODE' });
+                } else if (printModeKey !== 'none') {
+                    const activeSig = bpeResult.signature || 24;
+
+                    /**
+                     * 1:1 replica of internal un-exported sectionsArray() from @ppos/pricing-engine
+                     * (git-pinned to 8d324290d64b5bf17325ff1098db7ebb5f646b5d).
+                     * Decomposes pages into section counts for signature 24 or standard signatures (32/16/8/4).
+                     */
+                    function getSectionsArray(pages, sig) {
+                        if (pages === 0) return [0, 0, 0, 0];
+                        if (sig === 24) {
+                            return [
+                                Math.trunc(pages / 24),
+                                Math.trunc((pages % 24) / 16),
+                                Math.trunc((pages % 24 % 16) / 12),
+                                Math.trunc((pages % 24 % 16 % 12) / 8),
+                                Math.trunc((pages % 24 % 16 % 12 % 8) / 4),
+                            ];
+                        }
+                        return [
+                            Math.trunc(pages / 32),
+                            Math.trunc((pages % 32) / 16),
+                            Math.trunc((pages % 16) / 8),
+                            Math.trunc((pages % 8) / 4),
+                        ];
+                    }
+
+                    const sectArr = getSectionsArray(interiorPages, activeSig);
+                    const sectionKeys = activeSig === 24
+                        ? ['24p', '16p', '12p', '8p', '4p']
+                        : ['32p', '16p', '8p', '4p'];
+
+                    const fixedRatesDict = ratesSnapshot[`interior_${printModeKey}_colour_fixed`];
+                    const varRatesDict = ratesSnapshot[`interior_${printModeKey}_colour_var`];
+
+                    for (let i = 0; i < sectArr.length; i++) {
+                        if (sectArr[i] === 0) continue;
+                        const secKey = sectionKeys[i];
+                        const fixedKeyName = `interior_${printModeKey}_colour_fixed.${secKey}`;
+                        const varKeyName = `interior_${printModeKey}_colour_var.${secKey}`;
+
+                        let isFixedOk = true;
+                        let isVarOk = true;
+
+                        if (!fixedRatesDict || !(secKey in fixedRatesDict)) {
+                            uncalibratedRates.push(fixedKeyName);
+                            rateDetails.push({ key: fixedKeyName, status: 'MISSING' });
+                            isFixedOk = false;
+                        } else {
+                            const numF = Number(fixedRatesDict[secKey]);
+                            if (!Number.isFinite(numF)) {
+                                uncalibratedRates.push(fixedKeyName);
+                                rateDetails.push({ key: fixedKeyName, status: 'NON_FINITE' });
+                                isFixedOk = false;
+                            }
+                        }
+
+                        if (!varRatesDict || !(secKey in varRatesDict)) {
+                            uncalibratedRates.push(varKeyName);
+                            rateDetails.push({ key: varKeyName, status: 'MISSING' });
+                            isVarOk = false;
+                        } else {
+                            const numV = Number(varRatesDict[secKey]);
+                            if (!Number.isFinite(numV)) {
+                                uncalibratedRates.push(varKeyName);
+                                rateDetails.push({ key: varKeyName, status: 'NON_FINITE' });
+                                isVarOk = false;
+                            }
+                        }
+
+                        if (isFixedOk && isVarOk) {
+                            const numF = Number(fixedRatesDict[secKey]);
+                            const numV = Number(varRatesDict[secKey]);
+                            if (numF === 0 && numV === 0) {
+                                uncalibratedRates.push(fixedKeyName);
+                                rateDetails.push({ key: fixedKeyName, status: 'EXPLICIT_ZERO' });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let isValidCommercialQuote = true;
+        let quoteStatus = 'VALID_COMMERCIAL_QUOTE';
+
+        if (uncalibratedRates.length > 0) {
+            isValidCommercialQuote = false;
+            quoteStatus = 'INVALID_INCOMPLETE_RATES';
+            warnings.push(`INVALID_INCOMPLETE_RATES: Mandatory manufacturing rates (${uncalibratedRates.join(', ')}) evaluate to zero or are uncalibrated for printer node ${node.id}. Quote cannot be presented as a valid commercial price.`);
+        }
+
         // 6. Resolve Shipping Region & Transit Times (Canonical Shipping Service)
         const rawCountry = jobSpec.delivery_country;
         let deliveryCountry = null;
@@ -211,12 +340,12 @@ class PrinthouseQuotePreviewService {
             const itemLower = String(ln.item || '').toLowerCase();
             const amt = Number(ln.line_total || 0);
 
-            if (itemLower.includes('paper') || itemLower.includes('substrate')) {
+            if (itemLower.includes('binding') || itemLower.includes('stitch') || itemLower.includes('sewn') || itemLower.includes('hardcover') || itemLower.includes('softcover')) {
+                bindingCost += amt;
+            } else if (itemLower.includes('paper') || itemLower.includes('substrate')) {
                 paperCost += amt;
             } else if (itemLower.includes('print') || itemLower.includes('interior') || itemLower.includes('cover')) {
                 printCost += amt;
-            } else if (itemLower.includes('binding') || itemLower.includes('stitch') || itemLower.includes('sewn')) {
-                bindingCost += amt;
             } else if (itemLower.includes('lamination') || itemLower.includes('varnish') || itemLower.includes('finishing')) {
                 finishingCost += amt;
             } else if (itemLower.includes('packaging') || itemLower.includes('box')) {
@@ -278,6 +407,8 @@ class PrinthouseQuotePreviewService {
             parseMeaningfulText(jobSpec.spot_uv_details),
             parseMeaningfulText(jobSpec.raw_text),
             parseMeaningfulText(jobSpec.rawText),
+            parseMeaningfulText(jobSpec.explanation),
+            Array.isArray(jobSpec.warnings) ? parseMeaningfulText(jobSpec.warnings.join(' ')) : null,
             parseMeaningfulText(jobSpec.unsupportedDetails),
             parseMeaningfulText(jobSpec.notes),
             parseMeaningfulText(jobSpec.comments),
@@ -331,6 +462,10 @@ class PrinthouseQuotePreviewService {
             ok: true,
             currency: 'EUR',
             quantity: copies,
+            isValidCommercialQuote,
+            quoteStatus,
+            uncalibratedRates,
+            rateDetails,
             isSimplifiedApproximation,
             originalJobSpec: jobSpec,
             totals: {
@@ -348,7 +483,7 @@ class PrinthouseQuotePreviewService {
             productionLeadDays: node.production_lead_days || 7,
             estimatedDeliveryDays,
             shippingStatus,
-            taxStatus,
+            taxStatus: 'NOT_APPLIED_IN_PREVIEW',
             configurationTrace,
             warnings,
             engine: {

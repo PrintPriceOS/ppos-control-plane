@@ -17,7 +17,7 @@ import {
     FileText, Globe, Layers, AlertTriangle, CheckCircle2, 
     ChevronDown, ChevronUp, Edit3, Check, X, ArrowRight, ShieldCheck 
 } from 'lucide-react';
-import { printhouseCalibrationApi } from '../../../../lib/printhouseCalibrationApi';
+import { printhouseCalibrationApi, QuoteStatus } from '../../../../lib/printhouseCalibrationApi';
 
 interface OfferPoint {
     quantity: number;
@@ -45,6 +45,9 @@ interface StructuredQuoteReviewCardProps {
     rawExtractedText?: string;
     translatedText?: string;
     validationStatus?: string;
+    isValidCommercialQuote?: boolean;
+    quoteStatus?: QuoteStatus;
+    uncalibratedRates?: string[];
     onReadyForCalibration?: (evidenceId: string) => void;
     onIgnoreDocument?: (evidenceId: string) => void;
 }
@@ -63,6 +66,9 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     rawExtractedText,
     translatedText,
     validationStatus = 'CONSISTENT',
+    isValidCommercialQuote = true,
+    quoteStatus = 'VALID_COMMERCIAL_QUOTE',
+    uncalibratedRates = [],
     onReadyForCalibration,
     onIgnoreDocument
 }) => {
@@ -150,6 +156,24 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
 
             {/* Content Body */}
             <div className="p-4 space-y-4">
+                {!isValidCommercialQuote && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs space-y-1 text-amber-900 dark:text-amber-200">
+                        <div className="flex items-center gap-1.5 font-bold">
+                            <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                            <span>Cálculo parcial: tarifas incompletas</span>
+                        </div>
+                        <p className="m-0 text-[11px] text-amber-800 dark:text-amber-300">
+                            Esta cotización no se presenta como un precio comercial válido debido a tarifas de fabricación ausentes o no calibradas:
+                        </p>
+                        {uncalibratedRates.length > 0 && (
+                            <ul className="list-disc list-inside text-[11px] font-mono text-amber-900 dark:text-amber-200 font-semibold space-y-0.5 mt-1">
+                                {uncalibratedRates.map((r, i) => (
+                                    <li key={i}>{r}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
                 {/* Product & Specification */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-zinc-50/80 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800">
                     <div>

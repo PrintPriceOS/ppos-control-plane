@@ -78,6 +78,55 @@ export interface CreateCalibrationSessionPayload {
     includesPackaging?: boolean | null;
 }
 
+export type QuoteStatus = 'VALID_COMMERCIAL_QUOTE' | 'INVALID_INCOMPLETE_RATES';
+
+export interface QuotePreviewUncalibratedRate {
+    rateKey: string;
+    reason: string;
+    label: string;
+    currentRate: any;
+}
+
+export interface QuotePreviewRateDetail {
+    rateKey: string;
+    status: 'configured' | 'explicit_zero' | 'missing' | 'invalid_non_finite';
+    value: any;
+    label: string;
+}
+
+export interface QuotePreviewResponse {
+    ok: boolean;
+    currency: string;
+    quantity: number;
+    isValidCommercialQuote?: boolean;
+    quoteStatus?: QuoteStatus;
+    uncalibratedRates?: QuotePreviewUncalibratedRate[];
+    rateDetails?: QuotePreviewRateDetail[];
+    totals: {
+        manufacturing: number;
+        finishing: number;
+        binding: number;
+        packaging: number;
+        transport: number;
+        commercialMarkup: number;
+        tax: number;
+        finalSellingPrice: number;
+    };
+    unitPrice: number;
+    breakdown: Array<{ label: string; amount: number }>;
+    productionLeadDays: number;
+    estimatedDeliveryDays: number;
+    shippingStatus: string;
+    taxStatus: string;
+    configurationTrace: string[];
+    warnings: string[];
+    engine: {
+        package: string;
+        version: string;
+        forwardMethod: string;
+    };
+}
+
 export const printhouseCalibrationApi = {
     // ── Phase 193B: Reference Book & Calibration Sessions ───────────────────
     async createSession(payload: CreateCalibrationSessionPayload) {
@@ -266,40 +315,13 @@ export const printhouseCalibrationApi = {
     },
 
     // ── Phase 193H: Governed Quote Preview Smoke Test (Canonical BPE) ─────────
-    async previewQuote(jobSpec: any, printerNodeId?: string) {
+    async previewQuote(jobSpec: any, printerNodeId?: string): Promise<QuotePreviewResponse> {
         const res = await fetch(`${BASE_URL}/quote-preview`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ jobSpec, printerNodeId })
         });
-        return handleResponse<{
-            ok: boolean;
-            currency: string;
-            quantity: number;
-            totals: {
-                manufacturing: number;
-                finishing: number;
-                binding: number;
-                packaging: number;
-                transport: number;
-                commercialMarkup: number;
-                tax: number;
-                finalSellingPrice: number;
-            };
-            unitPrice: number;
-            breakdown: Array<{ label: string; amount: number }>;
-            productionLeadDays: number;
-            estimatedDeliveryDays: number;
-            shippingStatus: string;
-            taxStatus: string;
-            configurationTrace: string[];
-            warnings: string[];
-            engine: {
-                package: string;
-                version: string;
-                forwardMethod: string;
-            };
-        }>(res);
+        return handleResponse<QuotePreviewResponse>(res);
     },
 
     // ── Phase 194E / Phase 194F: PDF Quote Evidence Upload & Corrections ─────

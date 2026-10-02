@@ -441,19 +441,35 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                         updatedComms.isNetPrice = isNet;
                     } else if (field === 'delivery_country' || field === 'destination') {
                         const match = answer.match(/\b([A-Z]{2})\b/i);
-                        updatedSpec.delivery_country = match ? match[1].toUpperCase() : answer;
+                        if (match) updatedSpec.delivery_country = match[1].toUpperCase();
+                    } else if (field === 'interior_print' || field === 'interiorPrint') {
+                        const match = answer.match(/\b([1-4]\/[1-4])\b/);
+                        if (match) updatedSpec.interior_print = match[1];
+                        else if (answer.toLowerCase().includes('mono') || answer.toLowerCase().includes('1/1')) updatedSpec.interior_print = '1/1';
+                        else if (answer.toLowerCase().includes('full') || answer.toLowerCase().includes('4/4')) updatedSpec.interior_print = '4/4';
                     } else if (field === 'cover_print' || field === 'coverPrint') {
                         const match = answer.match(/\b([1-5]\/[0-5])\b/);
-                        updatedSpec.cover_print = match ? match[1] : answer;
+                        if (match) updatedSpec.cover_print = match[1];
                     } else if (field === 'lamination' || field === 'finishing') {
                         const rawLam = answer.toLowerCase().trim();
                         if (rawLam.includes('gloss')) updatedSpec.lamination = 'gloss';
                         else if (rawLam.includes('matt') || rawLam.includes('matte')) updatedSpec.lamination = 'matt';
                         else if (rawLam.includes('varnish')) updatedSpec.lamination = 'varnish';
                         else if (rawLam.includes('none') || rawLam.includes('no')) updatedSpec.lamination = null;
-                        else updatedSpec.lamination = answer;
+                    } else if (field === 'transportPricePerKg' || field === 'transport' || field === 'transportation') {
+                        const matchKg = answer.match(/(\d+(?:\.\d+)?)\s*(?:€|\$|eur)?\s*\/\s*kg/i);
+                        if (matchKg) {
+                            updatedComms.transportPricePerKg = parseFloat(matchKg[1]);
+                        } else {
+                            updatedComms.transportPricePerKg = null;
+                        }
                     } else {
-                        updatedSpec[field] = answer;
+                        // Only copy field if it is not a raw option string assigned to a numeric/enum field
+                        if (field in updatedSpec) {
+                            updatedSpec[field] = answer;
+                        } else if (field in updatedComms) {
+                            updatedComms[field] = answer;
+                        }
                     }
                 });
 
