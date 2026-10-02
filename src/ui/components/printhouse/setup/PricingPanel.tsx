@@ -86,19 +86,41 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
     const handleSaveIndustrialPricing = async (payload: any) => {
         setSavingIndustrial(true);
         try {
+            const fullPayload = {
+                nodeId: industrialData?.nodeId || payload.id || payload.nodeId,
+                ...payload
+            };
             const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(fullPayload)
             });
             const json = await res.json();
             if (!res.ok || !json.ok) {
-                throw new Error(json.error || 'Failed to save industrial pricing');
+                const errMsg = typeof json.error === 'object' ? (json.error.message || json.error.code) : (json.error || 'Failed to save industrial pricing');
+                const err: any = new Error(errMsg);
+                err.code = json.error?.code || (res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR');
+                err.status = res.status;
+                err.data = json;
+                throw err;
             }
-            await fetchIndustrialPricing();
+            if (json.baselineChecksum) {
+                setIndustrialData((prev: any) => prev ? {
+                    ...prev,
+                    nodeId: json.nodeId || prev.nodeId,
+                    baselineChecksum: json.baselineChecksum,
+                    signatures: payload.signatures !== undefined ? payload.signatures : prev.signatures,
+                    deliveryTime: payload.delivery_time !== undefined ? payload.delivery_time : prev.deliveryTime,
+                    productionLeadDays: payload.production_lead_days !== undefined ? payload.production_lead_days : prev.productionLeadDays,
+                    limits: payload.limits !== undefined ? payload.limits : prev.limits,
+                    rates: payload.rates !== undefined ? payload.rates : prev.rates
+                } : prev);
+            } else {
+                await fetchIndustrialPricing();
+            }
             onSaved?.();
         } finally {
             setSavingIndustrial(false);
@@ -488,9 +510,11 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                         delivery_time: industrialData.deliveryTime,
                                         production_lead_days: industrialData.productionLeadDays,
                                         limits: industrialData.limits,
-                                        rates: industrialData.rates
+                                        rates: industrialData.rates,
+                                        baselineChecksum: industrialData.baselineChecksum
                                     } : undefined}
                                     onSave={handleSaveIndustrialPricing}
+                                    onReloadRequest={fetchIndustrialPricing}
                                     saving={savingIndustrial}
                                 />
                             </div>
@@ -515,9 +539,11 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites, onSaved }) =>
                                 delivery_time: industrialData.deliveryTime,
                                 production_lead_days: industrialData.productionLeadDays,
                                 limits: industrialData.limits,
-                                rates: industrialData.rates
+                                rates: industrialData.rates,
+                                baselineChecksum: industrialData.baselineChecksum
                             } : undefined}
                             onSave={handleSaveIndustrialPricing}
+                            onReloadRequest={fetchIndustrialPricing}
                             saving={savingIndustrial}
                         />
                     </div>

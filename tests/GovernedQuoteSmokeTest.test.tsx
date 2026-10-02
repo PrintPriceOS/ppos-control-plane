@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GovernedQuoteSmokeTest } from '../src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest';
 import { QuickCalibrationPanel } from '../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel';
 import { StructuredQuoteReviewCard } from '../src/ui/components/printhouse/pricing/quick-calibration/StructuredQuoteReviewCard';
+import { CanonicalIndustrialPricingEditor } from '../src/ui/components/printhouse/pricing/CanonicalIndustrialPricingEditor';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../src/ui/lib/printhouseCalibrationApi';
 import { LocaleProvider } from '../src/ui/i18n';
 
@@ -1674,5 +1675,192 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         expect(result.quoteStatus).toBe('INVALID_INCOMPLETE_RATES');
         expect(result.uncalibratedRates).toContain('paper_price_interior_by_kilo.munken');
         expect(result.uncalibratedRates).toContain('interior_full_colour_fixed.24p');
+    });
+
+    it('27. CanonicalIndustrialPricingEditor handles expected_baseline_checksum transmission, 409 conflict draft preservation, and reload button', async () => {
+        const dummyNodeData = {
+            id: 'node-329a3bc4',
+            signatures: [24],
+            delivery_time: '14 days',
+            production_lead_days: 11,
+            limits: { min_copies: 50, max_pages: 1500 },
+            rates: { lam_fixed: { matt: 9.7231 } },
+            baselineChecksum: 'a'.repeat(64)
+        };
+
+        let savedPayload: any = null;
+        let reloadCalled = false;
+
+        const handleSaveMock = vi.fn(async (payload: any) => {
+            savedPayload = payload;
+            const err: any = new Error('CONCURRENCY CONFLICT (409)');
+            err.code = 'STALE_BASELINE_CONFLICT';
+            err.status = 409;
+            throw err;
+        });
+
+        const handleReloadMock = vi.fn(async () => {
+            reloadCalled = true;
+        });
+
+        render(
+            <CanonicalIndustrialPricingEditor
+                mode="ONBOARDING"
+                initialNodeData={dummyNodeData}
+                onSave={handleSaveMock}
+                onReloadRequest={handleReloadMock}
+            />
+        );
+
+        // Verify Save button is present
+        const saveButton = screen.getByRole('button', { name: /Save Industrial Pricing Rates/i });
+        expect(saveButton).toBeInTheDocument();
+
+        // Trigger Save submit
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(handleSaveMock).toHaveBeenCalledTimes(1);
+        expect(savedPayload).toBeDefined();
+        expect(savedPayload.expected_baseline_checksum).toBe('a'.repeat(64));
+
+        // Verify Conflict Alert is rendered with message and Reload button
+        expect(screen.getByText(/CONCURRENCY CONFLICT \(409\)/i)).toBeInTheDocument();
+        const reloadButton = screen.getByRole('button', { name: /Reload Server Rates/i });
+        expect(reloadButton).toBeInTheDocument();
+
+        // Click reload button
+        await act(async () => {
+            fireEvent.click(reloadButton);
+        });
+
+        expect(handleReloadMock).toHaveBeenCalledTimes(1);
+        expect(reloadCalled).toBe(true);
+    });
+
+    it('28. PricingPanel end-to-end flow: GET returns nodeId & baseline, PUT transmits both, 409 preserves draft, reload gets new baseline, 2nd save uses updated baseline', async () => {
+        let currentServerChecksum = 'b'.repeat(64);
+        let saveCallCount = 0;
+        let lastPutBody: any = null;
+
+        vi.spyOn(global, 'fetch').mockImplementation(async (url: any, opts: any) => {
+            const urlStr = String(url);
+            if (urlStr.includes('/api/printhouse/onboarding/pricing/industrial')) {
+                if (opts?.method === 'PUT') {
+                    saveCallCount++;
+                    lastPutBody = JSON.parse(opts.body || '{}');
+
+                    if (lastPutBody.expected_baseline_checksum !== currentServerChecksum) {
+                        return {
+                            ok: false,
+                            status: 409,
+                            json: async () => ({
+                                ok: false,
+                                error: {
+                                    code: 'STALE_BASELINE_CONFLICT',
+                                    message: 'The node state or rates were modified by another session.',
+                                    expected_checksum: lastPutBody.expected_baseline_checksum,
+                                    current_checksum: currentServerChecksum
+                                }
+                            })
+                        } as any;
+                    }
+
+                    // Successful save -> advances server checksum
+                    currentServerChecksum = 'c'.repeat(64);
+                    return {
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            ok: true,
+                            message: 'Updated',
+                            nodeId: 'node-329a3bc4',
+                            revision_id: 'rev_123',
+                            baselineChecksum: currentServerChecksum
+                        })
+                    } as any;
+                }
+
+                // GET request
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        ok: true,
+                        data: {
+                            nodeId: 'node-329a3bc4',
+                            nodeName: 'Primary Production Node',
+                            configured: true,
+                            signatures: [24],
+                            deliveryTime: '14 days',
+                            productionLeadDays: 11,
+                            limits: { min_copies: 50, max_pages: 1500 },
+                            rates: { lam_fixed: { matt: 9.7231 } },
+                            baselineChecksum: currentServerChecksum
+                        }
+                    })
+                } as any;
+            }
+            return { ok: true, status: 200, json: async () => ({ ok: true }) } as any;
+        });
+
+        // 1. Render editor with initial baseline 'b'*64
+        const initialNodeData = {
+            id: 'node-329a3bc4',
+            signatures: [24],
+            delivery_time: '14 days',
+            production_lead_days: 11,
+            limits: { min_copies: 50, max_pages: 1500 },
+            rates: { lam_fixed: { matt: 9.7231 } },
+            baselineChecksum: 'b'.repeat(64)
+        };
+
+        const onSaveProxy = async (payload: any) => {
+            const fullPayload = { nodeId: 'node-329a3bc4', ...payload };
+            const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fullPayload)
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) {
+                const err: any = new Error(json.error?.message || 'Save failed');
+                err.code = json.error?.code || 'SAVE_ERROR';
+                err.status = res.status;
+                throw err;
+            }
+        };
+
+        render(
+            <CanonicalIndustrialPricingEditor
+                mode="ONBOARDING"
+                initialNodeData={initialNodeData}
+                onSave={onSaveProxy}
+            />
+        );
+
+        // First Save -> expected_baseline_checksum matches currentServerChecksum 'b'*64
+        const saveButton = screen.getByRole('button', { name: /Save Industrial Pricing Rates/i });
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(saveCallCount).toBe(1);
+        expect(lastPutBody.nodeId).toBe('node-329a3bc4');
+        expect(lastPutBody.expected_baseline_checksum).toBe('b'.repeat(64));
+        expect(screen.getByText(/Industrial pricing configuration saved successfully/i)).toBeInTheDocument();
+
+        // Simulate external modification on server -> server checksum becomes 'd'*64
+        currentServerChecksum = 'd'.repeat(64);
+
+        // Second Save with stale checksum 'b'*64 -> Triggers 409 Conflict
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(saveCallCount).toBe(2);
+        expect(lastPutBody.expected_baseline_checksum).toBe('b'.repeat(64));
+        expect(screen.getByText(/CONCURRENCY CONFLICT \(409\)/i)).toBeInTheDocument();
     });
 });

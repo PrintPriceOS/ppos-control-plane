@@ -53,22 +53,52 @@ const finalizeTenantVerification = async (req, res, next) => {
     next();
 };
 
+const { v4: uuidv4 } = require('uuid');
+const calibrationSessionService = require('../services/calibrationSessionService');
+
+// Helper: compute canonical SHA-256 checksum for complete editable node state
+function computeNodeStateChecksum(nodeState) {
+    const canonicalState = {
+        signatures: Array.isArray(nodeState.signatures)
+            ? nodeState.signatures
+            : (typeof nodeState.signatures === 'string' ? JSON.parse(nodeState.signatures) : [16]),
+        delivery_time: String(nodeState.delivery_time || nodeState.deliveryTime || '14 days'),
+        production_lead_days: parseInt(nodeState.production_lead_days !== undefined ? nodeState.production_lead_days : (nodeState.productionLeadDays !== undefined ? nodeState.productionLeadDays : 11), 10),
+        limits: typeof nodeState.limits === 'string' ? JSON.parse(nodeState.limits) : (nodeState.limits || { min_copies: 50, max_pages: 1500 }),
+        rates: typeof nodeState.rates_json === 'string' ? JSON.parse(nodeState.rates_json) : (nodeState.rates_json || nodeState.rates || {})
+    };
+    return calibrationSessionService.computeRatesChecksum(canonicalState);
+}
+
 // ── GET /api/printhouse/onboarding/pricing/industrial ──
 router.get('/pricing/industrial', requireAuth, async (req, res) => {
     const tenantId = req.user.tenantId;
+    const requestedNodeId = req.query.nodeId || req.body?.nodeId;
+
     try {
-        const rows = await db.query('SELECT * FROM printer_nodes WHERE tenant_id = ? LIMIT 1', [tenantId]);
+        let sql = 'SELECT * FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"';
+        const params = [tenantId];
+
+        if (requestedNodeId) {
+            sql += ' AND id = ?';
+            params.push(requestedNodeId);
+        } else {
+            sql += ' ORDER BY created_at ASC, id ASC LIMIT 1';
+        }
+
+        const rows = await db.query(sql, params);
         if (rows.length === 0) {
             return res.json({
                 ok: true,
                 data: {
-                    nodeId: null,
+                    nodeId: requestedNodeId || null,
                     configured: false,
                     signatures: [16],
                     deliveryTime: '14 days',
                     productionLeadDays: 11,
                     limits: { min_copies: 50, max_pages: 1500 },
-                    rates: null
+                    rates: null,
+                    baselineChecksum: null
                 }
             });
         }
@@ -82,6 +112,18 @@ router.get('/pricing/industrial', requireAuth, async (req, res) => {
             }
         }
         const isConfigured = parsedRates !== null && Object.keys(parsedRates).length > 0;
+        const parsedSignatures = typeof node.signatures === 'string' ? JSON.parse(node.signatures) : (node.signatures || [16]);
+        const parsedDeliveryTime = node.delivery_time || '14 days';
+        const parsedProductionLeadDays = node.production_lead_days !== undefined ? node.production_lead_days : 11;
+        const parsedLimits = typeof node.limits === 'string' ? JSON.parse(node.limits) : (node.limits || { min_copies: 50, max_pages: 1500 });
+
+        const baselineChecksum = computeNodeStateChecksum({
+            signatures: parsedSignatures,
+            delivery_time: parsedDeliveryTime,
+            production_lead_days: parsedProductionLeadDays,
+            limits: parsedLimits,
+            rates: parsedRates || {}
+        });
 
         res.json({
             ok: true,
@@ -89,11 +131,12 @@ router.get('/pricing/industrial', requireAuth, async (req, res) => {
                 nodeId: node.id,
                 nodeName: node.name || 'Primary Production Node',
                 configured: isConfigured,
-                signatures: typeof node.signatures === 'string' ? JSON.parse(node.signatures) : (node.signatures || [16]),
-                deliveryTime: node.delivery_time || '14 days',
-                productionLeadDays: node.production_lead_days || 11,
-                limits: typeof node.limits === 'string' ? JSON.parse(node.limits) : (node.limits || { min_copies: 50, max_pages: 1500 }),
-                rates: parsedRates
+                signatures: parsedSignatures,
+                deliveryTime: parsedDeliveryTime,
+                productionLeadDays: parsedProductionLeadDays,
+                limits: parsedLimits,
+                rates: parsedRates,
+                baselineChecksum
             }
         });
     } catch (err) {
@@ -134,49 +177,198 @@ function safeDeepMergeRates(target, source) {
 // ── PUT /api/printhouse/onboarding/pricing/industrial ──
 router.put('/pricing/industrial', requireAuth, async (req, res) => {
     const tenantId = req.user.tenantId;
-    const { signatures, delivery_time, production_lead_days, limits, rates } = req.body;
+    const { nodeId: requestedNodeId, signatures, delivery_time, production_lead_days, limits, rates, expected_baseline_checksum } = req.body;
+
+    // Requirement 1 & 3: Role and write authorization check
+    const writeAllowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN'];
+    if (!req.user || !writeAllowedRoles.includes(req.user.role)) {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'FORBIDDEN_INSUFFICIENT_PERMISSIONS',
+                message: 'FORBIDDEN: Insufficient permissions to save industrial pricing rates.'
+            }
+        });
+    }
+
+    // Requirement 1: nodeId mandatory in PUT
+    if (!requestedNodeId || typeof requestedNodeId !== 'string' || !requestedNodeId.trim()) {
+        return res.status(400).json({
+            ok: false,
+            error: {
+                code: 'INVALID_NODE_ID',
+                message: 'nodeId is mandatory for updating industrial pricing configuration.'
+            }
+        });
+    }
+
+    // Requirement 1: expected_baseline_checksum mandatory and malformed check
+    if (!expected_baseline_checksum || typeof expected_baseline_checksum !== 'string' || !/^[a-fA-F0-9]{64}$/.test(expected_baseline_checksum.trim())) {
+        return res.status(400).json({
+            ok: false,
+            error: {
+                code: 'INVALID_BASELINE_CHECKSUM',
+                message: 'expected_baseline_checksum is mandatory and must be a valid 64-character SHA-256 hex string.'
+            }
+        });
+    }
+
+    let connection = null;
 
     try {
-        const rows = await db.query('SELECT id, rates_json FROM printer_nodes WHERE tenant_id = ? LIMIT 1', [tenantId]);
+        const pool = db.getPool();
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        const sql = 'SELECT id, tenant_id, signatures, delivery_time, production_lead_days, limits, rates_json FROM printer_nodes WHERE tenant_id = ? AND id = ? AND status != "DELETED" FOR UPDATE';
+        const params = [tenantId, requestedNodeId.trim()];
+
+        // Lock printer node row with SELECT ... FOR UPDATE
+        const [rows] = await connection.query(sql, params);
+
         if (rows.length === 0) {
-            return res.status(404).json({ ok: false, error: 'No printer node found for tenant. Configure production sites first.' });
+            await connection.rollback();
+            return res.status(404).json({ ok: false, error: { code: 'NODE_NOT_FOUND', message: 'No matching printer node found for tenant.' } });
         }
+
         const node = rows[0];
-        const nodeId = node.id;
+        const targetNodeId = node.id;
 
-        const fields = [];
-        const params = [];
-
-        if (signatures !== undefined) { fields.push('signatures = ?'); params.push(JSON.stringify(signatures)); }
-        if (delivery_time !== undefined) { fields.push('delivery_time = ?'); params.push(String(delivery_time)); }
-        if (production_lead_days !== undefined) { fields.push('production_lead_days = ?'); params.push(parseInt(production_lead_days, 10) || 0); }
-        if (limits !== undefined) { fields.push('limits = ?'); params.push(JSON.stringify(limits)); }
-        
-        if (rates !== undefined) {
-            let existingRates = {};
-            if (node.rates_json) {
-                try {
-                    existingRates = typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
-                    if (!isPlainObject(existingRates)) existingRates = {};
-                } catch (e) {
-                    existingRates = {};
-                }
+        // Parse current node state
+        const currentSignatures = typeof node.signatures === 'string' ? JSON.parse(node.signatures) : (node.signatures || [16]);
+        const currentDeliveryTime = node.delivery_time || '14 days';
+        const currentLeadDays = node.production_lead_days !== undefined ? node.production_lead_days : 11;
+        const currentLimits = typeof node.limits === 'string' ? JSON.parse(node.limits) : (node.limits || { min_copies: 50, max_pages: 1500 });
+        let currentRates = {};
+        if (node.rates_json) {
+            try {
+                currentRates = typeof node.rates_json === 'string' ? JSON.parse(node.rates_json) : node.rates_json;
+                if (!isPlainObject(currentRates)) currentRates = {};
+            } catch (e) {
+                currentRates = {};
             }
-            const mergedRates = safeDeepMergeRates(existingRates, rates);
-            fields.push('rates_json = ?');
-            params.push(JSON.stringify(mergedRates));
         }
 
-        if (fields.length > 0) {
-            params.push(nodeId);
-            params.push(tenantId);
-            await db.query(`UPDATE printer_nodes SET ${fields.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
+        const currentBaselineChecksum = computeNodeStateChecksum({
+            signatures: currentSignatures,
+            delivery_time: currentDeliveryTime,
+            production_lead_days: currentLeadDays,
+            limits: currentLimits,
+            rates: currentRates
+        });
+
+        // Concurrency drift check
+        if (expected_baseline_checksum.trim().toLowerCase() !== currentBaselineChecksum.toLowerCase()) {
+            await connection.rollback();
+            return res.status(409).json({
+                ok: false,
+                error: {
+                    code: 'STALE_BASELINE_CONFLICT',
+                    message: 'The node state or rates were modified by another session. Reload before saving.',
+                    expected_checksum: expected_baseline_checksum,
+                    current_checksum: currentBaselineChecksum
+                }
+            });
         }
 
-        res.json({ ok: true, message: 'Industrial pricing rates updated successfully' });
+        // Compute next state values
+        const nextSignatures = signatures !== undefined ? signatures : currentSignatures;
+        const nextDeliveryTime = delivery_time !== undefined ? String(delivery_time) : currentDeliveryTime;
+        const nextLeadDays = production_lead_days !== undefined ? (parseInt(production_lead_days, 10) || 0) : currentLeadDays;
+        const nextLimits = limits !== undefined ? limits : currentLimits;
+        const nextRates = rates !== undefined ? safeDeepMergeRates(currentRates, rates) : currentRates;
+
+        // Calculate rate card checksums for printhouse_pricing_revisions
+        const newRatesChecksum = calibrationSessionService.computeRatesChecksum(nextRates) || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+        const baselineRatesChecksum = calibrationSessionService.computeRatesChecksum(currentRates) || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+        // Find parent revision
+        const [parentRevRows] = await connection.query(
+            'SELECT id FROM printhouse_pricing_revisions WHERE tenant_id = ? AND printer_node_id = ? ORDER BY created_at DESC LIMIT 1',
+            [tenantId, targetNodeId]
+        );
+        const parentRevisionId = parentRevRows.length > 0 ? parentRevRows[0].id : null;
+
+        const revisionId = `rev_${uuidv4()}`;
+        const createdBy = JSON.stringify({
+            userId: req.user.id || req.user.userId || 'admin',
+            email: req.user.email || 'admin@printhouse.local',
+            role: req.user.role || 'PRINTHOUSE_ADMIN'
+        });
+
+        // Insert immutable pricing revision
+        await connection.query(
+            `INSERT INTO printhouse_pricing_revisions (
+                id, tenant_id, printer_node_id, source_type, parent_revision_id,
+                rates_json, rates_checksum, baseline_rates_checksum,
+                engine_package, engine_version, engine_commit, created_by_json
+            ) VALUES (?, ?, ?, 'MANUAL_EDIT', ?, ?, ?, ?, '@ppos/pricing-engine', '1.0.0', 'dba8d4874cee939de901640e9981e09d2fefdf73', ?)`,
+            [
+                revisionId,
+                tenantId,
+                targetNodeId,
+                parentRevisionId,
+                JSON.stringify(nextRates),
+                newRatesChecksum,
+                baselineRatesChecksum,
+                createdBy
+            ]
+        );
+
+        // Update printer_node
+        await connection.query(
+            `UPDATE printer_nodes
+             SET signatures = ?, delivery_time = ?, production_lead_days = ?, limits = ?, rates_json = ?
+             WHERE id = ? AND tenant_id = ?`,
+            [
+                JSON.stringify(nextSignatures),
+                nextDeliveryTime,
+                nextLeadDays,
+                JSON.stringify(nextLimits),
+                JSON.stringify(nextRates),
+                targetNodeId,
+                tenantId
+            ]
+        );
+
+        await connection.commit();
+
+        const newBaselineChecksum = computeNodeStateChecksum({
+            signatures: nextSignatures,
+            delivery_time: nextDeliveryTime,
+            production_lead_days: nextLeadDays,
+            limits: nextLimits,
+            rates: nextRates
+        });
+
+        return res.json({
+            ok: true,
+            message: 'Industrial pricing configuration updated successfully',
+            nodeId: targetNodeId,
+            revision_id: revisionId,
+            rates_checksum: newRatesChecksum,
+            baselineChecksum: newBaselineChecksum
+        });
     } catch (err) {
-        console.error('[ONBOARDING] Error updating industrial pricing:', err);
-        res.status(500).json({ ok: false, error: err.message });
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rbErr) {
+                console.error('[ONBOARDING] Rollback error:', rbErr);
+            }
+        }
+        console.error('[ONBOARDING] Error in governed industrial pricing update:', err);
+        return res.status(500).json({
+            ok: false,
+            error: {
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'An internal server error occurred while updating industrial pricing.'
+            }
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 });
 

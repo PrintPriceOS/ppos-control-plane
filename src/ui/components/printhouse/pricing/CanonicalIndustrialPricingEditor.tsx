@@ -50,8 +50,10 @@ interface CanonicalIndustrialPricingEditorProps {
         longitude?: number;
         timezone?: string;
         address_line?: string;
+        baselineChecksum?: string;
     };
     onSave: (payload: any) => Promise<void>;
+    onReloadRequest?: () => Promise<void>;
     saving?: boolean;
 }
 
@@ -182,12 +184,14 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
     mode = 'ONBOARDING',
     initialNodeData,
     onSave,
+    onReloadRequest,
     saving = false
 }) => {
     const [tab, setTab] = useState<FormTab>('Basic');
     const [bindingTab, setBindingTab] = useState<BindingKey>('pb');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [conflictError, setConflictError] = useState<any | null>(null);
 
     // Determines if rates_json is genuinely configured or empty
     const isUnconfigured = !initialNodeData?.rates || Object.keys(initialNodeData.rates).length === 0;
@@ -248,11 +252,20 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
         e.preventDefault();
         setSuccessMessage(null);
         setErrorMessage(null);
+        setConflictError(null);
         try {
-            await onSave(form);
+            await onSave({
+                ...form,
+                expected_baseline_checksum: initialNodeData?.baselineChecksum
+            });
             setSuccessMessage('Industrial pricing configuration saved successfully.');
         } catch (err: any) {
-            setErrorMessage(err.message || 'Failed to save industrial pricing.');
+            if (err.code === 'STALE_BASELINE_CONFLICT' || err.status === 409) {
+                setConflictError(err);
+                setErrorMessage('CONCURRENCY CONFLICT (409): The pricing configuration was modified by another session. Your un-submitted draft edits are preserved in the form below. Review your changes or click "Reload Server Rates" to fetch current values.');
+            } else {
+                setErrorMessage(err.message || 'Failed to save industrial pricing.');
+            }
         }
     };
 
@@ -323,9 +336,24 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 </div>
             )}
             {errorMessage && (
-                <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-900 rounded-lg text-xs flex items-center gap-2 font-medium">
-                    <AlertTriangle size={16} className="text-red-600" />
-                    <span>{errorMessage}</span>
+                <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-900 rounded-lg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-medium">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                        <span>{errorMessage}</span>
+                    </div>
+                    {conflictError && onReloadRequest && (
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                await onReloadRequest();
+                                setErrorMessage(null);
+                                setConflictError(null);
+                            }}
+                            className="px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-xs font-semibold whitespace-nowrap transition-colors self-start sm:self-auto"
+                        >
+                            Reload Server Rates
+                        </button>
+                    )}
                 </div>
             )}
 

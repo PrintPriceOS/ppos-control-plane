@@ -346,4 +346,15 @@ For tomorrow's demonstration:
 | **Estado Cotización** | `isValidCommercialQuote` / `quoteStatus` | `false` / `INVALID_INCOMPLETE_RATES` | `false` / `INVALID_INCOMPLETE_RATES` |
 
 ---
+
+## 17. Clarificación de Gobernanza: `VALID_COMMERCIAL_QUOTE` vs Rentabilidad Industrial
+
+El estado `VALID_COMMERCIAL_QUOTE` (`isValidCommercialQuote === true`) certifica que la tarjeta de tarifas en `rates_json` posee todos los campos numéricos requeridos para la especificación del trabajo y que el motor de precios generó una cotización técnicamente completa sin lanzar excepciones por falta de tarifas.
+
+**Precisiones de Gobernanza:**
+1. **Validación Técnica:** `VALID_COMMERCIAL_QUOTE` indica completitud técnica de campos en la matriz de tarifas.
+2. **Cobertura Completa y Rentabilidad:** NO demuestra por sí solo que la tarifa contemple acabados atípicos no modelables, ni garantiza que los precios cargados otorguen un margen industrial rentable para el taller.
+3. **Calibración Gobernada:** La verificación de costes industriales reales requiere el flujo de calibración con registro inmutable en `printhouse_pricing_revisions` y linaje auditado.
+
+---
 *Report compiled for Phase 195E Commercial Cost Model Audit.*
