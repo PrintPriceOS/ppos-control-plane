@@ -4,6 +4,7 @@ import { BellIcon, ExclamationTriangleIcon, ExclamationCircleIcon, InformationCi
 import { markNotificationRead, markAllNotificationsRead } from '../lib/adminApi';
 import { useAdminQuery } from '../hooks/useAdminData';
 import { adminFetch } from '../lib/adminApi';
+import { useLocale } from '../i18n';
 
 type NotifSeverity = 'error' | 'warning' | 'info' | 'success';
 
@@ -55,6 +56,7 @@ async function fetchNotifications() {
 }
 
 export const NotificationBell: React.FC = () => {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -109,6 +111,8 @@ export const NotificationBell: React.FC = () => {
     <div className="relative" ref={notifRef}>
       <button
         onClick={() => setNotifOpen(v => !v)}
+        aria-label={hasUnread ? (t('topbar.notificationsBtn', { count: unreadCount }) || `Notifications (${unreadCount} unread)`) : (t('topbar.notificationsBtnZero') || 'Notifications')}
+        title={hasUnread ? (t('topbar.notificationsBtn', { count: unreadCount }) || `Notifications (${unreadCount} unread)`) : (t('topbar.notificationsBtnZero') || 'Notifications')}
         className="p-2 transition-all relative text-slate-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5"
       >
         <BellIcon className="w-5 h-5" />
@@ -125,10 +129,10 @@ export const NotificationBell: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b ppos-border ppos-surface-muted">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">Notifications</p>
+              <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">{t('topbar.notificationsTitle') || 'Notifications'}</p>
               {hasUnread && (
                 <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] font-black uppercase">
-                  {unreadCount} new
+                  {unreadCount} {t('topbar.newBadge') || 'new'}
                 </span>
               )}
             </div>
@@ -137,7 +141,7 @@ export const NotificationBell: React.FC = () => {
                 onClick={handleMarkAllAsRead}
                 className="text-[9px] font-bold text-zinc-500 hover:text-white transition-colors uppercase"
               >
-                Mark all read
+                {t('topbar.markAllRead') || 'Mark all read'}
               </button>
             )}
           </div>

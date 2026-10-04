@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Factory, Package, Zap } from 'lucide-react';
 import { getPrinthouseDashboardOrders } from '../../lib/adminApi';
+import { useLocale } from '../../i18n';
 
 type OrderStatus = 'PENDING_ROUTING' | 'PRODUCTION' | 'SHIPPED' | 'ACKNOWLEDGED' | 'MACHINE_ASSIGNED' | 'IN_PRODUCTION';
 
@@ -9,12 +10,14 @@ interface LiveOrder {
     id: string;
     productName?: string;
     value: number;
+    currency?: string;
     status: OrderStatus;
     timestamp: number;
     isUrgent: boolean;
 }
 
 export const LiveOrdersFeed: React.FC = () => {
+    const { t } = useLocale();
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     const [orders, setOrders] = useState<LiveOrder[]>([]);
     const [revenue, setRevenue] = useState<number>(0);
@@ -75,7 +78,7 @@ export const LiveOrdersFeed: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: isDark ? '#fff' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Zap size={20} color="#dc0000" /> Expected Printhouse Revenue
+                        <Zap size={20} color="#dc0000" /> {t('dashboard.orders.expectedRevenue') || 'Expected Printhouse Revenue'}
                     </h2>
                     <p style={{ fontSize: '13px', color: isDark ? '#a1a1aa' : '#64748b' }}>
                         {loading ? 'Hydrating orders...' : `Expected Revenue: €${revenue.toFixed(2)}`}
@@ -102,7 +105,11 @@ export const LiveOrdersFeed: React.FC = () => {
                                 transition: 'all 0.2s'
                             }}
                         >
-                            {f === 'HIGH_PROFIT' ? 'High Profit' : f === 'URGENT' ? 'Urgent' : 'All Orders'}
+                            {f === 'HIGH_PROFIT' 
+                                ? (t('dashboard.orders.filterHighProfit') || 'High Profit') 
+                                : f === 'URGENT' 
+                                    ? (t('dashboard.orders.filterUrgent') || 'Urgent') 
+                                    : (t('dashboard.orders.filterAll') || 'All Orders')}
                         </button>
                     ))}
                 </div>
@@ -186,7 +193,7 @@ export const LiveOrdersFeed: React.FC = () => {
             
             {filteredOrders.length === 0 && (
                 <div style={{ padding: '40px', textAlign: 'center', color: isDark ? '#a1a1aa' : '#64748b' }}>
-                    No orders matching the current filter.
+                    {t('dashboard.orders.noOrders') || 'No orders matching the current filter.'}
                 </div>
             )}
         </div>

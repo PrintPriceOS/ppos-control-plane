@@ -21,12 +21,29 @@ import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
 
 
+import { useLocale } from '../i18n';
+import { getTheme, setTheme, subscribeTheme } from '../lib/themeStore';
+
 export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) => {
   const navigate = useNavigate();
+  const { locale, setLocale, t } = useLocale();
+  const [currentTheme, setCurrentThemeState] = useState(getTheme());
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeTheme((theme) => {
+      setCurrentThemeState(theme);
+    });
+    return unsubscribe;
+  }, []);
+
+  const toggleTheme = () => {
+    const next = currentTheme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -74,35 +91,68 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
           </div>
 
           {/* Environment Badge */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
-            <div className="w-1 h-1 bg-emerald-500" />
-            <span className="text-[9px] font-black uppercase tracking-widest">Production Environment</span>
-          </div>
+          {import.meta.env?.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <div className="w-1 h-1 bg-amber-500 rounded-full" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.devPreview') || 'Development Preview'}</span>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse-slow">
+              <div className="w-1 h-1 bg-emerald-500" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.prodEnv') || 'Production Environment'}</span>
+            </div>
+          )}
 
           {/* Certification Badge */}
           <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20">
             <ShieldCheckIcon className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-black uppercase tracking-widest">v2.0.0 Certified</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.certified') || 'v2.0.0 Certified'}</span>
           </div>
 
           {/* Region Context */}
           <div className="hidden lg:flex items-center gap-2 text-slate-400">
             <MapPinIcon className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-wider">EU-WEST-1 (Primary)</span>
+            <span className="text-xs font-bold uppercase tracking-wider">{t('topbar.region') || 'EU-WEST-1 (Primary)'}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Quick Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            id="topbar-theme-toggle"
+            aria-label={currentTheme === 'dark' ? (t('topbar.toggleThemeLight') || 'Switch to Light mode') : (t('topbar.toggleThemeDark') || 'Switch to Dark mode')}
+            title={currentTheme === 'dark' ? (t('topbar.toggleThemeLight') || 'Switch to Light mode') : (t('topbar.toggleThemeDark') || 'Switch to Dark mode')}
+            className="px-2 py-1 text-[10px] font-black uppercase tracking-wider border ppos-border hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors text-zinc-600 dark:text-zinc-300"
+          >
+            {currentTheme === 'dark' ? '🌙' : '☀️'}
+          </button>
+
+          {/* Quick Language Toggle */}
+          <button
+            onClick={() => {
+              const nextLoc = locale === 'en' ? 'es' : locale === 'es' ? 'de' : 'en';
+              setLocale(nextLoc);
+            }}
+            id="topbar-lang-toggle"
+            aria-label={t('topbar.toggleLanguage', { lang: locale.toUpperCase() }) || `Language: ${locale.toUpperCase()}`}
+            title={t('topbar.toggleLanguage', { lang: locale.toUpperCase() }) || `Language: ${locale.toUpperCase()}`}
+            className="px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border ppos-border hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors text-zinc-700 dark:text-zinc-200"
+          >
+            {locale.toUpperCase()}
+          </button>
+
           {/* Global Notifications */}
           <NotificationBell />
 
           {/* Role & Profile */}
-          <div className="h-10 w-[1px] ppos-border mx-1" />
+          <div className="h-6 w-[1px] ppos-border mx-1" />
 
           {/* User Menu */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(v => !v)}
+              id="topbar-user-menu-toggle"
               className="flex items-center gap-3 pl-2 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 pr-2 py-1 transition-all group"
             >
               <div className="text-right">
@@ -123,18 +173,20 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
                 <div className="p-0">
                   <button
                     onClick={handleSettings}
+                    id="topbar-menu-settings"
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 hover:text-black dark:hover:text-white transition-colors"
                   >
                     <Cog6ToothIcon className="w-4 h-4" />
-                    Settings
+                    {t('topbar.settings') || 'Settings'}
                   </button>
                   <div className="border-t border-white/5" />
                   <button
                     onClick={() => { setMenuOpen(false); setLogoutModal(true); }}
+                    id="topbar-menu-logout"
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-red-500 hover:bg-red-600 hover:text-white transition-colors"
                   >
                     <ArrowRightStartOnRectangleIcon className="w-4 h-4" />
-                    Logout
+                    {t('topbar.logout') || 'Logout'}
                   </button>
                 </div>
               </div>
@@ -145,33 +197,35 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
       {/* Logout Confirmation Modal */}
       {logoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" id="logout-dialog-overlay">
           <div
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={() => setLogoutModal(false)}
           />
-          <div className="relative ppos-surface border ppos-border p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5 shadow-none">
+          <div id="logout-dialog-panel" className="relative ppos-surface border ppos-border p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-5 shadow-none">
             <div className="w-12 h-12 bg-red-500/10 flex items-center justify-center">
               <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Close Session?</p>
+              <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">{t('topbar.closeSession') || 'Close Session?'}</p>
               <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase">
-                Are you sure you want to log out of the Control Plane?
+                {t('topbar.logoutConfirm') || 'Are you sure you want to log out of the Control Plane?'}
               </p>
             </div>
             <div className="flex gap-2 w-full">
               <button
+                id="logout-dialog-cancel"
                 onClick={() => setLogoutModal(false)}
                 className="flex-1 px-4 py-2 text-[10px] font-black uppercase border border-white/10 text-zinc-400 hover:bg-white/5 transition-colors"
               >
-                Cancel
+                {t('topbar.cancel') || 'Cancel'}
               </button>
               <button
+                id="logout-dialog-confirm"
                 onClick={handleLogoutConfirm}
                 className="flex-1 px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase hover:bg-red-700 transition-colors"
               >
-                Logout
+                {t('topbar.logout') || 'Logout'}
               </button>
             </div>
           </div>

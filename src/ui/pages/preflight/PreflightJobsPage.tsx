@@ -34,8 +34,10 @@ import { PreflightUploadPanel } from "../../components/PreflightUploadPanel";
 import { BackgroundJobProgress } from "../../components/BackgroundJobProgress";
 import { short } from "../../lib/formatters";
 import { collectFindings, mapPhase10Status } from "../../lib/preflightStatusHelpers";
+import { useLocale } from "../../i18n";
 
 export const PreflightJobsPage: React.FC = () => {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'JOBS' | 'BATCHES' | 'AUDIT' | 'GOVERNANCE'>('JOBS');
   
@@ -128,29 +130,29 @@ export const PreflightJobsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">
-              Industrial Preflight Console
+              {t('preflight.title') || 'Industrial Preflight Console'}
             </h1>
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-none border ${isDegraded ? 'bg-amber-500/10 border-amber-500/30' : 'bg-primary/10 border-primary/20'}`}>
               <div className={`w-1.5 h-1.5 rounded-none animate-pulse ${isDegraded ? 'bg-amber-500' : 'bg-primary'}`} />
               <span className={`text-[9px] font-black uppercase tracking-widest ${isDegraded ? 'text-amber-500' : 'text-primary'}`}>
-                {isDegraded ? `DEGRADED: ${currentSourceStatus}` : 'Upstream Contract Direct'}
+                {isDegraded ? `DEGRADED: ${currentSourceStatus}` : (t('preflight.upstreamDirect') || 'Upstream Contract Direct')}
               </span>
             </div>
           </div>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 font-bold mt-1 max-w-2xl">
-            High-density administrative interface proxying unmocked job operations, array batches, and forensic audit telemetry directly onto the canonical V2 contract layer.
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+            {t('preflight.subtitle') || 'High-density administrative interface proxying unmocked job operations, array batches, and forensic audit telemetry directly onto the canonical V2 contract layer.'}
           </p>
         </div>
         
         <div className="flex items-center gap-4">
           {/* Global Storage Quota Card */}
           <div className="hidden lg:flex flex-col items-end glass px-4 py-2 rounded-none border border-white/20 dark:border-white/5">
-            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Quota Usage</div>
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('preflight.quotaUsage') || 'Global Quota Usage'}</div>
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-black text-slate-800 dark:text-[#ECECF1]">
                 {storageQ.data ? Number((storageQ.data.totalBytes || 0) / (1024*1024*1024)).toFixed(2) : '0.00'} GB
               </span>
-              <span className="text-[9px] font-bold text-slate-400">allocated</span>
+              <span className="text-[9px] font-bold text-slate-400">{t('preflight.allocated') || 'allocated'}</span>
             </div>
           </div>
         </div>
@@ -160,14 +162,14 @@ export const PreflightJobsPage: React.FC = () => {
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
           <div className="text-xs font-bold flex-1">
-            Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.
+            {t('preflight.policiesUnavailable') || 'Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.'}
           </div>
         </div>
       ) : isPoliciesDegraded ? (
         <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-none flex items-center gap-3 text-amber-500">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
           <div className="text-xs font-bold flex-1">
-            Upstream policy catalog is unreachable. Using authoritative local versioned contract fallbacks for transformation enablement.
+            {t('preflight.policiesDegraded') || 'Upstream policy catalog is unreachable. Using authoritative local versioned contract fallbacks for transformation enablement.'}
           </div>
         </div>
       ) : null}
@@ -196,28 +198,28 @@ export const PreflightJobsPage: React.FC = () => {
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'JOBS' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
           >
             <QueueListIcon className="w-4 h-4" />
-            <span>Jobs Registry ({jobsQ.data?.total ?? 0})</span>
+            <span>{t('preflight.tabJobs') || 'Jobs Registry'} ({jobsQ.data?.total ?? 0})</span>
           </button>
           <button 
             onClick={() => setActiveTab('BATCHES')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'BATCHES' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
           >
             <RectangleStackIcon className="w-4 h-4" />
-            <span>Batches Pipeline ({batchesQ.data?.batches?.length ?? 0})</span>
+            <span>{t('preflight.tabBatches') || 'Batches Pipeline'} ({batchesQ.data?.batches?.length ?? 0})</span>
           </button>
           <button 
             onClick={() => setActiveTab('AUDIT')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'AUDIT' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
           >
             <ShieldCheckIcon className="w-4 h-4" />
-            <span>Audit Ledger</span>
+            <span>{t('preflight.tabAudit') || 'Audit Ledger'}</span>
           </button>
           <button 
             onClick={() => setActiveTab('GOVERNANCE')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'GOVERNANCE' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
           >
             <DocumentCheckIcon className="w-4 h-4" />
-            <span>Governance Matrix</span>
+            <span>{t('preflight.tabGovernance') || 'Governance Matrix'}</span>
           </button>
         </div>
 
@@ -229,11 +231,11 @@ export const PreflightJobsPage: React.FC = () => {
             if (activeTab === 'AUDIT') auditQ.refetch();
             if (activeTab === 'GOVERNANCE') governanceQ.refetch();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
           title="Force telemetry refresh"
         >
           <ArrowPathIcon className={`w-3.5 h-3.5 ${jobsQ.status === 'refetching' || batchesQ.status === 'refetching' ? 'animate-spin text-primary' : ''}`} />
-          <span className="uppercase tracking-widest">Refresh</span>
+          <span className="uppercase tracking-widest">{t('jobs.refresh') || 'Refresh'}</span>
         </button>
       </div>
 
@@ -243,7 +245,7 @@ export const PreflightJobsPage: React.FC = () => {
           <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Filter Scope by Tenant ID..." 
+            placeholder={t('preflight.filterTenant') || 'Filter Scope by Tenant ID...'} 
             value={filter.tenant}
             onChange={(e) => setFilter({ ...filter, tenant: e.target.value })}
             className="w-full ppos-surface-muted border-none rounded-none pl-8 pr-3 py-1.5 text-xs font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-1 focus:ring-primary/30 outline-none"
@@ -254,7 +256,7 @@ export const PreflightJobsPage: React.FC = () => {
           <BuildingOfficeIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Filter Printhouse Scope..." 
+            placeholder={t('preflight.filterPrinthouse') || 'Filter Printhouse Scope...'} 
             value={filter.printhouse}
             onChange={(e) => setFilter({ ...filter, printhouse: e.target.value })}
             className="w-full ppos-surface-muted border-none rounded-none pl-8 pr-3 py-1.5 text-xs font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-1 focus:ring-primary/30 outline-none"
@@ -267,7 +269,7 @@ export const PreflightJobsPage: React.FC = () => {
             onChange={(e) => setFilter({ ...filter, status: e.target.value })}
             className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer"
           >
-            <option value="">Status: All</option>
+            <option value="">{t('preflight.statusAll') || 'Status: All'}</option>
             <option value="COMPLETED">Completed</option>
             <option value="COMPLETED_WITH_FINDINGS">Completed with Findings</option>
             <option value="DEGRADED">Degraded</option>
@@ -284,7 +286,7 @@ export const PreflightJobsPage: React.FC = () => {
             onChange={(e) => setFilter({ ...filter, type: e.target.value })}
             className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer"
           >
-            <option value="">Type: All</option>
+            <option value="">{t('preflight.typeAll') || 'Type: All'}</option>
             <option value="ANALYZE">Analyze</option>
             <option value="AUTOFIX">Autofix</option>
             <option value="CERTIFY">Certify</option>
@@ -295,7 +297,7 @@ export const PreflightJobsPage: React.FC = () => {
             onChange={(e) => setFilter({ ...filter, policy: e.target.value })}
             className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer max-w-[160px] truncate"
           >
-            <option value="">Policy: All</option>
+            <option value="">{t('preflight.policyAll') || 'Policy: All'}</option>
             {(policiesData?.policies || []).map((p: any) => {
               const canonicalId = p.id || p.policy_id;
               const displayName = p.name || p.id;
@@ -310,16 +312,16 @@ export const PreflightJobsPage: React.FC = () => {
           {(filter.tenant || filter.printhouse || filter.status || filter.type || filter.policy) && (
             <button 
               onClick={() => setFilter({ tenant: '', printhouse: '', status: '', type: '', policy: '' })}
-              className="px-2 py-1.5 text-[10px] font-black text-red-500 uppercase tracking-wider hover:underline"
+              className="px-2 py-1.5 text-[10px] font-black text-red-500 uppercase tracking-wider hover:underline cursor-pointer"
             >
-              Reset Filters
+              {t('preflight.resetFilters') || 'Reset Filters'}
             </button>
           )}
         </div>
       </div>
 
       {/* Main Table View Panel */}
-      <div className="mt-2">
+      <div id="preflight-jobs-table" className="mt-2">
         {activeTab === 'JOBS' && (
           <DataTable 
             isLoading={jobsQ.status === 'loading'}
@@ -327,7 +329,7 @@ export const PreflightJobsPage: React.FC = () => {
             onRowClick={(j) => navigate(`/preflight/jobs/${j.jobId}`)}
             columns={[
               {
-                header: 'Job Payload',
+                header: t('preflight.thJobPayload') || 'Job Payload',
                 accessor: (j) => {
                   const fullJobId = j.jobId || j.id || j.sourceJobId || '—';
                   return (
@@ -341,19 +343,19 @@ export const PreflightJobsPage: React.FC = () => {
                         </span>
                         {j.batchId && (
                           <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-[8px] font-bold text-slate-400 rounded-none uppercase flex-shrink-0">
-                            Batch
+                            {t('preflight.batch') || 'Batch'}
                           </span>
                         )}
                       </div>
                       <span className="font-medium text-slate-600 dark:text-zinc-400 truncate max-w-[220px] block" title={j.filename}>
-                        {j.filename || 'Untitled.pdf'}
+                        {j.filename || (t('preflight.untitled') || 'Untitled.pdf')}
                       </span>
                     </div>
                   );
                 }
               },
               {
-                header: 'Tenant Identity',
+                header: t('preflight.thTenantIdentity') || 'Tenant Identity',
                 accessor: (j) => (
                   <div className="flex flex-col">
                     <span className="font-bold text-xs text-slate-700 dark:text-[#ECECF1]">{j.tenantId}</span>
@@ -367,7 +369,7 @@ export const PreflightJobsPage: React.FC = () => {
                 )
               },
               {
-                header: 'Type / Scope Policy',
+                header: t('preflight.thTypePolicy') || 'Type / Scope Policy',
                 accessor: (j) => (
                   <div className="flex flex-col gap-0.5">
                     <span className="px-1.5 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black uppercase text-slate-600 dark:text-zinc-400 tracking-wider w-fit">
@@ -380,11 +382,11 @@ export const PreflightJobsPage: React.FC = () => {
                 )
               },
               {
-                header: 'Payload Size',
+                header: t('preflight.thPayloadSize') || 'Payload Size',
                 accessor: (j) => <span className="text-xs font-mono font-bold text-slate-500">{formatSize(j.fileSize)}</span>
               },
               {
-                header: 'Status & Fidelity',
+                header: t('preflight.thStatusFidelity') || 'Status & Fidelity',
                 align: 'center',
                 accessor: (j: any) => {
                   const p = j.progress || (['COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(j.status) ? 100 : (['FAILED', 'DEGRADED', 'CANCELLED'].includes(j.status) ? 100 : (j.status === 'QUEUED' ? 5 : 20)));
@@ -409,7 +411,7 @@ export const PreflightJobsPage: React.FC = () => {
                 }
               },
               {
-                header: 'Diagnostics / Fix Result',
+                header: t('preflight.thDiagnostics') || 'Diagnostics / Fix Result',
                 accessor: (j: any) => {
                   if (j.type === 'AUTOFIX') {
                     const applied = j.appliedFixesCount ?? 0;
@@ -438,7 +440,7 @@ export const PreflightJobsPage: React.FC = () => {
                     return (
                       <div className="flex flex-col gap-1">
                         <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-none border text-[9px] font-black uppercase tracking-wider w-fit ${badgeColor}`}>
-                          <span>Fix Result</span>
+                          <span>{t('preflight.fixResult') || 'Fix Result'}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 dark:text-zinc-400">
                           <span title="Applied Fixes">A: <strong className="text-slate-800 dark:text-white">{applied}</strong></span>
@@ -456,11 +458,11 @@ export const PreflightJobsPage: React.FC = () => {
                   return (
                     <div className="flex items-center gap-3 text-[10px]">
                       <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Issues</span>
+                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">{t('preflight.issues') || 'Issues'}</span>
                         <span className="font-bold text-slate-700 dark:text-[#ECECF1]">{issues}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Fixes</span>
+                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">{t('preflight.fixes') || 'Fixes'}</span>
                         <span className="font-bold text-emerald-600">{fixes}</span>
                       </div>
                     </div>
@@ -468,7 +470,7 @@ export const PreflightJobsPage: React.FC = () => {
                 }
               },
               {
-                header: 'Timeline',
+                header: t('preflight.thTimeline') || 'Timeline',
                 accessor: (j) => (
                   <div className="flex flex-col text-[10px] text-slate-400 font-medium">
                     <span className="text-slate-600 dark:text-zinc-300 font-bold">
@@ -493,24 +495,24 @@ export const PreflightJobsPage: React.FC = () => {
             data={batchesQ.data?.batches || []}
             columns={[
               {
-                header: 'Batch ID',
+                header: t('preflight.batchId') || 'Batch ID',
                 accessor: (b) => <span className="font-mono text-xs font-bold text-primary">#{short(b.id || b.batchId, 12)}</span>
               },
               {
-                header: 'Tenant Array',
+                header: t('preflight.tenantArray') || 'Tenant Array',
                 accessor: (b) => <span className="font-bold text-xs text-slate-700 dark:text-[#ECECF1]">{b.tenantId || 'system'}</span>
               },
               {
-                header: 'Staged Jobs Count',
-                accessor: (b) => <span className="font-bold text-xs text-slate-600 dark:text-zinc-300">{b.jobIds?.length || b.jobs?.length || 0} Registered</span>
+                header: t('preflight.stagedJobsCount') || 'Staged Jobs Count',
+                accessor: (b) => <span className="font-bold text-xs text-slate-600 dark:text-zinc-300">{b.jobIds?.length || b.jobs?.length || 0} {t('preflight.registered') || 'Registered'}</span>
               },
               {
-                header: 'Execution Status',
+                header: t('preflight.executionStatus') || 'Execution Status',
                 align: 'center',
                 accessor: (b) => <StatusBadge status={b.status || 'PROPAGATED'} />
               },
               {
-                header: 'Timestamp',
+                header: t('preflight.timestamp') || 'Timestamp',
                 accessor: (b) => <span className="text-xs font-mono text-slate-400">{b.createdAt ? new Date(b.createdAt).toLocaleString() : 'N/A'}</span>
               }
             ]}
@@ -523,7 +525,7 @@ export const PreflightJobsPage: React.FC = () => {
             data={auditQ.data?.events || []}
             columns={[
               {
-                header: 'Audit ID / Trace',
+                header: t('preflight.auditIdTrace') || 'Audit ID / Trace',
                 accessor: (e) => (
                   <div className="flex flex-col">
                     <span className="font-mono text-xs font-bold text-slate-700 dark:text-white">#{e.id}</span>
@@ -532,24 +534,24 @@ export const PreflightJobsPage: React.FC = () => {
                 )
               },
               {
-                header: 'Tenant Identity',
+                header: t('preflight.thTenantIdentity') || 'Tenant Identity',
                 accessor: (e) => <span className="font-bold text-xs text-primary">{e.tenant_id}</span>
               },
               {
-                header: 'Operation Action',
+                header: t('preflight.operationAction') || 'Operation Action',
                 accessor: (e) => <span className="font-black text-xs text-slate-700 dark:text-[#ECECF1] tracking-wide">{e.action}</span>
               },
               {
-                header: 'Resolution Status',
+                header: t('preflight.resolutionStatus') || 'Resolution Status',
                 align: 'center',
                 accessor: (e) => <StatusBadge status={e.status || 'SUCCESS'} />
               },
               {
-                header: 'Message Trail',
+                header: t('preflight.messageTrail') || 'Message Trail',
                 accessor: (e) => <span className="text-xs text-slate-500 max-w-xs truncate block">{e.message || 'Execution OK'}</span>
               },
               {
-                header: 'Logged At',
+                header: t('preflight.loggedAt') || 'Logged At',
                 accessor: (e) => <span className="font-mono text-[10px] text-slate-400">{new Date(e.created_at).toLocaleString()}</span>
               }
             ]}
@@ -562,28 +564,28 @@ export const PreflightJobsPage: React.FC = () => {
             data={governanceQ.data?.governanceEvents || []}
             columns={[
               {
-                header: 'Event Ledger ID',
+                header: t('preflight.eventLedgerId') || 'Event Ledger ID',
                 accessor: (g) => <span className="font-mono text-xs font-bold">#{g.id}</span>
               },
               {
-                header: 'Tenant Target',
+                header: t('preflight.tenantTarget') || 'Tenant Target',
                 accessor: (g) => <span className="font-bold text-xs text-primary">{g.tenant_id}</span>
               },
               {
-                header: 'Rule Policy Slug',
+                header: t('preflight.rulePolicySlug') || 'Rule Policy Slug',
                 accessor: (g) => <span className="font-bold text-xs text-slate-800 dark:text-white">{g.rule_slug}</span>
               },
               {
-                header: 'Evaluation Status',
+                header: t('preflight.evaluationStatus') || 'Evaluation Status',
                 align: 'center',
                 accessor: (g) => <StatusBadge status={g.evaluation_result || 'PASSED'} />
               },
               {
-                header: 'Enforced Action',
+                header: t('preflight.enforcedAction') || 'Enforced Action',
                 accessor: (g) => <span className="font-mono text-xs text-slate-500">{g.enforcement_action || 'LOGGED_ONLY'}</span>
               },
               {
-                header: 'Registered Timestamp',
+                header: t('preflight.registeredTimestamp') || 'Registered Timestamp',
                 accessor: (g) => <span className="font-mono text-[10px] text-slate-400">{new Date(g.created_at).toLocaleString()}</span>
               }
             ]}
@@ -596,10 +598,10 @@ export const PreflightJobsPage: React.FC = () => {
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
           <div className="text-xs font-bold flex-1">
-            Upstream Gateway integration encountered a critical error: {jobsQ.error || batchesQ.error}
+            {t('preflight.gatewayCriticalError') || 'Upstream Gateway integration encountered a critical error:'} {jobsQ.error || batchesQ.error}
           </div>
           <button onClick={() => { jobsQ.refetch(); batchesQ.refetch(); }} className="text-xs font-black uppercase tracking-wider underline">
-            Execute Retry
+            {t('preflight.executeRetry') || 'Execute Retry'}
           </button>
         </div>
       )}

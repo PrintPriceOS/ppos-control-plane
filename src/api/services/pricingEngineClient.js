@@ -62,7 +62,7 @@ class PricingEngineClient {
             order_id: orderId,
             quote_id: order.quote_id || metadata.quote_id || null,
             currency,
-            target_margin_pct: order.target_margin_pct || pricing.target_margin_pct || 30.0,
+            target_margin_pct: (order.target_margin_pct !== undefined && order.target_margin_pct !== null) ? Number(order.target_margin_pct) : ((pricing.target_margin_pct !== undefined && pricing.target_margin_pct !== null) ? Number(pricing.target_margin_pct) : 30.0),
             customer,
             ...normalizedSpecs,
             specs: normalizedSpecs,
@@ -133,7 +133,127 @@ class PricingEngineClient {
             }
         }
 
-        // Ensure output shape exactly matches the Phase 3 schema requirement
+        if (!responseData || typeof responseData !== 'object') {
+            console.error(`[MARKETPLACE][PRICING-FAILED] Invalid or null response body received from BPE`, baseLogCtx);
+            return {
+                ok: false,
+                engine: "v3.0-industrial",
+                endpoint_used: usedEndpoint,
+                source: source,
+                trace_id: traceId,
+                order_id: orderId,
+                currency: currency,
+                selected_offer: null,
+                offers: [],
+                count: 0,
+                params: payload,
+                warnings: [],
+                errors: { message: 'BPE_INVALID_RESPONSE_BODY', details: 'Response body is null or non-object' }
+            };
+        }
+
+        // Validate explicit success vs error
+        const hasExplicitError = Boolean(responseData.error || responseData.ok === false || responseData.status === 'error');
+        const hasExplicitSuccess = responseData.ok === true;
+        const hasOffersArray = Array.isArray(responseData.offers);
+
+        // Do not declare success simply due to absence of ok:false if body is empty or malformed
+        if (hasExplicitError || (!hasExplicitSuccess && !hasOffersArray)) {
+            return {
+                ok: false,
+                engine: responseData.engine || "v3.0-industrial",
+                endpoint_used: usedEndpoint,
+                source: responseData.source || source,
+                trace_id: responseData.trace_id || traceId,
+                order_id: responseData.order_id || orderId,
+                currency: responseData.currency || currency,
+                selected_offer: null,
+                offers: [],
+                count: 0,
+                params: responseData.params || payload,
+                warnings: responseData.warnings || [],
+                errors: responseData.errors || { message: String(responseData.error || 'BPE_ENGINE_CALCULATION_FAILED') }
+            };
+        }
+
+        // Sanitize and validate offers array
+        const rawOffers = hasOffersArray ? responseData.offers : [];
+        const validatedOffers = [];
+
+        for (const rawOff of rawOffers) {
+            if (!rawOff || typeof rawOff !== 'object') continue;
+            
+            const rawCost = rawOff.production_cost !== undefined ? rawOff.production_cost : (rawOff.total_cost !== undefined ? rawOff.total_cost : rawOff.cost);
+            const rawPrice = rawOff.suggested_price !== undefined ? rawOff.suggested_price : (rawOff.total_price !== undefined ? rawOff.total_price : rawOff.price);
+
+            // Reject null, empty string, boolean, undefined BEFORE converting or substituting
+            if (rawCost === null || rawCost === '' || typeof rawCost === 'boolean' || rawCost === undefined ||
+                rawPrice === null || rawPrice === '' || typeof rawPrice === 'boolean' || rawPrice === undefined) {
+                console.warn(`[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field`, { offer: rawOff });
+                continue;
+            }
+
+            const cost = Number(rawCost);
+            const price = Number(rawPrice);
+
+            // Validate finite numerical costs/prices >= 0 (NO cost fallback for missing prices!)
+            if (!Number.isFinite(cost) || cost < 0 || !Number.isFinite(price) || price < 0) {
+                console.warn(`[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with non-finite cost/price`, { offer: rawOff });
+                continue;
+            }
+
+            const marginPct = (rawOff.margin_pct !== undefined && rawOff.margin_pct !== null)
+                ? Number(rawOff.margin_pct)
+                : ((rawOff.margin_percent !== undefined && rawOff.margin_percent !== null)
+                    ? Number(rawOff.margin_percent)
+                    : ((payload.target_margin_pct !== undefined && payload.target_margin_pct !== null)
+                        ? Number(payload.target_margin_pct)
+                        : 30.0));
+
+            const estimatedMargin = rawOff.estimated_margin !== undefined ? Number(rawOff.estimated_margin) : (price - cost);
+
+            validatedOffers.push({
+                ...rawOff,
+                total_cost: cost,
+                production_cost: cost,
+                total_price: price,
+                suggested_price: price,
+                estimated_margin: Number.isFinite(estimatedMargin) ? estimatedMargin : (price - cost),
+                margin_percent: marginPct,
+                margin_pct: marginPct
+            });
+        }
+
+        // If all offers in the payload were invalid, treat as engine calculation failure
+        if (hasOffersArray && rawOffers.length > 0 && validatedOffers.length === 0) {
+            console.error(`[MARKETPLACE][PRICING-FAILED] All offers in BPE response payload were invalid or malformed`, baseLogCtx);
+            return {
+                ok: false,
+                engine: responseData.engine || "v3.0-industrial",
+                endpoint_used: usedEndpoint,
+                source: responseData.source || source,
+                trace_id: responseData.trace_id || traceId,
+                order_id: responseData.order_id || orderId,
+                currency: responseData.currency || currency,
+                selected_offer: null,
+                offers: [],
+                count: 0,
+                params: responseData.params || payload,
+                warnings: responseData.warnings || [],
+                errors: { message: 'BPE_NO_VALID_OFFERS', details: 'All offers failed cost/price validation' }
+            };
+        }
+
+        // Validate selected_offer membership against validated offers
+        let selectedOffer = null;
+        if (responseData.selected_offer && typeof responseData.selected_offer === 'object') {
+            const selId = responseData.selected_offer.id || responseData.selected_offer.house_id || responseData.selected_offer.printhouse_id;
+            selectedOffer = validatedOffers.find(o => (o.id && o.id === selId) || (o.house_id && o.house_id === selId) || (o.printhouse_id && o.printhouse_id === selId)) || null;
+        }
+        if (!selectedOffer && validatedOffers.length > 0) {
+            selectedOffer = validatedOffers[0];
+        }
+
         return {
             ok: true,
             engine: responseData.engine || "v3.0-industrial",
@@ -144,12 +264,12 @@ class PricingEngineClient {
             trace_id: responseData.trace_id || traceId,
             order_id: responseData.order_id || orderId,
             currency: responseData.currency || currency,
-            selected_offer: responseData.selected_offer || null,
-            offers: Array.isArray(responseData.offers) ? responseData.offers : [],
-            count: Array.isArray(responseData.offers) ? responseData.offers.length : 0,
+            selected_offer: selectedOffer,
+            offers: validatedOffers,
+            count: validatedOffers.length,
             params: responseData.params || payload,
             warnings: responseData.warnings || [],
-            errors: responseData.errors || {}
+            errors: {}
         };
     }
 
@@ -206,7 +326,7 @@ class PricingEngineClient {
             const prodCost = house.total_cost != null ? Number(house.total_cost) : 0;
             
             // Margin calculations
-            const targetMargin = payload.target_margin_pct || 30.0;
+            const targetMargin = (payload.target_margin_pct !== undefined && payload.target_margin_pct !== null) ? Number(payload.target_margin_pct) : 30.0;
             const suggestedPrice = house.suggested_price != null ? Number(house.suggested_price) : Number((prodCost / (1 - targetMargin / 100)).toFixed(2));
             const estimatedMargin = Number((suggestedPrice - prodCost).toFixed(2));
 

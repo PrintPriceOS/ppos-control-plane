@@ -268,21 +268,43 @@ export const getAdminKey = getAuthToken;
 export const setAdminKey = setAuthToken;
 export const clearAdminKey = clearAuthToken;
 
+export type Range = "24h" | "7d" | "30d";
+
 export type OverviewResponse = {
-    totalJobs: number;
-    successRate: number;
-    avgLatencyMs: number;
-    maxLatencyMs: number;
-    p95LatencyMs: number | null;
-    deltaImprovementRate: number;
-    costProxy: number;
-    totalValueGenerated: number;
-    totalHoursSaved: number;
-    avgRiskBefore: number;
-    avgRiskAfter: number;
-    queueBacklog: number;
-    activeJobs: number;
-    oldestAgeSeconds: number;
+    totalJobs?: number;
+    total_jobs?: number;
+    successRate?: number;
+    success_rate?: number;
+    avgLatencyMs?: number;
+    avg_latency_ms?: number;
+    maxLatencyMs?: number;
+    max_latency_ms?: number;
+    p95LatencyMs?: number | null;
+    p95_latency_ms?: number | null;
+    deltaImprovementRate?: number;
+    delta_improvement_rate?: number;
+    costProxy?: number;
+    cost_proxy?: number;
+    totalValueGenerated?: number;
+    total_value_generated?: number;
+    totalHoursSaved?: number;
+    total_hours_saved?: number;
+    avgRiskBefore?: number;
+    avg_risk_before?: number;
+    avgRiskAfter?: number;
+    avg_risk_after?: number;
+    queueBacklog?: number;
+    queue_backlog?: number;
+    activeJobs?: number;
+    active_jobs?: number;
+    oldestAgeSeconds?: number;
+    oldest_age_seconds?: number;
+    efficiencyRate?: number;
+    efficiency_rate?: number;
+    activeWorkers?: number;
+    active_workers?: number;
+    totalWorkers?: number;
+    total_workers?: number;
 };
 
 export type TenantRow = {
@@ -814,12 +836,47 @@ export async function getMachineCapacityAnalysis(id: string) {
 }
 
 
-export async function getAdminQueueStats() {
+export type QueueStatsItem = {
+    name: string;
+    status: 'RUNNING' | 'PAUSED' | string;
+    size: number;
+    counts: {
+        waiting: number;
+        active: number;
+        completed: number;
+        failed: number;
+        delayed: number;
+    };
+};
 
+export type QueuePayload = {
+    ok?: boolean;
+    note?: string;
+    error?: string;
+    queues?: QueueStatsItem[];
+    global?: {
+        is_ready: boolean;
+        timestamp?: string;
+        error?: string;
+    };
+    active?: number;
+    active_count?: number;
+    waiting?: number;
+    waiting_count?: number;
+    delayed?: number;
+    delayed_count?: number;
+    failed?: number;
+    failed_count?: number;
+    completed?: number;
+    completed_count?: number;
+};
+
+export async function getAdminQueueStats() {
     return adminFetch<{ ok: boolean, stats: any }>(`/api/admin/control/queue/stats`);
 }
+
 export async function getQueue() {
-    return adminFetch<any>(`/api/admin/queue`);
+    return adminFetch<QueuePayload>(`/api/admin/queue`);
 }
 
 export async function getPrinters(filters: string = "") {

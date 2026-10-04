@@ -41,8 +41,27 @@ import { getUserRole } from "../../lib/authStore";
 import { safeArray, toDisplayText } from '../../lib/display';
 import { COLORS } from '../../design-system/tokens';
 import { LiveOrdersFeed } from '../../components/dashboard/LiveOrdersFeed';
+import { useLocale } from '../../i18n';
 
 // --- UTILS ---
+
+export const formatOperationalStatus = (status: string | undefined | null, t: (k: string) => string): string => {
+  if (!status) return '';
+  const s = String(status).toUpperCase();
+  switch (s) {
+    case 'PROCESSING': return t('dashboard.stateProcessing') || 'Processing';
+    case 'LISTENING': return t('dashboard.stateListening') || 'Listening';
+    case 'STANDBY': return t('dashboard.stateStandby') || 'Standby';
+    case 'ACTIVE': return t('dashboard.stateActive') || 'Active';
+    case 'OFFLINE': return t('dashboard.stateOffline') || 'Offline';
+    case 'DEGRADED': return t('dashboard.stateDegraded') || 'Degraded';
+    case 'SATURATED': return t('dashboard.stateSaturated') || 'Saturated';
+    case 'SECURE': return t('dashboard.stateSecure') || 'Secure';
+    case 'SYNCED': return t('dashboard.stateSynced') || 'Synced';
+    case 'HEALTHY': return t('dashboard.stateHealthy') || 'Healthy';
+    default: return toDisplayText(status);
+  }
+};
 
 const resolveNodeLocation = (node: any) => {
   let lat = node.latitude !== undefined && node.latitude !== null ? node.latitude : node.lat;
@@ -214,6 +233,7 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 // --- TACTICAL SUB-COMPONENTS ---
 
 const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { auditData?: any[], isPrinthouse?: boolean, printhouseIncidents?: any[] }) => {
+  const { t } = useLocale();
   const incidents = useAdminQuery(!isPrinthouse ? 'hawk-eye:incidents' : '', getIndustrialIncidents, 10000);
   const anomalies = useAdminQuery(!isPrinthouse ? 'hawk-eye:anomalies' : '', getAnomalies, 15000);
   const auditArray = Array.isArray(auditData) ? auditData : [];
@@ -221,7 +241,7 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
   
   const incidentCount = isPrinthouse
     ? (printhouseIncidents?.length || 0)
-    : (incidents.data?.incidentBridge?.count 
+    : ((incidents.data as any)?.incidentBridge?.count 
        ?? auditArray.filter((a: any) => a.event?.includes('BLOCKED')).length 
        ?? anomaliesArray.length 
        ?? 0);
@@ -229,52 +249,52 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
   const bridgeStatus = incidentCount > 0 ? 'DEGRADED' : 'ONLINE';
 
   return (
-    <div className="glass border border-zinc-800 bg-zinc-950/40 text-zinc-300 p-5 rounded-none shadow-sm flex flex-col gap-4">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-none shadow-sm flex flex-col gap-4`}>
+      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-2`}>
         <div className="flex items-center gap-2">
-          <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ECECF1]">Incident Bridge</h3>
+          <ExclamationTriangleIcon className="w-4 h-4 text-[#dc0000]" />
+          <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${COLORS.adaptive.textPrimary}`}>{t('dashboard.panelIncidentBridge') || 'Incident Bridge'}</h3>
         </div>
         <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
-          bridgeStatus === 'DEGRADED' ? 'bg-red-950/40 text-red-400 border-red-500/20' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20'
+          bridgeStatus === 'DEGRADED' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20' : 'bg-emerald-600/15 text-emerald-900 dark:text-emerald-300 border-emerald-600/30'
         }`}>
           {bridgeStatus}
         </span>
       </div>
       <div className="space-y-2">
-        <div className="font-mono font-bold text-xs">
-          Active Incidents: {incidentCount}
+        <div className={`font-mono font-bold text-xs ${COLORS.adaptive.textPrimary}`}>
+          {t('dashboard.activeIncidents') || 'Active Incidents'}: {incidentCount}
         </div>
         {isPrinthouse ? (
           safeArray(printhouseIncidents).slice(0, 5).map((inc: any) => (
-            <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
+            <div key={inc.id} className="p-2 border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
-                <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.eventType || inc.title}</span>
+                <span className="text-[9px] font-mono font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[120px]">{inc.eventType || inc.title}</span>
               </div>
-              <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
+              <span className="text-[8px] font-mono font-black text-red-700 dark:text-red-400 uppercase">{inc.severity}</span>
             </div>
           ))
         ) : (
           safeArray(incidents.data).slice(0, 5).map((inc: any) => (
-            <div key={inc.id} className="p-2 border border-red-950 bg-red-950/20 flex items-center justify-between">
+            <div key={inc.id} className="p-2 border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
-                <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
+                <span className="text-[9px] font-mono font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
               </div>
-              <span className="text-[8px] font-mono font-black text-red-400 uppercase">{inc.severity}</span>
+              <span className="text-[8px] font-mono font-black text-red-700 dark:text-red-400 uppercase">{inc.severity}</span>
             </div>
           ))
         )}
         {incidentCount === 0 && (
-          <div className="p-3 bg-zinc-950/20 border border-zinc-800 flex flex-col gap-1.5">
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-              <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase">Sector Clear</span>
-              <span className="text-[8px] font-mono font-black text-emerald-400">SECURE</span>
+              <span className="text-[9px] font-mono font-bold text-zinc-800 dark:text-zinc-300 uppercase">{t('dashboard.sectorClear') || 'Sector Clear'}</span>
+              <span className="text-[8px] font-mono font-black text-emerald-800 dark:text-emerald-400">{formatOperationalStatus('SECURE', t)}</span>
             </div>
-            <div className="text-[8px] text-zinc-500 flex justify-between font-mono">
-              <span>Continuous Sweep</span>
-              <span>Active [100%]</span>
+            <div className="text-[8px] text-zinc-600 dark:text-zinc-400 flex justify-between font-mono">
+              <span>{t('dashboard.continuousSweep') || 'Continuous Sweep'}</span>
+              <span>{formatOperationalStatus('ACTIVE', t)} [100%]</span>
             </div>
           </div>
         )}
@@ -284,64 +304,65 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
 };
 
 const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: any[], overviewData?: any }) => {
+  const { t } = useLocale();
   const anomalies = useAdminQuery('hawk-eye:anomalies', getAnomalies, 15000);
   
-  const inferenceActive = anomalies.data?.intelligenceActive 
+  const inferenceActive = (anomalies.data as any)?.intelligenceActive 
     ?? registryData?.some((i: any) => i.capabilities?.includes('ML_INFERENCE')) 
     ?? true;
     
-  const optimizationScore = anomalies.data?.optimizationScore 
+  const optimizationScore = (anomalies.data as any)?.optimizationScore 
     ?? overviewData?.efficiencyRate 
     ?? overviewData?.efficiency_rate 
     ?? 0.85;
 
   return (
-    <div className="glass border border-zinc-800 bg-zinc-950/40 text-zinc-300 p-5 rounded-none shadow-sm flex flex-col gap-4">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-none shadow-sm flex flex-col gap-4`}>
+      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-2`}>
         <div className="flex items-center gap-2">
-          <BoltIcon className="w-4 h-4 text-blue-400" />
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ECECF1]">Intelligence Layer</h3>
+          <BoltIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+          <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${COLORS.adaptive.textPrimary}`}>{t('dashboard.panelIntelligenceLayer') || 'Intelligence Layer'}</h3>
         </div>
         <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
-          inferenceActive ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20' : 'bg-zinc-950/40 text-zinc-400 border-zinc-800'
+          inferenceActive ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' : 'bg-zinc-100 dark:bg-zinc-950/40 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
         }`}>
           {inferenceActive ? 'ACTIVE' : 'INERT'}
         </span>
       </div>
       <div className="space-y-3">
         <div className="flex justify-between items-center text-xs font-mono font-bold">
-          <span>Inference Engines</span>
-          <span className={inferenceActive ? 'text-emerald-400' : 'text-zinc-500'}>
+          <span className={COLORS.adaptive.textSecondary}>{t('dashboard.inferenceEngines') || 'Inference Engines'}</span>
+          <span className={inferenceActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}>
             {inferenceActive ? 'ONLINE' : 'OFFLINE'}
           </span>
         </div>
         <div className="flex justify-between items-center text-xs font-mono font-bold">
-          <span>Optimization Rate</span>
-          <span className="text-white">
+          <span className={COLORS.adaptive.textSecondary}>{t('dashboard.optimizationRate') || 'Optimization Rate'}</span>
+          <span className={COLORS.adaptive.textPrimary}>
             {Math.round(optimizationScore * 100)}%
           </span>
         </div>
-        <div className="space-y-2 pt-2 border-t border-zinc-800/60">
+        <div className={`space-y-2 pt-2 border-t ${COLORS.adaptive.borderSubtle}`}>
           {safeArray(anomalies.data).slice(0, 4).map((anom: any) => (
-            <div key={anom.id} className="p-2 border border-zinc-800 bg-zinc-950/20 flex items-center justify-between">
+            <div key={anom.id} className="p-2 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-3 bg-[#dc0000]" />
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-mono font-bold text-zinc-300 uppercase truncate">{anom.title}</span>
+                  <span className="text-[9px] font-mono font-bold text-zinc-800 dark:text-zinc-300 uppercase truncate">{anom.title}</span>
                   <span className="text-[7px] font-mono text-zinc-500 uppercase">{anom.severity} Risk</span>
                 </div>
               </div>
-              <span className="text-[10px] font-mono font-black text-red-400">{anom.confidence}%</span>
+              <span className="text-[10px] font-mono font-black text-red-600 dark:text-red-400">{anom.confidence}%</span>
             </div>
           ))}
           {safeArray(anomalies.data).length === 0 && (
-            <div className="p-3 bg-zinc-950/20 border border-zinc-800 flex flex-col gap-1.5">
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase">Telemetry Inference</span>
-                <span className="text-[8px] font-mono font-black text-emerald-400">OPTIMAL</span>
+                <span className="text-[9px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">{t('dashboard.telemetryInference') || 'Telemetry Inference'}</span>
+                <span className="text-[8px] font-mono font-black text-emerald-600 dark:text-emerald-400">OPTIMAL</span>
               </div>
               <div className="text-[8px] text-zinc-500 flex justify-between font-mono">
-                <span>Drift Variance</span>
+                <span>{t('dashboard.driftVariance') || 'Drift Variance'}</span>
                 <span>&lt; 0.002σ</span>
               </div>
             </div>
@@ -353,6 +374,7 @@ const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: 
 };
 
 const IndustrialHeartbeatMatrix = () => {
+  const { t } = useLocale();
   const telemetry = useAdminQuery('hawk-eye:industrial-telemetry', getIndustrialTelemetryOverview, 5000);
   const nodes = useAdminQuery('hawk-eye:nodes', () => getCapacity(), 10000);
   const stats = telemetry.data?.telemetry || { active: 0, degraded: 0, offline: 0, saturated: 0, freshness_pct: 0 };
@@ -368,22 +390,22 @@ const IndustrialHeartbeatMatrix = () => {
   };
 
   return (
-    <TacticalPanel title="Heartbeat Matrix" icon={BoltIcon} badge="Industrial" color="emerald" status={telemetry.status}>
+    <TacticalPanel title={t('dashboard.panelHeartbeat') || 'Heartbeat Matrix'} icon={BoltIcon} badge="Industrial" color="emerald" status={telemetry.status}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>Active</span>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricActive') || 'Active'}</span>
           <div className={`text-sm font-black ${COLORS.adaptive.textPrimary}`}>{stats.active}</div>
         </div>
         <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>Load</span>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricLoad') || 'Load'}</span>
           <div className="text-sm font-black text-[#dc0000]">{stats.avg_load || 0}%</div>
         </div>
         <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>Risks</span>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricRisks') || 'Risks'}</span>
           <div className="text-sm font-black text-amber-500">{stats.degraded + stats.saturated}</div>
         </div>
         <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>Sync</span>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricSync') || 'Sync'}</span>
           <div className="text-sm font-black text-[#10B981]">{stats.freshness_pct}%</div>
         </div>
       </div>
@@ -403,6 +425,7 @@ const IndustrialHeartbeatMatrix = () => {
 };
 
 const ManufacturingDispatchConsole = () => {
+  const { t } = useLocale();
   const dispatches = useAdminQuery('hawk-eye:dispatches', getDispatches, 10000);
   const handleRollback = async (id: string) => {
     const reason = window.prompt('Enter rollback reason:');
@@ -417,7 +440,7 @@ const ManufacturingDispatchConsole = () => {
   };
 
   return (
-    <TacticalPanel title="Dispatch Console" icon={ArchiveBoxIcon} badge="Orchestration" color="slate" status={dispatches.status}>
+    <TacticalPanel title={t('dashboard.panelDispatchConsole') || 'Dispatch Console'} icon={ArchiveBoxIcon} badge="Orchestration" color="slate" status={dispatches.status}>
       <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
         {safeArray(dispatches.data?.dispatches).map((d: any) => (
           <div key={d?.id || Math.random()} className={`p-3 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between group`}>
@@ -437,6 +460,7 @@ const ManufacturingDispatchConsole = () => {
 };
 
 const RoutingSimulationPanel = () => {
+  const { t } = useLocale();
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<any>(null);
   const [input, setInput] = React.useState({ destination_country: 'IE', destination_city: 'Dublin', required_delivery_days: 10, product_type: 'SOFTCOVER_BOOK' });
@@ -476,7 +500,7 @@ const RoutingSimulationPanel = () => {
   }, []);
 
   return (
-    <TacticalPanel title="Routing Simulation" icon={BoltIcon} badge="Decision Layer" color="primary">
+    <TacticalPanel title={t('dashboard.panelRoutingSimulation') || 'Routing Simulation'} icon={BoltIcon} badge="Decision Layer" color="primary">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
@@ -504,6 +528,7 @@ const RoutingSimulationPanel = () => {
 // --- MAIN PAGE ---
 
 export const CommandCenterPage: React.FC = () => {
+  const { t } = useLocale();
   const role = getUserRole();
   const isGlobalAdmin = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN'].includes(role);
   const isTenantAdmin = role === 'TENANT_ADMIN';
@@ -559,17 +584,23 @@ export const CommandCenterPage: React.FC = () => {
       {/* Header */}
       <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-4`}>
         <div>
-          <h1 className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>
-            {isPrinthouseUser ? 'Printhouse Portal' : 'Control Plane'}
+          <h1 id="dashboard-main-title" className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>
+            {isPrinthouseUser 
+              ? (t('dashboard.titlePrinthouse') || 'Printhouse Portal') 
+              : (t('dashboard.titleControlPlane') || 'Control Plane')}
           </h1>
-          <p className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>
-            {isPrinthouseUser ? 'Operational Workspace' : 'Operational Intelligence'}
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1">
+            {isPrinthouseUser 
+              ? (t('dashboard.subtitlePrinthouse') || 'Operational Workspace & Production Dispatch') 
+              : (t('dashboard.subtitleControlPlane') || 'Operational Intelligence & Mission Control')}
           </p>
         </div>
         <div className="flex gap-4">
           <div className={`flex items-center gap-2 px-3 py-1.5 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
             <div className={`w-2 h-2 ${(isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'LIVE' || (isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'ACTIVE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
-            <span className={`text-[9px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-wider`}>System: {isPrinthouseUser ? 'ACTIVE' : (industrial.data?.queue?.state || 'OFFLINE')}</span>
+            <span className={`text-[9px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-wider`}>
+              {t('dashboard.systemStatus') || 'System:'} {isPrinthouseUser ? 'ACTIVE' : (industrial.data?.queue?.state || 'OFFLINE')}
+            </span>
           </div>
         </div>
       </div>
@@ -579,26 +610,26 @@ export const CommandCenterPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* COLUMN 1 */}
           <div className="space-y-6">
-            <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={phSummary.status}>
+            <TacticalPanel title={t('dashboard.panelPreflight') || 'Preflight'} icon={Square3Stack3DIcon} badge="Live" color="emerald" status={phSummary.status}>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-3">
-                  <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
-                  <TelemetryItem label="Failed (Today)" value={phSummary.data?.data?.failedJobsToday || 0} status="stable" />
+                  <TelemetryItem label={t('dashboard.activeJobs') || 'Active Jobs'} value={activeJobs} status="stable" />
+                  <TelemetryItem label={t('dashboard.failedToday') || 'Failed (Today)'} value={phSummary.data?.data?.failedJobsToday || 0} status="stable" />
                 </div>
-                <StatBar label="Completed Jobs Today" value={phSummary.data?.data?.completedJobsToday ? Math.min(100, (phSummary.data.data.completedJobsToday / 50) * 100) : 0} color="emerald" />
+                <StatBar label={t('dashboard.completedJobsToday') || 'Completed Jobs Today'} value={phSummary.data?.data?.completedJobsToday ? Math.min(100, (phSummary.data.data.completedJobsToday / 50) * 100) : 0} color="emerald" />
               </div>
             </TacticalPanel>
 
-            <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={phMachines.status === 'success' ? 'ACTIVE' : 'LOADING'} color="primary" status={phMachines.status}>
+            <TacticalPanel title={t('dashboard.panelFleet') || 'Fleet'} icon={CpuChipIcon} badge={formatOperationalStatus(phMachines.status === 'success' ? 'ACTIVE' : 'LOADING', t)} color="primary" status={phMachines.status}>
               <div className="space-y-2">
                 {safeArray(phMachines.data?.data?.machines).slice(0, 4).map((w: any) => (
                   <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
                     <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.name || w?.id)}</span>
-                    <span className={`text-[8px] font-black ${w?.status === 'active' || w?.status === 'ACTIVE' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(w?.status)}</span>
+                    <span className={`text-[8px] font-black ${w?.status === 'active' || w?.status === 'ACTIVE' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{formatOperationalStatus(w?.status, t)}</span>
                   </div>
                 ))}
                 {safeArray(phMachines.data?.data?.machines).length === 0 && (
-                  <div className={`text-center py-4 uppercase font-black text-[9px] ${COLORS.adaptive.textMuted}`}>No Machines Configured</div>
+                  <div className={`text-center py-4 uppercase font-black text-[9px] ${COLORS.adaptive.textMuted}`}>{t('dashboard.noMachinesConfigured') || 'No Machines Configured'}</div>
                 )}
               </div>
             </TacticalPanel>
@@ -611,16 +642,16 @@ export const CommandCenterPage: React.FC = () => {
 
           {/* COLUMN 3 */}
           <div className="space-y-6">
-            <TacticalPanel title="Operational Summary" icon={ServerIcon} badge="Summary" color="slate">
+            <TacticalPanel title={t('dashboard.panelOperationalSummary') || 'Operational Summary'} icon={ServerIcon} badge="Summary" color="slate">
                <div className="space-y-2">
                    <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Storage Utilized</span>
+                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.storageUtilized') || 'Storage Utilized'}</span>
                       <span className="text-[9px] font-mono font-black text-[#10B981]">
                         {storageAvailable ? `${((phSummary.data?.data?.storage?.sizeBytes || 0) / (1024**3)).toFixed(1)} GB` : 'Unavailable'}
                       </span>
                    </div>
                    <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Active Artifacts</span>
+                      <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.activeArtifacts') || 'Active Artifacts'}</span>
                       <span className="text-[9px] font-mono font-black text-[#10B981]">
                         {storageAvailable ? (phSummary.data?.data?.storage?.artifactsCount || 0) : 'Unavailable'}
                       </span>
@@ -636,7 +667,7 @@ export const CommandCenterPage: React.FC = () => {
 
           {/* SCOPED OPERATIONAL ACTIVITY */}
           <div className="lg:col-span-3">
-            <TacticalPanel title="Operational Activity Stream" icon={BoltIcon} badge="Immutable" color="slate" status={phActivity.status}>
+            <TacticalPanel title={t('dashboard.panelOperationalActivity') || 'Operational Activity Stream'} icon={BoltIcon} badge="Immutable" color="slate" status={phActivity.status}>
               <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
                 {safeArray(phActivity.data?.data?.events).slice(0, 10).map((log: any) => (
                   <div key={log.id} className="flex gap-2.5 items-center">
@@ -647,8 +678,8 @@ export const CommandCenterPage: React.FC = () => {
                 ))}
                 {safeArray(phActivity.data?.data?.events).length === 0 && (
                   <div className="flex flex-col gap-1.5 justify-center h-full text-center">
-                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>Stream Subscription Active</span>
-                    <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for operational activity traces...</span>
+                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>{t('dashboard.streamActive') || 'Stream Subscription Active'}</span>
+                    <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>{t('dashboard.listeningTraces') || 'Listening for operational activity traces...'}</span>
                   </div>
                 )}
               </div>
@@ -660,17 +691,17 @@ export const CommandCenterPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* COLUMN 1: INDUSTRIAL CORE */}
           <div className="space-y-6">
-            <TacticalPanel title="Preflight" icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status}>
+            <TacticalPanel title={t('dashboard.panelPreflight') || 'Preflight'} icon={Square3Stack3DIcon} badge="Live" color="emerald" status={industrial.status}>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-3">
-                  <TelemetryItem label="Active Jobs" value={activeJobs} status="stable" />
-                  <TelemetryItem label="Queue Depth" value={waitingJobs} status={waitingJobs > 100 ? 'warning' : 'stable'} />
+                  <TelemetryItem label={t('dashboard.activeJobs') || 'Active Jobs'} value={activeJobs} status="stable" />
+                  <TelemetryItem label={t('dashboard.queueDepth') || 'Queue Depth'} value={waitingJobs} status={waitingJobs > 100 ? 'warning' : 'stable'} />
                 </div>
-                <StatBar label="Throughput" value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
+                <StatBar label={t('dashboard.throughput') || 'Throughput'} value={throughput > 0 ? Math.min(100, (throughput / 5000) * 100) : 0} color="emerald" />
               </div>
             </TacticalPanel>
 
-            <TacticalPanel title="Fleet" icon={CpuChipIcon} badge={toDisplayText(industrial.data?.workers?.state, 'ACTIVE')} color="primary" status={industrial.status}>
+            <TacticalPanel title={t('dashboard.panelFleet') || 'Fleet'} icon={CpuChipIcon} badge={formatOperationalStatus(industrial.data?.workers?.state || 'ACTIVE', t)} color="primary" status={industrial.status}>
               <div className="space-y-2">
                 {(safeArray(industrial.data?.workers?.activeFleet).length ? safeArray(industrial.data?.workers?.activeFleet) : [
                   { id: 'worker-eu-west-1a', status: 'PROCESSING' },
@@ -679,19 +710,19 @@ export const CommandCenterPage: React.FC = () => {
                 ]).slice(0, 4).map((w: any) => (
                   <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
                     <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.id)}</span>
-                    <span className={`text-[8px] font-black ${w?.status === 'PROCESSING' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(w?.status)}</span>
+                    <span className={`text-[8px] font-black ${w?.status === 'PROCESSING' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{formatOperationalStatus(w?.status, t)}</span>
                   </div>
                 ))}
               </div>
             </TacticalPanel>
             
-            <TacticalPanel title="Storage" icon={ArchiveBoxIcon} badge="Tiering" color="slate" status={industrial.status}>
+            <TacticalPanel title={t('dashboard.panelStorage') || 'Storage'} icon={ArchiveBoxIcon} badge="Tiering" color="slate" status={industrial.status}>
                <div className="flex justify-between items-end mb-3">
                  <span className={`text-xl font-black ${COLORS.adaptive.textPrimary}`}>
                    {((industrial.data?.storage?.totalSizeBytes || 1482093021) / (1024**3)).toFixed(1)} GB
                  </span>
                  <span className={`text-[9px] ${COLORS.adaptive.textMuted}`}>
-                   {industrial.data?.storage?.artifactCount || 342} Artifacts
+                   {industrial.data?.storage?.artifactCount || 342} {t('dashboard.artifacts') || 'Artifacts'}
                  </span>
                </div>
                <div className="grid grid-cols-3 gap-2">
@@ -705,7 +736,7 @@ export const CommandCenterPage: React.FC = () => {
           {/* COLUMN 2: GOVERNANCE & SECURITY */}
           <div className="space-y-6">
             {!isTenantAdmin && (
-              <TacticalPanel title="Governance" icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
+              <TacticalPanel title={t('dashboard.panelGovernance') || 'Governance'} icon={ShieldCheckIcon} badge="Policy" color="red" status={blocks.status}>
                 <div className="space-y-2">
                   {(safeArray(blocks.data?.blocks).length ? safeArray(blocks.data?.blocks) : [
                     { name: 'STRICT_PDF_X4_INTENT', status: 'ACTIVE' },
@@ -724,11 +755,11 @@ export const CommandCenterPage: React.FC = () => {
 
           {/* COLUMN 3: ECONOMY & LOGISTICS */}
           <div className="space-y-6">
-            <TacticalPanel title="Economy" icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
+            <TacticalPanel title={t('dashboard.panelEconomy') || 'Economy'} icon={CurrencyEuroIcon} badge="Intelligence" color="amber" status={routing.status}>
               <div className="space-y-4">
-                <TelemetryItem label="Avg Margin" value={routing.data?.metrics?.avg_margin_pct ? `${Number(routing.data.metrics.avg_margin_pct).toFixed(1)}%` : '---'} status="stable" />
+                <TelemetryItem label={t('dashboard.avgMargin') || 'Avg Margin'} value={routing.data?.metrics?.avg_margin_pct ? `${Number(routing.data.metrics.avg_margin_pct).toFixed(1)}%` : '---'} status="stable" />
                 <div className={`flex justify-between border-t ${COLORS.adaptive.borderSubtle} pt-3`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>Quality</span>
+                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>{t('dashboard.quality') || 'Quality'}</span>
                   <span className="text-sm font-black text-[#10B981]">{Number(routing.data?.avg_final_score || 0).toFixed(1)}</span>
                 </div>
               </div>
@@ -737,19 +768,19 @@ export const CommandCenterPage: React.FC = () => {
             {!isTenantAdmin && <IndustrialHeartbeatMatrix />}
 
             {!isTenantAdmin && (
-              <TacticalPanel title="System Registry" icon={ServerIcon} badge="State DB" color="slate">
+              <TacticalPanel title={t('dashboard.panelSystemRegistry') || 'System Registry'} icon={ServerIcon} badge="State DB" color="slate">
                  <div className="space-y-2">
                      <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>PostgreSQL Clusters</span>
-                        <span className="text-[9px] font-mono font-black text-[#10B981]">SYNCED [{capacity.data?.length ? 2 + (capacity.data.length % 4) : 3}ms]</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('SYNCED', t)} [{capacity.data?.length ? 2 + (capacity.data.length % 4) : 3}ms]</span>
                      </div>
                      <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Redis Sub/Pub Engine</span>
-                        <span className="text-[9px] font-mono font-black text-[#10B981]">ACTIVE [{network.data ? 4 : 7}ms]</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('ACTIVE', t)} [{network.data ? 4 : 7}ms]</span>
                      </div>
                      <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Control Plane Broker</span>
-                        <span className="text-[9px] font-mono font-black text-[#10B981]">HEALTHY [1ms]</span>
+                        <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('HEALTHY', t)} [1ms]</span>
                      </div>
                  </div>
               </TacticalPanel>
@@ -759,7 +790,7 @@ export const CommandCenterPage: React.FC = () => {
           {/* MAP (SYSTEM ADMINS ONLY) */}
           {!isTenantAdmin && (
             <div className="lg:col-span-3">
-              <TacticalPanel title="Manufacturing Heatmap" icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
+              <TacticalPanel title={t('dashboard.panelHeatmap') || 'Manufacturing Heatmap'} icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
                 <div className={`h-[400px] ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} relative overflow-hidden`}>
                    <FederationMap />
                    <div className={`absolute bottom-0 left-0 right-0 ${COLORS.adaptive.surface} bg-opacity-90 p-3 border-t ${COLORS.adaptive.borderPrimary} flex justify-around`}>
@@ -774,7 +805,7 @@ export const CommandCenterPage: React.FC = () => {
 
           {/* AUDIT */}
           <div className="lg:col-span-3">
-            <TacticalPanel title="Operational Audit Stream" icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
+            <TacticalPanel title={t('dashboard.panelOperationalActivity') || 'Operational Audit Stream'} icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
               <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
                 {safeArray(audit.data).slice(0, 10).map((log: any) => (
                   <div key={log.id} className="flex gap-2.5 items-center">
@@ -785,7 +816,7 @@ export const CommandCenterPage: React.FC = () => {
                 ))}
                 {safeArray(audit.data).length === 0 && (
                   <div className="flex flex-col gap-1.5 justify-center h-full text-center">
-                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>Stream Subscription Active</span>
+                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>{t('dashboard.streamActive') || 'Stream Subscription Active'}</span>
                     <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for transactional microservice trace blocks...</span>
                   </div>
                 )}
@@ -808,10 +839,10 @@ export const CommandCenterPage: React.FC = () => {
           {/* SYSTEM COMMAND CONSOLE (SYSTEM ADMINS ONLY) */}
           {!isTenantAdmin && (
             <div className="lg:col-span-3">
-              <TacticalPanel title="Console" icon={CommandLineIcon} color="slate">
+              <TacticalPanel title={t('dashboard.panelConsole') || 'Console'} icon={CommandLineIcon} color="slate">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <CommandButton label="Pause Queue Orchestration" badge="Emergency Global Stop" icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
-                  <CommandButton label="Resume Queue Orchestration" badge="Re-engage Worker Hubs" icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
+                  <CommandButton label={t('dashboard.pauseQueue') || 'Pause Queue Orchestration'} badge={t('dashboard.pauseBadge') || 'Emergency Global Stop'} icon={PowerIcon} color="red" onClick={() => handleCommand('pause')} />
+                  <CommandButton label={t('dashboard.resumeQueue') || 'Resume Queue Orchestration'} badge={t('dashboard.resumeBadge') || 'Re-engage Worker Hubs'} icon={ArrowPathIcon} color="emerald" onClick={() => handleCommand('resume')} />
                 </div>
               </TacticalPanel>
             </div>

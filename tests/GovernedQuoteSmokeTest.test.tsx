@@ -1806,7 +1806,12 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
                     })
                 } as any;
             }
-            return { ok: true, status: 200, json: async () => ({ ok: true, data: [] }) } as any;
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({ ok: true, data: [] }),
+                text: async () => JSON.stringify({ ok: true, data: [] })
+            } as any;
         });
 
         // 1. Render PricingPanel real component directly
@@ -1817,7 +1822,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             expect(screen.getByText(/Choose Your Pricing Workflow/i)).toBeInTheDocument();
         });
 
-        const manualBtn = screen.getByRole('button', { name: /Use Manual Setup/i });
+        const manualBtn = screen.getByRole('button', { name: /Manual rate cards|Use Manual Setup/i });
         await act(async () => {
             fireEvent.click(manualBtn);
         });
@@ -1979,7 +1984,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
         fireEvent.change(inputEl, { target: { value: 'Confirming option 2 specs' } });
 
         // Submit form
-        const sendBtn = screen.getByRole('button', { name: /Send/i });
+        const sendBtn = screen.getByRole('button', { name: /Send|Enviar/i });
         fireEvent.click(sendBtn);
 
         expect(sentCalls.length).toBe(2);

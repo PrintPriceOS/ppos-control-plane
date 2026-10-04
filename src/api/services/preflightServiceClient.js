@@ -123,7 +123,21 @@ class PreflightServiceClient {
   }
 
   async getHealth() {
-    return this._request('GET', '/api/preflight/workers/health');
+    try {
+      return await this._request('GET', '/health');
+    } catch (err) {
+      if (err.status === 404) {
+        try {
+          return await this._request('GET', '/api/preflight/health');
+        } catch (err2) {
+          if (err2.status === 404) {
+            return await this._request('GET', '/api/preflight/workers/health');
+          }
+          throw err2;
+        }
+      }
+      throw err;
+    }
   }
 
   /**

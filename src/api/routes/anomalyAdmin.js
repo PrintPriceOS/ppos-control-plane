@@ -9,6 +9,11 @@ const db = require('../services/mysqlClient');
 const anomaly = require('../services/anomalyDetectionService');
 const twin = require('../services/digitalTwinService');
 const recovery = require('../services/preemptiveRecoveryService');
+const { requireRole } = require('../middleware/auth');
+
+// Anomaly & Drift telemetry routes represent platform-level infrastructure.
+// Strictly restrict to SUPER_ADMIN so Printhouse users cannot access global anomaly alerts.
+router.use(requireRole('SUPER_ADMIN'));
 
 /**
  * GET /api/admin/anomaly/health

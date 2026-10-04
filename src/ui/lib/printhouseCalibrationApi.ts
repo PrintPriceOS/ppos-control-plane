@@ -22,8 +22,16 @@ function getHeaders(): HeadersInit {
     };
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
-    const json = await res.json();
+export async function handleResponse<T>(res: Response): Promise<T> {
+    let json: any;
+    try {
+        json = await res.json();
+    } catch (e: any) {
+        const error = new Error('INVALID_JSON_RESPONSE: Server returned non-JSON response');
+        (error as any).status = res.status;
+        (error as any).code = 'INVALID_JSON_RESPONSE';
+        throw error;
+    }
     if (!res.ok || json.ok === false) {
         const errCode = json.error || json.code || `HTTP_${res.status}`;
         const errMsg = json.message || (typeof json.error === 'string' ? json.error : `Request failed with status ${res.status}`);

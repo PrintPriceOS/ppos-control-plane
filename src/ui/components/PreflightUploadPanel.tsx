@@ -16,6 +16,7 @@ import {
 } from "../lib/adminApi";
 import { useAdminQuery } from "../hooks/useAdminData";
 import { toDisplayText } from "../lib/display";
+import { useLocale } from "../i18n";
 
 const checkMagicBytes = async (file: File): Promise<boolean> => {
   try {
@@ -28,6 +29,7 @@ const checkMagicBytes = async (file: File): Promise<boolean> => {
 };
 
 export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
+  const { t } = useLocale();
   const [file, setFile] = useState<File | null>(null);
   const [tenantId, setTenantId] = useState('system');
   const [jobType, setJobType] = useState('ANALYZE');
@@ -163,7 +165,7 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
       <div className="flex items-center gap-2 mb-6">
         <CloudArrowUpIcon className="w-5 h-5 text-primary" />
         <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-[#ECECF1]">
-          Industrial Preflight Execution
+          {t('preflight.industrialExecution') || 'Industrial Preflight Execution'}
         </h2>
       </div>
 
@@ -193,18 +195,18 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
               <DocumentIcon className="w-12 h-12 text-emerald-500" />
               <div className="font-bold text-sm text-slate-800 dark:text-[#ECECF1] truncate max-w-[200px]">{file.name}</div>
               <div className="text-xs font-mono text-slate-500">{(file.size / (1024 * 1024)).toFixed(2)} MB</div>
-              <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest">Ready</div>
+              <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest">{t('preflight.readyStatus') || 'Ready'}</div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 pointer-events-none">
               <CloudArrowUpIcon className={`w-10 h-10 ${isDragActive ? 'text-primary' : 'text-slate-400'}`} />
-              <div className="text-sm font-black text-slate-800 dark:text-white">Click or drag PDF payload block</div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Enforces Magic Byte Checks</div>
+              <div className="text-sm font-black text-slate-800 dark:text-white">{t('preflight.dropzoneTitle') || 'Click or drag PDF payload block'}</div>
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t('preflight.magicByteNotice') || 'Enforces Magic Byte Checks'}</div>
               <button 
                 className="mt-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-[#ECECF1] text-xs font-black uppercase tracking-wider transition-colors pointer-events-auto"
                 onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
               >
-                Select PDF File
+                {t('preflight.selectPdfBtn') || 'Select PDF File'}
               </button>
             </div>
           )}
@@ -214,7 +216,7 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
         <div className="flex-1 space-y-4">
           <div className="flex gap-4">
             <div className="flex-1 space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Tenant Isolation</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('preflight.tenantIsolation') || 'Tenant Isolation'}</label>
               <input 
                 type="text" 
                 value={tenantId}
@@ -224,7 +226,7 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
               />
             </div>
             <div className="flex-1 space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Policy Catalog</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('preflight.policyCatalog') || 'Policy Catalog'}</label>
               <select 
                 value={policy}
                 onChange={(e) => setPolicy(e.target.value)}
@@ -237,14 +239,14 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
                     </option>
                   ))
                 ) : (
-                  <option value="">Unavailable</option>
+                  <option value="">{t('preflight.policyUnavailable') || 'Unavailable'}</option>
                 )}
               </select>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Execution Mode</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t('preflight.executionMode') || 'Execution Mode'}</label>
             <div className="grid grid-cols-1 gap-2">
               <div 
                 className={`p-3 border ppos-border flex items-start gap-3 cursor-pointer transition-all ${jobType === 'ANALYZE' ? 'border-primary bg-primary/5' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}
@@ -254,8 +256,8 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
                   {jobType === 'ANALYZE' && <div className="w-2 h-2 rounded-full bg-primary" />}
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase text-slate-800 dark:text-white">Analyze Only</div>
-                  <div className="text-[10px] text-slate-500">Checks the PDF and produces diagnostics. It may not produce a corrected PDF.</div>
+                  <div className="text-xs font-black uppercase text-slate-800 dark:text-white">{t('preflight.modeAnalyze') || 'Analyze Only'}</div>
+                  <div className="text-[10px] text-slate-500">{t('preflight.modeAnalyzeDesc') || 'Checks the PDF and produces diagnostics. It may not produce a corrected PDF.'}</div>
                 </div>
               </div>
               
@@ -267,8 +269,8 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
                   {jobType === 'AUTOFIX' && <div className="w-2 h-2 rounded-full bg-primary" />}
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase text-slate-800 dark:text-white">Autofix</div>
-                  <div className="text-[10px] text-slate-500">Attempts to repair the PDF and should produce a Fixed PDF when successful.</div>
+                  <div className="text-xs font-black uppercase text-slate-800 dark:text-white">{t('preflight.modeAutofix') || 'Autofix'}</div>
+                  <div className="text-[10px] text-slate-500">{t('preflight.modeAutofixDesc') || 'Attempts to repair the PDF and should produce a Fixed PDF when successful.'}</div>
                 </div>
               </div>
             </div>
@@ -291,11 +293,11 @@ export const PreflightUploadPanel: React.FC<{ onSuccess: () => void }> = ({ onSu
             `}
           >
             {status === 'executing' ? (
-              <><ArrowPathIcon className="w-4 h-4 animate-spin" /><span>Processing</span></>
+              <><ArrowPathIcon className="w-4 h-4 animate-spin" /><span>{t('preflight.btnProcessing') || 'Processing'}</span></>
             ) : status === 'success' ? (
-              <><CheckCircleIcon className="w-4 h-4" /><span>Dispatched Successfully</span></>
+              <><CheckCircleIcon className="w-4 h-4" /><span>{t('preflight.btnDispatched') || 'Dispatched Successfully'}</span></>
             ) : (
-              <span>Execute Preflight Job</span>
+              <span>{t('preflight.btnExecute') || 'Execute Preflight Job'}</span>
             )}
           </button>
         </div>

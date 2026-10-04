@@ -29,22 +29,30 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
   const [loading, setLoading] = useState(true);
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchEvents();
   }, [packageId]);
 
   const fetchEvents = async () => {
     setLoading(true);
+    setError(null);
     try {
       const url = (packageId && packageId !== 'undefined')
         ? `/api/admin/manufacturing/packages/${packageId}/events`
         : '/api/admin/manufacturing/events';
       const data = await adminFetch<any>(url);
-      if (data?.ok) {
-        setEvents(data.events || []);
+      if (data && data.ok) {
+        setEvents(Array.isArray(data.events) ? data.events : []);
+      } else {
+        setEvents([]);
+        setError(data?.error?.message || 'Failed to fetch production timeline');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch events', err);
+      setEvents([]);
+      setError(err?.message || 'Network error fetching events');
     } finally {
       setLoading(false);
     }
@@ -54,6 +62,16 @@ export const ProductionTimeline: React.FC<{ packageId?: string }> = ({ packageId
     return (
       <div className="p-10 flex justify-center">
         <div className="animate-spin rounded-none h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 p-4 rounded-none">
+          <p className="text-red-700 dark:text-red-400 font-bold text-xs uppercase tracking-wider">{error}</p>
+        </div>
       </div>
     );
   }

@@ -207,7 +207,11 @@ class ControlPlaneSchemaService {
                     tenant_id VARCHAR(64) PRIMARY KEY,
                     email_enabled BOOLEAN DEFAULT TRUE,
                     webhook_enabled BOOLEAN DEFAULT FALSE,
+                    email_order_alerts TINYINT(1) DEFAULT 1,
+                    email_qc_alerts TINYINT(1) DEFAULT 1,
+                    email_sla_alerts TINYINT(1) DEFAULT 1,
                     email_recipients_json JSON NULL,
+                    webhook_endpoint VARCHAR(512) NULL,
                     webhook_url VARCHAR(512) NULL,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB;

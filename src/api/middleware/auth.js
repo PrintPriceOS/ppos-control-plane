@@ -223,9 +223,10 @@ function resolveActorContext(req) {
     // Industrial Hardening: Ensure role is always a string and uppercase
     let role = String(user.role || user.userRole || 'VIEWER').toUpperCase();
     const email = (user.email || '').toLowerCase();
+    const authMode = user.authMode || 'NONE';
 
-    // SAFE FALLBACK: admin@printprice.pro is always SUPER_ADMIN
-    if (email === 'admin@printprice.pro' || user.isSuperAdmin) {
+    // Break-Glass or explicitly authenticated SUPER_ADMIN role
+    if (authMode === 'BREAK_GLASS' || (email === 'admin@printprice.pro' && role === 'SUPER_ADMIN')) {
         role = 'SUPER_ADMIN';
     }
     
@@ -237,7 +238,7 @@ function resolveActorContext(req) {
         isSuperAdmin: role === 'SUPER_ADMIN',
         isMachine: !!user.isMachine || role === 'WORKER_AGENT',
         isPrinthouseUser: ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role),
-        authMode: user.authMode || 'NONE'
+        authMode
     };
 }
 
@@ -246,23 +247,31 @@ function resolveActorContext(req) {
  * RBAC Enforcement Middleware.
  * Enforces role hierarchy and permission matrix.
  * 
- * Hierarchy: SUPER_ADMIN > TENANT_ADMIN > OPERATOR > VIEWER
+ * Hierarchy:
+ * SUPER_ADMIN (100) > OPS_ADMIN / SYSTEM_ADMIN (90) > TENANT_ADMIN / PRINTHOUSE_ADMIN (50) > OPERATOR / PRINTHOUSE_OPERATOR (20) > VIEWER (10)
  */
 const ROLE_HIERARCHY = {
     'SUPER_ADMIN': 100,
+    'OPS_ADMIN': 90,
+    'SYSTEM_ADMIN': 90,
     'TENANT_ADMIN': 50,
+    'PRINTHOUSE_ADMIN': 50,
     'OPERATOR': 20,
+    'PRINTHOUSE_OPERATOR': 20,
     'VIEWER': 10
 };
 
 function requireRole(minRole) {
-    const minLevel = ROLE_HIERARCHY[minRole.toUpperCase()] || 0;
+    const minRoleKey = String(minRole || '').toUpperCase();
+    // Fail-closed: Unknown required role requires level 999 (impossibility for normal roles)
+    const minLevel = Object.prototype.hasOwnProperty.call(ROLE_HIERARCHY, minRoleKey) ? ROLE_HIERARCHY[minRoleKey] : 999;
     
     return (req, res, next) => {
         const context = resolveActorContext(req);
-        const userLevel = ROLE_HIERARCHY[context.role] || 0;
+        // Fail-closed: Unknown user role defaults to level 0
+        const userLevel = Object.prototype.hasOwnProperty.call(ROLE_HIERARCHY, context.role) ? ROLE_HIERARCHY[context.role] : 0;
 
-        if (userLevel >= minLevel) {
+        if (userLevel >= minLevel && minLevel !== 999) {
             return next();
         }
 

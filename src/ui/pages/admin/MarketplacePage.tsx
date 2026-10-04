@@ -14,21 +14,23 @@ import { MarketplacePrinthouseHandoffTab } from "./MarketplacePrinthouseHandoffT
 import { MarketplaceAuditTab } from "./MarketplaceAuditTab";
 import { AutonomousMarketplaceTab } from "./AutonomousMarketplaceTab";
 import { getAuthUser } from "../../lib/authStore";
+import { useLocale } from "../../i18n";
 
 type MarketplaceSubTab = "intake" | "sessions" | "readiness" | "handoff" | "capacity_auctions" | "audit";
 
 export const MarketplacePage: React.FC = () => {
+    const { t } = useLocale();
     const user = getAuthUser();
     const role = String(user?.role || user?.userRole || 'VIEWER').toUpperCase();
     const isSuperAdmin = role === 'SUPER_ADMIN' || user?.email === 'admin@printprice.pro';
 
     const allTabs: Array<{ id: MarketplaceSubTab; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; superAdminOnly?: boolean }> = [
-        { id: "intake", label: "Order Intake", icon: InboxStackIcon },
-        { id: "sessions", label: "Pricing Sessions", icon: BuildingStorefrontIcon, superAdminOnly: true },
-        { id: "readiness", label: "Production Readiness", icon: ClipboardDocumentCheckIcon },
-        { id: "handoff", label: "Printhouse Handoff", icon: ClipboardDocumentCheckIcon },
-        { id: "capacity_auctions", label: "Capacity Auctions", icon: GlobeAltIcon, superAdminOnly: true },
-        { id: "audit", label: "Audit / Events", icon: ShieldCheckIcon, superAdminOnly: true },
+        { id: "intake", label: t('marketplace.tabIntake') || "Order Intake", icon: InboxStackIcon },
+        { id: "sessions", label: t('marketplace.tabSessions') || "Pricing Sessions", icon: BuildingStorefrontIcon, superAdminOnly: true },
+        { id: "readiness", label: t('marketplace.tabReadiness') || "Production Readiness", icon: ClipboardDocumentCheckIcon },
+        { id: "handoff", label: t('marketplace.tabHandoff') || "Printhouse Handoff", icon: ClipboardDocumentCheckIcon },
+        { id: "capacity_auctions", label: t('marketplace.tabAuctions') || "Capacity Auctions", icon: GlobeAltIcon, superAdminOnly: true },
+        { id: "audit", label: t('marketplace.tabAudit') || "Audit / Events", icon: ShieldCheckIcon, superAdminOnly: true },
     ];
 
     const visibleTabs = allTabs.filter(t => !t.superAdminOnly || isSuperAdmin);
@@ -41,13 +43,13 @@ export const MarketplacePage: React.FC = () => {
     return (
         <div className="flex min-h-full flex-col space-y-6">
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none uppercase">
-                    Marketplace Order Intake
+                <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {t('marketplace.title') || 'Marketplace Order Intake'}
                 </h1>
-                <p className="text-sm text-slate-500 font-medium tracking-tight mt-1">
+                <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium tracking-tight mt-1">
                     {isSuperAdmin 
-                        ? "Operational intake for Budget marketplace orders, production files, pricing sessions, preflight readiness, and handoff preparation."
-                        : "Orders assigned to your printhouse from the PrintPrice marketplace, production files, preflight readiness, and handoff preparation."}
+                        ? (t('marketplace.subtitleSuperadmin') || "Operational intake for Budget marketplace orders, production files, pricing sessions, preflight readiness, and handoff preparation.")
+                        : (t('marketplace.subtitlePrinthouse') || "Orders assigned to your printhouse from the PrintPrice marketplace, production files, preflight readiness, and handoff preparation.")}
                 </p>
             </div>
 

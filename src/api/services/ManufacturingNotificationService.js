@@ -4,8 +4,28 @@
  * Logic for generating and delivering operational notifications.
  */
 const persistence = require('./ManufacturingPersistenceService');
+const db = require('./mysqlClient');
 
 class ManufacturingNotificationService {
+  /**
+   * Helper to check tenant notification preferences before creating or delivering
+   */
+  async checkPreference(tenantId, alertKey) {
+    if (!tenantId) return true;
+    try {
+      const rows = await db.query('SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?', [tenantId]);
+      if (rows && rows.length > 0) {
+        const pref = rows[0];
+        if (alertKey in pref) {
+          return Boolean(pref[alertKey]);
+        }
+      }
+    } catch (e) {
+      // Degrade gracefully if table/query unavailable
+    }
+    return true; // Default allowed
+  }
+
   /**
    * Process a production event and generate notifications if needed
    */
@@ -27,6 +47,12 @@ class ManufacturingNotificationService {
         case 'PRODUCTION_COMPLETED':
           await this.notifyProductionCompleted(event);
           break;
+        case 'PREFLIGHT_FAILED':
+          await this.notifyPreflightFailed(event);
+          break;
+        case 'SLA_WARNING':
+          await this.notifySlaWarning(event);
+          break;
         default:
           // For other events, we might just store them but not notify immediately
           break;
@@ -36,11 +62,49 @@ class ManufacturingNotificationService {
     }
   }
 
+  async notifyPreflightFailed(event) {
+    const { metadata } = event;
+    const targetTenantId = metadata?.receiverTenantId || event.tenantId;
+    const allowed = await this.checkPreference(targetTenantId, 'email_qc_alerts');
+    if (!allowed) return;
+
+    await persistence.createNotification({
+      tenantId: targetTenantId,
+      title: 'Preflight Verification Failed',
+      message: event.message || `Artwork file failed preflight checks: ${metadata?.reason || 'Critical PDF/X violations detected'}.`,
+      severity: 'error',
+      type: 'PREFLIGHT_FAILED',
+      relatedEntityType: 'PACKAGE',
+      relatedEntityId: event.manufacturingPackageId || event.productionPackageId
+    });
+  }
+
+  async notifySlaWarning(event) {
+    const { metadata } = event;
+    const targetTenantId = metadata?.receiverTenantId || event.tenantId;
+    const allowed = await this.checkPreference(targetTenantId, 'email_sla_alerts');
+    if (!allowed) return;
+
+    await persistence.createNotification({
+      tenantId: targetTenantId,
+      title: 'SLA Cut-off Warning',
+      message: event.message || `Production deadline approaching daily facility cut-off threshold.`,
+      severity: 'warning',
+      type: 'SLA_WARNING',
+      relatedEntityType: 'PACKAGE',
+      relatedEntityId: event.manufacturingPackageId || event.productionPackageId
+    });
+  }
+
   async notifyDispatchReceived(event) {
     const { metadata } = event;
+    const targetTenantId = metadata.receiverTenantId;
+    const allowed = await this.checkPreference(targetTenantId, 'email_order_alerts');
+    if (!allowed) return;
+
     // Notify the receiver (printer)
     await persistence.createNotification({
-      tenantId: metadata.receiverTenantId,
+      tenantId: targetTenantId,
       title: 'New Manufacturing Job Received',
       message: `You have a new incoming manufacturing job from ${metadata.senderTenantId}.`,
       severity: 'info',

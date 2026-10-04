@@ -2098,6 +2098,34 @@
       "statementTypes": [
         "CREATE_TABLE"
       ]
+    },
+    {
+      "path": "migrations/156_phase194f_tenant_notification_preferences_schema_sync.sql",
+      "prefix": "156",
+      "canonicalSha256": "88f66847540267ec82250f66617731643dadce8ea891a97ee43833f9ab168c3c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1779,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
+      ]
+    },
+    {
+      "path": "migrations/157_phase194g_calibration_acceptances_nullable_provenance.sql",
+      "prefix": "157",
+      "canonicalSha256": "04cb77154e3375bba8ca2822f8f29b61554da2c3a69bbcb559ab741488c6aba5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 365,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
     }
   ]
 }

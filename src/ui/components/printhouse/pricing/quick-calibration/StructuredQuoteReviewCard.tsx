@@ -52,12 +52,13 @@ interface StructuredQuoteReviewCardProps {
     onReadyForCalibration?: (evidenceId: string) => void;
     onIgnoreDocument?: (evidenceId: string) => void;
     onSelectVariant?: (offer: any, variantId: string) => void;
+    selectedVariantId?: string;
 }
 
 export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps> = ({
     evidenceId,
     filename,
-    documentLanguage,
+    documentLanguage = 'en',
     pageCount = 1,
     printhouseName = 'Quotation Document',
     format = 'Custom Format',
@@ -73,7 +74,8 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     uncalibratedRates = [],
     onReadyForCalibration,
     onIgnoreDocument,
-    onSelectVariant
+    onSelectVariant,
+    selectedVariantId
 }) => {
     const defaultBinding = binding || 'Not Specified';
     const { t } = useLocale();
@@ -115,7 +117,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
     if (statusState === 'IGNORED') {
         return (
             <div className="p-3 bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 rounded-xl text-xs text-zinc-500 italic flex items-center justify-between">
-                <span>Document {filename} ignored.</span>
+                <span>{t('quoteReview.docIgnored', { filename })}</span>
             </div>
         );
     }
@@ -135,7 +137,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                                 {documentLanguage.toUpperCase()}
                             </span>
                         </div>
-                        <span className="text-[11px] text-zinc-500">{pageCount} page{pageCount !== 1 ? 's' : ''} extracted</span>
+                        <span className="text-[11px] text-zinc-500">{t('quoteReview.pagesExtracted', { count: pageCount })}</span>
                     </div>
                 </div>
 
@@ -143,17 +145,17 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                     {statusState === 'READY_FOR_CALIBRATION_REVIEW' ? (
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
                             <CheckCircle2 size={12} />
-                            <span>Ready for Calibration Review</span>
+                            <span>{t('quoteReview.readyForCalibration')}</span>
                         </span>
                     ) : hasInconsistency ? (
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 flex items-center gap-1">
                             <AlertTriangle size={12} />
-                            <span>Inconsistency Detected</span>
+                            <span>{t('quoteReview.inconsistent')}</span>
                         </span>
                     ) : (
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
                             <CheckCircle2 size={12} />
-                            <span>Consistent</span>
+                            <span>{t('quoteReview.consistent')}</span>
                         </span>
                     )}
                 </div>
@@ -182,7 +184,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                 {/* Product & Specification */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-zinc-50/80 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800">
                     <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Product Title</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{t('quoteReview.productTitle')}</span>
                         {isEditing ? (
                             <input
                                 type="text"
@@ -196,7 +198,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                     </div>
 
                     <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Format & Binding</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{t('quoteReview.formatAndBinding')}</span>
                         {isEditing ? (
                             <input
                                 type="text"
@@ -218,8 +220,8 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                             <>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                                     {isAllSameQuantity
-                                        ? `Extracted Commercial Offer Variants for ${offers[0]?.quantity} copies (${offers.length} variants)`
-                                        : `Extracted Commercial Quantities & Prices (${offers.length})`}
+                                        ? t('quoteReview.variantsForCopies', { copies: offers[0]?.quantity, count: offers.length })
+                                        : t('quoteReview.quantitiesAndPrices', { count: offers.length })}
                                 </span>
 
                                 <div className="space-y-2">
@@ -239,47 +241,64 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                                             >
                                                 <div className="flex items-center justify-between font-bold mb-1.5">
                                                     <span className="text-zinc-900 dark:text-white text-xs">
-                                                        {isAllSameQuantity ? `Opción ${idx + 1}: €${off.manufacturingPrice} (Fabricación)` : `${off.quantity} unidades`} {off.variantName ? `(${off.variantName})` : ''}
+                                                        {isAllSameQuantity ? t('quoteReview.optionLabel', { idx: idx + 1, price: off.manufacturingPrice }) : t('quoteReview.unitsLabel', { count: off.quantity })} {off.variantName ? `(${off.variantName})` : ''}
                                                     </span>
                                                     <span className={isOk ? 'text-emerald-700 dark:text-emerald-300 font-semibold text-xs' : 'text-red-700 dark:text-red-400 font-bold text-xs'}>
-                                                        {isOk ? '✓ Correct' : '⚠ Inconsistency Detected'}
+                                                        {isOk ? t('quoteReview.consistent') : t('quoteReview.inconsistent')}
                                                     </span>
                                                 </div>
 
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
                                                     <div>
-                                                        <span>Precio Ofertado Fabricación:</span> <strong className="text-zinc-900 dark:text-white">€{off.manufacturingPrice}</strong>
+                                                        <span>{t('quoteReview.mfgOffered')}</span> <strong className="text-zinc-900 dark:text-white">€{off.manufacturingPrice}</strong>
                                                     </div>
                                                     <div>
-                                                        <span>Transporte Separado:</span> <strong className="text-zinc-900 dark:text-white">€{off.transportPrice || 0}</strong>
+                                                        <span>{t('quoteReview.transportSep')}</span> <strong className="text-zinc-900 dark:text-white">{off.transportPrice != null ? `€${off.transportPrice}` : t('quoteReview.notSpecified')}</strong>
                                                     </div>
                                                     <div>
-                                                        <span>Total Ofertado Proveedor:</span> <strong className="text-zinc-900 dark:text-white">€{off.quotedTotalPrice}</strong>
+                                                        <span>{t('quoteReview.totalOffered')}</span> <strong className="text-zinc-900 dark:text-white">€{off.quotedTotalPrice}</strong>
                                                     </div>
                                                     <div>
-                                                        <span>Unitario Ofertado:</span>{' '}
+                                                        <span>{t('quoteReview.unitOffered')}</span>{' '}
                                                         <strong className={isOk ? 'text-zinc-900 dark:text-white' : 'text-red-600 font-bold'}>
                                                             €{Number(quotedUnit).toFixed(2)}
                                                         </strong>
                                                     </div>
                                                 </div>
 
-                                                {onSelectVariant && (
-                                                    <div className="mt-2 flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
-                                                        <span className="text-[10px] text-zinc-500 italic">Precio ofertado por el proveedor • Coste interno se calcula tras calibración</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => onSelectVariant(off, `variant-${idx}`)}
-                                                            className="px-2.5 py-1 bg-[#dc0000] hover:bg-[#b00000] text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
-                                                        >
-                                                            {t('selectThisVariant') ? `${t('selectThisVariant')} (€${off.manufacturingPrice})` : `Seleccionar variante (€${off.manufacturingPrice})`}
-                                                        </button>
-                                                    </div>
-                                                )}
+                                                {onSelectVariant && (() => {
+                                                    const vid = (off as any).variantId || `variant-${idx}`;
+                                                    const isSelected = selectedVariantId === vid;
+                                                    return (
+                                                        <div className="mt-2 flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                                                            <span className="text-[10px] text-zinc-500 italic">{t('quoteReview.vendorDisclaimer')}</span>
+                                                            <button
+                                                                type="button"
+                                                                data-variant-id={vid}
+                                                                aria-pressed={isSelected}
+                                                                onClick={() => onSelectVariant(off, vid)}
+                                                                className={`px-2.5 py-1 text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                                    isSelected
+                                                                        ? 'bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-500 ring-offset-1 shadow-xs'
+                                                                        : 'bg-[#dc0000] hover:bg-[#b00000]'
+                                                                }`}
+                                                            >
+                                                                {isSelected ? (
+                                                                    <>
+                                                                        <Check size={12} />
+                                                                        <span>{t('pricing.variant.selectedBadge') || 'Selected'} (€{off.manufacturingPrice})</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span>{t('selectThisVariant')} (€{off.manufacturingPrice})</span>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {!isOk && (
                                                     <p className="text-[11px] text-red-700 dark:text-red-300 font-medium m-0 mt-1.5">
-                                                        Indicated unit price (€{Number(quotedUnit).toFixed(2)}) differs from calculated total divided by quantity (€{Number(computedUnit).toFixed(2)}).
+                                                        {t('quoteReview.unitPriceDiffWarning', { quoted: Number(quotedUnit).toFixed(2), computed: Number(computedUnit).toFixed(2) })}
                                                     </p>
                                                 )}
                                             </div>
@@ -298,32 +317,32 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                         onClick={() => setShowDetails(!showDetails)}
                         className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1"
                     >
-                        <span>{showDetails ? 'Hide details' : 'Show original text & normalized canonical terms'}</span>
+                        <span>{showDetails ? t('quoteReview.hideDetails') : t('quoteReview.showOriginalText')}</span>
                         {showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
 
                     {showDetails && (
                         <div className="mt-3 p-3 bg-zinc-900 text-zinc-200 rounded-xl space-y-3 text-[11px] font-mono">
                             <div>
-                                <span className="text-zinc-400 uppercase font-bold text-[10px] block mb-1">Normalized Terms:</span>
+                                <span className="text-zinc-400 uppercase font-bold text-[10px] block mb-1">{t('quoteReview.normalizedTerms')}</span>
                                 <div className="space-y-1">
                                     {normalizedTerms.length > 0 ? (
-                                        normalizedTerms.map((t, idx) => (
+                                        normalizedTerms.map((tItem, idx) => (
                                             <div key={idx} className="flex items-center gap-2">
-                                                <span className="text-amber-400">"{t.original}"</span>
+                                                <span className="text-amber-400">"{tItem.original}"</span>
                                                 <ArrowRight size={10} className="text-zinc-500" />
-                                                <span className="text-emerald-400">{t.normalized}</span>
+                                                <span className="text-emerald-400">{tItem.normalized}</span>
                                             </div>
                                         ))
                                     ) : (
-                                        <span className="text-zinc-500">None detected</span>
+                                        <span className="text-zinc-500">{t('quoteReview.noneDetected')}</span>
                                     )}
                                 </div>
                             </div>
 
                             {rawExtractedText && (
                                 <div>
-                                    <span className="text-zinc-400 uppercase font-bold text-[10px] block mb-1">Raw Extracted Text:</span>
+                                    <span className="text-zinc-400 uppercase font-bold text-[10px] block mb-1">{t('quoteReview.rawExtractedText')}</span>
                                     <p className="m-0 text-zinc-300 max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                                         {rawExtractedText.slice(0, 500)}...
                                     </p>
@@ -344,7 +363,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5"
                             >
                                 <Check size={12} />
-                                <span>{savingCorrections ? 'Saving...' : 'Save Corrections'}</span>
+                                <span>{savingCorrections ? t('quoteReview.saving') : t('quoteReview.saveCorrections')}</span>
                             </button>
                         ) : (
                             <button
@@ -353,7 +372,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                                 className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs rounded-lg flex items-center gap-1.5"
                             >
                                 <Edit3 size={12} />
-                                <span>Edit Interpretation</span>
+                                <span>{t('quoteReview.editInterpretation')}</span>
                             </button>
                         )}
 
@@ -362,7 +381,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                             onClick={handleIgnore}
                             className="px-3 py-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-xs font-semibold"
                         >
-                            Ignore Document
+                            {t('quoteReview.ignoreDocument')}
                         </button>
                     </div>
 
@@ -373,7 +392,7 @@ export const StructuredQuoteReviewCard: React.FC<StructuredQuoteReviewCardProps>
                             className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5"
                         >
                             <ShieldCheck size={14} />
-                            <span>Mark Valid Offers Ready for Calibration</span>
+                            <span>{t('quoteReview.markValidOffersReady')}</span>
                         </button>
                     )}
                 </div>

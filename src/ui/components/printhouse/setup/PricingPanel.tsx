@@ -14,7 +14,9 @@ import { PricingRuleBuilder } from './PricingRuleBuilder';
 import { PricingPreview } from './PricingPreview';
 import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibrationPanel';
 import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
+import { SetupDrawer } from './SetupDrawer';
 import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders } from 'lucide-react';
+import { useLocale } from '../../../i18n';
 
 interface PricingPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -24,6 +26,7 @@ interface PricingPanelProps {
 type PricingSubTab = 'RULES' | 'SIMULATOR';
 
 export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved }) => {
+    const { t } = useLocale();
     // ── Workflow Selection State (Phase 193H Choice-First UX) ──
     const [selectedWorkflow, setSelectedWorkflow] = useState<PricingWorkflow>('assistant');
     const [isSecondaryExpanded, setIsSecondaryExpanded] = useState<boolean>(false);
@@ -91,7 +94,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 setIndustrialData(json.data);
             }
         } catch (e) {
-            console.error('Error loading industrial pricing:', e);
+            console.debug('Industrial pricing endpoint unavailable in dev offline:', e);
         } finally {
             setLoadingIndustrial(false);
         }
@@ -161,17 +164,25 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             });
             const data = await res.json();
             if (res.ok && data.ok) {
-                setPriceBooks(data.data || []);
+                setPriceBooks(Array.isArray(data.data) ? data.data : []);
                 // Update selectedBook reference if it's currently selected
-                if (selectedBook) {
-                    const updated = (data.data || []).find((b: any) => b.id === selectedBook.id);
+                if (selectedBook && Array.isArray(data.data)) {
+                    const updated = data.data.find((b: any) => b.id === selectedBook.id);
                     if (updated) setSelectedBook(updated);
                 }
             } else {
-                setError(data.error || 'Failed to fetch price books');
+                const isDevLocal = Boolean(import.meta.env?.DEV) && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                if (!isDevLocal) {
+                    setError(data?.error || data?.message || 'Failed to fetch price books');
+                }
             }
         } catch (err: any) {
-            setError(err.message || 'Error fetching price books');
+            const isDevLocal = Boolean(import.meta.env?.DEV) && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+            if (!isDevLocal) {
+                setError(err.message || 'Error fetching price books');
+            } else {
+                console.debug('Price books endpoint unavailable in dev offline:', err.message);
+            }
         } finally {
             setLoadingBooks(false);
         }
@@ -434,12 +445,12 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        <div className="space-y-2.5">
             {/* Notifications */}
             {error && (
                 <div style={{
-                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '13px', alignItems: 'center'
+                    display: 'flex', gap: '8px', padding: '10px 14px', backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '12px', alignItems: 'center'
                 }}>
                     <ShieldAlert size={16} />
                     <span>{error}</span>
@@ -447,204 +458,148 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             )}
             {successMsg && (
                 <div style={{
-                    display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: '#ecfdf5',
-                    border: '1px solid #a7f3d0', borderRadius: '8px', color: '#065f46', fontSize: '13px', alignItems: 'center'
+                    display: 'flex', gap: '8px', padding: '10px 14px', backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0', borderRadius: '8px', color: '#065f46', fontSize: '12px', alignItems: 'center'
                 }}>
                     <CheckCircle size={16} />
                     <span>{successMsg}</span>
                 </div>
             )}
 
-            {/* CHOICE-FIRST WORKFLOW SELECTOR (Phase 193H) */}
-            <PricingWorkflowSelector
-                selectedWorkflow={selectedWorkflow}
-                onSelectWorkflow={(wf) => {
-                    setSelectedWorkflow(wf);
-                    setIsSecondaryExpanded(false);
-                }}
-            />
-
-            {/* PRIMARY & SECONDARY WORKFLOWS BASED ON SELECTION */}
-            {selectedWorkflow === 'assistant' ? (
-                <>
-                    {/* 1. PRIMARY: Pricing Calibration Assistant */}
-                    <div className="space-y-3">
-                        <QuickCalibrationPanel
-                            printerNodeId={industrialData?.nodeId}
-                            printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
-                            onAccepted={() => {
-                                fetchIndustrialPricing();
-                                onSaved?.();
+            {/* COMPACT SETUP & WORKFLOW TOOLBAR */}
+            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+                <h2 className="sr-only">Choose Your Pricing Workflow</h2>
+                {/* Left: Mode toggle */}
+                <div className="flex items-center gap-3">
+                    <div
+                        id="pricing-mode-toggle"
+                        className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                        role="group"
+                        aria-label={t('pricing.workflow.group') || 'Pricing mode selector'}
+                    >
+                        <button
+                            id="pricing-mode-assistant-btn"
+                            type="button"
+                            aria-pressed={selectedWorkflow === 'assistant'}
+                            onClick={() => {
+                                setSelectedWorkflow('assistant');
+                                setIsSecondaryExpanded(false);
                             }}
-                        />
-                    </div>
-
-                    {/* 2. SECONDARY / COLLAPSED: Manual Rate Card Configuration */}
-                    <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all shadow-2xs">
-                        <div
-                            onClick={() => setIsSecondaryExpanded(!isSecondaryExpanded)}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer bg-zinc-50/70 dark:bg-zinc-900/60 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-colors border-b border-zinc-200/60 dark:border-zinc-800/60"
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                selectedWorkflow === 'assistant'
+                                    ? 'bg-white dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
+                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                            }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0">
-                                    <Calculator size={18} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                                            Manual Rate Card Configuration
-                                        </h3>
-                                        <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-200/80 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-                                            {isSecondaryExpanded ? 'Expanded' : 'Collapsed'}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                        Open if you prefer manual configuration instead of the assistant.
-                                    </p>
-                                </div>
-                            </div>
+                            <Sparkles size={13} className={selectedWorkflow === 'assistant' ? 'text-[#dc0000]' : 'text-zinc-400'} />
+                            <span>{t('pricing.mode.assistant')}</span>
+                        </button>
 
-                            <div className="flex items-center gap-3 self-end sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsSecondaryExpanded(!isSecondaryExpanded);
-                                    }}
-                                    className="px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                                >
-                                    <span>{isSecondaryExpanded ? 'Close Manual Setup' : 'Open Manual Setup'}</span>
-                                    {isSecondaryExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {isSecondaryExpanded && (
-                            <div className="p-5 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-in fade-in duration-200">
-                                <CanonicalIndustrialPricingEditor
-                                    mode="ONBOARDING"
-                                    initialNodeData={initialNodeDataMemo}
-                                    onSave={handleSaveIndustrialPricing}
-                                    onReloadRequest={fetchIndustrialPricing}
-                                    saving={savingIndustrial}
-                                />
-                            </div>
-                        )}
-                    </div>
-                </>
-            ) : (
-                <>
-                    {/* 1. PRIMARY: Manual Rate Card Configuration */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                Industrial Manufacturing Cost & Rate Cards
-                            </span>
-                        </div>
-                        <CanonicalIndustrialPricingEditor
-                            mode="ONBOARDING"
-                            initialNodeData={initialNodeDataMemo}
-                            onSave={handleSaveIndustrialPricing}
-                            onReloadRequest={fetchIndustrialPricing}
-                            saving={savingIndustrial}
-                        />
-                    </div>
-
-                    {/* 2. SECONDARY / COLLAPSED: Assistant-Guided Pricing */}
-                    <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all shadow-2xs">
-                        <div
-                            onClick={() => setIsSecondaryExpanded(!isSecondaryExpanded)}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer bg-zinc-50/70 dark:bg-zinc-900/60 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-colors border-b border-zinc-200/60 dark:border-zinc-800/60"
+                        <button
+                            id="pricing-mode-manual-btn"
+                            type="button"
+                            aria-label={t('pricing.mode.manual')}
+                            title={t('pricing.mode.manual')}
+                            aria-pressed={selectedWorkflow === 'manual'}
+                            onClick={() => {
+                                setSelectedWorkflow('manual');
+                                setIsSecondaryExpanded(false);
+                            }}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                selectedWorkflow === 'manual'
+                                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
+                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                            }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-red-100 dark:bg-red-950/60 text-[#dc0000] dark:text-red-400 shrink-0">
-                                    <Sparkles size={18} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                                            Assistant-Guided Pricing
-                                        </h3>
-                                        <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-200/80 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-                                            {isSecondaryExpanded ? 'Expanded' : 'Collapsed'}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                        Use a real completed job to calibrate your pricing with the assistant.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 self-end sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsSecondaryExpanded(!isSecondaryExpanded);
-                                    }}
-                                    className="px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                                >
-                                    <span>{isSecondaryExpanded ? 'Close Assistant' : 'Open Assistant'}</span>
-                                    {isSecondaryExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {isSecondaryExpanded && (
-                            <div className="p-5 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-in fade-in duration-200">
-                                <QuickCalibrationPanel
-                                    printerNodeId={industrialData?.nodeId}
-                                    printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
-                                    onAccepted={() => {
-                                        fetchIndustrialPricing();
-                                        onSaved?.();
-                                    }}
-                                />
-                            </div>
-                        )}
+                            <Calculator size={13} className={selectedWorkflow === 'manual' ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'} />
+                            <span>{t('pricing.mode.manual')}</span>
+                        </button>
                     </div>
-                </>
-            )}
 
-            {/* DOWNSTREAM / OPTIONAL: COMMERCIAL PRICING POLICIES & CATALOGS */}
-            <div className="bg-white dark:bg-[#18181b] rounded-xl border border-zinc-200 dark:border-[#27272a] overflow-hidden transition-colors">
-                <div 
-                    onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
-                    className="flex justify-between items-center px-6 py-4 cursor-pointer bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-[#27272a] transition-colors"
-                >
-                    <div className="flex items-center gap-2.5">
-                        <Tag size={18} className="text-zinc-500 dark:text-zinc-400" />
-                        <div>
-                            <h3 className="m-0 text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                                Commercial Pricing Policies & Markups
-                                <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded">
-                                    Downstream / Optional
-                                </span>
-                            </h3>
-                            <p className="m-0 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                                Configure commercial quantity tiers, surcharge markups, and customer-specific price books applied on top of industrial costs.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                        {showCommercialPolicy ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </div>
+                    {/* Production Node info if available, hiding empty parenthesis */}
+                    {industrialData?.nodeId && (
+                        <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-md border border-zinc-200/60 dark:border-zinc-700/60">
+                            <span>{t('pricing.mode.node')}</span>
+                            <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{industrialData.nodeName || industrialData.nodeId}</strong>
+                        </span>
+                    )}
                 </div>
 
-                {showCommercialPolicy && (
-                    <div>
-                        <div className="flex justify-end px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
-                            <button
-                                onClick={() => {
-                                    setCloningBook(null);
-                                    setEditingBook(null);
-                                    setShowBookModal(true);
-                                }}
-                                className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3.5 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-                            >
-                                <Plus size={14} /> Create Catalog
-                            </button>
-                        </div>
+                {/* Right: Labelled Secondary Menu / Drawers */}
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            showCommercialPolicy
+                                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white'
+                                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                        }`}
+                        title={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
+                        aria-label={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
+                    >
+                        <Tag size={13} className="text-zinc-500" />
+                        <span>{t('pricing.mode.priceBooks')}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* PRIMARY & SECONDARY WORKFLOWS BASED ON SELECTION */}
+            {/* 1. Assistant Calibration Container (Preserved in DOM to retain draft and conversation state) */}
+            <div
+                id="pricing-workflow-assistant"
+                className={`space-y-2.5 ${selectedWorkflow === 'assistant' ? 'block' : 'hidden'}`}
+            >
+                <QuickCalibrationPanel
+                    printerNodeId={industrialData?.nodeId}
+                    printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                    onAccepted={() => {
+                        fetchIndustrialPricing();
+                        onSaved?.();
+                    }}
+                />
+            </div>
+
+            {/* 2. Manual Rate Card Configuration Container */}
+            <div
+                id="pricing-workflow-manual"
+                className={`space-y-3 ${selectedWorkflow === 'manual' ? 'block' : 'hidden'}`}
+            >
+                <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                        {t('pricing.mode.manualHeading')}
+                    </span>
+                </div>
+                <CanonicalIndustrialPricingEditor
+                    mode="ONBOARDING"
+                    initialNodeData={initialNodeDataMemo}
+                    onSave={handleSaveIndustrialPricing}
+                    onReloadRequest={fetchIndustrialPricing}
+                    saving={savingIndustrial}
+                />
+            </div>
+
+            {/* SECONDARY MENU / DRAWER: COMMERCIAL PRICING POLICIES & CATALOGS */}
+            <SetupDrawer
+                isOpen={showCommercialPolicy}
+                onClose={() => setShowCommercialPolicy(false)}
+                title="Commercial Price Books & Markup Policies"
+                subtitle="Configure quantity tiers, surcharge markups, and customer-specific catalogs applied on top of industrial manufacturing costs."
+                widthClass="max-w-3xl"
+            >
+                <div>
+                    <div className="flex justify-end pb-3 border-b border-zinc-200 dark:border-zinc-800">
+                        <button
+                            onClick={() => {
+                                setCloningBook(null);
+                                setEditingBook(null);
+                                setShowBookModal(true);
+                            }}
+                            className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3.5 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                            <Plus size={14} /> Create Catalog
+                        </button>
+                    </div>
                         {/* Price Books Table */}
                         {loadingBooks ? (
                     <div className="p-10 text-center text-xs text-zinc-500">Loading price catalogs...</div>
@@ -949,9 +904,8 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                         )}
                     </div>
                 )}
-                    </div>
-                )}
-            </div>
+                </div>
+            </SetupDrawer>
 
             {/* MODAL 1: PRICE BOOK METADATA */}
             {showBookModal && (

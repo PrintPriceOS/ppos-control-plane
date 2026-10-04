@@ -16,6 +16,7 @@ import {
     BuildingStorefrontIcon
 } from "@heroicons/react/24/outline";
 import { safeTime, safeDate } from "../../lib/formatters";
+import { useLocale } from "../../i18n";
 
 // --- Defensive Helpers ---
 
@@ -98,6 +99,7 @@ const getStatusStyle = (status: string, order?: any) => {
 };
 
 export const OrderIntakeTab: React.FC = () => {
+    const { t } = useLocale();
     const [orders, setOrders] = useState<any[]>([]);
     const [counts, setCounts] = useState<any>({});
     const [loading, setLoading] = useState(true);
@@ -122,12 +124,12 @@ export const OrderIntakeTab: React.FC = () => {
     };
 
     const kpis = [
-        { label: 'New Orders', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, color: 'text-blue-600' },
-        { label: 'Files Uploaded', value: counts.filesUploaded || 0, icon: DocumentTextIcon, color: 'text-indigo-600' },
-        { label: 'Preflight Required', value: orders.filter(o => o.preflight?.status === 'REQUIRED').length, icon: ExclamationTriangleIcon, color: 'text-amber-600' },
-        { label: 'Payment Blocked', value: orders.filter(o => o.payment?.status === 'BLOCKED').length, icon: CreditCardIcon, color: 'text-red-600' },
-        { label: 'Ready for Handoff', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, color: 'text-emerald-600' },
-        { label: 'Blocked Orders', value: orders.filter(o => o.readiness === 'BLOCKED').length, icon: ExclamationCircleIcon, color: 'text-red-500' },
+        { label: t('marketplace.kpiNewOrders') || 'New Orders', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, color: 'text-blue-600' },
+        { label: t('marketplace.kpiFilesUploaded') || 'Files Uploaded', value: counts.filesUploaded || 0, icon: DocumentTextIcon, color: 'text-indigo-600' },
+        { label: t('marketplace.kpiPreflightReq') || 'Preflight Required', value: orders.filter(o => o.preflight?.status === 'REQUIRED').length, icon: ExclamationTriangleIcon, color: 'text-amber-600' },
+        { label: t('marketplace.kpiPaymentBlocked') || 'Payment Blocked', value: orders.filter(o => o.payment?.status === 'BLOCKED').length, icon: CreditCardIcon, color: 'text-red-600' },
+        { label: t('marketplace.kpiReadyHandoff') || 'Ready for Handoff', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, color: 'text-emerald-600' },
+        { label: t('marketplace.kpiBlockedOrders') || 'Blocked Orders', value: orders.filter(o => o.readiness === 'BLOCKED').length, icon: ExclamationCircleIcon, color: 'text-red-500' },
     ];
 
     return (
@@ -151,34 +153,34 @@ export const OrderIntakeTab: React.FC = () => {
                     <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Filter by Order Ref, Email or ID..."
+                        placeholder={t('marketplace.searchPlaceholder') || 'Filter by Order Ref, Email or ID...'}
                         className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#0e0e0f] border border-slate-200 dark:border-white/10 rounded-none text-xs font-bold uppercase tracking-widest focus:border-primary outline-none dark:text-white"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
                     />
                 </div>
-                <button onClick={fetchOrders} className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-none">
+                <button onClick={fetchOrders} className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-none cursor-pointer" title={t('jobs.refresh') || 'Refresh'}>
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
             {/* Orders Table */}
             <div className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none overflow-hidden shadow-none overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1200px]">
+                <table id="marketplace-orders-table" className="w-full text-left border-collapse min-w-[1200px]">
                     <thead>
                         <tr className="bg-slate-50/50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                            <th className="px-4 py-4">Public Ref</th>
-                            <th className="px-4 py-4">Created</th>
-                            <th className="px-4 py-4">Customer / Session</th>
-                            <th className="px-4 py-4">Specs</th>
-                            <th className="px-4 py-4">Printer / Printhouse</th>
-                            <th className="px-4 py-4">Files</th>
-                            <th className="px-4 py-4">Preflight</th>
-                            <th className="px-4 py-4">Payment</th>
-                            <th className="px-4 py-4">Total</th>
-                            <th className="px-4 py-4">Operational Status</th>
-                            <th className="px-4 py-4 text-right">Actions</th>
+                            <th className="px-4 py-4">{t('marketplace.thPublicRef') || 'Public Ref'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thCreated') || 'Created'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thCustomer') || 'Customer / Session'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thSpecs') || 'Specs'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thPrinter') || 'Printer / Printhouse'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thFiles') || 'Files'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thPreflight') || 'Preflight'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thPayment') || 'Payment'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thTotal') || 'Total'}</th>
+                            <th className="px-4 py-4">{t('marketplace.thStatus') || 'Operational Status'}</th>
+                            <th className="px-4 py-4 text-right">{t('marketplace.thActions') || 'Actions'}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -192,7 +194,7 @@ export const OrderIntakeTab: React.FC = () => {
                             <tr>
                                 <td colSpan={11} className="px-4 py-20 text-center">
                                     <InboxStackIcon className="w-12 h-12 text-slate-200 dark:text-white/10 mx-auto mb-3" />
-                                    <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">No marketplace orders found</p>
+                                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t('marketplace.emptyOrders') || 'No marketplace orders found'}</p>
                                 </td>
                             </tr>
                         ) : orders.map((order) => {
@@ -251,9 +253,9 @@ export const OrderIntakeTab: React.FC = () => {
                                     <td className="px-4 py-5 text-right">
                                         <button
                                             onClick={() => setSelectedOrderId(order.orderIntentId)}
-                                            className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-sm"
+                                            className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-sm cursor-pointer"
                                         >
-                                            View Order
+                                            {t('marketplace.viewOrder') || 'View Order'}
                                         </button>
                                     </td>
                                 </tr>
@@ -277,6 +279,7 @@ export const OrderIntakeTab: React.FC = () => {
 };
 
 const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: () => void }> = ({ id, onClose, onRefresh }) => {
+    const { t } = useLocale();
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [note, setNote] = useState("");
@@ -516,7 +519,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                 {/* Offer & Printer */}
                 <section className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <BuildingStorefrontIcon className="w-3.5 h-3.5" /> Selected Marketplace Offer
+                        <BuildingStorefrontIcon className="w-3.5 h-3.5" /> {t('marketplace.selectedOffer') || 'Selected Marketplace Offer'}
                     </h4>
                     <div className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 p-5 flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -538,7 +541,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                 {/* Production File Assets */}
                 <section className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <DocumentTextIcon className="w-3.5 h-3.5" /> Production File Assets
+                        <DocumentTextIcon className="w-3.5 h-3.5" /> {t('marketplace.prodFiles') || 'Production File Assets'}
                     </h4>
                     <div className="grid grid-cols-1 gap-3">
                         {getDisplayFiles(order).length > 0 ? (
@@ -567,7 +570,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         ) : (
                             <div className="bg-red-50 border border-red-100 p-8 text-center space-y-2">
                                 <ExclamationTriangleIcon className="w-6 h-6 mx-auto text-red-400" />
-                                <div className="text-[10px] font-black text-red-700 uppercase tracking-widest">No production files found</div>
+                                <div className="text-[10px] font-black text-red-700 uppercase tracking-widest">{t('marketplace.noProdFiles') || 'No production files found'}</div>
                                 <div className="text-[8px] text-red-400 font-bold uppercase tracking-tight">Customer has not uploaded interior/cover yet</div>
                             </div>
                         )}
@@ -576,7 +579,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
 
                 <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Preflight Readiness</h4>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('marketplace.tabReadiness') || 'Preflight Readiness'}</h4>
                         <div className={`p-4 border text-center space-y-2 ${order.preflight?.status === 'PASSED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                             <ShieldCheckIcon className="w-6 h-6 mx-auto opacity-50" />
                             <div className="text-[10px] font-black uppercase tracking-widest">{order.preflight?.status || 'NOT STARTED'}</div>
@@ -597,64 +600,64 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Operational Actions</h4>
                         <div className="space-y-3">
                             {!isOrderAcknowledged(order) && (
-                                <button onClick={handleAcknowledge} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">Acknowledge Order</button>
+                                <button onClick={handleAcknowledge} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all cursor-pointer">{t('marketplace.btnAcknowledge') || 'Acknowledge Order'}</button>
                             )}
 
                             {/* Preflight Management Block */}
                             <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
-                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">1. Preflight Gates</div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('marketplace.preflightGates') || '1. Preflight Gates'}</div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handleRunPreflight}
-                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Run Preflight
+                                        {t('marketplace.runPreflight') || 'Run Preflight'}
                                     </button>
                                     <button 
                                         onClick={handleMarkPreflightRequired} 
-                                        className="py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/10 transition-all"
+                                        className="py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/10 transition-all cursor-pointer"
                                     >
-                                        Require Preflight
+                                        {t('marketplace.requirePreflight') || 'Require Preflight'}
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handleMarkPreflightPassed}
-                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Force Pass
+                                        {t('marketplace.forcePass') || 'Force Pass'}
                                     </button>
                                     <button 
                                         onClick={handleMarkPreflightFailed}
-                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Force Fail
+                                        {t('marketplace.forceFail') || 'Force Fail'}
                                     </button>
                                 </div>
                             </div>
 
                             {/* Payment Management Block */}
                             <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
-                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">2. Payment Gates</div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('marketplace.paymentGates') || '2. Payment Gates'}</div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handleMarkPaymentReady}
-                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Verify & Approve
+                                        {t('marketplace.verifyApprove') || 'Verify & Approve'}
                                     </button>
                                     <button 
                                         onClick={handleMarkPaymentBlocked}
-                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-red-600 hover:bg-red-700 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Block Payment
+                                        {t('marketplace.blockPayment') || 'Block Payment'}
                                     </button>
                                 </div>
                             </div>
 
                             {/* Printhouse & Handoff Management Block */}
                             <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
-                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">3. Printhouse Handoff</div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('marketplace.printhouseHandoff') || '3. Printhouse Handoff'}</div>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -663,20 +666,20 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                         value={printhouseId}
                                         onChange={(e) => setPrinthouseId(e.target.value)}
                                     />
-                                    <button onClick={handleAssign} className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Assign PH</button>
+                                    <button onClick={handleAssign} className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all cursor-pointer">{t('marketplace.assignPh') || 'Assign PH'}</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handlePrepareHandoff}
-                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Prepare Package
+                                        {t('marketplace.preparePackage') || 'Prepare Package'}
                                     </button>
                                     <button 
                                         onClick={handleMarkHandoffReady}
-                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                                        className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                     >
-                                        Mark Ready
+                                        {t('marketplace.markReady') || 'Mark Ready'}
                                     </button>
                                 </div>
                             </div>
@@ -697,13 +700,13 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                     value={actionMessage}
                                     onChange={(e) => setActionMessage(e.target.value)}
                                 />
-                                <button onClick={handleRequestAction} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">Request Customer Action</button>
+                                <button onClick={handleRequestAction} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all cursor-pointer">{t('marketplace.requestAction') || 'Request Customer Action'}</button>
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Internal Ledger Notes</h4>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('marketplace.internalNotes') || 'Internal Ledger Notes'}</h4>
                         <div className="space-y-4">
                             <div className="max-h-60 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                                 {order.controlPlane?.notes?.length === 0 ? (
@@ -725,7 +728,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
                                 />
-                                <button onClick={handleAddNote} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all mt-2 shadow-xl active:scale-95">Add Internal Note</button>
+                                <button onClick={handleAddNote} className="w-full py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all mt-2 shadow-xl active:scale-95 cursor-pointer">{t('marketplace.addNote') || 'Add Internal Note'}</button>
                             </div>
                         </div>
                     </div>
@@ -734,7 +737,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                 {/* Audit Timeline */}
                 <section className="space-y-4 pt-10 border-t border-slate-100 dark:border-white/10">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <BoltIcon className="w-3.5 h-3.5" /> Immutable Audit Timeline
+                        <BoltIcon className="w-3.5 h-3.5" /> {t('marketplace.auditTimeline') || 'Immutable Audit Timeline'}
                     </h4>
                     <div className="space-y-6 relative before:absolute before:inset-0 before:left-2 before:w-0.5 before:bg-slate-100 dark:before:bg-white/5">
                         {(!order.audit || order.audit.length === 0) ? (

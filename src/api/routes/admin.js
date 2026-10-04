@@ -116,8 +116,8 @@ router.use((req, res, next) => {
   const isGlobalAdmin = context.isSuperAdmin || context.role === 'OPS_ADMIN' || context.role === 'SYSTEM_ADMIN';
   if (!isGlobalAdmin) {
     const isGlobalOnlyPath = 
-      path.startsWith('/tenants') ||
-      path.startsWith('/audit') ||
+      (path.startsWith('/tenants') && !path.includes('/notification-preferences')) ||
+      (path.startsWith('/audit') && path !== '/audit') ||
       path.startsWith('/federation') ||
       path.startsWith('/global') ||
       path.startsWith('/financial-operations') ||
@@ -966,9 +966,20 @@ router.post("/notifications/:id/cancel", async (req, res) => {
 
 // GET /api/admin/tenants/:id/notification-preferences
 router.get("/tenants/:id/notification-preferences", async (req, res) => {
+  const context = resolveActorContext(req);
+  const targetTenantId = req.params.id;
+
+  if (!context.isSuperAdmin && context.tenantId !== targetTenantId) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Cross-tenant notification preference access denied" });
+  }
+
   try {
-    const [prefs] = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [req.params.id]);
-    res.json({ ok: true, prefs: prefs || null });
+    const rows = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [targetTenantId]);
+    let prefs = (rows && rows.length > 0) ? rows[0] : null;
+    if (prefs) {
+      prefs.email_enabled = Boolean(prefs.email_order_alerts || prefs.email_qc_alerts || prefs.email_sla_alerts);
+    }
+    res.json({ ok: true, prefs });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -976,21 +987,94 @@ router.get("/tenants/:id/notification-preferences", async (req, res) => {
 
 // PUT /api/admin/tenants/:id/notification-preferences
 router.put("/tenants/:id/notification-preferences", async (req, res) => {
-  const { id } = req.params;
+  const context = resolveActorContext(req);
+  const targetTenantId = req.params.id;
+
+  if (!context.isSuperAdmin && context.tenantId !== targetTenantId) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Cross-tenant notification preference update denied" });
+  }
+
+  // Validate editing permissions (Tenant Admin, Printhouse Admin, Printhouse Operator or Super Admin)
+  const allowedRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'];
+  if (!context.isSuperAdmin && !allowedRoles.includes(context.role)) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Insufficient permissions to edit notification preferences" });
+  }
+
   const body = req.body;
 
-  const fields = Object.keys(body).filter(k => k !== 'tenant_id' && k !== 'created_at' && k !== 'updated_at');
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ ok: false, error: "Invalid request payload" });
+  }
+
+  // Strict whitelist of permitted notification preference fields
+  const ALLOWED_FIELDS = [
+    'webhook_enabled',
+    'email_order_alerts',
+    'email_qc_alerts',
+    'email_sla_alerts',
+    'email_recipients_json',
+    'webhook_endpoint'
+  ];
+
+  // Reject unknown keys strictly before constructing SQL
+  const bodyKeys = Object.keys(body);
+  const unknownKeys = bodyKeys.filter(k => !ALLOWED_FIELDS.includes(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: `UNKNOWN_FIELDS_REJECTED: Fields not allowed in notification preferences: ${unknownKeys.join(', ')}` 
+    });
+  }
+
+  const fields = bodyKeys.filter(k => k !== 'tenant_id' && k !== 'created_at' && k !== 'updated_at');
   if (fields.length === 0) return res.status(400).json({ ok: false, error: "No fields to update" });
 
-  const setClause = fields.map(f => `${f} = ?`).join(", ");
-  const values = fields.map(f => (f === 'email_recipients_json' ? JSON.stringify(body[f]) : body[f]));
+  // Validate types and values
+  for (const field of fields) {
+    const val = body[field];
+    if (['email_order_alerts', 'email_qc_alerts', 'email_sla_alerts', 'webhook_enabled'].includes(field)) {
+      if (typeof val !== 'boolean' && val !== 0 && val !== 1) {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be boolean or 0/1` });
+      }
+    } else if (field === 'email_recipients_json') {
+      if (!Array.isArray(val) && typeof val !== 'string' && val !== null) {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be array, JSON string or null` });
+      }
+      if (Array.isArray(val)) {
+        const isValidEmails = val.every(item => typeof item === 'string' && item.includes('@'));
+        if (!isValidEmails) {
+          return res.status(400).json({ ok: false, error: `INVALID_STRUCTURE: Field email_recipients_json array must contain valid email strings` });
+        }
+      }
+    } else if (field === 'webhook_endpoint') {
+      if (val !== null && typeof val !== 'string') {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be a string or null` });
+      }
+    }
+  }
+
+  const values = fields.map(f => {
+    const v = body[f];
+    if (f === 'email_recipients_json') {
+      return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
+    }
+    if (typeof v === 'boolean') {
+      return v ? 1 : 0;
+    }
+    return v;
+  });
 
   try {
-    await db.query(`
-            INSERT INTO tenant_notification_preferences (tenant_id, ${fields.join(", ")})
-            VALUES (?, ${fields.map(() => "?").join(", ")})
-            ON DUPLICATE KEY UPDATE ${setClause}
-        `, [id, ...values, ...values]);
+    const insertPlaceholders = fields.map(() => '?');
+    const updateClause = fields.map(f => `${f} = VALUES(${f})`).join(', ');
+
+    const sql = `
+      INSERT INTO tenant_notification_preferences (tenant_id, ${fields.join(', ')})
+      VALUES (?, ${insertPlaceholders.join(', ')})
+      ON DUPLICATE KEY UPDATE ${updateClause}
+    `;
+
+    await db.query(sql, [targetTenantId, ...values]);
 
     res.json({ ok: true });
   } catch (err) {

@@ -17,7 +17,7 @@
  * - Zero activation grant mutation.
  * - Uses canonical getAuthToken().
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { printhouseCalibrationApi, computeBookSpecChecksum } from '../../../../lib/printhouseCalibrationApi';
 import { GuidedCalibrationWizard } from './GuidedCalibrationWizard';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
@@ -31,6 +31,7 @@ import { PricingRevisionHistoryModal } from './PricingRevisionHistoryModal';
 import { CalibrationSessionsHistoryModal } from './CalibrationSessionsHistoryModal';
 import { CommercialCalibrationPanel } from './CommercialCalibrationPanel';
 import { isValidIso2Country } from '../../../../lib/countryCatalog';
+import { useLocale } from '../../../../i18n';
 import { 
     Sparkles, RefreshCw, Calculator, ShieldCheck, CheckCircle2, 
     AlertTriangle, History, ArrowRight, X, Layers, CheckCircle, 
@@ -48,6 +49,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     printerNodeName = 'Production Node',
     onAccepted
 }) => {
+    const { t } = useLocale();
     // ── Workflow States ──
     const [session, setSession] = useState<any | null>(null);
     const [loadingSession, setLoadingSession] = useState(false);
@@ -56,8 +58,18 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [explaining, setExplaining] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const successTimerRef = useRef<any>(null);
+    const isMountedRef = useRef<boolean>(true);
 
-    // ── Advanced / Power User View Toggle ──
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            if (successTimerRef.current) {
+                clearTimeout(successTimerRef.current);
+            }
+        };
+    }, []);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // ── Conversational & Proposal State (In-Memory) ──
@@ -65,6 +77,8 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [sendingChat, setSendingChat] = useState(false);
     const [activeProposal, setActiveProposal] = useState<any | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
+    const [activeQuoteEvidence, setActiveQuoteEvidence] = useState<any | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(undefined);
 
     // ── Local Editable Draft Spec & Commercials (Initially Clean / Empty) ──
     const [draftSpec, setDraftSpec] = useState<any>({
@@ -104,6 +118,37 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [showSessionsModal, setShowSessionsModal] = useState(false);
     const [showCommercialModal, setShowCommercialModal] = useState(false);
+
+    // ── Variant Selection & Price Coherence Synchronization ──
+    useEffect(() => {
+        if (activeQuoteEvidence?.offers && activeQuoteEvidence.offers.length > 0) {
+            const targetVid = selectedVariantId || (activeQuoteEvidence.offers[0]?.variantId || 'variant-0');
+            const matched = activeQuoteEvidence.offers.find((off: any, idx: number) =>
+                (off.variantId || `variant-${idx}`) === targetVid
+            ) || activeQuoteEvidence.offers[0];
+
+            if (matched) {
+                if (matched.manufacturingPrice != null && Number(matched.manufacturingPrice) > 0) {
+                    const newPrice = Number(matched.manufacturingPrice);
+                    setDraftCommercials((prev: any) => {
+                        if (prev.targetManufacturingPrice !== newPrice) {
+                            return { ...prev, targetManufacturingPrice: newPrice };
+                        }
+                        return prev;
+                    });
+                }
+                if (matched.quantity && Number(matched.quantity) > 0) {
+                    const newCopies = Number(matched.quantity);
+                    setDraftSpec((prev: any) => {
+                        if (prev.copies !== newCopies) {
+                            return { ...prev, copies: newCopies };
+                        }
+                        return prev;
+                    });
+                }
+            }
+        }
+    }, [selectedVariantId, activeQuoteEvidence]);
 
     // ── Session and Active Run Rehydration (Phase 193H.8C.6.11.3) ──
     useEffect(() => {
@@ -283,9 +328,12 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     };
 
     // ── 1. Conversational Chat (193E Zero-Write) ──
-    const handleSendMessage = async (text: string, evidenceId?: string, selectedVariantId?: string) => {
+    const handleSendMessage = async (text: string, evidenceId?: string, variantId?: string) => {
         setSendingChat(true);
         setError(null);
+        if (variantId !== undefined) {
+            setSelectedVariantId(variantId);
+        }
 
         // Append user message locally
         const userMsg = { role: 'user' as const, text, timestamp: new Date().toISOString() };
@@ -293,10 +341,11 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
 
         try {
             let result: any;
+            const effectiveVariantId = variantId !== undefined ? variantId : selectedVariantId;
             if (session?.id && session.status !== 'ACCEPTED' && session.status !== 'REJECTED') {
-                result = await printhouseCalibrationApi.assistantChat(session.id, text, evidenceId, selectedVariantId);
+                result = await printhouseCalibrationApi.assistantChat(session.id, text, evidenceId, effectiveVariantId);
             } else {
-                result = await printhouseCalibrationApi.interpretPreSession(text, evidenceId, selectedVariantId);
+                result = await printhouseCalibrationApi.interpretPreSession(text, evidenceId, effectiveVariantId);
             }
 
             setAiUnavailable(false);
@@ -400,7 +449,14 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
             setExtractedFields([]);
             setActiveProposal(null);
             setSuccessMessage('Specifications verified and saved to calibration session.');
-            setTimeout(() => setSuccessMessage(null), 4000);
+            if (successTimerRef.current) {
+                clearTimeout(successTimerRef.current);
+            }
+            successTimerRef.current = setTimeout(() => {
+                if (isMountedRef.current) {
+                    setSuccessMessage(null);
+                }
+            }, 4000);
             return persistedSession;
         } catch (err: any) {
             setError(err.message || 'Failed to save calibration session');
@@ -673,67 +729,64 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
     const residualVal = Number(activeRun?.absoluteResidual ?? activeRun?.absolute_residual ?? 0);
 
     return (
-        <div className="space-y-6">
-            {/* Header & Mode Selector */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                            Pricing Calibration Assistant
-                        </h2>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-950/50 text-[#dc0000] dark:text-red-400 border border-red-200/50 dark:border-red-800/50">
-                            <Sparkles size={11} />
-                            <span>Phase 193H</span>
-                        </span>
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-1">
-                        Node: <strong className="text-zinc-700 dark:text-zinc-300">{printerNodeName}</strong> ({printerNodeId})
-                    </p>
-                </div>
+        <div className="space-y-2.5">
+            {/* Header / Secondary Utilities Bar */}
+            <div className="flex items-center justify-between gap-3 px-1">
+                {/* Node info if available, no empty parentheses */}
+                {printerNodeId ? (
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                        Calibration Target: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{printerNodeName && printerNodeName !== 'Production Node' ? printerNodeName : printerNodeId}</strong>
+                    </span>
+                ) : <span />}
 
-                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {/* Secondary Actions (Drawer / Modal Triggers) */}
+                <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                         type="button"
                         onClick={() => setShowCommercialModal(!showCommercialModal)}
-                        className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
                             showCommercialModal 
                                 ? 'bg-indigo-600 border-indigo-500 text-white' 
-                                : 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300'
+                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-indigo-600 dark:text-indigo-400'
                         }`}
+                        title={t('pricing.action.calibrateQuote') || 'Calibrate from this quote'}
+                        aria-label={t('pricing.action.calibrateQuote') || 'Calibrate from this quote'}
                     >
-                        <Sliders size={14} className={showCommercialModal ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'} />
-                        <span>Calibrate from this quote</span>
+                        <Sliders size={13} />
+                        <span>{t('pricing.action.calibrateQuoteBtn') || 'Calibrate Quote'}</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setShowSessionsModal(true)}
-                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title={t('pricing.action.previousSessions') || 'Previous calibrated sessions'}
+                        aria-label={t('pricing.action.previousSessions') || 'Previous calibrated sessions'}
                     >
-                        <BookOpen size={14} className="text-[#dc0000]" />
-                        <span>Calibrated Books</span>
+                        <BookOpen size={13} className="text-[#dc0000]" />
+                        <span>{t('pricing.action.calibratedBooks') || 'Calibrated Books'}</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setShowAdvanced(!showAdvanced)}
-                        className={`px-3 py-2 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
                             showAdvanced 
                                 ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white' 
-                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200'
+                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-zinc-700 dark:text-zinc-300'
                         }`}
                     >
-                        <Sliders size={14} />
-                        <span>{showAdvanced ? 'Hide Advanced' : 'Advanced Details'}</span>
+                        <Sliders size={13} />
+                        <span>{showAdvanced ? (t('pricing.action.hideAdvanced') || 'Hide Advanced') : (t('pricing.action.advancedDetails') || 'Advanced Details')}</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setShowHistoryModal(true)}
-                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
-                        <History size={14} className="text-zinc-500" />
-                        <span>Revisions</span>
+                        <History size={13} className="text-zinc-500" />
+                        <span>{t('pricing.action.revisions') || 'Revisions'}</span>
                     </button>
                 </div>
             </div>
@@ -826,6 +879,10 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                     onAccept={() => setShowAcceptModal(true)}
                     calculating={calculating}
                     error={error}
+                    activeQuoteEvidence={activeQuoteEvidence}
+                    setActiveQuoteEvidence={setActiveQuoteEvidence}
+                    selectedVariantId={selectedVariantId}
+                    setSelectedVariantId={setSelectedVariantId}
                 />
             )}
 

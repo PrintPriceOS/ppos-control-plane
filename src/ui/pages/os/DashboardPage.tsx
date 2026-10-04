@@ -14,6 +14,7 @@ import { getOverview, getQueue, getGovernanceBlocks } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { getUserRole, isPrinthouseUser } from "../../lib/authStore";
 import { DataTable } from "../../components/DataTable";
+import { useLocale } from "../../i18n";
 
 const COLOR_MAP: Record<string, { bg: string; text: string }> = {
   primary: { bg: "bg-zinc-950/40", text: "text-zinc-400" },
@@ -51,6 +52,7 @@ function abbreviateId(id: string): string {
 }
 
 export const DashboardPage: React.FC = () => {
+    const { t } = useLocale();
     const role = getUserRole();
     const isPrinthouse = isPrinthouseUser();
 
@@ -65,29 +67,38 @@ export const DashboardPage: React.FC = () => {
     const totalWorkers = o.data?.totalWorkers ?? o.data?.total_workers ?? 12;
 
     const queueData = q.data ? [
-        { status: 'Active', count: q.data.active ?? q.data.active_count ?? 0, description: 'Jobs currently being processed by workers' },
-        { status: 'Waiting', count: q.data.waiting ?? q.data.waiting_count ?? 0, description: 'Jobs in queue waiting for an available worker' },
-        { status: 'Delayed', count: q.data.delayed ?? q.data.delayed_count ?? 0, description: 'Scheduled or delayed jobs' },
-        { status: 'Failed', count: q.data.failed ?? q.data.failed_count ?? 0, description: 'Jobs that encountered errors during execution' },
-        { status: 'Completed', count: q.data.completed ?? q.data.completed_count ?? 0, description: 'Successfully completed jobs' },
+        { status: 'Active', count: q.data.active ?? q.data.active_count ?? 0, description: t('dashboard.statusActiveDesc') || 'Jobs currently being processed by workers' },
+        { status: 'Waiting', count: q.data.waiting ?? q.data.waiting_count ?? 0, description: t('dashboard.statusWaitingDesc') || 'Jobs in queue waiting for an available worker' },
+        { status: 'Delayed', count: q.data.delayed ?? q.data.delayed_count ?? 0, description: t('dashboard.statusDelayedDesc') || 'Scheduled or delayed jobs' },
+        { status: 'Failed', count: q.data.failed ?? q.data.failed_count ?? 0, description: t('dashboard.statusFailedDesc') || 'Jobs that encountered errors during execution' },
+        { status: 'Completed', count: q.data.completed ?? q.data.completed_count ?? 0, description: t('dashboard.statusCompletedDesc') || 'Successfully completed jobs' },
     ] : [];
 
     const queueColumns = [
         {
-            header: 'Queue Status',
-            accessor: (row: any) => (
-                <span className={`font-bold ${
-                    row.status === 'Failed' ? 'text-red-400' :
-                    row.status === 'Completed' ? 'text-emerald-400' :
-                    row.status === 'Active' ? 'text-blue-400' :
-                    'text-[#ECECF1]'
-                }`}>
-                    {row.status}
-                </span>
-            )
+            header: t('dashboard.queueStatus') || 'Queue Status',
+            accessor: (row: any) => {
+                const label = 
+                    row.status === 'Active' ? (t('dashboard.queueStatusActive') || 'Active') :
+                    row.status === 'Waiting' ? (t('dashboard.queueStatusWaiting') || 'Waiting') :
+                    row.status === 'Delayed' ? (t('dashboard.queueStatusDelayed') || 'Delayed') :
+                    row.status === 'Failed' ? (t('dashboard.queueStatusFailed') || 'Failed') :
+                    row.status === 'Completed' ? (t('dashboard.queueStatusCompleted') || 'Completed') :
+                    row.status;
+                return (
+                    <span className={`font-bold ${
+                        row.status === 'Failed' ? 'text-red-400' :
+                        row.status === 'Completed' ? 'text-emerald-400' :
+                        row.status === 'Active' ? 'text-blue-400' :
+                        'text-[#ECECF1]'
+                    }`}>
+                        {label}
+                    </span>
+                );
+            }
         },
         {
-            header: 'Job Count',
+            header: t('dashboard.jobCount') || 'Job Count',
             accessor: (row: any) => (
                 <span className="font-mono font-black text-white dark:text-[#ECECF1]">
                     {row.count}
@@ -95,7 +106,7 @@ export const DashboardPage: React.FC = () => {
             )
         },
         {
-            header: 'Description',
+            header: t('dashboard.description') || 'Description',
             accessor: (row: any) => (
                 <span className="text-zinc-400">
                     {row.description}
@@ -109,25 +120,25 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center justify-between flex-wrap gap-4 border-b ppos-border pb-4">
                 <div>
                     <h1 className="text-2xl font-black text-white dark:text-[#ECECF1] tracking-tight">
-                        {isPrinthouse ? 'Printhouse Hub' : 'OS Control Center'}
+                        {isPrinthouse ? (t('dashboard.printhouseHub') || 'Printhouse Hub') : (t('dashboard.osControlCenter') || 'OS Control Center')}
                     </h1>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
                         {isPrinthouse 
-                          ? 'Real-time production vitals, job status, and operational metrics.' 
-                          : 'Global governance, real-time vitals, and infrastructure coordination.'}
+                          ? (t('dashboard.printhouseDesc') || 'Real-time production vitals, job status, and operational metrics.')
+                          : (t('dashboard.osControlDesc') || 'Global governance, real-time vitals, and infrastructure coordination.')}
                     </p>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-zinc-950/40 text-zinc-300 border border-zinc-800 rounded-none text-xs font-bold uppercase tracking-widest">
                    <ClockIcon className="w-4 h-4" />
-                   <span>Last 24 Hours</span>
+                   <span>{t('dashboard.last24Hours') || 'Last 24 Hours'}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <KpiCard title={isPrinthouse ? "Assigned Jobs" : "Global Jobs"} value={String(o.data?.totalJobs || o.data?.total_jobs || 0)} Icon={Square3Stack3DIcon} color="primary" />
-                <KpiCard title="SLA Success" value={`${Number(o.data?.successRate || o.data?.success_rate || 0).toFixed(1)}%`} Icon={CheckBadgeIcon} color="emerald" />
-                <KpiCard title={isPrinthouse ? "Avg. Turnaround" : "Mean Latency"} value={`${o.data?.avgLatencyMs || o.data?.avg_latency_ms || 0}ms`} Icon={BoltIcon} color="amber" />
-                <KpiCard title={isPrinthouse ? "Pending Action" : "Queue Depth"} value={String(o.data?.queueBacklog || o.data?.queue_backlog || 0)} Icon={QueueListIcon} color="orange" />
+                <KpiCard title={isPrinthouse ? (t('dashboard.assignedJobs') || "Assigned Jobs") : (t('dashboard.globalJobs') || "Global Jobs")} value={String(o.data?.totalJobs || o.data?.total_jobs || 0)} Icon={Square3Stack3DIcon} color="primary" />
+                <KpiCard title={t('dashboard.slaSuccess') || "SLA Success"} value={`${Number(o.data?.successRate || o.data?.success_rate || 0).toFixed(1)}%`} Icon={CheckBadgeIcon} color="emerald" />
+                <KpiCard title={isPrinthouse ? (t('dashboard.avgTurnaround') || "Avg. Turnaround") : (t('dashboard.meanLatency') || "Mean Latency")} value={`${o.data?.avgLatencyMs || o.data?.avg_latency_ms || 0}ms`} Icon={BoltIcon} color="amber" />
+                <KpiCard title={isPrinthouse ? (t('dashboard.pendingAction') || "Pending Action") : (t('dashboard.queueDepth') || "Queue Depth")} value={String(o.data?.queueBacklog || o.data?.queue_backlog || 0)} Icon={QueueListIcon} color="orange" />
             </div>
 
             {!isPrinthouse && (
@@ -136,10 +147,10 @@ export const DashboardPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <ShieldCheckIcon className="w-5 h-5 text-zinc-400" />
-                                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Governance Blocks</h3>
+                                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{t('dashboard.activeGovBlocks') || 'Active Governance Blocks'}</h3>
                             </div>
                             <button className="text-xs font-bold text-[#dc0000] dark:text-red-400 hover:underline flex items-center gap-1">
-                                Explore All <ArrowRightIcon className="w-3 h-3" />
+                                {t('dashboard.exploreAll') || 'Explore All'} <ArrowRightIcon className="w-3 h-3" />
                             </button>
                         </div>
                         <div className="space-y-4">
@@ -160,7 +171,7 @@ export const DashboardPage: React.FC = () => {
                                 </div>
                             ))}
                             {gov.data?.blocks?.length === 0 && (
-                                <p className="text-xs text-zinc-400 text-center py-4">No active governance blocks</p>
+                                <p className="text-xs text-zinc-400 text-center py-4">{t('dashboard.noActiveGovBlocks') || 'No active governance blocks'}</p>
                             )}
                         </div>
                     </div>
@@ -168,7 +179,7 @@ export const DashboardPage: React.FC = () => {
                     <div className="glass border ppos-border ppos-surface text-[#ECECF1] p-6 flex flex-col gap-6 shadow-none">
                         <div className="flex items-center gap-3">
                             <ServerIcon className="w-5 h-5 text-zinc-400" />
-                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Worker Cluster</h3>
+                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{t('dashboard.workerCluster') || 'Worker Cluster'}</h3>
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-center text-center gap-2">
                             <div className="relative">
@@ -178,11 +189,11 @@ export const DashboardPage: React.FC = () => {
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                                     <span className="text-2xl font-mono font-black text-white dark:text-[#ECECF1]">{Math.round(efficiencyPct * 100)}%</span>
-                                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Efficiency</span>
+                                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">{t('dashboard.efficiency') || 'Efficiency'}</span>
                                 </div>
                             </div>
-                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mt-2">{activeWorkers}/{totalWorkers} Workers Active</p>
-                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Regional Cluster eu-west-1</p>
+                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mt-2">{activeWorkers}/{totalWorkers} {t('dashboard.workersActive') || 'Workers Active'}</p>
+                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{t('dashboard.regionalCluster') || 'Regional Cluster eu-west-1'}</p>
                         </div>
                     </div>
                 </div>
@@ -192,16 +203,16 @@ export const DashboardPage: React.FC = () => {
                 <div className="px-6 py-4 bg-slate-900/50 border-b ppos-border flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CircleStackIcon className="w-5 h-5 text-slate-400" />
-                        <div className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">Queue Stream</div>
+                        <div className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">{t('dashboard.queueStream') || 'Queue Stream'}</div>
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Buffer Trace</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.liveBufferTrace') || 'Live Buffer Trace'}</span>
                     </div>
                 </div>
                 <div className="p-0">
-                    {q.status === "loading" && <div className="p-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">Attaching to stream...</div>}
-                    {q.status === "error" && <div className="p-10 text-center text-red-500 text-sm font-bold">Error loading stream</div>}
+                    {q.status === "loading" && <div className="p-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">{t('dashboard.attachingStream') || 'Attaching to stream...'}</div>}
+                    {q.status === "error" && <div className="p-10 text-center text-red-500 text-sm font-bold">{t('dashboard.errorLoadingStream') || 'Error loading stream'}</div>}
                     {(q.status === "success" || q.status === "refetching" || q.data) && q.data && (
                         <div className="bg-black/20 border-t ppos-border">
                             <DataTable 

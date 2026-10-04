@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { CountrySelect } from '../../common/CountrySelect';
 import { getCountryDisplayName } from '../../../lib/countryCatalog';
+import { useLocale } from '../../../i18n';
 
 export const HISTORICAL_TRANSPORT_SUGGESTIONS: Record<string, number> = {
     es: 0.95,
@@ -187,6 +188,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
     onReloadRequest,
     saving = false
 }) => {
+    const { t } = useLocale();
     const [tab, setTab] = useState<FormTab>('Basic');
     const [bindingTab, setBindingTab] = useState<BindingKey>('pb');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -1080,7 +1082,8 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                 <div className="sm:col-span-1 flex justify-end">
                                                     <button
                                                         type="button"
-                                                        title={`Remove ${displayName}`}
+                                                        title={t('pricing.action.removeEntry', { name: displayName }) || `Remove ${displayName}`}
+                                                        aria-label={t('pricing.action.removeEntry', { name: displayName }) || `Remove ${displayName}`}
                                                         onClick={() => {
                                                             setRates(r => {
                                                                 const nextCosts = { ...r.transport_costs };

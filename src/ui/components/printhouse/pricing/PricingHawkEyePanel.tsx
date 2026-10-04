@@ -22,6 +22,7 @@ import {
 import { Printhouse } from '../../../pages/os/PrinthousesPage';
 import { PricingDetailTab } from '../../../types/printhousePricing';
 import { getPricingHawkEyeState } from '../../../lib/pricingHawkEyeHelper';
+import { useLocale } from '../../../i18n';
 
 interface PricingHawkEyePanelProps {
     ph: Printhouse;
@@ -29,6 +30,7 @@ interface PricingHawkEyePanelProps {
 }
 
 export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, onNavigateTab }) => {
+    const { t } = useLocale();
     const state = getPricingHawkEyeState(ph.rates);
     const gov = ph.pricingGovernance;
 
@@ -63,7 +65,7 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
                 <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                     Pricing Hawk-Eye
                 </h2>
-                <InformationCircleIcon className="w-4 h-4 text-zinc-400 cursor-help" title="Read-only canonical pricing health, representative calibrated anchors, and domain completeness." />
+                <InformationCircleIcon className="w-4 h-4 text-zinc-400 cursor-help" title={t('pricing.hawkeye.tooltip') || 'Read-only canonical pricing health, representative calibrated anchors, and domain completeness.'} />
             </div>
 
             {/* 1. Top KPI Row (6 cards) */}
@@ -198,7 +200,7 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
                             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
                                 Key Pricing Anchors
                             </h3>
-                            <InformationCircleIcon className="w-3.5 h-3.5 text-zinc-400 cursor-help" title="Representative calibrated anchor rates from the canonical rate card." />
+                            <InformationCircleIcon className="w-3.5 h-3.5 text-zinc-400 cursor-help" title={t('pricing.hawkeye.anchorsTooltip') || 'Representative calibrated anchor rates from the canonical rate card.'} />
                         </div>
 
                         <div className="overflow-x-auto">
@@ -252,7 +254,7 @@ export const PricingHawkEyePanel: React.FC<PricingHawkEyePanelProps> = ({ ph, on
                             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
                                 Pricing Modules
                             </h3>
-                            <InformationCircleIcon className="w-3.5 h-3.5 text-zinc-400 cursor-help" title="Health and structural completeness per pricing domain." />
+                            <InformationCircleIcon className="w-3.5 h-3.5 text-zinc-400 cursor-help" title={t('pricing.hawkeye.modulesTooltip') || 'Health and structural completeness per pricing domain.'} />
                         </div>
 
                         <div className="space-y-2">

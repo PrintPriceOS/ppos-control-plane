@@ -18,6 +18,8 @@ import { CalibrationConversation } from './CalibrationConversation';
 import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
 import { CountrySelect } from '../../../common/CountrySelect';
 import { getCountryDisplayName, isValidIso2Country } from '../../../../lib/countryCatalog';
+import { SetupDrawer } from '../../setup/SetupDrawer';
+import { useLocale } from '../../../../i18n';
 
 interface GuidedCalibrationWizardProps {
     printerNodeId?: string;
@@ -27,7 +29,7 @@ interface GuidedCalibrationWizardProps {
     draftCommercials: any;
     setDraftCommercials: React.Dispatch<React.SetStateAction<any>>;
     messages: any[];
-    onSendMessage: (text: string) => Promise<void>;
+    onSendMessage: (text: string, evidenceId?: string, selectedVariantId?: string) => Promise<void>;
     sendingChat: boolean;
     activeProposal: any;
     aiUnavailable: boolean;
@@ -45,6 +47,10 @@ interface GuidedCalibrationWizardProps {
     onAccept: () => void;
     calculating: boolean;
     error: string | null;
+    activeQuoteEvidence?: any;
+    setActiveQuoteEvidence?: React.Dispatch<React.SetStateAction<any>>;
+    selectedVariantId?: string;
+    setSelectedVariantId?: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = ({
@@ -72,8 +78,13 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     onCalculate,
     onAccept,
     calculating,
-    error
+    error,
+    activeQuoteEvidence,
+    setActiveQuoteEvidence,
+    selectedVariantId,
+    setSelectedVariantId
 }) => {
+    const { t } = useLocale();
     // Current Wizard Step: 1 -> 2 -> 3 -> 4 -> 5
     const [step, setStep] = useState<number>(() => {
         if (isAccepted) return 5;
@@ -96,6 +107,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     // ── Phase 193H.6 Canonical Step Completion Predicates ──
     const [reviewConfirmed, setReviewConfirmed] = useState<boolean>(true);
     const [lastConfirmedSpecSnapshot, setLastConfirmedSpecSnapshot] = useState<string>(() => JSON.stringify(draftSpec));
+    const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState<boolean>(false);
 
     const isStep1Complete = Boolean(
         draftSpec.copies && draftSpec.copies > 0 &&
@@ -159,16 +171,16 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
     };
 
     return (
-        <div className="space-y-6">
-            {/* Stepper Indicator (Phase 193H.6 Visited vs Completed Gate) */}
-            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xs">
+        <div className="space-y-2.5">
+            {/* 2. Compact Workflow / Progress Row */}
+            <div className="px-3.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xs">
                 <div className="flex items-center justify-between max-w-2xl mx-auto text-xs font-semibold">
                     {[
-                        { num: 1, label: 'Describe Job' },
-                        { num: 2, label: 'Review' },
-                        { num: 3, label: 'Manufacturing Cost' },
-                        { num: 4, label: 'Calibrate' },
-                        { num: 5, label: 'Test Pricing' }
+                        { num: 1, label: t('pricing.wizard.step1') || 'Describe Job' },
+                        { num: 2, label: t('pricing.wizard.step2') || 'Review' },
+                        { num: 3, label: t('pricing.wizard.step3') || 'Manufacturing Cost' },
+                        { num: 4, label: t('pricing.wizard.step4') || 'Calibrate' },
+                        { num: 5, label: t('pricing.wizard.step5') || 'Test Pricing' }
                     ].map((s, idx) => {
                         const isCurrent = step === s.num;
                         const isCompleted = isStepComplete(s.num);
@@ -182,7 +194,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         if (isNavigable) setStep(s.num);
                                     }}
                                     disabled={!isNavigable}
-                                    className={`flex items-center gap-2 transition-colors ${
+                                    className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
                                         isCurrent
                                             ? 'text-[#dc0000] font-bold'
                                             : isCompleted
@@ -192,7 +204,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                             : 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-60'
                                     }`}
                                 >
-                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
                                         isCurrent
                                             ? 'bg-[#dc0000] text-white shadow-2xs'
                                             : isCompleted
@@ -203,10 +215,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     }`}>
                                         {isCompleted ? '✓' : isCurrent ? '●' : s.num}
                                     </span>
-                                    <span className="hidden sm:inline">{s.label}</span>
+                                    <span className="hidden sm:inline text-xs">{s.label}</span>
                                 </button>
                                 {idx < 4 && (
-                                    <div className={`flex-1 h-0.5 mx-2 ${
+                                    <div className={`flex-1 h-0.5 mx-1.5 ${
                                         isCompleted ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'
                                     }`} />
                                 )}
@@ -216,43 +228,275 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                 </div>
             </div>
 
-            {/* STEP 1: Tell us about a real job */}
+            {/* STEP 1: Tell us about a real job (Directly mounts Assistant Workspace) */}
             {step === 1 && (
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 1 of 5</span>
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-1">
-                            Tell us about a real job you have already produced
-                        </h3>
-                        <p className="text-xs text-zinc-500 mt-1">
-                            Describe the job in plain language or paste a previous job ticket. The assistant will extract the specifications for your review.
-                        </p>
+                <div className="space-y-2">
+                    {/* Viewport-Aware Desktop Grid: minmax(0, 1fr) Workspace with fixed Composer */}
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-start">
+                        {/* Dominant Assistant Section */}
+                        <div className="xl:col-span-8 min-w-0">
+                            <CalibrationConversation
+                                messages={messages}
+                                onSendMessage={onSendMessage}
+                                sending={sendingChat}
+                                activeProposal={activeProposal}
+                                onApplyProposal={async (proposal) => {
+                                    await onApplyProposal(proposal);
+                                    setStep(2);
+                                }}
+                                onApplyClarifications={onApplyClarifications}
+                                aiUnavailable={aiUnavailable}
+                                activeQuoteEvidence={activeQuoteEvidence}
+                                setActiveQuoteEvidence={setActiveQuoteEvidence}
+                                selectedVariantId={selectedVariantId}
+                                setSelectedVariantId={setSelectedVariantId}
+                            />
+                        </div>
+
+                        {/* Structured Review & Provenance Pane (Visible on xl desktops) */}
+                        <div id="pricing-sidebar-summary-pane" className="hidden xl:flex xl:col-span-4 flex-col gap-3 sticky top-4">
+                            {/* Section 1: Current Specification */}
+                            <div className="bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-xl p-3.5 space-y-2.5">
+                                <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-2">
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <Calculator size={13} className="text-[#dc0000]" />
+                                        <span>{t('pricing.calibration.currentSpec') || 'Current Specification'}</span>
+                                    </span>
+                                    {draftSpec.copies ? (
+                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                            {t('quoteReview.consistent') || 'Active'}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] font-medium text-zinc-400">
+                                            {t('pricing.review.pendingConfirmation') || 'Awaiting Input'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {draftSpec.copies ? (
+                                    <div className="space-y-1.5 text-xs">
+                                        <div className="flex justify-between py-0.5 border-b border-zinc-200/30 dark:border-zinc-800/30">
+                                            <span className="text-zinc-500">{t('pricing.spec.quantity') || 'Quantity:'}</span>
+                                            <strong className="text-zinc-900 dark:text-white font-mono">{draftSpec.copies} {t('pricing.spec.copies') || 'copies'}</strong>
+                                        </div>
+                                        <div className="flex justify-between py-0.5 border-b border-zinc-200/30 dark:border-zinc-800/30">
+                                            <span className="text-zinc-500">{t('pricing.spec.trimSize') || 'Trim Size:'}</span>
+                                            <strong className="text-zinc-900 dark:text-white">{draftSpec.book_width_mm || '—'} × {draftSpec.book_height_mm || '—'} mm</strong>
+                                        </div>
+                                        <div className="flex justify-between py-0.5 border-b border-zinc-200/30 dark:border-zinc-800/30">
+                                            <span className="text-zinc-500">{t('pricing.spec.interiorPages') || 'Interior Pages:'}</span>
+                                            <strong className="text-zinc-900 dark:text-white">{draftSpec.interior_pages || '—'}p ({draftSpec.interior_print || '4/4'})</strong>
+                                        </div>
+                                        <div className="flex justify-between py-0.5 border-b border-zinc-200/30 dark:border-zinc-800/30">
+                                            <span className="text-zinc-500">{t('pricing.spec.paper') || 'Paper:'}</span>
+                                            <strong className="text-zinc-900 dark:text-white truncate max-w-[130px]">{draftSpec.paper_weight_interior || ''}g {draftSpec.paper_type_interior || '—'}</strong>
+                                        </div>
+                                        <div className="flex justify-between py-0.5 border-b border-zinc-200/30 dark:border-zinc-800/30">
+                                            <span className="text-zinc-500">{t('pricing.spec.binding') || 'Binding:'}</span>
+                                            <strong className="text-zinc-900 dark:text-white capitalize">{draftSpec.binding_method || '—'}</strong>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setStep(2)}
+                                            className="w-full mt-1.5 py-1.5 px-3 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-xs font-semibold border border-zinc-300 dark:border-zinc-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                        >
+                                            <Edit3 size={12} className="text-[#dc0000]" />
+                                            <span>{t('pricing.calibration.editFullSpec') || 'Edit Full Specification'}</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="py-4 text-center text-zinc-400 text-xs space-y-1">
+                                        <p>{t('pricing.calibration.noSpecsYet') || 'No specifications entered yet.'}</p>
+                                        <p className="text-[11px] text-zinc-500">{t('pricing.calibration.noSpecsHint') || 'Upload a quote PDF or type a job description to begin.'}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Section 2: Selected Offer & Variant (Server-Resolved) */}
+                            {(() => {
+                                const selectedOffer = (activeQuoteEvidence?.offers || []).find((off: any, idx: number) =>
+                                    (off.variantId || `variant-${idx}`) === selectedVariantId
+                                ) || activeQuoteEvidence?.offers?.[0];
+                                const effectiveTarget = selectedOffer?.manufacturingPrice != null && Number(selectedOffer.manufacturingPrice) > 0
+                                    ? Number(selectedOffer.manufacturingPrice)
+                                    : (draftCommercials.targetManufacturingPrice ? Number(draftCommercials.targetManufacturingPrice) : null);
+
+                                return (
+                                    <div className="bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-xl p-3.5 space-y-2">
+                                        <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-1.5">
+                                            <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                                <ShieldCheck size={13} className="text-[#dc0000]" />
+                                                <span>{t('pricing.review.selectedVariant') || 'Selected Offer & Variant'}</span>
+                                            </span>
+                                            {selectedVariantId ? (
+                                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
+                                                    {selectedVariantId}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] text-zinc-400">
+                                                    {t('quoteReview.notSpecified') || 'None'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {effectiveTarget ? (
+                                            <div className="space-y-1.5 text-xs">
+                                                <div className="flex justify-between">
+                                                    <span className="text-zinc-500">{t('pricing.review.manufacturingTarget') || 'Manufacturing Target:'}</span>
+                                                    <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        €{Number(effectiveTarget).toFixed(2)}
+                                                    </strong>
+                                                </div>
+                                                {draftCommercials.transportPricePerKg != null && (
+                                                    <div className="flex justify-between text-[11px]">
+                                                        <span className="text-zinc-500">{t('pricing.review.transportPerKg') || 'Transport (€/kg):'}</span>
+                                                        <span className="font-mono text-zinc-700 dark:text-zinc-300">
+                                                            €{Number(draftCommercials.transportPricePerKg).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <div className="text-[10px] text-zinc-500 italic pt-1 border-t border-zinc-200/40 dark:border-zinc-800/40">
+                                                    {t('quoteReview.vendorDisclaimer') || 'Price resolved from evidence document.'}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-[11px] text-zinc-400 m-0 py-1">
+                                                {t('pricing.review.noVariantSelected') || 'No variant selected yet. Pick an offer variant from the card.'}
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Section 3: Solver Proposal & Calibration Status */}
+                            <div className="bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-xl p-3.5 space-y-2">
+                                <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-1.5">
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <Sparkles size={13} className="text-[#dc0000]" />
+                                        <span>{t('pricing.review.calibrationProposal') || 'Calibration Proposal'}</span>
+                                    </span>
+                                    {activeRun ? (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            isAccepted 
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' 
+                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                        }`}>
+                                            {isAccepted ? (t('pricing.solver.accepted') || 'Accepted') : (t(`pricing.solver.${(activeRun.status || 'CALCULATED').toLowerCase()}`) || activeRun.status || 'Calculated')}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] text-zinc-400">
+                                            {t('pricing.solver.awaitingSolver') || 'Awaiting Solver'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {activeRun ? (
+                                    <div className="space-y-1 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-zinc-500">{t('pricing.solver.predictedPrice') || 'Predicted Price:'}</span>
+                                            <strong className="font-mono text-zinc-900 dark:text-white">
+                                                €{Number(activeRun.enginePriceAfter ?? activeRun.predicted_manufacturing_price ?? 0).toFixed(2)}
+                                            </strong>
+                                        </div>
+                                        <div className="flex justify-between text-[11px]">
+                                            <span className="text-zinc-500">{t('pricing.solver.residual') || 'Residual:'}</span>
+                                            <strong className="font-mono text-zinc-700 dark:text-zinc-300">
+                                                €{Number(activeRun.absoluteResidual ?? activeRun.absolute_residual ?? 0).toFixed(2)}
+                                            </strong>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-zinc-400 m-0 py-1">
+                                        {t('pricing.review.noProposalYet') || 'No solver proposal generated yet. Proceed to Step 4 to calibrate.'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <CalibrationConversation
-                        messages={messages}
-                        onSendMessage={onSendMessage}
-                        sending={sendingChat}
-                        activeProposal={activeProposal}
-                        onApplyProposal={async (proposal) => {
-                            await onApplyProposal(proposal);
-                            setStep(2);
-                        }}
-                        onApplyClarifications={onApplyClarifications}
-                        aiUnavailable={aiUnavailable}
-                    />
-
-                    <div className="flex justify-end pt-2">
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-500">
+                                {draftSpec.copies ? `${draftSpec.copies} copies extracted` : 'Describe job or upload PDF'}
+                            </span>
+                            {/* Drawer trigger when xl summary pane is hidden */}
+                            <button
+                                type="button"
+                                onClick={() => setIsDetailDrawerOpen(true)}
+                                className="xl:hidden px-2.5 py-1 text-xs font-semibold rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                                <Calculator size={13} className="text-[#dc0000]" />
+                                <span>Review details</span>
+                            </button>
+                        </div>
                         <button
                             type="button"
                             onClick={() => setStep(2)}
                             disabled={!draftSpec.copies}
-                            className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
+                            className="px-5 py-2 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed cursor-pointer"
                         >
                             <span>Continue to Review</span>
                             <ArrowRight size={14} />
                         </button>
                     </div>
+
+                    {/* Review Details Drawer */}
+                    <SetupDrawer
+                        isOpen={isDetailDrawerOpen}
+                        onClose={() => setIsDetailDrawerOpen(false)}
+                        title={t('pricing.calibration.drawerTitle') || 'Current Specification & Extracted Details'}
+                        subtitle={t('pricing.calibration.drawerSubtitle') || 'Review parameters extracted by the assistant or attached PDF.'}
+                        widthClass="max-w-md"
+                    >
+                        <div className="space-y-4 text-xs">
+                            {draftSpec.copies ? (
+                                <div className="space-y-2.5">
+                                    <div className="flex justify-between py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                        <span className="text-zinc-500">Quantity:</span>
+                                        <strong className="text-zinc-900 dark:text-white font-mono">{draftSpec.copies} copies</strong>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                        <span className="text-zinc-500">Trim Size:</span>
+                                        <strong className="text-zinc-900 dark:text-white">{draftSpec.book_width_mm || '—'} × {draftSpec.book_height_mm || '—'} mm</strong>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                        <span className="text-zinc-500">Interior Pages:</span>
+                                        <strong className="text-zinc-900 dark:text-white">{draftSpec.interior_pages || '—'} pages ({draftSpec.interior_print || '4/4'})</strong>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                        <span className="text-zinc-500">Interior Paper:</span>
+                                        <strong className="text-zinc-900 dark:text-white">{draftSpec.paper_weight_interior || ''}g {draftSpec.paper_type_interior || '—'}</strong>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                        <span className="text-zinc-500">Binding:</span>
+                                        <strong className="text-zinc-900 dark:text-white capitalize">{draftSpec.binding_method || '—'}</strong>
+                                    </div>
+                                    {draftCommercials.targetManufacturingPrice && (
+                                        <div className="flex justify-between py-1.5 text-emerald-600 dark:text-emerald-400 font-bold border-b border-zinc-200/60 dark:border-zinc-800/60">
+                                            <span>Manufacturing Target:</span>
+                                            <span className="font-mono">€{Number(draftCommercials.targetManufacturingPrice).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDetailDrawerOpen(false);
+                                            setStep(2);
+                                        }}
+                                        className="w-full mt-3 py-2 px-3 bg-[#dc0000] hover:bg-[#b00000] text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                                    >
+                                        <Edit3 size={13} />
+                                        <span>{t('pricing.calibration.editFullSpec') || 'Edit Full Specification'}</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center text-zinc-500">
+                                    {t('pricing.calibration.noSpecsYet') || 'No specifications entered yet. Describe a book or attach a PDF quote to begin.'}
+                                </div>
+                            )}
+                        </div>
+                    </SetupDrawer>
                 </div>
             )}
 
@@ -622,7 +866,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <button
                             type="button"
                             onClick={async () => {
-                                const readySession = await onMarkReady();
+                                const readySession: any = await onMarkReady();
                                 if (readySession && (readySession.status === 'READY' || readySession.status === 'DRAFT' || readySession.status === 'CALCULATED')) {
                                     setStep(4);
                                 } else {

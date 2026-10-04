@@ -8,6 +8,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet">
     <title>PrintPrice OS | Control Plane</title>
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('ppos-theme') || 'dark';
+          if (t === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#0e0e0f';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.backgroundColor = '#ffffff';
+          }
+          var d = localStorage.getItem('ppos-density') || 'comfortable';
+          document.documentElement.setAttribute('data-density', d);
+          var a = localStorage.getItem('ppos-animations');
+          var red = (a === 'false') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+          if (red) {
+            document.documentElement.setAttribute('data-reduced-motion', 'true');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/ui/index.tsx"></script>
   </head>
   <body class="h-full">

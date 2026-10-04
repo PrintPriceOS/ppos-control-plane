@@ -30,7 +30,7 @@ const finalizeTenantVerification = async (req, res, next) => {
         return res.status(401).json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
     }
 
-    const allowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN'];
+    const allowedRoles = ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'SUPER_ADMIN', 'TENANT_ADMIN'];
     if (!allowedRoles.includes(req.user.role)) {
         return res.status(403).json({ error: 'FORBIDDEN: Invalid role' });
     }
@@ -831,6 +831,10 @@ const routeRuleService = require('../services/printhouseRouteRuleService');
 
 // POST /api/printhouse/onboarding/pricing/route-rules — Create governed route rule
 router.post('/pricing/route-rules', requireAuth, wrapHandler(async (req, res) => {
+    const writeAllowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN', 'TENANT_ADMIN'];
+    if (!req.user || !writeAllowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ ok: false, error: { code: 'FORBIDDEN', message: 'Administrative role required to create route rules.' } });
+    }
     const tenantId = req.user.tenantId;
     const printhouseId = req.body.printhouseId || req.body.printerNodeId || 'node-default-1';
     const actor = { id: req.user.id, email: req.user.email, role: req.user.role };

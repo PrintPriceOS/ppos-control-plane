@@ -5,8 +5,9 @@
  * Strict invariant: Calls only 193D POST /calibrations/:id/accept with { runId }.
  * Never sends client-crafted rates, patches, or checksums.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ShieldCheck, AlertTriangle, CheckCircle, X, Loader2, ArrowRight } from 'lucide-react';
+import { useLocale } from '../../../../i18n';
 
 interface CalibrationAcceptanceModalProps {
     isOpen: boolean;
@@ -33,10 +34,58 @@ export const CalibrationAcceptanceModal: React.FC<CalibrationAcceptanceModalProp
     residual,
     error
 }) => {
+    const { t } = useLocale();
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const modalRef = useRef<HTMLDivElement | null>(null);
+    const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            previousFocusRef.current = document.activeElement as HTMLElement;
+            // Set initial focus to confirm button or modal container
+            setTimeout(() => {
+                confirmButtonRef.current?.focus();
+            }, 0);
+
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && !accepting) {
+                    onClose();
+                    return;
+                }
+
+                if (e.key === 'Tab' && modalRef.current) {
+                    const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    );
+                    if (focusables.length === 0) return;
+                    const firstEl = focusables[0];
+                    const lastEl = focusables[focusables.length - 1];
+
+                    if (e.shiftKey) {
+                        if (document.activeElement === firstEl) {
+                            e.preventDefault();
+                            lastEl.focus();
+                        }
+                    } else {
+                        if (document.activeElement === lastEl) {
+                            e.preventDefault();
+                            firstEl.focus();
+                        }
+                    }
+                }
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => {
+                window.removeEventListener('keydown', handleKeyDown);
+                previousFocusRef.current?.focus?.();
+            };
+        }
+    }, [isOpen, onClose, accepting]);
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div ref={modalRef} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="acceptance-modal-title">
             <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -45,11 +94,11 @@ export const CalibrationAcceptanceModal: React.FC<CalibrationAcceptanceModalProp
                             <ShieldCheck size={18} />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                                Confirm Governed Acceptance
+                            <h3 id="acceptance-modal-title" className="text-base font-bold text-zinc-900 dark:text-white">
+                                {t('pricing.acceptance.modalTitle') || 'Confirm Governed Acceptance'}
                             </h3>
                             <p className="text-xs text-zinc-500 m-0">
-                                Apply calibrated rate card to production node
+                                {t('pricing.acceptance.modalSubtitle') || 'Apply calibrated rate card to production node'}
                             </p>
                         </div>
                     </div>
@@ -57,7 +106,8 @@ export const CalibrationAcceptanceModal: React.FC<CalibrationAcceptanceModalProp
                         type="button"
                         onClick={onClose}
                         disabled={accepting}
-                        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        aria-label={t('pricing.acceptance.closeModal') || 'Close modal'}
+                        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#dc0000]"
                     >
                         <X size={18} />
                     </button>
@@ -67,32 +117,32 @@ export const CalibrationAcceptanceModal: React.FC<CalibrationAcceptanceModalProp
                 <div className="space-y-3 text-xs">
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl space-y-2 border border-zinc-200 dark:border-zinc-800">
                         <div className="flex justify-between">
-                            <span className="text-zinc-500">Target Production Node:</span>
+                            <span className="text-zinc-500">{t('pricing.acceptance.targetNode') || 'Target Production Node:'}</span>
                             <span className="font-bold text-zinc-900 dark:text-white">{nodeName}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-zinc-500">Reference Book:</span>
+                            <span className="text-zinc-500">{t('pricing.acceptance.referenceBook') || 'Reference Book:'}</span>
                             <span className="font-bold text-zinc-900 dark:text-white">{bookName || 'Reference Book'}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-zinc-500">Declared Manufacturing Target:</span>
+                            <span className="text-zinc-500">{t('pricing.acceptance.declaredTarget') || 'Declared Manufacturing Target:'}</span>
                             <span className="font-mono font-bold text-zinc-900 dark:text-white">{targetPrice.toFixed(2)} EUR</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-zinc-500">Calibrated Forward Price:</span>
+                            <span className="text-zinc-500">{t('pricing.acceptance.calibratedPrice') || 'Calibrated Forward Price:'}</span>
                             <span className="font-mono font-bold text-emerald-600">{predictedPrice.toFixed(2)} EUR</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-zinc-500">Solver Residual:</span>
+                            <span className="text-zinc-500">{t('pricing.acceptance.solverResidual') || 'Solver Residual:'}</span>
                             <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">{residual.toFixed(2)} EUR</span>
                         </div>
                     </div>
 
                     {/* Governance Notice */}
                     <div className="p-3 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-xl text-blue-900 dark:text-blue-200 space-y-1.5">
-                        <span className="font-bold block">Immutable Pricing Revision Creation</span>
+                        <span className="font-bold block">{t('pricing.acceptance.immutableTitle') || 'Immutable Pricing Revision Creation'}</span>
                         <p className="m-0 text-[11px] leading-relaxed opacity-90">
-                            Accepting will atomically verify baseline integrity, update active production rate cards for this node, and record an immutable pricing revision in the audit ledger.
+                            {t('pricing.acceptance.immutableDesc') || 'Accepting will atomically verify baseline integrity, update active production rate cards for this node, and record an immutable pricing revision in the audit ledger.'}
                         </p>
                     </div>
 
@@ -111,25 +161,26 @@ export const CalibrationAcceptanceModal: React.FC<CalibrationAcceptanceModalProp
                         type="button"
                         onClick={onClose}
                         disabled={accepting}
-                        className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                        className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#dc0000]"
                     >
-                        Cancel
+                        {t('cancel') || 'Cancel'}
                     </button>
                     <button
+                        ref={confirmButtonRef}
                         type="button"
                         onClick={onConfirm}
                         disabled={accepting}
-                        className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-400 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                        className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-400 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]"
                     >
                         {accepting ? (
                             <>
                                 <Loader2 size={13} className="animate-spin" />
-                                <span>Applying Revision...</span>
+                                <span>{t('pricing.acceptance.applying') || 'Applying Revision...'}</span>
                             </>
                         ) : (
                             <>
                                 <CheckCircle size={13} />
-                                <span>Accept Pricing Revision</span>
+                                <span>{t('pricing.acceptance.acceptBtn') || 'Accept Pricing Revision'}</span>
                             </>
                         )}
                     </button>

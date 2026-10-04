@@ -913,13 +913,28 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
         let selectedOffer = null;
 
         if (selectedVariantId !== null && selectedVariantId !== undefined && selectedVariantId !== '') {
-            selectedOffer = offers.find((off, idx) =>
+            // 1. Exact canonical ID or name match FIRST (matches drawer resolution priority)
+            selectedOffer = offers.find((off) =>
                 off.variantId === selectedVariantId ||
-                off.variantName === selectedVariantId ||
-                `variant-${idx}` === selectedVariantId ||
-                String(idx) === String(selectedVariantId) ||
-                off.id === selectedVariantId
+                off.id === selectedVariantId ||
+                off.variantName === selectedVariantId
             ) || null;
+
+            // 2. Positional fallback ONLY if no exact canonical ID matched
+            if (!selectedOffer) {
+                const idxMatch = String(selectedVariantId).match(/^variant-(\d+)$/);
+                if (idxMatch) {
+                    const targetIdx = parseInt(idxMatch[1], 10);
+                    if (targetIdx >= 0 && targetIdx < offers.length) {
+                        selectedOffer = offers[targetIdx];
+                    }
+                } else if (/^\d+$/.test(String(selectedVariantId))) {
+                    const targetIdx = parseInt(String(selectedVariantId), 10);
+                    if (targetIdx >= 0 && targetIdx < offers.length) {
+                        selectedOffer = offers[targetIdx];
+                    }
+                }
+            }
 
             if (!selectedOffer && offers.length > 0) {
                 const err = new Error(`QUOTE_VARIANT_NOT_FOUND: Variant '${selectedVariantId}' not found in evidence document`);

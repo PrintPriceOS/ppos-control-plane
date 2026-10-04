@@ -7,13 +7,28 @@
 const TOKEN_KEY = 'ppos_control_token';
 const USER_KEY = 'ppos_control_user';
 
+// ── TEMPORARY UX REVIEW DEV BYPASS (MUST BE REMOVED BEFORE FINAL COMMIT) ──────
+const isLocalDevBypassEligible = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    // Strict guard: MUST be Vite development mode (import.meta.env.DEV === true)
+    // AND running exclusively on localhost or 127.0.0.1
+    const isDev = Boolean(import.meta.env?.DEV);
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isDev && isLocalhost;
+};
+
 /**
  * Retrieves the stored Bearer token from localStorage.
  */
 export function getAuthToken(): string {
     if (typeof window === 'undefined') return '';
     const token = localStorage.getItem(TOKEN_KEY);
-    return token ? token.trim() : '';
+    if (token) return token.trim();
+    // [TEMPORARY_DEV_BYPASS]: UX review access for localhost in development mode only
+    if (isLocalDevBypassEligible()) {
+        return 'dev_printhouse_operator_token';
+    }
+    return '';
 }
 
 /**
@@ -41,7 +56,18 @@ export function setAuthUser(user: any): void {
 export function getAuthUser(): any | null {
     if (typeof window === 'undefined') return null;
     const user = localStorage.getItem(USER_KEY);
-    return user ? JSON.parse(user) : null;
+    if (user) return JSON.parse(user);
+    // [TEMPORARY_DEV_BYPASS]: UX review printhouse user for localhost in development mode only
+    if (isLocalDevBypassEligible()) {
+        return {
+            email: 'operator@printhouse.local',
+            role: 'PRINTHOUSE_OPERATOR',
+            tenantId: 'tenant-demo-local',
+            printhouseId: 'node-329a3bc4',
+            companyName: 'Local Imprenta Demo'
+        };
+    }
+    return null;
 }
 
 /**

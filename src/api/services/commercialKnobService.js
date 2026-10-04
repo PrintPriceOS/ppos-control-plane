@@ -76,6 +76,13 @@ class CommercialKnobService {
         return computeRatesChecksum(ratesObj);
     }
 
+    computePatchChecksum(adjustmentsObj) {
+        if (!adjustmentsObj || typeof adjustmentsObj !== 'object') return 'sha256:0000000000000000';
+        const sanitized = this.sanitizeAdjustments(adjustmentsObj);
+        const canonical = canonicalStringify(sanitized);
+        return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
+    }
+
     /**
      * Sanitizes and bounds input adjustments to prevent invalid or out-of-bound values.
      */

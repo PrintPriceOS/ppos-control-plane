@@ -54,6 +54,8 @@ async function fetchSourceSafely(queryStr, params) {
     }
 }
 
+const { resolveActorContext } = require('../middleware/auth');
+
 /**
  * GET /api/admin/audit
  */
@@ -68,10 +70,25 @@ router.get('/', async (req, res) => {
         severity
     } = req.query;
 
+    const context = resolveActorContext(req);
+    // Strict Tenant Boundary Isolation:
+    // If user is not SUPER_ADMIN, they can ONLY access their own tenant's audit trail.
+    // Querying another tenant or omitting tenant does not bypass their effective tenant.
+    let effectiveTenant = tenant;
+    if (!context.isSuperAdmin) {
+        if (!context.tenantId) {
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN: Tenant context required to query audit logs' });
+        }
+        if (tenant && tenant !== context.tenantId) {
+            return res.status(403).json({ ok: false, error: 'FORBIDDEN: Cross-tenant audit log access denied' });
+        }
+        effectiveTenant = context.tenantId;
+    }
+
     let apiWhere = "1=1";
     const apiParams = [];
 
-    if (tenant) { apiWhere += " AND tenant_id = ?"; apiParams.push(tenant); }
+    if (effectiveTenant) { apiWhere += " AND tenant_id = ?"; apiParams.push(effectiveTenant); }
     if (event_type) { apiWhere += " AND event_type LIKE ?"; apiParams.push(`%${event_type}%`); }
     // Add logic to search inside JSON for actor/entity if strictly needed,
     // or we can do post-filtering for complex logic.

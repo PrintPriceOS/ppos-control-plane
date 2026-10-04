@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminFetch } from '../../lib/adminApi';
 import { toDisplayText } from '../../lib/display';
+import { useLocale } from '../../i18n';
 
 interface Dispatch {
   id: string;
@@ -39,6 +40,7 @@ interface Package {
 }
 
 export const IncomingJobsPage: React.FC = () => {
+  const { t } = useLocale();
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [packages, setPackages] = useState<Record<string, Package>>({});
   const [loading, setLoading] = useState(true);
@@ -51,39 +53,65 @@ export const IncomingJobsPage: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Fetch dispatches
+      // Fetch dispatches handling data, empty array, invalid payload, and error responses
       const dData = await adminFetch<any>('/api/admin/manufacturing/dispatches');
       
-      if (dData.ok) {
-        setDispatches(dData.dispatches);
+      if (!dData || typeof dData !== 'object') {
+        setDispatches([]);
+        setError(t('jobs.invalidPayload') || 'Invalid manufacturing payload received from server');
+        return;
+      }
+
+      if (dData.ok === false) {
+        setDispatches([]);
+        setError(dData.error?.message || t('jobs.errorTitle') || 'Failed to fetch dispatches');
+        return;
+      }
+
+      if (dData.ok === true) {
+        if (!Array.isArray(dData.dispatches)) {
+          setDispatches([]);
+          setError(t('jobs.invalidPayload') || 'Invalid manufacturing payload received from server');
+          return;
+        }
+
+        const rawDispatches = dData.dispatches;
+        setDispatches(rawDispatches);
         
         // Fetch linked packages safely, skipping validation seeds to prevent 404s
-        const rawPackageIds = dData.dispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id);
+        const rawPackageIds = rawDispatches.map((d: any) => d.manufacturing_package_id || d.production_package_id);
         const validPids = [...new Set(rawPackageIds)].filter(id => {
           if (!id || id === 'undefined') return false;
-          if (id.startsWith('TEST-JOB-')) return false;
+          if (typeof id === 'string' && id.startsWith('TEST-JOB-')) return false;
           // Also skip if any dispatch pointing to this ID is explicitly a seed
-          const isAssociatedSeed = dData.dispatches.some((d: any) => 
+          const isAssociatedSeed = rawDispatches.some((d: any) => 
             (d.manufacturing_package_id === id || d.production_package_id === id) &&
-            (d.job_id?.startsWith('TEST-JOB-') || d.isSeed)
+            ((typeof d.job_id === 'string' && d.job_id.startsWith('TEST-JOB-')) || d.isSeed)
           );
           return !isAssociatedSeed;
         }) as string[];
         const pkgMap: Record<string, Package> = {};
         
         for (const pid of validPids) {
-          const pData = await adminFetch<any>(`/api/admin/manufacturing/packages/${pid}`);
-          if (pData?.ok && pData.package) {
-            pkgMap[pid] = pData.package;
+          try {
+            const pData = await adminFetch<any>(`/api/admin/manufacturing/packages/${pid}`);
+            if (pData?.ok && pData.package) {
+              pkgMap[pid] = pData.package;
+            }
+          } catch (pErr) {
+            console.warn(`Could not sync linked package ${pid}:`, pErr);
           }
         }
         setPackages(pkgMap);
       } else {
-        setError(dData.error?.message || 'Failed to fetch dispatches');
+        setDispatches([]);
+        setError(t('jobs.invalidPayload') || 'Invalid manufacturing payload received from server');
       }
     } catch (err: any) {
-      setError(err.message);
+      setDispatches([]);
+      setError(err.message || 'Error communicating with manufacturing dispatch service');
     } finally {
       setLoading(false);
     }
@@ -134,20 +162,30 @@ export const IncomingJobsPage: React.FC = () => {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px] bg-slate-50 dark:bg-zinc-950">
         <div className="animate-spin rounded-none h-12 w-12 border-b-2 border-red-600 dark:border-red-500"></div>
-        <p className="mt-4 text-slate-500 dark:text-zinc-400 font-medium animate-pulse">Syncing manufacturing pipeline...</p>
+        <p className="mt-4 text-slate-500 dark:text-zinc-400 font-medium animate-pulse">{t('jobs.syncing') || 'Syncing manufacturing pipeline...'}</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-8 bg-slate-50 dark:bg-zinc-950 h-full">
-        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-none p-6 flex items-center gap-4">
-          <ExclamationTriangleIcon className="h-8 w-8 text-red-500 dark:text-red-400" />
-          <div>
-            <h3 className="text-red-800 dark:text-red-300 font-bold uppercase tracking-wider text-sm">Pipeline Error</h3>
-            <p className="text-red-600 dark:text-red-400">{toDisplayText(error)}</p>
+      <div className="p-8 bg-slate-50 dark:bg-zinc-950 h-full flex flex-col justify-start">
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-none p-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <ExclamationTriangleIcon className="h-8 w-8 text-red-500 dark:text-red-400 shrink-0" />
+            <div>
+              <h3 className="text-red-800 dark:text-red-300 font-bold uppercase tracking-wider text-sm">{t('jobs.errorTitle') || 'Pipeline Error'}</h3>
+              <p className="text-red-600 dark:text-red-400 mt-1">{toDisplayText(error)}</p>
+            </div>
           </div>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center gap-2 border border-red-700 cursor-pointer shrink-0"
+            data-testid="manufacturing-retry-btn"
+          >
+            <CogIcon className="h-4 w-4" />
+            {t('jobs.retry') || 'Retry'}
+          </button>
         </div>
       </div>
     );
@@ -161,29 +199,31 @@ export const IncomingJobsPage: React.FC = () => {
       <div className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 p-6 flex justify-between items-center shadow-none">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-zinc-100 tracking-tight flex items-center gap-3">
-            <InboxIcon className="h-8 w-8 text-red-600 dark:text-red-500" />
-            INCOMING MANUFACTURING JOBS
+            <InboxIcon className="h-7 w-7 text-red-600 dark:text-red-500" />
+            {t('jobs.title') || 'Incoming Manufacturing Jobs'}
           </h1>
-          <p className="text-slate-500 dark:text-zinc-500 text-sm font-medium mt-1 uppercase tracking-[0.1em]">Operational Cockpit — Phase 11</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1">
+            {t('jobs.subtitle') || 'Operational Cockpit — Production Dispatch'}
+          </p>
         </div>
         
         <div className="flex gap-2">
           <button 
             onClick={fetchData}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-100 font-mono font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center gap-2 border border-slate-800 dark:border-zinc-700"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-100 font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center gap-2 border border-slate-800 dark:border-zinc-700 cursor-pointer"
           >
             <CogIcon className="h-4 w-4" />
-            REFRESH
+            {t('jobs.refresh') || 'Refresh'}
           </button>
         </div>
       </div>
 
       {/* Stats Bar */}
       <div className="grid grid-cols-4 border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <StatCard title="Pending" value={dispatches.filter(d => d.status === 'SENT').length} color="red" />
-        <StatCard title="Active" value={dispatches.filter(d => d.status === 'ACCEPTED').length} color="emerald" />
-        <StatCard title="Rejected" value={dispatches.filter(d => d.status === 'REJECTED').length} color="rose" />
-        <StatCard title="Expired" value={dispatches.filter(d => d.status === 'EXPIRED').length} color="amber" />
+        <StatCard title={t('jobs.statPending') || 'Pending'} value={dispatches.filter(d => d.status === 'SENT').length} color="red" />
+        <StatCard title={t('jobs.statActive') || 'Active'} value={dispatches.filter(d => d.status === 'ACCEPTED').length} color="emerald" />
+        <StatCard title={t('jobs.statRejected') || 'Rejected'} value={dispatches.filter(d => d.status === 'REJECTED').length} color="rose" />
+        <StatCard title={t('jobs.statExpired') || 'Expired'} value={dispatches.filter(d => d.status === 'EXPIRED').length} color="amber" />
       </div>
 
       {/* Content */}
@@ -192,11 +232,11 @@ export const IncomingJobsPage: React.FC = () => {
           <table className="w-full text-sm text-left border-collapse text-slate-700 dark:text-zinc-300">
             <thead className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-500 uppercase tracking-wide">
               <tr>
-                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">Job Identity</th>
-                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">Specs &amp; Policy</th>
-                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">Customer</th>
-                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">Status</th>
-                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest text-right">Actions</th>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">{t('jobs.thIdentity') || 'Job Identity'}</th>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">{t('jobs.thSpecs') || 'Specs & Policy'}</th>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">{t('jobs.thCustomer') || 'Customer'}</th>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest">{t('jobs.thStatus') || 'Status'}</th>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-widest text-right">{t('jobs.thActions') || 'Actions'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
@@ -237,9 +277,9 @@ export const IncomingJobsPage: React.FC = () => {
                         </div>
                       ) : (
                         (pkgId?.startsWith('TEST-JOB-') || dispatch.job_id?.startsWith('TEST-JOB-') || dispatch.isSeed) ? (
-                          <span className="text-xs text-amber-600 dark:text-amber-400 font-bold italic">Validation seed — no production package</span>
+                          <span className="text-xs text-amber-600 dark:text-amber-400 font-bold italic">{t('jobs.validationSeed') || 'Validation seed — no production package'}</span>
                         ) : (
-                          <span className="text-xs text-slate-400 dark:text-zinc-500 italic">Syncing package data...</span>
+                          <span className="text-xs text-slate-400 dark:text-zinc-500 italic">{t('jobs.syncingPackage') || 'Syncing package data...'}</span>
                         )
                       )}
                     </td>
@@ -253,8 +293,8 @@ export const IncomingJobsPage: React.FC = () => {
                       <div className="flex justify-end gap-2 items-center">
                         <button 
                           onClick={() => downloadBundle(dispatch.manufacturing_package_id || dispatch.production_package_id)}
-                          className="p-2 bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-100 border border-slate-200 dark:border-zinc-700 rounded-none transition-colors"
-                          title="Download Bundle"
+                          className="p-2 bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-100 border border-slate-200 dark:border-zinc-700 rounded-none transition-colors cursor-pointer"
+                          title={t('jobs.downloadBundle') || 'Download Bundle'}
                         >
                           <ArrowDownTrayIcon className="h-4 w-4" />
                         </button>
@@ -263,15 +303,15 @@ export const IncomingJobsPage: React.FC = () => {
                           <>
                             <button 
                               onClick={() => handleAction(dispatch.id, 'accept')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none cursor-pointer"
                             >
-                              Accept
+                              {t('jobs.actionAccept') || 'Accept'}
                             </button>
                             <button 
                               onClick={() => handleAction(dispatch.id, 'reject')}
-                              className="px-3 py-1.5 bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none hover:bg-rose-50 dark:hover:bg-zinc-700"
+                              className="px-3 py-1.5 bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none hover:bg-rose-50 dark:hover:bg-zinc-700 cursor-pointer"
                             >
-                              Reject
+                              {t('jobs.actionReject') || 'Reject'}
                             </button>
                           </>
                         )}
@@ -281,23 +321,23 @@ export const IncomingJobsPage: React.FC = () => {
                             {pkg?.status === 'ACCEPTED_BY_PRINTER' && (
                               <button 
                                 onClick={() => handleAction(dispatch.id, 'IN_PRODUCTION')}
-                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none"
+                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none cursor-pointer"
                               >
-                                Start Production
+                                {t('jobs.actionStartProduction') || 'Start Production'}
                               </button>
                             )}
                             {pkg?.status === 'IN_PRODUCTION' && (
                               <button 
                                 onClick={() => handleAction(dispatch.id, 'COMPLETED')}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none"
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-none text-[10px] font-black uppercase tracking-widest transition-all shadow-none cursor-pointer"
                               >
-                                Complete
+                                {t('jobs.actionComplete') || 'Complete'}
                               </button>
                             )}
                             {pkg?.status === 'COMPLETED' && (
                               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-green-950/40 text-emerald-700 dark:text-green-400 border border-emerald-100 dark:border-green-900/60 rounded-none text-[10px] font-black uppercase tracking-widest">
                                 <CheckCircleIcon className="h-4 w-4" />
-                                Finished
+                                {t('jobs.statusFinished') || 'Finished'}
                               </div>
                             )}
                             {pkg?.status !== 'COMPLETED' && (
@@ -317,7 +357,7 @@ export const IncomingJobsPage: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="p-20 text-center">
                     <InboxIcon className="h-12 w-12 text-slate-200 dark:text-zinc-700 mx-auto" />
-                    <p className="mt-4 text-slate-400 dark:text-zinc-500 font-black uppercase tracking-[0.2em] text-sm italic">No Incoming Jobs Found</p>
+                    <p className="mt-4 text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider text-sm">{t('jobs.emptyTitle') || 'No Incoming Jobs Found'}</p>
                   </td>
                 </tr>
               )}

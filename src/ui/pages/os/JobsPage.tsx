@@ -6,8 +6,10 @@ import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
 import { short } from "../../lib/formatters";
 import { safeArray } from "../../lib/display";
+import { useLocale } from "../../i18n";
 
 export const JobsPage: React.FC = () => {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
@@ -53,8 +55,12 @@ export const JobsPage: React.FC = () => {
       {/* High-Density Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Incoming Jobs & Pipeline Console</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Authoritative ingress telemetry tracking validated preflight payloads and autofix operations.</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-zinc-100 tracking-tight">
+            {t('jobs.title') || 'Incoming Manufacturing Jobs'}
+          </h1>
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1">
+            {t('jobs.subtitle') || 'Operational Cockpit — Production Dispatch'}
+          </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 flex-wrap">
           <span>Active Pipes: <strong className="text-zinc-900 dark:text-zinc-200">{activePipesCount}</strong></span>

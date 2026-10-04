@@ -1057,7 +1057,7 @@ class CalibrationAcceptanceService {
             const [existingActiveRev] = await connection.query(
                 `SELECT id, rates_checksum, created_at
                  FROM printhouse_pricing_revisions
-                 WHERE tenant_id = ? AND printer_node_id = ? AND rates_checksum = ? AND source_type = 'COMMERCIAL_KNOB_CALIBRATION'
+                 WHERE tenant_id = ? AND printer_node_id = ? AND rates_checksum = ? AND source_type IN ('CALIBRATION_ACCEPTANCE', 'MANUAL_EDIT', 'COMMERCIAL_KNOB_CALIBRATION')
                  ORDER BY created_at DESC, id DESC
                  LIMIT 1`,
                 [tenantId, printerNodeId, candidateRatesChecksum]
@@ -1137,6 +1137,129 @@ class CalibrationAcceptanceService {
             // 7. ATOMIC DATABASE MUTATIONS
             const revisionId = `prev-${uuidv4().substring(0, 8)}`;
             const acceptanceId = `pacc-${uuidv4().substring(0, 8)}`;
+            let sessionId = params.calibration_session_id || params.calibrationSessionId || params.sessionId || null;
+            let runId = params.calibration_run_id || params.calibrationRunId || params.runId || null;
+
+            if (calibrationMode === 'EVIDENCE_CALIBRATED') {
+                sessionId = sessionId || quoteEvidence?.sessionId || quoteEvidence?.calibration_session_id || null;
+                runId = runId || quoteEvidence?.runId || quoteEvidence?.calibration_run_id || null;
+
+                if (!sessionId || !runId) {
+                    const err = new Error('MISSING_CALIBRATION_PROVENANCE');
+                    err.code = 'MISSING_CALIBRATION_PROVENANCE';
+                    err.statusCode = 422;
+                    err.details = 'Both calibration_session_id and calibration_run_id are required for EVIDENCE_CALIBRATED mode.';
+                    throw err;
+                }
+            }
+
+            // PROVENANCE PAIR COHERENCE: If either sessionId or runId is provided, BOTH must be provided
+            if ((sessionId && !runId) || (!sessionId && runId)) {
+                const err = new Error('MISSING_CALIBRATION_PROVENANCE');
+                err.code = 'MISSING_CALIBRATION_PROVENANCE';
+                err.statusCode = 422;
+                err.details = 'Both calibration_session_id and calibration_run_id must be provided together as a coherent pair.';
+                throw err;
+            }
+
+            // SERVER-SIDE PROVENANCE VALIDATION (When session and run IDs are supplied)
+            if (sessionId && runId) {
+                const [sessionRows] = await connection.query(
+                    `SELECT id, tenant_id, printer_node_id, status FROM printhouse_pricing_calibration_sessions WHERE id = ?`,
+                    [sessionId]
+                );
+                if (!sessionRows || sessionRows.length === 0) {
+                    const err = new Error('CALIBRATION_SESSION_NOT_FOUND');
+                    err.code = 'CALIBRATION_SESSION_NOT_FOUND';
+                    err.statusCode = 404;
+                    err.details = `Calibration session ${sessionId} does not exist.`;
+                    throw err;
+                }
+                const calSession = sessionRows[0];
+                if (calSession.tenant_id !== tenantId) {
+                    const err = new Error('TENANT_MISMATCH');
+                    err.code = 'TENANT_MISMATCH';
+                    err.statusCode = 403;
+                    err.details = `Calibration session ${sessionId} belongs to tenant ${calSession.tenant_id}, not requesting tenant ${tenantId}.`;
+                    throw err;
+                }
+                if (calSession.printer_node_id !== printerNodeId) {
+                    const err = new Error('PRINTER_NODE_MISMATCH');
+                    err.code = 'PRINTER_NODE_MISMATCH';
+                    err.statusCode = 400;
+                    err.details = `Calibration session ${sessionId} belongs to printer node ${calSession.printer_node_id}, not requesting node ${printerNodeId}.`;
+                    throw err;
+                }
+
+                const [runRows] = await connection.query(
+                    `SELECT id, calibration_session_id, tenant_id, printer_node_id, status FROM printhouse_pricing_calibration_runs WHERE id = ?`,
+                    [runId]
+                );
+                if (!runRows || runRows.length === 0) {
+                    const err = new Error('CALIBRATION_RUN_NOT_FOUND');
+                    err.code = 'CALIBRATION_RUN_NOT_FOUND';
+                    err.statusCode = 404;
+                    err.details = `Calibration run ${runId} does not exist.`;
+                    throw err;
+                }
+                const calRun = runRows[0];
+                if (calRun.calibration_session_id !== sessionId) {
+                    const err = new Error('CALIBRATION_RUN_SESSION_MISMATCH');
+                    err.code = 'CALIBRATION_RUN_SESSION_MISMATCH';
+                    err.statusCode = 400;
+                    err.details = `Calibration run ${runId} belongs to session ${calRun.calibration_session_id}, not session ${sessionId}.`;
+                    throw err;
+                }
+                const { CANONICAL_ACCEPTABLE_RUN_STATUSES } = require('./calibrationGovernanceTolerances');
+                const validRunStatuses = new Set([...CANONICAL_ACCEPTABLE_RUN_STATUSES, 'COMPLETED', 'COMMERCIAL_CALIBRATED']);
+
+                const runTenant = calRun.tenant_id || calSession.tenant_id;
+                const runNode = calRun.printer_node_id || calSession.printer_node_id;
+
+                if (!runTenant || runTenant !== tenantId) {
+                    const err = new Error('TENANT_MISMATCH');
+                    err.code = 'TENANT_MISMATCH';
+                    err.statusCode = 403;
+                    err.details = `Calibration run ${runId} tenant (${runTenant || 'MISSING'}) does not match requesting tenant ${tenantId}.`;
+                    throw err;
+                }
+                if (!runNode || runNode !== printerNodeId) {
+                    const err = new Error('PRINTER_NODE_MISMATCH');
+                    err.code = 'PRINTER_NODE_MISMATCH';
+                    err.statusCode = 400;
+                    err.details = `Calibration run ${runId} printer node (${runNode || 'MISSING'}) does not match requesting node ${printerNodeId}.`;
+                    throw err;
+                }
+                if (!validRunStatuses.has(calRun.status)) {
+                    const err = new Error('INVALID_CALIBRATION_RUN_STATE');
+                    err.code = 'INVALID_CALIBRATION_RUN_STATE';
+                    err.statusCode = 422;
+                    err.details = `Calibration run ${runId} has invalid status ${calRun.status}. Must be one of: ${Array.from(validRunStatuses).join(', ')}`;
+                    throw err;
+                }
+                const expectedPatchChecksum = commercialKnobService.computePatchChecksum(adjustments);
+                if (calRun.proposed_patch_checksum && calRun.proposed_patch_checksum !== expectedPatchChecksum) {
+                    const err = new Error('PROPOSED_PATCH_CHECKSUM_MISMATCH');
+                    err.code = 'PROPOSED_PATCH_CHECKSUM_MISMATCH';
+                    err.statusCode = 422;
+                    err.details = `Calibration run ${runId} proposed_patch_checksum (${calRun.proposed_patch_checksum}) does not match canonical patch checksum (${expectedPatchChecksum}).`;
+                    throw err;
+                }
+                if (calRun.rate_snapshot_checksum && calRun.rate_snapshot_checksum !== currentBaselineChecksum) {
+                    const err = new Error('RATE_SNAPSHOT_CHECKSUM_MISMATCH');
+                    err.code = 'RATE_SNAPSHOT_CHECKSUM_MISMATCH';
+                    err.statusCode = 409;
+                    err.details = `Calibration run ${runId} rate_snapshot_checksum (${calRun.rate_snapshot_checksum}) does not match current baseline checksum (${currentBaselineChecksum}).`;
+                    throw err;
+                }
+                if (calRun.candidate_rates_checksum && calRun.candidate_rates_checksum !== candidateRatesChecksum) {
+                    const err = new Error('CANDIDATE_CHECKSUM_MISMATCH');
+                    err.code = 'CANDIDATE_CHECKSUM_MISMATCH';
+                    err.statusCode = 422;
+                    err.details = `Calibration run ${runId} candidate_rates_checksum (${calRun.candidate_rates_checksum}) does not match computed candidate rates checksum (${candidateRatesChecksum}).`;
+                    throw err;
+                }
+            }
 
             const actorJson = {
                 id: actor.id || 'operator-1',
@@ -1158,24 +1281,31 @@ class CalibrationAcceptanceService {
                 quoteEvidenceIds: validQuoteEvidenceIds
             };
 
+            const canonicalPatchChecksum = commercialKnobService.computePatchChecksum(adjustments);
+            const sourceType = calibrationMode === 'EVIDENCE_CALIBRATED' ? 'CALIBRATION_ACCEPTANCE' : 'MANUAL_EDIT';
+
             // a. Insert immutable pricing revision
             await connection.query(
                 `INSERT INTO printhouse_pricing_revisions
                  (id, tenant_id, printer_node_id, source_type,
+                  source_calibration_session_id, source_calibration_run_id,
                   parent_revision_id, rates_json, rates_checksum,
                   baseline_rates_checksum, proposed_patch_checksum,
                   engine_package, engine_version, engine_commit, solver_version,
                   created_by_json, created_at)
-                 VALUES (?, ?, ?, 'COMMERCIAL_KNOB_CALIBRATION', ?, ?, ?, ?, ?, ?, ?, ?, '195G_COMMERCIAL_SOLVER', ?, NOW(6))`,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '195G_COMMERCIAL_SOLVER', ?, NOW(6))`,
                 [
                     revisionId,
                     tenantId,
                     printerNodeId,
+                    sourceType,
+                    sessionId,
+                    runId,
                     parentRevisionId,
                     JSON.stringify(candidateRates),
                     candidateRatesChecksum,
                     currentBaselineChecksum,
-                    candidateRatesChecksum,
+                    canonicalPatchChecksum,
                     adapter.enginePackage,
                     adapter.engineVersion,
                     adapter.engineCommit,
@@ -1191,22 +1321,24 @@ class CalibrationAcceptanceService {
                 [JSON.stringify(candidateRates), printerNodeId, tenantId]
             );
 
-            // c. Insert calibration acceptance record
+            // c. Insert calibration acceptance record (with NOT NULL session_id and run_id)
             await connection.query(
                 `INSERT INTO printhouse_pricing_calibration_acceptances
-                 (id, tenant_id, printer_node_id, pricing_revision_id,
+                 (id, tenant_id, printer_node_id, calibration_session_id, calibration_run_id, pricing_revision_id,
                   baseline_checksum, proposed_patch_checksum, resulting_rates_checksum,
                   target_manufacturing_price, verified_manufacturing_price, absolute_residual, percent_residual,
                   acceptance_tolerance_absolute, acceptance_tolerance_percent, effective_acceptance_tolerance,
                   warnings_json, verification_json, curve_acceptance_json, acceptance_mode, accepted_by_json, accepted_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6))`,
                 [
                     acceptanceId,
                     tenantId,
                     printerNodeId,
+                    sessionId,
+                    runId,
                     revisionId,
                     currentBaselineChecksum,
-                    candidateRatesChecksum,
+                    canonicalPatchChecksum,
                     candidateRatesChecksum,
                     previewResult.quantities[0]?.quotedManufacturingPrice || previewResult.quantities[0]?.baselinePrice || 0,
                     previewResult.quantities[0]?.adjustedPrice || 0,
@@ -1220,6 +1352,18 @@ class CalibrationAcceptanceService {
                     JSON.stringify(fitResult),
                     calibrationMode,
                     JSON.stringify(actorJson)
+                ]
+            );
+
+            // d. Write audit log event (canonical api_audit_logs schema)
+            await connection.query(
+                `INSERT INTO api_audit_logs
+                 (event_type, tenant_id, user_id, status, metadata_json, created_at)
+                 VALUES ('COMMERCIAL_KNOB_CALIBRATION_ACCEPTED', ?, ?, 'SUCCESS', ?, NOW(6))`,
+                [
+                    tenantId,
+                    actor.id || null,
+                    JSON.stringify({ acceptanceId, revisionId, printerNodeId, ratesChecksum: candidateRatesChecksum })
                 ]
             );
 
