@@ -313,10 +313,20 @@ router.post('/printhouse/register', async (req, res) => {
     try {
         const { tenantId, printhouseId, user } = await printhouseService.selfRegister(req.body);
 
-        // Auto-login after registration
+        // Auto-login after registration with server session
+        const userSessionService = require('../services/userSessionService');
+        const sessionRecord = await userSessionService.createSession({
+            userId: user.id,
+            tenantId: tenantId,
+            role: (user.role || 'PRINTHOUSE_ADMIN').toUpperCase(),
+            ipAddress: req.ip || req.connection?.remoteAddress,
+            userAgent: req.headers['user-agent']
+        });
+
         const token = jwt.sign(
             {
                 sub: user.id,
+                jti: sessionRecord.sessionId,
                 email: user.email,
                 role: user.role,
                 tenant_id: tenantId,
