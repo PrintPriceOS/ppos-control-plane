@@ -14,47 +14,6 @@ const BACKOFF_DELAYS_MS = [60000, 300000, 900000]; // 1m, 5m, 15m
 
 class OutgoingWebhookService {
 
-    async ensureTablesExist() {
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS webhook_subscriptions (
-                    id VARCHAR(64) PRIMARY KEY,
-                    tenant_id VARCHAR(255) NOT NULL,
-                    url VARCHAR(1024) NOT NULL,
-                    secret VARCHAR(255) NOT NULL,
-                    events_json JSON NOT NULL,
-                    status ENUM('ACTIVE', 'PAUSED', 'DISABLED') NOT NULL DEFAULT 'ACTIVE',
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_webhook_sub_tenant (tenant_id, status)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            `);
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS webhook_deliveries (
-                    id VARCHAR(64) PRIMARY KEY,
-                    tenant_id VARCHAR(255) NOT NULL,
-                    subscription_id VARCHAR(64) NOT NULL,
-                    event_type VARCHAR(100) NOT NULL,
-                    event_id VARCHAR(64) NOT NULL,
-                    payload_json JSON NOT NULL,
-                    signature VARCHAR(128) NOT NULL,
-                    status ENUM('PENDING', 'DELIVERED', 'FAILED', 'EXHAUSTED') NOT NULL DEFAULT 'PENDING',
-                    attempt_count INT NOT NULL DEFAULT 0,
-                    max_attempts INT NOT NULL DEFAULT 3,
-                    next_retry_at DATETIME NULL,
-                    last_status_code INT NULL,
-                    last_error TEXT NULL,
-                    delivered_at DATETIME NULL,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_webhook_del_tenant_status (tenant_id, status),
-                    INDEX idx_webhook_del_retry (status, next_retry_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            `);
-        } catch (err) {
-            logger.warn('Failed to auto-ensure webhook tables', { error: err.message });
-        }
-    }
-
     /**
      * Validates URL against SSRF threats (rejects loopback/private IPs unless explicitly allowed).
      */
@@ -99,7 +58,6 @@ class OutgoingWebhookService {
      * Creates or updates a tenant webhook subscription.
      */
     async createSubscription({ tenantId, url, events = ['*'], status = 'ACTIVE' }) {
-        await this.ensureTablesExist();
 
         const validatedUrl = this.validateTargetUrl(url);
         const subscriptionId = uuidv4();
@@ -125,7 +83,6 @@ class OutgoingWebhookService {
      * Rotates subscription secret key.
      */
     async rotateSecret(subscriptionId, tenantId) {
-        await this.ensureTablesExist();
 
         const newSecret = crypto.randomBytes(32).toString('hex');
         const result = await db.query(
@@ -151,7 +108,6 @@ class OutgoingWebhookService {
      * Enqueues an outgoing webhook event to outbox deliveries.
      */
     async enqueueWebhookEvent({ tenantId, eventType, payload, eventId = null }) {
-        await this.ensureTablesExist();
 
         const actualEventId = eventId || uuidv4();
         const subs = await db.query(
@@ -187,7 +143,6 @@ class OutgoingWebhookService {
      * Dispatches a single pending webhook delivery record over HTTP.
      */
     async deliverSingleWebhook(deliveryId, options = {}) {
-        await this.ensureTablesExist();
 
         const [delivery] = await db.query(
             `SELECT d.id, d.tenant_id, d.subscription_id, d.event_type, d.event_id, d.payload_json, d.signature, d.attempt_count, d.max_attempts,
@@ -271,7 +226,6 @@ class OutgoingWebhookService {
      * Lists tenant subscriptions.
      */
     async listSubscriptions(tenantId) {
-        await this.ensureTablesExist();
         return db.query(`SELECT id, url, events_json, status, created_at, updated_at FROM webhook_subscriptions WHERE tenant_id = ?`, [tenantId]);
     }
 
@@ -279,7 +233,6 @@ class OutgoingWebhookService {
      * Lists recent deliveries.
      */
     async listDeliveries(tenantId) {
-        await this.ensureTablesExist();
         return db.query(
             `SELECT id, subscription_id, event_type, event_id, status, attempt_count, last_status_code, last_error, delivered_at, created_at
              FROM webhook_deliveries WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50`,

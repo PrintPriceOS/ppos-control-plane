@@ -13,39 +13,9 @@ const DEFAULT_ABSOLUTE_HOURS = 24;
 class UserSessionService {
 
     /**
-     * Ensures table exists if migration hasn't run yet.
-     */
-    async ensureTableExists() {
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS user_sessions (
-                    id VARCHAR(64) PRIMARY KEY,
-                    user_id VARCHAR(255) NOT NULL,
-                    tenant_id VARCHAR(255) NOT NULL,
-                    role VARCHAR(64) NOT NULL,
-                    ip_address VARCHAR(64) NULL,
-                    user_agent TEXT NULL,
-                    status ENUM('ACTIVE', 'REVOKED', 'EXPIRED') NOT NULL DEFAULT 'ACTIVE',
-                    last_activity_at DATETIME NOT NULL,
-                    expires_at DATETIME NOT NULL,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    revoked_at DATETIME NULL,
-                    revoked_reason VARCHAR(255) NULL,
-                    INDEX idx_user_sessions_user_tenant (user_id, tenant_id),
-                    INDEX idx_user_sessions_status_exp (status, expires_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            `);
-        } catch (err) {
-            logger.warn('Failed to auto-ensure user_sessions table', { error: err.message });
-        }
-    }
-
-    /**
      * Creates a new trackable server session.
      */
     async createSession({ userId, tenantId, role, ipAddress = null, userAgent = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES, absoluteHours = DEFAULT_ABSOLUTE_HOURS }) {
-        await this.ensureTableExists();
-
         const sessionId = uuidv4();
         const now = new Date();
         const expiresAt = new Date(now.getTime() + (absoluteHours * 60 * 60 * 1000));
@@ -66,28 +36,31 @@ class UserSessionService {
     }
 
     /**
-     * Validates session state, expiry, and inactivity timeout on the server side.
+     * Validates session state, expiry, sub, tenant, and inactivity timeout.
+     * Preserves internal DB errors without hiding them as missing session.
      */
-    async validateSession(sessionId, tenantId = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES) {
+    async validateSession(sessionId, tenantId = null, userId = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES) {
         if (!sessionId) {
             return { valid: false, reason: 'MISSING_SESSION_ID' };
         }
 
         try {
-            await this.ensureTableExists();
-
             let query = `SELECT id, user_id, tenant_id, role, status, last_activity_at, expires_at FROM user_sessions WHERE id = ?`;
             let params = [sessionId];
 
-            if (tenantId) {
-                query += ` AND tenant_id = ?`;
-                params.push(tenantId);
-            }
-
-            const [session] = await db.query(query, params).catch(() => []);
+            const rows = await db.query(query, params);
+            const session = rows && rows[0] ? rows[0] : null;
 
             if (!session) {
                 return { valid: false, reason: 'SESSION_NOT_FOUND' };
+            }
+
+            if (tenantId && session.tenant_id !== tenantId) {
+                return { valid: false, reason: 'SESSION_TENANT_MISMATCH' };
+            }
+
+            if (userId && session.user_id !== userId) {
+                return { valid: false, reason: 'SESSION_USER_MISMATCH' };
             }
 
             if (session.status === 'REVOKED') {
@@ -120,9 +93,13 @@ class UserSessionService {
                 session
             };
         } catch (err) {
-            logger.error('Session validation error', { error: err.message, sessionId });
-            // Fail closed
-            return { valid: false, reason: 'SESSION_VALIDATION_ERROR' };
+            logger.error('Session validation database error', { error: err.message, sessionId, stack: err.stack });
+            return {
+                valid: false,
+                isDbError: true,
+                reason: 'DATABASE_ERROR',
+                internalDiagnostic: `DB_QUERY_FAILED: ${err.message}`
+            };
         }
     }
 
@@ -134,20 +111,56 @@ class UserSessionService {
     }
 
     /**
-     * Revokes a specific session.
+     * Revokes a specific session after checking ownership or administrative role.
+     * Supports both options object { sessionId, tenantId, requestingUserId, requestingUserRole, reason }
+     * and positional arguments (sessionId, tenantId, reason).
      */
-    async revokeSession(sessionId, tenantId = null, reason = 'USER_LOGOUT') {
-        await this.ensureTableExists();
+    async revokeSession(optsOrSessionId, tenantIdParam = null, reasonParam = 'USER_LOGOUT') {
+        let sessionId, tenantId = tenantIdParam, requestingUserId = null, requestingUserRole = null, reason = reasonParam;
+        if (typeof optsOrSessionId === 'object' && optsOrSessionId !== null) {
+            sessionId = optsOrSessionId.sessionId;
+            tenantId = optsOrSessionId.tenantId || tenantId;
+            requestingUserId = optsOrSessionId.requestingUserId || null;
+            requestingUserRole = optsOrSessionId.requestingUserRole || null;
+            reason = optsOrSessionId.reason || reason;
+        } else {
+            sessionId = optsOrSessionId;
+        }
 
-        let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE id = ?`;
-        let params = [reason, sessionId];
+        if (!sessionId) {
+            return { ok: false, code: 'MISSING_SESSION_ID', statusCode: 400, message: 'Session ID is required' };
+        }
 
+        let query = `SELECT id, user_id, tenant_id FROM user_sessions WHERE id = ?`;
+        let params = [sessionId];
         if (tenantId) {
             query += ` AND tenant_id = ?`;
             params.push(tenantId);
         }
 
-        const result = await db.query(query, params);
+        const [session] = await db.query(query, params).catch(() => []);
+        if (!session) {
+            return { ok: false, code: 'SESSION_NOT_FOUND', statusCode: 404, message: 'Session not found' };
+        }
+
+        if (requestingUserId && session.user_id !== requestingUserId) {
+            const role = (requestingUserRole || '').toUpperCase();
+            const isAdmin = role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN' || role === 'ADMIN';
+            if (!isAdmin) {
+                return {
+                    ok: false,
+                    code: 'FORBIDDEN_SESSION_REVOCATION',
+                    statusCode: 403,
+                    message: 'Cannot revoke a session belonging to another user'
+                };
+            }
+        }
+
+        const result = await db.query(
+            `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE id = ?`,
+            [reason, sessionId]
+        );
+
         return { ok: true, affectedRows: result.affectedRows || 0 };
     }
 
@@ -155,8 +168,6 @@ class UserSessionService {
      * Revokes all active sessions for a user.
      */
     async revokeAllUserSessions(userId, tenantId = null, reason = 'REVOKE_ALL') {
-        await this.ensureTableExists();
-
         let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE user_id = ? AND status = 'ACTIVE'`;
         let params = [reason, userId];
 
@@ -173,8 +184,6 @@ class UserSessionService {
      * Lists active sessions for a given user or tenant.
      */
     async listSessions(userId, tenantId) {
-        await this.ensureTableExists();
-
         const rows = await db.query(
             `SELECT id, user_id, tenant_id, role, ip_address, user_agent, status, last_activity_at, expires_at, created_at
              FROM user_sessions
@@ -184,7 +193,7 @@ class UserSessionService {
             [userId, tenantId]
         );
 
-        return rows.map(r => ({
+        return (rows || []).map(r => ({
             id: r.id,
             userId: r.user_id,
             tenantId: r.tenant_id,

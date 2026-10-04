@@ -143,9 +143,29 @@ async function requireAdmin(req, res, next) {
     // 1. Validate JWT
     try {
         const decoded = jwt.verify(token, JWT_SECRET, {
-            audience: JWT_AUDIENCE,
+            audience: [JWT_AUDIENCE, 'ppos:mfa-challenge'],
             issuer: JWT_ISSUER
         });
+
+        // Reject MFA Challenge Tokens on normal protected routes
+        if (decoded.is_mfa_challenge || decoded.purpose === 'mfa_challenge' || decoded.aud === 'ppos:mfa-challenge') {
+            return res.status(403).json({
+                ok: false,
+                error: {
+                    code: 'MFA_CHALLENGE_PENDING',
+                    message: 'MFA challenge token cannot access protected resources. Please complete MFA verification at /api/auth/mfa/verify first.'
+                }
+            });
+        }
+
+        // Transition policy for human user JWTs without jti
+        const isSystemActor = decoded.sub === 'preflight-worker' || (decoded.role || '').toUpperCase() === 'SYSTEM';
+        if (!decoded.jti && !isSystemActor) {
+            const strictJtiRequired = process.env.STRICT_SESSION_JTI_REQUIRED === 'true' || process.env.NODE_ENV === 'production';
+            if (strictJtiRequired) {
+                return fail(req, res, 'Session tracking ID (jti) is required for user authentication');
+            }
+        }
 
         // Resolve Tenant features dynamically
         const tenantGuard = require('../services/tenantGuard');
@@ -156,14 +176,30 @@ async function requireAdmin(req, res, next) {
             if (tenant) features = tenantGuard.resolveFeatures(tenant);
         }
 
-        // Server-Side Session Revocation Check (Goal A)
+        // Server-Side Session Revocation & Identity Matching Check
         if (decoded.jti) {
             const userSessionService = require('../services/userSessionService');
-            const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id);
+            const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id, decoded.sub);
+
             if (!sessionCheck.valid) {
+                if (sessionCheck.isDbError) {
+                    console.error('[AUTH-DB-ERROR]', sessionCheck.internalDiagnostic);
+                    return res.status(500).json({
+                        ok: false,
+                        error: {
+                            code: 'DATABASE_ERROR',
+                            message: 'Authentication session verification temporarily unavailable'
+                        }
+                    });
+                }
+
                 const msg = sessionCheck.reason === 'SESSION_REVOKED'
                     ? 'Session has been revoked on the server'
-                    : (sessionCheck.reason === 'SESSION_INACTIVE' ? 'Session expired due to inactivity' : 'Invalid or expired session');
+                    : (sessionCheck.reason === 'SESSION_INACTIVE'
+                        ? 'Session expired due to inactivity'
+                        : (sessionCheck.reason === 'SESSION_USER_MISMATCH' || sessionCheck.reason === 'SESSION_TENANT_MISMATCH'
+                            ? 'Session identity mismatch'
+                            : 'Invalid or expired session'));
                 return fail(req, res, msg);
             }
         }

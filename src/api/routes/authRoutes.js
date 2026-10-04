@@ -69,10 +69,20 @@ router.post('/login', async (req, res) => {
         if (enableBreakGlass && breakGlassToken && password === breakGlassToken) {
             console.log(`[AUTH] Break-glass access used by: ${email}`);
             
+            const userSessionService = require('../services/userSessionService');
+            const sessionRecord = await userSessionService.createSession({
+                userId: 'break-glass-session',
+                tenantId: 'ppos-production',
+                role: 'SUPER_ADMIN',
+                ipAddress: req.ip || req.connection?.remoteAddress,
+                userAgent: req.headers['user-agent']
+            });
+
             // Sign JWT for Super Admin session
             const token = jwt.sign(
                 {
                     sub: 'break-glass-session',
+                    jti: sessionRecord.sessionId,
                     email: email,
                     role: 'SUPER_ADMIN',
                     tenant_id: 'ppos-production',
@@ -93,7 +103,8 @@ router.post('/login', async (req, res) => {
                     email: email,
                     role: 'SUPER_ADMIN',
                     tenantId: 'ppos-production',
-                    isSuperAdmin: true
+                    isSuperAdmin: true,
+                    sessionId: sessionRecord.sessionId
                 }
             });
         }
@@ -121,11 +132,17 @@ router.post('/login', async (req, res) => {
         const userMfaService = require('../services/userMfaService');
         const mfaStatus = await userMfaService.getUserMfaStatus(user.id);
         if (mfaStatus.mfaEnabled) {
-            // Issue short-lived temporary MFA challenge token (5 min expiry)
+            // Issue short-lived temporary MFA challenge token (5 min expiry) with dedicated audience & purpose
             const mfaToken = jwt.sign(
-                { sub: user.id, email: user.email, tenant_id: user.tenant_id, is_mfa_challenge: true },
+                {
+                    sub: user.id,
+                    email: user.email,
+                    tenant_id: user.tenant_id,
+                    is_mfa_challenge: true,
+                    purpose: 'mfa_challenge'
+                },
                 JWT_SECRET,
-                { expiresIn: '5m', issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
+                { expiresIn: '5m', issuer: JWT_ISSUER, audience: 'ppos:mfa-challenge' }
             );
 
             return res.json({
@@ -482,7 +499,16 @@ router.post('/sessions/revoke', requireAdmin, async (req, res) => {
             return res.json({ ok: true, revokedCount: result.revokedCount });
         }
         if (sessionId) {
-            await userSessionService.revokeSession(sessionId, req.user.tenantId, 'USER_REVOKE');
+            const result = await userSessionService.revokeSession({
+                sessionId,
+                tenantId: req.user.tenantId,
+                requestingUserId: req.user.id,
+                requestingUserRole: req.user.role,
+                reason: 'USER_REVOKE'
+            });
+            if (!result.ok) {
+                return res.status(result.statusCode || 400).json({ ok: false, error: result.message });
+            }
             return res.json({ ok: true, message: `Session ${sessionId} revoked` });
         }
         res.status(400).json({ ok: false, error: 'sessionId or revokeAll is required' });
@@ -547,12 +573,16 @@ router.post('/mfa/verify', async (req, res) => {
 
         let decoded;
         try {
-            decoded = jwt.verify(mfaToken, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
+            decoded = jwt.verify(mfaToken, JWT_SECRET, { audience: 'ppos:mfa-challenge', issuer: JWT_ISSUER });
         } catch (e) {
-            return res.status(401).json({ ok: false, error: 'Invalid or expired MFA challenge token' });
+            try {
+                decoded = jwt.verify(mfaToken, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
+            } catch (err2) {
+                return res.status(401).json({ ok: false, error: 'Invalid or expired MFA challenge token' });
+            }
         }
 
-        if (!decoded.is_mfa_challenge) {
+        if (!decoded.is_mfa_challenge && decoded.purpose !== 'mfa_challenge') {
             return res.status(400).json({ ok: false, error: 'Token is not a valid MFA challenge token' });
         }
 

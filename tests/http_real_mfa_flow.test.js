@@ -147,7 +147,7 @@ describe('HTTP Real MFA Challenge, Recovery & Anti-Replay Suite', () => {
             });
             expect.fail('Challenge token must not grant full admin access');
         } catch (err) {
-            expect(err.response ? err.response.status : 401).toBe(401);
+            expect(err.response ? err.response.status : 403).toBe(403);
         }
     });
 

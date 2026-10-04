@@ -89,33 +89,10 @@ function decryptSecret(encryptedPayload) {
 
 class UserMfaService {
 
-    async ensureTableExists() {
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS user_mfa (
-                    user_id VARCHAR(255) PRIMARY KEY,
-                    tenant_id VARCHAR(255) NOT NULL,
-                    totp_secret_encrypted TEXT NOT NULL,
-                    is_confirmed TINYINT(1) NOT NULL DEFAULT 0,
-                    recovery_codes_json JSON NOT NULL,
-                    last_used_timestep BIGINT NOT NULL DEFAULT 0,
-                    failed_attempts INT NOT NULL DEFAULT 0,
-                    locked_until DATETIME NULL,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_user_mfa_tenant (tenant_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            `);
-        } catch (err) {
-            logger.warn('Failed to auto-ensure user_mfa table', { error: err.message });
-        }
-    }
-
     /**
      * Initializes MFA setup for a user, returning secret and QR URI.
      */
     async setupMfa(userId, tenantId, userEmail) {
-        await this.ensureTableExists();
 
         // Check if confirmed MFA already exists
         const [existing] = await db.query(`SELECT is_confirmed FROM user_mfa WHERE user_id = ?`, [userId]).catch(() => []);
@@ -164,7 +141,6 @@ class UserMfaService {
      * Confirms MFA setup by verifying the first TOTP code.
      */
     async confirmMfa(userId, tenantId, totpCode) {
-        await this.ensureTableExists();
 
         const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, recovery_codes_json, is_confirmed FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [userId, tenantId]);
         if (!record) {
@@ -202,7 +178,6 @@ class UserMfaService {
      * Validates MFA code or recovery code during login challenge.
      */
     async verifyMfaChallenge(userId, codeOrRecoveryCode) {
-        await this.ensureTableExists();
 
         const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, is_confirmed, recovery_codes_json, last_used_timestep, failed_attempts, locked_until FROM user_mfa WHERE user_id = ?`, [userId]);
         if (!record || !record.is_confirmed) {
@@ -274,7 +249,6 @@ class UserMfaService {
      * Checks whether a user has active confirmed MFA.
      */
     async getUserMfaStatus(userId) {
-        await this.ensureTableExists();
 
         const [record] = await db.query(`SELECT is_confirmed, created_at FROM user_mfa WHERE user_id = ?`, [userId]).catch(() => []);
         return {
@@ -287,7 +261,6 @@ class UserMfaService {
      * Disables MFA for a user with re-authentication verification.
      */
     async disableMfa(userId, tenantId) {
-        await this.ensureTableExists();
 
         await db.query(`DELETE FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [userId, tenantId]);
         return { ok: true, message: 'MFA disabled successfully' };

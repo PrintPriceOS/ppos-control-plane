@@ -169,10 +169,20 @@ class PrinthouseActivationService {
 
             await connection.commit();
 
-            // 5. Sign JWT session token
+            // 5. Create Trackable Server Session and Sign JWT
+            const userSessionService = require('./userSessionService');
+            const sessionRecord = await userSessionService.createSession({
+                userId: user.id,
+                tenantId: tenantId,
+                role: user.role,
+                ipAddress: null,
+                userAgent: 'Printhouse-Activation'
+            });
+
             const token = jwt.sign(
                 {
                     sub: user.id,
+                    jti: sessionRecord.sessionId,
                     email: user.email,
                     role: user.role,
                     tenant_id: tenantId,

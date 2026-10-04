@@ -1498,6 +1498,40 @@ class ControlPlaneSchemaService {
 
         console.log('[CONTROL-PLANE-SCHEMA] Phase 39.2.3 Tenant Governance schemas ensured successfully.');
     }
+
+    /**
+     * Read-only startup verification that all required operational tables exist in MySQL.
+     * Does NOT execute any DDL.
+     */
+    async verifyRequiredTablesExist() {
+        const requiredTables = [
+            'user_mfa',
+            'user_sessions',
+            'webhook_subscriptions',
+            'webhook_deliveries',
+            'slack_integrations',
+            'bpe_pricing_publications'
+        ];
+        const missing = [];
+        for (const tableName of requiredTables) {
+            try {
+                const rows = await db.query(
+                    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+                    [tableName]
+                );
+                if (!rows || rows.length === 0) {
+                    missing.push(tableName);
+                }
+            } catch (err) {
+                missing.push(tableName);
+            }
+        }
+        if (missing.length > 0) {
+            logger.warn('Startup schema verification: missing required tables', { missing });
+            return { ok: false, missing };
+        }
+        return { ok: true, missing: [] };
+    }
 }
 
 const service = new ControlPlaneSchemaService();

@@ -180,4 +180,102 @@ describe('HTTP Real Auth Flow & Session Revocation Suite', () => {
             expect(err.response ? err.response.status : 401).toBe(401);
         }
     });
+
+    it('5. MFA Challenge Token -> rejected when accessing protected routes (verify, sessions, preferences)', async () => {
+        const mfaChallengeToken = jwt.sign(
+            {
+                sub: 'mfa_user_pending',
+                email: 'mfa@printprice.pro',
+                tenant_id: 'tenant_http_1',
+                is_mfa_challenge: true,
+                purpose: 'mfa_challenge'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '5m', issuer: process.env.JWT_ISSUER, audience: 'ppos:mfa-challenge' }
+        );
+
+        try {
+            await axios.get(`${baseUrl}/api/admin/verify`, {
+                headers: { Authorization: `Bearer ${mfaChallengeToken}` }
+            });
+            expect.fail('MFA challenge token should be rejected on protected route');
+        } catch (err) {
+            expect(err.response.status).toBe(403);
+            expect(err.response.data.error.code).toBe('MFA_CHALLENGE_PENDING');
+        }
+
+        try {
+            await axios.get(`${baseUrl}/api/auth/sessions`, {
+                headers: { Authorization: `Bearer ${mfaChallengeToken}` }
+            });
+            expect.fail('MFA challenge token should be rejected on sessions route');
+        } catch (err) {
+            expect(err.response.status).toBe(403);
+        }
+    });
+
+    it('6. Session Revocation Ownership -> non-admin cannot revoke another user session (403); admin can', async () => {
+        const victimSession = await userSessionService.createSession({
+            userId: 'victim_user',
+            tenantId: 'tenant_http_1',
+            role: 'VIEWER'
+        });
+
+        const attackerSession = await userSessionService.createSession({
+            userId: 'attacker_user',
+            tenantId: 'tenant_http_1',
+            role: 'VIEWER'
+        });
+
+        const attackerToken = jwt.sign(
+            {
+                sub: 'attacker_user',
+                jti: attackerSession.sessionId,
+                email: 'attacker@printprice.pro',
+                role: 'VIEWER',
+                tenant_id: 'tenant_http_1'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h', issuer: process.env.JWT_ISSUER, audience: process.env.JWT_AUDIENCE }
+        );
+
+        // Attacker attempts to revoke victim's session -> rejected 403
+        try {
+            await axios.post(`${baseUrl}/api/auth/sessions/revoke`, {
+                sessionId: victimSession.sessionId
+            }, {
+                headers: { Authorization: `Bearer ${attackerToken}` }
+            });
+            expect.fail('Non-admin revoking another user session should be rejected with 403');
+        } catch (err) {
+            expect(err.response.status).toBe(403);
+            expect(err.response.data.error).toContain('another user');
+        }
+    });
+
+    it('7. Human user JWT without jti when strict jti required -> rejected with HTTP 401', async () => {
+        process.env.STRICT_SESSION_JTI_REQUIRED = 'true';
+        const noJtiToken = jwt.sign(
+            {
+                sub: 'legacy_user',
+                email: 'legacy@printprice.pro',
+                role: 'PRINTHOUSE_ADMIN',
+                tenant_id: 'tenant_http_1'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h', issuer: process.env.JWT_ISSUER, audience: process.env.JWT_AUDIENCE }
+        );
+
+        try {
+            await axios.get(`${baseUrl}/api/admin/verify`, {
+                headers: { Authorization: `Bearer ${noJtiToken}` }
+            });
+            expect.fail('JWT without jti should be rejected');
+        } catch (err) {
+            expect(err.response.status).toBe(401);
+            expect(err.response.data.error.message).toContain('jti');
+        } finally {
+            delete process.env.STRICT_SESSION_JTI_REQUIRED;
+        }
+    });
 });

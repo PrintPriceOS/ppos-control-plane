@@ -18,33 +18,10 @@ function redactSlackUrl(rawUrl) {
 
 class SlackNotificationService {
 
-    async ensureTableExists() {
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS slack_integrations (
-                    id VARCHAR(64) PRIMARY KEY,
-                    tenant_id VARCHAR(255) NOT NULL UNIQUE,
-                    webhook_url TEXT NOT NULL,
-                    channel_name VARCHAR(100) NOT NULL DEFAULT '#general',
-                    enabled TINYINT(1) NOT NULL DEFAULT 1,
-                    events_json JSON NOT NULL,
-                    last_test_at DATETIME NULL,
-                    last_test_status VARCHAR(50) NULL,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_slack_tenant (tenant_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            `);
-        } catch (err) {
-            logger.warn('Failed to auto-ensure slack_integrations table', { error: err.message });
-        }
-    }
-
     /**
      * Saves or updates Slack integration configuration for a tenant.
      */
     async configureSlackIntegration({ tenantId, webhookUrl, channelName = '#alerts', enabled = true, events = ['qc_alert', 'sla_alert', 'order_alert', 'calibration_alert'] }) {
-        await this.ensureTableExists();
 
         if (!webhookUrl || typeof webhookUrl !== 'string' || !webhookUrl.startsWith('http')) {
             throw new Error('Valid Slack webhook URL is required');
@@ -71,7 +48,6 @@ class SlackNotificationService {
      * Retrieves tenant Slack configuration with redacted webhook URL.
      */
     async getSlackConfig(tenantId) {
-        await this.ensureTableExists();
 
         const [config] = await db.query(`SELECT id, tenant_id, webhook_url, channel_name, enabled, events_json, last_test_at, last_test_status FROM slack_integrations WHERE tenant_id = ?`, [tenantId]).catch(() => []);
         if (!config) {
@@ -94,7 +70,6 @@ class SlackNotificationService {
      * Triggers a test alert to the configured Slack webhook or mock handler.
      */
     async testSlackIntegration(tenantId, options = {}) {
-        await this.ensureTableExists();
 
         const [config] = await db.query(`SELECT webhook_url, channel_name FROM slack_integrations WHERE tenant_id = ?`, [tenantId]);
         if (!config || !config.webhook_url) {
