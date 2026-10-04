@@ -117,10 +117,43 @@ router.post('/login', async (req, res) => {
         let isSuper = userRole === 'SUPER_ADMIN' || user.email === 'admin@printprice.pro';
         if (isSuper) userRole = 'SUPER_ADMIN';
 
-        // Sign JWT with Printhouse/Tenant context
+        // Check if user has active TOTP MFA (Goal B)
+        const userMfaService = require('../services/userMfaService');
+        const mfaStatus = await userMfaService.getUserMfaStatus(user.id);
+        if (mfaStatus.mfaEnabled) {
+            // Issue short-lived temporary MFA challenge token (5 min expiry)
+            const mfaToken = jwt.sign(
+                { sub: user.id, email: user.email, tenant_id: user.tenant_id, is_mfa_challenge: true },
+                JWT_SECRET,
+                { expiresIn: '5m', issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
+            );
+
+            return res.json({
+                ok: true,
+                mfaRequired: true,
+                mfaToken,
+                user: {
+                    email: user.email,
+                    tenantId: user.tenant_id
+                }
+            });
+        }
+
+        // Create Trackable Server Session (Goal A)
+        const userSessionService = require('../services/userSessionService');
+        const sessionRecord = await userSessionService.createSession({
+            userId: user.id,
+            tenantId: user.tenant_id || 'default',
+            role: userRole,
+            ipAddress: req.ip || req.connection?.remoteAddress,
+            userAgent: req.headers['user-agent']
+        });
+
+        // Sign JWT with jti linked to server session
         const token = jwt.sign(
             {
                 sub: user.id,
+                jti: sessionRecord.sessionId,
                 email: user.email,
                 role: userRole,
                 tenant_id: user.tenant_id,
@@ -139,11 +172,14 @@ router.post('/login', async (req, res) => {
             ok: true,
             token,
             user: {
+                id: user.id,
                 email: user.email,
                 role: userRole,
                 tenantId: user.tenant_id,
                 printhouseId: user.printhouse_id,
-                isSuperAdmin: isSuper
+                isSuperAdmin: isSuper,
+                sessionId: sessionRecord.sessionId,
+                mfaEnabled: false
             }
         });
     } catch (err) {
@@ -398,6 +434,204 @@ router.post('/reset-password', async (req, res) => {
     } catch (err) {
         console.error('[AUTH-RESET-PW-ERROR]', err.message);
         return res.status(500).json({ ok: false, error: 'Internal error during password reset.' });
+    }
+});
+
+// ── Session Management Endpoints (Goal A) ─────────────────────────────────
+const userSessionService = require('../services/userSessionService');
+const userMfaService = require('../services/userMfaService');
+const { requireAdmin } = require('../middleware/auth');
+
+/**
+ * POST /api/auth/logout
+ * Invalidates current server session.
+ */
+router.post('/logout', requireAdmin, async (req, res) => {
+    try {
+        if (req.user?.sessionId) {
+            await userSessionService.revokeSession(req.user.sessionId, req.user.tenantId, 'USER_LOGOUT');
+        }
+        res.json({ ok: true, message: 'Logged out successfully. Session invalidated on server.' });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/auth/sessions
+ * List active sessions for user.
+ */
+router.get('/sessions', requireAdmin, async (req, res) => {
+    try {
+        const sessions = await userSessionService.listSessions(req.user.id, req.user.tenantId);
+        res.json({ ok: true, sessions });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/auth/sessions/revoke
+ * Revoke specific session or all sessions for current user.
+ */
+router.post('/sessions/revoke', requireAdmin, async (req, res) => {
+    try {
+        const { sessionId, revokeAll } = req.body || {};
+        if (revokeAll) {
+            const result = await userSessionService.revokeAllUserSessions(req.user.id, req.user.tenantId, 'USER_REVOKE_ALL');
+            return res.json({ ok: true, revokedCount: result.revokedCount });
+        }
+        if (sessionId) {
+            await userSessionService.revokeSession(sessionId, req.user.tenantId, 'USER_REVOKE');
+            return res.json({ ok: true, message: `Session ${sessionId} revoked` });
+        }
+        res.status(400).json({ ok: false, error: 'sessionId or revokeAll is required' });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── TOTP MFA Endpoints (Goal B) ───────────────────────────────────────────
+
+/**
+ * GET /api/auth/mfa/status
+ * Check MFA status for current user.
+ */
+router.get('/mfa/status', requireAdmin, async (req, res) => {
+    try {
+        const status = await userMfaService.getUserMfaStatus(req.user.id);
+        res.json({ ok: true, ...status });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/auth/mfa/setup
+ * Initiates TOTP MFA setup, generating secret and recovery codes.
+ */
+router.post('/mfa/setup', requireAdmin, async (req, res) => {
+    try {
+        const result = await userMfaService.setupMfa(req.user.id, req.user.tenantId, req.user.email);
+        res.json(result);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/auth/mfa/confirm
+ * Confirms setup with first valid TOTP code.
+ */
+router.post('/mfa/confirm', requireAdmin, async (req, res) => {
+    try {
+        const { code } = req.body || {};
+        if (!code) return res.status(400).json({ ok: false, error: 'TOTP code is required' });
+        const result = await userMfaService.confirmMfa(req.user.id, req.user.tenantId, code);
+        res.json(result);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/auth/mfa/verify
+ * Validates MFA challenge during login.
+ */
+router.post('/mfa/verify', async (req, res) => {
+    try {
+        const { mfaToken, code } = req.body || {};
+        if (!mfaToken || !code) {
+            return res.status(400).json({ ok: false, error: 'mfaToken and code are required' });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(mfaToken, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
+        } catch (e) {
+            return res.status(401).json({ ok: false, error: 'Invalid or expired MFA challenge token' });
+        }
+
+        if (!decoded.is_mfa_challenge) {
+            return res.status(400).json({ ok: false, error: 'Token is not a valid MFA challenge token' });
+        }
+
+        const verification = await userMfaService.verifyMfaChallenge(decoded.sub, code);
+        if (!verification.valid) {
+            return res.status(401).json({ ok: false, error: verification.reason || 'Invalid MFA code' });
+        }
+
+        const user = await userService.findById ? await userService.findById(decoded.sub) : await userService.findByEmail(decoded.email);
+        const userRole = (user?.role || 'VIEWER').toUpperCase();
+        const isSuper = userRole === 'SUPER_ADMIN' || user?.email === 'admin@printprice.pro';
+
+        // Create Trackable Server Session
+        const sessionRecord = await userSessionService.createSession({
+            userId: decoded.sub,
+            tenantId: decoded.tenant_id || 'default',
+            role: userRole,
+            ipAddress: req.ip || req.connection?.remoteAddress,
+            userAgent: req.headers['user-agent']
+        });
+
+        // Sign full JWT token with session jti
+        const token = jwt.sign(
+            {
+                sub: decoded.sub,
+                jti: sessionRecord.sessionId,
+                email: decoded.email,
+                role: userRole,
+                tenant_id: decoded.tenant_id,
+                printhouse_id: user?.printhouse_id,
+                is_super_admin: isSuper
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
+        );
+
+        res.json({
+            ok: true,
+            token,
+            user: {
+                id: decoded.sub,
+                email: decoded.email,
+                role: userRole,
+                tenantId: decoded.tenant_id,
+                printhouseId: user?.printhouse_id,
+                isSuperAdmin: isSuper,
+                sessionId: sessionRecord.sessionId,
+                mfaEnabled: true
+            }
+        });
+    } catch (err) {
+        console.error('[AUTH-MFA-VERIFY-ERROR]', err);
+        res.status(500).json({ ok: false, error: 'Internal server error during MFA verification' });
+    }
+});
+
+/**
+ * POST /api/auth/mfa/disable
+ * Disables MFA after password re-authentication.
+ */
+router.post('/mfa/disable', requireAdmin, async (req, res) => {
+    try {
+        const { password } = req.body || {};
+        if (!password) {
+            return res.status(400).json({ ok: false, error: 'Password re-authentication is required to disable MFA' });
+        }
+
+        const user = await userService.findByEmail(req.user.email);
+        if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+        const isValid = await bcrypt.compare(password, user.password_hash);
+        if (!isValid) {
+            return res.status(401).json({ ok: false, error: 'Invalid password. Cannot disable MFA.' });
+        }
+
+        const result = await userMfaService.disableMfa(req.user.id, req.user.tenantId);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 

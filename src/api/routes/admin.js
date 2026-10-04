@@ -1201,6 +1201,136 @@ router.use('/', adminGovernedInvoices);
 router.use('/', adminPartnerSettlement);
 router.use('/', adminTaxVatReadiness);
 
+// ── Outgoing Webhooks Endpoints (Goal C) ──────────────────────────────────
+const outgoingWebhookService = require('../services/outgoingWebhookService');
+
+router.get('/webhooks/subscriptions', async (req, res) => {
+    try {
+        const subs = await outgoingWebhookService.listSubscriptions(req.user.tenantId);
+        res.json({ ok: true, data: subs });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/subscriptions', async (req, res) => {
+    try {
+        const sub = await outgoingWebhookService.createSubscription({
+            tenantId: req.user.tenantId,
+            url: req.body.url,
+            events: req.body.events || ['*']
+        });
+        res.status(201).json({ ok: true, data: sub });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/subscriptions/:id/rotate-secret', async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.rotateSecret(req.params.id, req.user.tenantId);
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.get('/webhooks/deliveries', async (req, res) => {
+    try {
+        const deliveries = await outgoingWebhookService.listDeliveries(req.user.tenantId);
+        res.json({ ok: true, data: deliveries });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/deliveries/:id/resend', async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.deliverSingleWebhook(req.params.id);
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/test', async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.enqueueWebhookEvent({
+            tenantId: req.user.tenantId,
+            eventType: 'test.ping',
+            payload: { timestamp: new Date().toISOString(), message: 'Control Plane Webhook Test Event' }
+        });
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── Slack Alerts Endpoints (Goal D) ───────────────────────────────────────
+const slackNotificationService = require('../services/slackNotificationService');
+
+router.get('/notifications/slack', async (req, res) => {
+    try {
+        const config = await slackNotificationService.getSlackConfig(req.user.tenantId);
+        res.json({ ok: true, data: config });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/notifications/slack', async (req, res) => {
+    try {
+        const config = await slackNotificationService.configureSlackIntegration({
+            tenantId: req.user.tenantId,
+            webhookUrl: req.body.webhookUrl,
+            channelName: req.body.channelName,
+            enabled: req.body.enabled,
+            events: req.body.events
+        });
+        res.json({ ok: true, data: config });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/notifications/slack/test', async (req, res) => {
+    try {
+        const result = await slackNotificationService.testSlackIntegration(req.user.tenantId);
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── Governed Pricing BPE Publication Endpoints (Goal F) ───────────────────
+const bpePublicationService = require('../services/bpePublicationService');
+
+router.post('/printhouses/:nodeId/publish-rates', async (req, res) => {
+    try {
+        const { revisionId } = req.body || {};
+        if (!revisionId) {
+            return res.status(400).json({ ok: false, error: 'revisionId is required' });
+        }
+        const publication = await bpePublicationService.publishAcceptedRevision(
+            req.user.tenantId,
+            req.params.nodeId,
+            revisionId
+        );
+        res.json({ ok: true, data: publication });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.get('/printhouses/:nodeId/publications/latest', async (req, res) => {
+    try {
+        const pub = await bpePublicationService.getLatestPublication(req.params.nodeId);
+        res.json({ ok: true, data: pub });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 
 // Diagnostic Catch-all for Admin
 router.all(/^(.*)$/, (req, res) => {

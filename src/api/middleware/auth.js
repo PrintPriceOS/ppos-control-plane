@@ -156,6 +156,18 @@ async function requireAdmin(req, res, next) {
             if (tenant) features = tenantGuard.resolveFeatures(tenant);
         }
 
+        // Server-Side Session Revocation Check (Goal A)
+        if (decoded.jti) {
+            const userSessionService = require('../services/userSessionService');
+            const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id);
+            if (!sessionCheck.valid) {
+                const msg = sessionCheck.reason === 'SESSION_REVOKED'
+                    ? 'Session has been revoked on the server'
+                    : (sessionCheck.reason === 'SESSION_INACTIVE' ? 'Session expired due to inactivity' : 'Invalid or expired session');
+                return fail(req, res, msg);
+            }
+        }
+
         // 2. Map Industrial Identity
         req.user = {
             id: decoded.sub,
@@ -166,6 +178,7 @@ async function requireAdmin(req, res, next) {
             scopes: decoded.scopes || [],
             features: features,
             authMode: 'JWT',
+            sessionId: decoded.jti || null,
             issuedAt: decoded.iat,
             expiresAt: decoded.exp
         };
