@@ -2,6 +2,7 @@ import os
 import json
 import time
 import hashlib
+import zipfile
 import subprocess
 from playwright.sync_api import sync_playwright
 
@@ -320,7 +321,9 @@ def setup_client_intercepts(page, error_state=None):
         # 2. Reviews endpoints
         if url.endswith('/api/admin/beta/runtime-reviews/reviews'):
             if method == 'GET':
-                if error_state.get("fail_reviews", False):
+                if error_state.get("fail_reviews_401", False):
+                    route.fulfill(status=401, content_type='application/json', body=json.dumps({"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Sesión expirada o ausente. Por favor, inicie sesión."}}))
+                elif error_state.get("fail_reviews", False):
                     route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de revisiones"}))
                 else:
                     route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEWS_LIST))
@@ -339,7 +342,9 @@ def setup_client_intercepts(page, error_state=None):
         # 3. Preparations endpoints
         if url.endswith('/api/admin/beta/cohort-interventions/preparations'):
             if method == 'GET':
-                if error_state.get("fail_preps", False):
+                if error_state.get("fail_preps_401", False):
+                    route.fulfill(status=401, content_type='application/json', body=json.dumps({"ok": False, "error": {"error": {"code": "UNAUTHORIZED", "message": "Sesión ausente en preparación. Inicie sesión para continuar."}}}))
+                elif error_state.get("fail_preps", False):
                     route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de propuestas"}))
                 else:
                     route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATIONS_LIST))
@@ -358,7 +363,9 @@ def setup_client_intercepts(page, error_state=None):
         # 4. Approvals endpoints
         if url.endswith('/api/admin/beta/cohort-intervention-approvals/approvals'):
             if method == 'GET':
-                if error_state.get("fail_approvals", False):
+                if error_state.get("fail_approvals_401", False):
+                    route.fulfill(status=401, content_type='application/json', body=json.dumps({"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Credenciales inválidas para acceso a gobernanza."}}))
+                elif error_state.get("fail_approvals", False):
                     route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio interno de gobernanza"}))
                 else:
                     route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVALS_LIST))
@@ -715,6 +722,111 @@ def run_captures():
 
             ctx_err.close()
 
+        # ══════════════════════════════════════════════════════════════
+        # RECORRIDO 3: CASO HTTP 401 CON OBJETO ANIDADO {CODE, MESSAGE},
+        # SIN CRASH REACT #31 Y CON INICIAR SESIÓN SIN BUCLE DE REINTENTO
+        # ══════════════════════════════════════════════════════════════
+        print("\n>>> 3. RECORRIDO: HTTP 401 CON OBJETO ANIDADO {code, message} Y BOTÓN INICIAR SESIÓN <<<")
+
+        unauthorized_stages = [
+            {
+                "stage": stages[3],  # Revisiones de salud
+                "target_endpoint": "/api/admin/beta/runtime-reviews/reviews",
+                "expected_error": "Sesión expirada o ausente. Por favor, inicie sesión.",
+                "state_key": "fail_reviews_401",
+                "shot_name": "04_revisiones_salud_http401_error_dark_es.png"
+            },
+            {
+                "stage": stages[4],  # Preparación
+                "target_endpoint": "/api/admin/beta/cohort-interventions/preparations",
+                "expected_error": "Sesión ausente en preparación. Inicie sesión para continuar.",
+                "state_key": "fail_preps_401",
+                "shot_name": "05_preparacion_intervenciones_http401_error_dark_es.png"
+            },
+            {
+                "stage": stages[5],  # Aprobación
+                "target_endpoint": "/api/admin/beta/cohort-intervention-approvals/approvals",
+                "expected_error": "Credenciales inválidas para acceso a gobernanza.",
+                "state_key": "fail_approvals_401",
+                "shot_name": "06_aprobacion_intervenciones_http401_error_dark_es.png"
+            }
+        ]
+
+        for item in unauthorized_stages:
+            stage_info = item["stage"]
+            target_url = f"http://127.0.0.1:3000{stage_info['path']}"
+            target_endpoint = item["target_endpoint"]
+
+            ctx_401 = browser.new_context(viewport={"width": 1280, "height": 720})
+            page_401 = ctx_401.new_page()
+
+            err_state = {"fail_reviews_401": False, "fail_preps_401": False, "fail_approvals_401": False}
+            err_state[item["state_key"]] = True
+            setup_client_intercepts(page_401, error_state=err_state)
+            setup_page_auth_and_theme(page_401, theme='dark', locale='es')
+
+            print(f"\n--- Testing HTTP 401 & Safe Login Button for {stage_info['id']} ---")
+
+            # 1. PLAYWRIGHT ASSERTION 1: Observe HTTP 401 on target request
+            with page_401.expect_response(lambda r: target_endpoint in r.url and r.request.method == 'GET') as resp_info:
+                page_401.goto(target_url, wait_until='networkidle')
+            resp = resp_info.value
+            assert resp.status == 401, f"ASSERTION FAILED: Target request {target_endpoint} did not return HTTP 401! Returned: {resp.status}"
+            print(f"  [ASSERTION 1 PASSED] Target request {target_endpoint} responded with status HTTP 401.")
+
+            page_401.wait_for_timeout(500)
+            page_401.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
+
+            # 2. PLAYWRIGHT ASSERTION 2: Verify NO Minified React error #31 crash
+            page_text = page_401.content()
+            assert "Minified React error" not in page_text, "ASSERTION FAILED: React error crash detected in page content!"
+            assert "object with keys {code, message}" not in page_text, "ASSERTION FAILED: Error object dumped to JSX child!"
+            print(f"  [ASSERTION 2 PASSED] Screen did NOT crash with Minified React error #31.")
+
+            # 3. PLAYWRIGHT ASSERTION 3: Error message and Iniciar Sesion button visible, Reintentar button absent
+            err_locator = page_401.locator(f'text={item["expected_error"]}')
+            assert err_locator.first.is_visible(), f"ASSERTION FAILED: Error message '{item['expected_error']}' is not visible on page!"
+
+            login_btn = page_401.locator('button:has-text("Iniciar Sesión")').first
+            assert login_btn.is_visible(), f"ASSERTION FAILED: 'Iniciar Sesión' button is not visible on HTTP 401 state!"
+
+            retry_count = page_401.locator('button:has-text("Reintentar")').count()
+            assert retry_count == 0, f"ASSERTION FAILED: 'Reintentar' button must NOT be present on 401 to prevent retry loops!"
+            print(f"  [ASSERTION 3 PASSED] Safe string message and 'Iniciar Sesión' are visible. 'Reintentar' is correctly suppressed (zero retry loops).")
+
+            # 4. CAPTURE COMPLETE AFFECTED PANEL (using scroll and element capture)
+            affected_panel = login_btn.locator('xpath=ancestor::div[contains(@class, "ppos-card")]').first
+            affected_panel.scroll_into_view_if_needed()
+            page_401.wait_for_timeout(300)
+
+            shot_401_name = item["shot_name"]
+            shot_401_path = os.path.join(OUT_DIR, shot_401_name)
+            affected_panel.screenshot(path=shot_401_path)
+
+            sha_401 = compute_sha256(shot_401_path)
+            sha_map[shot_401_name] = sha_401
+            overflow_401 = check_overflow(page_401)
+
+            results.append({
+                "stage": stage_info["name"],
+                "flow": "Recorrido 3 (HTTP 401 Sesión Ausente/Expirada)",
+                "variant": "Desktop - Dark - HTTP 401 Error Panel Completo - ES",
+                "file": shot_401_name,
+                "git_sha": git_sha,
+                "sha256": sha_401,
+                "overflow": overflow_401,
+                "simulated_data": {
+                    "http_401_injected": True,
+                    "target_endpoint": target_endpoint,
+                    "nested_error_object": True,
+                    "login_button_present": True,
+                    "retry_loop_prevented": True
+                }
+            })
+            print(f"  [CAPTURA OK] {shot_401_name} (Panel Completo: Error normalizado y botón Iniciar Sesión)")
+
+            ctx_401.close()
+
         browser.close()
 
     summary_path = os.path.join(OUT_DIR, "evidence_summary.json")
@@ -729,6 +841,15 @@ def run_captures():
 
     print(f"\nResumen completo de evidencias generado en: {summary_path}")
     print(f"Total de capturas acreditadas: {len(results)}")
+
+    zip_path = os.path.abspath("review_artifacts_beta_operational.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(OUT_DIR):
+            for file in files:
+                abs_f = os.path.join(root, file)
+                rel_f = os.path.relpath(abs_f, OUT_DIR)
+                zf.write(abs_f, rel_f)
+    print(f"Paquete ZIP generado exitosamente en: {zip_path}")
 
 if __name__ == '__main__':
     run_captures()

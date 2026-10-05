@@ -899,9 +899,20 @@ export async function getHealth() {
     return adminFetch<any[]>(`/api/admin/network/health`);
 }
 
-export async function getSystemHealth(): Promise<{ ok: boolean; status?: string; dependencies?: any }> {
+export async function getSystemHealth(): Promise<{ ok: boolean; status?: string; dependencies?: any; uptime_seconds?: number; pid?: number }> {
     try {
-        const res = await fetch('/api/system/health');
+        const token = getAuthToken();
+        const headers: Record<string, string> = {
+            'Accept': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+        const res = await fetch('/api/system/health', {
+            headers,
+            credentials: 'include'
+        });
+        if (res.status === 401) {
+            return { ok: false, status: 'UNAUTHORIZED' };
+        }
         if (!res.ok) return { ok: false, status: 'HTTP_ERROR' };
         return await res.json();
     } catch (err: any) {

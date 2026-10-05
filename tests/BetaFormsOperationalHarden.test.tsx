@@ -595,4 +595,75 @@ describe('Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards
       expect(screen.getByText('Verificación de cuotas de procesamiento por participante')).toBeDefined();
     });
   });
+
+  it('11. Regression: HTTP 401 with nested {code, message} in Review renders safely without React #31 and shows login button without retry loop', async () => {
+    mockReviewClient.listReviews.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      error: { code: 'UNAUTHORIZED', message: 'Sesión expirada o ausente. Por favor, inicie sesión.' }
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaRuntimeActivityReview />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    // Must safely render error string without crashing React
+    await waitFor(() => {
+      expect(screen.getByText(/Sesión expirada o ausente\. Por favor, inicie sesión\./i)).toBeDefined();
+    });
+
+    // 401 must display 'Iniciar Sesión' and NOT 'Reintentar' to avoid retry loops
+    expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
+
+  it('12. Regression: HTTP 401 with deeply nested {error: {code, message}} in Preparation renders safely without React #31 and offers login', async () => {
+    mockPrepClient.listPreparations.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      error: { error: { code: 'TOKEN_EXPIRED', message: 'Token de acceso revocado por el servidor de autenticación' } }
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaCohortInterventionPreparation />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Token de acceso revocado por el servidor de autenticación/i)).toBeDefined();
+    });
+
+    expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
+
+  it('13. Regression: HTTP 401 with {code, message} in Approval renders safely without React #31 and offers login', async () => {
+    mockApprovalClient.listApprovals.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      error: { code: 'AUTH_REQUIRED', message: 'Credenciales inválidas para acceso a gobernanza' }
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaCohortInterventionApproval />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Credenciales inválidas para acceso a gobernanza/i)).toBeDefined();
+    });
+
+    expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Reintentar/i })).toBeNull();
+  });
 });

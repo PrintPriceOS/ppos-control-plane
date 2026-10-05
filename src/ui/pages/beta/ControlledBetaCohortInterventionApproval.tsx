@@ -51,6 +51,7 @@ export function ControlledBetaCohortInterventionApproval() {
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchStatus, setFetchStatus] = useState<number | null>(null);
 
   // Stale async response tracking
   const approvalSeqRef = useRef(0);
@@ -73,17 +74,26 @@ export function ControlledBetaCohortInterventionApproval() {
     const seq = ++approvalSeqRef.current;
     setLoading(true);
     setFetchError(null);
+    setFetchStatus(null);
     try {
       const res = await cohortInterventionApprovalClient.listApprovals();
       if (seq !== approvalSeqRef.current) return;
       if (res.ok) {
         setApprovals(res.approvals || []);
       } else {
-        setFetchError((res as any)?.error || 'Error al listar expedientes de aprobación');
+        const status = (res as any)?.status || 500;
+        setFetchStatus(status);
+        const fallback = status === 401
+          ? 'Sesión ausente o expirada. Por favor, inicie sesión.'
+          : status === 403
+          ? 'No tiene permisos suficientes para consultar expedientes de aprobación.'
+          : 'Error al listar expedientes de aprobación';
+        setFetchError(normalizeUiError((res as any)?.error, fallback));
       }
     } catch (err: any) {
       if (seq !== approvalSeqRef.current) return;
-      setFetchError(err?.message || String(err));
+      setFetchStatus(err?.status || 500);
+      setFetchError(normalizeUiError(err, 'Error de conexión al listar expedientes'));
     } finally {
       if (seq === approvalSeqRef.current) setLoading(false);
     }
@@ -174,7 +184,7 @@ export function ControlledBetaCohortInterventionApproval() {
         await fetchApprovalsList();
         setSelectedApprovalId(res.approval.approval_id);
       } else {
-        setErrorMsg('Error creando el expediente de aprobación');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error creando el expediente de aprobación'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -194,7 +204,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setMessage(`Firma de rol ${role} registrada con éxito.`);
         await loadApprovalDetails(selectedApprovalId);
       } else {
-        setErrorMsg('Error al registrar la firma');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error al registrar la firma'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -221,7 +231,7 @@ export function ControlledBetaCohortInterventionApproval() {
             await loadApprovalDetails(selectedApprovalId);
             await fetchApprovalsList();
           } else {
-            setErrorMsg('Error registrando la decisión');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error registrando la decisión'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -251,7 +261,7 @@ export function ControlledBetaCohortInterventionApproval() {
             await loadApprovalDetails(selectedApprovalId);
             await fetchApprovalsList();
           } else {
-            setErrorMsg('Error al solicitar cambios');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al solicitar cambios'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -281,7 +291,7 @@ export function ControlledBetaCohortInterventionApproval() {
             await loadApprovalDetails(selectedApprovalId);
             await fetchApprovalsList();
           } else {
-            setErrorMsg('Error al retornar el expediente');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al retornar el expediente'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -311,7 +321,7 @@ export function ControlledBetaCohortInterventionApproval() {
             await loadApprovalDetails(selectedApprovalId);
             await fetchApprovalsList();
           } else {
-            setErrorMsg('Error al escalar el expediente');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al escalar el expediente'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -342,7 +352,7 @@ export function ControlledBetaCohortInterventionApproval() {
             await loadApprovalDetails(selectedApprovalId);
             await fetchApprovalsList();
           } else {
-            setErrorMsg('Error al sustituir el expediente');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al sustituir el expediente'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -473,13 +483,25 @@ export function ControlledBetaCohortInterventionApproval() {
             {fetchError ? (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
                 <p className="text-xs text-red-500 font-medium">{fetchError}</p>
-                <button
-                  type="button"
-                  onClick={fetchApprovalsList}
-                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                >
-                  Reintentar
-                </button>
+                {fetchStatus === 401 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
+                  >
+                    Iniciar Sesión
+                  </button>
+                ) : fetchStatus === 403 ? (
+                  <span className="text-[11px] text-zinc-500 font-medium">Permisos insuficientes</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={fetchApprovalsList}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                  >
+                    Reintentar
+                  </button>
+                )}
               </div>
             ) : filteredApprovals.length === 0 ? (
               <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">

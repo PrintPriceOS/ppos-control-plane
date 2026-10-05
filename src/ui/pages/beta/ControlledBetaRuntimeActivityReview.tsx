@@ -43,6 +43,7 @@ export function ControlledBetaRuntimeActivityReview() {
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reviewFetchError, setReviewFetchError] = useState<string | null>(null);
+  const [reviewFetchStatus, setReviewFetchStatus] = useState<number | null>(null);
 
   // Confirmation modal state for critical/destructive actions
   const [confirmModal, setConfirmModal] = useState<{
@@ -64,17 +65,26 @@ export function ControlledBetaRuntimeActivityReview() {
     const seq = ++reviewSeqRef.current;
     setLoading(true);
     setReviewFetchError(null);
+    setReviewFetchStatus(null);
     try {
       const res = await runtimeActivityReviewClient.listReviews();
       if (seq !== reviewSeqRef.current) return;
       if (res.ok) {
         setReviews(res.reviews || []);
       } else {
-        setReviewFetchError((res as any)?.error || 'Error al listar revisiones');
+        const status = (res as any)?.status || 500;
+        setReviewFetchStatus(status);
+        const fallback = status === 401
+          ? 'Sesión ausente o expirada. Por favor, inicie sesión.'
+          : status === 403
+          ? 'No tiene permisos suficientes para consultar las revisiones de actividad.'
+          : 'Error al listar revisiones de salud';
+        setReviewFetchError(normalizeUiError((res as any)?.error, fallback));
       }
     } catch (err: any) {
       if (seq !== reviewSeqRef.current) return;
-      setReviewFetchError(err?.message || String(err));
+      setReviewFetchStatus(err?.status || 500);
+      setReviewFetchError(normalizeUiError(err, 'Error de conexión al listar revisiones'));
     } finally {
       if (seq === reviewSeqRef.current) {
         setLoading(false);
@@ -148,7 +158,7 @@ export function ControlledBetaRuntimeActivityReview() {
         await fetchReviewsList();
         setSelectedReviewId(res.review.review_id);
       } else {
-        setErrorMsg('Error creando la revisión de salud');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error creando la revisión de salud'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -168,7 +178,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setMessage('Evaluación de salud completada con éxito.');
         await loadReviewDetails(selectedReviewId);
       } else {
-        setErrorMsg('Error al evaluar la salud del cohorte');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error al evaluar la salud del cohorte'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -195,7 +205,7 @@ export function ControlledBetaRuntimeActivityReview() {
             await loadReviewDetails(selectedReviewId);
             await fetchReviewsList();
           } else {
-            setErrorMsg('Error al finalizar la revisión');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al finalizar la revisión'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -233,7 +243,7 @@ export function ControlledBetaRuntimeActivityReview() {
             await loadReviewDetails(selectedReviewId);
             await fetchReviewsList();
           } else {
-            setErrorMsg('Error al sustituir la revisión');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al sustituir la revisión'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -362,13 +372,25 @@ export function ControlledBetaRuntimeActivityReview() {
             {reviewFetchError ? (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
                 <p className="text-xs text-red-500 font-medium">{reviewFetchError}</p>
-                <button
-                  type="button"
-                  onClick={fetchReviewsList}
-                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                >
-                  Reintentar
-                </button>
+                {reviewFetchStatus === 401 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
+                  >
+                    Iniciar Sesión
+                  </button>
+                ) : reviewFetchStatus === 403 ? (
+                  <span className="text-[11px] text-zinc-500 font-medium">Permisos insuficientes</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={fetchReviewsList}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                  >
+                    Reintentar
+                  </button>
+                )}
               </div>
             ) : filteredReviews.length === 0 ? (
               <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">

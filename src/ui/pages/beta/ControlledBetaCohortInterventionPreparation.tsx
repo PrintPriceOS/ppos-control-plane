@@ -48,6 +48,7 @@ export function ControlledBetaCohortInterventionPreparation() {
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchStatus, setFetchStatus] = useState<number | null>(null);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -70,17 +71,26 @@ export function ControlledBetaCohortInterventionPreparation() {
     const seq = ++prepSeqRef.current;
     setLoading(true);
     setFetchError(null);
+    setFetchStatus(null);
     try {
       const res = await cohortInterventionPreparationClient.listPreparations();
       if (seq !== prepSeqRef.current) return;
       if (res.ok) {
         setPreparations(res.preparations || []);
       } else {
-        setFetchError((res as any)?.error || 'Error al listar propuestas');
+        const status = (res as any)?.status || 500;
+        setFetchStatus(status);
+        const fallback = status === 401
+          ? 'Sesión ausente o expirada. Por favor, inicie sesión.'
+          : status === 403
+          ? 'No tiene permisos suficientes para consultar propuestas de intervención.'
+          : 'Error al listar propuestas de intervención';
+        setFetchError(normalizeUiError((res as any)?.error, fallback));
       }
     } catch (err: any) {
       if (seq !== prepSeqRef.current) return;
-      setFetchError(err?.message || String(err));
+      setFetchStatus(err?.status || 500);
+      setFetchError(normalizeUiError(err, 'Error de conexión al listar propuestas'));
     } finally {
       if (seq === prepSeqRef.current) setLoading(false);
     }
@@ -171,7 +181,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         await fetchPrepsList();
         setSelectedPrepId(res.preparation.preparation_id);
       } else {
-        setErrorMsg('Error creando la propuesta de intervención');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error creando la propuesta de intervención'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -191,7 +201,7 @@ export function ControlledBetaCohortInterventionPreparation() {
       if (res.ok) {
         await loadPrepDetails(selectedPrepId);
       } else {
-        setErrorMsg('Error actualizando la tarea de verificación');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error actualizando la tarea de verificación'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -211,7 +221,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setMessage(`Aprobación registrada para el rol ${role}.`);
         await loadPrepDetails(selectedPrepId);
       } else {
-        setErrorMsg('Error registrando la aprobación de rol');
+        setErrorMsg(normalizeUiError((res as any)?.error, 'Error registrando la aprobación de rol'));
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -238,7 +248,7 @@ export function ControlledBetaCohortInterventionPreparation() {
             await loadPrepDetails(selectedPrepId);
             await fetchPrepsList();
           } else {
-            setErrorMsg(`Bloqueo al finalizar: ${(res as any).reason || 'Requisitos pendientes'}`);
+            setErrorMsg(normalizeUiError((res as any)?.reason || (res as any)?.error, 'Requisitos pendientes'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -268,7 +278,7 @@ export function ControlledBetaCohortInterventionPreparation() {
             await loadPrepDetails(selectedPrepId);
             await fetchPrepsList();
           } else {
-            setErrorMsg('Error al rechazar la propuesta');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al rechazar la propuesta'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -299,7 +309,7 @@ export function ControlledBetaCohortInterventionPreparation() {
             await loadPrepDetails(selectedPrepId);
             await fetchPrepsList();
           } else {
-            setErrorMsg('Error al sustituir la propuesta');
+            setErrorMsg(normalizeUiError((res as any)?.error, 'Error al sustituir la propuesta'));
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));
@@ -435,13 +445,25 @@ export function ControlledBetaCohortInterventionPreparation() {
             {fetchError ? (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
                 <p className="text-xs text-red-500 font-medium">{fetchError}</p>
-                <button
-                  type="button"
-                  onClick={fetchPrepsList}
-                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                >
-                  Reintentar
-                </button>
+                {fetchStatus === 401 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
+                  >
+                    Iniciar Sesión
+                  </button>
+                ) : fetchStatus === 403 ? (
+                  <span className="text-[11px] text-zinc-500 font-medium">Permisos insuficientes</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={fetchPrepsList}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                  >
+                    Reintentar
+                  </button>
+                )}
               </div>
             ) : filteredPreparations.length === 0 ? (
               <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">

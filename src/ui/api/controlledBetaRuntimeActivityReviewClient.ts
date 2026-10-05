@@ -4,23 +4,24 @@ import {
   RuntimeActivityReviewFinding,
   RuntimeActivityReviewEvidence
 } from '../types/controlledBetaRuntimeActivityReview';
+import { authenticatedBetaFetch } from './betaApiAuthHelper';
 
 export class ControlledBetaRuntimeActivityReviewClient {
   private baseUrl = '/api/admin/beta/runtime-reviews';
 
-  async listReviews(): Promise<{ ok: boolean; reviews: RuntimeActivityReview[] }> {
-    const res = await fetch(`${this.baseUrl}/reviews`);
-    return res.json();
+  async listReviews(): Promise<{ ok: boolean; reviews?: RuntimeActivityReview[]; status?: number; error?: any }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews`);
   }
 
   async getReview(reviewId: string): Promise<{
     ok: boolean;
-    review: RuntimeActivityReview;
+    review?: RuntimeActivityReview;
     decision?: RuntimeActivityReviewDecision;
-    findings: RuntimeActivityReviewFinding[];
+    findings?: RuntimeActivityReviewFinding[];
+    status?: number;
+    error?: any;
   }> {
-    const res = await fetch(`${this.baseUrl}/reviews/${reviewId}`);
-    return res.json();
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews/${reviewId}`);
   }
 
   async createReview(data: {
@@ -28,51 +29,65 @@ export class ControlledBetaRuntimeActivityReviewClient {
     cohortId: string;
     windowStart: string;
     windowEnd: string;
-  }): Promise<{ ok: boolean; review: RuntimeActivityReview }> {
-    const res = await fetch(`${this.baseUrl}/reviews`, {
+  }): Promise<{ ok: boolean; review?: RuntimeActivityReview; status?: number; error?: any }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
   }
 
   async evaluateReview(reviewId: string): Promise<{
     ok: boolean;
-    evaluationResult: any;
-    decision: RuntimeActivityReviewDecision;
-    findings: RuntimeActivityReviewFinding[];
+    evaluationResult?: any;
+    decision?: RuntimeActivityReviewDecision;
+    findings?: RuntimeActivityReviewFinding[];
+    status?: number;
+    error?: any;
   }> {
-    const res = await fetch(`${this.baseUrl}/reviews/${reviewId}/evaluate`, {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews/${reviewId}/evaluate`, {
       method: 'POST'
     });
-    return res.json();
   }
 
-  async finalizeReview(reviewId: string): Promise<{ ok: boolean; review: RuntimeActivityReview; evidencePack: RuntimeActivityReviewEvidence }> {
-    const res = await fetch(`${this.baseUrl}/reviews/${reviewId}/finalize`, {
+  async finalizeReview(reviewId: string): Promise<{
+    ok: boolean;
+    review?: RuntimeActivityReview;
+    evidencePack?: RuntimeActivityReviewEvidence;
+    status?: number;
+    error?: any;
+  }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews/${reviewId}/finalize`, {
       method: 'POST'
     });
-    return res.json();
   }
 
-  async supersedeReview(reviewId: string, data: { supersededByReviewId: string; reason: string }): Promise<{ ok: boolean }> {
-    const res = await fetch(`${this.baseUrl}/reviews/${reviewId}/supersede`, {
+  async supersedeReview(reviewId: string, data: { supersededByReviewId: string; reason: string }): Promise<{
+    ok: boolean;
+    status?: number;
+    error?: any;
+  }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews/${reviewId}/supersede`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
   }
 
-  async getEvidencePack(reviewId: string): Promise<{ ok: boolean; evidencePack: RuntimeActivityReviewEvidence }> {
-    const res = await fetch(`${this.baseUrl}/reviews/${reviewId}/evidence-pack`);
-    return res.json();
+  async getEvidencePack(reviewId: string): Promise<{
+    ok: boolean;
+    evidencePack?: RuntimeActivityReviewEvidence;
+    status?: number;
+    error?: any;
+  }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/reviews/${reviewId}/evidence-pack`);
   }
 
-  async getCohortHealthSummary(cohortId: string, tenantId: string): Promise<{ ok: boolean; summary: any }> {
-    const res = await fetch(`${this.baseUrl}/cohorts/${cohortId}/health-summary?tenantId=${tenantId}`);
-    return res.json();
+  async getCohortHealthSummary(cohortId: string, tenantId: string): Promise<{
+    ok: boolean;
+    summary?: any;
+    status?: number;
+    error?: any;
+  }> {
+    return authenticatedBetaFetch(`${this.baseUrl}/cohorts/${cohortId}/health-summary?tenantId=${tenantId}`);
   }
 }
 
