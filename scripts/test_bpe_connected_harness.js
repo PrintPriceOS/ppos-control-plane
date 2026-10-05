@@ -542,7 +542,7 @@ async function runConnectedHarness() {
         // Route B: Estimates Calculation
         const initialEstimatesRes = await axios.post(`${bpeBaseUrl}/api/estimates`, quotePayload);
         assert(initialEstimatesRes.data.ok === true, 'Estimates route baseline returned ok=true');
-        const initialEstimateHouse = initialEstimatesRes.data.print_houses?.find(h => h.id === fixtureHouseId);
+        const initialEstimateHouse = initialEstimatesRes.data.print_houses?.find(h => h.house_id === fixtureHouseId);
         assert(!!initialEstimateHouse, 'Found initial estimate for harness house in estimates route');
         const initialCost = Number(initialEstimateHouse.total_cost);
         assert(Number.isFinite(initialCost) && initialCost > 0, `Initial estimates total_cost must be a positive finite number (got: ${initialEstimateHouse.total_cost})`);
@@ -669,7 +669,7 @@ async function runConnectedHarness() {
         // Route B: Estimates Calculation
         const updatedEstimatesRes = await axios.post(`${bpeBaseUrl}/api/estimates`, quotePayload);
         assert(updatedEstimatesRes.data.ok === true, 'Estimates route post-publication returned ok=true');
-        const updatedEstimateHouse = updatedEstimatesRes.data.print_houses?.find(h => h.id === fixtureHouseId);
+        const updatedEstimateHouse = updatedEstimatesRes.data.print_houses?.find(h => h.house_id === fixtureHouseId);
         assert(!!updatedEstimateHouse, 'Found updated estimate for harness house in estimates route');
         const updatedCost = Number(updatedEstimateHouse.total_cost);
         assert(Number.isFinite(updatedCost) && updatedCost > 0, `Updated estimates total_cost must be a positive finite number (got: ${updatedEstimateHouse.total_cost})`);
