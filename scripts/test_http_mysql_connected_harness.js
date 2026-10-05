@@ -5,6 +5,10 @@
  * Strictly NO mocks, NO in-memory fallbacks.
  * Connects exclusively to isolated MySQL test instance: pposrcmdw0qdtest on 127.0.0.1:3306.
  */
+
+// Set NODE_ENV to test before importing any routers or services
+process.env.NODE_ENV = 'test';
+
 const mysql = require('mysql2/promise');
 const express = require('express');
 const http = require('http');
@@ -12,12 +16,12 @@ const axios = require('axios');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
-// 1. Enforce strict isolated test database configuration
+// 1. Clear URL environment variables to enforce discrete variables
 delete process.env.DATABASE_URL;
 delete process.env.MYSQL_URL;
 
 const TEST_HOST = process.env.TEST_MYSQL_HOST || '127.0.0.1';
-const TEST_PORT = parseInt(process.env.TEST_MYSQL_PORT || '3306');
+const TEST_PORT = parseInt(process.env.TEST_MYSQL_PORT || '3306', 10);
 const TEST_DB = process.env.TEST_MYSQL_DATABASE || 'pposrcmdw0qdtest';
 const TEST_USER = process.env.TEST_MYSQL_USER || 'ppos_rc_mdw0qd';
 const TEST_PASSWORD = process.env.TEST_MYSQL_PASSWORD || '';
@@ -61,7 +65,28 @@ async function runConnectedHarness() {
     console.log(' PrintPrice OS Control Plane — Connected HTTP/MySQL Harness');
     console.log('================================================================');
 
-    // 2. Validate DB connection & identity (FAIL FAST)
+    // 2. Strict Isolation Check (Fail Fast)
+    if (TEST_HOST !== '127.0.0.1') {
+        logger.error('CRITICAL ISOLATION FAILURE: TEST_HOST must be strictly 127.0.0.1', { TEST_HOST });
+        process.exit(1);
+    }
+
+    if (TEST_PORT !== 3306) {
+        logger.error('CRITICAL ISOLATION FAILURE: TEST_PORT must be strictly 3306', { TEST_PORT });
+        process.exit(1);
+    }
+
+    if (TEST_DB !== 'pposrcmdw0qdtest') {
+        logger.error('CRITICAL ISOLATION FAILURE: TEST_DB must be strictly pposrcmdw0qdtest', { TEST_DB });
+        process.exit(1);
+    }
+
+    if (TEST_USER !== 'ppos_rc_mdw0qd') {
+        logger.error('CRITICAL ISOLATION FAILURE: TEST_USER must be strictly ppos_rc_mdw0qd', { TEST_USER });
+        process.exit(1);
+    }
+
+    // Direct raw connection check
     let conn;
     try {
         conn = await mysql.createConnection({
@@ -77,25 +102,44 @@ async function runConnectedHarness() {
         const currentUser = identityRows[0].currentUser;
         const currentDb = identityRows[0].currentDb;
 
-        logger.info('Connected to MySQL test instance successfully', { currentUser, currentDb });
+        logger.info('Direct MySQL connection established', { currentUser, currentDb });
 
-        if (currentDb !== TEST_DB) {
-            throw new Error(`Connected database "${currentDb}" does not match target test DB "${TEST_DB}"`);
+        if (currentDb !== 'pposrcmdw0qdtest') {
+            logger.error('CRITICAL: DATABASE() does not match pposrcmdw0qdtest', { currentDb });
+            process.exit(1);
         }
 
-        if (TEST_HOST !== '127.0.0.1' && TEST_HOST !== 'localhost') {
-            throw new Error(`Test host "${TEST_HOST}" must be local 127.0.0.1`);
+        if (currentUser !== 'ppos_rc_mdw0qd@127.0.0.1') {
+            logger.error('CRITICAL: CURRENT_USER() does not match ppos_rc_mdw0qd@127.0.0.1', { currentUser });
+            process.exit(1);
         }
     } catch (err) {
-        logger.error('CRITICAL: Failed MySQL connection or identity validation', { error: err.message });
-        console.error('Abort harness: No real MySQL test database available or incorrect identity.');
+        logger.error('CRITICAL: Direct MySQL connection or identity validation failed', { error: err.message });
         process.exit(1);
     } finally {
         if (conn) await conn.end();
     }
 
-    // 3. Initialize server & modules with real MySQL pool
+    // Initialize mysqlClient service and verify identity through mysqlClient.query
     const db = require('../src/api/services/mysqlClient');
+
+    try {
+        const clientRows = await db.query('SELECT CURRENT_USER() AS currentUser, DATABASE() AS currentDb');
+        const clientUser = clientRows[0].currentUser;
+        const clientDb = clientRows[0].currentDb;
+
+        logger.info('mysqlClient pool verification established', { clientUser, clientDb });
+
+        if (clientDb !== 'pposrcmdw0qdtest' || clientUser !== 'ppos_rc_mdw0qd@127.0.0.1') {
+            logger.error('CRITICAL: mysqlClient identity mismatch', { clientUser, clientDb });
+            process.exit(1);
+        }
+    } catch (err) {
+        logger.error('CRITICAL: mysqlClient bootstrap query failed', { error: err.message });
+        process.exit(1);
+    }
+
+    // Import routes & services after isolation validation
     const authRoutes = require('../src/api/routes/authRoutes');
     const adminRoutes = require('../src/api/routes/admin');
     const userMfaService = require('../src/api/services/userMfaService');
@@ -108,23 +152,31 @@ async function runConnectedHarness() {
     let server;
     let baseUrl;
 
-    await new Promise((resolve) => {
-        server = http.createServer(app);
-        server.listen(0, '127.0.0.1', () => {
-            const port = server.address().port;
-            baseUrl = `http://127.0.0.1:${port}`;
-            logger.info('HTTP test server listening on isolated localhost', { baseUrl });
-            resolve();
-        });
-    });
-
-    const tenantId = 'tenant_harness_connected';
-    const pwUserId = 'user_pw_harness_' + Date.now();
-    const pwEmail = `harness_pw_${Date.now()}@printprice.pro`;
-    const rawPassword = 'TestPassword123!';
+    const createdTenantIds = new Set();
+    const createdUserIds = new Set();
+    const createdSignupEmails = new Set();
 
     try {
-        // Prepare test tenant and user in MySQL
+        await new Promise((resolve) => {
+            server = http.createServer(app);
+            server.listen(0, '127.0.0.1', () => {
+                const port = server.address().port;
+                baseUrl = `http://127.0.0.1:${port}`;
+                logger.info('HTTP test server listening on isolated localhost', { baseUrl });
+                resolve();
+            });
+        });
+
+        const tenantId = 'tenant_harness_connected';
+        const pwUserId = 'user_pw_harness_' + Date.now();
+        const pwEmail = `harness_pw_${Date.now()}@printprice.pro`;
+        const rawPassword = 'TestPassword123!';
+
+        createdTenantIds.add(tenantId);
+        createdUserIds.add(pwUserId);
+        createdSignupEmails.add(pwEmail);
+
+        // Seed test tenant and test user in MySQL
         await db.query(
             `INSERT INTO tenants (id, name, status, plan, created_at)
              VALUES (?, 'Harness Test Tenant', 'ACTIVE', 'ENTERPRISE', NOW())
@@ -158,8 +210,8 @@ async function runConnectedHarness() {
             throw new Error('Login response did not include sessionId in user object');
         }
 
-        // Verify session persistence in MySQL user_sessions table
-        const [sessionRows] = await db.query(
+        // Verify session persistence in MySQL user_sessions table using mysqlClient contract (returns rows array)
+        const sessionRows = await db.query(
             `SELECT id, user_id, tenant_id, status FROM user_sessions WHERE id = ?`,
             [sessionId]
         );
@@ -191,11 +243,11 @@ async function runConnectedHarness() {
         }
 
         // Verify session status updated to REVOKED in MySQL
-        const [revokedRows] = await db.query(
+        const revokedRows = await db.query(
             `SELECT status FROM user_sessions WHERE id = ?`,
             [sessionId]
         );
-        if (!revokedRows || revokedRows[0].status !== 'REVOKED') {
+        if (!revokedRows || revokedRows.length === 0 || revokedRows[0].status !== 'REVOKED') {
             throw new Error(`Session status in MySQL was NOT updated to REVOKED after logout`);
         }
         logger.info('Case 1 Check 3 PASSED: Session status updated to REVOKED in MySQL');
@@ -217,6 +269,8 @@ async function runConnectedHarness() {
         logger.info('Executing Case 2: Self-Registration Auto-Login & Persisted Session');
 
         const regEmail = `harness_reg_${Date.now()}@printprice.pro`;
+        createdSignupEmails.add(regEmail);
+
         const regRes = await axios.post(`${baseUrl}/api/auth/printhouse/register`, {
             companyName: 'Harness Print Shop',
             email: regEmail,
@@ -229,8 +283,9 @@ async function runConnectedHarness() {
 
         const regToken = regRes.data.token;
         const regTenantId = regRes.data.user.tenantId;
+        if (regTenantId) createdTenantIds.add(regTenantId);
 
-        // Verify session persistence for newly registered user
+        // Access protected route to retrieve user ID and session ID
         const regVerifyRes = await axios.get(`${baseUrl}/api/admin/verify`, {
             headers: { Authorization: `Bearer ${regToken}` }
         });
@@ -239,22 +294,32 @@ async function runConnectedHarness() {
             throw new Error('Protected route access failed for self-registered user');
         }
 
+        const regUserId = regVerifyRes.data.user.id;
         const regSessionId = regVerifyRes.data.user.sessionId;
-        const [regSessionRows] = await db.query(
-            `SELECT id, status FROM user_sessions WHERE id = ?`,
+
+        if (regUserId) createdUserIds.add(regUserId);
+
+        const regSessionRows = await db.query(
+            `SELECT id, user_id, tenant_id, status FROM user_sessions WHERE id = ?`,
             [regSessionId]
         );
 
-        if (!regSessionRows || regSessionRows[0].status !== 'ACTIVE') {
-            throw new Error('Registration session was NOT active in MySQL');
+        if (!regSessionRows || regSessionRows.length === 0 || regSessionRows[0].status !== 'ACTIVE') {
+            throw new Error('Registration session was NOT active in MySQL user_sessions');
         }
-        logger.info('Case 2 PASSED: Self-registration auto-login issued persisted session JWT', { regSessionId, regTenantId });
+
+        if (regSessionRows[0].user_id !== regUserId || regSessionRows[0].tenant_id !== regTenantId) {
+            throw new Error('Registration session user_id or tenant_id mismatch');
+        }
+        logger.info('Case 2 PASSED: Self-registration auto-login issued persisted session JWT', { regUserId, regSessionId, regTenantId });
 
         // ── CASE 3: MFA Challenge, Recovery & Anti-Replay in MySQL ──────────
         logger.info('Executing Case 3: Real MFA Challenge, Recovery & Anti-Replay');
 
         const mfaUserId = 'user_mfa_harness_' + Date.now();
         const mfaEmail = `harness_mfa_${Date.now()}@printprice.pro`;
+        createdUserIds.add(mfaUserId);
+        createdSignupEmails.add(mfaEmail);
 
         await db.query(
             `INSERT INTO control_users (id, tenant_id, email, password_hash, role, status, created_at)
@@ -305,15 +370,14 @@ async function runConnectedHarness() {
             throw new Error(`MFA verification failed: ${JSON.stringify(mfaVerifyRes.data)}`);
         }
 
-        const fullAccessToken = mfaVerifyRes.data.token;
         const mfaSessionId = mfaVerifyRes.data.user.sessionId;
 
         // Verify session persistence in MySQL
-        const [mfaSessionRows] = await db.query(
+        const mfaSessionRows = await db.query(
             `SELECT id, status FROM user_sessions WHERE id = ?`,
             [mfaSessionId]
         );
-        if (!mfaSessionRows || mfaSessionRows[0].status !== 'ACTIVE') {
+        if (!mfaSessionRows || mfaSessionRows.length === 0 || mfaSessionRows[0].status !== 'ACTIVE') {
             throw new Error('MFA verified session was NOT persisted in MySQL user_sessions');
         }
         logger.info('Case 3 Check 2 PASSED: MFA verification issued full persisted session', { mfaSessionId });
@@ -332,14 +396,6 @@ async function runConnectedHarness() {
             logger.info('Case 3 Check 3 PASSED: Reused TOTP code rejected due to anti-replay');
         }
 
-        // ── Clean up harness test fixtures ONLY ───────────────────────────────
-        logger.info('Cleaning up test fixtures...');
-        await db.query(`DELETE FROM user_sessions WHERE user_id IN (?, ?, ?) OR tenant_id = ?`, [pwUserId, mfaUserId, regTenantId, tenantId]).catch(() => {});
-        await db.query(`DELETE FROM user_mfa WHERE user_id = ?`, [mfaUserId]).catch(() => {});
-        await db.query(`DELETE FROM control_users WHERE id IN (?, ?) OR email = ?`, [pwUserId, mfaUserId, regEmail]).catch(() => {});
-        await db.query(`DELETE FROM tenants WHERE id IN (?, ?)`, [tenantId, regTenantId]).catch(() => {});
-        await db.query(`DELETE FROM printhouse_signup_requests WHERE email = ?`, [regEmail]).catch(() => {});
-
         console.log('================================================================');
         console.log(' SUCCESS: All connected HTTP/MySQL 8 harness tests PASSED!');
         console.log('================================================================');
@@ -348,21 +404,97 @@ async function runConnectedHarness() {
         logger.error('Harness test failure', { error: err.message, stack: err.stack });
         process.exitCode = 1;
     } finally {
-        if (server) {
-            await new Promise(r => server.close(r));
+        logger.info('Executing teardown and fixture cleanup in finally block...');
+
+        const tenantArray = Array.from(createdTenantIds);
+        const userArray = Array.from(createdUserIds);
+        const emailArray = Array.from(createdSignupEmails);
+
+        // Reverse FK order cleanup with error tracing (no swallowed errors)
+        try {
+            if (userArray.length || tenantArray.length) {
+                const uPlaceholders = userArray.map(() => '?').join(',') || 'NULL';
+                const tPlaceholders = tenantArray.map(() => '?').join(',') || 'NULL';
+
+                await db.query(
+                    `DELETE FROM user_sessions WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
+                    [...userArray, ...tenantArray]
+                );
+
+                await db.query(
+                    `DELETE FROM user_mfa WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
+                    [...userArray, ...tenantArray]
+                );
+
+                await db.query(
+                    `DELETE FROM tenant_licenses WHERE tenant_id IN (${tPlaceholders})`,
+                    tenantArray
+                );
+
+                await db.query(
+                    `DELETE FROM printhouse_capabilities WHERE tenant_id IN (${tPlaceholders})`,
+                    tenantArray
+                );
+
+                await db.query(
+                    `DELETE FROM printer_nodes WHERE tenant_id IN (${tPlaceholders})`,
+                    tenantArray
+                );
+
+                if (emailArray.length) {
+                    const ePlaceholders = emailArray.map(() => '?').join(',');
+                    await db.query(
+                        `DELETE FROM control_users WHERE id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders}) OR email IN (${ePlaceholders})`,
+                        [...userArray, ...tenantArray, ...emailArray]
+                    );
+
+                    await db.query(
+                        `DELETE FROM printhouse_signup_requests WHERE email IN (${ePlaceholders})`,
+                        emailArray
+                    );
+                }
+
+                await db.query(
+                    `DELETE FROM tenants WHERE id IN (${tPlaceholders})`,
+                    tenantArray
+                );
+            }
+            logger.info('Fixture cleanup completed successfully');
+        } catch (cleanupErr) {
+            logger.error('CRITICAL: Fixture cleanup encountered an error', { error: cleanupErr.message, stack: cleanupErr.stack });
+            process.exitCode = 1;
         }
+
+        // Close server and database connection pools cleanly
+        if (server) {
+            await new Promise((resolve) => server.close(resolve)).catch(err => {
+                logger.error('HTTP server close error', { error: err.message });
+                process.exitCode = 1;
+            });
+        }
+
+        try {
+            await db.closePool();
+        } catch (err) {
+            logger.error('mysqlClient closePool error', { error: err.message });
+            process.exitCode = 1;
+        }
+
+        try {
+            const upstreamDbPath = require.resolve('../src/api/upstream/src/services/db');
+            const cachedUpstream = require.cache[upstreamDbPath];
+            if (cachedUpstream && cachedUpstream.exports && typeof cachedUpstream.exports.shutdown === 'function') {
+                await cachedUpstream.exports.shutdown();
+            }
+        } catch (err) {}
+
         try {
             const redisPath = require.resolve('../src/api/adapters/redisConnection');
-            const cached = require.cache[redisPath];
-            if (cached && cached.exports && typeof cached.exports.quit === 'function') {
-                await cached.exports.quit();
+            const cachedRedis = require.cache[redisPath];
+            if (cachedRedis && cachedRedis.exports && typeof cachedRedis.exports.quit === 'function') {
+                await cachedRedis.exports.quit();
             }
-        } catch (e) {}
-
-        const pool = db.getPool();
-        if (pool && typeof pool.end === 'function') {
-            await pool.end();
-        }
+        } catch (err) {}
     }
 }
 
