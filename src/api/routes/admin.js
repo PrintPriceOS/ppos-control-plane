@@ -1,6 +1,6 @@
 // routes/admin.js
 const express = require("express");
-const { requireAdmin, resolveActorContext } = require("../middleware/auth");
+const { requireAdmin, resolveActorContext, requireRole } = require("../middleware/auth");
 const db = require("../services/mysqlClient");
 
 const router = express.Router();
@@ -1213,7 +1213,7 @@ router.get('/webhooks/subscriptions', async (req, res) => {
     }
 });
 
-router.post('/webhooks/subscriptions', async (req, res) => {
+router.post('/webhooks/subscriptions', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const sub = await outgoingWebhookService.createSubscription({
             tenantId: req.user.tenantId,
@@ -1226,7 +1226,7 @@ router.post('/webhooks/subscriptions', async (req, res) => {
     }
 });
 
-router.post('/webhooks/subscriptions/:id/rotate-secret', async (req, res) => {
+router.post('/webhooks/subscriptions/:id/rotate-secret', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const result = await outgoingWebhookService.rotateSecret(req.params.id, req.user.tenantId);
         res.json({ ok: true, data: result });
@@ -1244,16 +1244,21 @@ router.get('/webhooks/deliveries', async (req, res) => {
     }
 });
 
-router.post('/webhooks/deliveries/:id/resend', async (req, res) => {
+router.post('/webhooks/deliveries/:id/resend', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
-        const result = await outgoingWebhookService.deliverSingleWebhook(req.params.id);
+        const result = await outgoingWebhookService.resendDelivery({
+            deliveryId: req.params.id,
+            tenantId: req.user.tenantId,
+            requestingUserRole: req.user.role
+        });
         res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        const status = err.statusCode || (err.message.includes('not found') ? 404 : (err.message.includes('Forbidden') || err.message.includes('not authorized') ? 403 : 500));
+        res.status(status).json({ ok: false, error: err.message });
     }
 });
 
-router.post('/webhooks/test', async (req, res) => {
+router.post('/webhooks/test', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const result = await outgoingWebhookService.enqueueWebhookEvent({
             tenantId: req.user.tenantId,
@@ -1278,7 +1283,7 @@ router.get('/notifications/slack', async (req, res) => {
     }
 });
 
-router.post('/notifications/slack', async (req, res) => {
+router.post('/notifications/slack', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const config = await slackNotificationService.configureSlackIntegration({
             tenantId: req.user.tenantId,
@@ -1293,7 +1298,7 @@ router.post('/notifications/slack', async (req, res) => {
     }
 });
 
-router.post('/notifications/slack/test', async (req, res) => {
+router.post('/notifications/slack/test', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const result = await slackNotificationService.testSlackIntegration(req.user.tenantId);
         res.json({ ok: true, data: result });
@@ -1305,7 +1310,7 @@ router.post('/notifications/slack/test', async (req, res) => {
 // ── Governed Pricing BPE Publication Endpoints (Goal F) ───────────────────
 const bpePublicationService = require('../services/bpePublicationService');
 
-router.post('/printhouses/:nodeId/publish-rates', async (req, res) => {
+router.post('/printhouses/:nodeId/publish-rates', requireRole('TENANT_ADMIN'), async (req, res) => {
     try {
         const { revisionId } = req.body || {};
         if (!revisionId) {

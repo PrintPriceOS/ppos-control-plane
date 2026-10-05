@@ -94,11 +94,15 @@ class AIProviderAdapter {
 
     /**
      * Plain-text / structured completion helper for decisions/evaluations.
-     * Returns rawText output from generateStructuredCompletion.
+     * Returns rawText output from generateStructuredCompletion while honoring maxTokens and temperature.
      */
-    async complete({ prompt, maxTokens = 100, temperature = 0.1 }) {
+    async complete({ prompt, maxTokens = 100, temperature = 0.1, model = null }) {
         const result = await this.generateStructuredCompletion({
-            userPrompt: prompt
+            userPrompt: prompt,
+            model,
+            maxTokens,
+            temperature,
+            responseMimeType: null
         });
         return result.rawText;
     }
@@ -107,19 +111,25 @@ class AIProviderAdapter {
      * Generates a structured JSON completion using the configured provider.
      *
      * @param {Object} options
-     * @param {string} options.systemInstruction - System instructions defining schema and boundaries
+     * @param {string} [options.systemInstruction] - System instructions defining schema and boundaries
      * @param {string} options.userPrompt - Sanitized user message and context
      * @param {Array} [options.history] - Optional sanitized conversational history
      * @param {string} [options.model] - Target model name override
      * @param {Object} [options.mockResponse] - Optional mock response for testing/isolated execution
-     * @returns {Promise<{ rawText: string, json: Object, model: string, usage: Object, latencyMs: number }>}
+     * @param {number} [options.maxTokens] - Max tokens to generate
+     * @param {number} [options.temperature] - Sampling temperature
+     * @param {string|null} [options.responseMimeType] - Response mime type ('application/json' or null)
+     * @returns {Promise<{ rawText: string, json: Object, model: string, provider: string, isFallback: boolean, usage: Object, latencyMs: number }>}
      */
     async generateStructuredCompletion({
         systemInstruction,
         userPrompt,
         history = [],
         model = null,
-        mockResponse = null
+        mockResponse = null,
+        maxTokens = null,
+        temperature = 0.1,
+        responseMimeType = 'application/json'
     }) {
         const startTime = Date.now();
         const selectedModel = model || this.getConfiguredModel();
@@ -128,10 +138,19 @@ class AIProviderAdapter {
         // 1. Support deterministic mock injection for unit/integration tests
         if (mockResponse) {
             const latencyMs = Date.now() - startTime;
+            const text = typeof mockResponse === 'string' ? mockResponse : JSON.stringify(mockResponse);
+            let parsed = null;
+            try {
+                parsed = typeof mockResponse === 'string' ? JSON.parse(mockResponse) : mockResponse;
+            } catch {
+                parsed = null;
+            }
             return {
-                rawText: typeof mockResponse === 'string' ? mockResponse : JSON.stringify(mockResponse),
-                json: typeof mockResponse === 'string' ? JSON.parse(mockResponse) : mockResponse,
+                rawText: text,
+                json: parsed,
                 model: 'mock-test-model',
+                provider: 'mock',
+                isFallback: true,
                 usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
                 latencyMs
             };
@@ -166,15 +185,22 @@ class AIProviderAdapter {
             parts: [{ text: userPrompt }]
         });
 
+        const generationConfig = {
+            temperature: typeof temperature === 'number' ? temperature : 0.1
+        };
+        if (responseMimeType) {
+            generationConfig.responseMimeType = responseMimeType;
+        }
+        if (typeof maxTokens === 'number' && maxTokens > 0) {
+            generationConfig.maxOutputTokens = maxTokens;
+        }
+
         const requestBody = {
             contents,
             systemInstruction: systemInstruction ? {
                 parts: [{ text: systemInstruction }]
             } : undefined,
-            generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.1
-            }
+            generationConfig
         };
 
         const targetModel = selectedModel.startsWith('models/') ? selectedModel : `models/${selectedModel}`;
@@ -197,17 +223,26 @@ class AIProviderAdapter {
                 throw err;
             }
 
-            let parsedJson;
-            try {
-                // Strip markdown code fences if model enclosed JSON
-                const sanitized = textPart.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-                parsedJson = JSON.parse(sanitized);
-            } catch (pErr) {
-                const err = new Error(`Failed to parse AI response as JSON: ${pErr.message}`);
-                err.code = 'AI_STRUCTURED_OUTPUT_INVALID';
-                err.statusCode = 502;
-                err.rawText = textPart;
-                throw err;
+            let parsedJson = null;
+            if (responseMimeType === 'application/json') {
+                try {
+                    // Strip markdown code fences if model enclosed JSON
+                    const sanitized = textPart.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+                    parsedJson = JSON.parse(sanitized);
+                } catch (pErr) {
+                    const err = new Error(`Failed to parse AI response as JSON: ${pErr.message}`);
+                    err.code = 'AI_STRUCTURED_OUTPUT_INVALID';
+                    err.statusCode = 502;
+                    err.rawText = textPart;
+                    throw err;
+                }
+            } else {
+                try {
+                    const sanitized = textPart.trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+                    parsedJson = JSON.parse(sanitized);
+                } catch {
+                    parsedJson = null;
+                }
             }
 
             const usage = response.data?.usageMetadata || {
@@ -220,6 +255,8 @@ class AIProviderAdapter {
                 rawText: textPart,
                 json: parsedJson,
                 model: targetModel,
+                provider: 'gemini',
+                isFallback: false,
                 usage: {
                     promptTokens: usage.promptTokenCount || 0,
                     completionTokens: usage.candidatesTokenCount || 0,

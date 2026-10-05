@@ -25,7 +25,7 @@ class UserSessionService {
     /**
      * Creates a new trackable server session with canonical string IDs.
      */
-    async createSession({ userId, tenantId, role, ipAddress = null, userAgent = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES, absoluteHours = DEFAULT_ABSOLUTE_HOURS }) {
+    async createSession({ userId, tenantId, role, sessionId = null, ipAddress = null, userAgent = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES, absoluteHours = DEFAULT_ABSOLUTE_HOURS }) {
         const canonicalUserId = canonicalId(userId);
         const canonicalTenantId = canonicalId(tenantId);
 
@@ -36,18 +36,18 @@ class UserSessionService {
             throw new Error('Valid tenantId is required to create a session');
         }
 
-        const sessionId = uuidv4();
+        const effectiveSessionId = sessionId || uuidv4();
         const now = new Date();
         const expiresAt = new Date(now.getTime() + (absoluteHours * 60 * 60 * 1000));
 
         await db.query(
             `INSERT INTO user_sessions (id, user_id, tenant_id, role, ip_address, user_agent, status, last_activity_at, expires_at, created_at)
              VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', NOW(), ?, NOW())`,
-            [sessionId, canonicalUserId, canonicalTenantId, role, ipAddress, userAgent ? userAgent.slice(0, 500) : null, expiresAt]
+            [effectiveSessionId, canonicalUserId, canonicalTenantId, role, ipAddress, userAgent ? userAgent.slice(0, 500) : null, expiresAt]
         );
 
         return {
-            sessionId,
+            sessionId: effectiveSessionId,
             userId: canonicalUserId,
             tenantId: canonicalTenantId,
             expiresAt,
@@ -211,6 +211,30 @@ class UserSessionService {
 
         let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE user_id = ? AND status = 'ACTIVE'`;
         let params = [reason, canonicalUserId];
+
+        if (canonicalTenantId !== null) {
+            query += ` AND tenant_id = ?`;
+            params.push(canonicalTenantId);
+        }
+
+        const result = await db.query(query, params);
+        return { ok: true, revokedCount: result.affectedRows || 0 };
+    }
+
+    /**
+     * Revokes all active sessions for a user EXCEPT the current session.
+     */
+    async revokeOtherSessions(userId, tenantId, currentSessionId, reason = 'REVOKE_OTHER_SESSIONS') {
+        const canonicalUserId = canonicalId(userId);
+        const canonicalTenantId = canonicalId(tenantId);
+        const canonicalCurrentSessionId = canonicalId(currentSessionId);
+
+        if (!canonicalUserId || !canonicalCurrentSessionId) {
+            return { ok: false, code: 'MISSING_PARAMS', message: 'Valid userId and currentSessionId are required' };
+        }
+
+        let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE user_id = ? AND id != ? AND status = 'ACTIVE'`;
+        let params = [reason, canonicalUserId, canonicalCurrentSessionId];
 
         if (canonicalTenantId !== null) {
             query += ` AND tenant_id = ?`;

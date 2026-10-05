@@ -515,9 +515,16 @@ router.get('/sessions', requireAdmin, async (req, res) => {
  */
 router.post('/sessions/revoke', requireAdmin, async (req, res) => {
     try {
-        const { sessionId, revokeAll } = req.body || {};
+        const { sessionId, revokeAll, revokeOthers } = req.body || {};
         if (revokeAll) {
             const result = await userSessionService.revokeAllUserSessions(req.user.id, req.user.tenantId, 'USER_REVOKE_ALL');
+            return res.json({ ok: true, revokedCount: result.revokedCount });
+        }
+        if (revokeOthers) {
+            if (!req.user.sessionId) {
+                return res.status(400).json({ ok: false, error: 'Current session tracking ID is missing' });
+            }
+            const result = await userSessionService.revokeOtherSessions(req.user.id, req.user.tenantId, req.user.sessionId, 'USER_REVOKE_OTHERS');
             return res.json({ ok: true, revokedCount: result.revokedCount });
         }
         if (sessionId) {
@@ -533,7 +540,7 @@ router.post('/sessions/revoke', requireAdmin, async (req, res) => {
             }
             return res.json({ ok: true, message: `Session ${sessionId} revoked` });
         }
-        res.status(400).json({ ok: false, error: 'sessionId or revokeAll is required' });
+        res.status(400).json({ ok: false, error: 'sessionId, revokeAll, or revokeOthers is required' });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

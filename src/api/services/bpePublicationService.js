@@ -132,8 +132,17 @@ class BpePublicationService {
             }
         }
 
+        const bpeServiceToken = (process.env.PPOS_BPE_SERVICE_TOKEN || '').trim();
+        if (!bpeServiceToken) {
+            const errorMsg = 'BPE publication service token (PPOS_BPE_SERVICE_TOKEN) is not configured. Rate publication is disabled.';
+            await db.query(`UPDATE bpe_pricing_publications SET status = 'FAILED', error_message = ? WHERE id = ?`, [errorMsg, publicationId]);
+            const err = new Error(errorMsg);
+            err.code = 'BPE_TOKEN_NOT_CONFIGURED';
+            err.statusCode = 503;
+            throw err;
+        }
+
         try {
-            const bpeServiceToken = process.env.PPOS_BPE_SERVICE_TOKEN || process.env.PPOS_CONTROL_TOKEN || 'bpe-internal-service-token';
             const res = await axios.post(`${bpeUrl}${publishPath}`, publicationPayload, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -171,14 +180,10 @@ class BpePublicationService {
             const errorMsg = err.response?.data?.error || err.message || 'BPE publication request failed';
             await db.query(`UPDATE bpe_pricing_publications SET status = 'FAILED', error_message = ? WHERE id = ?`, [String(errorMsg), publicationId]);
 
-            // If BPE publication endpoint is unavailable, return structured pending status for isolated environments
-            return {
-                ok: false,
-                status: 'FAILED',
-                publicationId,
-                printerNodeId,
-                error: String(errorMsg)
-            };
+            const failureErr = new Error(String(errorMsg));
+            failureErr.statusCode = err.response?.status || err.statusCode || 500;
+            failureErr.publicationId = publicationId;
+            throw failureErr;
         }
     }
 

@@ -297,6 +297,8 @@ MANAGER MESSAGE:
             sessionId,
             proposal: validatedResponse,
             model: aiResult.model,
+            provider: aiResult.provider || (aiResult.isFallback ? 'mock' : 'gemini'),
+            isFallback: Boolean(aiResult.isFallback),
             latencyMs: aiResult.latencyMs
         };
     }
@@ -393,6 +395,8 @@ MANAGER MESSAGE:
             ok: true,
             proposal: validatedResponse,
             model: aiResult.model,
+            provider: aiResult.provider || (aiResult.isFallback ? 'mock' : 'gemini'),
+            isFallback: Boolean(aiResult.isFallback),
             latencyMs: aiResult.latencyMs
         };
     }
