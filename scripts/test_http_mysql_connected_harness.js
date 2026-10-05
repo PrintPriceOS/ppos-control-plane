@@ -167,29 +167,33 @@ async function runConnectedHarness() {
             });
         });
 
-        const tenantId = 'tenant_harness_connected';
-        const pwUserId = 'user_pw_harness_' + Date.now();
-        const pwEmail = `harness_pw_${Date.now()}@printprice.pro`;
+        const tenantId = `tenant_harness_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const pwEmail = `harness_pw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@printprice.pro`;
         const rawPassword = 'TestPassword123!';
 
         createdTenantIds.add(tenantId);
-        createdUserIds.add(pwUserId);
         createdSignupEmails.add(pwEmail);
 
-        // Seed test tenant and test user in MySQL
+        // Seed unique test tenant in MySQL (only standard columns, no updated_at)
         await db.query(
-            `INSERT INTO tenants (id, name, status, plan, created_at)
-             VALUES (?, 'Harness Test Tenant', 'ACTIVE', 'ENTERPRISE', NOW())
-             ON DUPLICATE KEY UPDATE updated_at = NOW()`,
+            `INSERT INTO tenants (id, name, status, created_at)
+             VALUES (?, 'Harness Test Tenant', 'ACTIVE', NOW())`,
             [tenantId]
         );
 
         const passwordHash = await bcrypt.hash(rawPassword, 10);
-        await db.query(
-            `INSERT INTO control_users (id, tenant_id, email, password_hash, role, status, created_at)
-             VALUES (?, ?, ?, ?, 'PRINTHOUSE_ADMIN', 'ACTIVE', NOW())`,
-            [pwUserId, tenantId, pwEmail, passwordHash]
+        // Omit id for AUTO_INCREMENT control_users table, use valid ENUM 'printhouse_admin'
+        const pwInsertRes = await db.query(
+            `INSERT INTO control_users (tenant_id, email, password_hash, role, status, created_at)
+             VALUES (?, ?, ?, 'printhouse_admin', 'ACTIVE', NOW())`,
+            [tenantId, pwEmail, passwordHash]
         );
+        const pwInsertId = pwInsertRes.insertId || (Array.isArray(pwInsertRes) && pwInsertRes[0]?.insertId);
+        if (!pwInsertId) {
+            throw new Error('Failed to retrieve insertId for password control_users fixture');
+        }
+        const pwUserId = String(pwInsertId);
+        createdUserIds.add(pwUserId);
 
         // ── CASE 1: Password Login & Persisted Session ───────────────────────
         logger.info('Executing Case 1: Password Login & Persisted Session');
@@ -220,7 +224,7 @@ async function runConnectedHarness() {
             throw new Error(`Session ${sessionId} was NOT persisted in MySQL user_sessions table`);
         }
 
-        if (sessionRows[0].status !== 'ACTIVE' || sessionRows[0].user_id !== pwUserId || sessionRows[0].tenant_id !== tenantId) {
+        if (sessionRows[0].status !== 'ACTIVE' || String(sessionRows[0].user_id) !== pwUserId || sessionRows[0].tenant_id !== tenantId) {
             throw new Error(`Persisted session mismatch: ${JSON.stringify(sessionRows[0])}`);
         }
         logger.info('Case 1 Check 1 PASSED: Session record verified in MySQL user_sessions table', { sessionId, status: sessionRows[0].status });
@@ -268,7 +272,7 @@ async function runConnectedHarness() {
         // ── CASE 2: Self-Registration Auto-Login & Persisted Session ─────────
         logger.info('Executing Case 2: Self-Registration Auto-Login & Persisted Session');
 
-        const regEmail = `harness_reg_${Date.now()}@printprice.pro`;
+        const regEmail = `harness_reg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@printprice.pro`;
         createdSignupEmails.add(regEmail);
 
         const regRes = await axios.post(`${baseUrl}/api/auth/printhouse/register`, {
@@ -294,7 +298,7 @@ async function runConnectedHarness() {
             throw new Error('Protected route access failed for self-registered user');
         }
 
-        const regUserId = regVerifyRes.data.user.id;
+        const regUserId = String(regVerifyRes.data.user.id);
         const regSessionId = regVerifyRes.data.user.sessionId;
 
         if (regUserId) createdUserIds.add(regUserId);
@@ -308,7 +312,7 @@ async function runConnectedHarness() {
             throw new Error('Registration session was NOT active in MySQL user_sessions');
         }
 
-        if (regSessionRows[0].user_id !== regUserId || regSessionRows[0].tenant_id !== regTenantId) {
+        if (String(regSessionRows[0].user_id) !== regUserId || regSessionRows[0].tenant_id !== regTenantId) {
             throw new Error('Registration session user_id or tenant_id mismatch');
         }
         logger.info('Case 2 PASSED: Self-registration auto-login issued persisted session JWT', { regUserId, regSessionId, regTenantId });
@@ -316,16 +320,20 @@ async function runConnectedHarness() {
         // ── CASE 3: MFA Challenge, Recovery & Anti-Replay in MySQL ──────────
         logger.info('Executing Case 3: Real MFA Challenge, Recovery & Anti-Replay');
 
-        const mfaUserId = 'user_mfa_harness_' + Date.now();
-        const mfaEmail = `harness_mfa_${Date.now()}@printprice.pro`;
-        createdUserIds.add(mfaUserId);
+        const mfaEmail = `harness_mfa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@printprice.pro`;
         createdSignupEmails.add(mfaEmail);
 
-        await db.query(
-            `INSERT INTO control_users (id, tenant_id, email, password_hash, role, status, created_at)
-             VALUES (?, ?, ?, ?, 'PRINTHOUSE_ADMIN', 'ACTIVE', NOW())`,
-            [mfaUserId, tenantId, mfaEmail, passwordHash]
+        const mfaInsertRes = await db.query(
+            `INSERT INTO control_users (tenant_id, email, password_hash, role, status, created_at)
+             VALUES (?, ?, ?, 'printhouse_admin', 'ACTIVE', NOW())`,
+            [tenantId, mfaEmail, passwordHash]
         );
+        const mfaInsertId = mfaInsertRes.insertId || (Array.isArray(mfaInsertRes) && mfaInsertRes[0]?.insertId);
+        if (!mfaInsertId) {
+            throw new Error('Failed to retrieve insertId for MFA control_users fixture');
+        }
+        const mfaUserId = String(mfaInsertId);
+        createdUserIds.add(mfaUserId);
 
         const mfaSetup = await userMfaService.setupMfa(mfaUserId, tenantId, mfaEmail);
         const currentStep = Math.floor(Date.now() / 1000 / 30);
@@ -406,60 +414,66 @@ async function runConnectedHarness() {
     } finally {
         logger.info('Executing teardown and fixture cleanup in finally block...');
 
-        const tenantArray = Array.from(createdTenantIds);
-        const userArray = Array.from(createdUserIds);
-        const emailArray = Array.from(createdSignupEmails);
+        const tenantArray = Array.from(createdTenantIds).filter(Boolean);
+        const userArray = Array.from(createdUserIds).filter(Boolean);
+        const emailArray = Array.from(createdSignupEmails).filter(Boolean);
 
-        // Reverse FK order cleanup with error tracing (no swallowed errors)
+        // Selective cleanup: delete ONLY dynamically created fixtures in reverse FK order
         try {
-            if (userArray.length || tenantArray.length) {
-                const uPlaceholders = userArray.map(() => '?').join(',') || 'NULL';
-                const tPlaceholders = tenantArray.map(() => '?').join(',') || 'NULL';
+            if (userArray.length || tenantArray.length || emailArray.length) {
+                if (userArray.length && tenantArray.length) {
+                    const uPlaceholders = userArray.map(() => '?').join(',');
+                    const tPlaceholders = tenantArray.map(() => '?').join(',');
+                    await db.query(
+                        `DELETE FROM user_sessions WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
+                        [...userArray, ...tenantArray]
+                    );
+                    await db.query(
+                        `DELETE FROM user_mfa WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
+                        [...userArray, ...tenantArray]
+                    );
+                } else if (userArray.length) {
+                    const uPlaceholders = userArray.map(() => '?').join(',');
+                    await db.query(`DELETE FROM user_sessions WHERE user_id IN (${uPlaceholders})`, userArray);
+                    await db.query(`DELETE FROM user_mfa WHERE user_id IN (${uPlaceholders})`, userArray);
+                } else if (tenantArray.length) {
+                    const tPlaceholders = tenantArray.map(() => '?').join(',');
+                    await db.query(`DELETE FROM user_sessions WHERE tenant_id IN (${tPlaceholders})`, tenantArray);
+                    await db.query(`DELETE FROM user_mfa WHERE tenant_id IN (${tPlaceholders})`, tenantArray);
+                }
 
-                await db.query(
-                    `DELETE FROM user_sessions WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
-                    [...userArray, ...tenantArray]
-                );
+                if (tenantArray.length) {
+                    const tPlaceholders = tenantArray.map(() => '?').join(',');
+                    await db.query(`DELETE FROM tenant_licenses WHERE tenant_id IN (${tPlaceholders})`, tenantArray).catch(() => {});
+                    await db.query(`DELETE FROM printhouse_capabilities WHERE tenant_id IN (${tPlaceholders})`, tenantArray).catch(() => {});
+                    await db.query(`DELETE FROM printer_nodes WHERE tenant_id IN (${tPlaceholders})`, tenantArray).catch(() => {});
+                }
 
-                await db.query(
-                    `DELETE FROM user_mfa WHERE user_id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders})`,
-                    [...userArray, ...tenantArray]
-                );
-
-                await db.query(
-                    `DELETE FROM tenant_licenses WHERE tenant_id IN (${tPlaceholders})`,
-                    tenantArray
-                );
-
-                await db.query(
-                    `DELETE FROM printhouse_capabilities WHERE tenant_id IN (${tPlaceholders})`,
-                    tenantArray
-                );
-
-                await db.query(
-                    `DELETE FROM printer_nodes WHERE tenant_id IN (${tPlaceholders})`,
-                    tenantArray
-                );
+                if (userArray.length || emailArray.length) {
+                    const clauses = [];
+                    const params = [];
+                    if (userArray.length) {
+                        clauses.push(`id IN (${userArray.map(() => '?').join(',')})`);
+                        params.push(...userArray);
+                    }
+                    if (emailArray.length) {
+                        clauses.push(`email IN (${emailArray.map(() => '?').join(',')})`);
+                        params.push(...emailArray);
+                    }
+                    await db.query(`DELETE FROM control_users WHERE ${clauses.join(' OR ')}`, params);
+                }
 
                 if (emailArray.length) {
                     const ePlaceholders = emailArray.map(() => '?').join(',');
-                    await db.query(
-                        `DELETE FROM control_users WHERE id IN (${uPlaceholders}) OR tenant_id IN (${tPlaceholders}) OR email IN (${ePlaceholders})`,
-                        [...userArray, ...tenantArray, ...emailArray]
-                    );
-
-                    await db.query(
-                        `DELETE FROM printhouse_signup_requests WHERE email IN (${ePlaceholders})`,
-                        emailArray
-                    );
+                    await db.query(`DELETE FROM printhouse_signup_requests WHERE email IN (${ePlaceholders})`, emailArray).catch(() => {});
                 }
 
-                await db.query(
-                    `DELETE FROM tenants WHERE id IN (${tPlaceholders})`,
-                    tenantArray
-                );
+                if (tenantArray.length) {
+                    const tPlaceholders = tenantArray.map(() => '?').join(',');
+                    await db.query(`DELETE FROM tenants WHERE id IN (${tPlaceholders})`, tenantArray);
+                }
+                logger.info('Fixture cleanup completed successfully');
             }
-            logger.info('Fixture cleanup completed successfully');
         } catch (cleanupErr) {
             logger.error('CRITICAL: Fixture cleanup encountered an error', { error: cleanupErr.message, stack: cleanupErr.stack });
             process.exitCode = 1;
@@ -475,6 +489,7 @@ async function runConnectedHarness() {
 
         try {
             await db.closePool();
+            logger.info('mysqlClient connection pool closed cleanly');
         } catch (err) {
             logger.error('mysqlClient closePool error', { error: err.message });
             process.exitCode = 1;
@@ -485,16 +500,29 @@ async function runConnectedHarness() {
             const cachedUpstream = require.cache[upstreamDbPath];
             if (cachedUpstream && cachedUpstream.exports && typeof cachedUpstream.exports.shutdown === 'function') {
                 await cachedUpstream.exports.shutdown();
+                logger.info('Upstream DB service closed.');
             }
-        } catch (err) {}
+        } catch (err) {
+            logger.warn('Upstream DB cleanup warning', { error: err.message });
+        }
 
         try {
             const redisPath = require.resolve('../src/api/adapters/redisConnection');
             const cachedRedis = require.cache[redisPath];
             if (cachedRedis && cachedRedis.exports && typeof cachedRedis.exports.quit === 'function') {
                 await cachedRedis.exports.quit();
+                logger.info('Redis connection closed.');
             }
-        } catch (err) {}
+        } catch (err) {
+            logger.warn('Redis cleanup warning', { error: err.message });
+        }
+
+        if (process._getActiveHandles) {
+            const handles = process._getActiveHandles();
+            const activeTimers = handles.filter(h => h.constructor && h.constructor.name === 'Timeout');
+            const activeSockets = handles.filter(h => h.constructor && h.constructor.name === 'Socket');
+            logger.info('Active resources summary', { totalHandles: handles.length, activeTimers: activeTimers.length, activeSockets: activeSockets.length });
+        }
     }
 }
 

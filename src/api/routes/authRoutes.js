@@ -32,13 +32,16 @@ function checkRateLimit(ip) {
     return true;
 }
 
-// Clean up stale rate limit entries every 30 minutes
-setInterval(() => {
+// Clean up stale rate limit entries every 30 minutes (unref'd to prevent blocking process exit)
+const rateLimiterInterval = setInterval(() => {
     const now = Date.now();
     for (const [ip, entry] of authRateLimiter.entries()) {
         if ((now - entry.windowStart) > RATE_LIMIT_WINDOW_MS) authRateLimiter.delete(ip);
     }
 }, 30 * 60 * 1000);
+if (rateLimiterInterval && typeof rateLimiterInterval.unref === 'function') {
+    rateLimiterInterval.unref();
+}
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
