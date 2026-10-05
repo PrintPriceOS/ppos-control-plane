@@ -145,10 +145,15 @@ async function provisionBpePrinthouse(options = {}) {
         // ──────────────────────────────────────────────────────────────────────────
         let isAlreadyProvisionedInMongo = false;
 
-        // A. Check by House ID
-        const existingHouse = await printhousesColl.findOne({
+        // A. Check by House ID using find(...).limit(2).toArray() to detect real duplicates
+        const houseMatches = await printhousesColl.find({
             $or: [{ id: effectiveHouseId }, { house_id: effectiveHouseId }]
-        });
+        }).limit(2).toArray();
+
+        if (houseMatches.length > 1) {
+            throw new Error(`CONFLICT_DUPLICATE_BPE_HOUSE: Found ${houseMatches.length} conflicting printhouse documents matching house ID "${effectiveHouseId}". Manual deduplication required.`);
+        }
+        const existingHouse = houseMatches[0] || null;
 
         if (existingHouse) {
             const existingNode = existingHouse.printer_node_id;
@@ -160,8 +165,13 @@ async function provisionBpePrinthouse(options = {}) {
             isAlreadyProvisionedInMongo = true;
         }
 
-        // B. Check by Node ID
-        const existingNodeDoc = await printhousesColl.findOne({ printer_node_id: nodeId });
+        // B. Check by Node ID using find(...).limit(2).toArray() to detect multiple node mappings
+        const nodeMatches = await printhousesColl.find({ printer_node_id: nodeId }).limit(2).toArray();
+        if (nodeMatches.length > 1) {
+            throw new Error(`CONFLICT_MULTIPLE_NODE_MAPPINGS: Found ${nodeMatches.length} conflicting printhouse documents matching printer_node_id "${nodeId}". Manual deduplication required.`);
+        }
+        const existingNodeDoc = nodeMatches[0] || null;
+
         if (existingNodeDoc) {
             const existingId = existingNodeDoc.id || existingNodeDoc.house_id;
             if (existingId !== effectiveHouseId) {
@@ -169,6 +179,12 @@ async function provisionBpePrinthouse(options = {}) {
             }
             isAlreadyProvisionedInMongo = true;
         }
+
+        if (existingHouse && existingNodeDoc && String(existingHouse._id) !== String(existingNodeDoc._id)) {
+            throw new Error(`CONFLICT_INCONSISTENT_MAPPINGS: Discrepancy between house match and node match in MongoDB.`);
+        }
+
+        const existingDoc = existingHouse || existingNodeDoc;
 
         // ──────────────────────────────────────────────────────────────────────────
         // 5. Construct BPE Document & MySQL Metadata Update
@@ -189,23 +205,40 @@ async function provisionBpePrinthouse(options = {}) {
             ? JSON.parse(node.shipping)
             : (node.shipping || {});
 
-        const targetMongoDoc = {
-            id: effectiveHouseId,
-            house_id: effectiveHouseId,
-            name: node.name || 'philologica.ai Printhouse',
-            tenant_id: node.tenant_id,
-            printer_node_id: node.id,
-            status: realStatus, // Exact node status: SUSPENDED (no activation)
-            active: isCotizable, // false if SUSPENDED
-            version: existingHouse?.version || 1,
-            rates,
-            signatures,
-            production_lead_days: node.production_lead_days || 7,
-            shipping_days: node.shipping_days || 3,
-            limits,
-            shipping,
-            updated_at: new Date()
-        };
+        // Target document:
+        // - New provisioning: starts at version: 0, without simulating a previous publication.
+        //   First governed CP publication will be version 1.
+        // - Replay over existing document: preserve governed pricing state (rates, version, checksums, published_revision_id).
+        const targetMongoDoc = isAlreadyProvisionedInMongo
+            ? {
+                ...existingDoc,
+                status: realStatus,
+                active: isCotizable,
+                name: node.name || existingDoc.name || 'philologica.ai Printhouse',
+                signatures: signatures || existingDoc.signatures,
+                production_lead_days: node.production_lead_days || existingDoc.production_lead_days || 7,
+                shipping_days: node.shipping_days || existingDoc.shipping_days || 3,
+                limits: Object.keys(limits).length > 0 ? limits : (existingDoc.limits || {}),
+                shipping: Object.keys(shipping).length > 0 ? shipping : (existingDoc.shipping || {}),
+                updated_at: new Date()
+            }
+            : {
+                id: effectiveHouseId,
+                house_id: effectiveHouseId,
+                name: node.name || 'philologica.ai Printhouse',
+                tenant_id: node.tenant_id,
+                printer_node_id: node.id,
+                status: realStatus, // Exact node status: SUSPENDED (no activation)
+                active: isCotizable, // false if SUSPENDED
+                version: 0, // Governed baseline: new provisioned house starts at version 0
+                rates,
+                signatures,
+                production_lead_days: node.production_lead_days || 7,
+                shipping_days: node.shipping_days || 3,
+                limits,
+                shipping,
+                updated_at: new Date()
+            };
 
         const updatedMetadata = {
             ...existingMeta,
@@ -233,7 +266,7 @@ async function provisionBpePrinthouse(options = {}) {
                 tenant_id: node.tenant_id,
                 bpe_printhouse_id: effectiveHouseId
             },
-            mongoAction: isAlreadyProvisionedInMongo ? 'UPDATE_STATUS_AND_RATES' : 'INSERT_DOCUMENT',
+            mongoAction: isAlreadyProvisionedInMongo ? 'PRESERVE_GOVERNED_RATES_AND_UPDATE_STATUS' : 'INSERT_NEW_PRINTHOUSE_V0',
             mongoDocument: targetMongoDoc,
             mysqlUpdate: {
                 table: 'printer_nodes',
@@ -241,7 +274,8 @@ async function provisionBpePrinthouse(options = {}) {
                 metadata_json: updatedMetadataJson
             },
             statusPreserved: realStatus,
-            activationGranted: false
+            activationGranted: false,
+            preservedFields: isAlreadyProvisionedInMongo ? ['rates', 'version', 'published_revision_id', 'rates_checksum', 'accepted_patch_checksum'] : []
         };
 
         // ──────────────────────────────────────────────────────────────────────────
@@ -272,22 +306,23 @@ async function provisionBpePrinthouse(options = {}) {
 
         // A. Mutate MongoDB
         if (isAlreadyProvisionedInMongo) {
+            // Replay over existing document: preserve governed pricing state!
+            // Do NOT overwrite rates, version, checksums, or published_revision_id.
+            const setFields = {
+                status: realStatus,
+                active: isCotizable,
+                updated_at: new Date()
+            };
+            if (node.name) setFields.name = node.name;
+            if (signatures) setFields.signatures = signatures;
+            if (node.production_lead_days) setFields.production_lead_days = node.production_lead_days;
+            if (node.shipping_days) setFields.shipping_days = node.shipping_days;
+            if (limits && Object.keys(limits).length > 0) setFields.limits = limits;
+            if (shipping && Object.keys(shipping).length > 0) setFields.shipping = shipping;
+
             await printhousesColl.updateOne(
-                { _id: existingHouse?._id || existingNodeDoc?._id },
-                {
-                    $set: {
-                        status: realStatus,
-                        active: isCotizable,
-                        name: targetMongoDoc.name,
-                        rates: targetMongoDoc.rates,
-                        signatures: targetMongoDoc.signatures,
-                        production_lead_days: targetMongoDoc.production_lead_days,
-                        shipping_days: targetMongoDoc.shipping_days,
-                        limits: targetMongoDoc.limits,
-                        shipping: targetMongoDoc.shipping,
-                        updated_at: new Date()
-                    }
-                }
+                { _id: existingDoc._id },
+                { $set: setFields }
             );
         } else {
             targetMongoDoc.created_at = new Date();
@@ -301,11 +336,24 @@ async function provisionBpePrinthouse(options = {}) {
         );
 
         // C. Readback Verification
-        const readbackMongo = await printhousesColl.findOne({
+        const readbackMatches = await printhousesColl.find({
             $or: [{ id: effectiveHouseId }, { house_id: effectiveHouseId }]
-        });
+        }).limit(2).toArray();
+        const readbackMongo = readbackMatches[0];
         if (!readbackMongo || readbackMongo.status !== realStatus) {
             throw new Error(`PROVISION_READBACK_FAILED: MongoDB readback failed or status mismatch (expected: "${realStatus}", got: "${readbackMongo?.status}")`);
+        }
+        if (isAlreadyProvisionedInMongo) {
+            if (existingDoc.version !== undefined && readbackMongo.version !== existingDoc.version) {
+                throw new Error(`PROVISION_READBACK_FAILED: Governed version was modified during replay (expected: ${existingDoc.version}, got: ${readbackMongo.version})`);
+            }
+            if (existingDoc.published_revision_id && readbackMongo.published_revision_id !== existingDoc.published_revision_id) {
+                throw new Error(`PROVISION_READBACK_FAILED: Governed published_revision_id was modified during replay`);
+            }
+        } else {
+            if (readbackMongo.version !== 0) {
+                throw new Error(`PROVISION_READBACK_FAILED: New provisioned printhouse must have version 0 (got: ${readbackMongo.version})`);
+            }
         }
 
         const readbackNodeRows = await dbClient.query(
@@ -329,12 +377,16 @@ async function provisionBpePrinthouse(options = {}) {
             ok: true,
             dryRun: false,
             provisioned: true,
+            alreadyProvisioned: isAlreadyProvisionedInMongo,
             nodeId,
             tenantId,
             bpePrinthouseId: effectiveHouseId,
             status: realStatus,
             active: isCotizable,
-            message: `Successfully provisioned printer node "${nodeId}" to BPE house "${effectiveHouseId}" with status "${realStatus}".`
+            version: readbackMongo.version,
+            message: isAlreadyProvisionedInMongo
+                ? `Successfully updated existing BPE house "${effectiveHouseId}" preserving governed rates/version (${readbackMongo.version}) and status "${realStatus}".`
+                : `Successfully provisioned new printer node "${nodeId}" to BPE house "${effectiveHouseId}" with baseline version 0 and status "${realStatus}".`
         };
 
     } finally {

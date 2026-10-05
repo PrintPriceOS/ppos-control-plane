@@ -1472,6 +1472,25 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             db: () => ({
                 databaseName: 'test_bpe_harness',
                 collection: () => ({
+                    find: (query) => {
+                        const filterFn = (p) => {
+                            if (query.$or) {
+                                const ids = query.$or.map(o => o.id || o.house_id).filter(Boolean);
+                                return ids.includes(p.id) || ids.includes(p.house_id);
+                            }
+                            if (query.printer_node_id) {
+                                return p.printer_node_id === query.printer_node_id;
+                            }
+                            return true;
+                        };
+                        const matches = mockPrinthouses.filter(filterFn);
+                        return {
+                            limit: (n) => ({
+                                toArray: async () => matches.slice(0, n)
+                            }),
+                            toArray: async () => matches
+                        };
+                    },
                     findOne: async (query) => {
                         if (query.$or) {
                             const ids = query.$or.map(o => o.id || o.house_id).filter(Boolean);
@@ -1538,6 +1557,7 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(res.plan.activationGranted).toBe(false);
             expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
             expect(res.plan.mongoDocument.active).toBe(false);
+            expect(res.plan.mongoDocument.version).toBe(0);
             expect(res.plan.statusPreserved).toBe('SUSPENDED');
 
             // Verify ZERO mutations
@@ -1600,7 +1620,57 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             ).rejects.toThrow(/CONFLICT_DUPLICATE_BPE_HOUSE/);
         });
 
-        it('should execute governed provisioning when execute mode is enabled on local test DB', async () => {
+        it('should detect duplicate house documents in MongoDB using find(...).limit(2).toArray() and reject without writes', async () => {
+            // Seed duplicate documents with the same house ID in MongoDB
+            mockPrinthouses.push(
+                { _id: 'mongo_dup_1', id: realHouseId, house_id: realHouseId, printer_node_id: realNodeId, tenant_id: realTenantId },
+                { _id: 'mongo_dup_2', id: realHouseId, house_id: realHouseId, printer_node_id: realNodeId, tenant_id: realTenantId }
+            );
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_DUPLICATE_BPE_HOUSE: Found 2 conflicting printhouse documents matching house ID/);
+
+            // Verify ZERO mutations made
+            expect(mockPrinthouses.length).toBe(2);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+        });
+
+        it('should detect multiple node mapping documents in MongoDB using find(...).limit(2).toArray() and reject without writes', async () => {
+            // Seed multiple documents for the same node ID with different house IDs in MongoDB
+            mockPrinthouses.push(
+                { _id: 'mongo_node_dup_1', id: 'bpe_house_alpha', house_id: 'bpe_house_alpha', printer_node_id: realNodeId, tenant_id: realTenantId },
+                { _id: 'mongo_node_dup_2', id: 'bpe_house_beta', house_id: 'bpe_house_beta', printer_node_id: realNodeId, tenant_id: realTenantId }
+            );
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_MULTIPLE_NODE_MAPPINGS: Found 2 conflicting printhouse documents matching printer_node_id/);
+
+            // Verify ZERO mutations made
+            expect(mockPrinthouses.length).toBe(2);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+        });
+
+        it('should execute governed provisioning with baseline version: 0, without simulating publication, and copy real SUSPENDED status', async () => {
             const res = await provisionBpePrinthouse({
                 nodeId: realNodeId,
                 tenantId: realTenantId,
@@ -1616,13 +1686,18 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(res.provisioned).toBe(true);
             expect(res.status).toBe('SUSPENDED');
             expect(res.active).toBe(false);
+            expect(res.version).toBe(0);
 
-            // Verify MongoDB document
+            // Verify MongoDB document has version: 0 without simulating any publication
             expect(mockPrinthouses.length).toBe(1);
             const mongoHouse = mockPrinthouses[0];
             expect(mongoHouse.id).toBe(realHouseId);
             expect(mongoHouse.status).toBe('SUSPENDED');
             expect(mongoHouse.active).toBe(false);
+            expect(mongoHouse.version).toBe(0);
+            expect(mongoHouse.published_revision_id).toBeUndefined();
+            expect(mongoHouse.rates_checksum).toBeUndefined();
+            expect(mongoHouse.accepted_patch_checksum).toBeUndefined();
             expect(mongoHouse.printer_node_id).toBe(realNodeId);
             expect(mongoHouse.tenant_id).toBe(realTenantId);
 
@@ -1631,8 +1706,113 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(node.status).toBe('SUSPENDED');
             const meta = JSON.parse(node.metadata_json);
             expect(meta.bpe_printhouse_id).toBe(realHouseId);
+        });
 
-            // Idempotent replay: running again succeeds without creating duplicate documents
+        it('should support workflow: provision (version 0) -> first governed CP publication (version 1) -> verified persistence', async () => {
+            // 1. Initial provision: creates baseline with version 0
+            const provRes = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+            expect(provRes.ok).toBe(true);
+            expect(provRes.version).toBe(0);
+
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.version).toBe(0);
+
+            // 2. Prepare first governed revision in MySQL
+            const revId = 'rev_first_governed_publication_' + Date.now();
+            const patchChecksum = 'sha256:patch_governed_v1_chk';
+            const publishedRates = { base_charge: 350, unit_price: 0.15 };
+            const ratesChecksum = bpePublicationService.computeRatesChecksum(publishedRates);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [revId, realTenantId, realNodeId, patchChecksum, ratesChecksum, JSON.stringify(publishedRates)]
+            );
+
+            // 3. Publish first revision from CP to BPE (which reserves and publishes version 1)
+            let receivedVersionInBpe = null;
+            const pubRes = await bpePublicationService.publishAcceptedRevision(realTenantId, realNodeId, revId, {
+                mockHandler: async (payload) => {
+                    receivedVersionInBpe = payload.version;
+                    // BPE receiver updates document in MongoDB to version 1 with published rates and checksums
+                    mongoHouse.version = payload.version;
+                    mongoHouse.rates = payload.rates;
+                    mongoHouse.accepted_patch_checksum = payload.accepted_patch_checksum;
+                    mongoHouse.rates_checksum = payload.rates_checksum;
+                    mongoHouse.published_revision_id = payload.revision_id;
+                    mongoHouse.updated_at = new Date();
+
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(pubRes.ok).toBe(true);
+            expect(pubRes.status).toBe('PUBLISHED');
+            expect(pubRes.version).toBe(1);
+            expect(receivedVersionInBpe).toBe(1); // First governed CP publication is exactly version 1
+
+            // Verify MongoDB document state after first publication
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.published_revision_id).toBe(revId);
+            expect(mongoHouse.rates.base_charge).toBe(350);
+            expect(mongoHouse.accepted_patch_checksum).toBe(patchChecksum);
+            expect(mongoHouse.rates_checksum).toBe(bpePublicationService.toCanonicalSha256(ratesChecksum));
+            // Crucial: printhouse remains SUSPENDED / active: false
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+        });
+
+        it('should preserve governed rates, version, checksums, and published_revision_id on replay after publication', async () => {
+            // Setup: document already exists in MongoDB with version 1, published rates, and revision metadata
+            const establishedRevId = 'rev_established_v1';
+            const establishedPatchChecksum = 'sha256:established_patch_chk';
+            const establishedRates = { base_charge: 500, click_rate: 0.08 };
+            const establishedRatesChecksum = bpePublicationService.toCanonicalSha256(
+                bpePublicationService.computeRatesChecksum(establishedRates)
+            );
+
+            mockPrinthouses.push({
+                _id: 'mongo_established_house',
+                id: realHouseId,
+                house_id: realHouseId,
+                name: 'philologica.ai Printhouse',
+                tenant_id: realTenantId,
+                printer_node_id: realNodeId,
+                status: 'SUSPENDED',
+                active: false,
+                version: 1,
+                rates: establishedRates,
+                published_revision_id: establishedRevId,
+                accepted_patch_checksum: establishedPatchChecksum,
+                rates_checksum: establishedRatesChecksum,
+                updated_at: new Date('2026-10-01T10:00:00Z')
+            });
+
+            // Modify CP MySQL node rates to simulate node config divergence (e.g. unreviewed draft in node table)
+            const nodeInDb = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            nodeInDb.rates_json = JSON.stringify({ base_charge: 9999, tampered: true });
+
+            // Execute replay provisioning
             const replayRes = await provisionBpePrinthouse({
                 nodeId: realNodeId,
                 tenantId: realTenantId,
@@ -1642,8 +1822,39 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
                 dbClient: db,
                 mongoClientInstance: mockMongoClient
             });
+
             expect(replayRes.ok).toBe(true);
+            expect(replayRes.alreadyProvisioned).toBe(true);
+            expect(replayRes.version).toBe(1);
+
+            // Verify MongoDB document: rates, version, checksums, published_revision_id were NOT overwritten!
             expect(mockPrinthouses.length).toBe(1);
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.rates.base_charge).toBe(500); // Preserved established rates!
+            expect(mongoHouse.rates.tampered).toBeUndefined();
+            expect(mongoHouse.published_revision_id).toBe(establishedRevId);
+            expect(mongoHouse.accepted_patch_checksum).toBe(establishedPatchChecksum);
+            expect(mongoHouse.rates_checksum).toBe(establishedRatesChecksum);
+
+            // Status and isolation preserved
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+
+            // Replay again to confirm strict idempotency
+            const replayRes2 = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+            expect(replayRes2.ok).toBe(true);
+            expect(mockPrinthouses.length).toBe(1);
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.rates.base_charge).toBe(500);
         });
 
         it('should preserve existing metadata_json keys when provisioning', async () => {
