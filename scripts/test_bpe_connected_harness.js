@@ -282,7 +282,7 @@ async function runConnectedHarness() {
         const fixturePatch2 = `sha256:${runId}_patch_2`;
 
         // 4.1 Seed Tenant into official `tenants` table
-        const [tenantCols] = await mysqlClient.query('SHOW COLUMNS FROM tenants');
+        const tenantCols = await mysqlClient.query('SHOW COLUMNS FROM tenants');
         const tenantColSet = new Set(tenantCols.map(c => c.Field));
 
         const tenantFields = ['id', 'name'];
@@ -304,7 +304,7 @@ async function runConnectedHarness() {
         assert(true, `Seeded tenant in official table (${fixtureTenantId})`);
 
         // 4.2 Seed Printer Node into official `printer_nodes` table
-        const [nodeCols] = await mysqlClient.query('SHOW COLUMNS FROM printer_nodes');
+        const nodeCols = await mysqlClient.query('SHOW COLUMNS FROM printer_nodes');
         const nodeColSet = new Set(nodeCols.map(c => c.Field));
 
         const nodeFields = ['id', 'tenant_id', 'name'];
@@ -346,7 +346,46 @@ async function runConnectedHarness() {
         };
         const initialRatesChecksum = computeRatesChecksum(baseRates);
 
-        // 4.3 Seed Printhouse Document in MongoDB with established tenant and node mapping
+        // 4.3 Seed Initial Baseline Revision & Publication in MySQL (version 1)
+        await mysqlClient.query(
+            `INSERT INTO printhouse_pricing_revisions 
+                (id, tenant_id, printer_node_id, source_type, proposed_patch_checksum, rates_checksum, rates_json, engine_package, engine_version, engine_commit, created_by_json, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL 1 HOUR))`,
+            [
+                fixtureRevId1,
+                fixtureTenantId,
+                fixtureNodeId,
+                'CALIBRATION_PROPOSAL',
+                fixturePatch1,
+                initialRatesChecksum,
+                JSON.stringify(baseRates),
+                '@ppos/pricing-engine',
+                '1.0.0',
+                bpeSha,
+                JSON.stringify({ user: 'harness_baseline', role: 'OPS_ADMIN' })
+            ]
+        );
+        tracker.revisions.add(fixtureRevId1);
+
+        const initialPubId = `pub_${runId}_rev_1`;
+        await mysqlClient.query(
+            `INSERT INTO bpe_pricing_publications
+                (id, tenant_id, printer_node_id, bpe_printhouse_id, revision_id, accepted_patch_checksum, version, status, bpe_response_checksum, bpe_published_at, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, 'PUBLISHED', ?, DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 1 HOUR))`,
+            [
+                initialPubId,
+                fixtureTenantId,
+                fixtureNodeId,
+                fixtureHouseId,
+                fixtureRevId1,
+                fixturePatch1,
+                fixturePatch1
+            ]
+        );
+        tracker.publications.add(initialPubId);
+        assert(true, `Seeded initial baseline revision and publication in MySQL (${fixtureRevId1} v1)`);
+
+        // 4.4 Seed Printhouse Document in MongoDB with established tenant and node mapping
         const initialHouseDoc = {
             id: fixtureHouseId,
             house_id: fixtureHouseId,
@@ -519,43 +558,24 @@ async function runConnectedHarness() {
         const expectedNewRatesChecksum = computeRatesChecksum(updatedRates);
 
         // Insert revision into official `printhouse_pricing_revisions` table
-        const [revCols] = await mysqlClient.query('SHOW COLUMNS FROM printhouse_pricing_revisions');
-        const revColSet = new Set(revCols.map(c => c.Field));
-
-        const revFields = [
-            'id', 'tenant_id', 'printer_node_id', 'source_type',
-            'rates_json', 'rates_checksum', 'engine_package',
-            'engine_version', 'engine_commit', 'created_by_json'
-        ];
-        const revVals = [
-            fixtureRevId2,
-            fixtureTenantId,
-            fixtureNodeId,
-            'MANUAL_EDIT',
-            JSON.stringify(updatedRates),
-            expectedNewRatesChecksum,
-            '@ppos/pricing-engine',
-            '1.0.0',
-            bpeSha,
-            JSON.stringify({ user: 'harness_connected', role: 'OPS_ADMIN' })
-        ];
-
-        if (revColSet.has('proposed_patch_checksum')) {
-            revFields.push('proposed_patch_checksum');
-            revVals.push(fixturePatch2);
-        }
-        if (revColSet.has('accepted_patch_checksum')) {
-            revFields.push('accepted_patch_checksum');
-            revVals.push(fixturePatch2);
-        }
-        if (revColSet.has('version')) {
-            revFields.push('version');
-            revVals.push(2);
-        }
-
+        // Conforms strictly to official schema (proposed_patch_checksum, rates_checksum, rates_json, etc.)
         await mysqlClient.query(
-            `INSERT INTO printhouse_pricing_revisions (${revFields.join(',')}) VALUES (${revVals.map(() => '?').join(',')})`,
-            revVals
+            `INSERT INTO printhouse_pricing_revisions 
+                (id, tenant_id, printer_node_id, source_type, proposed_patch_checksum, rates_checksum, rates_json, engine_package, engine_version, engine_commit, created_by_json, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+                fixtureRevId2,
+                fixtureTenantId,
+                fixtureNodeId,
+                'MANUAL_EDIT',
+                fixturePatch2,
+                expectedNewRatesChecksum,
+                JSON.stringify(updatedRates),
+                '@ppos/pricing-engine',
+                '1.0.0',
+                bpeSha,
+                JSON.stringify({ user: 'harness_connected', role: 'OPS_ADMIN' })
+            ]
         );
         tracker.revisions.add(fixtureRevId2);
         assert(true, `Inserted immutable revision in MySQL (${fixtureRevId2})`);
@@ -575,13 +595,14 @@ async function runConnectedHarness() {
         assert(pubResult.ratesChecksum === expectedNewRatesChecksum, 'Readback rates checksum matches canonical rates checksum');
 
         // Verify MySQL persistence of publication record
-        const [pubRows] = await mysqlClient.query(
-            `SELECT id, status, bpe_response_checksum, revision_id FROM bpe_pricing_publications WHERE id = ?`,
+        const pubRows = await mysqlClient.query(
+            `SELECT id, status, bpe_response_checksum, revision_id, version FROM bpe_pricing_publications WHERE id = ?`,
             [pubResult.publicationId]
         );
         assert(pubRows.length === 1, 'Publication record found in MySQL');
         assert(pubRows[0].status === 'PUBLISHED', 'MySQL publication status is PUBLISHED');
         assert(pubRows[0].bpe_response_checksum === fixturePatch2, 'MySQL response checksum matches');
+        assert(pubRows[0].version === 2, 'MySQL publication version is 2');
 
         // Verify MongoDB persistence and readback
         const verifiedMongoHouse = await printhousesColl.findOne({ id: fixtureHouseId });
@@ -661,6 +682,21 @@ async function runConnectedHarness() {
 
         // 1. MySQL Teardown in strict FK order
         try {
+            // Guarantee cleanup of publications even if publishAcceptedRevision failed after INSERT:
+            // Locate publication IDs by the unique revision IDs created in this run
+            if (tracker.revisions.size > 0) {
+                const revIds = Array.from(tracker.revisions);
+                const orphanPubRows = await mysqlClient.query(
+                    `SELECT id FROM bpe_pricing_publications WHERE revision_id IN (${revIds.map(() => '?').join(',')})`,
+                    revIds
+                );
+                for (const row of orphanPubRows) {
+                    if (row && row.id) {
+                        tracker.publications.add(row.id);
+                    }
+                }
+            }
+
             if (tracker.publications.size > 0) {
                 const pubIds = Array.from(tracker.publications);
                 await mysqlClient.query(

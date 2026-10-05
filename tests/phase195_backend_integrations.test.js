@@ -212,8 +212,8 @@ function handleInMemoryQuery(sql, params = []) {
 
     // INSERT INTO printhouse_pricing_revisions
     if (/INSERT INTO printhouse_pricing_revisions/i.test(s)) {
-        const [id, tenantId, nodeId, acceptedChecksum, proposedChecksum, ratesJson, version] = params;
-        const record = { id, tenant_id: tenantId, printer_node_id: nodeId, accepted_patch_checksum: acceptedChecksum, proposed_patch_checksum: proposedChecksum, rates_json: ratesJson, version };
+        const [id, tenantId, nodeId, proposedChecksum, ratesChecksum, ratesJson] = params;
+        const record = { id, tenant_id: tenantId, printer_node_id: nodeId, proposed_patch_checksum: proposedChecksum, rates_checksum: ratesChecksum, rates_json: ratesJson, created_at: new Date() };
         inMemoryTables.printhouse_pricing_revisions.push(record);
         return { affectedRows: 1 };
     }
@@ -228,13 +228,23 @@ function handleInMemoryQuery(sql, params = []) {
     // INSERT INTO bpe_pricing_publications
     if (/INSERT INTO bpe_pricing_publications/i.test(s)) {
         const [id, tenantId, nodeId, bpeHouseId, revId, checksum, version] = params;
-        const record = { id, tenant_id: tenantId, printer_node_id: nodeId, bpe_printhouse_id: bpeHouseId, revision_id: revId, accepted_patch_checksum: checksum, version, status: 'PENDING' };
+        const record = { id, tenant_id: tenantId, printer_node_id: nodeId, bpe_printhouse_id: bpeHouseId, revision_id: revId, accepted_patch_checksum: checksum, version, status: 'PENDING', created_at: new Date() };
         inMemoryTables.bpe_pricing_publications.push(record);
         return { affectedRows: 1 };
     }
 
     // SELECT FROM bpe_pricing_publications
     if (/FROM bpe_pricing_publications/i.test(s)) {
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ?')) {
+            const [nodeId, bpeHouseId] = params;
+            const pubs = inMemoryTables.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.bpe_printhouse_id === bpeHouseId);
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND revision_id = ?')) {
+            const [nodeId, revId, tenantId, bpeHouseId] = params;
+            const pubs = inMemoryTables.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.revision_id === revId && r.tenant_id === tenantId && r.status === 'PUBLISHED');
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
         const nodeId = params[0];
         const pub = inMemoryTables.bpe_pricing_publications.find(r => r.printer_node_id === nodeId && r.status === 'PUBLISHED');
         return pub ? [pub] : [];
@@ -508,11 +518,14 @@ describe('Phase 195 Backend Integrations Suite', () => {
             const tenantId = 'tenant_bpe_1';
             const checksum = 'sha256:accepted_test_checksum_12345';
 
+            const rates = { paper: { offset: { gsm80: 0.05 } } };
+            const ratesChecksum = bpePublicationService.computeRatesChecksum(rates);
+
             // Insert mock revision record
             await db.query(
-                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
-                [revisionId, tenantId, printerNodeId, checksum, checksum, JSON.stringify({ paper: { offset: { gsm80: 0.05 } } })]
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [revisionId, tenantId, printerNodeId, checksum, ratesChecksum, JSON.stringify(rates)]
             );
 
             let capturedPayload = null;

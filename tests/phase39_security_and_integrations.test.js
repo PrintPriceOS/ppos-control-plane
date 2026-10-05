@@ -201,8 +201,8 @@ db.query = async function (sql, params = []) {
 
     // Printhouse pricing revisions
     if (/INSERT INTO printhouse_pricing_revisions/is.test(s)) {
-        const [id, tenantId, nodeId, acceptedChecksum, proposedChecksum, ratesJson, version] = params;
-        const rec = { id, tenant_id: tenantId, printer_node_id: nodeId, accepted_patch_checksum: acceptedChecksum, proposed_patch_checksum: proposedChecksum, rates_json: ratesJson, version };
+        const [id, tenantId, nodeId, proposedChecksum, ratesChecksum, ratesJson] = params;
+        const rec = { id, tenant_id: tenantId, printer_node_id: nodeId, proposed_patch_checksum: proposedChecksum, rates_checksum: ratesChecksum, rates_json: ratesJson, created_at: new Date() };
         memoryDb.printhouse_pricing_revisions.push(rec);
         return { affectedRows: 1 };
     }
@@ -233,6 +233,14 @@ db.query = async function (sql, params = []) {
                 r.tenant_id === tenantId &&
                 r.bpe_printhouse_id === bpePrinthouseId &&
                 r.status === 'PUBLISHED'
+            );
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ?')) {
+            const [printerNodeId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.bpe_printhouse_id === bpePrinthouseId
             );
             return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
         }
@@ -630,10 +638,11 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
         const checksum = 'sha256:bpe_verified_checksum_999';
 
         beforeAll(async () => {
+            const rates = { offset: 0.12 };
             await db.query(
-                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
-                [revId, tenantId, nodeId, checksum, checksum, JSON.stringify({ offset: 0.12 })]
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [revId, tenantId, nodeId, checksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
             );
         });
 
@@ -706,13 +715,65 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(res2.ratesChecksum).toBe(res1.ratesChecksum);
         });
 
+        it('should handle MANUAL_EDIT with NULL proposed_patch_checksum and explicitly define revision checksum', async () => {
+            const manualRevId = 'rev_manual_edit_' + Date.now();
+            const manualRates = { offset: 0.15 };
+            const manualRatesCs = bpePublicationService.computeRatesChecksum(manualRates);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [manualRevId, tenantId, nodeId, null, manualRatesCs, JSON.stringify(manualRates)]
+            );
+
+            let capturedPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, manualRevId, {
+                mockHandler: async (payload) => {
+                    capturedPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: manualRatesCs,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: manualRatesCs
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(capturedPayload.accepted_patch_checksum).toMatch(/^sha256:rev_/);
+            // Must NOT confuse revision patch checksum with rates checksum
+            expect(capturedPayload.accepted_patch_checksum).not.toBe(manualRatesCs);
+            expect(capturedPayload.version).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should fail when stored rates_checksum does not match canonical hash of rates_json', async () => {
+            const corruptRevId = 'rev_corrupt_rates_' + Date.now();
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [corruptRevId, tenantId, nodeId, checksum, 'sha256:corrupted_checksum', JSON.stringify({ offset: 0.12 })]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, corruptRevId)
+            ).rejects.toThrow(/Revision integrity check failed/);
+        });
+
         it('should reject response without readback.verified: true and mark publication as FAILED', async () => {
             const badRevId = 'rev_bad_readback_' + Date.now();
             const badChecksum = 'sha256:bad_readback_chk';
+            const rates = { offset: 0.12 };
             await db.query(
-                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
-                [badRevId, tenantId, nodeId, badChecksum, badChecksum, JSON.stringify({ offset: 0.12 })]
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badRevId, tenantId, nodeId, badChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
             );
 
             await expect(
@@ -741,10 +802,11 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
         it('should reject response with mismatched rates_checksum between BPE readback and sent canonical checksum', async () => {
             const mismatchRevId = 'rev_rates_mismatch_' + Date.now();
             const mismatchChecksum = 'sha256:rates_mismatch_chk';
+            const rates = { offset: 0.12 };
             await db.query(
-                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
-                [mismatchRevId, tenantId, nodeId, mismatchChecksum, mismatchChecksum, JSON.stringify({ offset: 0.12 })]
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [mismatchRevId, tenantId, nodeId, mismatchChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
             );
 
             await expect(
@@ -776,10 +838,11 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
         it('should reject response with mismatched printhouse identity', async () => {
             const identRevId = 'rev_ident_mismatch_' + Date.now();
             const identChecksum = 'sha256:ident_mismatch_chk';
+            const rates = { offset: 0.12 };
             await db.query(
-                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
-                [identRevId, tenantId, nodeId, identChecksum, identChecksum, JSON.stringify({ offset: 0.12 })]
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [identRevId, tenantId, nodeId, identChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
             );
 
             await expect(
