@@ -137,6 +137,8 @@
 .ppos-text { color: var(--ppos-text); }
 .ppos-text-muted { color: var(--ppos-text-muted); }
 .ppos-accent { color: var(--ppos-accent); }
+.ppos-card { background-color: var(--ppos-surface); border-color: var(--ppos-border); color: var(--ppos-text); }
+.ppos-input { background-color: var(--ppos-surface-muted); border-color: var(--ppos-border); color: var(--ppos-text); }
 
 .glass {
   background: var(--ppos-surface);

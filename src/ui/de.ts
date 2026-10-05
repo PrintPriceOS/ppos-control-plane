@@ -1217,6 +1217,45 @@ export const de = {
   'map.tileLoadFailed': 'Kartenkacheln konnten nicht geladen werden (401/403/Netzwerk)',
   'map.tileLoadFailedHint': 'Der konfigurierte Kachelanbieter hat nicht geantwortet. Taktisches Knotenregister und Maschineninspektion bleiben voll einsatzbereit.',
   'common.retry': 'Wiederholen',
+
+  // Workspace and Navigation Shells
+  'beta.runtime.workspaceTitle': 'Kontrollierte Beta-Laufzeitumgebung',
+  'beta.runtime.workspaceDesc': 'Überwachung aktiver Sitzungen, Aktivitätsverfolgung und Kohortengesundheitsprüfungen.',
+  'beta.runtime.breadcrumb': 'Laufzeit',
+  'beta.runtime.tabOverview': 'Übersicht',
+  'beta.runtime.tabSessions': 'Sitzungen',
+  'beta.runtime.tabActivity': 'Aktivität',
+  'beta.runtime.tabHealth': 'Kohortengesundheit',
+
+  'beta.governance.workspaceTitle': 'Beta-Kohorten-Governance',
+  'beta.governance.workspaceDesc': 'Regelung von Interventionsvorschlägen, Genehmigungen, betrieblichen Ausführungen und Simulationen.',
+  'beta.governance.breadcrumb': 'Governance',
+  'beta.governance.tabInterventions': 'Interventionen',
+  'beta.governance.tabApprovals': 'Genehmigungen',
+  'beta.governance.tabExecutions': 'Ausführungen',
+  'beta.governance.tabSimulations': 'Simulationen',
+  'beta.governance.tabSimulationReviews': 'Simulationsprüfungen',
+
+  'beta.cohort.workspaceTitle': 'Beta-Kohorten-Verwaltung',
+  'beta.cohort.workspaceDesc': 'Verwaltung der Kohortenaktivierung, Ausstellung von Einladungen und Prüfung aktiver Teilnehmer.',
+  'beta.cohort.breadcrumb': 'Kohorten',
+  'beta.cohort.tabActivation': 'Aktivierung',
+  'beta.cohort.tabInvitations': 'Einladungen',
+  'beta.cohort.tabParticipants': 'Teilnehmer',
+
+  // Industrial Operations Navigation Tabs
+  'industrial.tabLive': 'Live-Schleife',
+  'industrial.tabWorkers': 'Flotte',
+  'industrial.tabNodes': 'Knoten',
+  'industrial.tabDispatch': 'Disposition',
+  'industrial.tabMetrics': 'Metriken',
+  'industrial.tabEconomics': 'Wirtschaft',
+  'industrial.tabTemporal': 'Zeitlich',
+  'industrial.tabSim': 'Simulation',
+  'industrial.tabPolicies': 'Richtlinien',
+  'industrial.tabIncidents': 'Vorfälle',
+  'industrial.tabLifecycle': 'Lebenszyklus',
+  'industrial.tabStorage': 'Speicher',
 } as const;
 
 export type TranslationKeys = keyof typeof de;

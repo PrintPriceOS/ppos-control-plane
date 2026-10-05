@@ -80,13 +80,13 @@ export const IndustrialOpsPage: React.FC = () => {
                 <div className="space-y-2">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <BoltIcon className="w-3.5 h-3.5 text-amber-500" />
-                        {t('industrial.operational') || 'Operational'}
+                        {t('industrial.operational') || 'Operacional'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                        <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon={BoltIcon} label="Live Loop" />
-                        <TabButton active={activeTab === 'workers'} onClick={() => setActiveTab('workers')} icon={CpuChipIcon} label="Fleet" />
-                        <TabButton active={activeTab === 'nodes'} onClick={() => setActiveTab('nodes')} icon={ShieldCheckIcon} label="Nodes" />
-                        <TabButton active={activeTab === 'orchestration'} onClick={() => setActiveTab('orchestration')} icon={BoltIcon} label="Dispatch" />
+                        <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon={BoltIcon} label={t('industrial.tabLive') || 'Bucle en Vivo'} />
+                        <TabButton active={activeTab === 'workers'} onClick={() => setActiveTab('workers')} icon={CpuChipIcon} label={t('industrial.tabWorkers') || 'Flota'} />
+                        <TabButton active={activeTab === 'nodes'} onClick={() => setActiveTab('nodes')} icon={ShieldCheckIcon} label={t('industrial.tabNodes') || 'Nodos'} />
+                        <TabButton active={activeTab === 'orchestration'} onClick={() => setActiveTab('orchestration')} icon={BoltIcon} label={t('industrial.tabDispatch') || 'Despacho'} />
                     </div>
                 </div>
 
@@ -94,14 +94,14 @@ export const IndustrialOpsPage: React.FC = () => {
                 <div className="space-y-2 border-t md:border-t-0 md:border-l ppos-border pt-2 md:pt-0 md:pl-4">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <AcademicCapIcon className="w-3.5 h-3.5 text-blue-500" />
-                        {t('industrial.intelligence') || 'Intelligence'}
+                        {t('industrial.intelligence') || 'Inteligencia'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                        <TabButton active={activeTab === 'intelligence'} onClick={() => setActiveTab('intelligence')} icon={AcademicCapIcon} label="Metrics" />
-                        <TabButton active={activeTab === 'economics'} onClick={() => setActiveTab('economics')} icon={BanknotesIcon} label="Economics" />
-                        <TabButton active={activeTab === 'temporal'} onClick={() => setActiveTab('temporal')} icon={ClockIcon} label="Temporal" />
-                        <TabButton active={activeTab === 'simulation'} onClick={() => setActiveTab('simulation')} icon={CpuChipIcon} label="Sim" />
-                        <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={MapIcon} label={t('industrial.liveMap') || 'Live Map'} />
+                        <TabButton active={activeTab === 'intelligence'} onClick={() => setActiveTab('intelligence')} icon={AcademicCapIcon} label={t('industrial.tabMetrics') || 'Métricas'} />
+                        <TabButton active={activeTab === 'economics'} onClick={() => setActiveTab('economics')} icon={BanknotesIcon} label={t('industrial.tabEconomics') || 'Economía'} />
+                        <TabButton active={activeTab === 'temporal'} onClick={() => setActiveTab('temporal')} icon={ClockIcon} label={t('industrial.tabTemporal') || 'Temporal'} />
+                        <TabButton active={activeTab === 'simulation'} onClick={() => setActiveTab('simulation')} icon={CpuChipIcon} label={t('industrial.tabSim') || 'Simulación'} />
+                        <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={MapIcon} label={t('industrial.liveMap') || 'Mapa en Vivo'} />
                     </div>
                 </div>
 
@@ -109,13 +109,13 @@ export const IndustrialOpsPage: React.FC = () => {
                 <div className="space-y-2 border-t md:border-t-0 md:border-l ppos-border pt-2 md:pt-0 md:pl-4">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-500" />
-                        {t('industrial.governance') || 'Governance'}
+                        {t('industrial.governance') || 'Gobernanza'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                        <TabButton active={activeTab === 'governance'} onClick={() => setActiveTab('governance')} icon={ShieldCheckIcon} label="Policies" />
-                        <TabButton active={activeTab === 'incidents'} onClick={() => setActiveTab('incidents')} icon={ExclamationTriangleIcon} label="Incidents" />
-                        <TabButton active={activeTab === 'lifecycle'} onClick={() => setActiveTab('lifecycle')} icon={ClockIcon} label="Lifecycle" />
-                        <TabButton active={activeTab === 'storage'} onClick={() => setActiveTab('storage')} icon={CircleStackIcon} label="Storage" />
+                        <TabButton active={activeTab === 'governance'} onClick={() => setActiveTab('governance')} icon={ShieldCheckIcon} label={t('industrial.tabPolicies') || 'Políticas'} />
+                        <TabButton active={activeTab === 'incidents'} onClick={() => setActiveTab('incidents')} icon={ExclamationTriangleIcon} label={t('industrial.tabIncidents') || 'Incidencias'} />
+                        <TabButton active={activeTab === 'lifecycle'} onClick={() => setActiveTab('lifecycle')} icon={ClockIcon} label={t('industrial.tabLifecycle') || 'Ciclo de Vida'} />
+                        <TabButton active={activeTab === 'storage'} onClick={() => setActiveTab('storage')} icon={CircleStackIcon} label={t('industrial.tabStorage') || 'Almacenamiento'} />
                     </div>
                 </div>
             </div>

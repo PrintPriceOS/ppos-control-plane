@@ -1217,6 +1217,45 @@ export const en = {
   'map.tileLoadFailed': 'Failed to load map tiles (401/403/Network)',
   'map.tileLoadFailedHint': 'Configured tile provider failed to respond. Tactical node registry and machine inspection remain fully operational.',
   'common.retry': 'Retry',
+
+  // Workspace and Navigation Shells
+  'beta.runtime.workspaceTitle': 'Controlled Beta Runtime',
+  'beta.runtime.workspaceDesc': 'Monitor active sessions, activity tracking, and cohort health reviews.',
+  'beta.runtime.breadcrumb': 'Runtime',
+  'beta.runtime.tabOverview': 'Overview',
+  'beta.runtime.tabSessions': 'Sessions',
+  'beta.runtime.tabActivity': 'Activity',
+  'beta.runtime.tabHealth': 'Cohort Health',
+
+  'beta.governance.workspaceTitle': 'Beta Cohort Governance',
+  'beta.governance.workspaceDesc': 'Govern cohort intervention proposals, approvals, operational executions, and simulations.',
+  'beta.governance.breadcrumb': 'Governance',
+  'beta.governance.tabInterventions': 'Interventions',
+  'beta.governance.tabApprovals': 'Approvals',
+  'beta.governance.tabExecutions': 'Executions',
+  'beta.governance.tabSimulations': 'Simulations',
+  'beta.governance.tabSimulationReviews': 'Simulation Reviews',
+
+  'beta.cohort.workspaceTitle': 'Beta Cohort Management',
+  'beta.cohort.workspaceDesc': 'Manage cohort activation, issue invites, and audit active participants.',
+  'beta.cohort.breadcrumb': 'Cohorts',
+  'beta.cohort.tabActivation': 'Activation',
+  'beta.cohort.tabInvitations': 'Invitations',
+  'beta.cohort.tabParticipants': 'Participants',
+
+  // Industrial Operations Navigation Tabs
+  'industrial.tabLive': 'Live Loop',
+  'industrial.tabWorkers': 'Fleet',
+  'industrial.tabNodes': 'Nodes',
+  'industrial.tabDispatch': 'Dispatch',
+  'industrial.tabMetrics': 'Metrics',
+  'industrial.tabEconomics': 'Economics',
+  'industrial.tabTemporal': 'Temporal',
+  'industrial.tabSim': 'Simulation',
+  'industrial.tabPolicies': 'Policies',
+  'industrial.tabIncidents': 'Incidents',
+  'industrial.tabLifecycle': 'Lifecycle',
+  'industrial.tabStorage': 'Storage',
 } as const;
 
 export type TranslationKeys = keyof typeof en;

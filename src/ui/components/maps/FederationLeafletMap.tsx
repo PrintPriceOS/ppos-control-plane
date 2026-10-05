@@ -75,7 +75,15 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
   const { t } = useLocale();
   const isLight = theme === 'light';
   const [tileError, setTileError] = React.useState(false);
-  const isTileFailure = forceTileError || tileError;
+  const isTileFailure = forceTileError || tileError || Boolean(typeof window !== 'undefined' && (window as any).__PPOS_FORCE_TILE_ERROR);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setTileError(Boolean(e.detail !== false));
+    };
+    window.addEventListener('ppos-tile-error', handler);
+    return () => window.removeEventListener('ppos-tile-error', handler);
+  }, []);
 
   // Tile provider detection
   const cartoApiKey = (import.meta as any).env?.VITE_CARTO_API_KEY;
@@ -138,7 +146,12 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
             </div>
             <button
               type="button"
-              onClick={() => setTileError(false)}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  (window as any).__PPOS_FORCE_TILE_ERROR = false;
+                }
+                setTileError(false);
+              }}
               className="px-2.5 py-1 text-[9px] font-mono font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 uppercase tracking-widest transition-colors"
             >
               {t('common.retry') || 'Reintentar'}

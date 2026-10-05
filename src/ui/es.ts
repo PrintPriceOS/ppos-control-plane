@@ -1217,6 +1217,45 @@ export const es = {
   'map.tileLoadFailed': 'Error al cargar teselas cartográficas (401/403/Red)',
   'map.tileLoadFailedHint': 'El proveedor cartográfico configurado no respondió satisfactoriamente. Se mantiene activo el registro táctico de nodos y la inspección de maquinaria.',
   'common.retry': 'Reintentar',
+
+  // Workspace and Navigation Shells
+  'beta.runtime.workspaceTitle': 'Entorno Beta Controlado',
+  'beta.runtime.workspaceDesc': 'Supervisión de sesiones activas, registro de actividad y revisiones de salud de cohorte.',
+  'beta.runtime.breadcrumb': 'Ejecución',
+  'beta.runtime.tabOverview': 'Resumen',
+  'beta.runtime.tabSessions': 'Sesiones',
+  'beta.runtime.tabActivity': 'Actividad',
+  'beta.runtime.tabHealth': 'Salud de Cohorte',
+
+  'beta.governance.workspaceTitle': 'Gobernanza de Cohorte Beta',
+  'beta.governance.workspaceDesc': 'Gobernanza de propuestas de intervención, aprobaciones, ejecuciones operativas y simulaciones.',
+  'beta.governance.breadcrumb': 'Gobernanza',
+  'beta.governance.tabInterventions': 'Intervenciones',
+  'beta.governance.tabApprovals': 'Aprobaciones',
+  'beta.governance.tabExecutions': 'Ejecuciones',
+  'beta.governance.tabSimulations': 'Simulaciones',
+  'beta.governance.tabSimulationReviews': 'Revisiones de Simulación',
+
+  'beta.cohort.workspaceTitle': 'Gestión de Cohorte Beta',
+  'beta.cohort.workspaceDesc': 'Gestión de activación de cohorte, emisión de invitaciones y auditoría de participantes activos.',
+  'beta.cohort.breadcrumb': 'Cohortes',
+  'beta.cohort.tabActivation': 'Activación',
+  'beta.cohort.tabInvitations': 'Invitaciones',
+  'beta.cohort.tabParticipants': 'Participantes',
+
+  // Industrial Operations Navigation Tabs
+  'industrial.tabLive': 'Bucle en Vivo',
+  'industrial.tabWorkers': 'Flota',
+  'industrial.tabNodes': 'Nodos',
+  'industrial.tabDispatch': 'Despacho',
+  'industrial.tabMetrics': 'Métricas',
+  'industrial.tabEconomics': 'Economía',
+  'industrial.tabTemporal': 'Temporal',
+  'industrial.tabSim': 'Simulación',
+  'industrial.tabPolicies': 'Políticas',
+  'industrial.tabIncidents': 'Incidencias',
+  'industrial.tabLifecycle': 'Ciclo de Vida',
+  'industrial.tabStorage': 'Almacenamiento',
 } as const;
 
 export type TranslationKeys = keyof typeof es;
