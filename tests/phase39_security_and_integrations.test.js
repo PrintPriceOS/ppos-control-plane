@@ -201,8 +201,8 @@ db.query = async function (sql, params = []) {
 
     // Printhouse pricing revisions
     if (/INSERT INTO printhouse_pricing_revisions/is.test(s)) {
-        const [id, tenantId, nodeId, proposedChecksum, ratesChecksum, ratesJson] = params;
-        const rec = { id, tenant_id: tenantId, printer_node_id: nodeId, proposed_patch_checksum: proposedChecksum, rates_checksum: ratesChecksum, rates_json: ratesJson, created_at: new Date() };
+        const [id, tenantId, nodeId, proposedChecksum, ratesChecksum, ratesJson, customCreatedAt] = params;
+        const rec = { id, tenant_id: tenantId, printer_node_id: nodeId, proposed_patch_checksum: proposedChecksum, rates_checksum: ratesChecksum, rates_json: ratesJson, created_at: customCreatedAt || new Date() };
         memoryDb.printhouse_pricing_revisions.push(rec);
         return { affectedRows: 1 };
     }
@@ -215,7 +215,7 @@ db.query = async function (sql, params = []) {
     // BPE Publications
     if (/INSERT INTO bpe_pricing_publications/is.test(s)) {
         const [id, tenantId, printerNodeId, bpePrinthouseId, revisionId, checksum, version, status] = params;
-        const rec = { id, tenant_id: tenantId, printer_node_id: printerNodeId, bpe_printhouse_id: bpePrinthouseId, revision_id: revisionId, accepted_patch_checksum: checksum, version, status, created_at: new Date() };
+        const rec = { id, tenant_id: tenantId, printer_node_id: printerNodeId, bpe_printhouse_id: bpePrinthouseId, revision_id: revisionId, accepted_patch_checksum: checksum, version: Number(version), status: status || 'PENDING', created_at: new Date() };
         memoryDb.bpe_pricing_publications.push(rec);
         return { affectedRows: 1 };
     }
@@ -236,13 +236,22 @@ db.query = async function (sql, params = []) {
             );
             return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
         }
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ? AND status = \'PUBLISHED\'')) {
+            const [printerNodeId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.bpe_printhouse_id === bpePrinthouseId &&
+                r.status === 'PUBLISHED'
+            ).sort((a, b) => (b.version - a.version) || (new Date(b.created_at) - new Date(a.created_at)));
+            return pubs.length > 0 ? [pubs[0]] : [];
+        }
         if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ?')) {
             const [printerNodeId, bpePrinthouseId] = params;
             const pubs = memoryDb.bpe_pricing_publications.filter(r =>
                 r.printer_node_id === printerNodeId &&
                 r.bpe_printhouse_id === bpePrinthouseId
-            );
-            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+            ).sort((a, b) => b.version - a.version);
+            return pubs.length > 0 ? [pubs[0]] : [];
         }
         const nodeId = params[0];
         const pubs = memoryDb.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.status === 'PUBLISHED');
@@ -336,6 +345,54 @@ db.query = async function (sql, params = []) {
     }
 
     return [];
+};
+
+const activeLocks = new Set();
+const lockWaiters = new Map();
+
+db.getConnection = async function () {
+    return {
+        query: async (sql, params = []) => {
+            if (/SELECT GET_LOCK/i.test(sql)) {
+                const lockName = params[0];
+                const timeoutSec = params[1] || 15;
+                if (!activeLocks.has(lockName)) {
+                    activeLocks.add(lockName);
+                    return [[{ lock_status: 1 }]];
+                }
+                return new Promise((resolve) => {
+                    const timer = setTimeout(() => {
+                        const waiters = lockWaiters.get(lockName) || [];
+                        lockWaiters.set(lockName, waiters.filter(w => w !== unlock));
+                        resolve([[{ lock_status: 0 }]]);
+                    }, timeoutSec * 1000);
+
+                    const unlock = () => {
+                        clearTimeout(timer);
+                        activeLocks.add(lockName);
+                        resolve([[{ lock_status: 1 }]]);
+                    };
+
+                    const waiters = lockWaiters.get(lockName) || [];
+                    waiters.push(unlock);
+                    lockWaiters.set(lockName, waiters);
+                });
+            }
+            if (/SELECT RELEASE_LOCK/i.test(sql)) {
+                const lockName = params[0];
+                activeLocks.delete(lockName);
+                const waiters = lockWaiters.get(lockName) || [];
+                if (waiters.length > 0) {
+                    const next = waiters.shift();
+                    next();
+                }
+                return [[{ release_status: 1 }]];
+            }
+            const rows = await db.query(sql, params);
+            return [rows];
+        },
+        release: () => {}
+    };
 };
 
 describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
@@ -895,6 +952,150 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
 
             expect(cached.rates.markup_paper).toBe(1.25);
             expect(cached.accepted_patch_checksum).toBe(checksum);
+        });
+
+        it('should reject historical revision even if a subsequent publication attempt FAILED', async () => {
+            const nodeIdHist = 'node_hist_test_' + Date.now();
+            const revIdSuccess = 'rev_success_' + Date.now();
+            const revIdFailed = 'rev_failed_' + Date.now();
+            const revIdOld = 'rev_old_' + Date.now();
+
+            const rates1 = { offset: 0.10 };
+            const rates2 = { offset: 0.20 };
+            const ratesOld = { offset: 0.05 };
+
+            // Revision 1: created 2 hours ago
+            const t1 = new Date(Date.now() - 2 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdSuccess, tenantId, nodeIdHist, 'sha256:p1', bpePublicationService.computeRatesChecksum(rates1), JSON.stringify(rates1), t1]
+            );
+
+            // Revision 2 (will fail): created 1 hour ago
+            const t2 = new Date(Date.now() - 1 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdFailed, tenantId, nodeIdHist, 'sha256:p2', bpePublicationService.computeRatesChecksum(rates2), JSON.stringify(rates2), t2]
+            );
+
+            // Historical Revision (older than Revision 1): created 3 hours ago
+            const tOld = new Date(Date.now() - 3 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdOld, tenantId, nodeIdHist, 'sha256:pOld', bpePublicationService.computeRatesChecksum(ratesOld), JSON.stringify(ratesOld), tOld]
+            );
+
+            // 1. Publish Revision 1 -> Success (status PUBLISHED, version 1)
+            const res1 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdSuccess, {
+                mockHandler: async (payload) => ({
+                    ok: true,
+                    status: 'PUBLISHED',
+                    bpe_printhouse_id: payload.bpe_printhouse_id,
+                    revision_id: payload.revision_id,
+                    accepted_patch_checksum: payload.accepted_patch_checksum,
+                    rates_checksum: payload.rates ? bpePublicationService.computeRatesChecksum(payload.rates) : 'sha256:r1',
+                    readback: {
+                        verified: true,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates ? bpePublicationService.computeRatesChecksum(payload.rates) : 'sha256:r1'
+                    }
+                })
+            });
+            expect(res1.ok).toBe(true);
+            expect(res1.version).toBe(1);
+
+            // 2. Publish Revision 2 -> FAILS (status FAILED, version 2)
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdFailed, {
+                    mockHandler: async () => {
+                        throw new Error('Simulated BPE Network Timeout');
+                    }
+                })
+            ).rejects.toThrow('Simulated BPE Network Timeout');
+
+            // 3. Attempt to publish Historical Revision (created 3h ago, older than Revision 1 at 2h ago)
+            // Even though the latest row in bpe_pricing_publications is FAILED,
+            // the service MUST find the last PUBLISHED revision and reject the historical one!
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdOld, {
+                    mockHandler: async () => ({ ok: true, status: 'PUBLISHED' })
+                })
+            ).rejects.toThrow(/Cannot publish historical revision/);
+        });
+
+        it('should serialize concurrent publications to the same destination without duplicate versions', async () => {
+            const nodeIdConc = 'node_conc_test_' + Date.now();
+            const revA = 'rev_conc_a_' + Date.now();
+            const revB = 'rev_conc_b_' + Date.now();
+
+            const ratesA = { offset: 0.11 };
+            const ratesB = { offset: 0.22 };
+
+            const tA = new Date(Date.now() - 1000);
+            const tB = new Date(Date.now());
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revA, tenantId, nodeIdConc, 'sha256:pA', bpePublicationService.computeRatesChecksum(ratesA), JSON.stringify(ratesA), tA]
+            );
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revB, tenantId, nodeIdConc, 'sha256:pB', bpePublicationService.computeRatesChecksum(ratesB), JSON.stringify(ratesB), tB]
+            );
+
+            // Launch both simultaneously
+            const [resA, resB] = await Promise.all([
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdConc, revA, {
+                    mockHandler: async (payload) => {
+                        // simulate slight processing delay inside lock
+                        await new Promise(r => setTimeout(r, 20));
+                        return {
+                            ok: true,
+                            status: 'PUBLISHED',
+                            bpe_printhouse_id: payload.bpe_printhouse_id,
+                            revision_id: payload.revision_id,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                            readback: {
+                                verified: true,
+                                accepted_patch_checksum: payload.accepted_patch_checksum,
+                                rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                            }
+                        };
+                    }
+                }),
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdConc, revB, {
+                    mockHandler: async (payload) => {
+                        await new Promise(r => setTimeout(r, 20));
+                        return {
+                            ok: true,
+                            status: 'PUBLISHED',
+                            bpe_printhouse_id: payload.bpe_printhouse_id,
+                            revision_id: payload.revision_id,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                            readback: {
+                                verified: true,
+                                accepted_patch_checksum: payload.accepted_patch_checksum,
+                                rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                            }
+                        };
+                    }
+                })
+            ]);
+
+            expect(resA.ok).toBe(true);
+            expect(resB.ok).toBe(true);
+            // Must have reserved distinct monotonically increasing versions!
+            expect(resA.version).not.toBe(resB.version);
+            const versions = [resA.version, resB.version].sort((a, b) => a - b);
+            expect(versions).toEqual([1, 2]);
         });
     });
 

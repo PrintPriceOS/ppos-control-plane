@@ -235,10 +235,17 @@ function handleInMemoryQuery(sql, params = []) {
 
     // SELECT FROM bpe_pricing_publications
     if (/FROM bpe_pricing_publications/i.test(s)) {
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ? AND status = \'PUBLISHED\'')) {
+            const [nodeId, bpeHouseId] = params;
+            const pubs = inMemoryTables.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.bpe_printhouse_id === bpeHouseId && r.status === 'PUBLISHED')
+                .sort((a, b) => (b.version - a.version) || (new Date(b.created_at) - new Date(a.created_at)));
+            return pubs.length > 0 ? [pubs[0]] : [];
+        }
         if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ?')) {
             const [nodeId, bpeHouseId] = params;
-            const pubs = inMemoryTables.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.bpe_printhouse_id === bpeHouseId);
-            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+            const pubs = inMemoryTables.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.bpe_printhouse_id === bpeHouseId)
+                .sort((a, b) => b.version - a.version);
+            return pubs.length > 0 ? [pubs[0]] : [];
         }
         if (s.includes('WHERE printer_node_id = ? AND revision_id = ?')) {
             const [nodeId, revId, tenantId, bpeHouseId] = params;
@@ -267,7 +274,23 @@ function handleInMemoryQuery(sql, params = []) {
     }
 
     return [];
-}
+};
+
+db.getConnection = async function () {
+    return {
+        query: async (sql, params = []) => {
+            if (/SELECT GET_LOCK/i.test(sql)) {
+                return [[{ lock_status: 1 }]];
+            }
+            if (/SELECT RELEASE_LOCK/i.test(sql)) {
+                return [[{ release_status: 1 }]];
+            }
+            const rows = await db.query(sql, params);
+            return [rows];
+        },
+        release: () => {}
+    };
+};
 
 
 describe('Phase 195 Backend Integrations Suite', () => {

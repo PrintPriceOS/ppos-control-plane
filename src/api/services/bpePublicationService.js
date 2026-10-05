@@ -122,124 +122,185 @@ class BpePublicationService {
      * Publishes a governed accepted pricing revision from Control Plane to BPE.
      *
      * @param {string} tenantId - From JWT
+    /**
+     * Derives a deterministic MySQL advisory lock name for a BPE destination (max 64 chars).
+     */
+    getDestinationLockName(bpePrinthouseId) {
+        const raw = `bpe_pub_dst_${bpePrinthouseId}`;
+        if (raw.length <= 64) return raw;
+        const hash = crypto.createHash('sha256').update(raw).digest('hex').substring(0, 48);
+        return `bpe_pub_${hash}`;
+    }
+
+    /**
+     * Acquires connection-scoped advisory lock on MySQL.
+     */
+    async acquireDestinationLock(conn, lockName, timeoutSeconds = 15) {
+        const res = await conn.query('SELECT GET_LOCK(?, ?) AS lock_status', [lockName, timeoutSeconds]);
+        const rows = Array.isArray(res) && Array.isArray(res[0]) ? res[0] : res;
+        const status = Array.isArray(rows) ? rows[0]?.lock_status : rows?.lock_status;
+        if (Number(status) !== 1) {
+            throw new Error(`Failed to acquire publication lock for BPE destination (lock: ${lockName}, status: ${status})`);
+        }
+    }
+
+    /**
+     * Releases connection-scoped advisory lock on MySQL.
+     */
+    async releaseDestinationLock(conn, lockName) {
+        try {
+            await conn.query('SELECT RELEASE_LOCK(?) AS release_status', [lockName]);
+        } catch (err) {
+            logger.warn(`Failed to release publication lock ${lockName}: ${err.message}`);
+        }
+    }
+
+    /**
+     * Publishes an accepted pricing revision to BPE with strict readback verification.
+     * Serialized per BPE destination using MySQL advisory locks throughout the entire cycle.
+     * 
+     * @param {string} tenantId - Control Plane tenant ID
      * @param {string} printerNodeId - Control Plane printer node ID
      * @param {string} revisionId - Revision ID in printhouse_pricing_revisions
      * @param {Object} [options] - Mock/test injection options
      */
     async publishAcceptedRevision(tenantId, printerNodeId, revisionId, options = {}) {
-
-        // 1. Fetch Revision & Node rates (SELECT ... FOR UPDATE / Read)
-        const revisionRows = await db.query(
-            `SELECT id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, parent_revision_id, created_at
-             FROM printhouse_pricing_revisions
-             WHERE id = ? AND tenant_id = ? AND printer_node_id = ?`,
-            [revisionId, tenantId, printerNodeId]
-        );
-        const revision = Array.isArray(revisionRows) ? revisionRows[0] : revisionRows;
-
-        if (!revision) {
-            throw new Error(`Revision ${revisionId} not found for printer node ${printerNodeId}`);
-        }
-
-        // 1.1 Integrity verification: read rates_checksum and compare with canonical hash of rates_json
-        const ratesPayload = typeof revision.rates_json === 'string' ? JSON.parse(revision.rates_json) : revision.rates_json;
-        const canonicalRatesHash = computeRatesChecksum(ratesPayload);
-
-        if (revision.rates_checksum && revision.rates_checksum !== canonicalRatesHash) {
-            throw new Error(`Revision integrity check failed: stored rates_checksum (${revision.rates_checksum}) does not match canonical hash of rates_json (${canonicalRatesHash})`);
-        }
-        const sentRatesChecksum = revision.rates_checksum || canonicalRatesHash;
-
-        // 1.2 Define explicitly the contract revision/patch checksum without confusing patch and rates checksums
-        let checksumToPublish;
-        if (revision.proposed_patch_checksum) {
-            checksumToPublish = revision.proposed_patch_checksum;
-        } else {
-            // MANUAL_EDIT or revision without proposed_patch_checksum: define explicit deterministic revision checksum
-            checksumToPublish = 'sha256:rev_' + crypto.createHash('sha256').update(`revision:${revision.id}:${sentRatesChecksum}`).digest('hex');
-        }
-
         const bpePrinthouseId = await this.resolveBpePrinthouseId(printerNodeId);
+        const lockName = this.getDestinationLockName(bpePrinthouseId);
+        const lockTimeout = Number(process.env.PPOS_BPE_LOCK_TIMEOUT_SECONDS) || 15;
 
-        // 2. Check Idempotency / Superseded Status with comprehensive identity & checksum checks
-        const existingPubRows = await db.query(
-            `SELECT id, tenant_id, printer_node_id, bpe_printhouse_id, revision_id, accepted_patch_checksum, bpe_response_checksum, version, status
-             FROM bpe_pricing_publications
-             WHERE printer_node_id = ? AND revision_id = ? AND tenant_id = ? AND bpe_printhouse_id = ? AND status = 'PUBLISHED'
-             ORDER BY version DESC, created_at DESC LIMIT 1`,
-            [printerNodeId, revisionId, tenantId, bpePrinthouseId]
-        );
-        const existingPublished = Array.isArray(existingPubRows) ? existingPubRows[0] : existingPubRows;
+        let lockConn = null;
+        let lockAcquired = false;
 
-        if (existingPublished) {
-            const isPatchChecksumMatch = existingPublished.accepted_patch_checksum === checksumToPublish &&
-                                         existingPublished.bpe_response_checksum === checksumToPublish;
-            const ratesMatch = computeRatesChecksum(revision.rates_json) === sentRatesChecksum;
-
-            if (isPatchChecksumMatch && ratesMatch &&
-                String(existingPublished.revision_id) === String(revisionId) &&
-                String(existingPublished.tenant_id) === String(tenantId) &&
-                String(existingPublished.printer_node_id) === String(printerNodeId) &&
-                String(existingPublished.bpe_printhouse_id) === String(bpePrinthouseId)) {
-
-                logger.info(`Revision ${revisionId} (patch: ${checksumToPublish}, rates: ${sentRatesChecksum}) is already published and verified to BPE`, { printerNodeId, tenantId, bpePrinthouseId });
-                return {
-                    ok: true,
-                    alreadyPublished: true,
-                    status: 'PUBLISHED',
-                    publicationId: existingPublished.id,
-                    checksum: checksumToPublish,
-                    ratesChecksum: sentRatesChecksum
-                };
+        try {
+            if (typeof db.getConnection === 'function') {
+                lockConn = await db.getConnection();
+                await this.acquireDestinationLock(lockConn, lockName, lockTimeout);
+                lockAcquired = true;
             }
-        }
 
-        // 2.1 Determine monotonic publication sequence from bpe_pricing_publications
-        const latestPubRows = await db.query(
-            `SELECT id, version, revision_id, status, created_at
-             FROM bpe_pricing_publications
-             WHERE printer_node_id = ? AND bpe_printhouse_id = ?
-             ORDER BY version DESC, created_at DESC LIMIT 1`,
-            [printerNodeId, bpePrinthouseId]
-        );
-        const latestPub = Array.isArray(latestPubRows) ? latestPubRows[0] : latestPubRows;
-
-        // Prevent older historical revisions from overwriting a more recent published revision
-        if (latestPub && latestPub.status === 'PUBLISHED' && String(latestPub.revision_id) !== String(revisionId)) {
-            const latestRevRows = await db.query(
-                `SELECT created_at FROM printhouse_pricing_revisions WHERE id = ?`,
-                [latestPub.revision_id]
+            // 1. Fetch Revision & Node rates (SELECT ... FOR UPDATE / Read)
+            const revisionRows = await db.query(
+                `SELECT id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, parent_revision_id, created_at
+                 FROM printhouse_pricing_revisions
+                 WHERE id = ? AND tenant_id = ? AND printer_node_id = ?`,
+                [revisionId, tenantId, printerNodeId]
             );
-            const latestPubRev = Array.isArray(latestRevRows) ? latestRevRows[0] : latestRevRows;
-            if (latestPubRev && new Date(revision.created_at) < new Date(latestPubRev.created_at)) {
-                throw new Error(`Cannot publish historical revision ${revisionId} (created ${revision.created_at}) over more recent published revision ${latestPub.revision_id} (created ${latestPubRev.created_at})`);
+            const revision = Array.isArray(revisionRows) ? revisionRows[0] : revisionRows;
+
+            if (!revision) {
+                throw new Error(`Revision ${revisionId} not found for printer node ${printerNodeId}`);
             }
-        }
 
-        const nextPublicationVersion = (Number(latestPub?.version) || 0) + 1;
-        const publicationId = uuidv4();
+            // 1.1 Integrity verification: read rates_checksum and compare with canonical hash of rates_json
+            const ratesPayload = typeof revision.rates_json === 'string' ? JSON.parse(revision.rates_json) : revision.rates_json;
+            const canonicalRatesHash = computeRatesChecksum(ratesPayload);
 
-        await db.query(
-            `INSERT INTO bpe_pricing_publications (id, tenant_id, printer_node_id, bpe_printhouse_id, revision_id, accepted_patch_checksum, version, status, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())`,
-            [publicationId, tenantId, printerNodeId, bpePrinthouseId, revisionId, checksumToPublish, nextPublicationVersion]
-        );
+            if (revision.rates_checksum && revision.rates_checksum !== canonicalRatesHash) {
+                throw new Error(`Revision integrity check failed: stored rates_checksum (${revision.rates_checksum}) does not match canonical hash of rates_json (${canonicalRatesHash})`);
+            }
+            const sentRatesChecksum = revision.rates_checksum || canonicalRatesHash;
 
-        // 3. Prepare payload for BPE publication contract
-        const bpeUrl = process.env.PPOS_PRICING_ENGINE_URL || 'http://127.0.0.1:8004';
-        const publishPath = process.env.PPOS_BPE_PUBLISH_PATH || '/api/marketplace/revisions/publish';
+            // 1.2 Define explicitly the contract revision/patch checksum without confusing patch and rates checksums
+            let checksumToPublish;
+            if (revision.proposed_patch_checksum) {
+                checksumToPublish = revision.proposed_patch_checksum;
+            } else {
+                // MANUAL_EDIT or revision without proposed_patch_checksum: define explicit deterministic revision checksum
+                checksumToPublish = 'sha256:rev_' + crypto.createHash('sha256').update(`revision:${revision.id}:${sentRatesChecksum}`).digest('hex');
+            }
 
-        const publicationPayload = {
-            origin: 'PPOS_CONTROL_PLANE',
-            tenant_id: tenantId,
-            printer_node_id: printerNodeId,
-            bpe_printhouse_id: bpePrinthouseId,
-            revision_id: revisionId,
-            accepted_patch_checksum: checksumToPublish,
-            version: nextPublicationVersion,
-            rates: ratesPayload,
-            published_at: new Date().toISOString()
-        };
+            // 2. Check Idempotency / Superseded Status with comprehensive identity & checksum checks
+            const existingPubRows = await db.query(
+                `SELECT id, tenant_id, printer_node_id, bpe_printhouse_id, revision_id, accepted_patch_checksum, bpe_response_checksum, version, status
+                 FROM bpe_pricing_publications
+                 WHERE printer_node_id = ? AND revision_id = ? AND tenant_id = ? AND bpe_printhouse_id = ? AND status = 'PUBLISHED'
+                 ORDER BY version DESC, created_at DESC LIMIT 1`,
+                [printerNodeId, revisionId, tenantId, bpePrinthouseId]
+            );
+            const existingPublished = Array.isArray(existingPubRows) ? existingPubRows[0] : existingPubRows;
+
+            if (existingPublished) {
+                const isPatchChecksumMatch = existingPublished.accepted_patch_checksum === checksumToPublish &&
+                                             existingPublished.bpe_response_checksum === checksumToPublish;
+                const ratesMatch = computeRatesChecksum(revision.rates_json) === sentRatesChecksum;
+
+                if (isPatchChecksumMatch && ratesMatch &&
+                    String(existingPublished.revision_id) === String(revisionId) &&
+                    String(existingPublished.tenant_id) === String(tenantId) &&
+                    String(existingPublished.printer_node_id) === String(printerNodeId) &&
+                    String(existingPublished.bpe_printhouse_id) === String(bpePrinthouseId)) {
+
+                    logger.info(`Revision ${revisionId} (patch: ${checksumToPublish}, rates: ${sentRatesChecksum}) is already published and verified to BPE`, { printerNodeId, tenantId, bpePrinthouseId });
+                    return {
+                        ok: true,
+                        alreadyPublished: true,
+                        status: 'PUBLISHED',
+                        publicationId: existingPublished.id,
+                        checksum: checksumToPublish,
+                        ratesChecksum: sentRatesChecksum
+                    };
+                }
+            }
+
+            // 2.1 Query A: Latest PUBLISHED publication to prevent historical revisions from overwriting newer published rates
+            const latestPublishedRows = await db.query(
+                `SELECT id, version, revision_id, status, created_at
+                 FROM bpe_pricing_publications
+                 WHERE printer_node_id = ? AND bpe_printhouse_id = ? AND status = 'PUBLISHED'
+                 ORDER BY version DESC, created_at DESC LIMIT 1`,
+                [printerNodeId, bpePrinthouseId]
+            );
+            const latestPublished = Array.isArray(latestPublishedRows) ? latestPublishedRows[0] : latestPublishedRows;
+
+            if (latestPublished && String(latestPublished.revision_id) !== String(revisionId)) {
+                const latestRevRows = await db.query(
+                    `SELECT created_at FROM printhouse_pricing_revisions WHERE id = ?`,
+                    [latestPublished.revision_id]
+                );
+                const latestPubRev = Array.isArray(latestRevRows) ? latestRevRows[0] : latestRevRows;
+                if (latestPubRev && new Date(revision.created_at) < new Date(latestPubRev.created_at)) {
+                    throw new Error(`Cannot publish historical revision ${revisionId} (created ${revision.created_at}) over more recent published revision ${latestPublished.revision_id} (created ${latestPubRev.created_at})`);
+                }
+            }
+
+            // 2.2 Query B: Monotonic publication sequence counter across ALL publication records (PENDING, PUBLISHED, FAILED, SUPERSEDED)
+            const maxVersionRows = await db.query(
+                `SELECT version
+                 FROM bpe_pricing_publications
+                 WHERE printer_node_id = ? AND bpe_printhouse_id = ?
+                 ORDER BY version DESC LIMIT 1`,
+                [printerNodeId, bpePrinthouseId]
+            );
+            const maxVersionRow = Array.isArray(maxVersionRows) ? maxVersionRows[0] : maxVersionRows;
+            const currentMaxVersion = maxVersionRow && Number.isInteger(Number(maxVersionRow.version))
+                ? Number(maxVersionRow.version)
+                : 0;
+
+            const nextPublicationVersion = currentMaxVersion + 1;
+            const publicationId = uuidv4();
+
+            await db.query(
+                `INSERT INTO bpe_pricing_publications (id, tenant_id, printer_node_id, bpe_printhouse_id, revision_id, accepted_patch_checksum, version, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())`,
+                [publicationId, tenantId, printerNodeId, bpePrinthouseId, revisionId, checksumToPublish, nextPublicationVersion]
+            );
+
+            // 3. Prepare payload for BPE publication contract
+            const bpeUrl = process.env.PPOS_PRICING_ENGINE_URL || 'http://127.0.0.1:8004';
+            const publishPath = process.env.PPOS_BPE_PUBLISH_PATH || '/api/marketplace/revisions/publish';
+
+            const publicationPayload = {
+                origin: 'PPOS_CONTROL_PLANE',
+                tenant_id: tenantId,
+                printer_node_id: printerNodeId,
+                bpe_printhouse_id: bpePrinthouseId,
+                revision_id: revisionId,
+                accepted_patch_checksum: checksumToPublish,
+                version: nextPublicationVersion,
+                rates: ratesPayload,
+                published_at: new Date().toISOString()
+            };
 
         // 4. Dispatch to Mock Handler or BPE Endpoint
         if (options.mockHandler) {
@@ -263,6 +324,7 @@ class BpePublicationService {
                     publicationId,
                     printerNodeId,
                     bpePrinthouseId,
+                    version: nextPublicationVersion,
                     checksumReadback: validatedChecksum,
                     checksumMatched: true,
                     ratesChecksum: sentRatesChecksum
@@ -324,6 +386,21 @@ class BpePublicationService {
             failureErr.statusCode = err.response?.status || err.statusCode || 500;
             failureErr.publicationId = publicationId;
             throw failureErr;
+        }
+        } finally {
+            if (lockConn) {
+                try {
+                    if (lockAcquired) {
+                        await this.releaseDestinationLock(lockConn, lockName);
+                    }
+                } finally {
+                    try {
+                        lockConn.release();
+                    } catch (releaseErr) {
+                        logger.warn(`Failed to release MySQL lock connection: ${releaseErr.message}`);
+                    }
+                }
+            }
         }
     }
 

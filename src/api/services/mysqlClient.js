@@ -110,6 +110,28 @@ async function query(sql, params = []) {
     }
 }
 
+async function getConnection() {
+    const isConfigured = process.env.MYSQL_HOST || process.env.DATABASE_URL;
+    
+    if (!isConfigured) {
+        const error = new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
+        error.code = 'DB_UNCONFIGURED';
+        throw error;
+    }
+
+    try {
+        return await getPool().getConnection();
+    } catch (err) {
+        if (err.code === 'ECONNREFUSED') {
+            const wrappedErr = new Error(`Database connection refused at ${process.env.MYSQL_HOST || 'localhost'}`);
+            wrappedErr.code = 'DB_CONNECTION_REFUSED';
+            wrappedErr.originalError = err;
+            throw wrappedErr;
+        }
+        throw err;
+    }
+}
+
 async function closePool() {
     if (pool) {
         try {
@@ -123,4 +145,5 @@ async function closePool() {
     }
 }
 
-module.exports = { getPool, query, closePool };
+module.exports = { getPool, query, getConnection, closePool };
+
