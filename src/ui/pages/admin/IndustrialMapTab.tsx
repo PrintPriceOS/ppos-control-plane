@@ -17,7 +17,7 @@ export const IndustrialMapTab: React.FC = () => {
     const { data: mapState } = useAdminQuery('routing:map', getRoutingMap, 5000);
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const warnings = safeArray(mapState?.warnings ?? []);
+    const warnings = safeArray((mapState as any)?.warnings ?? []);
     const sourceStatus = mapState?.source_status || '';
     const hasWarnings = warnings.length > 0 || sourceStatus === 'PARTIAL_COORDINATES' || sourceStatus === 'NO_COORDINATES_AVAILABLE';
 

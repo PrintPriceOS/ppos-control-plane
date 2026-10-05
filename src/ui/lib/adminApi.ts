@@ -899,6 +899,16 @@ export async function getHealth() {
     return adminFetch<any[]>(`/api/admin/network/health`);
 }
 
+export async function getSystemHealth(): Promise<{ ok: boolean; status?: string; dependencies?: any }> {
+    try {
+        const res = await fetch('/api/system/health');
+        if (!res.ok) return { ok: false, status: 'HTTP_ERROR' };
+        return await res.json();
+    } catch (err: any) {
+        return { ok: false, status: 'UNREACHABLE' };
+    }
+}
+
 export async function getRoutingOverview() {
     return adminFetch<any>(`/api/admin/routing/overview`);
 }

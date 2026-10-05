@@ -159,8 +159,7 @@ export function ControlledBetaRuntimeActivityReview() {
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await runtimeActivityReviewClient.supersedeReview({
-        reviewId: selectedReviewId,
+      const res = await runtimeActivityReviewClient.supersedeReview(selectedReviewId, {
         supersededByReviewId: targetSupersedeId,
         reason: supersedeReason
       });

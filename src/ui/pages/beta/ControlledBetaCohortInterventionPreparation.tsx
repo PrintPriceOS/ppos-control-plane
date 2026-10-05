@@ -88,7 +88,7 @@ export function ControlledBetaCohortInterventionPreparation() {
       const res = await cohortInterventionPreparationClient.getPreparation(prepId);
       if (res.ok) {
         setSelectedPrep(res.preparation);
-        setChecklistItems(res.checklist);
+        setChecklistItems((res as any).checklist || (res as any).items || []);
 
         if (res.preparation.preparation_status === 'FINALIZED') {
           const evRes = await cohortInterventionPreparationClient.getEvidencePack(prepId);
@@ -139,7 +139,7 @@ export function ControlledBetaCohortInterventionPreparation() {
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await cohortInterventionPreparationClient.updateChecklistItem(selectedPrepId, itemId, newStatus);
+      const res = await cohortInterventionPreparationClient.updateItemStatus(selectedPrepId, itemId, newStatus);
       if (res.ok) {
         await loadPrepDetails(selectedPrepId);
       } else {
@@ -158,7 +158,7 @@ export function ControlledBetaCohortInterventionPreparation() {
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await cohortInterventionPreparationClient.approvePreparationRole(selectedPrepId, role, 'current-admin');
+      const res = await cohortInterventionPreparationClient.approveRole(selectedPrepId, role);
       if (res.ok) {
         setMessage(`Aprobación registrada para el rol ${role}.`);
         await loadPrepDetails(selectedPrepId);
@@ -184,15 +184,13 @@ export function ControlledBetaCohortInterventionPreparation() {
         setMessage('');
         setErrorMsg('');
         try {
-          const res = await cohortInterventionPreparationClient.finalizePreparation(selectedPrepId, {
-            attestedBy: 'super-admin'
-          });
+          const res = await cohortInterventionPreparationClient.finalizePreparation(selectedPrepId);
           if (res.ok) {
             setMessage('Propuesta de intervención sellada y finalizada correctamente.');
             await loadPrepDetails(selectedPrepId);
             await fetchPrepsList();
           } else {
-            setErrorMsg(`Bloqueo al finalizar: ${res.reason || 'Requisitos pendientes'}`);
+            setErrorMsg(`Bloqueo al finalizar: ${(res as any).reason || 'Requisitos pendientes'}`);
           }
         } catch (err: any) {
           setErrorMsg(normalizeUiError(err));

@@ -35,7 +35,8 @@ export const IndustrialOpsPage: React.FC = () => {
     const { t } = useLocale();
     const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'live' | 'intelligence' | 'economics' | 'governance' | 'temporal' | 'simulation' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle' | 'map'>('map');
 
-    const { data: mapState, isLoading } = useAdminQuery('routing:map', getRoutingMap, 10000);
+    const { data: mapState, status } = useAdminQuery('routing:map', getRoutingMap, 10000);
+    const isLoading = status === 'loading';
     const nodes = safeArray(mapState?.nodes);
     const isOperational = nodes.length > 0;
 

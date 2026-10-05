@@ -64,7 +64,8 @@ const BoundsFit: React.FC<{ nodes: any[] }> = ({ nodes }) => {
 };
 
 export const FederationLeafletMap: React.FC = () => {
-  const { data: mapState, isLoading } = useAdminQuery('routing:map', getRoutingMap, 5000);
+  const { data: mapState, status } = useAdminQuery('routing:map', getRoutingMap, 5000);
+  const isLoading = status === 'loading';
   const { openMachine } = useMachineDrawer();
   const theme = useTheme();
   const { t } = useLocale();

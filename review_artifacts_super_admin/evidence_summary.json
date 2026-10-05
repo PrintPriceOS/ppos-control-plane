@@ -1,0 +1,101 @@
+[
+  {
+    "screen": "Entorno Beta / Limited Beta Runtime",
+    "variant": "Desktop 1280x720 - Dark - ES",
+    "file": "beta_runtime_desktop_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Gobernanza Beta / Interventions",
+    "variant": "Desktop 1280x720 - Dark - ES",
+    "file": "beta_governance_desktop_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Operaciones Industriales / Live Map",
+    "variant": "Desktop 1280x720 - Dark - ES",
+    "file": "industrial_ops_desktop_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Entorno Beta / Limited Beta Runtime",
+    "variant": "Desktop 1280x720 - Light - ES",
+    "file": "beta_runtime_desktop_light_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Gobernanza Beta / Interventions",
+    "variant": "Desktop 1280x720 - Light - ES",
+    "file": "beta_governance_desktop_light_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Operaciones Industriales / Live Map",
+    "variant": "Desktop 1280x720 - Light - ES",
+    "file": "industrial_ops_desktop_light_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 1280,
+      "winWidth": 1280,
+      "bodyWidth": 1280
+    }
+  },
+  {
+    "screen": "Entorno Beta / Limited Beta Runtime",
+    "variant": "Mobile 390x844 - Dark - ES",
+    "file": "beta_runtime_mobile_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 390,
+      "winWidth": 390,
+      "bodyWidth": 390
+    }
+  },
+  {
+    "screen": "Gobernanza Beta / Interventions",
+    "variant": "Mobile 390x844 - Dark - ES",
+    "file": "beta_governance_mobile_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 390,
+      "winWidth": 390,
+      "bodyWidth": 390
+    }
+  },
+  {
+    "screen": "Operaciones Industriales / Live Map",
+    "variant": "Mobile 390x844 - Dark - ES",
+    "file": "industrial_ops_mobile_dark_es.png",
+    "overflow": {
+      "hasOverflow": false,
+      "docWidth": 390,
+      "winWidth": 390,
+      "bodyWidth": 390
+    }
+  }
+]

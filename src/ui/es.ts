@@ -1099,6 +1099,13 @@ export const es = {
 
   // Topbar and Governance Posture
   'topbar.governedPosture': 'Gobernanza Activa',
+  'topbar.governedVerifying': 'Verificando...',
+  'topbar.governedDegraded': 'Gobernanza Parcial',
+  'topbar.governedOffline': 'Sin Telemetría',
+  'topbar.governedActiveTooltip': 'Telemetría de servidor y control RBAC verificados en tiempo real.',
+  'topbar.governedDegradedTooltip': 'Conectividad establecida con dependencias de servidor degradadas.',
+  'topbar.governedOfflineTooltip': 'No se pudo verificar la telemetría del servidor en vivo; no se afirman garantías operativas.',
+  'topbar.governedVerifyingTooltip': 'Comprobando telemetría de dependencias de servidor y control RBAC.',
 
   // Industrial Operations Page
   'industrial.title': 'Operaciones Industriales',

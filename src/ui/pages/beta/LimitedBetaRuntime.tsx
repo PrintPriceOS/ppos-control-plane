@@ -30,7 +30,6 @@ import {
 } from '../../api/limitedBetaRuntimeClient';
 import { useLocale } from '../../i18n';
 import {
-  ShieldAlertIcon,
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   ArrowPathIcon,
@@ -81,7 +80,7 @@ export function LimitedBetaRuntime() {
     action: () => {}
   });
 
-  const run = useCallback(async (label: string, fn: () => Promise<Record<string, unknown>>) => {
+  const run = useCallback(async (label: string, fn: () => Promise<any>) => {
     setLoading(true);
     setMessage('');
     try {

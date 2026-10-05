@@ -15,7 +15,7 @@ import {
   Bars3Icon
 } from "@heroicons/react/24/outline";
 import { NotificationBell } from '../components/NotificationBell';
-import { clearAdminKey } from '../lib/adminApi';
+import { clearAdminKey, getSystemHealth } from '../lib/adminApi';
 import { getAuthUser, getUserRole } from '../lib/authStore';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
@@ -28,10 +28,32 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
   const navigate = useNavigate();
   const { locale, setLocale, t } = useLocale();
   const [currentTheme, setCurrentThemeState] = useState(getTheme());
+  const [governancePosture, setGovernancePosture] = useState<'VERIFYING' | 'ACTIVE' | 'DEGRADED' | 'OFFLINE'>('VERIFYING');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getSystemHealth()
+      .then(data => {
+        if (!isMounted) return;
+        if (data && data.ok) {
+          setGovernancePosture('ACTIVE');
+        } else if (data && data.status === 'HTTP_ERROR') {
+          setGovernancePosture('DEGRADED');
+        } else {
+          setGovernancePosture('OFFLINE');
+        }
+      })
+      .catch(() => {
+        if (isMounted) setGovernancePosture('OFFLINE');
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeTheme((theme) => {
@@ -103,11 +125,43 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             </div>
           )}
 
-          {/* Governed Posture Badge */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20" title={t('topbar.governedPosture') || 'Gobernanza Activa'}>
-            <ShieldCheckIcon className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedPosture') || 'Gobernanza Activa'}</span>
-          </div>
+          {/* Governed Posture Badge - Derived dynamically from server telemetry */}
+          {governancePosture === 'ACTIVE' && (
+            <div
+              className="hidden md:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+              title={t('topbar.governedActiveTooltip') || 'Telemetría de servidor y control RBAC verificados en tiempo real.'}
+            >
+              <ShieldCheckIcon className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedPosture') || 'Gobernanza Activa'}</span>
+            </div>
+          )}
+          {governancePosture === 'DEGRADED' && (
+            <div
+              className="hidden md:flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20"
+              title={t('topbar.governedDegradedTooltip') || 'Conectividad establecida con dependencias degradadas.'}
+            >
+              <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedDegraded') || 'Gobernanza Parcial'}</span>
+            </div>
+          )}
+          {governancePosture === 'OFFLINE' && (
+            <div
+              className="hidden md:flex items-center gap-2 px-3 py-1 bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+              title={t('topbar.governedOfflineTooltip') || 'No se pudo verificar la telemetría del servidor en vivo; no se afirman garantías operativas.'}
+            >
+              <ExclamationCircleIcon className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedOffline') || 'Sin Telemetría'}</span>
+            </div>
+          )}
+          {governancePosture === 'VERIFYING' && (
+            <div
+              className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse"
+              title={t('topbar.governedVerifyingTooltip') || 'Comprobando telemetría de dependencias de servidor y control RBAC.'}
+            >
+              <InformationCircleIcon className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedVerifying') || 'Verificando...'}</span>
+            </div>
+          )}
 
           {/* Region Context */}
           <div className="hidden lg:flex items-center gap-2 text-slate-400">

@@ -108,6 +108,7 @@ vi.mock('../src/ui/api/controlledBetaCohortInterventionApprovalClient', () => ({
   }
 }));
 
+const mockOpenMachine = vi.fn();
 vi.mock('../src/ui/lib/adminApi', () => ({
   getRoutingMap: vi.fn().mockResolvedValue({
     nodes: [
@@ -119,12 +120,13 @@ vi.mock('../src/ui/lib/adminApi', () => ({
     warnings: []
   }),
   getRoutingLive: vi.fn().mockResolvedValue({ decisions: [] }),
-  clearAdminKey: vi.fn()
+  clearAdminKey: vi.fn(),
+  getSystemHealth: vi.fn().mockResolvedValue({ ok: true })
 }));
 
 vi.mock('../src/ui/components/federation/MachineDrawerContext', () => ({
   useMachineDrawer: () => ({
-    openMachine: vi.fn()
+    openMachine: mockOpenMachine
   })
 }));
 
@@ -143,11 +145,26 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
     vi.clearAllMocks();
   });
 
-  it('1. Topbar renders active governance posture badge instead of static v2.0.0 Certified', () => {
-    renderWithProviders(<Topbar />);
+  it('1. Topbar derives governance posture dynamically from real telemetry without static unverified assertions', async () => {
+    const adminApi = await import('../src/ui/lib/adminApi');
+
+    // Healthy telemetry case
+    (adminApi.getSystemHealth as any).mockResolvedValueOnce({ ok: true });
+    const { unmount } = renderWithProviders(<Topbar />);
 
     expect(screen.queryByText(/v2\.0\.0 Certified/i)).toBeNull();
-    expect(screen.getByText(/Gobernanza Activa|Active Governance|Aktive Governance/i)).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText(/Gobernanza Activa|Active Governance|Aktive Governance/i)).toBeDefined();
+    });
+    unmount();
+
+    // Unreachable telemetry case: must NOT assert active operational status without backing data
+    (adminApi.getSystemHealth as any).mockResolvedValueOnce({ ok: false, status: 'UNREACHABLE' });
+    renderWithProviders(<Topbar />);
+    await waitFor(() => {
+      expect(screen.queryByText(/Gobernanza Activa/i)).toBeNull();
+      expect(screen.getByText(/Sin Telemetría|No Telemetry|Keine Telemetrie/i)).toBeDefined();
+    });
   });
 
   it('2. LimitedBetaRuntime replaces Phase 128.1 with functional title and confirms emergency kill switch before execution', async () => {
@@ -222,7 +239,7 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
     });
   });
 
-  it('7. FederationLeafletMap detects unconfigured Carto key and renders structured tactical grid without failing tiles', async () => {
+  it('7. FederationLeafletMap detects unconfigured Carto key, retains node list, and allows inspecting machine', async () => {
     renderWithProviders(<FederationLeafletMap />);
 
     await waitFor(() => {
@@ -230,6 +247,45 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
       expect(screen.getByText(/Registro Táctico de Nodos/i)).toBeDefined();
       expect(screen.getByText(/Berlin Druck/i)).toBeDefined();
       expect(screen.getByText(/Madrid Grafic/i)).toBeDefined();
+    });
+
+    // Node inspection works without map tiles
+    const inspectBtns = screen.getAllByText(/Inspeccionar Máquina/i);
+    expect(inspectBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(inspectBtns[0]);
+    expect(mockOpenMachine).toHaveBeenCalledWith('node_1');
+  });
+
+  it('8. Critical actions do NOT invoke endpoints when cancelling confirmation dialog', async () => {
+    const { triggerRuntimeKillSwitch } = await import('../src/ui/api/limitedBetaRuntimeClient');
+    renderWithProviders(<LimitedBetaRuntime />);
+
+    const gateInput = screen.getByPlaceholderText(/ID de Gate/i);
+    fireEvent.change(gateInput, { target: { value: 'gate_test_safe' } });
+
+    // Click trigger kill switch
+    const killSwitchBtn = screen.getByText(/Activar Interruptor/i);
+    fireEvent.click(killSwitchBtn);
+
+    // Modal appears
+    expect(screen.getByText(/ALERTA DE SEGURIDAD/i)).toBeDefined();
+
+    // Click Cancel
+    const cancelBtn = screen.getByText(/Cancelar/i);
+    fireEvent.click(cancelBtn);
+
+    // Endpoint must NOT be called on cancel
+    expect(triggerRuntimeKillSwitch).not.toHaveBeenCalled();
+
+    // Re-open and confirm
+    fireEvent.click(killSwitchBtn);
+    const confirmBtn = screen.getByText(/Confirmar/i);
+    fireEvent.click(confirmBtn);
+
+    // Endpoint must be called now
+    expect(triggerRuntimeKillSwitch).toHaveBeenCalledWith({
+      gate_id: 'gate_test_safe',
+      reason: 'EMERGENCY_ACCESS_SUSPENSION'
     });
   });
 });

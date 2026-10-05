@@ -1098,7 +1098,14 @@ export const en = {
   'fileTooLargeError': 'File exceeds server size limit (10 MB). Please select a smaller PDF.',
 
   // Topbar and Governance Posture
-  'topbar.governedPosture': 'Governed Posture',
+  'topbar.governedPosture': 'Active Governance',
+  'topbar.governedVerifying': 'Verifying...',
+  'topbar.governedDegraded': 'Partial Governance',
+  'topbar.governedOffline': 'No Telemetry',
+  'topbar.governedActiveTooltip': 'Server telemetry and RBAC access control verified in real time.',
+  'topbar.governedDegradedTooltip': 'Connectivity established with degraded server dependencies.',
+  'topbar.governedOfflineTooltip': 'Live server telemetry could not be verified; no operational guarantees asserted.',
+  'topbar.governedVerifyingTooltip': 'Checking server dependencies telemetry and RBAC control.',
 
   // Industrial Operations Page
   'industrial.title': 'Industrial Operations',

@@ -142,7 +142,7 @@ export function ControlledBetaCohortInterventionApproval() {
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await cohortInterventionApprovalClient.signApprovalStep(selectedApprovalId, role, 'super-admin');
+      const res = await cohortInterventionApprovalClient.signStep(selectedApprovalId, role);
       if (res.ok) {
         setMessage(`Firma de rol ${role} registrada con éxito.`);
         await loadApprovalDetails(selectedApprovalId);

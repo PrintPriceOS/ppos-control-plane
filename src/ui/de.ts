@@ -1099,6 +1099,13 @@ export const de = {
 
   // Topbar and Governance Posture
   'topbar.governedPosture': 'Aktive Governance',
+  'topbar.governedVerifying': 'Wird geprüft...',
+  'topbar.governedDegraded': 'Eingeschränkte Governance',
+  'topbar.governedOffline': 'Keine Telemetrie',
+  'topbar.governedActiveTooltip': 'Server-Telemetrie und RBAC-Zugriffskontrolle in Echtzeit verifiziert.',
+  'topbar.governedDegradedTooltip': 'Verbindung hergestellt mit beeinträchtigten Server-Abhängigkeiten.',
+  'topbar.governedOfflineTooltip': 'Live-Servertelemetrie konnte nicht verifiziert werden; keine betrieblichen Garantien zugesichert.',
+  'topbar.governedVerifyingTooltip': 'Überprüfung der Server-Abhängigkeiten und RBAC-Kontrolle.',
 
   // Industrial Operations Page
   'industrial.title': 'Industrieller Betrieb',
