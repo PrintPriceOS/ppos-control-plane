@@ -86,6 +86,50 @@ async function resolveCanonicalShippingConfiguration(dbClient, tenantId, nodeId,
 }
 
 /**
+ * Safely parse and validate metadata_json from MySQL.
+ * Accepts either:
+ * - A parsed JSON object (e.g. when MySQL driver / client automatically parses JSON columns)
+ * - A JSON string (e.g. '{"key": "val"}')
+ * - null or undefined (treated as empty object for uninitialized metadata)
+ *
+ * Validates that the result is a non-null plain JSON object (not an array, not a primitive).
+ * Rejects invalid JSON strings with explicit diagnostics, eliminating silent empty catch blocks.
+ *
+ * @param {unknown} rawMetadata
+ * @param {string} [context='metadata'] Context identifier for actionable diagnostic error messages
+ * @returns {Record<string, any>} Plain object representation of metadata
+ */
+function parseAndValidateMetadata(rawMetadata, context = 'metadata') {
+    if (rawMetadata == null) {
+        return {};
+    }
+
+    let parsed;
+    if (typeof rawMetadata === 'string') {
+        const trimmed = rawMetadata.trim();
+        if (trimmed === '') {
+            return {};
+        }
+        try {
+            parsed = JSON.parse(trimmed);
+        } catch (err) {
+            throw new Error(`INVALID_METADATA_JSON: Failed to parse metadata_json (${context}): ${err.message}`);
+        }
+    } else if (typeof rawMetadata === 'object') {
+        parsed = rawMetadata;
+    } else {
+        throw new Error(`INVALID_METADATA_JSON: metadata_json (${context}) must be a JSON object or valid JSON string, got ${typeof rawMetadata}`);
+    }
+
+    if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        const actualType = Array.isArray(parsed) ? 'array' : (parsed === null ? 'null' : typeof parsed);
+        throw new Error(`INVALID_METADATA_JSON: metadata_json (${context}) must resolve to a non-null JSON object, got ${actualType}`);
+    }
+
+    return parsed;
+}
+
+/**
  * Governed provisioning logic.
  *
  * @param {object} options
@@ -177,15 +221,8 @@ async function provisionBpePrinthouse(options = {}) {
         const realStatus = node.status ? String(node.status).trim().toUpperCase() : 'DRAFT';
         const isCotizable = realStatus === 'ACTIVE';
 
-        // Check existing metadata_json
-        let existingMeta = {};
-        if (node.metadata_json) {
-            try {
-                existingMeta = typeof node.metadata_json === 'string' ? JSON.parse(node.metadata_json) : node.metadata_json;
-            } catch (err) {
-                existingMeta = {};
-            }
-        }
+        // Check and validate existing metadata_json (supports object, JSON string, or null/empty)
+        const existingMeta = parseAndValidateMetadata(node.metadata_json, 'initial');
 
         if (existingMeta.bpe_printhouse_id && existingMeta.bpe_printhouse_id !== effectiveHouseId) {
             throw new Error(`MAPPING_CONFLICT: Printer node "${nodeId}" is already mapped to BPE house "${existingMeta.bpe_printhouse_id}" in metadata_json, conflicting with requested "${effectiveHouseId}".`);
@@ -446,13 +483,14 @@ async function provisionBpePrinthouse(options = {}) {
             [nodeId, tenantId]
         );
         const readbackNode = Array.isArray(readbackNodeRows) ? readbackNodeRows[0] : readbackNodeRows;
-        let readbackMeta = {};
-        try {
-            readbackMeta = JSON.parse(readbackNode.metadata_json);
-        } catch (e) {}
+        if (!readbackNode) {
+            throw new Error(`PROVISION_READBACK_FAILED: Printer node "${nodeId}" not found in MySQL readback.`);
+        }
+
+        const readbackMeta = parseAndValidateMetadata(readbackNode.metadata_json, 'readback');
 
         if (readbackMeta.bpe_printhouse_id !== effectiveHouseId) {
-            throw new Error(`PROVISION_READBACK_FAILED: MySQL metadata_json missing bpe_printhouse_id "${effectiveHouseId}"`);
+            throw new Error(`PROVISION_READBACK_FAILED: MySQL metadata_json missing bpe_printhouse_id "${effectiveHouseId}" (found: "${readbackMeta.bpe_printhouse_id}")`);
         }
         if (readbackNode.status !== realStatus) {
             throw new Error(`PROVISION_READBACK_FAILED: MySQL node status was unexpectedly modified (expected: "${realStatus}", got: "${readbackNode.status}")`);
@@ -573,5 +611,6 @@ Options:
 
 module.exports = {
     provisionBpePrinthouse,
-    resolveCanonicalShippingConfiguration
+    resolveCanonicalShippingConfiguration,
+    parseAndValidateMetadata
 };

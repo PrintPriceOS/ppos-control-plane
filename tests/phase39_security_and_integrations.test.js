@@ -1461,7 +1461,7 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
 
     // ── 8. GOVERNED PROVISIONING CP -> BPE & SUSPENSION INTEGRITY ──────────
     describe('8. Governed CP -> BPE Printhouse Provisioning & Suspension Integrity', () => {
-        const { provisionBpePrinthouse } = require('../scripts/provision_bpe_printhouse');
+        const { provisionBpePrinthouse, parseAndValidateMetadata } = require('../scripts/provision_bpe_printhouse');
 
         const realNodeId = 'node-329a3bc4';
         const realTenantId = 'ph-707a5869';
@@ -2047,6 +2047,230 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(res.plan.mongoDocument.shipping).toBeDefined();
             expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
             expect(res.plan.mongoDocument.active).toBe(false);
+        });
+
+        describe('Metadata JSON Parsing, Object/String Interoperability & Diagnostics', () => {
+            it('should validate and parse metadata_json unit test cases', () => {
+                // Object input
+                expect(parseAndValidateMetadata({ key: 'val' })).toEqual({ key: 'val' });
+                // String input
+                expect(parseAndValidateMetadata('{"key":"val"}')).toEqual({ key: 'val' });
+                // Null / undefined / empty
+                expect(parseAndValidateMetadata(null)).toEqual({});
+                expect(parseAndValidateMetadata(undefined)).toEqual({});
+                expect(parseAndValidateMetadata('')).toEqual({});
+                expect(parseAndValidateMetadata('   ')).toEqual({});
+
+                // Invalid JSON string -> explicit diagnostic
+                expect(() => parseAndValidateMetadata('{ broken: json', 'readback'))
+                    .toThrow(/INVALID_METADATA_JSON: Failed to parse metadata_json \(readback\)/);
+
+                // Array rejection
+                expect(() => parseAndValidateMetadata([1, 2], 'initial'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+                expect(() => parseAndValidateMetadata('[1, 2]', 'initial'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+
+                // Non-object primitive rejection
+                expect(() => parseAndValidateMetadata('null', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got null/);
+                expect(() => parseAndValidateMetadata('123', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got number/);
+                expect(() => parseAndValidateMetadata('"raw_string"', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got string/);
+            });
+
+            it('should succeed when MySQL readback returns metadata_json as an Object (production driver behavior)', async () => {
+                // Mock db where SELECT returns metadata_json as an Object instead of a serialized string
+                const objectMetadataDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) {
+                            return [];
+                        }
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            // Return metadata_json as parsed Object
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'philologica.ai Printhouse',
+                                    status: 'SUSPENDED',
+                                    metadata_json: { bpe_printhouse_id: realHouseId }, // Object format!
+                                    rates_json: '{}',
+                                    signatures: '[]',
+                                    limits: '{}',
+                                    delivery_time: '14 days',
+                                    production_lead_days: 7,
+                                    country: 'ES',
+                                    region: 'Madrid',
+                                    marketplace_enabled: 0,
+                                    visibility_scope: 'PRIVATE'
+                                }
+                            ];
+                        }
+                        if (/UPDATE printer_nodes/is.test(sql)) {
+                            return { affectedRows: 1 };
+                        }
+                        return [];
+                    }
+                };
+
+                const res = await provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: objectMetadataDb,
+                    mongoClientInstance: mockMongoClient
+                });
+
+                expect(res.ok).toBe(true);
+                expect(res.provisioned).toBe(true);
+                expect(res.status).toBe('SUSPENDED');
+                expect(res.active).toBe(false);
+                expect(res.bpePrinthouseId).toBe(realHouseId);
+            });
+
+            it('should reject provisioning when metadata_json contains invalid JSON with explicit diagnostic', async () => {
+                const invalidMetaDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) return [];
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'Corrupted Node',
+                                    status: 'SUSPENDED',
+                                    metadata_json: '{ unquoted_key: invalid }',
+                                    rates_json: '{}',
+                                    signatures: '[]'
+                                }
+                            ];
+                        }
+                        return [];
+                    }
+                };
+
+                await expect(
+                    provisionBpePrinthouse({
+                        nodeId: realNodeId,
+                        tenantId: realTenantId,
+                        houseId: realHouseId,
+                        dryRun: true,
+                        dbClient: invalidMetaDb,
+                        mongoClientInstance: mockMongoClient
+                    })
+                ).rejects.toThrow(/INVALID_METADATA_JSON: Failed to parse metadata_json \(initial\)/);
+            });
+
+            it('should reject provisioning when metadata_json is a JSON array instead of an object', async () => {
+                const arrayMetaDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) return [];
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'Array Meta Node',
+                                    status: 'SUSPENDED',
+                                    metadata_json: '[ "not", "an", "object" ]',
+                                    rates_json: '{}',
+                                    signatures: '[]'
+                                }
+                            ];
+                        }
+                        return [];
+                    }
+                };
+
+                await expect(
+                    provisionBpePrinthouse({
+                        nodeId: realNodeId,
+                        tenantId: realTenantId,
+                        houseId: realHouseId,
+                        dryRun: true,
+                        dbClient: arrayMetaDb,
+                        mongoClientInstance: mockMongoClient
+                    })
+                ).rejects.toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+            });
+
+            it('should preserve existing metadata keys during replay for both object and string representations', async () => {
+                // Clear any leftover mocks
+                mockPrinthouses = [];
+
+                // Seed MongoDB with established document
+                mockPrinthouses.push({
+                    _id: 'mongo_established_replay',
+                    id: realHouseId,
+                    house_id: realHouseId,
+                    name: 'philologica.ai Printhouse',
+                    tenant_id: realTenantId,
+                    printer_node_id: realNodeId,
+                    status: 'SUSPENDED',
+                    active: false,
+                    version: 1,
+                    rates: { base_charge: 500, per_unit: 0.12 },
+                    published_revision_id: 'rev_replay_test',
+                    accepted_patch_checksum: 'sha256:patch_chk_123',
+                    rates_checksum: 'sha256:rates_chk_123'
+                });
+
+                // Node with metadata_json as Object having multiple existing keys
+                const nodeWithObjMeta = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+                nodeWithObjMeta.metadata_json = {
+                    cluster_zone: 'eu-west-1',
+                    webhook_endpoint: 'https://hooks.philologica.ai/print',
+                    bpe_printhouse_id: realHouseId
+                };
+
+                const replayRes = await provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                });
+
+                expect(replayRes.ok).toBe(true);
+                expect(replayRes.alreadyProvisioned).toBe(true);
+
+                // Verify MySQL updated metadata_json preserved existing keys
+                const updatedNode = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+                const parsedMeta = typeof updatedNode.metadata_json === 'string'
+                    ? JSON.parse(updatedNode.metadata_json)
+                    : updatedNode.metadata_json;
+
+                expect(parsedMeta.cluster_zone).toBe('eu-west-1');
+                expect(parsedMeta.webhook_endpoint).toBe('https://hooks.philologica.ai/print');
+                expect(parsedMeta.bpe_printhouse_id).toBe(realHouseId);
+
+                // Verify Mongo document preserved rates, version, checksums, published_revision_id
+                const mongoDoc = mockPrinthouses[0];
+                expect(mongoDoc.version).toBe(1);
+                expect(mongoDoc.rates.base_charge).toBe(500);
+                expect(mongoDoc.rates.per_unit).toBe(0.12);
+                expect(mongoDoc.published_revision_id).toBe('rev_replay_test');
+                expect(mongoDoc.status).toBe('SUSPENDED');
+                expect(mongoDoc.active).toBe(false);
+            });
         });
     });
 });
