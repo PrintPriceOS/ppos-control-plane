@@ -317,7 +317,7 @@ describe('Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards
     });
   });
 
-  it('4. Empty and error states with retry are presented clearly', async () => {
+  it('4. Empty and error states with retry are presented clearly and do NOT show empty list text on error', async () => {
     mockApprovalClient.listApprovals.mockRejectedValueOnce(new Error('Network gateway timeout'));
 
     render(
@@ -333,6 +333,9 @@ describe('Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards
       expect(screen.getByText(/Network gateway timeout/i)).toBeDefined();
       expect(screen.getByRole('button', { name: /Reintentar/i })).toBeDefined();
     });
+
+    // CRITICAL REGRESSION: An error state must NEVER be represented as an empty list
+    expect(screen.queryByText(/No hay expedientes registrados/i)).toBeNull();
 
     // Mock successful recovery on retry
     mockApprovalClient.listApprovals.mockResolvedValueOnce({
@@ -429,6 +432,85 @@ describe('Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards
 
     await waitFor(() => {
       expect(screen.getAllByText(/Gate ID/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('7. Action mutations send payloads with exact selected IDs and enforce active tenant ownership', async () => {
+    mockReviewClient.createReview.mockResolvedValue({
+      ok: true,
+      review: { review_id: 'rev_new_99', tenant_id: 'tenant_alpha', cohort_id: 'cohort_q4_test' }
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaRuntimeActivityReview />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    // 1. Select Tenant Alpha
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Filtrar por Tenant/i)).toBeDefined();
+    });
+    fireEvent.change(screen.getByLabelText(/Filtrar por Tenant/i), { target: { value: 'tenant_alpha' } });
+
+    // 2. Fill cohort input
+    const cohortInput = screen.getByPlaceholderText('cohort_...');
+    fireEvent.change(cohortInput, { target: { value: 'cohort_q4_test' } });
+
+    // 3. Submit creation
+    const submitBtn = screen.getByRole('button', { name: /Crear Revisión de Ventana/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockReviewClient.createReview).toHaveBeenCalledTimes(1);
+      const calledPayload = mockReviewClient.createReview.mock.calls[0][0];
+      // Payload MUST carry the active tenant ID and cohort ID
+      expect(calledPayload.tenantId).toBe('tenant_alpha');
+      expect(calledPayload.cohortId).toBe('cohort_q4_test');
+    });
+  });
+
+  it('8. Preparation creation binds strictly to selected finalized review ID of active tenant', async () => {
+    mockPrepClient.createPreparationFromReview.mockResolvedValue({
+      ok: true,
+      preparation: { preparation_id: 'prep_bound_01', tenant_id: 'tenant_alpha', source_review_id: 'rev_alpha_01' }
+    });
+    mockReviewClient.listReviews.mockResolvedValue({
+      ok: true,
+      reviews: [
+        { review_id: 'rev_alpha_01', tenant_id: 'tenant_alpha', review_status: 'FINALIZED', risk_level: 'LOW' }
+      ]
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaCohortInterventionPreparation />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    // Select Alpha tenant
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Filtrar por Tenant/i)).toBeDefined();
+    });
+    fireEvent.change(screen.getByLabelText(/Filtrar por Tenant/i), { target: { value: 'tenant_alpha' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Generar Paquete de Propuesta/i })).toBeDefined();
+    });
+
+    // Select source review
+    const sourceSelect = screen.getByLabelText(/Revisión Finalizada de Origen/i);
+    fireEvent.change(sourceSelect, { target: { value: 'rev_alpha_01' } });
+
+    // Click Build Proposal
+    fireEvent.click(screen.getByRole('button', { name: /Generar Paquete de Propuesta/i }));
+
+    await waitFor(() => {
+      expect(mockPrepClient.createPreparationFromReview).toHaveBeenCalledWith('rev_alpha_01');
     });
   });
 });

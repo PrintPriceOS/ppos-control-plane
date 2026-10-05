@@ -110,7 +110,7 @@ export function ControlledBetaRuntimeActivityReview() {
         setDecision(res.decision || null);
         setFindings(res.findings || []);
 
-        if (res.review.review_status === 'FINALIZED') {
+        if (res.review?.review_status === 'FINALIZED') {
           const evRes = await runtimeActivityReviewClient.getEvidencePack(reviewId);
           if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
@@ -359,38 +359,41 @@ export function ControlledBetaRuntimeActivityReview() {
               </button>
             </div>
 
-            {reviewFetchError && (
-              <div className="p-2 text-[11px] text-red-500 bg-red-500/10 border border-red-500/20 rounded flex items-center justify-between">
-                <span>{reviewFetchError}</span>
+            {reviewFetchError ? (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
+                <p className="text-xs text-red-500 font-medium">{reviewFetchError}</p>
                 <button
                   type="button"
                   onClick={fetchReviewsList}
-                  className="underline uppercase text-[10px] font-bold ml-2"
+                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                 >
                   Reintentar
                 </button>
               </div>
-            )}
-
-            <select
-              value={selectedReviewId}
-              onChange={e => setSelectedReviewId(e.target.value)}
-              className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
-            >
-              <option value="">-- Seleccionar Revisión --</option>
-              {filteredReviews.map(r => (
-                <option key={r.review_id} value={r.review_id}>
-                  {r.review_id.slice(0, 16)}... [{r.review_status}] ({r.cohort_id || 'Sin cohorte'}) - Riesgo: {r.risk_level || 'N/A'}
-                </option>
-              ))}
-            </select>
-
-            {!loading && filteredReviews.length === 0 && (
-              <p className="text-[11px] text-zinc-400 italic">
+            ) : filteredReviews.length === 0 ? (
+              <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">
                 {tenantId
                   ? 'No hay revisiones asociadas al tenant seleccionado.'
                   : 'No se encontraron revisiones de cohorte registradas.'}
-              </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label htmlFor="review-list-selector" className="text-[10px] font-bold text-zinc-500 uppercase block">Seleccionar Revisión</label>
+                <select
+                  id="review-list-selector"
+                  aria-label="Seleccionar Revisión de Cohorte"
+                  value={selectedReviewId}
+                  onChange={e => setSelectedReviewId(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
+                >
+                  <option value="">-- Seleccionar Revisión --</option>
+                  {filteredReviews.map(r => (
+                    <option key={r.review_id} value={r.review_id}>
+                      {r.review_id.slice(0, 16)}... [{r.review_status}] ({r.cohort_id || 'Sin cohorte'}) - Riesgo: {r.risk_level || 'N/A'}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>

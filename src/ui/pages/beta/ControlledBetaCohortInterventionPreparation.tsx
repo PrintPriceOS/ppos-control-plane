@@ -138,7 +138,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         setSelectedPrep(res.preparation);
         setChecklistItems((res as any).checklist || (res as any).items || []);
 
-        if (res.preparation.preparation_status === 'FINALIZED') {
+        if (res.preparation?.preparation_status === 'FINALIZED') {
           const evRes = await cohortInterventionPreparationClient.getEvidencePack(prepId);
           if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
@@ -375,6 +375,8 @@ export function ControlledBetaCohortInterventionPreparation() {
                     Revisión Finalizada de Origen
                   </label>
                   <select
+                    id="source-review-selector"
+                    aria-label="Revisión Finalizada de Origen"
                     value={sourceReviewId}
                     onChange={e => setSourceReviewId(e.target.value)}
                     className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
@@ -430,40 +432,41 @@ export function ControlledBetaCohortInterventionPreparation() {
               </button>
             </div>
 
-            {fetchError && (
-              <div className="p-2 text-[11px] text-red-500 bg-red-500/10 border border-red-500/20 rounded flex items-center justify-between">
-                <span>{fetchError}</span>
+            {fetchError ? (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
+                <p className="text-xs text-red-500 font-medium">{fetchError}</p>
                 <button
                   type="button"
                   onClick={fetchPrepsList}
-                  className="underline uppercase text-[10px] font-bold ml-2"
+                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                 >
                   Reintentar
                 </button>
               </div>
-            )}
-
-            <select
-              id="prep-proposal-selector"
-              aria-label="Seleccionar Propuesta de Intervención"
-              value={selectedPrepId}
-              onChange={e => setSelectedPrepId(e.target.value)}
-              className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
-            >
-              <option value="">-- Seleccionar Propuesta --</option>
-              {filteredPreparations.map(p => (
-                <option key={p.preparation_id} value={p.preparation_id}>
-                  {p.preparation_id.slice(0, 16)}... ({p.preparation_type || 'MANUAL'}) - {p.preparation_status}
-                </option>
-              ))}
-            </select>
-
-            {!loading && filteredPreparations.length === 0 && (
-              <p className="text-[11px] text-zinc-400 italic">
+            ) : filteredPreparations.length === 0 ? (
+              <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">
                 {tenantId
                   ? 'No hay propuestas de intervención registradas para el tenant seleccionado.'
                   : 'No se encontraron propuestas de intervención registradas.'}
-              </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label htmlFor="prep-proposal-selector" className="text-[10px] font-bold text-zinc-500 uppercase block">Seleccionar Propuesta</label>
+                <select
+                  id="prep-proposal-selector"
+                  aria-label="Seleccionar Propuesta de Intervención"
+                  value={selectedPrepId}
+                  onChange={e => setSelectedPrepId(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
+                >
+                  <option value="">-- Seleccionar Propuesta --</option>
+                  {filteredPreparations.map(p => (
+                    <option key={p.preparation_id} value={p.preparation_id}>
+                      {p.preparation_id.slice(0, 16)}... ({p.preparation_type || 'MANUAL'}) - {p.preparation_status}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>

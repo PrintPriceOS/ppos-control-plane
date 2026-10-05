@@ -141,7 +141,7 @@ export function ControlledBetaCohortInterventionApproval() {
         setSelectedApproval(res.approval);
         setSteps(res.steps || []);
 
-        if (res.approval.approval_status === 'FINALIZED') {
+        if (res.approval?.approval_status === 'FINALIZED') {
           const evRes = await cohortInterventionApprovalClient.getEvidencePack(approvalId);
           if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
