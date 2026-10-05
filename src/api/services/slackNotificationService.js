@@ -125,6 +125,52 @@ class SlackNotificationService {
             };
         }
     }
+
+    /**
+     * Dispatches a live notification alert to tenant's configured Slack channel.
+     * Silent no-op when Slack is not configured or disabled.
+     */
+    async notifyEvent({ tenantId, eventType, text, blocks = [] }) {
+        if (!tenantId || !text) return { skipped: true, reason: 'MISSING_PARAMS' };
+
+        try {
+            const [config] = await db.query(
+                `SELECT webhook_url, channel_name, enabled, events_json FROM slack_integrations WHERE tenant_id = ?`,
+                [tenantId]
+            ).catch(() => []);
+
+            if (!config || !config.enabled || !config.webhook_url) {
+                return { skipped: true, reason: 'NOT_CONFIGURED_OR_DISABLED' };
+            }
+
+            const events = typeof config.events_json === 'string' ? JSON.parse(config.events_json) : (config.events_json || []);
+            if (!events.includes('*') && !events.includes(eventType)) {
+                return { skipped: true, reason: 'EVENT_NOT_SUBSCRIBED' };
+            }
+
+            const payload = {
+                text,
+                blocks: blocks && blocks.length > 0 ? blocks : [
+                    {
+                        type: "section",
+                        text: { type: "mrkdwn", text }
+                    }
+                ]
+            };
+
+            await axios.post(config.webhook_url, payload, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 5000,
+                maxRedirects: 0
+            });
+
+            logger.info('Slack alert dispatched successfully', { tenantId, eventType });
+            return { ok: true, delivered: true };
+        } catch (err) {
+            logger.warn('Failed to dispatch Slack alert', { tenantId, eventType, error: err.message });
+            return { ok: false, error: err.message };
+        }
+    }
 }
 
 module.exports = new SlackNotificationService();

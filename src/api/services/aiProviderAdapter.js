@@ -93,6 +93,17 @@ class AIProviderAdapter {
     }
 
     /**
+     * Plain-text / structured completion helper for decisions/evaluations.
+     * Returns rawText output from generateStructuredCompletion.
+     */
+    async complete({ prompt, maxTokens = 100, temperature = 0.1 }) {
+        const result = await this.generateStructuredCompletion({
+            userPrompt: prompt
+        });
+        return result.rawText;
+    }
+
+    /**
      * Generates a structured JSON completion using the configured provider.
      *
      * @param {Object} options

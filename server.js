@@ -32,6 +32,7 @@ const path = require('path');
 const federationRouter = require('./src/api/routes/adminFederationCluster');
 const federationConsensusService = require('./src/api/services/federationConsensusService');
 const federationSyncService = require('./src/api/services/federationSyncService');
+const outgoingWebhookService = require('./src/api/services/outgoingWebhookService');
 
 // Security: Admin Auth Hook
 fastify.addHook('onRequest', async (request, reply) => {
@@ -448,13 +449,14 @@ const start = async () => {
         await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' });
         console.log(`[CONTROL-PLANE] Governance layer active on port ${PORT}`);
         
-        // Start federation consensus and synchronization loops (gated by schema compatibility)
+        // Start federation consensus, sync loops, and webhook outbox worker (gated by schema compatibility)
         if (isReady) {
             await federationConsensusService.start();
             await federationSyncService.start();
-            console.log('[BOOT] Federation consensus and sync daemons initiated.');
+            outgoingWebhookService.startWorker(10000);
+            console.log('[BOOT] Federation consensus, sync daemons, and webhook outbox worker initiated.');
         } else {
-            console.warn('[BOOT] Federation consensus and sync loops deferred due to schema compatibility status.');
+            console.warn('[BOOT] Federation consensus, sync loops, and webhook worker deferred due to schema compatibility status.');
         }
         
         if (typeof process.send === 'function') {
@@ -477,11 +479,12 @@ const start = async () => {
 const gracefulShutdown = async (signal) => {
     console.log(`[SHUTDOWN] Intercepted signal: ${signal}. Initiating graceful teardown...`);
     try {
-        console.log('[SHUTDOWN] Stopping Federation daemons...');
+        console.log('[SHUTDOWN] Stopping Federation daemons and Webhook worker...');
         await federationConsensusService.stop();
         await federationSyncService.stop();
+        outgoingWebhookService.stopWorker();
     } catch (err) {
-        console.error('[SHUTDOWN] Error stopping Federation daemons:', err.message);
+        console.error('[SHUTDOWN] Error stopping background daemons:', err.message);
     }
     
     try {

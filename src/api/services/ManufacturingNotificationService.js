@@ -77,6 +77,30 @@ class ManufacturingNotificationService {
       relatedEntityType: 'PACKAGE',
       relatedEntityId: event.manufacturingPackageId || event.productionPackageId
     });
+
+    try {
+      const outgoingWebhookService = require('./outgoingWebhookService');
+      await outgoingWebhookService.enqueueWebhookEvent({
+        tenantId: targetTenantId,
+        eventType: 'preflight.failed',
+        payload: {
+          event: 'preflight.failed',
+          tenantId: targetTenantId,
+          packageId: event.manufacturingPackageId || event.productionPackageId,
+          reason: metadata?.reason || 'Critical PDF/X violations detected',
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (_) {}
+
+    try {
+      const slackNotificationService = require('./slackNotificationService');
+      await slackNotificationService.notifyEvent({
+        tenantId: targetTenantId,
+        eventType: 'qc_alert',
+        text: `⚠️ *Preflight Verification Failed*\nTenant: \`${targetTenantId}\`\nPackage: \`${event.manufacturingPackageId || event.productionPackageId}\`\nReason: ${metadata?.reason || 'PDF/X violations'}`
+      });
+    } catch (_) {}
   }
 
   async notifySlaWarning(event) {
@@ -94,6 +118,29 @@ class ManufacturingNotificationService {
       relatedEntityType: 'PACKAGE',
       relatedEntityId: event.manufacturingPackageId || event.productionPackageId
     });
+
+    try {
+      const outgoingWebhookService = require('./outgoingWebhookService');
+      await outgoingWebhookService.enqueueWebhookEvent({
+        tenantId: targetTenantId,
+        eventType: 'sla.warning',
+        payload: {
+          event: 'sla.warning',
+          tenantId: targetTenantId,
+          packageId: event.manufacturingPackageId || event.productionPackageId,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (_) {}
+
+    try {
+      const slackNotificationService = require('./slackNotificationService');
+      await slackNotificationService.notifyEvent({
+        tenantId: targetTenantId,
+        eventType: 'sla_alert',
+        text: `⏰ *SLA Deadline Approaching*\nTenant: \`${targetTenantId}\`\nPackage: \`${event.manufacturingPackageId || event.productionPackageId}\`\nCut-off threshold reached.`
+      });
+    } catch (_) {}
   }
 
   async notifyDispatchReceived(event) {
@@ -112,6 +159,30 @@ class ManufacturingNotificationService {
       relatedEntityType: 'DISPATCH',
       relatedEntityId: event.dispatchId
     });
+
+    try {
+      const outgoingWebhookService = require('./outgoingWebhookService');
+      await outgoingWebhookService.enqueueWebhookEvent({
+        tenantId: targetTenantId,
+        eventType: 'order.created',
+        payload: {
+          event: 'order.created',
+          tenantId: targetTenantId,
+          senderTenantId: metadata.senderTenantId,
+          dispatchId: event.dispatchId,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (_) {}
+
+    try {
+      const slackNotificationService = require('./slackNotificationService');
+      await slackNotificationService.notifyEvent({
+        tenantId: targetTenantId,
+        eventType: 'order_alert',
+        text: `📦 *New Manufacturing Job Received*\nReceiver: \`${targetTenantId}\`\nSender: \`${metadata.senderTenantId}\`\nDispatch: \`${event.dispatchId}\``
+      });
+    } catch (_) {}
   }
 
   async notifyDispatchAccepted(event) {

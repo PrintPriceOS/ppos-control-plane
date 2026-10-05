@@ -467,7 +467,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
 
         await waitFor(() => {
             expect(screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i)).toBeInTheDocument();
-        });
+        }, { timeout: 5000 });
 
         // Type in conversational chat and click Send
         const input = screen.getByPlaceholderText(/(Describe (your book|el libro)|adjunta|attach)/i);

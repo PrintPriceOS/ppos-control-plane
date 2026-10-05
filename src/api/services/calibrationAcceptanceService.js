@@ -556,6 +556,41 @@ class CalibrationAcceptanceService {
 
             await connection.commit();
 
+            // Enqueue outgoing webhook and dispatch Slack alert AFTER transaction commits
+            try {
+                const outgoingWebhookService = require('./outgoingWebhookService');
+                await outgoingWebhookService.enqueueWebhookEvent({
+                    tenantId,
+                    eventType: 'calibration.revision_accepted',
+                    eventId: `evt-${revisionId}`,
+                    payload: {
+                        event: 'calibration.revision_accepted',
+                        tenantId,
+                        printerNodeId: session.printer_node_id,
+                        sessionId,
+                        runId,
+                        revisionId,
+                        resultingRatesChecksum,
+                        verifiedManufacturingPrice,
+                        targetManufacturingPrice,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (whErr) {
+                logger.warn('Failed to enqueue webhook for calibration acceptance (non-fatal):', whErr.message);
+            }
+
+            try {
+                const slackNotificationService = require('./slackNotificationService');
+                await slackNotificationService.notifyEvent({
+                    tenantId,
+                    eventType: 'calibration_alert',
+                    text: `🎯 *Pricing Calibration Revision Accepted*\nTenant: \`${tenantId}\`\nNode: \`${session.printer_node_id}\`\nRevision: \`${revisionId}\`\nChecksum: \`${resultingRatesChecksum.slice(0, 12)}\`\nTarget Price: €${targetManufacturingPrice} | Verified: €${verifiedManufacturingPrice}`
+                });
+            } catch (slErr) {
+                logger.warn('Failed to notify Slack for calibration acceptance (non-fatal):', slErr.message);
+            }
+
             logger.info('Calibration run accepted successfully', {
                 tenantId,
                 sessionId,

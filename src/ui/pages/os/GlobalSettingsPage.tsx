@@ -34,7 +34,11 @@ import {
     BuildingOffice2Icon,
     ClockIcon,
     ExclamationTriangleIcon,
-    CommandLineIcon
+    CommandLineIcon,
+    KeyIcon,
+    DocumentDuplicateIcon,
+    TrashIcon,
+    ArrowUpTrayIcon
 } from "@heroicons/react/24/outline";
 
 type Section = 'general' | 'notifications' | 'security' | 'integrations' | 'appearance';
@@ -139,9 +143,43 @@ export const GlobalSettingsPage: React.FC = () => {
             return '60';
         }
     });
-    const [mfaModalOpen, setMfaModalOpen] = useState<boolean>(false);
+    const [mfaEnabled, setMfaEnabled] = useState<boolean>(false);
+    const [mfaRecoveryRemaining, setMfaRecoveryRemaining] = useState<number | null>(null);
+    const [mfaSetupModalOpen, setMfaSetupModalOpen] = useState<boolean>(false);
+    const [mfaDisableModalOpen, setMfaDisableModalOpen] = useState<boolean>(false);
+    const [mfaSetupData, setMfaSetupData] = useState<{ secret?: string; uri?: string; recoveryCodes?: string[] } | null>(null);
+    const [mfaVerifyCode, setMfaVerifyCode] = useState<string>('');
+    const [mfaDisablePassword, setMfaDisablePassword] = useState<string>('');
+    const [mfaActionLoading, setMfaActionLoading] = useState<boolean>(false);
+    const [mfaMessage, setMfaMessage] = useState<{ text: string; error?: boolean } | null>(null);
+    const [copiedSecret, setCopiedSecret] = useState<boolean>(false);
+    const [copiedCodes, setCopiedCodes] = useState<boolean>(false);
+
+    // Active Sessions State
+    const [sessionsList, setSessionsList] = useState<any[]>([]);
+    const [loadingSessions, setLoadingSessions] = useState<boolean>(false);
+    const [sessionActionMsg, setSessionActionMsg] = useState<string | null>(null);
+
     const [auditRecords, setAuditRecords] = useState<any[]>([]);
     const [loadingAudit, setLoadingAudit] = useState<boolean>(false);
+
+    // Helper: determine current session JTI
+    const getCurrentSessionId = (): string | null => {
+        if (currentUser?.sessionId) return currentUser.sessionId;
+        const token = getAuthToken();
+        if (!token || token.startsWith('dev_')) return null;
+        try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                return payload.jti || null;
+            }
+        } catch {
+            return null;
+        }
+        return null;
+    };
+    const currentSessionId = getCurrentSessionId();
 
     // ── Integrations State ───────────────────────────────────────────────────
     const [webhookUrl, setWebhookUrl] = useState<string>(() => {
@@ -152,10 +190,22 @@ export const GlobalSettingsPage: React.FC = () => {
         }
     });
     const [webhookSecret] = useState<string>('••••••••••••••••••••••••••••••••');
-    const [slackEnabled, setSlackEnabled] = useState<boolean>(false);
-    const [slackWebhook, setSlackWebhook] = useState<string>('');
+    const [webhookSubscriptions, setWebhookSubscriptions] = useState<any[]>([]);
+    const [webhookDeliveries, setWebhookDeliveries] = useState<any[]>([]);
+    const [loadingWebhooks, setLoadingWebhooks] = useState<boolean>(false);
+    const [webhookActionMsg, setWebhookActionMsg] = useState<string | null>(null);
     const [testWebhookStatus, setTestWebhookStatus] = useState<string | null>(null);
     const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
+
+    // Slack Alerts State
+    const [slackEnabled, setSlackEnabled] = useState<boolean>(false);
+    const [slackWebhook, setSlackWebhook] = useState<string>('');
+    const [slackChannel, setSlackChannel] = useState<string>('#factory-alerts');
+    const [slackEvents, setSlackEvents] = useState<string[]>(['calibration_alert', 'qc_alert', 'sla_alert', 'order_alert']);
+    const [testingSlack, setTestingSlack] = useState<boolean>(false);
+    const [slackTestStatus, setSlackTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
+    const [slackSaving, setSlackSaving] = useState<boolean>(false);
+    const [slackSavedMsg, setSlackSavedMsg] = useState<string | null>(null);
 
     // Navigation item definitions with translated labels
     const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
@@ -165,6 +215,64 @@ export const GlobalSettingsPage: React.FC = () => {
         { id: 'integrations',  label: t('settings.nav.integrations'),  icon: ServerIcon },
         { id: 'appearance',    label: t('settings.nav.appearance'),    icon: PaintBrushIcon },
     ];
+
+    // Loaders for Security & Integrations
+    const loadMfaStatus = () => {
+        adminFetch<any>('/api/auth/mfa/status')
+            .then(res => {
+                if (res && res.ok) {
+                    setMfaEnabled(Boolean(res.mfa_enabled));
+                    if (res.recovery_codes_remaining !== undefined) {
+                        setMfaRecoveryRemaining(res.recovery_codes_remaining);
+                    }
+                }
+            })
+            .catch(() => {});
+    };
+
+    const loadSessions = () => {
+        setLoadingSessions(true);
+        adminFetch<any>('/api/auth/sessions')
+            .then(res => {
+                if (res && res.ok && Array.isArray(res.sessions)) {
+                    setSessionsList(res.sessions);
+                } else if (Array.isArray(res)) {
+                    setSessionsList(res);
+                }
+            })
+            .catch(() => setSessionsList([]))
+            .finally(() => setLoadingSessions(false));
+    };
+
+    const loadWebhooks = () => {
+        setLoadingWebhooks(true);
+        Promise.all([
+            adminFetch<any>('/api/admin/webhooks/subscriptions').catch(() => ({ ok: false, data: [] })),
+            adminFetch<any>('/api/admin/webhooks/deliveries').catch(() => ({ ok: false, data: [] }))
+        ]).then(([subsRes, delRes]) => {
+            const subs = subsRes?.data || (Array.isArray(subsRes) ? subsRes : []);
+            const dels = delRes?.data || (Array.isArray(delRes) ? delRes : []);
+            setWebhookSubscriptions(subs);
+            setWebhookDeliveries(dels);
+            if (subs.length > 0 && !webhookUrl) {
+                setWebhookUrl(subs[0].url);
+            }
+        }).finally(() => setLoadingWebhooks(false));
+    };
+
+    const loadSlack = () => {
+        adminFetch<any>('/api/admin/notifications/slack')
+            .then(res => {
+                if (res && res.ok && res.data) {
+                    const d = res.data;
+                    setSlackEnabled(Boolean(d.enabled));
+                    if (d.webhook_url) setSlackWebhook(d.webhook_url);
+                    if (d.channel_name) setSlackChannel(d.channel_name);
+                    if (Array.isArray(d.events)) setSlackEvents(d.events);
+                }
+            })
+            .catch(() => {});
+    };
 
     // Load initial tenant company profile, notification preferences, and audit log
     useEffect(() => {
@@ -213,6 +321,12 @@ export const GlobalSettingsPage: React.FC = () => {
             })
             .catch(() => setAuditRecords([]))
             .finally(() => setLoadingAudit(false));
+
+        // Load initial MFA and Sessions
+        loadMfaStatus();
+        loadSessions();
+        loadWebhooks();
+        loadSlack();
     }, [tenantId, isSuper]);
 
     // Bi-directional subscription to theme, density, and animation stores
@@ -247,14 +361,236 @@ export const GlobalSettingsPage: React.FC = () => {
         setLocale(newLoc);
     };
 
-    // Handle Test Webhook (Honest notice when no live gateway is connected)
-    const handleTestWebhook = () => {
+    // ── MFA Handlers ─────────────────────────────────────────────────────────
+    const handleStartMfaSetup = async () => {
+        setMfaActionLoading(true);
+        setMfaMessage(null);
+        setCopiedSecret(false);
+        setCopiedCodes(false);
+        try {
+            const res = await adminFetch<any>('/api/auth/mfa/setup', { method: 'POST' });
+            if (res && (res.ok || res.secret)) {
+                setMfaSetupData(res);
+                setMfaSetupModalOpen(true);
+            } else {
+                setMfaMessage({ text: res?.error || 'Failed to initialize MFA setup', error: true });
+            }
+        } catch (e: any) {
+            setMfaMessage({ text: e?.message || 'Error starting MFA setup', error: true });
+        } finally {
+            setMfaActionLoading(false);
+        }
+    };
+
+    const handleConfirmMfaSetup = async () => {
+        if (!mfaVerifyCode || mfaVerifyCode.trim().length < 6) return;
+        setMfaActionLoading(true);
+        setMfaMessage(null);
+        try {
+            const res = await adminFetch<any>('/api/auth/mfa/confirm', {
+                method: 'POST',
+                body: JSON.stringify({ code: mfaVerifyCode.trim() })
+            });
+            if (res && (res.ok || res.mfa_enabled)) {
+                setMfaEnabled(true);
+                setMfaSetupModalOpen(false);
+                setMfaSetupData(null);
+                setMfaVerifyCode('');
+                setMfaMessage({ text: t('settings.security.mfaStatusActive') });
+                loadMfaStatus();
+            } else {
+                setMfaMessage({ text: res?.error || 'Invalid verification code', error: true });
+            }
+        } catch (e: any) {
+            setMfaMessage({ text: e?.message || 'Verification failed', error: true });
+        } finally {
+            setMfaActionLoading(false);
+        }
+    };
+
+    const handleDisableMfa = async () => {
+        if (!mfaDisablePassword) return;
+        setMfaActionLoading(true);
+        setMfaMessage(null);
+        try {
+            const res = await adminFetch<any>('/api/auth/mfa/disable', {
+                method: 'POST',
+                body: JSON.stringify({ password: mfaDisablePassword })
+            });
+            if (res && res.ok) {
+                setMfaEnabled(false);
+                setMfaDisableModalOpen(false);
+                setMfaDisablePassword('');
+                setMfaMessage({ text: t('settings.security.mfaStatusDisabled') });
+                loadMfaStatus();
+            } else {
+                setMfaMessage({ text: res?.error || 'Failed to disable MFA', error: true });
+            }
+        } catch (e: any) {
+            setMfaMessage({ text: e?.message || 'Error disabling MFA', error: true });
+        } finally {
+            setMfaActionLoading(false);
+        }
+    };
+
+    // ── Sessions Handlers ────────────────────────────────────────────────────
+    const handleRevokeSession = async (sessionId: string) => {
+        try {
+            const res = await adminFetch<any>('/api/auth/sessions/revoke', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId })
+            });
+            if (res && res.ok) {
+                setSessionActionMsg(t('settings.security.sessionRevokedSuccess'));
+                loadSessions();
+                setTimeout(() => setSessionActionMsg(null), 3500);
+            } else {
+                setSessionActionMsg(res?.error || 'Revocation failed');
+            }
+        } catch (e: any) {
+            setSessionActionMsg(e?.message || 'Error revoking session');
+        }
+    };
+
+    const handleRevokeAllOtherSessions = async () => {
+        try {
+            const res = await adminFetch<any>('/api/auth/sessions/revoke', {
+                method: 'POST',
+                body: JSON.stringify({ revokeAll: true })
+            });
+            if (res && res.ok) {
+                setSessionActionMsg(t('settings.security.sessionRevokeAllSuccess'));
+                loadSessions();
+                setTimeout(() => setSessionActionMsg(null), 3500);
+            } else {
+                setSessionActionMsg(res?.error || 'Revoke all failed');
+            }
+        } catch (e: any) {
+            setSessionActionMsg(e?.message || 'Error revoking all sessions');
+        }
+    };
+
+    // ── Webhooks Handlers ────────────────────────────────────────────────────
+    const handleCreateWebhookSubscription = async () => {
+        if (!webhookUrl) return;
+        try {
+            const res = await adminFetch<any>('/api/admin/webhooks/subscriptions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    url: webhookUrl,
+                    events: ['*']
+                })
+            });
+            if (res && res.ok) {
+                setWebhookActionMsg('Webhook subscription updated.');
+                loadWebhooks();
+                setTimeout(() => setWebhookActionMsg(null), 3000);
+            } else {
+                setWebhookActionMsg(res?.error || 'Failed to save subscription');
+            }
+        } catch (e: any) {
+            setWebhookActionMsg(e?.message || 'Error saving subscription');
+        }
+    };
+
+    const handleRotateSecret = async (subId: string) => {
+        try {
+            const res = await adminFetch<any>(`/api/admin/webhooks/subscriptions/${encodeURIComponent(subId)}/rotate-secret`, {
+                method: 'POST'
+            });
+            if (res && res.ok) {
+                setWebhookActionMsg(t('settings.integrations.rotateSecretSuccess'));
+                loadWebhooks();
+                setTimeout(() => setWebhookActionMsg(null), 3000);
+            } else {
+                setWebhookActionMsg(res?.error || 'Failed to rotate secret');
+            }
+        } catch (e: any) {
+            setWebhookActionMsg(e?.message || 'Error rotating secret');
+        }
+    };
+
+    const handleTestWebhook = async () => {
         setTestingWebhook(true);
         setTestWebhookStatus(null);
-        setTimeout(() => {
+        try {
+            const res = await adminFetch<any>('/api/admin/webhooks/test', { method: 'POST' });
+            if (res && res.ok) {
+                setTestWebhookStatus(t('settings.integrations.testPayloadSuccess'));
+                loadWebhooks();
+            } else {
+                setTestWebhookStatus(res?.error || 'Failed to enqueue test webhook');
+            }
+        } catch (e: any) {
+            setTestWebhookStatus(e?.message || 'Error testing webhook');
+        } finally {
             setTestingWebhook(false);
-            setTestWebhookStatus(t('settings.integrations.testPayloadUnavailable'));
-        }, 500);
+        }
+    };
+
+    const handleResendDelivery = async (deliveryId: string) => {
+        try {
+            const res = await adminFetch<any>(`/api/admin/webhooks/deliveries/${encodeURIComponent(deliveryId)}/resend`, {
+                method: 'POST'
+            });
+            if (res && res.ok) {
+                setWebhookActionMsg('Webhook redelivery processed.');
+                loadWebhooks();
+                setTimeout(() => setWebhookActionMsg(null), 3000);
+            } else {
+                setWebhookActionMsg(res?.error || 'Failed to redeliver');
+            }
+        } catch (e: any) {
+            setWebhookActionMsg(e?.message || 'Error redelivering webhook');
+        }
+    };
+
+    // ── Slack Handlers ───────────────────────────────────────────────────────
+    const handleSaveSlack = async () => {
+        setSlackSaving(true);
+        setSlackSavedMsg(null);
+        try {
+            const res = await adminFetch<any>('/api/admin/notifications/slack', {
+                method: 'POST',
+                body: JSON.stringify({
+                    enabled: slackEnabled,
+                    webhookUrl: slackWebhook.startsWith('https://hooks.slack.com/services/T***') ? undefined : slackWebhook,
+                    channelName: slackChannel,
+                    events: slackEvents
+                })
+            });
+            if (res && res.ok) {
+                setSlackSavedMsg(t('settings.integrations.slackSaved'));
+                loadSlack();
+                setTimeout(() => setSlackSavedMsg(null), 3000);
+            } else {
+                setSlackSavedMsg(res?.error || 'Failed to save Slack settings');
+            }
+        } catch (e: any) {
+            setSlackSavedMsg(e?.message || 'Error saving Slack settings');
+        } finally {
+            setSlackSaving(false);
+        }
+    };
+
+    const handleTestSlack = async () => {
+        setTestingSlack(true);
+        setSlackTestStatus(null);
+        try {
+            const res = await adminFetch<any>('/api/admin/notifications/slack/test', {
+                method: 'POST'
+            });
+            if (res && res.ok && res.data?.ok) {
+                setSlackTestStatus({ ok: true, message: `${t('settings.integrations.slackTestSuccess')} (${res.data.durationMs}ms)` });
+            } else {
+                const errMsg = res?.data?.error || res?.error || 'Slack webhook returned failure';
+                setSlackTestStatus({ ok: false, message: errMsg });
+            }
+        } catch (e: any) {
+            setSlackTestStatus({ ok: false, message: e?.message || 'Network error reaching Slack' });
+        } finally {
+            setTestingSlack(false);
+        }
     };
 
     // Save All Settings
@@ -649,25 +985,181 @@ export const GlobalSettingsPage: React.FC = () => {
                                 </div>
                             </Field>
 
-                            {/* Honest MFA Section (Not Available / Integration Pending) */}
+                            {/* Two-Factor Authentication (2FA / TOTP) Card */}
                             <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                            {t('settings.security.mfa')}
-                                        </p>
-                                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                                            {t('settings.security.mfaStatusPending')}
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                                                {t('settings.security.mfa')}
+                                            </p>
+                                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${
+                                                mfaEnabled 
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                                                    : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                                            }`}>
+                                                {mfaEnabled ? t('settings.security.mfaStatusActive') : t('settings.security.mfaStatusDisabled')}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-1">
+                                            {mfaEnabled 
+                                                ? (mfaRecoveryRemaining !== null 
+                                                    ? `${mfaRecoveryRemaining} recovery codes remaining.` 
+                                                    : 'RFC 6238 TOTP authenticator protection enabled.')
+                                                : 'Protect your account with Google Authenticator, 1Password, or any RFC 6238 app.'}
                                         </p>
                                     </div>
-                                    <button
-                                        id="settings-mfa-enroll-btn"
-                                        type="button"
-                                        onClick={() => setMfaModalOpen(true)}
-                                        className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 text-xs font-bold rounded-none hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-                                    >
-                                        {t('settings.security.mfaDetailsBtn')}
-                                    </button>
+                                    <div>
+                                        {mfaEnabled ? (
+                                            <button
+                                                id="settings-mfa-disable-btn"
+                                                type="button"
+                                                onClick={() => { setMfaDisableModalOpen(true); setMfaMessage(null); }}
+                                                className="px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-bold rounded-none hover:bg-red-500/20 transition-colors cursor-pointer"
+                                            >
+                                                {t('settings.security.mfaDisableBtn')}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                id="settings-mfa-enroll-btn"
+                                                type="button"
+                                                onClick={handleStartMfaSetup}
+                                                disabled={mfaActionLoading}
+                                                className="px-3 py-1.5 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold rounded-none hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                {mfaActionLoading ? (
+                                                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                                ) : (
+                                                    <KeyIcon className="w-3.5 h-3.5" />
+                                                )}
+                                                <span>{t('settings.security.mfaSetupBtn')}</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {mfaMessage && (
+                                    <div className={`p-2.5 text-xs font-medium border-l-2 ${
+                                        mfaMessage.error 
+                                            ? 'bg-red-500/10 border-red-500 text-red-500' 
+                                            : 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
+                                    }`}>
+                                        {mfaMessage.text}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Active User Sessions Table */}
+                            <div className="space-y-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-black uppercase tracking-widest text-[#dc0000]">
+                                            {t('settings.security.sessionsTitle')}
+                                        </p>
+                                        <p className="text-xs text-zinc-500 font-medium">
+                                            {t('settings.security.sessionsDesc')}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            id="settings-sessions-refresh-btn"
+                                            type="button"
+                                            onClick={loadSessions}
+                                            disabled={loadingSessions}
+                                            className="p-1.5 text-zinc-400 hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 cursor-pointer"
+                                            title="Refresh Sessions"
+                                        >
+                                            <ArrowPathIcon className={`w-3.5 h-3.5 ${loadingSessions ? 'animate-spin' : ''}`} />
+                                        </button>
+                                        <button
+                                            id="settings-sessions-revoke-all-btn"
+                                            type="button"
+                                            onClick={handleRevokeAllOtherSessions}
+                                            disabled={sessionsList.filter(s => s.status === 'ACTIVE').length <= 1}
+                                            className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 text-xs font-bold rounded-none hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                        >
+                                            {t('settings.security.sessionRevokeAll')}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {sessionActionMsg && (
+                                    <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 border-l-2 border-[#dc0000] text-xs font-mono text-zinc-700 dark:text-zinc-300">
+                                        {sessionActionMsg}
+                                    </div>
+                                )}
+
+                                <div className="border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+                                    <table className="w-full text-left text-xs font-mono">
+                                        <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wider">
+                                            <tr>
+                                                <th className="p-3">Status</th>
+                                                <th className="p-3">{t('settings.security.sessionIp')}</th>
+                                                <th className="p-3">{t('settings.security.sessionAgent')}</th>
+                                                <th className="p-3">{t('settings.security.sessionCreated')}</th>
+                                                <th className="p-3">{t('settings.security.sessionLastActive')}</th>
+                                                <th className="p-3 text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                            {loadingSessions ? (
+                                                <tr>
+                                                    <td colSpan={6} className="p-4 text-center text-zinc-500">
+                                                        <ArrowPathIcon className="w-4 h-4 animate-spin inline-block text-[#dc0000] mr-2" />
+                                                        Loading active sessions...
+                                                    </td>
+                                                </tr>
+                                            ) : sessionsList.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} className="p-4 text-center text-zinc-500">
+                                                        No active sessions tracked.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                sessionsList.map((sess: any) => {
+                                                    const isCurrent = currentSessionId && String(sess.id) === String(currentSessionId);
+                                                    return (
+                                                        <tr key={sess.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
+                                                            <td className="p-3">
+                                                                {isCurrent ? (
+                                                                    <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                                        {t('settings.security.sessionCurrent')}
+                                                                    </span>
+                                                                ) : sess.status === 'ACTIVE' ? (
+                                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                                                        ACTIVE
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-zinc-500/20 text-zinc-400">
+                                                                        REVOKED
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3 text-zinc-800 dark:text-zinc-200">{sess.ip_address || '127.0.0.1'}</td>
+                                                            <td className="p-3 text-zinc-500 dark:text-zinc-400 max-w-xs truncate" title={sess.user_agent}>
+                                                                {sess.user_agent ? (sess.user_agent.length > 36 ? sess.user_agent.slice(0, 36) + '...' : sess.user_agent) : 'Browser Client'}
+                                                            </td>
+                                                            <td className="p-3 text-zinc-400 text-[11px]">
+                                                                {sess.created_at ? new Date(sess.created_at).toLocaleString() : '—'}
+                                                            </td>
+                                                            <td className="p-3 text-zinc-400 text-[11px]">
+                                                                {sess.last_active ? new Date(sess.last_active).toLocaleString() : 'Recent'}
+                                                            </td>
+                                                            <td className="p-3 text-right">
+                                                                {!isCurrent && sess.status === 'ACTIVE' && (
+                                                                    <button
+                                                                        onClick={() => handleRevokeSession(sess.id)}
+                                                                        className="px-2 py-1 text-[10px] font-bold uppercase text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-500 transition-colors cursor-pointer"
+                                                                    >
+                                                                        {t('settings.security.sessionRevoke')}
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
@@ -733,51 +1225,160 @@ export const GlobalSettingsPage: React.FC = () => {
                                 description={t('settings.integrations.desc')} 
                             />
 
-                            {/* Outbound Webhook */}
-                            <Field label={t('settings.integrations.webhookUrl')}>
-                                <div className="space-y-2">
-                                    <input 
-                                        id="settings-webhook-url"
-                                        value={webhookUrl} 
-                                        onChange={e => setWebhookUrl(e.target.value)} 
-                                        placeholder="https://mfg.yourprinthouse.com/api/ppos/dispatch" 
-                                        className={inputCls} 
-                                    />
-                                    <div className="flex items-center gap-3">
+                            {/* Outbound Signed Webhooks */}
+                            <div className="space-y-4">
+                                <Field label={t('settings.integrations.webhookUrl')}>
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input 
+                                                id="settings-webhook-url"
+                                                value={webhookUrl} 
+                                                onChange={e => setWebhookUrl(e.target.value)} 
+                                                placeholder="https://mfg.yourprinthouse.com/api/ppos/dispatch" 
+                                                className={inputCls} 
+                                            />
+                                            <button
+                                                id="settings-webhook-save-sub-btn"
+                                                type="button"
+                                                onClick={handleCreateWebhookSubscription}
+                                                className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 shrink-0 cursor-pointer"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                id="settings-webhook-test-btn"
+                                                type="button"
+                                                onClick={handleTestWebhook}
+                                                disabled={testingWebhook}
+                                                className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                {testingWebhook ? (
+                                                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                                ) : (
+                                                    <CommandLineIcon className="w-3.5 h-3.5" />
+                                                )}
+                                                <span>{testingWebhook ? 'Enqueuing...' : t('settings.integrations.testWebhookBtn')}</span>
+                                            </button>
+                                            {testWebhookStatus && (
+                                                <span className="text-xs font-medium text-emerald-500 flex items-center gap-1">
+                                                    <CheckIcon className="w-3.5 h-3.5" />
+                                                    {testWebhookStatus}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Field>
+
+                                <Field label={t('settings.integrations.webhookSecret')}>
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input 
+                                                value={webhookSecret} 
+                                                readOnly 
+                                                className={`${inputCls} font-mono text-xs opacity-80 cursor-not-allowed`} 
+                                            />
+                                            {webhookSubscriptions.length > 0 && (
+                                                <button
+                                                    id="settings-webhook-rotate-btn"
+                                                    type="button"
+                                                    onClick={() => handleRotateSecret(webhookSubscriptions[0].id)}
+                                                    className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0 cursor-pointer"
+                                                >
+                                                    {t('settings.integrations.rotateSecretBtn')}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-zinc-500 font-medium">
+                                            {t('settings.integrations.webhookSecretHint')}
+                                        </p>
+                                    </div>
+                                </Field>
+
+                                {webhookActionMsg && (
+                                    <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 border-l-2 border-[#dc0000] text-xs font-mono text-zinc-700 dark:text-zinc-300">
+                                        {webhookActionMsg}
+                                    </div>
+                                )}
+
+                                {/* Webhook Outbox Deliveries Table */}
+                                <div className="space-y-2 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs font-black uppercase tracking-widest text-[#dc0000]">
+                                            {t('settings.integrations.recentDeliveriesTitle')}
+                                        </p>
                                         <button
-                                            id="settings-webhook-test-btn"
                                             type="button"
-                                            onClick={handleTestWebhook}
-                                            disabled={testingWebhook}
-                                            className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                                            onClick={loadWebhooks}
+                                            disabled={loadingWebhooks}
+                                            className="p-1 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                                            title="Refresh Deliveries"
                                         >
-                                            {testingWebhook ? 'Delivering...' : t('settings.integrations.testWebhookBtn')}
+                                            <ArrowPathIcon className={`w-3.5 h-3.5 ${loadingWebhooks ? 'animate-spin' : ''}`} />
                                         </button>
-                                        {testWebhookStatus && (
-                                            <span className="text-xs font-medium text-amber-500 flex items-center gap-1">
-                                                <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-                                                {testWebhookStatus}
-                                            </span>
-                                        )}
+                                    </div>
+
+                                    <div className="border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+                                        <table className="w-full text-left text-xs font-mono">
+                                            <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wider">
+                                                <tr>
+                                                    <th className="p-2.5">Event</th>
+                                                    <th className="p-2.5">Target</th>
+                                                    <th className="p-2.5">Status</th>
+                                                    <th className="p-2.5">Code</th>
+                                                    <th className="p-2.5">Time</th>
+                                                    <th className="p-2.5 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                                {loadingWebhooks ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="p-3 text-center text-zinc-500">Loading deliveries...</td>
+                                                    </tr>
+                                                ) : webhookDeliveries.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="p-3 text-center text-zinc-500">No webhook deliveries recorded.</td>
+                                                    </tr>
+                                                ) : (
+                                                    webhookDeliveries.slice(0, 5).map((del: any) => (
+                                                        <tr key={del.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
+                                                            <td className="p-2.5 font-bold text-zinc-900 dark:text-zinc-100">{del.event_type}</td>
+                                                            <td className="p-2.5 text-zinc-500 truncate max-w-xs" title={del.target_url}>{del.target_url}</td>
+                                                            <td className="p-2.5">
+                                                                <span className={`px-1.5 py-0.5 text-[9px] font-bold ${
+                                                                    del.status === 'DELIVERED' 
+                                                                        ? 'bg-emerald-500/20 text-emerald-400' 
+                                                                        : del.status === 'FAILED'
+                                                                        ? 'bg-red-500/20 text-red-400'
+                                                                        : 'bg-amber-500/20 text-amber-400'
+                                                                }`}>
+                                                                    {del.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2.5 text-zinc-400">{del.status_code || '—'}</td>
+                                                            <td className="p-2.5 text-zinc-400 text-[10px]">
+                                                                {del.created_at ? new Date(del.created_at).toLocaleTimeString() : 'Recent'}
+                                                            </td>
+                                                            <td className="p-2.5 text-right">
+                                                                <button
+                                                                    onClick={() => handleResendDelivery(del.id)}
+                                                                    className="px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-600 dark:text-zinc-300 hover:text-white border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-800 transition-colors cursor-pointer"
+                                                                >
+                                                                    {t('settings.integrations.resendBtn')}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                            </Field>
-
-                            <Field label={t('settings.integrations.webhookSecret')}>
-                                <div className="space-y-1">
-                                    <input 
-                                        value={webhookSecret} 
-                                        readOnly 
-                                        className={`${inputCls} font-mono text-xs opacity-80 cursor-not-allowed`} 
-                                    />
-                                    <p className="text-[11px] text-zinc-500 font-medium">
-                                        {t('settings.integrations.webhookSecretHint')}
-                                    </p>
-                                </div>
-                            </Field>
+                            </div>
 
                             {/* Slack Channel Alerts */}
-                            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+                            <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
                                 <ToggleRow 
                                     id="settings-slack-toggle"
                                     label={t('settings.integrations.slackToggle')} 
@@ -785,11 +1386,13 @@ export const GlobalSettingsPage: React.FC = () => {
                                     checked={slackEnabled} 
                                     onChange={() => setSlackEnabled(v => !v)} 
                                 />
+
                                 {slackEnabled && (
-                                    <div className="space-y-2">
-                                        <div className="p-2.5 bg-amber-500/10 border-l-2 border-amber-500 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                    <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                                        <div className="p-2.5 bg-blue-500/10 border-l-2 border-blue-500 text-xs text-blue-600 dark:text-blue-400 font-medium">
                                             {t('settings.integrations.slackPendingNotice')}
                                         </div>
+
                                         <Field label={t('settings.integrations.slackWebhook')}>
                                             <input 
                                                 id="settings-slack-url"
@@ -799,6 +1402,89 @@ export const GlobalSettingsPage: React.FC = () => {
                                                 className={inputCls} 
                                             />
                                         </Field>
+
+                                        <Field label={t('settings.integrations.slackChannel')}>
+                                            <input 
+                                                id="settings-slack-channel"
+                                                value={slackChannel}
+                                                onChange={e => setSlackChannel(e.target.value)}
+                                                placeholder="#factory-alerts" 
+                                                className={inputCls} 
+                                            />
+                                        </Field>
+
+                                        {/* Events Checkbox Grid */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Subscribed Alert Events</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                                {[
+                                                    { id: 'calibration_alert', label: 'Pricing Calibration Accepted' },
+                                                    { id: 'qc_alert', label: 'Preflight / QC Failures' },
+                                                    { id: 'sla_alert', label: 'SLA Threshold Warnings' },
+                                                    { id: 'order_alert', label: 'Production Order Dispatched' }
+                                                ].map(ev => (
+                                                    <label key={ev.id} className="flex items-center gap-2 text-xs font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={slackEvents.includes(ev.id)}
+                                                            onChange={e => {
+                                                                if (e.target.checked) {
+                                                                    setSlackEvents(prev => [...prev, ev.id]);
+                                                                } else {
+                                                                    setSlackEvents(prev => prev.filter(x => x !== ev.id));
+                                                                }
+                                                            }}
+                                                            className="rounded-none text-[#dc0000] focus:ring-0 cursor-pointer"
+                                                        />
+                                                        <span>{ev.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                            <button
+                                                id="settings-slack-save-btn"
+                                                type="button"
+                                                onClick={handleSaveSlack}
+                                                disabled={slackSaving}
+                                                className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                {slackSaving && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
+                                                <span>Save Slack Config</span>
+                                            </button>
+
+                                            <button
+                                                id="settings-slack-test-btn"
+                                                type="button"
+                                                onClick={handleTestSlack}
+                                                disabled={testingSlack}
+                                                className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                {testingSlack ? (
+                                                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                                ) : (
+                                                    <BellIcon className="w-3.5 h-3.5" />
+                                                )}
+                                                <span>{testingSlack ? 'Sending...' : t('settings.integrations.slackTestBtn')}</span>
+                                            </button>
+                                        </div>
+
+                                        {slackSavedMsg && (
+                                            <div className="p-2.5 bg-emerald-500/10 border-l-2 border-emerald-500 text-xs text-emerald-500 font-medium">
+                                                {slackSavedMsg}
+                                            </div>
+                                        )}
+
+                                        {slackTestStatus && (
+                                            <div className={`p-2.5 text-xs font-medium border-l-2 ${
+                                                slackTestStatus.ok 
+                                                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500' 
+                                                    : 'bg-red-500/10 border-red-500 text-red-500'
+                                            }`}>
+                                                {slackTestStatus.message}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -962,37 +1648,186 @@ export const GlobalSettingsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Honest MFA Integration Architecture Modal */}
-            {mfaModalOpen && (
+            {/* MFA Setup Modal */}
+            {mfaSetupModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 max-w-lg w-full space-y-4 shadow-xl">
                         <div className="flex items-center gap-3">
                             <ShieldCheckIcon className="w-6 h-6 text-[#dc0000]" />
                             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                                {t('settings.security.mfaModalTitle')}
+                                {t('settings.security.mfaModalSetupTitle')}
                             </h3>
                         </div>
-                        <div className="p-3 bg-amber-500/10 border-l-2 border-amber-500 text-xs text-amber-600 dark:text-amber-400 font-medium">
+
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
                             {t('settings.security.mfaModalStatus')}
+                        </p>
+
+                        {/* Secret Key Display */}
+                        {mfaSetupData?.secret && (
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                                    {t('settings.security.mfaSecretLabel')}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="text" 
+                                        readOnly 
+                                        value={mfaSetupData.secret} 
+                                        className="w-full px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold text-[#dc0000] select-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigator.clipboard?.writeText(mfaSetupData.secret || '');
+                                            setCopiedSecret(true);
+                                            setTimeout(() => setCopiedSecret(false), 2000);
+                                        }}
+                                        className="px-3 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 shrink-0 cursor-pointer flex items-center gap-1"
+                                    >
+                                        <DocumentDuplicateIcon className="w-3.5 h-3.5" />
+                                        <span>{copiedSecret ? 'Copied' : 'Copy'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Recovery Codes Grid */}
+                        {mfaSetupData?.recoveryCodes && (
+                            <div className="space-y-1.5 pt-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                                        {t('settings.security.mfaRecoveryCodesLabel')}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigator.clipboard?.writeText(mfaSetupData.recoveryCodes?.join('\n') || '');
+                                            setCopiedCodes(true);
+                                            setTimeout(() => setCopiedCodes(false), 2000);
+                                        }}
+                                        className="text-[11px] font-bold text-[#dc0000] hover:underline cursor-pointer flex items-center gap-1"
+                                    >
+                                        <DocumentDuplicateIcon className="w-3 h-3" />
+                                        <span>{copiedCodes ? 'Copied All' : 'Copy All'}</span>
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-2 bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 font-mono text-[11px] text-center">
+                                    {mfaSetupData.recoveryCodes.map((code, idx) => (
+                                        <span key={idx} className="p-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 select-all font-bold text-zinc-800 dark:text-zinc-200">
+                                            {code}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Verification Input */}
+                        <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                                {t('settings.security.mfaCodePrompt')}
+                            </label>
+                            <input 
+                                id="settings-mfa-verify-code-input"
+                                type="text"
+                                maxLength={6}
+                                value={mfaVerifyCode}
+                                onChange={e => setMfaVerifyCode(e.target.value.replace(/\D/g, ''))}
+                                placeholder="123456"
+                                className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-center text-lg tracking-widest text-zinc-900 dark:text-zinc-100 font-bold focus:outline-none focus:border-[#dc0000]"
+                            />
                         </div>
-                        <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
-                            <p>
-                                <strong>{t('settings.security.mfaModalArchitecture')}</strong>
-                            </p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>{t('settings.security.mfaModalWebAuthn')}</li>
-                                <li>{t('settings.security.mfaModalTotp')}</li>
-                                <li>{t('settings.security.mfaModalIsolation')}</li>
-                            </ul>
-                        </div>
-                        <div className="flex justify-end gap-2 pt-2">
+
+                        {mfaMessage && (
+                            <div className={`p-2 text-xs font-medium border-l-2 ${
+                                mfaMessage.error 
+                                    ? 'bg-red-500/10 border-red-500 text-red-500' 
+                                    : 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
+                            }`}>
+                                {mfaMessage.text}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
                             <button
                                 id="settings-mfa-close-btn"
                                 type="button"
-                                onClick={() => setMfaModalOpen(false)}
+                                onClick={() => { setMfaSetupModalOpen(false); setMfaSetupData(null); }}
                                 className="px-4 py-2 text-xs font-bold uppercase border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
                             >
                                 {t('settings.security.mfaCloseBtn')}
+                            </button>
+                            <button
+                                id="settings-mfa-confirm-btn"
+                                type="button"
+                                onClick={handleConfirmMfaSetup}
+                                disabled={mfaVerifyCode.length < 6 || mfaActionLoading}
+                                className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                            >
+                                {mfaActionLoading && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
+                                <span>{t('settings.security.mfaConfirmBtn')}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MFA Disable Confirmation Modal */}
+            {mfaDisableModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 max-w-md w-full space-y-4 shadow-xl">
+                        <div className="flex items-center gap-3">
+                            <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
+                            <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                                {t('settings.security.mfaDisableTitle')}
+                            </h3>
+                        </div>
+
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                            Disabling two-factor authentication will lower your account security.
+                        </p>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                                {t('settings.security.mfaPasswordPrompt')}
+                            </label>
+                            <input 
+                                id="settings-mfa-disable-password-input"
+                                type="password"
+                                value={mfaDisablePassword}
+                                onChange={e => setMfaDisablePassword(e.target.value)}
+                                placeholder="••••••••••••"
+                                className="w-full px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000]"
+                            />
+                        </div>
+
+                        {mfaMessage && (
+                            <div className={`p-2 text-xs font-medium border-l-2 ${
+                                mfaMessage.error 
+                                    ? 'bg-red-500/10 border-red-500 text-red-500' 
+                                    : 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
+                            }`}>
+                                {mfaMessage.text}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => { setMfaDisableModalOpen(false); setMfaDisablePassword(''); }}
+                                className="px-4 py-2 text-xs font-bold uppercase border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                id="settings-mfa-disable-confirm-btn"
+                                type="button"
+                                onClick={handleDisableMfa}
+                                disabled={!mfaDisablePassword || mfaActionLoading}
+                                className="px-4 py-2 bg-red-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                            >
+                                {mfaActionLoading && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
+                                <span>{t('settings.security.mfaDisableConfirmBtn')}</span>
                             </button>
                         </div>
                     </div>

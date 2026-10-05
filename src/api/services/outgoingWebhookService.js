@@ -5,6 +5,8 @@
  */
 const crypto = require('crypto');
 const axios = require('axios');
+const dns = require('dns');
+const net = require('net');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
 const logger = require('./logger').child('outgoing-webhooks');
@@ -12,7 +14,45 @@ const logger = require('./logger').child('outgoing-webhooks');
 const DEFAULT_TIMEOUT_MS = 5000;
 const BACKOFF_DELAYS_MS = [60000, 300000, 900000]; // 1m, 5m, 15m
 
+function isPrivateOrForbiddenIp(ip) {
+    if (!ip || typeof ip !== 'string') return true;
+    const clean = ip.trim().toLowerCase();
+
+    // Check IPv4
+    if (net.isIPv4(clean)) {
+        if (clean === '0.0.0.0' || clean.startsWith('0.')) return true;
+        if (clean.startsWith('127.')) return true; // Loopback
+        if (clean.startsWith('10.')) return true; // Private RFC 1918
+        if (clean.startsWith('192.168.')) return true; // Private RFC 1918
+        if (clean.startsWith('169.254.')) return true; // Link-local & Cloud Metadata (169.254.169.254)
+        if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(clean)) return true; // Private RFC 1918 (172.16.0.0/12)
+        if (/^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(clean)) return true; // Carrier-grade NAT RFC 6598
+        if (clean === '255.255.255.255') return true;
+        return false;
+    }
+
+    // Check IPv6
+    if (net.isIPv6(clean)) {
+        if (clean === '::1' || clean === '0:0:0:0:0:0:0:1') return true; // Loopback
+        if (clean === '::' || clean === '0:0:0:0:0:0:0:0') return true; // Unspecified
+        if (clean.startsWith('fc') || clean.startsWith('fd')) return true; // Unique local (fc00::/7)
+        if (clean.startsWith('fe8') || clean.startsWith('fe9') || clean.startsWith('fea') || clean.startsWith('feb')) return true; // Link-local (fe80::/10)
+        // IPv4-mapped IPv6 (::ffff:127.0.0.1 etc.)
+        if (clean.startsWith('::ffff:')) {
+            const mappedIpv4 = clean.replace('::ffff:', '');
+            return isPrivateOrForbiddenIp(mappedIpv4);
+        }
+        return false;
+    }
+
+    return false;
+}
+
 class OutgoingWebhookService {
+    constructor() {
+        this._workerTimer = null;
+        this._isProcessing = false;
+    }
 
     /**
      * Validates URL against SSRF threats (rejects loopback/private IPs unless explicitly allowed).
@@ -33,20 +73,27 @@ class OutgoingWebhookService {
             throw new Error('Webhook URL must use HTTP or HTTPS protocol');
         }
 
-        const allowLocal = process.env.ALLOW_LOCAL_WEBHOOKS === 'true';
+        // Strictly disallow local webhooks in production
+        const isProduction = process.env.NODE_ENV === 'production';
+        const allowLocal = process.env.ALLOW_LOCAL_WEBHOOKS === 'true' && !isProduction;
+
         if (!allowLocal) {
             const hostname = parsed.hostname.toLowerCase();
-            const isForbidden = 
+
+            // 1. Check hostname string directly for obvious loopback / metadata
+            if (
                 hostname === 'localhost' ||
                 hostname === '127.0.0.1' ||
                 hostname === '0.0.0.0' ||
                 hostname === '::1' ||
                 hostname === '169.254.169.254' ||
-                hostname.startsWith('10.') ||
-                hostname.startsWith('192.168.') ||
-                /^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname);
+                hostname.endsWith('.localhost') ||
+                hostname.endsWith('.local')
+            ) {
+                throw new Error('Forbidden webhook target destination: Loopback or metadata addresses are prohibited to prevent SSRF.');
+            }
 
-            if (isForbidden) {
+            if (isPrivateOrForbiddenIp(hostname)) {
                 throw new Error('Forbidden webhook target destination: Private or loopback IP addresses are prohibited to prevent SSRF.');
             }
         }
@@ -55,11 +102,46 @@ class OutgoingWebhookService {
     }
 
     /**
+     * Performs async DNS resolution to inspect underlying IPv4/IPv6 addresses against SSRF.
+     */
+    async validateDnsResolution(targetUrl) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        const allowLocal = process.env.ALLOW_LOCAL_WEBHOOKS === 'true' && !isProduction;
+        if (allowLocal) return;
+
+        let parsed;
+        try {
+            parsed = new URL(targetUrl);
+        } catch {
+            return;
+        }
+
+        const hostname = parsed.hostname.toLowerCase();
+        try {
+            const resolvedAddresses = await dns.promises.lookup(hostname, { all: true });
+            for (const addr of resolvedAddresses) {
+                if (isPrivateOrForbiddenIp(addr.address)) {
+                    throw new Error(`Forbidden webhook target destination: Resolved IP (${addr.address}) is private, loopback, or metadata (SSRF protection).`);
+                }
+            }
+        } catch (dnsErr) {
+            if (dnsErr.message && dnsErr.message.includes('Forbidden webhook target')) {
+                throw dnsErr;
+            }
+            logger.warn('DNS lookup failed for webhook target URL', { hostname, error: dnsErr.message });
+            if (isProduction) {
+                throw new Error(`Invalid webhook target destination: Unable to resolve hostname "${hostname}".`);
+            }
+        }
+    }
+
+    /**
      * Creates or updates a tenant webhook subscription.
      */
     async createSubscription({ tenantId, url, events = ['*'], status = 'ACTIVE' }) {
 
         const validatedUrl = this.validateTargetUrl(url);
+        await this.validateDnsResolution(url);
         const subscriptionId = uuidv4();
         const secret = crypto.randomBytes(32).toString('hex');
 
@@ -188,6 +270,8 @@ class OutgoingWebhookService {
         }
 
         try {
+            await this.validateTargetUrl(delivery.url);
+
             const response = await axios.post(delivery.url, payloadString, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -197,7 +281,8 @@ class OutgoingWebhookService {
                     'X-PPOS-Tenant-Id': delivery.tenant_id,
                     'User-Agent': 'PPOS-Control-Plane-WebhookWorker/1.0'
                 },
-                timeout: DEFAULT_TIMEOUT_MS
+                timeout: DEFAULT_TIMEOUT_MS,
+                maxRedirects: 0 // Prevent redirect-based SSRF bypass
             });
 
             await db.query(
@@ -219,6 +304,68 @@ class OutgoingWebhookService {
             );
 
             return { ok: false, status: isExhausted ? 'EXHAUSTED' : 'FAILED', statusCode, error: errorMsg };
+        }
+    }
+
+    /**
+     * Outbox processing: fetches pending deliveries and due retries, dispatching each.
+     */
+    async processPendingDeliveries(batchSize = 25) {
+        if (this._isProcessing) {
+            return { processed: 0, inFlight: true };
+        }
+
+        this._isProcessing = true;
+        try {
+            const rows = await db.query(
+                `SELECT id FROM webhook_deliveries
+                 WHERE status = 'PENDING' OR (status = 'FAILED' AND next_retry_at IS NOT NULL AND next_retry_at <= NOW())
+                 ORDER BY created_at ASC
+                 LIMIT ?`,
+                [batchSize]
+            ).catch(err => {
+                logger.warn('Failed to query pending webhook deliveries:', err.message);
+                return [];
+            });
+
+            const results = [];
+            for (const row of rows) {
+                try {
+                    const res = await this.deliverSingleWebhook(row.id);
+                    results.push({ id: row.id, ...res });
+                } catch (delivErr) {
+                    results.push({ id: row.id, ok: false, error: delivErr.message });
+                }
+            }
+
+            return { processed: results.length, results };
+        } finally {
+            this._isProcessing = false;
+        }
+    }
+
+    /**
+     * Starts the background outbox polling loop.
+     */
+    startWorker(intervalMs = 10000) {
+        if (this._workerTimer) return;
+        this._workerTimer = setInterval(() => {
+            this.processPendingDeliveries().catch(err => {
+                logger.warn('Error in webhook outbox worker interval:', err.message);
+            });
+        }, intervalMs);
+        if (this._workerTimer.unref) this._workerTimer.unref();
+        logger.info('Outgoing webhook outbox worker started', { intervalMs });
+    }
+
+    /**
+     * Gracefully stops the outbox background worker.
+     */
+    stopWorker() {
+        if (this._workerTimer) {
+            clearInterval(this._workerTimer);
+            this._workerTimer = null;
+            logger.info('Outgoing webhook outbox worker stopped');
         }
     }
 

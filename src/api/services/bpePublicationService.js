@@ -133,8 +133,12 @@ class BpePublicationService {
         }
 
         try {
+            const bpeServiceToken = process.env.PPOS_BPE_SERVICE_TOKEN || process.env.PPOS_CONTROL_TOKEN || 'bpe-internal-service-token';
             const res = await axios.post(`${bpeUrl}${publishPath}`, publicationPayload, {
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-BPE-Service-Token': bpeServiceToken
+                },
                 timeout: 8000
             });
 
