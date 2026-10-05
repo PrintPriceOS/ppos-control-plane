@@ -533,17 +533,19 @@ async function runConnectedHarness() {
         // Route A: Marketplace Offers
         const initialMarketplaceRes = await axios.post(`${bpeBaseUrl}/api/marketplace/offers`, quotePayload);
         assert(initialMarketplaceRes.data.ok === true, 'Marketplace route baseline returned ok=true');
-        const initialOffer = initialMarketplaceRes.data.offers.find(o => o.print_house_id === fixtureHouseId);
+        const initialOffer = initialMarketplaceRes.data.offers?.find(o => o.house_id === fixtureHouseId);
         assert(!!initialOffer, 'Found initial offer for harness house in marketplace offers');
         const initialPrice = Number(initialOffer.suggested_price);
+        assert(Number.isFinite(initialPrice) && initialPrice > 0, `Initial marketplace suggested_price must be a positive finite number (got: ${initialOffer.suggested_price})`);
         console.log(`  -> Initial Marketplace Suggested Price: ${initialPrice} €`);
 
         // Route B: Estimates Calculation
         const initialEstimatesRes = await axios.post(`${bpeBaseUrl}/api/estimates`, quotePayload);
         assert(initialEstimatesRes.data.ok === true, 'Estimates route baseline returned ok=true');
-        const initialEstimateHouse = initialEstimatesRes.data.print_houses.find(h => h.id === fixtureHouseId);
+        const initialEstimateHouse = initialEstimatesRes.data.print_houses?.find(h => h.id === fixtureHouseId);
         assert(!!initialEstimateHouse, 'Found initial estimate for harness house in estimates route');
         const initialCost = Number(initialEstimateHouse.total_cost);
+        assert(Number.isFinite(initialCost) && initialCost > 0, `Initial estimates total_cost must be a positive finite number (got: ${initialEstimateHouse.total_cost})`);
         console.log(`  -> Initial Estimates Total Cost: ${initialCost} €`);
 
         // ----------------------------------------------------------------------
@@ -656,15 +658,21 @@ async function runConnectedHarness() {
 
         // Route A: Marketplace Offers
         const updatedMarketplaceRes = await axios.post(`${bpeBaseUrl}/api/marketplace/offers`, quotePayload);
-        const updatedOffer = updatedMarketplaceRes.data.offers.find(o => o.print_house_id === fixtureHouseId);
+        assert(updatedMarketplaceRes.data.ok === true, 'Marketplace route post-publication returned ok=true');
+        const updatedOffer = updatedMarketplaceRes.data.offers?.find(o => o.house_id === fixtureHouseId);
+        assert(!!updatedOffer, 'Found updated offer for harness house in marketplace offers');
         const updatedPrice = Number(updatedOffer.suggested_price);
+        assert(Number.isFinite(updatedPrice) && updatedPrice > 0, `Updated marketplace suggested_price must be a positive finite number (got: ${updatedOffer.suggested_price})`);
         console.log(`  -> Updated Marketplace Suggested Price: ${updatedPrice} € (Initial: ${initialPrice} €)`);
         assert(updatedPrice > initialPrice, 'Marketplace price increased reflecting 10x cover paper rate');
 
         // Route B: Estimates Calculation
         const updatedEstimatesRes = await axios.post(`${bpeBaseUrl}/api/estimates`, quotePayload);
-        const updatedEstimateHouse = updatedEstimatesRes.data.print_houses.find(h => h.id === fixtureHouseId);
+        assert(updatedEstimatesRes.data.ok === true, 'Estimates route post-publication returned ok=true');
+        const updatedEstimateHouse = updatedEstimatesRes.data.print_houses?.find(h => h.id === fixtureHouseId);
+        assert(!!updatedEstimateHouse, 'Found updated estimate for harness house in estimates route');
         const updatedCost = Number(updatedEstimateHouse.total_cost);
+        assert(Number.isFinite(updatedCost) && updatedCost > 0, `Updated estimates total_cost must be a positive finite number (got: ${updatedEstimateHouse.total_cost})`);
         console.log(`  -> Updated Estimates Total Cost: ${updatedCost} € (Initial: ${initialCost} €)`);
         assert(updatedCost > initialCost, 'Estimates total cost increased reflecting published rate card');
 
