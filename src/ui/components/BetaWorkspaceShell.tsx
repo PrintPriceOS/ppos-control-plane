@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useLocale } from '../i18n';
 
 export interface WorkspaceTab {
   id: string;
@@ -43,17 +44,19 @@ export const BetaWorkspaceShell: React.FC<BetaWorkspaceShellProps> = ({
 
   const ActiveComponent = activeTab.component;
 
+  const { t } = useLocale();
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 border-slate-200 dark:bg-slate-950 dark:text-slate-100 dark:border-slate-800 p-6 transition-colors duration-200">
+    <div className="min-h-screen ppos-bg text-slate-900 dark:text-slate-100 p-4 lg:p-6 transition-colors duration-200">
       {/* Header & Breadcrumbs */}
       <div className="mb-6">
         <nav className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">
-          Limited Beta / {breadcrumbGroup} / <span className="text-slate-900 dark:text-slate-100">{activeTab.label}</span>
+          {t('beta.runtime.limitedBeta') || 'Entorno Beta'} / {breadcrumbGroup} / <span className="text-slate-900 dark:text-slate-100">{activeTab.label}</span>
         </nav>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
           {title} — {activeTab.label}
         </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
           {description}
         </p>
       </div>

@@ -128,6 +128,46 @@ export const moduleReadinessRegistry: ModuleReadiness[] = [
         requiredTables: ['api_audit_logs'],
         roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
         description: 'Security and operation logs.'
+    },
+    {
+        id: 'industrial',
+        label: 'Industrial Ops',
+        route: '/admin/industrial',
+        status: 'ACTIVE',
+        requiredEndpoints: ['/api/admin/routing/map', '/api/admin/routing/live'],
+        requiredTables: ['printer_nodes'],
+        roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
+        description: 'Industrial federation routing and machine topology.'
+    },
+    {
+        id: 'beta-runtime',
+        label: 'Beta Runtime',
+        route: '/admin/beta/runtime',
+        status: 'ACTIVE',
+        requiredEndpoints: ['/api/admin/beta/runtime/state'],
+        requiredTables: ['beta_runtime_state'],
+        roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
+        description: 'Controlled limited beta runtime and kill switch controls.'
+    },
+    {
+        id: 'beta-cohorts',
+        label: 'Beta Cohorts',
+        route: '/admin/beta/cohorts',
+        status: 'ACTIVE',
+        requiredEndpoints: ['/api/admin/beta/cohorts'],
+        requiredTables: ['beta_cohorts'],
+        roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
+        description: 'Controlled beta cohort lifecycle and access control.'
+    },
+    {
+        id: 'beta-governance',
+        label: 'Beta Governance',
+        route: '/admin/beta/governance',
+        status: 'ACTIVE',
+        requiredEndpoints: ['/api/admin/beta/governance/interventions'],
+        requiredTables: ['beta_cohort_interventions'],
+        roles: ['SUPER_ADMIN', 'OPS_ADMIN'],
+        description: 'Intervention governance, safety verification, and execution.'
     }
 ];
 

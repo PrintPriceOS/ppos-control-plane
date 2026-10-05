@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cohortInterventionPreparationClient } from '../../api/controlledBetaCohortInterventionPreparationClient';
 import { normalizeUiError } from '../../utils/errorUtils';
 import { runtimeActivityReviewClient } from '../../api/controlledBetaRuntimeActivityReviewClient';
@@ -8,19 +9,31 @@ import {
   CohortInterventionPreparationEvidence
 } from '../../types/controlledBetaCohortInterventionPreparation';
 import { RuntimeActivityReview } from '../../types/controlledBetaRuntimeActivityReview';
+import { useLocale } from '../../i18n';
+import {
+  ShieldCheckIcon,
+  ExclamationTriangleIcon,
+  ClipboardDocumentCheckIcon,
+  CheckCircleIcon,
+  ArrowRightIcon,
+  XCircleIcon
+} from '@heroicons/react/24/outline';
 
 export function ControlledBetaCohortInterventionPreparation() {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+
   const [preparations, setPreparations] = useState<CohortInterventionPreparation[]>([]);
   const [selectedPrepId, setSelectedPrepId] = useState<string>('');
   const [selectedPrep, setSelectedPrep] = useState<CohortInterventionPreparation | null>(null);
   const [checklistItems, setChecklistItems] = useState<CohortInterventionPreparationItem[]>([]);
   const [evidencePack, setEvidencePack] = useState<CohortInterventionPreparationEvidence | null>(null);
 
-  // Completed Phase 137 finalized reviews to choose from
+  // Finalized reviews to choose from
   const [finalizedReviews, setFinalizedReviews] = useState<RuntimeActivityReview[]>([]);
   const [sourceReviewId, setSourceReviewId] = useState<string>('');
 
-  // Rejection / Supersede / Approve Form inputs
+  // Rejection / Supersede inputs
   const [rejectReason, setRejectReason] = useState<string>('');
   const [supersedeReason, setSupersedeReason] = useState<string>('');
   const [targetSupersedeId, setTargetSupersedeId] = useState<string>('');
@@ -28,6 +41,19 @@ export function ControlledBetaCohortInterventionPreparation() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    action: () => {}
+  });
 
   const fetchPrepsList = useCallback(async () => {
     try {
@@ -44,7 +70,6 @@ export function ControlledBetaCohortInterventionPreparation() {
     try {
       const res = await runtimeActivityReviewClient.listReviews();
       if (res.ok) {
-        // filter finalized reviews
         const filtered = res.reviews.filter(r => r.review_status === 'FINALIZED');
         setFinalizedReviews(filtered);
         if (filtered.length > 0 && !sourceReviewId) {
@@ -63,7 +88,7 @@ export function ControlledBetaCohortInterventionPreparation() {
       const res = await cohortInterventionPreparationClient.getPreparation(prepId);
       if (res.ok) {
         setSelectedPrep(res.preparation);
-        setChecklistItems(res.items);
+        setChecklistItems(res.checklist);
 
         if (res.preparation.preparation_status === 'FINALIZED') {
           const evRes = await cohortInterventionPreparationClient.getEvidencePack(prepId);
@@ -77,7 +102,7 @@ export function ControlledBetaCohortInterventionPreparation() {
         }
       }
     } catch (err: any) {
-      console.error('Error loading preparation details:', err);
+      console.error('Error loading prep details:', err);
     } finally {
       setLoading(false);
     }
@@ -85,7 +110,7 @@ export function ControlledBetaCohortInterventionPreparation() {
 
   const handleCreatePrep = async () => {
     if (!sourceReviewId) {
-      setErrorMsg('A finalized source review is required.');
+      setErrorMsg('Se requiere una revisión previa finalizada.');
       return;
     }
     setLoading(true);
@@ -94,12 +119,11 @@ export function ControlledBetaCohortInterventionPreparation() {
     try {
       const res = await cohortInterventionPreparationClient.createPreparationFromReview(sourceReviewId);
       if (res.ok) {
-        setMessage(`Intervention preparation generated: ${res.preparation.preparation_id}`);
-        setSelectedPrepId(res.preparation.preparation_id);
+        setMessage(`Propuesta de intervención creada: ${res.preparation.preparation_id}`);
         await fetchPrepsList();
-        await loadPrepDetails(res.preparation.preparation_id);
+        setSelectedPrepId(res.preparation.preparation_id);
       } else {
-        setErrorMsg('Failed to generate intervention preparation.');
+        setErrorMsg('Error creando la propuesta de intervención');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -110,17 +134,16 @@ export function ControlledBetaCohortInterventionPreparation() {
 
   const handleToggleItemStatus = async (itemId: string, currentStatus: string) => {
     if (!selectedPrepId) return;
-    const nextStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+    const newStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
     setLoading(true);
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await cohortInterventionPreparationClient.updateItemStatus(selectedPrepId, itemId, nextStatus);
+      const res = await cohortInterventionPreparationClient.updateChecklistItem(selectedPrepId, itemId, newStatus);
       if (res.ok) {
-        setMessage('Checklist item updated.');
         await loadPrepDetails(selectedPrepId);
       } else {
-        setErrorMsg('Failed to update item status');
+        setErrorMsg('Error actualizando la tarea de verificación');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -135,12 +158,12 @@ export function ControlledBetaCohortInterventionPreparation() {
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await cohortInterventionPreparationClient.approveRole(selectedPrepId, role);
+      const res = await cohortInterventionPreparationClient.approvePreparationRole(selectedPrepId, role, 'current-admin');
       if (res.ok) {
-        setMessage(`Role ${role} approved.`);
+        setMessage(`Aprobación registrada para el rol ${role}.`);
         await loadPrepDetails(selectedPrepId);
       } else {
-        setErrorMsg('Approval failed');
+        setErrorMsg('Error registrando la aprobación de rol');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -149,72 +172,82 @@ export function ControlledBetaCohortInterventionPreparation() {
     }
   };
 
-  const handleFinalize = async () => {
+  const confirmFinalize = () => {
     if (!selectedPrepId) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionPreparationClient.finalizePreparation(selectedPrepId);
-      if (res.ok) {
-        setMessage('Intervention package finalized and locked.');
-        await loadPrepDetails(selectedPrepId);
-        await fetchPrepsList();
-      } else {
-        setErrorMsg('Finalization failed');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Finalizar y Sellar Paquete de Intervención',
+      description: `Esta acción sellará criptográficamente la propuesta ${selectedPrepId}. No se ejecutarán cambios en producción de forma directa; el paquete quedará listo para la fase de aprobación de gobernanza.`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionPreparationClient.finalizePreparation(selectedPrepId, {
+            attestedBy: 'super-admin'
+          });
+          if (res.ok) {
+            setMessage('Propuesta de intervención sellada y finalizada correctamente.');
+            await loadPrepDetails(selectedPrepId);
+            await fetchPrepsList();
+          } else {
+            setErrorMsg(`Bloqueo al finalizar: ${res.reason || 'Requisitos pendientes'}`);
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleReject = async () => {
-    if (!selectedPrepId) return;
-    if (!rejectReason.trim()) {
-      setErrorMsg('Rejection reason is required.');
-      return;
-    }
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionPreparationClient.rejectPreparation(selectedPrepId, rejectReason);
-      if (res.ok) {
-        setMessage('Preparation package rejected.');
-        setRejectReason('');
-        await loadPrepDetails(selectedPrepId);
-        await fetchPrepsList();
-      } else {
-        setErrorMsg('Rejection failed');
+  const confirmReject = () => {
+    if (!selectedPrepId || !rejectReason.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Rechazar Paquete de Intervención',
+      description: `Se marcará la propuesta ${selectedPrepId} como RECHAZADA. Motivo: "${rejectReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionPreparationClient.rejectPreparation(selectedPrepId, rejectReason);
+          if (res.ok) {
+            setMessage(`Propuesta ${selectedPrepId} rechazada.`);
+            setRejectReason('');
+            await loadPrepDetails(selectedPrepId);
+            await fetchPrepsList();
+          } else {
+            setErrorMsg('Error al rechazar la propuesta');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleSupersede = async () => {
-    if (!selectedPrepId || !targetSupersedeId) return;
-    if (!supersedeReason.trim()) {
-      setErrorMsg('Supersede reason is required.');
-      return;
-    }
+    if (!selectedPrepId || !targetSupersedeId || !supersedeReason.trim()) return;
     setLoading(true);
     setMessage('');
     setErrorMsg('');
     try {
       const res = await cohortInterventionPreparationClient.supersedePreparation(selectedPrepId, targetSupersedeId, supersedeReason);
       if (res.ok) {
-        setMessage(`Intervention ${selectedPrepId} marked as superseded.`);
+        setMessage(`Propuesta ${selectedPrepId} marcada como sustituida.`);
         setSupersedeReason('');
         setTargetSupersedeId('');
         await loadPrepDetails(selectedPrepId);
         await fetchPrepsList();
       } else {
-        setErrorMsg('Supersede failed');
+        setErrorMsg('Error al sustituir la propuesta');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -235,47 +268,79 @@ export function ControlledBetaCohortInterventionPreparation() {
   }, [selectedPrepId, loadPrepDetails]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'Inter, sans-serif', color: '#1f2937' }}>
+    <div className="space-y-6">
       {/* WARNING BANNER */}
-      <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', color: '#92400e', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700 }}>⚠️ review-only proposed action package</h3>
-        <p style={{ margin: 0, fontSize: 14 }}>
-          This interface is strictly for preparing governed intervention packages. No operational mutations, billing changes, participant revocations, cohort pauses, or provider submissions are executed.
-        </p>
+      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded flex items-start gap-3">
+        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="text-xs font-black uppercase tracking-wider text-amber-500">
+            {t('beta.governance.title') || 'Preparación de Intervenciones Gobernadas'}
+          </h4>
+          <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+            {t('beta.runtime.safetyWarning') || 'Esta interfaz prepara paquetes formales de propuesta de intervención. No ejecuta mutaciones operativas, cambios de facturación ni revocaciones inmediatas.'}
+          </p>
+        </div>
       </div>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 24 }}>Governed Cohort Intervention Preparation Gate (Phase 138)</h1>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24 }}>
-        {/* Left column: Create and Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Prepare from Finalized Review</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column: Create and Select (1/3 width) */}
+        <div className="space-y-6">
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <ClipboardDocumentCheckIcon className="w-4 h-4 text-blue-500" />
+              Construir desde Revisión Finalizada
+            </h3>
             {finalizedReviews.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="space-y-3">
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 600 }}>Source Finalized Review</label>
-                  <select value={sourceReviewId} onChange={e => setSourceReviewId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff' }}>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Revisión Finalizada de Origen</label>
+                  <select
+                    value={sourceReviewId}
+                    onChange={e => setSourceReviewId(e.target.value)}
+                    className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
+                  >
                     {finalizedReviews.map(r => (
                       <option key={r.review_id} value={r.review_id}>
-                        {r.review_id} ({r.cohort_id}) - Risk: {r.risk_level}
+                        {r.review_id} ({r.cohort_id}) - Riesgo: {r.risk_level}
                       </option>
                     ))}
                   </select>
                 </div>
-                <button onClick={handleCreatePrep} disabled={loading} style={{ width: '100%', padding: 10, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                  Build Preparation Package
+                <button
+                  type="button"
+                  onClick={handleCreatePrep}
+                  disabled={loading}
+                  className="w-full px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
+                >
+                  Generar Paquete de Propuesta
                 </button>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>No finalized reviews found from Phase 137. Finalize a health review first.</p>
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  {t('beta.governance.noFinalizedReviews') || 'No se encontraron revisiones de salud finalizadas. Se requiere una revisión de actividad antes de preparar una intervención.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/beta/runtime?tab=health')}
+                  className="w-full px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                >
+                  {t('beta.governance.goToHealthReviews') || 'Ir a Revisiones de Salud'}
+                </button>
+              </div>
             )}
           </div>
 
-          <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Select Active Preparation</h2>
-            <select value={selectedPrepId} onChange={e => setSelectedPrepId(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff' }}>
-              <option value="">-- Choose Preparation --</option>
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
+              Seleccionar Propuesta Activa
+            </h3>
+            <select
+              value={selectedPrepId}
+              onChange={e => setSelectedPrepId(e.target.value)}
+              className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
+            >
+              <option value="">-- Seleccionar Propuesta --</option>
               {preparations.map(p => (
                 <option key={p.preparation_id} value={p.preparation_id}>
                   {p.preparation_id} ({p.preparation_type}) - {p.preparation_status}
@@ -285,185 +350,212 @@ export function ControlledBetaCohortInterventionPreparation() {
           </div>
         </div>
 
-        {/* Right column: Details / Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Right column: Details / Actions (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
           {selectedPrep ? (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div className="ppos-card p-6 border ppos-border rounded space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ppos-border">
                 <div>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Preparation Details</h2>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>ID: <code>{selectedPrep.preparation_id}</code></span>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Detalle de Propuesta: {selectedPrep.preparation_id}
+                  </h3>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase">
+                    Cohorte: {selectedPrep.cohort_id} | Tipo: {selectedPrep.preparation_type}
+                  </span>
                 </div>
-                <span style={{
-                  padding: '6px 12px',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: selectedPrep.preparation_status === 'FINALIZED' ? '#d1fae5' : selectedPrep.preparation_status === 'REJECTED' ? '#fee2e2' : '#f3f4f6',
-                  color: selectedPrep.preparation_status === 'FINALIZED' ? '#065f46' : selectedPrep.preparation_status === 'REJECTED' ? '#991b1b' : '#374151'
-                }}>{selectedPrep.preparation_status}</span>
+                <span className={`px-2.5 py-1 rounded text-xs font-black uppercase self-start sm:self-auto ${
+                  selectedPrep.preparation_status === 'FINALIZED'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : selectedPrep.preparation_status === 'REJECTED'
+                      ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                      : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
+                }`}>
+                  {selectedPrep.preparation_status}
+                </span>
               </div>
 
-              {/* Status and Action Buttons */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-                <button onClick={handleFinalize} disabled={loading || selectedPrep.preparation_status === 'FINALIZED' || selectedPrep.preparation_status === 'REJECTED' || selectedPrep.preparation_status === 'SUPERSEDED'} style={{ padding: '8px 16px', background: '#ec4899', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                  Finalize & Sign Package
+              {/* Action Button */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmFinalize}
+                  disabled={loading || selectedPrep.preparation_status === 'FINALIZED' || selectedPrep.preparation_status === 'REJECTED' || selectedPrep.preparation_status === 'SUPERSEDED'}
+                  className="px-4 py-2 text-xs font-bold bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded transition-colors"
+                >
+                  Finalizar y Sellar Paquete
                 </button>
               </div>
 
               {/* Summary Card */}
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, background: '#f9fafb', marginBottom: 24 }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: 16, fontWeight: 700, color: '#111827' }}>Intervention Summary</h3>
-                <div style={{ fontSize: 13, marginBottom: 6 }}>
-                  Type: <strong>{selectedPrep.preparation_type}</strong>
-                </div>
-                <div style={{ fontSize: 13, marginBottom: 6 }}>
-                  Cohort ID: <strong>{selectedPrep.cohort_id}</strong>
-                </div>
-                <div style={{ fontSize: 13, marginBottom: 6 }}>
-                  Source Review: <strong>{selectedPrep.source_review_id}</strong>
-                </div>
-                <div style={{ fontSize: 13, color: '#4b5563' }}>
-                  Summary: <em>{selectedPrep.intervention_summary_json.summary}</em>
+              <div className="p-4 ppos-surface-muted border ppos-border rounded space-y-1.5 text-xs">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase mb-2">
+                  Resumen de la Intervención
+                </h4>
+                <div>Tipo: <strong className="text-blue-500">{selectedPrep.preparation_type}</strong></div>
+                <div>Revisión de Origen: <strong className="font-mono">{selectedPrep.source_review_id}</strong></div>
+                <div className="text-zinc-600 dark:text-zinc-400 pt-1">
+                  Descripción: <em>{selectedPrep.intervention_summary_json?.summary}</em>
                 </div>
               </div>
 
               {/* Checklist Items */}
-              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Checklist Tasks ({checklistItems.length})</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {checklistItems.map(item => (
-                  <div key={item.item_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, border: '1px solid #f3f4f6', borderRadius: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={item.item_status === 'COMPLETED'}
-                        disabled={selectedPrep.preparation_status === 'FINALIZED'}
-                        onChange={() => handleToggleItemStatus(item.item_id, item.item_status)}
-                        style={{ cursor: 'pointer', width: 16, height: 16 }}
-                      />
-                      <span style={{ fontSize: 13, textDecoration: item.item_status === 'COMPLETED' ? 'line-through' : 'none', color: item.item_status === 'COMPLETED' ? '#9ca3af' : '#1f2937' }}>
-                        {item.description}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
+                  Tareas de Verificación ({checklistItems.length})
+                </h4>
+                <div className="space-y-2">
+                  {checklistItems.map(item => (
+                    <div
+                      key={item.item_id}
+                      className="flex items-center justify-between p-3 border ppos-border rounded ppos-surface"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={item.item_status === 'COMPLETED'}
+                          disabled={selectedPrep.preparation_status === 'FINALIZED'}
+                          onChange={() => handleToggleItemStatus(item.item_id, item.item_status)}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                        />
+                        <span className={`text-xs ${
+                          item.item_status === 'COMPLETED' ? 'line-through text-zinc-400' : 'text-slate-800 dark:text-zinc-200'
+                        }`}>
+                          {item.description}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                        item.item_status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                      }`}>
+                        {item.item_status}
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: item.item_status === 'COMPLETED' ? '#d1fae5' : '#fef3c7', color: item.item_status === 'COMPLETED' ? '#065f46' : '#92400e' }}>
-                      {item.item_status}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Approvals Section */}
-              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Required Approvals</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {selectedPrep.required_approvals_json.map((app, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, border: '1px solid #f3f4f6', borderRadius: 6, background: app.approved ? '#ecfdf5' : '#ffffff' }}>
-                    <div style={{ fontSize: 13 }}>
-                      Role: <strong>{app.role}</strong> {app.approved && <span style={{ color: '#059669', marginLeft: 8 }}>(Approved by {app.approved_by})</span>}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
+                  Aprobaciones de Rol Requeridas
+                </h4>
+                <div className="space-y-2">
+                  {selectedPrep.required_approvals_json?.map((app, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 border ppos-border rounded ppos-surface"
+                    >
+                      <div className="text-xs text-slate-800 dark:text-zinc-200">
+                        Rol: <strong className="font-mono">{app.role}</strong>
+                        {app.approved && <span className="text-emerald-500 ml-2 font-bold">(Aprobado por {app.approved_by})</span>}
+                      </div>
+                      {!app.approved && (
+                        <button
+                          type="button"
+                          onClick={() => handleApproveRole(app.role)}
+                          disabled={selectedPrep.preparation_status === 'FINALIZED'}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
+                        >
+                          Aprobar Rol
+                        </button>
+                      )}
                     </div>
-                    {!app.approved && (
-                      <button
-                        onClick={() => handleApproveRole(app.role)}
-                        disabled={selectedPrep.preparation_status === 'FINALIZED'}
-                        style={{ padding: '4px 8px', fontSize: 11, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                      >
-                        Approve Role
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              {/* Non-Execution Attestation Checkbox Status */}
-              <div style={{ border: '1px solid #d1fae5', borderRadius: 8, padding: 16, background: '#ecfdf5', marginBottom: 24 }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: 15, fontWeight: 700, color: '#065f46' }}>🛡️ Safety Attestation Proof</h3>
-                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: '#065f46', lineHeight: '1.6' }}>
-                  <li>Non-execution planning acknowledged: <strong>{String(selectedPrep.non_execution_attestation_json.non_execution_acknowledged)}</strong></li>
-                  <li>Readiness-only context verified: <strong>{String(selectedPrep.non_execution_attestation_json.readiness_only_attested)}</strong></li>
-                  <li>Attested by: <strong>{selectedPrep.non_execution_attestation_json.attested_by}</strong></li>
-                  <li>Timestamp: <strong>{selectedPrep.non_execution_attestation_json.timestamp}</strong></li>
+              {/* Safety Attestation Proof */}
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded space-y-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  Prueba de Atestación de No-Ejecución
+                </h4>
+                <ul className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+                  <li>Planificación sin ejecución reconocida: <strong>{String(selectedPrep.non_execution_attestation_json?.non_execution_acknowledged ?? false)}</strong></li>
+                  <li>Contexto acotado verificado: <strong>{String(selectedPrep.non_execution_attestation_json?.readiness_only_attested ?? false)}</strong></li>
+                  <li>Atestado por: <strong>{selectedPrep.non_execution_attestation_json?.attested_by}</strong></li>
                 </ul>
               </div>
 
-              {/* Evidence Pack */}
-              {evidencePack && (
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Lock Evidence Pack (v{evidencePack.evidence_schema_version})</h3>
-                  <div style={{ fontSize: 12, background: '#f9fafb', padding: 12, borderRadius: 6, maxHeight: 150, overflowY: 'auto' }}>
-                    <div>Input Review Hash: <code>{evidencePack.input_review_hash}</code></div>
-                    <div>Preparation Result Hash: <code>{evidencePack.preparation_result_hash}</code></div>
-                    <div>Evidence Pack Hash: <code>{evidencePack.evidence_pack_hash}</code></div>
-                    <pre style={{ marginTop: 10 }}>{JSON.stringify(evidencePack.evidence_data_json, null, 2)}</pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Finalization Blockers JSON */}
-              {selectedPrep.finalization_blockers_json && (
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, background: '#fffbeb', marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 10px 0', fontSize: 15, fontWeight: 700, color: '#b45309' }}>Blocker Verification Status</h3>
-                  <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: '#78350f', lineHeight: '1.6' }}>
-                    <li>Missing required approvals: <strong style={{ color: selectedPrep.finalization_blockers_json.missing_required_approvals ? '#dc2626' : '#059669' }}>{String(selectedPrep.finalization_blockers_json.missing_required_approvals)}</strong></li>
-                    <li>Non execution attestation invalid: <strong style={{ color: selectedPrep.finalization_blockers_json.non_execution_attestation_invalid ? '#dc2626' : '#059669' }}>{String(selectedPrep.finalization_blockers_json.non_execution_attestation_invalid)}</strong></li>
-                    <li>Guardrail checks failed: <strong style={{ color: selectedPrep.finalization_blockers_json.guardrail_failed ? '#dc2626' : '#059669' }}>{String(selectedPrep.finalization_blockers_json.guardrail_failed)}</strong></li>
-                    <li>Source review not finalized: <strong style={{ color: selectedPrep.finalization_blockers_json.source_review_not_finalized ? '#dc2626' : '#059669' }}>{String(selectedPrep.finalization_blockers_json.source_review_not_finalized)}</strong></li>
-                  </ul>
-                </div>
-              )}
-
               {/* Reject Action */}
               {selectedPrep.preparation_status !== 'REJECTED' && selectedPrep.preparation_status !== 'FINALIZED' && (
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20, marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Reject this Preparation</h3>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 11, fontWeight: 600 }}>Rejection Reason</label>
-                      <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason description..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-                    </div>
-                    <button onClick={handleReject} disabled={loading || !rejectReason} style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                      Apply Reject
+                <div className="pt-4 border-t ppos-border space-y-3">
+                  <h4 className="text-xs font-bold text-red-500 uppercase">Rechazar esta Propuesta</h4>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      placeholder="Motivo del rechazo..."
+                      className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
+                    />
+                    <button
+                      type="button"
+                      onClick={confirmReject}
+                      disabled={loading || !rejectReason.trim()}
+                      className="px-4 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded shrink-0 transition-colors"
+                    >
+                      Rechazar
                     </button>
                   </div>
                 </div>
               )}
-
-              {/* Supersede Action */}
-              {selectedPrep.preparation_status !== 'SUPERSEDED' && (
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Supersede this Preparation</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600 }}>Replacement Prep ID</label>
-                      <input value={targetSupersedeId} onChange={e => setTargetSupersedeId(e.target.value)} placeholder="prp_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600 }}>Enforced Reason</label>
-                      <input value={supersedeReason} onChange={e => setSupersedeReason(e.target.value)} placeholder="Ex: new review finalized" style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-                    </div>
-                  </div>
-                  <button onClick={handleSupersede} disabled={loading || !targetSupersedeId || !supersedeReason} style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                    Apply Supersede
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
-            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>No finalized runtime activity reviews were found.</div>
-              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 137 Runtime Activity Review.</div>
-              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: FINALIZED review snapshot.</div>
-              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create and finalize a Phase 137 review before preparing an intervention package.</div>
+            <div className="ppos-card border border-dashed ppos-border p-10 rounded text-center flex flex-col items-center justify-center space-y-3">
+              <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">
+                {t('beta.governance.noFinalizedReviews') || 'No se encontraron revisiones de salud finalizadas.'}
+              </span>
+              <p className="text-xs text-zinc-500 max-w-md">
+                {t('beta.governance.preparationHint') || 'Para preparar una propuesta de intervención gobernada se requiere una revisión de actividad finalizada.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/beta/runtime?tab=health')}
+                className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+              >
+                {t('beta.governance.goToHealthReviews') || 'Ir a Revisiones de Salud de Cohorte'}
+              </button>
             </div>
           )}
 
-          {/* Feedback message */}
           {(message || errorMsg) && (
-            <div style={{ padding: 16, borderRadius: 8, background: '#f3f4f6', border: '1px solid #e5e7eb' }}>
-              {message && <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>{message}</div>}
-              {errorMsg && <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>{errorMsg}</div>}
+            <div className="ppos-card p-4 border ppos-border rounded">
+              {message && <div className="text-xs font-semibold text-emerald-500 mb-1">{message}</div>}
+              {errorMsg && <div className="text-xs font-semibold text-red-500">{errorMsg}</div>}
             </div>
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="ppos-card p-6 border ppos-border rounded max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-500">
+              <ExclamationTriangleIcon className="w-6 h-6 shrink-0" />
+              <h3 className="text-base font-black uppercase tracking-wider">{confirmModal.title}</h3>
+            </div>
+            <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+              {confirmModal.description}
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 text-xs font-bold ppos-surface-muted hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-slate-700 dark:text-zinc-300 transition-colors"
+              >
+                {t('common.cancel') || 'Cancelar'}
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.action}
+                className="px-4 py-2 text-xs font-black uppercase tracking-wider bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+              >
+                {t('common.confirm') || 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,8 +9,19 @@ import {
   ParticipantUsageSummary,
   CohortUsageSummary
 } from '../../types/controlledBetaRuntimeActivityObservation';
+import { useLocale } from '../../i18n';
+import {
+  EyeIcon,
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
+  BellAlertIcon,
+  SignalIcon,
+  CheckCircleIcon
+} from '@heroicons/react/24/outline';
 
 export function ControlledBetaRuntimeActivityObservation() {
+  const { t } = useLocale();
+
   const [observationGateId, setObservationGateId] = useState('');
   const [sessionGateId, setSessionGateId] = useState('');
   const [runtimeSessionId, setRuntimeSessionId] = useState('');
@@ -88,9 +99,9 @@ export function ControlledBetaRuntimeActivityObservation() {
     try {
       const res = await actionFn();
       if (res.ok) {
-        setMessage(`${actionLabel} succeeded.`);
+        setMessage(`${actionLabel}: ${t('common.done') || 'Operación completada correctamente.'}`);
       } else {
-        setErrorMsg(`${actionLabel} failed: ${res.error || res.reason || 'Unknown error'}`);
+        setErrorMsg(`${actionLabel} falló: ${res.error || res.reason || 'Error no especificado'}`);
       }
       await refreshState();
       return res;
@@ -102,7 +113,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleCreateGate = async () => {
-    const res = await runAction('Create Observation Gate', () =>
+    const res = await runAction('Crear Gate de Observación', () =>
       runtimeActivityObservationClient.createGate({
         observation_gate_id: observationGateId || undefined,
         session_gate_id: sessionGateId,
@@ -120,7 +131,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleIngestEvent = () => {
-    return runAction('Ingest Activity Event', () =>
+    return runAction('Registrar Evento de Actividad', () =>
       runtimeActivityObservationClient.ingestEvent(observationGateId, {
         runtimeSessionId,
         eventType,
@@ -133,7 +144,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleRecordBlockedAttempt = () => {
-    return runAction('Record Blocked Attempt', () =>
+    return runAction('Registrar Intento Bloqueado', () =>
       runtimeActivityObservationClient.recordBlockedAttempt(observationGateId, {
         runtimeSessionId,
         featureKey,
@@ -145,7 +156,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleRecordAnomaly = () => {
-    return runAction('Record Anomaly Signal', () =>
+    return runAction('Registrar Anomalía Operativa', () =>
       runtimeActivityObservationClient.recordAnomalySignal(observationGateId, {
         runtimeSessionId,
         participantId,
@@ -158,7 +169,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleRecordHealth = () => {
-    return runAction('Record Health Signal', () =>
+    return runAction('Registrar Señal de Salud', () =>
       runtimeActivityObservationClient.recordHealthSignal(observationGateId, {
         runtimeSessionId,
         participantId,
@@ -172,13 +183,13 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleRunGuardrails = () => {
-    return runAction('Run Guardrails', () =>
+    return runAction('Verificar Protecciones', () =>
       runtimeActivityObservationClient.runGuardrails(observationGateId)
     );
   };
 
   const handleCreateFinding = () => {
-    return runAction('Create Finding', () =>
+    return runAction('Crear Hallazgo', () =>
       runtimeActivityObservationClient.createFinding(observationGateId, {
         severity: findingSeverity,
         findingKey,
@@ -188,7 +199,7 @@ export function ControlledBetaRuntimeActivityObservation() {
   };
 
   const handleResolveFinding = () => {
-    return runAction('Resolve Finding', () =>
+    return runAction('Resolver Hallazgo', () =>
       runtimeActivityObservationClient.resolveFinding(observationGateId, findingId)
     );
   };
@@ -200,214 +211,276 @@ export function ControlledBetaRuntimeActivityObservation() {
   }, [observationGateId, refreshState]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'Inter, sans-serif', color: '#1f2937' }}>
+    <div className="space-y-6">
       {/* Warning Banner */}
-      <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700 }}>⚠️ Controlled runtime activity observation only.</h3>
-        <p style={{ margin: 0, fontSize: 14 }}>
-          This does not enforce, revoke, expand, charge, submit externally, or open public beta.
-        </p>
+      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded flex items-start gap-3">
+        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="text-xs font-black uppercase tracking-wider text-amber-500">
+            {t('beta.runtime.activityReview') || 'Observación de Actividad del Entorno Beta'}
+          </h4>
+          <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+            {t('beta.runtime.safetyWarning') || 'Módulo de telemetría y supervisión de actividad acotada. No ejecuta cobros, modificaciones de tarifas ni cambios en producción.'}
+          </p>
+        </div>
       </div>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 24 }}>Controlled Beta Runtime Activity Observation (Phase 136)</h1>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, marginBottom: 24 }}>
-        {/* Left Column: Form Setup and Event Ingestion */}
-        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Observation Gate Setup</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Observation Gate ID</label>
-              <input value={observationGateId} onChange={e => setObservationGateId(e.target.value)} placeholder="obs_136_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Gate setup and Event ingestion (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Observation Gate Setup */}
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <EyeIcon className="w-4 h-4 text-blue-500" />
+              Configuración de Observación de Actividad
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Observación</label>
+                <input
+                  value={observationGateId}
+                  onChange={e => setObservationGateId(e.target.value)}
+                  placeholder="obs_..."
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Sesión Previo</label>
+                <input
+                  value={sessionGateId}
+                  onChange={e => setSessionGateId(e.target.value)}
+                  placeholder="sg_..."
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Sesión Activa</label>
+                <input
+                  value={runtimeSessionId}
+                  onChange={e => setRuntimeSessionId(e.target.value)}
+                  placeholder="sess_..."
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Participante</label>
+                <input
+                  value={participantId}
+                  onChange={e => setParticipantId(e.target.value)}
+                  placeholder="part_..."
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Session Gate ID (Phase 135)</label>
-              <input value={sessionGateId} onChange={e => setSessionGateId(e.target.value)} placeholder="sg_135_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Active Session ID</label>
-              <input value={runtimeSessionId} onChange={e => setRuntimeSessionId(e.target.value)} placeholder="sess_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Participant ID</label>
-              <input value={participantId} onChange={e => setParticipantId(e.target.value)} placeholder="part_134_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Tenant ID</label>
-              <input value={tenantId} onChange={e => setTenantId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Cohort ID</label>
-              <input value={cohortId} onChange={e => setCohortId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <button onClick={handleCreateGate} disabled={loading} style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Create Gate</button>
-            <button onClick={handleRunGuardrails} disabled={loading || !observationGateId} style={{ padding: '8px 16px', background: '#ec4899', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Run Guardrails</button>
-          </div>
-
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ingest Activity Event</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Event Type</label>
-              <input value={eventType} onChange={e => setEventType(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Event Status</label>
-              <input value={eventStatus} onChange={e => setEventStatus(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Feature Key</label>
-              <input value={featureKey} onChange={e => setFeatureKey(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Action Key</label>
-              <input value={actionKey} onChange={e => setActionKey(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <button onClick={handleIngestEvent} disabled={loading || !observationGateId} style={{ padding: '8px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Ingest Event</button>
-          </div>
-
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Signals Ingestion</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Blocked Reason</label>
-              <input value={blockedReason} onChange={e => setBlockedReason(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <button onClick={handleRecordBlockedAttempt} disabled={loading || !observationGateId} style={{ width: '100%', padding: '10px', background: '#d97706', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 18 }}>Record Blocked Attempt</button>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Anomaly Key</label>
-              <input value={anomalyKey} onChange={e => setAnomalyKey(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <button onClick={handleRecordAnomaly} disabled={loading || !observationGateId} style={{ width: '100%', padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 18 }}>Record Anomaly</button>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Health Key</label>
-              <input value={healthKey} onChange={e => setHealthKey(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <button onClick={handleRecordHealth} disabled={loading || !observationGateId} style={{ width: '100%', padding: '10px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 18 }}>Record Health Warning</button>
+            <div className="flex gap-2 pt-2 border-t ppos-border">
+              <button
+                type="button"
+                onClick={handleCreateGate}
+                disabled={loading}
+                className="px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                Crear Gate
+              </button>
+              <button
+                type="button"
+                onClick={handleRunGuardrails}
+                disabled={loading || !observationGateId}
+                className="px-3 py-1.5 text-xs font-bold bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                Ejecutar Protecciones
+              </button>
             </div>
           </div>
 
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Findings Management</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Finding Key</label>
-              <input value={findingKey} onChange={e => setFindingKey(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+          {/* Event Ingestion */}
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <SignalIcon className="w-4 h-4 text-emerald-500" />
+              Ingesta y Registro de Eventos
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Tipo de Evento</label>
+                <input
+                  value={eventType}
+                  onChange={e => setEventType(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Estado</label>
+                <input
+                  value={eventStatus}
+                  onChange={e => setEventStatus(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Característica</label>
+                <input
+                  value={featureKey}
+                  onChange={e => setFeatureKey(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Acción</label>
+                <input
+                  value={actionKey}
+                  onChange={e => setActionKey(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+              </div>
             </div>
-            <div>
-              <button onClick={handleCreateFinding} disabled={loading || !observationGateId} style={{ width: '100%', padding: '10px', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 18 }}>Raise Finding</button>
+            <button
+              type="button"
+              onClick={handleIngestEvent}
+              disabled={loading || !observationGateId}
+              className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded transition-colors"
+            >
+              Registrar Evento
+            </button>
+          </div>
+
+          {/* Signals & Findings */}
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <BellAlertIcon className="w-4 h-4 text-amber-500" />
+              Supervisión de Señales y Hallazgos
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block">Motivo de Bloqueo</label>
+                <input
+                  value={blockedReason}
+                  onChange={e => setBlockedReason(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleRecordBlockedAttempt}
+                  disabled={loading || !observationGateId}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded"
+                >
+                  Registrar Bloqueo
+                </button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block">Clave de Anomalía</label>
+                <input
+                  value={anomalyKey}
+                  onChange={e => setAnomalyKey(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleRecordAnomaly}
+                  disabled={loading || !observationGateId}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded"
+                >
+                  Registrar Anomalía
+                </button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block">Clave de Salud</label>
+                <input
+                  value={healthKey}
+                  onChange={e => setHealthKey(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleRecordHealth}
+                  disabled={loading || !observationGateId}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded"
+                >
+                  Registrar Alerta
+                </button>
+              </div>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Finding ID to Resolve</label>
-              <input value={findingId} onChange={e => setFindingId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
-            </div>
-            <div>
-              <button onClick={handleResolveFinding} disabled={loading || !findingId} style={{ width: '100%', padding: '10px', background: '#4b5563', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 18 }}>Resolve Finding</button>
+
+            <div className="pt-3 border-t ppos-border grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block">Clave de Hallazgo</label>
+                <input
+                  value={findingKey}
+                  onChange={e => setFindingKey(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateFinding}
+                  disabled={loading || !observationGateId}
+                  className="px-3 py-1.5 text-xs font-bold bg-zinc-700 hover:bg-zinc-800 disabled:opacity-50 text-white rounded"
+                >
+                  Abrir Hallazgo
+                </button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block">ID de Hallazgo a Resolver</label>
+                <input
+                  value={findingId}
+                  onChange={e => setFindingId(e.target.value)}
+                  placeholder="ID de Hallazgo"
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleResolveFinding}
+                  disabled={loading || !findingId}
+                  className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded"
+                >
+                  Resolver Hallazgo
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Status Checklist and Diagnostics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Dashboard */}
-          {dashboard && (
-            <div style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 700 }}>Observation Dashboard</h3>
-              <p style={{ margin: 0, fontSize: 12, color: '#4b5563' }}>{dashboard.warning_banner}</p>
-            </div>
-          )}
-
-          {/* Feedback */}
+        {/* Right Column: Status & Feedback (1/3 width) */}
+        <div className="space-y-6">
           {(message || errorMsg) && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              {message && <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>{message}</div>}
-              {errorMsg && <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>{errorMsg}</div>}
+            <div className="ppos-card p-4 border ppos-border rounded">
+              {message && <div className="text-xs font-semibold text-emerald-500 mb-1">{message}</div>}
+              {errorMsg && <div className="text-xs font-semibold text-red-500">{errorMsg}</div>}
             </div>
           )}
 
-          {/* Readiness Status */}
           {readiness && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Readiness Checks</h3>
-                <span style={{
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: readiness.ok ? '#d1fae5' : '#fee2e2',
-                  color: readiness.ok ? '#065f46' : '#991b1b'
-                }}>{readiness.readiness_status}</span>
+            <div className="ppos-card p-5 border ppos-border rounded">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  Estado de Observación
+                </h3>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  readiness.ok ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
+                }`}>
+                  {readiness.readiness_status}
+                </span>
               </div>
-              {readiness.blocked_reasons.length > 0 && (
-                <div style={{ marginBottom: 16, padding: 8, background: '#fef2f2', borderRadius: 4, color: '#991b1b', fontSize: 12 }}>
-                  <strong>Blockers:</strong> {readiness.blocked_reasons.join(', ')}
+              {readiness.blocked_reasons?.length > 0 && (
+                <div className="text-xs text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
+                  Bloqueos: {readiness.blocked_reasons.join(', ')}
                 </div>
               )}
             </div>
           )}
 
-          {/* Redacted Usage Summaries */}
-          {participantSummary && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 700 }}>Participant Usage Summary (Redacted)</h3>
-              <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div>Total Sessions: <strong>{participantSummary.total_sessions}</strong></div>
-                <div>Total Events: <strong>{participantSummary.total_events}</strong></div>
-                <div>Allowed / Denied / Blocked: <strong>{participantSummary.allowed_events} / {participantSummary.denied_events} / {participantSummary.blocked_events}</strong></div>
-                <div>Features Used: <strong>{participantSummary.features_used_count}</strong></div>
-                <div>Anomalies Detected: <strong>{participantSummary.anomaly_count}</strong></div>
-              </div>
+          {/* Collapsible Diagnostics */}
+          <details className="ppos-card p-4 border ppos-border rounded text-xs">
+            <summary className="font-bold text-zinc-500 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
+              {t('beta.runtime.advancedDiagnostics') || 'Diagnóstico Técnico y Respuestas JSON'}
+            </summary>
+            <div className="mt-3 space-y-2 font-mono text-[10px]">
+              <div>Observation Gate: {observationGateId || 'N/A'}</div>
+              <div>Session Gate: {sessionGateId || 'N/A'}</div>
+              <div>Participant: {participantId || 'N/A'}</div>
             </div>
-          )}
-
-          {cohortSummary && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 700 }}>Cohort Usage Summary (Redacted)</h3>
-              <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div>Active Participants: <strong>{cohortSummary.active_participant_count}</strong></div>
-                <div>Total Events: <strong>{cohortSummary.total_events}</strong></div>
-                <div>Allowed / Denied: <strong>{cohortSummary.allowed_events} / {cohortSummary.denied_events}</strong></div>
-              </div>
-            </div>
-          )}
-
-          {/* Evidence Pack */}
-          {evidencePack && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 700 }}>Evidence Pack (v{evidencePack.evidence_schema_version})</h3>
-              <div style={{ fontSize: 11, background: '#f9fafb', padding: 8, borderRadius: 4, maxHeight: 150, overflowY: 'auto' }}>
-                <pre>{JSON.stringify(evidencePack, null, 2)}</pre>
-              </div>
-            </div>
-          )}
-
-          {/* Audit Logs */}
-          {auditLog.length > 0 && (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 700 }}>Audit Timeline</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 200, overflowY: 'auto' }}>
-                {auditLog.map((aud, idx) => (
-                  <div key={idx} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>{aud.event_type}</div>
-                    <div style={{ fontSize: 10, color: '#6b7280' }}>
-                      By: {aud.actor_id} | {new Date(aud.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </details>
         </div>
       </div>
     </div>
   );
 }
+
 export default ControlledBetaRuntimeActivityObservation;

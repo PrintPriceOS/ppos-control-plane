@@ -26,30 +26,60 @@ import { IndustrialGovernanceTab } from "./IndustrialGovernanceTab";
 import { IndustrialTemporalTab } from "./IndustrialTemporalTab";
 import { IndustrialSimulationTab } from "./IndustrialSimulationTab";
 import { IndustrialMapTab } from "./IndustrialMapTab";
+import { useLocale } from "../../i18n";
+import { useAdminQuery } from "../../hooks/useAdminData";
+import { getRoutingMap } from "../../lib/adminApi";
+import { safeArray } from "../../lib/display";
 
 export const IndustrialOpsPage: React.FC = () => {
+    const { t } = useLocale();
     const [activeTab, setActiveTab] = useState<'artifacts' | 'workers' | 'nodes' | 'live' | 'intelligence' | 'economics' | 'governance' | 'temporal' | 'simulation' | 'large-docs' | 'storage' | 'orchestration' | 'incidents' | 'lifecycle' | 'map'>('map');
+
+    const { data: mapState, isLoading } = useAdminQuery('routing:map', getRoutingMap, 10000);
+    const nodes = safeArray(mapState?.nodes);
+    const isOperational = nodes.length > 0;
 
     return (
         <div className="space-y-6 italic-text-off">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black text-white tracking-tight">Industrial Operations</h1>
-                    <p className="text-sm text-zinc-400 font-medium tracking-tight">High-fidelity orchestration and governance for distributed infrastructure.</p>
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                        {t('industrial.title') || 'Industrial Operations'}
+                    </h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">
+                        {t('industrial.subtitle') || 'High-fidelity orchestration and governance for distributed infrastructure.'}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-[#10B981]/10 border border-[#10B981]/20 rounded-none shrink-0">
-                    <div className="w-2 h-2 rounded-none bg-[#10B981] animate-pulse" />
-                    <span className="text-[10px] font-black text-[#10B981] uppercase tracking-widest">System Operational</span>
+
+                {/* Dynamically derived status badge */}
+                <div className={`flex items-center gap-2 px-3 py-1 border rounded-none shrink-0 self-start sm:self-auto ${
+                    isLoading 
+                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' 
+                        : isOperational 
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
+                            : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-400'
+                }`}>
+                    <div className={`w-2 h-2 rounded-none ${
+                        isLoading ? 'bg-amber-500 animate-spin' : isOperational ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-500'
+                    }`} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                        {isLoading 
+                            ? (t('industrial.verifyingStatus') || 'Verificando Estado...')
+                            : isOperational 
+                                ? (t('industrial.systemOperational') || 'Sistema Operativo')
+                                : (t('industrial.telemetryDegraded') || 'Telemetría Parcial')
+                        }
+                    </span>
                 </div>
             </div>
 
             {/* Categorized Industrial Navigation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-zinc-900/20 p-2 border border-zinc-800 shadow-none">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ppos-card p-3 border ppos-border">
                 {/* Operational Group */}
                 <div className="space-y-2">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        <BoltIcon className="w-3 h-3" />
-                        Operational
+                        <BoltIcon className="w-3.5 h-3.5 text-amber-500" />
+                        {t('industrial.operational') || 'Operational'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
                         <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon={BoltIcon} label="Live Loop" />
@@ -60,25 +90,25 @@ export const IndustrialOpsPage: React.FC = () => {
                 </div>
 
                 {/* Intelligence Group */}
-                <div className="space-y-2 border-t md:border-t-0 md:border-l border-zinc-800/60 pt-2 md:pt-0 md:pl-4">
+                <div className="space-y-2 border-t md:border-t-0 md:border-l ppos-border pt-2 md:pt-0 md:pl-4">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        <AcademicCapIcon className="w-3 h-3" />
-                        Intelligence
+                        <AcademicCapIcon className="w-3.5 h-3.5 text-blue-500" />
+                        {t('industrial.intelligence') || 'Intelligence'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
                         <TabButton active={activeTab === 'intelligence'} onClick={() => setActiveTab('intelligence')} icon={AcademicCapIcon} label="Metrics" />
                         <TabButton active={activeTab === 'economics'} onClick={() => setActiveTab('economics')} icon={BanknotesIcon} label="Economics" />
                         <TabButton active={activeTab === 'temporal'} onClick={() => setActiveTab('temporal')} icon={ClockIcon} label="Temporal" />
                         <TabButton active={activeTab === 'simulation'} onClick={() => setActiveTab('simulation')} icon={CpuChipIcon} label="Sim" />
-                        <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={MapIcon} label="Live Map" />
+                        <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={MapIcon} label={t('industrial.liveMap') || 'Live Map'} />
                     </div>
                 </div>
 
                 {/* Governance Group */}
-                <div className="space-y-2 border-t md:border-t-0 md:border-l border-zinc-800/60 pt-2 md:pt-0 md:pl-4">
+                <div className="space-y-2 border-t md:border-t-0 md:border-l ppos-border pt-2 md:pt-0 md:pl-4">
                     <h3 className="px-3 text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        <ShieldCheckIcon className="w-3 h-3" />
-                        Governance
+                        <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-500" />
+                        {t('industrial.governance') || 'Governance'}
                     </h3>
                     <div className="flex flex-wrap gap-1">
                         <TabButton active={activeTab === 'governance'} onClick={() => setActiveTab('governance')} icon={ShieldCheckIcon} label="Policies" />
@@ -116,11 +146,11 @@ const TabButton = ({ active, onClick, icon: Icon, label }: { active: boolean, on
         onClick={onClick}
         className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors border rounded-none ${
             active
-            ? 'bg-zinc-800/60 border-zinc-700 text-white font-black shadow-inner'
-            : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 font-bold'
+            ? 'bg-zinc-800/80 border-zinc-600 text-white font-black shadow-xs'
+            : 'border-transparent text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5 font-bold'
         }`}
     >
-        <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#dc0000]' : 'text-zinc-500'}`} />
+        <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#dc0000]' : 'text-zinc-400'}`} />
         <span className="text-[11px] uppercase tracking-tight">{label}</span>
     </button>
 );

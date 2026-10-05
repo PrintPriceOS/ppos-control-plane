@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { runtimeActivityReviewClient } from '../../api/controlledBetaRuntimeActivityReviewClient';
 import { normalizeUiError } from '../../utils/errorUtils';
 import {
@@ -7,8 +8,20 @@ import {
   RuntimeActivityReviewFinding,
   RuntimeActivityReviewEvidence
 } from '../../types/controlledBetaRuntimeActivityReview';
+import { useLocale } from '../../i18n';
+import {
+  HeartIcon,
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
+  CheckCircleIcon,
+  ArrowPathIcon,
+  DocumentMagnifyingGlassIcon
+} from '@heroicons/react/24/outline';
 
 export function ControlledBetaRuntimeActivityReview() {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+
   const [reviews, setReviews] = useState<RuntimeActivityReview[]>([]);
   const [selectedReviewId, setSelectedReviewId] = useState<string>('');
   const [selectedReview, setSelectedReview] = useState<RuntimeActivityReview | null>(null);
@@ -82,12 +95,11 @@ export function ControlledBetaRuntimeActivityReview() {
         windowEnd: new Date(windowEnd).toISOString()
       });
       if (res.ok) {
-        setMessage(`Review created successfully: ${res.review.review_id}`);
-        setSelectedReviewId(res.review.review_id);
+        setMessage(`Revisión de salud creada con éxito: ${res.review.review_id}`);
         await fetchReviewsList();
-        await loadReviewDetails(res.review.review_id);
+        setSelectedReviewId(res.review.review_id);
       } else {
-        setErrorMsg('Failed to create review');
+        setErrorMsg('Error creando la revisión de salud');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -104,10 +116,10 @@ export function ControlledBetaRuntimeActivityReview() {
     try {
       const res = await runtimeActivityReviewClient.evaluateReview(selectedReviewId);
       if (res.ok) {
-        setMessage('Review evaluation completed.');
+        setMessage('Evaluación de salud completada con éxito.');
         await loadReviewDetails(selectedReviewId);
       } else {
-        setErrorMsg('Evaluation failed');
+        setErrorMsg('Error al evaluar la salud del cohorte');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -124,10 +136,11 @@ export function ControlledBetaRuntimeActivityReview() {
     try {
       const res = await runtimeActivityReviewClient.finalizeReview(selectedReviewId);
       if (res.ok) {
-        setMessage('Review finalized and locked.');
+        setMessage('Revisión finalizada y protegida criptográficamente.');
         await loadReviewDetails(selectedReviewId);
+        await fetchReviewsList();
       } else {
-        setErrorMsg('Finalization failed');
+        setErrorMsg('Error al finalizar la revisión');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -139,24 +152,25 @@ export function ControlledBetaRuntimeActivityReview() {
   const handleSupersede = async () => {
     if (!selectedReviewId || !targetSupersedeId) return;
     if (!supersedeReason.trim()) {
-      setErrorMsg('Supersede reason is exigent and required.');
+      setErrorMsg('El motivo de sustitución es obligatorio.');
       return;
     }
     setLoading(true);
     setMessage('');
     setErrorMsg('');
     try {
-      const res = await runtimeActivityReviewClient.supersedeReview(selectedReviewId, {
+      const res = await runtimeActivityReviewClient.supersedeReview({
+        reviewId: selectedReviewId,
         supersededByReviewId: targetSupersedeId,
         reason: supersedeReason
       });
       if (res.ok) {
-        setMessage(`Review ${selectedReviewId} marked as superseded.`);
+        setMessage(`Revisión ${selectedReviewId} sustituida correctamente.`);
         setSupersedeReason('');
         setTargetSupersedeId('');
         await loadReviewDetails(selectedReviewId);
       } else {
-        setErrorMsg('Supersede call failed');
+        setErrorMsg('Error al sustituir la revisión');
       }
     } catch (err: any) {
       setErrorMsg(normalizeUiError(err));
@@ -176,49 +190,84 @@ export function ControlledBetaRuntimeActivityReview() {
   }, [selectedReviewId, loadReviewDetails]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'Inter, sans-serif', color: '#1f2937' }}>
+    <div className="space-y-6">
       {/* Warning Header */}
-      <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700 }}>⚠️ Cohort Health Review Gate</h3>
-        <p style={{ margin: 0, fontSize: 14 }}>
-          This review does not automatically change cohort access, participant access, marketplace scope, payment execution, provider submission, tax/accounting submission, or enforcement behavior.
-        </p>
+      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded flex items-start gap-3">
+        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="text-xs font-black uppercase tracking-wider text-amber-500">
+            {t('beta.health.title') || 'Revisión de Salud de Cohorte y Recomendaciones'}
+          </h4>
+          <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+            {t('beta.runtime.safetyWarning') || 'Esta revisión analítica no altera automáticamente el acceso del cohorte, la facturación ni la ejecución de órdenes.'}
+          </p>
+        </div>
       </div>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 24 }}>Runtime Activity Review & Recommendation Gate (Phase 137)</h1>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24 }}>
-        {/* Left pane: Review selector and creation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Snapshot a New Review</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left pane: Review selector and creation (1/3 width) */}
+        <div className="space-y-6">
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+              <DocumentMagnifyingGlassIcon className="w-4 h-4 text-blue-500" />
+              Nueva Captura de Revisión
+            </h3>
+            <div className="space-y-3 mb-4">
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600 }}>Tenant ID</label>
-                <input value={tenantId} onChange={e => setTenantId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Tenant</label>
+                <input
+                  value={tenantId}
+                  onChange={e => setTenantId(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600 }}>Cohort ID</label>
-                <input value={cohortId} onChange={e => setCohortId(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Cohorte</label>
+                <input
+                  value={cohortId}
+                  onChange={e => setCohortId(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600 }}>Window Start</label>
-                <input type="datetime-local" value={windowStart} onChange={e => setWindowStart(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Inicio de Ventana</label>
+                <input
+                  type="datetime-local"
+                  value={windowStart}
+                  onChange={e => setWindowStart(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600 }}>Window End</label>
-                <input type="datetime-local" value={windowEnd} onChange={e => setWindowEnd(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Fin de Ventana</label>
+                <input
+                  type="datetime-local"
+                  value={windowEnd}
+                  onChange={e => setWindowEnd(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                />
               </div>
             </div>
-            <button onClick={handleCreateReview} disabled={loading} style={{ width: '100%', padding: 10, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-              Create Snapshot Review
+            <button
+              type="button"
+              onClick={handleCreateReview}
+              disabled={loading}
+              className="w-full px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
+            >
+              Crear Revisión de Ventana
             </button>
           </div>
 
-          <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Select Cohort Review</h2>
-            <select value={selectedReviewId} onChange={e => setSelectedReviewId(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff' }}>
-              <option value="">-- Choose Review --</option>
+          <div className="ppos-card p-5 border ppos-border rounded">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
+              Seleccionar Revisión de Cohorte
+            </h3>
+            <select
+              value={selectedReviewId}
+              onChange={e => setSelectedReviewId(e.target.value)}
+              className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
+            >
+              <option value="">-- Seleccionar Revisión --</option>
               {reviews.map(r => (
                 <option key={r.review_id} value={r.review_id}>
                   {r.review_id} ({r.cohort_id}) - {r.review_status}
@@ -228,136 +277,176 @@ export function ControlledBetaRuntimeActivityReview() {
           </div>
         </div>
 
-        {/* Right pane: Details and Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Right pane: Details and Actions (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
           {selectedReview ? (
-            <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Review Details: {selectedReview.review_id}</h2>
-                <span style={{
-                  padding: '6px 12px',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: selectedReview.review_status === 'FINALIZED' ? '#d1fae5' : '#f3f4f6',
-                  color: selectedReview.review_status === 'FINALIZED' ? '#065f46' : '#374151'
-                }}>{selectedReview.review_status}</span>
+            <div className="ppos-card p-6 border ppos-border rounded space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ppos-border">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Detalle de Revisión: {selectedReview.review_id}
+                  </h3>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase">
+                    Cohorte: {selectedReview.cohort_id} | Tenant: {selectedReview.tenant_id}
+                  </span>
+                </div>
+                <span className={`px-2.5 py-1 rounded text-xs font-black uppercase self-start sm:self-auto ${
+                  selectedReview.review_status === 'FINALIZED'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
+                }`}>
+                  {selectedReview.review_status}
+                </span>
               </div>
 
               {/* Status and Action Buttons */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-                <button onClick={handleEvaluate} disabled={loading || selectedReview.review_status === 'FINALIZED'} style={{ padding: '8px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                  Evaluate Health
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleEvaluate}
+                  disabled={loading || selectedReview.review_status === 'FINALIZED'}
+                  className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded transition-colors"
+                >
+                  Evaluar Salud
                 </button>
-                <button onClick={handleFinalize} disabled={loading || selectedReview.review_status === 'FINALIZED'} style={{ padding: '8px 16px', background: '#ec4899', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                  Finalize & Lock Review
+                <button
+                  type="button"
+                  onClick={handleFinalize}
+                  disabled={loading || selectedReview.review_status === 'FINALIZED'}
+                  className="px-4 py-2 text-xs font-bold bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded transition-colors"
+                >
+                  Finalizar y Bloquear Revisión
                 </button>
               </div>
 
               {/* Recommendations Card */}
               {decision && (
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, background: '#f9fafb', marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 10px 0', fontSize: 16, fontWeight: 700, color: '#111827' }}>Decision Recommendation</h3>
-                  <div style={{ fontSize: 13, marginBottom: 8 }}>
-                    Recommendation: <strong style={{ color: '#2563eb' }}>{decision.recommended_decision}</strong>
+                <div className="p-4 ppos-surface-muted border ppos-border rounded space-y-2">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Recomendación de Decisión Operativa
+                  </h4>
+                  <div className="text-xs">
+                    Recomendación: <strong className="text-blue-500 font-mono">{decision.recommended_decision}</strong>
                   </div>
-                  <div style={{ fontSize: 13, marginBottom: 8 }}>
-                    Execution Status: <strong>{decision.decision_execution_status}</strong>
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                    Estado de Ejecución: <strong className="text-slate-900 dark:text-white">{decision.decision_execution_status}</strong>
                   </div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>
-                    Reason: <em>{decision.execution_blocked_reason}</em>
-                  </div>
+                  {decision.execution_blocked_reason && (
+                    <div className="text-xs text-amber-500">
+                      Motivo de bloqueo: <em>{decision.execution_blocked_reason}</em>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Non-Mutation Attestation Display */}
-              <div style={{ border: '1px solid #d1fae5', borderRadius: 8, padding: 16, background: '#ecfdf5', marginBottom: 24 }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: 15, fontWeight: 700, color: '#065f46' }}>🛡️ Safety Attestation Proof</h3>
-                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: '#065f46', lineHeight: '1.6' }}>
-                  <li>Cohort access state mutated: <strong>{String(selectedReview.non_mutation_attestation_json.cohort_access_mutated)}</strong></li>
-                  <li>Participant runtime bound mutated: <strong>{String(selectedReview.non_mutation_attestation_json.participant_access_mutated)}</strong></li>
-                  <li>External provider payment mutation: <strong>{String(selectedReview.non_mutation_attestation_json.payment_execution_triggered)}</strong></li>
-                  <li>External provider submission mutation: <strong>{String(selectedReview.non_mutation_attestation_json.provider_submission_triggered)}</strong></li>
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded space-y-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  Prueba de No-Mutación de Estado
+                </h4>
+                <ul className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+                  <li>Estado de acceso a cohorte alterado: <strong>{String(selectedReview.non_mutation_attestation_json?.cohort_access_mutated ?? false)}</strong></li>
+                  <li>Límites del participante alterados: <strong>{String(selectedReview.non_mutation_attestation_json?.participant_access_mutated ?? false)}</strong></li>
+                  <li>Cobros o pagos comerciales ejecutados: <strong>{String(selectedReview.non_mutation_attestation_json?.payment_execution_triggered ?? false)}</strong></li>
+                  <li>Envíos a proveedores externos ejecutados: <strong>{String(selectedReview.non_mutation_attestation_json?.provider_submission_triggered ?? false)}</strong></li>
                 </ul>
               </div>
 
               {/* Findings */}
-              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Generated Findings ({findings.length})</h3>
-              {findings.length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 24 }}>
-                  <thead>
-                    <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                      <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Finding Key</th>
-                      <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Severity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {findings.map(f => (
-                      <tr key={f.finding_id}>
-                        <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>{f.finding_key}</td>
-                        <td style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>
-                          <span style={{
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            background: f.severity === 'HIGH' || f.severity === 'CRITICAL' ? '#fee2e2' : '#fef3c7',
-                            color: f.severity === 'HIGH' || f.severity === 'CRITICAL' ? '#991b1b' : '#92400e'
-                          }}>{f.severity}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 24 }}>No findings generated for this review window.</p>
-              )}
-
-              {/* Evidence Pack */}
-              {evidencePack && (
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Lock Evidence Pack (v{evidencePack.evidence_schema_version})</h3>
-                  <div style={{ fontSize: 12, background: '#f9fafb', padding: 12, borderRadius: 6, maxHeight: 150, overflowY: 'auto' }}>
-                    <div>Snapshot Hash: <code>{evidencePack.input_snapshot_hash}</code></div>
-                    <div>Evaluation Hash: <code>{evidencePack.evaluation_result_hash}</code></div>
-                    <div>Evidence Pack Hash: <code>{evidencePack.evidence_pack_hash}</code></div>
-                    <pre style={{ marginTop: 10 }}>{JSON.stringify(evidencePack.evidence_data_json, null, 2)}</pre>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-2">
+                  Hallazgos Registrados ({findings.length})
+                </h4>
+                {findings.length > 0 ? (
+                  <div className="border ppos-border rounded overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="ppos-surface-muted text-zinc-500 uppercase text-[10px]">
+                        <tr>
+                          <th className="p-2.5 text-left">Clave de Hallazgo</th>
+                          <th className="p-2.5 text-right">Severidad</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y ppos-border font-mono">
+                        {findings.map(f => (
+                          <tr key={f.finding_id}>
+                            <td className="p-2.5 text-slate-800 dark:text-zinc-200">{f.finding_key}</td>
+                            <td className="p-2.5 text-right">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                f.severity === 'HIGH' || f.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'
+                              }`}>
+                                {f.severity}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    No se han registrado hallazgos en esta ventana de revisión.
+                  </p>
+                )}
+              </div>
 
               {/* Supersede Review */}
               {selectedReview.review_status !== 'SUPERSEDED' && (
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Supersede this Review</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div className="pt-4 border-t ppos-border space-y-3">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase">Sustituir esta Revisión</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 600 }}>Replacement Review ID</label>
-                      <input value={targetSupersedeId} onChange={e => setTargetSupersedeId(e.target.value)} placeholder="rev_..." style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Revisión Reemplazante</label>
+                      <input
+                        value={targetSupersedeId}
+                        onChange={e => setTargetSupersedeId(e.target.value)}
+                        placeholder="rev_..."
+                        className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                      />
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 600 }}>Enforced Reason</label>
-                      <input value={supersedeReason} onChange={e => setSupersedeReason(e.target.value)} placeholder="Ex: snapshots completed with newer logs" style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4 }} />
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Motivo Justificado</label>
+                      <input
+                        value={supersedeReason}
+                        onChange={e => setSupersedeReason(e.target.value)}
+                        placeholder="Ej: Capturas actualizadas con registros más recientes"
+                        className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
+                      />
                     </div>
                   </div>
-                  <button onClick={handleSupersede} disabled={loading || !targetSupersedeId || !supersedeReason} style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
-                    Apply Supersede
+                  <button
+                    type="button"
+                    onClick={handleSupersede}
+                    disabled={loading || !targetSupersedeId || !supersedeReason}
+                    className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded transition-colors"
+                  >
+                    Aplicar Sustitución
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ background: '#f9fafb', border: '1px dotted #d1d5db', borderRadius: 8, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280', padding: 24, textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>No runtime activity observation snapshots are available yet.</div>
-              <div style={{ fontSize: 13, color: '#4b5563' }}>Required parent: Phase 136 Runtime Activity Observation.</div>
-              <div style={{ fontSize: 13, color: '#4b5563' }}>Required state: finalized observation window with preserved safety invariants.</div>
-              <div style={{ fontSize: 13, color: '#059669', marginTop: 12 }}>Next action: create or finalize a Phase 136 runtime activity observation before creating a cohort health review.</div>
+            <div className="ppos-card border border-dashed ppos-border p-10 rounded text-center flex flex-col items-center justify-center space-y-3">
+              <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">
+                {t('beta.health.noReviews') || 'No se han generado revisiones de actividad todavía.'}
+              </span>
+              <p className="text-xs text-zinc-500 max-w-md">
+                {t('beta.health.actionableHint') || 'Para evaluar la salud del cohorte se requiere un registro previo de observación de actividad con invariantes de seguridad preservadas.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/beta/runtime?tab=activity')}
+                className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+              >
+                {t('beta.health.goToActivity') || 'Ir a Observación de Actividad'}
+              </button>
             </div>
           )}
 
-          {/* Feedback message */}
           {(message || errorMsg) && (
-            <div style={{ padding: 16, borderRadius: 8, background: '#f3f4f6', border: '1px solid #e5e7eb' }}>
-              {message && <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>{message}</div>}
-              {errorMsg && <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>{errorMsg}</div>}
+            <div className="ppos-card p-4 border ppos-border rounded">
+              {message && <div className="text-xs font-semibold text-emerald-500 mb-1">{message}</div>}
+              {errorMsg && <div className="text-xs font-semibold text-red-500">{errorMsg}</div>}
             </div>
           )}
         </div>

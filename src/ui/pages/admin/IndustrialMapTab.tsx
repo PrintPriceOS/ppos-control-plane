@@ -9,8 +9,10 @@ import { useAdminQuery } from '../../hooks/useAdminData';
 import { getRoutingLive, getRoutingMap } from '../../lib/adminApi';
 import { toDisplayText } from '../../lib/formatters';
 import { safeArray } from '../../lib/display';
+import { useLocale } from '../../i18n';
 
 export const IndustrialMapTab: React.FC = () => {
+    const { t } = useLocale();
     const { data: liveData } = useAdminQuery('routing:live', getRoutingLive, 5000);
     const { data: mapState } = useAdminQuery('routing:map', getRoutingMap, 5000);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -20,6 +22,12 @@ export const IndustrialMapTab: React.FC = () => {
     const hasWarnings = warnings.length > 0 || sourceStatus === 'PARTIAL_COORDINATES' || sourceStatus === 'NO_COORDINATES_AVAILABLE';
 
     const safeDecisions = safeArray(liveData?.decisions ?? []);
+    const nodes = safeArray(mapState?.nodes ?? []);
+    const routes = safeArray(mapState?.routes ?? []);
+
+    const avgScore = safeDecisions.length > 0
+        ? Math.round(safeDecisions.reduce((acc: number, d: any) => acc + (Number(d?.routing_score) || 0), 0) / safeDecisions.length)
+        : null;
 
     return (
         <div className="space-y-6">
@@ -33,12 +41,12 @@ export const IndustrialMapTab: React.FC = () => {
                         <div className="flex items-center gap-3">
                             <div className="w-1.5 h-1.5 bg-amber-500 animate-pulse" />
                             <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">
-                                {toDisplayText(sourceStatus).replace(/_/g, ' ')} — {warnings.length} {warnings.length === 1 ? 'node' : 'nodes'} excluded from map
+                                {toDisplayText(sourceStatus).replace(/_/g, ' ')} — {warnings.length} {warnings.length === 1 ? (t('map.nodeExcluded') || 'nodo excluido del mapa geoespacial') : (t('map.nodesExcluded') || 'nodos excluidos del mapa geoespacial')}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[8px] font-bold text-amber-500/80 uppercase tracking-widest">
-                                {isExpanded ? 'Collapse Telemetry' : 'Inspect Exclusions'}
+                                {isExpanded ? (t('map.collapseTelemetry') || 'Colapsar Telemetría') : (t('map.inspectExclusions') || 'Inspeccionar Exclusiones')}
                             </span>
                             <span className="text-[9px] font-mono text-amber-500 font-bold">
                                 {isExpanded ? '▲' : '▼'}
@@ -47,14 +55,14 @@ export const IndustrialMapTab: React.FC = () => {
                     </div>
 
                     {isExpanded && warnings.length > 0 && (
-                        <div className="border-t border-amber-500/10 bg-zinc-950/40 divide-y divide-amber-500/5 max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="border-t border-amber-500/10 ppos-surface-muted divide-y divide-amber-500/10 max-h-60 overflow-y-auto custom-scrollbar">
                             {warnings.map((w: any, idx: number) => (
                                 <div key={w?.id || idx} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono">
                                     <div className="flex items-center gap-2">
                                         <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 font-bold text-[8px]">
                                             {toDisplayText(w?.type || w?.entityType || 'NODE')}
                                         </span>
-                                        <span className="font-bold text-zinc-200">
+                                        <span className="font-bold text-slate-800 dark:text-zinc-200">
                                             {toDisplayText(w?.name || 'Unknown')}
                                         </span>
                                         <span className="text-zinc-500 text-[8px]">
@@ -73,7 +81,7 @@ export const IndustrialMapTab: React.FC = () => {
 
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Main Tactical Surface */}
-                <div className="xl:col-span-3 min-h-[700px] flex flex-col">
+                <div className="xl:col-span-3 min-h-[650px] flex flex-col">
                     <div className="flex-1 relative">
                         <FederationMap />
                     </div>
@@ -81,26 +89,33 @@ export const IndustrialMapTab: React.FC = () => {
 
                 {/* Live Event Stream */}
                 <div className="space-y-6">
-                    <div className="glass border border-zinc-800 bg-zinc-950/40 overflow-hidden flex flex-col h-[700px] rounded-none">
-                        <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-950/60 flex items-center justify-between">
-                            <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Routing Decalog</h3>
+                    <div className="border ppos-border ppos-card overflow-hidden flex flex-col h-[650px] rounded-none">
+                        <div className="px-4 py-3 border-b ppos-border ppos-surface-muted flex items-center justify-between">
+                            <div>
+                                <h3 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                    {t('map.routingDecalog') || 'Decálogo de Enrutamiento'}
+                                </h3>
+                                <p className="text-[9px] text-zinc-500">
+                                    {t('map.routingExplanation') || 'Historial de decisiones operativas de enrutamiento y asignación.'}
+                                </p>
+                            </div>
                             <div className="w-1.5 h-1.5 bg-primary animate-pulse" />
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {safeDecisions.map((d: any) => {
                                 const safeDecId = d?.id ? String(d.id).substring(0, 8) : 'N/A';
                                 return (
-                                    <div key={d?.id || Math.random()} className="p-3 bg-zinc-900/40 border border-zinc-800 rounded-none">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-[8px] font-mono font-bold text-blue-400 uppercase tracking-tighter">#{safeDecId}</span>
+                                    <div key={d?.id || Math.random()} className="p-3 ppos-surface border ppos-border rounded-none">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-[8px] font-mono font-bold text-blue-500 uppercase tracking-tighter">#{safeDecId}</span>
                                             <span className="text-[9px] font-black text-emerald-500 uppercase">{toDisplayText(d?.routing_score)}%</span>
                                         </div>
-                                        <p className="text-[9px] font-bold text-zinc-300 leading-relaxed mb-2">
+                                        <p className="text-[10px] font-medium text-slate-700 dark:text-zinc-300 leading-relaxed mb-2">
                                             {toDisplayText(d?.explanation)}
                                         </p>
-                                        <div className="flex justify-between items-center text-[7px] font-black text-zinc-500 uppercase">
-                                            <span>Node: {toDisplayText(d?.selected_machine_id)}</span>
+                                        <div className="flex justify-between items-center text-[8px] font-mono text-zinc-500 uppercase">
+                                            <span>Nodo: {toDisplayText(d?.selected_machine_id || 'Auto')}</span>
                                             <span>{d?.created_at ? new Date(d.created_at).toLocaleTimeString() : ''}</span>
                                         </div>
                                     </div>
@@ -108,40 +123,71 @@ export const IndustrialMapTab: React.FC = () => {
                             })}
 
                             {safeDecisions.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale">
-                                    <div className="w-12 h-12 border-2 border-dashed border-white/10 mb-4 rounded-none" />
-                                    <span className="text-[8px] font-black uppercase">Scanning for Routing Events...</span>
+                                <div className="h-full flex flex-col items-center justify-center p-6 text-center text-zinc-400">
+                                    <div className="w-8 h-8 border border-dashed ppos-border mb-3 rounded-none" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                                        Sin decisiones de enrutamiento recientes
+                                    </span>
+                                    <span className="text-[8px] text-zinc-400 mt-1 max-w-xs">
+                                        Las decisiones se registrarán en tiempo real cuando se despachen trabajos a través de la federación.
+                                    </span>
                                 </div>
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-zinc-800 bg-zinc-950/60">
-                            <div className="flex items-center justify-between text-[8px] font-black text-zinc-500 uppercase tracking-widest">
-                                <span>Session Decisions</span>
-                                <span className="text-white font-mono">{safeDecisions.length}</span>
-                            </div>
+                        <div className="p-3 border-t ppos-border ppos-surface-muted flex items-center justify-between text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                            <span>Decisiones en Sesión</span>
+                            <span className="text-slate-900 dark:text-white font-bold">{safeDecisions.length}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Regional Stats */}
+            {/* Regional / Operational Stats backed by real data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatusCard label="Federation Uptime" value="---" trend="SIGNAL LOSS" />
-                <StatusCard label="Routing Efficiency" value="---" trend="ANALYZING" />
-                <StatusCard label="Cross-Border Load" value="---" trend="OFFLINE" />
-                <StatusCard label="Carbon Reduction" value="---" trend="NO DATA" />
+                <StatusCard 
+                    label="Nodos de Federación" 
+                    value={nodes.length > 0 ? String(nodes.length) : '0'} 
+                    trend={nodes.length > 0 ? 'CONECTADO' : 'SIN NODOS'} 
+                    explanation="Nodos de impresión activos en el clúster"
+                />
+                <StatusCard 
+                    label="Eficacia de Enrutamiento" 
+                    value={avgScore !== null ? `${avgScore}%` : '---'} 
+                    trend={avgScore !== null ? 'CALCULADO' : 'A LA ESPERA'} 
+                    explanation={avgScore !== null ? 'Puntuación media de despacho' : 'Requiere sesiones de enrutamiento activas'}
+                />
+                <StatusCard 
+                    label="Rutas Activas" 
+                    value={String(routes.length)} 
+                    trend={routes.length > 0 ? 'EN CURSO' : 'INACTIVO'} 
+                    explanation="Líneas de despacho transfronterizo activas"
+                />
+                <StatusCard 
+                    label="Reducción de Carbono" 
+                    value="---" 
+                    trend="SIN CONFIGURAR" 
+                    explanation="Requiere activación de telemetría de sostenibilidad"
+                />
             </div>
         </div>
     );
 };
 
-const StatusCard = ({ label, value, trend }: { label: string, value: string, trend: string }) => (
-    <div className="p-4 glass border border-zinc-800 bg-zinc-950/40 rounded-none">
-        <div className="flex justify-between items-start mb-2">
-            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
-            <span className={`text-[8px] font-black ${trend.startsWith('+') ? 'text-emerald-500' : 'text-blue-500'}`}>{trend}</span>
+const StatusCard = ({ label, value, trend, explanation }: { label: string, value: string, trend: string, explanation: string }) => {
+    const isPositive = trend === 'CONECTADO' || trend === 'CALCULADO' || trend === 'EN CURSO';
+    return (
+        <div className="p-4 ppos-card border ppos-border rounded-none">
+            <div className="flex justify-between items-start mb-2">
+                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
+                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 ${isPositive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                    {trend}
+                </span>
+            </div>
+            <div className="text-xl font-mono font-black text-slate-900 dark:text-white tabular-nums">{value}</div>
+            <p className="text-[9px] text-zinc-500 dark:text-zinc-400 mt-1 truncate" title={explanation}>
+                {explanation}
+            </p>
         </div>
-        <div className="text-xl font-mono font-black text-white tabular-nums">{value}</div>
-    </div>
-);
+    );
+};

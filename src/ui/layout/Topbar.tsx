@@ -103,10 +103,10 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             </div>
           )}
 
-          {/* Certification Badge */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20">
+          {/* Governed Posture Badge */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20" title={t('topbar.governedPosture') || 'Gobernanza Activa'}>
             <ShieldCheckIcon className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.certified') || 'v2.0.0 Certified'}</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedPosture') || 'Gobernanza Activa'}</span>
           </div>
 
           {/* Region Context */}
