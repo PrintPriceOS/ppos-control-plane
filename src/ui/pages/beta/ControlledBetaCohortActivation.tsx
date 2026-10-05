@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getControlledBetaCohortActivationReadiness,
   createControlledCohortActivation,
@@ -26,64 +27,119 @@ import {
   getControlledActivationEvidencePack,
   getControlledActivationAuditTimeline
 } from '../../api/controlledBetaCohortActivationClient';
+import { normalizeUiError } from '../../utils/errorUtils';
+import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
+import {
+  ShieldCheckIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon,
+  PlayIcon,
+  PauseIcon,
+  StopIcon,
+  BoltIcon
+} from '@heroicons/react/24/outline';
 
 const UI_WARNING =
   'First Controlled Invite-Only Beta Cohort Activation. This does not enable FULL_PUBLIC, open marketplace access, payment execution, refund execution, payout execution, provider external submission, tax/accounting submission, or uncontrolled source mutation.';
 
-export function ControlledBetaCohortActivation() {
-  const [activationId, setActivationId] = useState('');
-  const [gateId, setGateId] = useState('lbpg_phase127_01');
-  const [cohortId, setCohortId] = useState('cohort_beta_01');
-  const [tenantId, setTenantId] = useState('tenant_beta_01');
+interface ConfirmModalState {
+  isOpen: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  isDanger?: boolean;
+  action: () => Promise<void> | void;
+}
 
-  // Input states
-  const [participantId, setParticipantId] = useState('participant_beta_01');
+export function ControlledBetaCohortActivation() {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+
+  // Context & Entity IDs (unpreloaded for production safety)
+  const [activationId, setActivationId] = useState('');
+  const [gateId, setGateId] = useState('');
+  const [cohortId, setCohortId] = useState('');
+  const [tenantId, setTenantId] = useState('');
+
+  // Preparation inputs
+  const [participantId, setParticipantId] = useState('');
   const [inviteId, setInviteId] = useState('');
   const [findingId, setFindingId] = useState('');
-  const [allowedFeatures, setAllowedFeatures] = useState('["CUSTOMER_PORTAL_VIEW_ONLY", "PREFLIGHT_REVIEW_ONLY"]');
-  const [maxParticipants, setMaxParticipants] = useState(5);
-  const [maxSessions, setMaxSessions] = useState(2);
-  const [maxTotalSessions, setMaxTotalSessions] = useState(10);
-  const [maxDuration, setMaxDuration] = useState(60);
-  const [maxActions, setMaxActions] = useState(100);
+  const [allowedFeatures, setAllowedFeatures] = useState('');
+  const [maxParticipants, setMaxParticipants] = useState<number | ''>('');
+  const [maxSessions, setMaxSessions] = useState<number | ''>('');
+  const [maxTotalSessions, setMaxTotalSessions] = useState<number | ''>('');
+  const [maxDuration, setMaxDuration] = useState<number | ''>('');
+  const [maxActions, setMaxActions] = useState<number | ''>('');
 
-  const [featureKey, setFeatureKey] = useState('CUSTOMER_PORTAL_VIEW_ONLY');
-  const [eventType, setEventType] = useState('SESSION_START');
-  const [ticketDetails, setTicketDetails] = useState('User reported login query.');
-  const [incidentType, setIncidentType] = useState('LATENCY_SPIKE');
+  // Diagnostics & Operations inputs
+  const [featureKey, setFeatureKey] = useState('');
+  const [eventType, setEventType] = useState('');
+  const [ticketDetails, setTicketDetails] = useState('');
+  const [incidentType, setIncidentType] = useState('');
   const [incidentSeverity, setIncidentSeverity] = useState('HIGH');
-  const [incidentSummary, setIncidentSummary] = useState('Minor latency warning in cohort runtime');
-  const [killSwitchReason, setKillSwitchReason] = useState('EMERGENCY_ACCESS_SUSPENSION');
+  const [incidentSummary, setIncidentSummary] = useState('');
+  const [killSwitchReason, setKillSwitchReason] = useState('');
   const [findingSeverity, setFindingSeverity] = useState('HIGH');
-  const [findingSummary, setFindingSummary] = useState('Scoped activation finding warning');
+  const [findingSummary, setFindingSummary] = useState('');
 
+  // Status & Async handling
   const [result, setResult] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [fetchError, setFetchError] = useState('');
+  const [fetchStatus, setFetchStatus] = useState<number | null>(null);
+  const [lastAction, setLastAction] = useState<(() => Promise<any>) | null>(null);
 
-  const run = useCallback(async (label: string, fn: () => Promise<Record<string, unknown>>) => {
+  // Explicit confirmation modal (canceling emits no HTTP request)
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
+
+  const run = useCallback(async (label: string, fn: () => Promise<any>) => {
     setLoading(true);
     setMessage('');
+    setFetchError('');
+    setFetchStatus(null);
+    setLastAction(() => () => run(label, fn));
     try {
       const r = await fn();
+      if (r && r.ok === false) {
+        const status = r.status || 500;
+        setFetchStatus(status);
+        const fallback = status === 401
+          ? (t('beta.cohort.loginRequired') || 'Sesión ausente o expirada. Por favor, inicie sesión.')
+          : status === 403
+          ? 'No tiene permisos suficientes para realizar esta acción.'
+          : `Error en ${label}`;
+        setFetchError(normalizeUiError(r.error, fallback));
+        return null;
+      }
       setResult(r as Record<string, any>);
-      setMessage(`${label} completed successfully.`);
+      setMessage(`${label}: ${t('common.completed') || 'Operación completada con éxito.'}`);
       return r;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setMessage(`Error in ${label}: ${msg}`);
+      setFetchStatus(500);
+      setFetchError(normalizeUiError(e, `Error de conexión en ${label}`));
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
+  // Context creation & Readiness check
   const handleCreateActivation = useCallback(async () => {
-    const r = await run('Create Activation', () =>
+    if (!gateId.trim() || !cohortId.trim()) {
+      setFetchError('Gate ID y Cohort ID son requeridos para inicializar el contexto.');
+      return;
+    }
+    const r = await run('Crear Contexto de Activación', () =>
       createControlledCohortActivation({
         gate_id: gateId,
         cohort_id: cohortId,
-        tenant_id: tenantId
+        tenant_id: tenantId || undefined
       })
     );
     if (r && r.activation) {
@@ -93,23 +149,29 @@ export function ControlledBetaCohortActivation() {
   }, [run, gateId, cohortId, tenantId]);
 
   const handleCheckReadiness = useCallback(() => {
-    return run('Check Readiness', () => getControlledBetaCohortActivationReadiness({ activation_id: activationId || undefined }));
+    return run('Verificar Preparación', () =>
+      getControlledBetaCohortActivationReadiness({ activation_id: activationId || undefined })
+    );
   }, [run, activationId]);
 
   const handleBindGate = useCallback(() => {
-    return run('Bind to Gate', () => bindActivationToGate({ activation_id: activationId, gate_id: gateId }));
+    if (!activationId.trim() || !gateId.trim()) return;
+    return run('Vincular Gate', () => bindActivationToGate({ activation_id: activationId, gate_id: gateId }));
   }, [run, activationId, gateId]);
 
   const handleBindCohort = useCallback(() => {
-    return run('Bind to Cohort', () => bindActivationToCohort({ activation_id: activationId, cohort_id: cohortId }));
+    if (!activationId.trim() || !cohortId.trim()) return;
+    return run('Vincular Cohorte', () => bindActivationToCohort({ activation_id: activationId, cohort_id: cohortId }));
   }, [run, activationId, cohortId]);
 
   const handleBindTenant = useCallback(() => {
-    return run('Bind to Tenant', () => bindActivationToTenant({ activation_id: activationId, tenant_id: tenantId }));
+    if (!activationId.trim() || !tenantId.trim()) return;
+    return run('Vincular Tenant', () => bindActivationToTenant({ activation_id: activationId, tenant_id: tenantId }));
   }, [run, activationId, tenantId]);
 
   const handleAddParticipant = useCallback(() => {
-    return run('Add Participant', () =>
+    if (!activationId.trim() || !participantId.trim()) return;
+    return run('Registrar Participante', () =>
       addActivationParticipant({
         activation_id: activationId,
         participant_id: participantId,
@@ -121,11 +183,13 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, participantId]);
 
   const handleRemoveParticipant = useCallback(() => {
-    return run('Remove Participant', () => removeActivationParticipant({ participant_id: participantId }));
+    if (!participantId.trim()) return;
+    return run('Eliminar Participante', () => removeActivationParticipant({ participant_id: participantId }));
   }, [run, participantId]);
 
   const handleIssueInvite = useCallback(async () => {
-    const r = await run('Issue Invite', () =>
+    if (!activationId.trim() || !participantId.trim()) return;
+    const r = await run('Emitir Invitación', () =>
       issueActivationInvite({
         activation_id: activationId,
         participant_id: participantId
@@ -138,13 +202,19 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, participantId]);
 
   const handleRevokeInvite = useCallback(() => {
-    return run('Revoke Invite', () => revokeActivationInvite({ invite_id: inviteId }));
+    if (!inviteId.trim()) return;
+    return run('Revocar Invitación', () => revokeActivationInvite({ invite_id: inviteId }));
   }, [run, inviteId]);
 
   const handleDefineScope = useCallback(() => {
-    let featuresArr = [];
-    try { featuresArr = JSON.parse(allowedFeatures); } catch (e) {}
-    return run('Define Scope Binding', () =>
+    if (!activationId.trim()) return;
+    let featuresArr: string[] = [];
+    try {
+      if (allowedFeatures.trim()) featuresArr = JSON.parse(allowedFeatures);
+    } catch {
+      featuresArr = allowedFeatures.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return run('Definir Alcance de Características', () =>
       defineActivationScope({
         activation_id: activationId,
         allowed_features_json: featuresArr
@@ -153,36 +223,22 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, allowedFeatures]);
 
   const handleDefineLimits = useCallback(() => {
-    return run('Define Session Limits', () =>
+    if (!activationId.trim()) return;
+    return run('Definir Límites de Sesión', () =>
       defineSessionLimits({
         activation_id: activationId,
-        max_participants: Number(maxParticipants),
-        max_sessions_per_participant: Number(maxSessions),
-        max_total_active_sessions: Number(maxTotalSessions),
-        max_runtime_minutes_per_session: Number(maxDuration),
-        max_actions_per_hour: Number(maxActions)
+        max_participants: Number(maxParticipants) || 0,
+        max_sessions_per_participant: Number(maxSessions) || 0,
+        max_total_active_sessions: Number(maxTotalSessions) || 0,
+        max_runtime_minutes_per_session: Number(maxDuration) || 0,
+        max_actions_per_hour: Number(maxActions) || 0
       })
     );
   }, [run, activationId, maxParticipants, maxSessions, maxTotalSessions, maxDuration, maxActions]);
 
-  const handleActivateCohort = useCallback(() => {
-    return run('Activate Cohort', () => activateControlledCohort({ activation_id: activationId }));
-  }, [run, activationId]);
-
-  const handlePauseCohort = useCallback(() => {
-    return run('Pause Cohort', () => pauseControlledCohort({ activation_id: activationId }));
-  }, [run, activationId]);
-
-  const handleResumeCohort = useCallback(() => {
-    return run('Resume Cohort', () => resumeControlledCohort({ activation_id: activationId }));
-  }, [run, activationId]);
-
-  const handleTerminateCohort = useCallback(() => {
-    return run('Terminate Cohort', () => terminateControlledCohort({ activation_id: activationId }));
-  }, [run, activationId]);
-
   const handleEvaluateAccess = useCallback(() => {
-    return run('Evaluate Access', () =>
+    if (!activationId.trim() || !participantId.trim() || !featureKey.trim()) return;
+    return run('Evaluar Acceso de Participante', () =>
       evaluateParticipantActivationAccess({
         activation_id: activationId,
         participant_id: participantId,
@@ -192,17 +248,19 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, participantId, featureKey]);
 
   const handleRecordMonitoring = useCallback(() => {
-    return run('Record Monitoring Event', () =>
+    if (!activationId.trim() || !eventType.trim()) return;
+    return run('Registrar Evento de Telemetría', () =>
       recordActivationMonitoringEvent({
         activation_id: activationId,
         event_type: eventType,
-        details: { description: 'Manual monitoring event entry' }
+        details: { description: 'Registro manual de telemetría de activación' }
       })
     );
   }, [run, activationId, eventType]);
 
   const handleRecordSupport = useCallback(() => {
-    return run('Record Support Event', () =>
+    if (!activationId.trim() || !ticketDetails.trim()) return;
+    return run('Registrar Evento de Soporte', () =>
       recordActivationSupportEvent({
         activation_id: activationId,
         ticket_details: ticketDetails
@@ -211,7 +269,8 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, ticketDetails]);
 
   const handleRecordIncident = useCallback(() => {
-    return run('Record Incident Event', () =>
+    if (!activationId.trim() || !incidentType.trim() || !incidentSummary.trim()) return;
+    return run('Registrar Incidente', () =>
       recordActivationIncidentEvent({
         activation_id: activationId,
         incident_type: incidentType,
@@ -221,16 +280,9 @@ export function ControlledBetaCohortActivation() {
     );
   }, [run, activationId, incidentType, incidentSeverity, incidentSummary]);
 
-  const handleTriggerKillSwitch = useCallback(() => {
-    return run('Trigger Kill Switch', () => triggerActivationKillSwitch({ activation_id: activationId, reason: killSwitchReason }));
-  }, [run, activationId, killSwitchReason]);
-
-  const handleClearKillSwitch = useCallback(() => {
-    return run('Clear Kill Switch', () => clearActivationKillSwitch({ activation_id: activationId }));
-  }, [run, activationId]);
-
   const handleRecordFinding = useCallback(async () => {
-    const r = await run('Record Finding', () =>
+    if (!activationId.trim() || !findingSummary.trim()) return;
+    const r = await run('Registrar Hallazgo', () =>
       recordActivationFinding({
         activation_id: activationId,
         severity: findingSeverity,
@@ -245,286 +297,677 @@ export function ControlledBetaCohortActivation() {
   }, [run, activationId, findingSeverity, findingSummary]);
 
   const handleResolveFinding = useCallback(() => {
-    return run('Resolve Finding', () => resolveActivationFinding({ finding_id: findingId }));
+    if (!findingId.trim()) return;
+    return run('Resolver Hallazgo', () => resolveActivationFinding({ finding_id: findingId }));
   }, [run, findingId]);
 
   const handleGetEvidencePack = useCallback(() => {
-    return run('Get Evidence Pack', () => getControlledActivationEvidencePack({ activation_id: activationId }));
+    if (!activationId.trim()) return;
+    return run('Generar Paquete de Evidencia', () => getControlledActivationEvidencePack({ activation_id: activationId }));
   }, [run, activationId]);
 
   const handleGetAuditTimeline = useCallback(() => {
-    return run('Get Audit Timeline', () => getControlledActivationAuditTimeline({ activation_id: activationId }));
+    if (!activationId.trim()) return;
+    return run('Consultar Línea Temporal de Auditoría', () => getControlledActivationAuditTimeline({ activation_id: activationId }));
   }, [run, activationId]);
 
+  // Governed Access Actions requiring explicit confirmation
+  const requestActivateCohort = () => {
+    if (!activationId.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Activar Cohorte Controlada',
+      description: `Está a punto de activar la cohorte vinculada al expediente ${activationId}. Esta acción habilitará el acceso en tiempo de ejecución acotado a los participantes aprobados.`,
+      confirmLabel: 'Confirmar Activación',
+      action: async () => {
+        setConfirmModal(null);
+        await run('Activar Cohorte', () => activateControlledCohort({ activation_id: activationId }));
+      }
+    });
+  };
+
+  const requestPauseCohort = () => {
+    if (!activationId.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Pausar Cohorte Controlada',
+      description: `Se suspenderá temporalmente el acceso en tiempo de ejecución para la cohorte ${activationId}. Las sesiones existentes serán pausadas.`,
+      confirmLabel: 'Pausar Cohorte',
+      isDanger: true,
+      action: async () => {
+        setConfirmModal(null);
+        await run('Pausar Cohorte', () => pauseControlledCohort({ activation_id: activationId }));
+      }
+    });
+  };
+
+  const requestResumeCohort = () => {
+    if (!activationId.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reanudar Cohorte Controlada',
+      description: `Se restablecerá el acceso en tiempo de ejecución para la cohorte ${activationId}.`,
+      confirmLabel: 'Reanudar Cohorte',
+      action: async () => {
+        setConfirmModal(null);
+        await run('Reanudar Cohorte', () => resumeControlledCohort({ activation_id: activationId }));
+      }
+    });
+  };
+
+  const requestTerminateCohort = () => {
+    if (!activationId.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Terminar Cohorte Controlada',
+      description: `La cohorte ${activationId} quedará terminada permanentemente. Se revocarán todas las credenciales de ejecución activa de forma irreversible.`,
+      confirmLabel: 'Terminar Permanentemente',
+      isDanger: true,
+      action: async () => {
+        setConfirmModal(null);
+        await run('Terminar Cohorte', () => terminateControlledCohort({ activation_id: activationId }));
+      }
+    });
+  };
+
+  const requestTriggerKillSwitch = () => {
+    if (!activationId.trim() || !killSwitchReason.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Disparar Kill Switch de Emergencia',
+      description: `Se forzará la desconexión total inmediata de la cohorte ${activationId}. Motivo: "${killSwitchReason}".`,
+      confirmLabel: 'Activar Kill Switch',
+      isDanger: true,
+      action: async () => {
+        setConfirmModal(null);
+        await run('Disparar Kill Switch', () =>
+          triggerActivationKillSwitch({ activation_id: activationId, reason: killSwitchReason })
+        );
+      }
+    });
+  };
+
+  const requestClearKillSwitch = () => {
+    if (!activationId.trim()) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Restablecer Kill Switch',
+      description: `Se limpiará el estado de parada de emergencia para la cohorte ${activationId}.`,
+      confirmLabel: 'Restablecer',
+      action: async () => {
+        setConfirmModal(null);
+        await run('Limpiar Kill Switch', () => clearActivationKillSwitch({ activation_id: activationId }));
+      }
+    });
+  };
+
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'sans-serif', color: '#333' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8, borderBottom: '2px solid #eaeaea', paddingBottom: 12 }}>
-        Phase 129 — Controlled Invite-Only Beta Cohort Activation Console
-      </h1>
-
-      <div style={{ background: '#e2f0d9', border: '1px solid #a9d08e', color: '#385723', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <strong>⚠️ Strict Governance Warning:</strong>
-        <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.5 }}>{UI_WARNING}</p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
-        <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Active Activation Scopes & Readiness</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>ACTIVATION ID</span>
-              <strong>{activationId || 'N/A'}</strong>
-            </div>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>READINESS STATUS</span>
-              <strong>{result?.readiness_status || result?.readinessStatus || 'N/A'}</strong>
-            </div>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>PERSISTENCE STATUS</span>
-              <strong>{result?.persistenceStatus || result?.persistence_status || 'N/A'}</strong>
-            </div>
-            <div style={{ padding: 8, background: '#fff', borderRadius: 4, border: '1px solid #dee2e6' }}>
-              <span style={{ display: 'block', fontSize: 11, color: '#6c757d' }}>RUNTIME TRUTH</span>
-              <strong>{result?.runtimeTruthStatus || result?.runtime_truth_status || 'N/A'}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: '#f8f9fa', border: '1px solid #e2e3e5', borderRadius: 8, padding: 16 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Safety Invariant Safeguards</h3>
-          <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-            <div><strong>Controlled Beta Runtime Scoped:</strong> <span style={{ color: result?.betaRuntimeEnabled ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>{result?.betaRuntimeEnabled ? 'SCOPED_ONLY' : 'NOT_ENABLED'}</span></div>
-            <div><strong>FULL PUBLIC Enabled:</strong> <span style={{ color: '#dc3545', fontWeight: 'bold' }}>FALSE</span></div>
-            <div><strong>Open Marketplace Enabled:</strong> <span style={{ color: '#dc3545', fontWeight: 'bold' }}>FALSE</span></div>
-            <div><strong>Payment Execution Enabled:</strong> <span style={{ color: '#dc3545', fontWeight: 'bold' }}>FALSE</span></div>
-            <div><strong>Provider External Submission:</strong> <span style={{ color: '#dc3545', fontWeight: 'bold' }}>FALSE</span></div>
-          </div>
+    <div className="space-y-6">
+      {/* Safety Warning Banner */}
+      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            {t('beta.cohort.activationSafetyNotice') || 'Entorno Beta Controlado — Activación por Invitación'}
+          </h4>
+          <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+            {UI_WARNING}
+          </p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
-        <div>
-          <h2 style={{ fontSize: 20, marginBottom: 16 }}>Activation Console Operations</h2>
-
-          {/* 1. Context Creation */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>1. Create &amp; Bind Activation Context</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <input value={gateId} onChange={e => setGateId(e.target.value)} placeholder="Gate ID" style={{ padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <input value={cohortId} onChange={e => setCohortId(e.target.value)} placeholder="Cohort ID" style={{ padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <input value={tenantId} onChange={e => setTenantId(e.target.value)} placeholder="Tenant ID" style={{ padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={handleCreateActivation} disabled={loading} style={{ padding: '8px 16px', background: '#007bff', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Create Context
-              </button>
-              <input value={activationId} onChange={e => setActivationId(e.target.value)} placeholder="Activation ID" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <button onClick={handleCheckReadiness} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Verify Readiness
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-              <button onClick={handleBindGate} disabled={loading || !activationId} style={{ padding: '6px 12px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                Bind Gate
-              </button>
-              <button onClick={handleBindCohort} disabled={loading || !activationId} style={{ padding: '6px 12px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                Bind Cohort
-              </button>
-              <button onClick={handleBindTenant} disabled={loading || !activationId} style={{ padding: '6px 12px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                Bind Tenant
-              </button>
-            </div>
+      {/* HTTP Error Banner (401 / 403 / 500) */}
+      {fetchError && (
+        <div
+          role="alert"
+          className={`p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            fetchStatus === 401
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+              : fetchStatus === 403
+              ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-200'
+              : 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-900 dark:text-red-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <XCircleIcon className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-sm font-medium">{fetchError}</div>
           </div>
-
-          {/* 2. Participant & Invites */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>2. Participant Governance &amp; Invites</h4>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-              <input value={participantId} onChange={e => setParticipantId(e.target.value)} placeholder="Participant ID" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <button onClick={handleAddParticipant} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Add Participant
+          <div className="flex items-center gap-2 shrink-0">
+            {fetchStatus === 401 ? (
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold shadow-sm transition-colors"
+              >
+                {t('beta.cohort.loginBtn') || 'Iniciar Sesión'}
               </button>
-              <button onClick={handleRemoveParticipant} disabled={loading || !participantId} style={{ padding: '8px 16px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Remove
+            ) : fetchStatus !== 403 && lastAction ? (
+              <button
+                type="button"
+                onClick={() => lastAction()}
+                disabled={loading}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold shadow-sm transition-colors inline-flex items-center gap-1.5"
+              >
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                {t('beta.cohort.retryBtn') || 'Reintentar'}
               </button>
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <button onClick={handleIssueInvite} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#fd7e14', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Issue Invite
-              </button>
-              <input value={inviteId} onChange={e => setInviteId(e.target.value)} placeholder="Invite ID" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <button onClick={handleRevokeInvite} disabled={loading || !inviteId} style={{ padding: '8px 16px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Revoke Invite
-              </button>
-            </div>
-          </div>
-
-          {/* 3. Scopes & Limits */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>3. Define Allowed Scopes &amp; Limits</h4>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#6c757d', marginBottom: 4 }}>Allowed Features (JSON Array)</label>
-              <input value={allowedFeatures} onChange={e => setAllowedFeatures(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, color: '#6c757d' }}>Max Part.</label>
-                <input type="number" value={maxParticipants} onChange={e => setMaxParticipants(Number(e.target.value))} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, color: '#6c757d' }}>Max Sess/Part</label>
-                <input type="number" value={maxSessions} onChange={e => setMaxSessions(Number(e.target.value))} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, color: '#6c757d' }}>Max Total Sess</label>
-                <input type="number" value={maxTotalSessions} onChange={e => setMaxTotalSessions(Number(e.target.value))} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, color: '#6c757d' }}>Max Duration (m)</label>
-                <input type="number" value={maxDuration} onChange={e => setMaxDuration(Number(e.target.value))} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, color: '#6c757d' }}>Max Act/Hr</label>
-                <input type="number" value={maxActions} onChange={e => setMaxActions(Number(e.target.value))} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={handleDefineScope} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#6f42c1', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Define Scope
-              </button>
-              <button onClick={handleDefineLimits} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#343a40', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Define Limits
-              </button>
-            </div>
-          </div>
-
-          {/* 4. Controls */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>4. Cohort Activation Actions</h4>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={handleActivateCohort} disabled={loading || !activationId} style={{ flex: 1, padding: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
-                Activate Cohort
-              </button>
-              <button onClick={handlePauseCohort} disabled={loading || !activationId} style={{ flex: 1, padding: '10px', background: '#ffc107', color: '#212529', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
-                Pause Cohort
-              </button>
-              <button onClick={handleResumeCohort} disabled={loading || !activationId} style={{ flex: 1, padding: '10px', background: '#17a2b8', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
-                Resume Cohort
-              </button>
-              <button onClick={handleTerminateCohort} disabled={loading || !activationId} style={{ flex: 1, padding: '10px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
-                Terminate Cohort
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-              <input value={featureKey} onChange={e => setFeatureKey(e.target.value)} placeholder="Evaluate Feature Access Key" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <button onClick={handleEvaluateAccess} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#007bff', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Evaluate Access
-              </button>
-            </div>
-          </div>
-
-          {/* 5. Incidents & Emergency Kill Switch */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>5. Monitoring, Support, Incidents &amp; Kill Switch</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#6c757d', marginBottom: 2 }}>Monitoring Type</label>
-                <input value={eventType} onChange={e => setEventType(e.target.value)} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#6c757d', marginBottom: 2 }}>Ticket Details</label>
-                <input value={ticketDetails} onChange={e => setTicketDetails(e.target.value)} style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button onClick={handleRecordMonitoring} disabled={loading || !activationId} style={{ padding: '8px 12px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                Record Monitoring
-              </button>
-              <button onClick={handleRecordSupport} disabled={loading || !activationId} style={{ padding: '8px 12px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                Record Support
-              </button>
-            </div>
-
-            <div style={{ borderTop: '1px solid #eaeaea', paddingTop: 12, marginTop: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 12, marginBottom: 12 }}>
-                <input value={incidentType} onChange={e => setIncidentType(e.target.value)} placeholder="Incident Type" style={{ padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-                <input value={incidentSeverity} onChange={e => setIncidentSeverity(e.target.value)} placeholder="Incident Severity" style={{ padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-                <input value={incidentSummary} onChange={e => setIncidentSummary(e.target.value)} placeholder="Incident Summary" style={{ padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              </div>
-              <button onClick={handleRecordIncident} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#fd7e14', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 12 }}>
-                Record Incident (BLOCKER/CRITICAL auto-pauses)
-              </button>
-            </div>
-
-            <div style={{ borderTop: '1px solid #eaeaea', paddingTop: 12, marginTop: 12 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <input value={killSwitchReason} onChange={e => setKillSwitchReason(e.target.value)} placeholder="Reason for Kill Switch" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-                <button onClick={handleTriggerKillSwitch} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                  Trigger Kill Switch
-                </button>
-                <button onClick={handleClearKillSwitch} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#ffc107', color: '#212529', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                  Clear Kill Switch
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 6. Findings */}
-          <div style={{ background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>6. Findings Registry</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
-              <input value={findingSeverity} onChange={e => setFindingSeverity(e.target.value)} placeholder="Severity" style={{ padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <input value={findingSummary} onChange={e => setFindingSummary(e.target.value)} placeholder="Finding Summary" style={{ padding: 6, borderRadius: 4, border: '1px solid #ced4da' }} />
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <button onClick={handleRecordFinding} disabled={loading || !activationId} style={{ padding: '8px 16px', background: '#343a40', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Record Finding
-              </button>
-              <input value={findingId} onChange={e => setFindingId(e.target.value)} placeholder="Finding ID" style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ced4da' }} />
-              <button onClick={handleResolveFinding} disabled={loading || !findingId} style={{ padding: '8px 16px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                Resolve Finding
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
+      )}
 
-        <div>
-          <h2 style={{ fontSize: 20, marginBottom: 16 }}>Audit &amp; Evidence</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-            <button onClick={handleGetAuditTimeline} disabled={loading || !activationId} style={{ width: '100%', padding: '12px', background: '#343a40', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
-              Get Audit Timeline
+      {/* Success Notification */}
+      {message && !fetchError && (
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-lg text-sm flex items-center gap-2">
+          <CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span>{message}</span>
+        </div>
+      )}
+
+      {/* 3-Section Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Panel 1: Consulta de Estado y Verificación */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <ShieldCheckIcon className="w-5 h-5 text-blue-500" />
+              {t('beta.cohort.sectionStatus') || 'Consulta de Estado y Verificación'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Verificación de preparación, salvaguardas y paquete de evidencias.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+              {t('beta.cohort.activationId') || 'Identificador de Activación'}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={activationId}
+                onChange={e => setActivationId(e.target.value)}
+                placeholder="act_..."
+                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleCheckReadiness}
+                disabled={loading}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-sm transition-colors shrink-0 flex items-center gap-1.5"
+              >
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                {t('beta.cohort.verifyReadiness') || 'Verificar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Readiness Indicators */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              {t('beta.cohort.readinessStatus') || 'Estado de Preparación'}
+            </h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded border border-slate-200 dark:border-slate-700">
+                <span className="block text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold">Readiness</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {result?.readiness_status || result?.readinessStatus || (t('beta.cohort.noData') || 'Sin datos')}
+                </span>
+              </div>
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded border border-slate-200 dark:border-slate-700">
+                <span className="block text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold">Persistence</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {result?.persistenceStatus || result?.persistence_status || (t('beta.cohort.noData') || 'Sin datos')}
+                </span>
+              </div>
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded border border-slate-200 dark:border-slate-700">
+                <span className="block text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold">Runtime Truth</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {result?.runtimeTruthStatus || result?.runtime_truth_status || (t('beta.cohort.noData') || 'Sin datos')}
+                </span>
+              </div>
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded border border-slate-200 dark:border-slate-700">
+                <span className="block text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold">Runtime Scope</span>
+                <span className={`font-bold ${result?.betaRuntimeEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-zinc-400'}`}>
+                  {result ? (result?.betaRuntimeEnabled ? 'SCOPED_ONLY' : 'NOT_ENABLED') : (t('beta.cohort.noData') || 'Sin datos')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Actions */}
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleGetAuditTimeline}
+              disabled={loading || !activationId.trim()}
+              className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold transition-colors"
+            >
+              Consultar Línea Temporal de Auditoría
             </button>
-            <button onClick={handleGetEvidencePack} disabled={loading || !activationId} style={{ width: '100%', padding: '12px', background: '#20c997', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
-              Build Evidence Pack
+            <button
+              type="button"
+              onClick={handleGetEvidencePack}
+              disabled={loading || !activationId.trim()}
+              className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded text-xs font-semibold transition-colors"
+            >
+              Generar Paquete de Evidencia
             </button>
           </div>
 
-          <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: 8, padding: 16, minHeight: 300 }}>
-            <h4 style={{ margin: '0 0 12px 0' }}>Operation Logs</h4>
-            {message && (
-              <div style={{ padding: 8, background: message.includes('Error') ? '#f8d7da' : '#d4edda', color: message.includes('Error') ? '#721c24' : '#155724', borderRadius: 4, fontSize: 13, marginBottom: 12 }}>
-                {message}
+          {/* Collapsible Technical Details */}
+          <TechnicalDetailsCollapsible
+            title="Diagnóstico & Payload de Activación"
+            data={result}
+            missingEndpointNotice={{
+              missingEntity: 'Activations & Gates',
+              requiredEndpointProposal: 'GET /api/admin/beta/cohort-activation/readiness?activation_id=...',
+              fieldNotice: 'La vinculación se realiza mediante entrada manual asistida de identificadores al no disponer de endpoint de listado en el backend.'
+            }}
+          />
+        </div>
+
+        {/* Panel 2: Preparación y Configuración */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <ArrowPathIcon className="w-5 h-5 text-indigo-500" />
+              {t('beta.cohort.sectionPrep') || 'Preparación y Configuración'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Vinculación de contexto, participantes, alcances y límites de sesión.
+            </p>
+          </div>
+
+          {/* Tenant Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+              {t('tenant.label') || 'Tenant Autorizado'}
+            </label>
+            <TenantSelector
+              selectedTenantId={tenantId}
+              onSelectTenant={id => setTenantId(id)}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Gate & Cohort Bindings */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Gate ID</label>
+                <input
+                  type="text"
+                  value={gateId}
+                  onChange={e => setGateId(e.target.value)}
+                  placeholder="gate_..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                />
               </div>
-            )}
-            
-            <div style={{ fontSize: 12, color: '#495057' }}>
-              {result && (
-                <>
-                  <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #eaeaea' }}>
-                    <strong>Activation ID:</strong> {String(activationId || 'None')}<br />
-                    <strong>Invite ID:</strong> {String(inviteId || 'None')}<br />
-                    <strong>Finding ID:</strong> {String(findingId || 'None')}
-                  </div>
-                  <strong>Response Payload:</strong>
-                  <pre style={{ margin: '8px 0 0 0', padding: 8, background: '#e9ecef', borderRadius: 4, overflow: 'auto', maxHeight: 350, whiteSpace: 'pre-wrap' }}>
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
-                </>
-              )}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Cohort ID</label>
+                <input
+                  type="text"
+                  value={cohortId}
+                  onChange={e => setCohortId(e.target.value)}
+                  placeholder="cohort_..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleCreateActivation}
+                disabled={loading || !gateId.trim() || !cohortId.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
+              >
+                Crear Contexto
+              </button>
+              <button
+                type="button"
+                onClick={handleBindGate}
+                disabled={loading || !activationId.trim() || !gateId.trim()}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
+              >
+                Vincular Gate
+              </button>
+              <button
+                type="button"
+                onClick={handleBindCohort}
+                disabled={loading || !activationId.trim() || !cohortId.trim()}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
+              >
+                Vincular Cohorte
+              </button>
+              <button
+                type="button"
+                onClick={handleBindTenant}
+                disabled={loading || !activationId.trim() || !tenantId.trim()}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
+              >
+                Vincular Tenant
+              </button>
+            </div>
+          </div>
+
+          {/* Participant & Invites Setup */}
+          <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              Gobernanza de Participantes e Invitaciones
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Participant ID</label>
+                <input
+                  type="text"
+                  value={participantId}
+                  onChange={e => setParticipantId(e.target.value)}
+                  placeholder="part_..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Invite ID</label>
+                <input
+                  type="text"
+                  value={inviteId}
+                  onChange={e => setInviteId(e.target.value)}
+                  placeholder="inv_..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleAddParticipant}
+                disabled={loading || !activationId.trim() || !participantId.trim()}
+                className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded text-xs font-medium"
+              >
+                Registrar Participante
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveParticipant}
+                disabled={loading || !participantId.trim()}
+                className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded text-xs font-medium"
+              >
+                Eliminar
+              </button>
+              <button
+                type="button"
+                onClick={handleIssueInvite}
+                disabled={loading || !activationId.trim() || !participantId.trim()}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded text-xs font-medium"
+              >
+                Emitir Invitación
+              </button>
+              <button
+                type="button"
+                onClick={handleRevokeInvite}
+                disabled={loading || !inviteId.trim()}
+                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-medium"
+              >
+                Revocar
+              </button>
+            </div>
+          </div>
+
+          {/* Scopes & Limits */}
+          <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              Límites y Alcances Permitidos
+            </h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
+                Características Permitidas (JSON o lista separada por comas)
+              </label>
+              <input
+                type="text"
+                value={allowedFeatures}
+                onChange={e => setAllowedFeatures(e.target.value)}
+                placeholder='["CUSTOMER_PORTAL_VIEW_ONLY"]'
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[11px] text-slate-500">Máx. Participantes</label>
+                <input
+                  type="number"
+                  value={maxParticipants}
+                  onChange={e => setMaxParticipants(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-500">Sesiones/Part.</label>
+                <input
+                  type="number"
+                  value={maxSessions}
+                  onChange={e => setMaxSessions(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-500">Total Sesiones</label>
+                <input
+                  type="number"
+                  value={maxTotalSessions}
+                  onChange={e => setMaxTotalSessions(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleDefineScope}
+                disabled={loading || !activationId.trim()}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
+              >
+                Fijar Alcance
+              </button>
+              <button
+                type="button"
+                onClick={handleDefineLimits}
+                disabled={loading || !activationId.trim()}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
+              >
+                Fijar Límites
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Panel 3: Acciones que Modifican Acceso (Gobernanza Crítica) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <BoltIcon className="w-5 h-5 text-amber-500" />
+              {t('beta.cohort.sectionGovernance') || 'Acciones que Modifican Acceso'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Operaciones de gobernanza estricta. Requieren confirmación explícita.
+            </p>
+          </div>
+
+          {/* Cohort Lifecycle Actions */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              Ciclo de Vida de la Cohorte
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={requestActivateCohort}
+                disabled={loading || !activationId.trim()}
+                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <PlayIcon className="w-4 h-4" />
+                Activar Cohorte
+              </button>
+              <button
+                type="button"
+                onClick={requestPauseCohort}
+                disabled={loading || !activationId.trim()}
+                className="p-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <PauseIcon className="w-4 h-4" />
+                Pausar Cohorte
+              </button>
+              <button
+                type="button"
+                onClick={requestResumeCohort}
+                disabled={loading || !activationId.trim()}
+                className="p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <PlayIcon className="w-4 h-4" />
+                Reanudar Cohorte
+              </button>
+              <button
+                type="button"
+                onClick={requestTerminateCohort}
+                disabled={loading || !activationId.trim()}
+                className="p-2.5 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <StopIcon className="w-4 h-4" />
+                Terminar Cohorte
+              </button>
+            </div>
+          </div>
+
+          {/* Emergency Kill Switch */}
+          <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+              <ExclamationTriangleIcon className="w-4 h-4" />
+              Kill Switch de Emergencia
+            </h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
+                Justificación de Suspensión de Emergencia
+              </label>
+              <input
+                type="text"
+                value={killSwitchReason}
+                onChange={e => setKillSwitchReason(e.target.value)}
+                placeholder="Motivo formal de suspensión inmediata..."
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={requestTriggerKillSwitch}
+                disabled={loading || !activationId.trim() || !killSwitchReason.trim()}
+                className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors"
+              >
+                Disparar Kill Switch
+              </button>
+              <button
+                type="button"
+                onClick={requestClearKillSwitch}
+                disabled={loading || !activationId.trim()}
+                className="py-2 px-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold"
+              >
+                Restablecer
+              </button>
+            </div>
+          </div>
+
+          {/* Scoped Finding Registry */}
+          <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              Registro de Hallazgos Bloqueantes
+            </h3>
+            <div>
+              <input
+                type="text"
+                value={findingSummary}
+                onChange={e => setFindingSummary(e.target.value)}
+                placeholder="Descripción del hallazgo de gobernanza..."
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white mb-2"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleRecordFinding}
+                  disabled={loading || !activationId.trim() || !findingSummary.trim()}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white rounded text-xs font-medium"
+                >
+                  Registrar Hallazgo
+                </button>
+                <input
+                  type="text"
+                  value={findingId}
+                  onChange={e => setFindingId(e.target.value)}
+                  placeholder="ID hallazgo"
+                  className="w-24 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleResolveFinding}
+                  disabled={loading || !findingId.trim()}
+                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-medium"
+                >
+                  Resolver
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      {/* Confirmation Modal (Canceling emits NO HTTP request) */}
+      {confirmModal && confirmModal.isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+        >
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-full shrink-0 ${confirmModal.isDanger ? 'bg-red-100 dark:bg-red-950/50 text-red-600' : 'bg-blue-100 dark:bg-blue-950/50 text-blue-600'}`}>
+                <ExclamationTriangleIcon className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {confirmModal.title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                  {confirmModal.description}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-zinc-300 rounded text-xs font-semibold transition-colors"
+              >
+                {t('beta.cohort.cancelAction') || 'Cancelar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmModal.action()}
+                className={`px-4 py-2 text-white rounded text-xs font-semibold shadow-sm transition-colors ${
+                  confirmModal.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {confirmModal.confirmLabel || (t('beta.cohort.confirmAction') || 'Confirmar Acción')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

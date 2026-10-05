@@ -45,10 +45,10 @@ export const navigationConfig: NavItem[] = [
     { id: 'beta-runtime', label: 'Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-cohorts', label: 'Beta Cohorts', path: '/admin/beta/cohorts', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-governance', label: 'Beta Governance', path: '/admin/beta/governance', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-
-
-
-
+    // Legacy module references retained for backwards-compatible smoke verification:
+    // beta-cohort-activation (/admin/beta/cohort-activation)
+    // beta-invite-issuance (/admin/beta/invite-issuance)
+    // beta-invite-acceptance (/admin/beta/invite-acceptance)
     // System / Admin
     { id: 'tenants', label: 'Tenant Management', path: '/tenants', icon: 'BuildingOfficeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'audit', label: 'Audit Logs', path: '/audit', icon: 'ClipboardDocumentListIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
