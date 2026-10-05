@@ -1521,7 +1521,9 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
         beforeEach(() => {
             mockPrinthouses = [];
             memoryDb.printer_nodes = memoryDb.printer_nodes.filter(n => n.id !== 'node-other-conflicting' && n.id !== 'node-with-meta-test');
-            // Seed the real node in MySQL mock: node-329a3bc4, status: SUSPENDED, metadata_json: null
+            // Seed the real node in MySQL mock with ONLY real columns from SHOW COLUMNS:
+            // id, tenant_id, name, status, metadata_json, rates_json, signatures, limits,
+            // delivery_time, production_lead_days, country, region, marketplace_enabled, visibility_scope
             const existingIdx = memoryDb.printer_nodes.findIndex(n => n.id === realNodeId);
             const nodeRec = {
                 id: realNodeId,
@@ -1531,10 +1533,13 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
                 metadata_json: null,
                 rates_json: JSON.stringify({ base_charge: 100 }),
                 signatures: JSON.stringify([16, 32]),
-                production_lead_days: 7,
-                shipping_days: 3,
                 limits: '{}',
-                shipping: '{}'
+                delivery_time: '14 days',
+                production_lead_days: 7,
+                country: 'ES',
+                region: 'Madrid',
+                marketplace_enabled: 0,
+                visibility_scope: 'PRIVATE'
             };
             if (existingIdx >= 0) memoryDb.printer_nodes[existingIdx] = nodeRec;
             else memoryDb.printer_nodes.push(nodeRec);
@@ -1559,6 +1564,14 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(res.plan.mongoDocument.active).toBe(false);
             expect(res.plan.mongoDocument.version).toBe(0);
             expect(res.plan.statusPreserved).toBe('SUSPENDED');
+
+            // Shipping resolution: no canonical shipping configured, not inventing days
+            expect(res.plan.shippingResolution.configured).toBe(false);
+            expect(res.plan.shippingResolution.shipping_days).toBeNull();
+            expect(res.plan.shippingResolution.shipping).toBeNull();
+            expect(res.plan.shippingResolution.delivery_time_raw).toBe('14 days');
+            expect(res.plan.mongoDocument.shipping_days).toBeUndefined();
+            expect(res.plan.mongoDocument.shipping).toBeUndefined();
 
             // Verify ZERO mutations
             expect(mockPrinthouses.length).toBe(0);
@@ -1885,6 +1898,155 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(parsed.custom_webhook).toBe('https://hook.test');
             expect(parsed.cluster_zone).toBe('eu-west-1');
             expect(parsed.bpe_printhouse_id).toBe('bpe_custom_meta');
+        });
+
+        it('should strictly query only real columns from printer_nodes schema (no shipping_days, no shipping)', async () => {
+            const capturedQueries = [];
+            const strictDb = {
+                query: async (sql, params) => {
+                    capturedQueries.push({ sql, params });
+                    if (/SELECT CURRENT_USER/is.test(sql)) {
+                        return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                    }
+                    if (/FROM printer_nodes/is.test(sql)) {
+                        if (sql.includes('WHERE id != ?')) {
+                            return [];
+                        }
+
+                        // Enforce real columns only as per SHOW COLUMNS
+                        const REAL_COLUMNS = new Set([
+                            'id', 'tenant_id', 'name', 'status', 'metadata_json', 'rates_json',
+                            'signatures', 'limits', 'delivery_time', 'production_lead_days',
+                            'country', 'region', 'marketplace_enabled', 'visibility_scope'
+                        ]);
+
+                        const selectMatch = sql.match(/SELECT\s+(.*?)\s+FROM\s+printer_nodes/is);
+                        if (selectMatch) {
+                            const rawCols = selectMatch[1].split(',').map(c => c.trim().toLowerCase());
+                            for (const col of rawCols) {
+                                if (/^[a-z0-9_]+$/.test(col)) {
+                                    if (!REAL_COLUMNS.has(col)) {
+                                        throw new Error(`ER_BAD_FIELD_ERROR: Unknown column '${col}' in 'field list'`);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ensure nonexistent columns are never queried
+                        expect(sql).not.toContain('shipping_days');
+                        expect(sql).not.toMatch(/\bshipping\b\s*,/i);
+
+                        return [
+                            {
+                                id: realNodeId,
+                                tenant_id: realTenantId,
+                                name: 'philologica.ai Printhouse',
+                                status: 'SUSPENDED',
+                                metadata_json: null,
+                                rates_json: '{}',
+                                signatures: '[]',
+                                limits: '{}',
+                                delivery_time: '14 days',
+                                production_lead_days: 7,
+                                country: 'ES',
+                                region: 'Madrid',
+                                marketplace_enabled: 0,
+                                visibility_scope: 'PRIVATE'
+                            }
+                        ];
+                    }
+                    return [];
+                }
+            };
+
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: strictDb,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.plan.node.real_status).toBe('SUSPENDED');
+            expect(res.plan.node.is_cotizable).toBe(false);
+            expect(res.plan.shippingResolution.status).toBe('NO_APPLICABLE_SHIPPING_CONFIG');
+            expect(res.plan.mongoDocument.shipping_days).toBeUndefined();
+            expect(res.plan.mongoDocument.shipping).toBeUndefined();
+
+            // Verify the printer_nodes SELECT query was recorded and used only real columns
+            const nodeQuery = capturedQueries.find(q => /FROM\s+printer_nodes\s+WHERE\s+id\s*=\s*\?/i.test(q.sql));
+            expect(nodeQuery).toBeDefined();
+            expect(nodeQuery.sql).not.toContain('shipping_days');
+            expect(nodeQuery.sql).not.toContain('shipping,');
+        });
+
+        it('should resolve canonical shipping when printhouse_shipping_regions is configured and reflect it in plan', async () => {
+            const dbWithShipping = {
+                query: async (sql, params) => {
+                    if (/SELECT CURRENT_USER/is.test(sql)) {
+                        return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                    }
+                    if (/FROM printhouse_shipping_regions/is.test(sql)) {
+                        return [
+                            {
+                                id: 'sreg_iberia_1',
+                                name: 'Iberia Express Region',
+                                code: 'IBERIA_EXP',
+                                enabled: 1,
+                                countries_json: '["ES", "PT"]',
+                                standard_transit_days: 2,
+                                expedited_transit_days: 1,
+                                handling_days: 1
+                            }
+                        ];
+                    }
+                    if (/FROM printer_nodes/is.test(sql)) {
+                        if (sql.includes('WHERE id != ?')) {
+                            return [];
+                        }
+                        return [
+                            {
+                                id: realNodeId,
+                                tenant_id: realTenantId,
+                                name: 'philologica.ai Printhouse',
+                                status: 'SUSPENDED',
+                                metadata_json: null,
+                                rates_json: '{}',
+                                signatures: '[]',
+                                limits: '{}',
+                                delivery_time: '14 days',
+                                production_lead_days: 5,
+                                country: 'ES',
+                                region: 'Madrid',
+                                marketplace_enabled: 0,
+                                visibility_scope: 'PRIVATE'
+                            }
+                        ];
+                    }
+                    return [];
+                }
+            };
+
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: dbWithShipping,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.plan.shippingResolution.configured).toBe(true);
+            expect(res.plan.shippingResolution.shipping_days).toBe(2);
+            expect(res.plan.shippingResolution.shipping.region_name).toBe('Iberia Express Region');
+            expect(res.plan.shippingResolution.shipping.countries).toEqual(['ES', 'PT']);
+            expect(res.plan.mongoDocument.shipping_days).toBe(2);
+            expect(res.plan.mongoDocument.shipping).toBeDefined();
+            expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
+            expect(res.plan.mongoDocument.active).toBe(false);
         });
     });
 });

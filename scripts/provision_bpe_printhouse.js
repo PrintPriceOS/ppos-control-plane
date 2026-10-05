@@ -29,6 +29,63 @@ function isLocalHost(host) {
 }
 
 /**
+ * Resolves shipping configuration from the canonical database/service if configured.
+ * Does NOT interpret delivery_time as an integer without a verified contract,
+ * and does NOT invent shipping_days or transport costs.
+ */
+async function resolveCanonicalShippingConfiguration(dbClient, tenantId, nodeId, node) {
+    try {
+        const rows = await dbClient.query(
+            `SELECT id, name, code, enabled, countries_json, standard_transit_days, expedited_transit_days, handling_days
+             FROM printhouse_shipping_regions
+             WHERE tenant_id = ? AND (site_id = ? OR site_id IS NULL) AND enabled = 1 AND status = 'ACTIVE'
+             ORDER BY created_at DESC`,
+            [tenantId, nodeId]
+        ).catch(() => []);
+
+        if (Array.isArray(rows) && rows.length > 0) {
+            const primary = rows[0];
+            const transitDays = Number.isInteger(primary.standard_transit_days) ? primary.standard_transit_days : null;
+            let countries = [];
+            try {
+                countries = typeof primary.countries_json === 'string'
+                    ? JSON.parse(primary.countries_json)
+                    : (primary.countries_json || []);
+            } catch (e) {
+                countries = [];
+            }
+
+            return {
+                configured: true,
+                source: 'printhouse_shipping_regions',
+                shipping_days: transitDays,
+                shipping: {
+                    region_id: primary.id,
+                    region_name: primary.name,
+                    code: primary.code,
+                    countries,
+                    standard_transit_days: transitDays,
+                    expedited_transit_days: Number.isInteger(primary.expedited_transit_days) ? primary.expedited_transit_days : null
+                },
+                delivery_time_raw: node.delivery_time || null,
+                message: `Resolved canonical shipping configuration from shipping region "${primary.name}".`
+            };
+        }
+    } catch (err) {
+        // Table or query not available
+    }
+
+    return {
+        configured: false,
+        source: null,
+        shipping_days: null,
+        shipping: null,
+        delivery_time_raw: node.delivery_time || null,
+        message: 'No applicable canonical shipping configuration found. Shipping days and transport structure omitted (delivery_time is not parsed as integer without verified contract).'
+    };
+}
+
+/**
  * Governed provisioning logic.
  *
  * @param {object} options
@@ -92,9 +149,13 @@ async function provisionBpePrinthouse(options = {}) {
 
         // ──────────────────────────────────────────────────────────────────────────
         // 2. Query MySQL Printer Node State & Strict Validation
+        // Conforms strictly to real printer_nodes schema (SHOW COLUMNS):
+        // id, tenant_id, name, status, metadata_json, rates_json, signatures, limits,
+        // delivery_time, production_lead_days, country, region, marketplace_enabled, visibility_scope
+        // (shipping_days and shipping do NOT exist in printer_nodes)
         // ──────────────────────────────────────────────────────────────────────────
         const nodeRows = await dbClient.query(
-            `SELECT id, tenant_id, name, status, metadata_json, rates_json, signatures, production_lead_days, shipping_days, limits, shipping
+            `SELECT id, tenant_id, name, status, metadata_json, rates_json, signatures, limits, delivery_time, production_lead_days, country, region, marketplace_enabled, visibility_scope
              FROM printer_nodes
              WHERE id = ?`,
             [nodeId]
@@ -108,6 +169,9 @@ async function provisionBpePrinthouse(options = {}) {
         if (String(node.tenant_id) !== String(tenantId)) {
             throw new Error(`TENANT_MISMATCH: Printer node "${nodeId}" belongs to tenant "${node.tenant_id}", but requested tenant is "${tenantId}".`);
         }
+
+        // Resolve canonical shipping configuration without inventing days or transport costs
+        const shippingResolution = await resolveCanonicalShippingConfiguration(dbClient, tenantId, nodeId, node);
 
         // Copy real status as-is without activating or granting permissions
         const realStatus = node.status ? String(node.status).trim().toUpperCase() : 'DRAFT';
@@ -201,14 +265,34 @@ async function provisionBpePrinthouse(options = {}) {
             ? JSON.parse(node.limits)
             : (node.limits || {});
 
-        const shipping = (node.shipping && typeof node.shipping === 'string')
-            ? JSON.parse(node.shipping)
-            : (node.shipping || {});
+        const prodDays = node.production_lead_days != null ? Number(node.production_lead_days) : 7;
 
         // Target document:
         // - New provisioning: starts at version: 0, without simulating a previous publication.
         //   First governed CP publication will be version 1.
         // - Replay over existing document: preserve governed pricing state (rates, version, checksums, published_revision_id).
+        // - Shipping: only set if canonical configuration exists; do NOT invent shipping_days or transport costs.
+        const baseNewDoc = {
+            id: effectiveHouseId,
+            house_id: effectiveHouseId,
+            name: node.name || 'philologica.ai Printhouse',
+            tenant_id: node.tenant_id,
+            printer_node_id: node.id,
+            status: realStatus, // Exact node status: SUSPENDED (no activation)
+            active: isCotizable, // false if SUSPENDED
+            version: 0, // Governed baseline: new provisioned house starts at version 0
+            rates,
+            signatures,
+            production_lead_days: prodDays,
+            limits,
+            updated_at: new Date()
+        };
+
+        if (shippingResolution.configured) {
+            if (shippingResolution.shipping_days != null) baseNewDoc.shipping_days = shippingResolution.shipping_days;
+            if (shippingResolution.shipping != null) baseNewDoc.shipping = shippingResolution.shipping;
+        }
+
         const targetMongoDoc = isAlreadyProvisionedInMongo
             ? {
                 ...existingDoc,
@@ -216,29 +300,16 @@ async function provisionBpePrinthouse(options = {}) {
                 active: isCotizable,
                 name: node.name || existingDoc.name || 'philologica.ai Printhouse',
                 signatures: signatures || existingDoc.signatures,
-                production_lead_days: node.production_lead_days || existingDoc.production_lead_days || 7,
-                shipping_days: node.shipping_days || existingDoc.shipping_days || 3,
+                production_lead_days: node.production_lead_days != null ? Number(node.production_lead_days) : (existingDoc.production_lead_days || 7),
                 limits: Object.keys(limits).length > 0 ? limits : (existingDoc.limits || {}),
-                shipping: Object.keys(shipping).length > 0 ? shipping : (existingDoc.shipping || {}),
                 updated_at: new Date()
             }
-            : {
-                id: effectiveHouseId,
-                house_id: effectiveHouseId,
-                name: node.name || 'philologica.ai Printhouse',
-                tenant_id: node.tenant_id,
-                printer_node_id: node.id,
-                status: realStatus, // Exact node status: SUSPENDED (no activation)
-                active: isCotizable, // false if SUSPENDED
-                version: 0, // Governed baseline: new provisioned house starts at version 0
-                rates,
-                signatures,
-                production_lead_days: node.production_lead_days || 7,
-                shipping_days: node.shipping_days || 3,
-                limits,
-                shipping,
-                updated_at: new Date()
-            };
+            : baseNewDoc;
+
+        if (isAlreadyProvisionedInMongo && shippingResolution.configured) {
+            if (shippingResolution.shipping_days != null) targetMongoDoc.shipping_days = shippingResolution.shipping_days;
+            if (shippingResolution.shipping != null) targetMongoDoc.shipping = shippingResolution.shipping;
+        }
 
         const updatedMetadata = {
             ...existingMeta,
@@ -259,12 +330,23 @@ async function provisionBpePrinthouse(options = {}) {
                 tenant_id: node.tenant_id,
                 real_status: realStatus,
                 is_cotizable: isCotizable,
-                existing_metadata: existingMeta
+                existing_metadata: existingMeta,
+                delivery_time: node.delivery_time || null,
+                production_lead_days: node.production_lead_days != null ? Number(node.production_lead_days) : null
             },
             mapping: {
                 printer_node_id: node.id,
                 tenant_id: node.tenant_id,
                 bpe_printhouse_id: effectiveHouseId
+            },
+            shippingResolution: {
+                status: shippingResolution.configured ? 'CONFIGURED' : 'NO_APPLICABLE_SHIPPING_CONFIG',
+                configured: shippingResolution.configured,
+                source: shippingResolution.source,
+                shipping_days: shippingResolution.shipping_days,
+                shipping: shippingResolution.shipping,
+                delivery_time_raw: node.delivery_time || null,
+                message: shippingResolution.message
             },
             mongoAction: isAlreadyProvisionedInMongo ? 'PRESERVE_GOVERNED_RATES_AND_UPDATE_STATUS' : 'INSERT_NEW_PRINTHOUSE_V0',
             mongoDocument: targetMongoDoc,
@@ -315,10 +397,13 @@ async function provisionBpePrinthouse(options = {}) {
             };
             if (node.name) setFields.name = node.name;
             if (signatures) setFields.signatures = signatures;
-            if (node.production_lead_days) setFields.production_lead_days = node.production_lead_days;
-            if (node.shipping_days) setFields.shipping_days = node.shipping_days;
+            if (node.production_lead_days != null) setFields.production_lead_days = Number(node.production_lead_days);
             if (limits && Object.keys(limits).length > 0) setFields.limits = limits;
-            if (shipping && Object.keys(shipping).length > 0) setFields.shipping = shipping;
+
+            if (shippingResolution.configured) {
+                if (shippingResolution.shipping_days != null) setFields.shipping_days = shippingResolution.shipping_days;
+                if (shippingResolution.shipping != null) setFields.shipping = shippingResolution.shipping;
+            }
 
             await printhousesColl.updateOne(
                 { _id: existingDoc._id },
@@ -487,5 +572,6 @@ Options:
 }
 
 module.exports = {
-    provisionBpePrinthouse
+    provisionBpePrinthouse,
+    resolveCanonicalShippingConfiguration
 };
