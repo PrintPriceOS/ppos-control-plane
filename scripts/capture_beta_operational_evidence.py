@@ -8,13 +8,13 @@ from playwright.sync_api import sync_playwright
 OUT_DIR = os.path.abspath('review_artifacts_beta_operational')
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# ── Mock Data Definitions for Journey 1 (Populated & Selected Entities) ──
+# ── Fixtures according to real client contracts ──
 MOCK_TENANTS_POPULATED = [
     {"id": "tenant_alpha", "name": "Alpha Press LLC", "status": "ACTIVE", "commercial_status": "ACTIVE"},
     {"id": "tenant_beta", "name": "Beta Graphics Corp", "status": "ACTIVE", "commercial_status": "ACTIVE"}
 ]
 
-MOCK_REVIEWS_POPULATED = {
+MOCK_REVIEWS_LIST = {
     "ok": True,
     "reviews": [
         {
@@ -38,7 +38,7 @@ MOCK_REVIEWS_POPULATED = {
     ]
 }
 
-MOCK_REVIEW_DETAIL_ALPHA = {
+MOCK_REVIEW_DETAIL = {
     "ok": True,
     "review": {
         "review_id": "rev_beta_alpha_01",
@@ -52,14 +52,24 @@ MOCK_REVIEW_DETAIL_ALPHA = {
     "decision": {
         "review_id": "rev_beta_alpha_01",
         "decision": "PROCEED",
-        "notes": "Parámetros de telemetría y error rate estables en cohorte."
+        "notes": "Parámetros de salud de cohorte en rango nominal (latencia < 45ms, 0 anomalías bloqueantes)."
     },
     "findings": [
-        {"id": "find_01", "severity": "INFO", "title": "Volumen de pruebas nominal"}
+        {"id": "find_01", "severity": "INFO", "title": "Rendimiento estable verificado en ventana"},
+        {"id": "find_02", "severity": "LOW", "title": "Sin alertas de cuotas excedidas"}
     ]
 }
 
-MOCK_PREPARATIONS_POPULATED = {
+MOCK_REVIEW_EVIDENCE = {
+    "ok": True,
+    "evidencePack": {
+        "evidence_pack_id": "ev_pack_rev_alpha_01",
+        "checksum": "c9a4f89d34e2b012",
+        "finalized_at": "2026-10-05T12:00:00Z"
+    }
+}
+
+MOCK_PREPARATIONS_LIST = {
     "ok": True,
     "preparations": [
         {
@@ -73,7 +83,7 @@ MOCK_PREPARATIONS_POPULATED = {
     ]
 }
 
-MOCK_PREPARATION_DETAIL_ALPHA = {
+MOCK_PREPARATION_DETAIL = {
     "ok": True,
     "preparation": {
         "preparation_id": "prep_alpha_intervention_01",
@@ -83,13 +93,21 @@ MOCK_PREPARATION_DETAIL_ALPHA = {
         "preparation_status": "FINALIZED",
         "preparation_type": "POLICY_UPDATE"
     },
-    "checklist": [
+    "items": [
         {"id": "item_01", "label": "Validación de cuota por participante", "status": "APPROVED", "required_role": "SUPER_ADMIN"},
         {"id": "item_02", "label": "Certificación de no ejecución industrial", "status": "APPROVED", "required_role": "SUPER_ADMIN"}
     ]
 }
 
-MOCK_APPROVALS_POPULATED = {
+MOCK_PREPARATION_EVIDENCE = {
+    "ok": True,
+    "evidencePack": {
+        "evidence_pack_id": "ev_pack_prep_alpha_01",
+        "checksum": "f83b1029da7c44e9"
+    }
+}
+
+MOCK_APPROVALS_LIST = {
     "ok": True,
     "approvals": [
         {
@@ -107,7 +125,7 @@ MOCK_APPROVALS_POPULATED = {
     ]
 }
 
-MOCK_APPROVAL_DETAIL_ALPHA = {
+MOCK_APPROVAL_DETAIL = {
     "ok": True,
     "approval": {
         "approval_id": "appr_alpha_gov_01",
@@ -127,6 +145,14 @@ MOCK_APPROVAL_DETAIL_ALPHA = {
     "steps": [
         {"role": "SUPER_ADMIN", "status": "PENDING", "assigned_to": "admin@printprice.pro"}
     ]
+}
+
+MOCK_APPROVAL_EVIDENCE = {
+    "ok": True,
+    "evidencePack": {
+        "evidence_pack_id": "ev_pack_appr_alpha_01",
+        "checksum": "e12da89c3b7490f1"
+    }
 }
 
 MOCK_SESSION_DASHBOARD = {
@@ -177,79 +203,6 @@ def check_overflow(page):
         };
     }""")
 
-def setup_intercepts(page, mode='populated'):
-    def route_handler(route):
-        url = route.request.url
-
-        if '/api/admin/tenants' in url:
-            if mode == 'empty':
-                route.fulfill(status=200, content_type='application/json', body=json.dumps([]))
-            elif mode == 'error':
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"error": "Error interno del servidor de tenants"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_TENANTS_POPULATED))
-            return
-
-        if '/api/admin/beta/runtime-reviews/reviews' in url:
-            if mode == 'empty':
-                route.fulfill(status=200, content_type='application/json', body=json.dumps({"ok": True, "reviews": []}))
-            elif mode == 'error':
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "Fallo al listar revisiones"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEWS_POPULATED))
-            return
-
-        if '/api/admin/beta/runtime-reviews/review/' in url:
-            if mode in ('empty', 'error'):
-                route.fulfill(status=404, content_type='application/json', body=json.dumps({"ok": False, "error": "Revisión no encontrada"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEW_DETAIL_ALPHA))
-            return
-
-        if '/api/admin/beta/cohort-interventions/preparations' in url:
-            if mode == 'empty':
-                route.fulfill(status=200, content_type='application/json', body=json.dumps({"ok": True, "preparations": []}))
-            elif mode == 'error':
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "Fallo al listar propuestas"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATIONS_POPULATED))
-            return
-
-        if '/api/admin/beta/cohort-interventions/preparation/' in url:
-            if mode in ('empty', 'error'):
-                route.fulfill(status=404, content_type='application/json', body=json.dumps({"ok": False, "error": "Propuesta no encontrada"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATION_DETAIL_ALPHA))
-            return
-
-        if '/api/admin/beta/cohort-intervention-approvals/approvals' in url:
-            if mode == 'empty':
-                route.fulfill(status=200, content_type='application/json', body=json.dumps({"ok": True, "approvals": []}))
-            elif mode == 'error':
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "Fallo al listar expedientes de aprobación"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVALS_POPULATED))
-            return
-
-        if '/api/admin/beta/cohort-intervention-approvals/approval/' in url:
-            if mode in ('empty', 'error'):
-                route.fulfill(status=404, content_type='application/json', body=json.dumps({"ok": False, "error": "Expediente no encontrado"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVAL_DETAIL_ALPHA))
-            return
-
-        if '/api/admin/beta/runtime-sessions/dashboard' in url or '/api/admin/beta/runtime-sessions/readiness' in url:
-            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_SESSION_DASHBOARD))
-            return
-
-        if '/api/admin/beta/runtime-activity-observation/dashboard' in url or '/api/admin/beta/runtime-activity-observation/readiness' in url:
-            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_OBSERVATION_DASHBOARD))
-            return
-
-        route.continue_()
-
-    page.route('**/*', route_handler)
-
 def setup_page_auth_and_theme(page, theme='dark', locale='es'):
     page.goto('http://127.0.0.1:3000/')
     page.evaluate(f"""() => {{
@@ -274,12 +227,86 @@ def setup_page_auth_and_theme(page, theme='dark', locale='es'):
         document.documentElement.lang = '{locale}';
     }}""")
 
+def setup_client_intercepts(page, error_mode=False):
+    # State flags to allow dynamic recovery on retry
+    state = {"fail_approvals": error_mode, "fail_preps": error_mode, "fail_reviews": error_mode}
+
+    def route_handler(route):
+        url = route.request.url
+
+        # 1. Tenants list
+        if url.endswith('/api/admin/tenants'):
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_TENANTS_POPULATED))
+            return
+
+        # 2. Reviews endpoints
+        if url.endswith('/api/admin/beta/runtime-reviews/reviews'):
+            if state["fail_reviews"]:
+                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de revisiones"}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEWS_LIST))
+            return
+
+        if '/api/admin/beta/runtime-reviews/reviews/' in url and 'evidence-pack' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEW_EVIDENCE))
+            return
+
+        if '/api/admin/beta/runtime-reviews/reviews/' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEW_DETAIL))
+            return
+
+        # 3. Preparations endpoints
+        if url.endswith('/api/admin/beta/cohort-interventions/preparations'):
+            if state["fail_preps"]:
+                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de propuestas"}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATIONS_LIST))
+            return
+
+        if '/api/admin/beta/cohort-interventions/preparations/' in url and 'evidence-pack' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATION_EVIDENCE))
+            return
+
+        if '/api/admin/beta/cohort-interventions/preparations/' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATION_DETAIL))
+            return
+
+        # 4. Approvals endpoints
+        if url.endswith('/api/admin/beta/cohort-intervention-approvals/approvals'):
+            if state["fail_approvals"]:
+                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio interno de gobernanza"}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVALS_LIST))
+            return
+
+        if '/api/admin/beta/cohort-intervention-approvals/approvals/' in url and 'evidence-pack' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVAL_EVIDENCE))
+            return
+
+        if '/api/admin/beta/cohort-intervention-approvals/approvals/' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVAL_DETAIL))
+            return
+
+        # 5. Sessions & observation dashboards
+        if '/api/admin/beta/runtime-sessions/dashboard' in url or '/api/admin/beta/runtime-sessions/readiness' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_SESSION_DASHBOARD))
+            return
+
+        if '/api/admin/beta/runtime-activity-observation/dashboard' in url or '/api/admin/beta/runtime-activity-observation/readiness' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_OBSERVATION_DASHBOARD))
+            return
+
+        route.continue_()
+
+    page.route('**/*', route_handler)
+    return state
+
 def run_captures():
     git_sha = get_git_sha()
-    print("=" * 60)
-    print("CAPTURA DE EVIDENCIAS: SUPER_ADMIN OPERATIONAL FORMS & FLOWS")
+    print("=" * 70)
+    print("CAPTURA Y VERIFICACIÓN OPERATIVA SUPER_ADMIN (PLAYWRIGHT)")
     print(f"Commit Git Code Base: {git_sha}")
-    print("=" * 60)
+    print("=" * 70)
 
     stages = [
         {"id": "01_entorno_beta_overview", "name": "1. Entorno Beta (Overview)", "path": "/admin/beta/runtime?tab=overview"},
@@ -296,12 +323,14 @@ def run_captures():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 
-        # ── RECORRIDO 1: ENTIDADES SELECCIONADAS (Desktop Dark, Desktop Light, Mobile) ──
-        print("\n>>> RECORRIDO 1: Entidades Seleccionadas (Dark, Light, Mobile) <<<")
+        # ══════════════════════════════════════════════════════════════
+        # RECORRIDO 1: ENTIDADES SELECCIONADAS (DARK, LIGHT, MOBILE)
+        # ══════════════════════════════════════════════════════════════
+        print("\n>>> 1. RECORRIDO CON ENTIDADES SELECCIONADAS (Dark, Light, Mobile) <<<")
         for theme in ['dark', 'light']:
             ctx = browser.new_context(viewport={"width": 1280, "height": 720})
             page = ctx.new_page()
-            setup_intercepts(page, mode='populated')
+            setup_client_intercepts(page, error_mode=False)
             setup_page_auth_and_theme(page, theme=theme, locale='es')
 
             for stage in stages:
@@ -309,39 +338,50 @@ def run_captures():
                 page.goto(target_url, wait_until='networkidle')
                 page.wait_for_timeout(800)
 
-                # Ensure theme applied
+                # Theme setup
                 if theme == 'dark':
                     page.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
                 else:
                     page.evaluate("() => { document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff'; }")
 
-                # If stage has tenant selector, select tenant_alpha
+                # Select Tenant
                 tenant_select = page.locator('select[id$="-tenant-selector"]')
                 if tenant_select.count() > 0:
                     try:
                         tenant_select.first.select_option(value='tenant_alpha')
                         page.wait_for_timeout(400)
-                    except Exception as e:
+                    except Exception:
                         pass
 
-                # If stage has proposal or approval select, select the first available
-                prep_sel = page.locator('#prep-proposal-selector')
-                if prep_sel.count() > 0:
-                    try:
+                # Stage 4: Select Review rev_beta_alpha_01
+                if stage["id"] == "04_revisiones_salud":
+                    rev_sel = page.locator('#review-list-selector')
+                    if rev_sel.count() > 0:
+                        rev_sel.select_option(value='rev_beta_alpha_01')
+                        page.wait_for_selector('text=Detalle de Revisión: rev_beta_alpha_01', timeout=4000)
+                        page.wait_for_timeout(500)
+
+                # Stage 5: Select Source Review and Preparation prep_alpha_intervention_01
+                if stage["id"] == "05_preparacion_intervenciones":
+                    src_sel = page.locator('#source-review-selector')
+                    if src_sel.count() > 0:
+                        src_sel.select_option(value='rev_beta_alpha_01')
+                        page.wait_for_timeout(300)
+                    prep_sel = page.locator('#prep-proposal-selector')
+                    if prep_sel.count() > 0:
                         prep_sel.select_option(value='prep_alpha_intervention_01')
-                        page.wait_for_timeout(400)
-                    except Exception:
-                        pass
+                        page.wait_for_selector('text=Detalle de Propuesta: prep_alpha_intervention_01', timeout=4000)
+                        page.wait_for_timeout(500)
 
-                appr_sel = page.locator('#approval-expediente-selector')
-                if appr_sel.count() > 0:
-                    try:
+                # Stage 6: Select Approval appr_alpha_gov_01
+                if stage["id"] == "06_aprobacion_intervenciones":
+                    appr_sel = page.locator('#approval-expediente-selector')
+                    if appr_sel.count() > 0:
                         appr_sel.select_option(value='appr_alpha_gov_01')
-                        page.wait_for_timeout(400)
-                    except Exception:
-                        pass
+                        page.wait_for_selector('text=Expediente de Aprobación', timeout=4000)
+                        page.wait_for_timeout(500)
 
-                # Expand technical details to show collapsible capability
+                # Expand technical details collapsible
                 tech_btn = page.locator('button[aria-expanded="false"]').first
                 if tech_btn.count() > 0:
                     try:
@@ -366,6 +406,7 @@ def run_captures():
                     "git_sha": git_sha,
                     "sha256": sha256,
                     "overflow": overflow,
+                    "entity_selected": True,
                     "simulated_data": {
                         "tenants": True,
                         "reviews": True,
@@ -377,14 +418,14 @@ def run_captures():
 
             ctx.close()
 
-        # Mobile Viewport (390x844) for populated flow
+        # Mobile Viewport (390x844)
         print("\n>>> Mobile 390x844 Viewport Check <<<")
         ctx_mobile = browser.new_context(viewport={"width": 390, "height": 844})
         page_mobile = ctx_mobile.new_page()
-        setup_intercepts(page_mobile, mode='populated')
+        setup_client_intercepts(page_mobile, error_mode=False)
         setup_page_auth_and_theme(page_mobile, theme='dark', locale='es')
 
-        for stage in [stages[1], stages[4], stages[5]]:  # Sessions, Preps, Approvals
+        for stage in [stages[3], stages[4], stages[5]]:  # Reviews, Preps, Approvals
             target_url = f"http://127.0.0.1:3000{stage['path']}"
             page_mobile.goto(target_url, wait_until='networkidle')
             page_mobile.wait_for_timeout(800)
@@ -412,41 +453,110 @@ def run_captures():
 
         ctx_mobile.close()
 
-        # ── RECORRIDO 2: DATOS VACÍOS O ERROR CON BOTÓN DE REINTENTO ──
-        print("\n>>> RECORRIDO 2: Datos Vacíos o Error con Reintento <<<")
+        # ══════════════════════════════════════════════════════════════
+        # RECORRIDO 2: PROVOCAR HTTP 500 REAL, VERIFICAR QUE NO SEA LISTA
+        # VACÍA, PULSAR REINTENTAR Y ACREDITAR RECUPERACIÓN EXITOSA
+        # ══════════════════════════════════════════════════════════════
+        print("\n>>> 2. RECORRIDO: HTTP 500 REAL, COMPROBACIÓN NO-LISTA-VACÍA Y RECUPERACIÓN CON REINTENTAR <<<")
         ctx_err = browser.new_context(viewport={"width": 1280, "height": 720})
         page_err = ctx_err.new_page()
-        setup_intercepts(page_err, mode='error')
+        intercept_state = setup_client_intercepts(page_err, error_mode=True)
         setup_page_auth_and_theme(page_err, theme='dark', locale='es')
 
-        for stage in [stages[3], stages[4], stages[5]]:  # Health review, Preps, Approvals
-            target_url = f"http://127.0.0.1:3000{stage['path']}"
+        error_stages = [
+            {
+                "stage": stages[3], # Revisiones de salud
+                "expected_error": "HTTP 500: Fallo en el servicio de revisiones",
+                "empty_text_forbidden": "No se encontraron revisiones de cohorte registradas",
+                "state_key": "fail_reviews"
+            },
+            {
+                "stage": stages[4], # Preparación
+                "expected_error": "HTTP 500: Fallo en el servicio de propuestas",
+                "empty_text_forbidden": "No se encontraron propuestas de intervención registradas",
+                "state_key": "fail_preps"
+            },
+            {
+                "stage": stages[5], # Aprobación
+                "expected_error": "HTTP 500: Fallo en el servicio interno de gobernanza",
+                "empty_text_forbidden": "No hay expedientes registrados",
+                "state_key": "fail_approvals"
+            }
+        ]
+
+        for item in error_stages:
+            stage_info = item["stage"]
+            target_url = f"http://127.0.0.1:3000{stage_info['path']}"
+            
+            # 1. Nav with HTTP 500 active
             page_err.goto(target_url, wait_until='networkidle')
             page_err.wait_for_timeout(800)
             page_err.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
 
-            shot_name = f"{stage['id']}_error_retry_dark_es.png"
-            shot_path = os.path.join(OUT_DIR, shot_name)
-            page_err.screenshot(path=shot_path, full_page=False)
+            # Check that error text is visible and retry button is present
+            err_locator = page_err.locator(f'text={item["expected_error"]}')
+            retry_btn = page_err.locator('button:has-text("Reintentar")').first
+            assert err_locator.count() > 0, f"Error message {item['expected_error']} not displayed on HTTP 500!"
+            assert retry_btn.count() > 0, f"Retry button not found on HTTP 500 for {stage_info['id']}!"
 
-            sha256 = compute_sha256(shot_path)
-            sha_map[shot_name] = sha256
-            overflow = check_overflow(page_err)
+            # CRITICAL CHECK: Verify that the empty list message is NOT shown
+            empty_locator = page_err.locator(f'text={item["empty_text_forbidden"]}')
+            assert empty_locator.count() == 0, f"Error state incorrectly displays empty list message '{item['empty_text_forbidden']}'!"
+            print(f"  [VERIFICACIÓN OK] {stage_info['id']}: Error 500 y Reintentar visibles. Mensaje de lista vacía correctamente ausente.")
+
+            # Capture screenshot of HTTP 500 error state
+            shot_err_name = f"{stage_info['id']}_http500_error_dark_es.png"
+            shot_err_path = os.path.join(OUT_DIR, shot_err_name)
+            page_err.screenshot(path=shot_err_path, full_page=False)
+
+            sha_err = compute_sha256(shot_err_path)
+            sha_map[shot_err_name] = sha_err
+            overflow_err = check_overflow(page_err)
 
             results.append({
-                "stage": stage["name"],
-                "flow": "Recorrido 2 (Error con Reintento)",
-                "variant": "Desktop 1280x720 - Dark - Error State - ES",
-                "file": shot_name,
+                "stage": stage_info["name"],
+                "flow": "Recorrido 2 (HTTP 500 Error)",
+                "variant": "Desktop 1280x720 - Dark - HTTP 500 Error - ES",
+                "file": shot_err_name,
                 "git_sha": git_sha,
-                "sha256": sha256,
-                "overflow": overflow,
+                "sha256": sha_err,
+                "overflow": overflow_err,
                 "simulated_data": {
-                    "server_error_500": True,
-                    "retry_button_visible": True
+                    "http_500_injected": True,
+                    "empty_list_hidden": True,
+                    "retry_button_present": True
                 }
             })
-            print(f"  [OK Error] {shot_name} (SHA-256: {sha256[:12]}..., Overflow: {overflow['hasOverflow']})")
+
+            # 2. RESTORE normal 200 response and click Reintentar to prove recovery!
+            intercept_state[item["state_key"]] = False
+            retry_btn.click()
+            page_err.wait_for_timeout(1000)
+
+            # Check that error is gone and items are recovered
+            assert page_err.locator(f'text={item["expected_error"]}').count() == 0, "Error message did not disappear after clicking Reintentar!"
+            print(f"  [RECUPERACIÓN OK] {stage_info['id']}: Reintentar pulsado y recuperación acreditada correctamente.")
+
+            shot_recov_name = f"{stage_info['id']}_http500_recovered_dark_es.png"
+            shot_recov_path = os.path.join(OUT_DIR, shot_recov_name)
+            page_err.screenshot(path=shot_recov_path, full_page=False)
+
+            sha_recov = compute_sha256(shot_recov_path)
+            sha_map[shot_recov_name] = sha_recov
+            overflow_recov = check_overflow(page_err)
+
+            results.append({
+                "stage": stage_info["name"],
+                "flow": "Recorrido 2 (Recuperación con Reintentar)",
+                "variant": "Desktop 1280x720 - Dark - Recuperación Exitosa - ES",
+                "file": shot_recov_name,
+                "git_sha": git_sha,
+                "sha256": sha_recov,
+                "overflow": overflow_recov,
+                "simulated_data": {
+                    "recovery_after_retry": True
+                }
+            })
 
         ctx_err.close()
         browser.close()
