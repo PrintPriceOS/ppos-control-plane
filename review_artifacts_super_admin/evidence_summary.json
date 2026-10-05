@@ -1,101 +1,230 @@
-[
-  {
-    "screen": "Entorno Beta / Limited Beta Runtime",
-    "variant": "Desktop 1280x720 - Dark - ES",
-    "file": "beta_runtime_desktop_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
+{
+  "git_commit_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+  "generated_at": "2026-10-05T10:24:34Z",
+  "captures": [
+    {
+      "screen": "Entorno Beta / Limited Beta Runtime",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "beta_runtime_desktop_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "d6936ecda2a5c6847951bba3909401397ca4aeedb675fc5a70bf533afef9d668",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Gobernanza Beta / Interventions",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "beta_governance_desktop_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "5e3b5dfe6cb92adef0acc6c5673fc3e2ef9df9a4a45569d1eae91a405e5a8a1b",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Operaciones Industriales / Live Map",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "industrial_ops_desktop_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "b52d7da907460b979d02370734a7bf9902f2f269b181c036538534767a464861",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": true
+      }
+    },
+    {
+      "screen": "Entorno Beta / Limited Beta Runtime",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "beta_runtime_desktop_light_es.png",
+      "effective_theme": "light",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "23a396f650f11e57d5d242a5b6f3a77ec247044cbc8527d8036e574148a963c5",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Gobernanza Beta / Interventions",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "beta_governance_desktop_light_es.png",
+      "effective_theme": "light",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "d9a68ba1a39710a7084d0fc105aabab6a09f798799563389648743fb33280dec",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Operaciones Industriales / Live Map",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "industrial_ops_desktop_light_es.png",
+      "effective_theme": "light",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "40ac23d7e2a57049501069c4efbd99abd52f95fe76c4ad579f5b6f8ac2f9efb2",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": true
+      }
+    },
+    {
+      "screen": "Entorno Beta / Limited Beta Runtime",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "beta_runtime_mobile_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "d7c1950ea97a0d7110ef71bd9304cdfe01c3d703b70ef3d758e49fd3c4a54555",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Gobernanza Beta / Interventions",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "beta_governance_mobile_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "0213262542bec041b6e24c456a263f80d5d2d13fd09806ed269e0849afc31637",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": false
+      }
+    },
+    {
+      "screen": "Operaciones Industriales / Live Map",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "industrial_ops_mobile_dark_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "092d21199af1c5b803f67af141751caf0bd75ca1dcdfac272d9cd7543917b7a2",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": true
+      }
+    },
+    {
+      "screen": "Operaciones Industriales / Fallo de Teselas",
+      "variant": "Desktop 1280x720 - Dark - Tile Failure Fallback - ES",
+      "file": "industrial_ops_tile_failure_fallback_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "3df0601ad847ffe59041c17da1c4eb10379b1fabce8cd13d210e03db4a748c99",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": true,
+        "tile_load_failure_simulated": true
+      }
+    },
+    {
+      "screen": "Operaciones Industriales / Inspecci\u00f3n de M\u00e1quina",
+      "variant": "Desktop 1280x720 - Dark - Machine Drawer Opened - ES",
+      "file": "industrial_ops_node_machine_inspection_es.png",
+      "effective_theme": "dark",
+      "language": "es",
+      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "sha256": "f06e45bd4b7783275afc4cba70debdcecc9666b894c0bf7c9f5be64fcf1b5abb",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "system_health_telemetry": true,
+        "routing_map_nodes": true,
+        "machine_drawer_inspection": true
+      }
     }
-  },
-  {
-    "screen": "Gobernanza Beta / Interventions",
-    "variant": "Desktop 1280x720 - Dark - ES",
-    "file": "beta_governance_desktop_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
-    }
-  },
-  {
-    "screen": "Operaciones Industriales / Live Map",
-    "variant": "Desktop 1280x720 - Dark - ES",
-    "file": "industrial_ops_desktop_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
-    }
-  },
-  {
-    "screen": "Entorno Beta / Limited Beta Runtime",
-    "variant": "Desktop 1280x720 - Light - ES",
-    "file": "beta_runtime_desktop_light_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
-    }
-  },
-  {
-    "screen": "Gobernanza Beta / Interventions",
-    "variant": "Desktop 1280x720 - Light - ES",
-    "file": "beta_governance_desktop_light_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
-    }
-  },
-  {
-    "screen": "Operaciones Industriales / Live Map",
-    "variant": "Desktop 1280x720 - Light - ES",
-    "file": "industrial_ops_desktop_light_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 1280,
-      "winWidth": 1280,
-      "bodyWidth": 1280
-    }
-  },
-  {
-    "screen": "Entorno Beta / Limited Beta Runtime",
-    "variant": "Mobile 390x844 - Dark - ES",
-    "file": "beta_runtime_mobile_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 390,
-      "winWidth": 390,
-      "bodyWidth": 390
-    }
-  },
-  {
-    "screen": "Gobernanza Beta / Interventions",
-    "variant": "Mobile 390x844 - Dark - ES",
-    "file": "beta_governance_mobile_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 390,
-      "winWidth": 390,
-      "bodyWidth": 390
-    }
-  },
-  {
-    "screen": "Operaciones Industriales / Live Map",
-    "variant": "Mobile 390x844 - Dark - ES",
-    "file": "industrial_ops_mobile_dark_es.png",
-    "overflow": {
-      "hasOverflow": false,
-      "docWidth": 390,
-      "winWidth": 390,
-      "bodyWidth": 390
-    }
+  ],
+  "checksums": {
+    "beta_runtime_desktop_dark_es.png": "d6936ecda2a5c6847951bba3909401397ca4aeedb675fc5a70bf533afef9d668",
+    "beta_governance_desktop_dark_es.png": "5e3b5dfe6cb92adef0acc6c5673fc3e2ef9df9a4a45569d1eae91a405e5a8a1b",
+    "industrial_ops_desktop_dark_es.png": "b52d7da907460b979d02370734a7bf9902f2f269b181c036538534767a464861",
+    "beta_runtime_desktop_light_es.png": "23a396f650f11e57d5d242a5b6f3a77ec247044cbc8527d8036e574148a963c5",
+    "beta_governance_desktop_light_es.png": "d9a68ba1a39710a7084d0fc105aabab6a09f798799563389648743fb33280dec",
+    "industrial_ops_desktop_light_es.png": "40ac23d7e2a57049501069c4efbd99abd52f95fe76c4ad579f5b6f8ac2f9efb2",
+    "beta_runtime_mobile_dark_es.png": "d7c1950ea97a0d7110ef71bd9304cdfe01c3d703b70ef3d758e49fd3c4a54555",
+    "beta_governance_mobile_dark_es.png": "0213262542bec041b6e24c456a263f80d5d2d13fd09806ed269e0849afc31637",
+    "industrial_ops_mobile_dark_es.png": "092d21199af1c5b803f67af141751caf0bd75ca1dcdfac272d9cd7543917b7a2",
+    "industrial_ops_tile_failure_fallback_es.png": "3df0601ad847ffe59041c17da1c4eb10379b1fabce8cd13d210e03db4a748c99",
+    "industrial_ops_node_machine_inspection_es.png": "f06e45bd4b7783275afc4cba70debdcecc9666b894c0bf7c9f5be64fcf1b5abb"
   }
-]
+}
