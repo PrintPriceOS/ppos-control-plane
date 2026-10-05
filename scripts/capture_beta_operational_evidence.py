@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 OUT_DIR = os.path.abspath('review_artifacts_beta_operational')
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# ── Fixtures according to real client contracts ──
+# ── Fixtures according to real client contracts & DB schema ──
 MOCK_TENANTS_POPULATED = [
     {"id": "tenant_alpha", "name": "Alpha Press LLC", "status": "ACTIVE", "commercial_status": "ACTIVE"},
     {"id": "tenant_beta", "name": "Beta Graphics Corp", "status": "ACTIVE", "commercial_status": "ACTIVE"}
@@ -23,8 +23,9 @@ MOCK_REVIEWS_LIST = {
             "cohort_id": "cohort_2026_q4",
             "review_status": "FINALIZED",
             "risk_level": "LOW",
-            "window_start": "2026-10-01T00:00:00Z",
-            "window_end": "2026-10-05T00:00:00Z"
+            "confidence_level": "HIGH",
+            "review_window_start": "2026-10-01T00:00:00Z",
+            "review_window_end": "2026-10-05T00:00:00Z"
         },
         {
             "review_id": "rev_beta_beta_02",
@@ -32,6 +33,7 @@ MOCK_REVIEWS_LIST = {
             "cohort_id": "cohort_2026_q4",
             "review_status": "FINALIZED",
             "risk_level": "MEDIUM",
+            "confidence_level": "HIGH",
             "window_start": "2026-10-01T00:00:00Z",
             "window_end": "2026-10-05T00:00:00Z"
         }
@@ -46,17 +48,56 @@ MOCK_REVIEW_DETAIL = {
         "cohort_id": "cohort_2026_q4",
         "review_status": "FINALIZED",
         "risk_level": "LOW",
-        "window_start": "2026-10-01T00:00:00Z",
-        "window_end": "2026-10-05T00:00:00Z"
+        "confidence_level": "HIGH",
+        "review_window_start": "2026-10-01T00:00:00Z",
+        "review_window_end": "2026-10-05T00:00:00Z",
+        "non_mutation_attestation_json": {
+            "cohort_access_mutated": False,
+            "participant_access_mutated": False,
+            "payment_execution_triggered": False,
+            "provider_submission_triggered": False
+        },
+        "created_at": "2026-10-05T08:00:00Z",
+        "updated_at": "2026-10-05T12:00:00Z",
+        "finalized_at": "2026-10-05T12:00:00Z"
     },
     "decision": {
+        "decision_id": "dec_beta_alpha_01",
         "review_id": "rev_beta_alpha_01",
-        "decision": "PROCEED",
-        "notes": "Parámetros de salud de cohorte en rango nominal (latencia < 45ms, 0 anomalías bloqueantes)."
+        "recommended_decision": "CONTINUE_COHORT",
+        "decision_execution_status": "NOT_EXECUTED_REVIEW_ONLY",
+        "execution_blocked_reason": "PHASE_137_IS_READONLY_RECOMMENDATION_GATE",
+        "rationale": "Parámetros de salud de cohorte en rango nominal (latencia < 45ms, 0 anomalías bloqueantes)."
     },
     "findings": [
-        {"id": "find_01", "severity": "INFO", "title": "Rendimiento estable verificado en ventana"},
-        {"id": "find_02", "severity": "LOW", "title": "Sin alertas de cuotas excedidas"}
+        {
+            "finding_id": "find_alpha_01",
+            "review_id": "rev_beta_alpha_01",
+            "finding_key": "LATENCY_WINDOW_NOMINAL",
+            "title": "Rendimiento de latencia nominal",
+            "description": "Latencia p99 dentro de límites contractuales (< 45ms) durante la ventana completa.",
+            "severity": "LOW",
+            "details_json": {
+                "metric": "p99_latency_ms",
+                "observed": 38.4,
+                "threshold": 45.0,
+                "description": "Latencia p99 dentro de límites contractuales (< 45ms) durante la ventana completa."
+            }
+        },
+        {
+            "finding_id": "find_alpha_02",
+            "review_id": "rev_beta_alpha_01",
+            "finding_key": "QUOTA_BURST_STABLE",
+            "title": "Cuotas de procesamiento estables",
+            "description": "Consumo sostenido de cuotas de procesamiento sin saturación ni throttling.",
+            "severity": "LOW",
+            "details_json": {
+                "metric": "burst_saturation_pct",
+                "observed": 14.2,
+                "threshold": 80.0,
+                "description": "Consumo sostenido de cuotas de procesamiento sin saturación ni throttling."
+            }
+        }
     ]
 }
 
@@ -90,12 +131,41 @@ MOCK_PREPARATION_DETAIL = {
         "source_review_id": "rev_beta_alpha_01",
         "tenant_id": "tenant_alpha",
         "cohort_id": "cohort_2026_q4",
+        "recommended_decision_from_phase137": "CONTINUE_COHORT",
+        "preparation_type": "POLICY_UPDATE",
         "preparation_status": "FINALIZED",
-        "preparation_type": "POLICY_UPDATE"
+        "preparation_execution_status": "NOT_EXECUTED_PREPARATION_ONLY",
+        "risk_level": "LOW",
+        "confidence_level": "HIGH",
+        "intervention_summary_json": {
+            "summary": "Actualización preventiva de límites operativos de cohorte beta para tenant Alpha Press LLC."
+        },
+        "non_execution_attestation_json": {
+            "non_execution_acknowledged": True,
+            "readiness_only_attested": True,
+            "timestamp": "2026-10-05T12:00:00Z",
+            "attested_by": "admin@printprice.pro"
+        }
     },
     "items": [
-        {"id": "item_01", "label": "Validación de cuota por participante", "status": "APPROVED", "required_role": "SUPER_ADMIN"},
-        {"id": "item_02", "label": "Certificación de no ejecución industrial", "status": "APPROVED", "required_role": "SUPER_ADMIN"}
+        {
+            "item_id": "item_alpha_01",
+            "preparation_id": "prep_alpha_intervention_01",
+            "action_key": "VERIFY_PARTICIPANT_QUOTA",
+            "title": "Validación de cuota por participante",
+            "description": "Comprobar límites transaccionales asignados a la cohorte beta sin desbordamientos.",
+            "item_status": "COMPLETED",
+            "required_role": "SUPER_ADMIN"
+        },
+        {
+            "item_id": "item_alpha_02",
+            "preparation_id": "prep_alpha_intervention_01",
+            "action_key": "ATTEST_NON_EXECUTION_STATE",
+            "title": "Certificación de no ejecución industrial",
+            "description": "Garantizar aislamiento estricto sin órdenes industriales ni transacciones monetarias.",
+            "item_status": "COMPLETED",
+            "required_role": "SUPER_ADMIN"
+        }
     ]
 }
 
@@ -117,6 +187,7 @@ MOCK_APPROVALS_LIST = {
             "cohort_id": "cohort_2026_q4",
             "approval_status": "READY_FOR_APPROVAL",
             "risk_level": "LOW",
+            "confidence_level": "HIGH",
             "approval_policy_json": {
                 "policy_name": "Gobernanza Beta Controlada",
                 "required_roles": ["SUPER_ADMIN"]
@@ -134,6 +205,7 @@ MOCK_APPROVAL_DETAIL = {
         "cohort_id": "cohort_2026_q4",
         "approval_status": "READY_FOR_APPROVAL",
         "risk_level": "LOW",
+        "confidence_level": "HIGH",
         "approval_policy_json": {
             "policy_name": "Gobernanza Beta Controlada",
             "required_roles": ["SUPER_ADMIN"]
@@ -143,7 +215,12 @@ MOCK_APPROVAL_DETAIL = {
         }
     },
     "steps": [
-        {"role": "SUPER_ADMIN", "status": "PENDING", "assigned_to": "admin@printprice.pro"}
+        {
+            "step_id": "step_alpha_01",
+            "role": "SUPER_ADMIN",
+            "status": "PENDING",
+            "approver_id": "admin@printprice.pro"
+        }
     ]
 }
 
@@ -227,12 +304,13 @@ def setup_page_auth_and_theme(page, theme='dark', locale='es'):
         document.documentElement.lang = '{locale}';
     }}""")
 
-def setup_client_intercepts(page, error_mode=False):
-    # State flags to allow dynamic recovery on retry
-    state = {"fail_approvals": error_mode, "fail_preps": error_mode, "fail_reviews": error_mode}
+def setup_client_intercepts(page, error_state=None):
+    if error_state is None:
+        error_state = {"fail_reviews": False, "fail_preps": False, "fail_approvals": False}
 
     def route_handler(route):
-        url = route.request.url
+        url = route.request.url.split('?')[0]
+        method = route.request.method
 
         # 1. Tenants list
         if url.endswith('/api/admin/tenants'):
@@ -241,10 +319,13 @@ def setup_client_intercepts(page, error_mode=False):
 
         # 2. Reviews endpoints
         if url.endswith('/api/admin/beta/runtime-reviews/reviews'):
-            if state["fail_reviews"]:
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de revisiones"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEWS_LIST))
+            if method == 'GET':
+                if error_state.get("fail_reviews", False):
+                    route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de revisiones"}))
+                else:
+                    route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_REVIEWS_LIST))
+                return
+            route.continue_()
             return
 
         if '/api/admin/beta/runtime-reviews/reviews/' in url and 'evidence-pack' in url:
@@ -257,10 +338,13 @@ def setup_client_intercepts(page, error_mode=False):
 
         # 3. Preparations endpoints
         if url.endswith('/api/admin/beta/cohort-interventions/preparations'):
-            if state["fail_preps"]:
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de propuestas"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATIONS_LIST))
+            if method == 'GET':
+                if error_state.get("fail_preps", False):
+                    route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio de propuestas"}))
+                else:
+                    route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_PREPARATIONS_LIST))
+                return
+            route.continue_()
             return
 
         if '/api/admin/beta/cohort-interventions/preparations/' in url and 'evidence-pack' in url:
@@ -273,10 +357,13 @@ def setup_client_intercepts(page, error_mode=False):
 
         # 4. Approvals endpoints
         if url.endswith('/api/admin/beta/cohort-intervention-approvals/approvals'):
-            if state["fail_approvals"]:
-                route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio interno de gobernanza"}))
-            else:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVALS_LIST))
+            if method == 'GET':
+                if error_state.get("fail_approvals", False):
+                    route.fulfill(status=500, content_type='application/json', body=json.dumps({"ok": False, "error": "HTTP 500: Fallo en el servicio interno de gobernanza"}))
+                else:
+                    route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_APPROVALS_LIST))
+                return
+            route.continue_()
             return
 
         if '/api/admin/beta/cohort-intervention-approvals/approvals/' in url and 'evidence-pack' in url:
@@ -299,7 +386,7 @@ def setup_client_intercepts(page, error_mode=False):
         route.continue_()
 
     page.route('**/*', route_handler)
-    return state
+    return error_state
 
 def run_captures():
     git_sha = get_git_sha()
@@ -330,13 +417,13 @@ def run_captures():
         for theme in ['dark', 'light']:
             ctx = browser.new_context(viewport={"width": 1280, "height": 720})
             page = ctx.new_page()
-            setup_client_intercepts(page, error_mode=False)
+            setup_client_intercepts(page, error_state={"fail_reviews": False, "fail_preps": False, "fail_approvals": False})
             setup_page_auth_and_theme(page, theme=theme, locale='es')
 
             for stage in stages:
                 target_url = f"http://127.0.0.1:3000{stage['path']}"
                 page.goto(target_url, wait_until='networkidle')
-                page.wait_for_timeout(800)
+                page.wait_for_timeout(600)
 
                 # Theme setup
                 if theme == 'dark':
@@ -349,7 +436,7 @@ def run_captures():
                 if tenant_select.count() > 0:
                     try:
                         tenant_select.first.select_option(value='tenant_alpha')
-                        page.wait_for_timeout(400)
+                        page.wait_for_timeout(300)
                     except Exception:
                         pass
 
@@ -359,19 +446,25 @@ def run_captures():
                     if rev_sel.count() > 0:
                         rev_sel.select_option(value='rev_beta_alpha_01')
                         page.wait_for_selector('text=Detalle de Revisión: rev_beta_alpha_01', timeout=4000)
-                        page.wait_for_timeout(500)
+                        # Confirm findings with descriptions are rendered
+                        assert page.locator('text=LATENCY_WINDOW_NOMINAL').first.is_visible()
+                        assert page.locator('text=Latencia p99 dentro de límites contractuales').first.is_visible()
+                        page.wait_for_timeout(400)
 
                 # Stage 5: Select Source Review and Preparation prep_alpha_intervention_01
                 if stage["id"] == "05_preparacion_intervenciones":
                     src_sel = page.locator('#source-review-selector')
                     if src_sel.count() > 0:
                         src_sel.select_option(value='rev_beta_alpha_01')
-                        page.wait_for_timeout(300)
+                        page.wait_for_timeout(200)
                     prep_sel = page.locator('#prep-proposal-selector')
                     if prep_sel.count() > 0:
                         prep_sel.select_option(value='prep_alpha_intervention_01')
                         page.wait_for_selector('text=Detalle de Propuesta: prep_alpha_intervention_01', timeout=4000)
-                        page.wait_for_timeout(500)
+                        # Confirm tasks with descriptions are rendered
+                        assert page.locator('text=Validación de cuota por participante').first.is_visible()
+                        assert page.locator('text=Comprobar límites transaccionales asignados').first.is_visible()
+                        page.wait_for_timeout(400)
 
                 # Stage 6: Select Approval appr_alpha_gov_01
                 if stage["id"] == "06_aprobacion_intervenciones":
@@ -379,14 +472,16 @@ def run_captures():
                     if appr_sel.count() > 0:
                         appr_sel.select_option(value='appr_alpha_gov_01')
                         page.wait_for_selector('text=Expediente de Aprobación', timeout=4000)
-                        page.wait_for_timeout(500)
+                        # Confirm steps are rendered
+                        assert page.locator('text=SUPER_ADMIN').first.is_visible()
+                        page.wait_for_timeout(400)
 
                 # Expand technical details collapsible
                 tech_btn = page.locator('button[aria-expanded="false"]').first
                 if tech_btn.count() > 0:
                     try:
                         tech_btn.click()
-                        page.wait_for_timeout(300)
+                        page.wait_for_timeout(200)
                     except Exception:
                         pass
 
@@ -422,13 +517,13 @@ def run_captures():
         print("\n>>> Mobile 390x844 Viewport Check <<<")
         ctx_mobile = browser.new_context(viewport={"width": 390, "height": 844})
         page_mobile = ctx_mobile.new_page()
-        setup_client_intercepts(page_mobile, error_mode=False)
+        setup_client_intercepts(page_mobile, error_state={"fail_reviews": False, "fail_preps": False, "fail_approvals": False})
         setup_page_auth_and_theme(page_mobile, theme='dark', locale='es')
 
-        for stage in [stages[3], stages[4], stages[5]]:  # Reviews, Preps, Approvals
+        for stage in [stages[1], stages[3], stages[4], stages[5]]:  # Sessions, Reviews, Preps, Approvals
             target_url = f"http://127.0.0.1:3000{stage['path']}"
             page_mobile.goto(target_url, wait_until='networkidle')
-            page_mobile.wait_for_timeout(800)
+            page_mobile.wait_for_timeout(600)
             page_mobile.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
 
             shot_name = f"{stage['id']}_selected_mobile_390x844_dark.png"
@@ -455,59 +550,90 @@ def run_captures():
 
         # ══════════════════════════════════════════════════════════════
         # RECORRIDO 2: PROVOCAR HTTP 500 REAL, VERIFICAR QUE NO SEA LISTA
-        # VACÍA, PULSAR REINTENTAR Y ACREDITAR RECUPERACIÓN EXITOSA
+        # VACÍA, CAPTURAR PANEL AFECTADO COMPLETO, REINTENTAR Y
+        # ACREDITAR RESPUESTA 200 CON ENTIDAD CONOCIDA EN EL SELECTOR
         # ══════════════════════════════════════════════════════════════
-        print("\n>>> 2. RECORRIDO: HTTP 500 REAL, COMPROBACIÓN NO-LISTA-VACÍA Y RECUPERACIÓN CON REINTENTAR <<<")
-        ctx_err = browser.new_context(viewport={"width": 1280, "height": 720})
-        page_err = ctx_err.new_page()
-        intercept_state = setup_client_intercepts(page_err, error_mode=True)
-        setup_page_auth_and_theme(page_err, theme='dark', locale='es')
+        print("\n>>> 2. RECORRIDO: HTTP 500 REAL, VERIFICACIÓN VISUAL Y RECUPERACIÓN CON ENTIDAD CONOCIDA <<<")
 
         error_stages = [
             {
                 "stage": stages[3], # Revisiones de salud
+                "target_endpoint": "/api/admin/beta/runtime-reviews/reviews",
                 "expected_error": "HTTP 500: Fallo en el servicio de revisiones",
                 "empty_text_forbidden": "No se encontraron revisiones de cohorte registradas",
-                "state_key": "fail_reviews"
+                "state_key": "fail_reviews",
+                "selector_id": "#review-list-selector",
+                "known_entity_id": "rev_beta_alpha_01",
+                "detail_wait_text": "Detalle de Revisión: rev_beta_alpha_01"
             },
             {
                 "stage": stages[4], # Preparación
+                "target_endpoint": "/api/admin/beta/cohort-interventions/preparations",
                 "expected_error": "HTTP 500: Fallo en el servicio de propuestas",
                 "empty_text_forbidden": "No se encontraron propuestas de intervención registradas",
-                "state_key": "fail_preps"
+                "state_key": "fail_preps",
+                "selector_id": "#prep-proposal-selector",
+                "known_entity_id": "prep_alpha_intervention_01",
+                "detail_wait_text": "Detalle de Propuesta: prep_alpha_intervention_01"
             },
             {
                 "stage": stages[5], # Aprobación
+                "target_endpoint": "/api/admin/beta/cohort-intervention-approvals/approvals",
                 "expected_error": "HTTP 500: Fallo en el servicio interno de gobernanza",
                 "empty_text_forbidden": "No hay expedientes registrados",
-                "state_key": "fail_approvals"
+                "state_key": "fail_approvals",
+                "selector_id": "#approval-expediente-selector",
+                "known_entity_id": "appr_alpha_gov_01",
+                "detail_wait_text": "Expediente de Aprobación"
             }
         ]
 
         for item in error_stages:
             stage_info = item["stage"]
             target_url = f"http://127.0.0.1:3000{stage_info['path']}"
-            
-            # 1. Nav with HTTP 500 active
-            page_err.goto(target_url, wait_until='networkidle')
-            page_err.wait_for_timeout(800)
+            target_endpoint = item["target_endpoint"]
+
+            ctx_err = browser.new_context(viewport={"width": 1280, "height": 720})
+            page_err = ctx_err.new_page()
+
+            # Initialize with failure active ONLY for this stage
+            err_state = {"fail_reviews": False, "fail_preps": False, "fail_approvals": False}
+            err_state[item["state_key"]] = True
+            setup_client_intercepts(page_err, error_state=err_state)
+            setup_page_auth_and_theme(page_err, theme='dark', locale='es')
+
+            print(f"\n--- Testing HTTP 500 & Recovery for {stage_info['id']} ---")
+
+            # 1. PLAYWRIGHT ASSERTION 1: Observe HTTP 500 on target request
+            with page_err.expect_response(lambda r: target_endpoint in r.url and r.request.method == 'GET') as resp_info:
+                page_err.goto(target_url, wait_until='networkidle')
+            resp = resp_info.value
+            assert resp.status == 500, f"ASSERTION FAILED: Target request {target_endpoint} did not return HTTP 500! Returned: {resp.status}"
+            print(f"  [ASSERTION 1 PASSED] Target request {target_endpoint} responded with status HTTP 500.")
+
+            page_err.wait_for_timeout(500)
             page_err.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
 
-            # Check that error text is visible and retry button is present
+            # 2. PLAYWRIGHT ASSERTION 2: Error message and Reintentar visible, empty message absent
             err_locator = page_err.locator(f'text={item["expected_error"]}')
+            assert err_locator.first.is_visible(), f"ASSERTION FAILED: Error message '{item['expected_error']}' is not visible on page!"
+
             retry_btn = page_err.locator('button:has-text("Reintentar")').first
-            assert err_locator.count() > 0, f"Error message {item['expected_error']} not displayed on HTTP 500!"
-            assert retry_btn.count() > 0, f"Retry button not found on HTTP 500 for {stage_info['id']}!"
+            assert retry_btn.is_visible(), f"ASSERTION FAILED: 'Reintentar' button is not visible on HTTP 500 error state!"
 
-            # CRITICAL CHECK: Verify that the empty list message is NOT shown
-            empty_locator = page_err.locator(f'text={item["empty_text_forbidden"]}')
-            assert empty_locator.count() == 0, f"Error state incorrectly displays empty list message '{item['empty_text_forbidden']}'!"
-            print(f"  [VERIFICACIÓN OK] {stage_info['id']}: Error 500 y Reintentar visibles. Mensaje de lista vacía correctamente ausente.")
+            empty_count = page_err.locator(f'text={item["empty_text_forbidden"]}').count()
+            assert empty_count == 0, f"ASSERTION FAILED: Error state incorrectly rendered empty list message '{item['empty_text_forbidden']}'!"
+            print(f"  [ASSERTION 2 PASSED] Error message and 'Reintentar' are visible. Empty list message correctly suppressed.")
 
-            # Capture screenshot of HTTP 500 error state
+            # 3. CAPTURE COMPLETE AFFECTED PANEL (using scroll and element capture so header doesn't push error out of view)
+            affected_panel = retry_btn.locator('xpath=ancestor::div[contains(@class, "ppos-card")]').first
+            affected_panel.scroll_into_view_if_needed()
+            page_err.wait_for_timeout(300)
+
             shot_err_name = f"{stage_info['id']}_http500_error_dark_es.png"
             shot_err_path = os.path.join(OUT_DIR, shot_err_name)
-            page_err.screenshot(path=shot_err_path, full_page=False)
+            # Element screenshot captures the full affected card without viewport cut-offs
+            affected_panel.screenshot(path=shot_err_path)
 
             sha_err = compute_sha256(shot_err_path)
             sha_map[shot_err_name] = sha_err
@@ -516,30 +642,56 @@ def run_captures():
             results.append({
                 "stage": stage_info["name"],
                 "flow": "Recorrido 2 (HTTP 500 Error)",
-                "variant": "Desktop 1280x720 - Dark - HTTP 500 Error - ES",
+                "variant": "Desktop - Dark - HTTP 500 Error Panel Completo - ES",
                 "file": shot_err_name,
                 "git_sha": git_sha,
                 "sha256": sha_err,
                 "overflow": overflow_err,
                 "simulated_data": {
                     "http_500_injected": True,
+                    "target_endpoint": target_endpoint,
                     "empty_list_hidden": True,
                     "retry_button_present": True
                 }
             })
+            print(f"  [CAPTURA OK] {shot_err_name} (Panel Completo: Error y Reintentar visibles)")
 
-            # 2. RESTORE normal 200 response and click Reintentar to prove recovery!
-            intercept_state[item["state_key"]] = False
-            retry_btn.click()
-            page_err.wait_for_timeout(1000)
+            # 4. PLAYWRIGHT ASSERTION 3: Click Reintentar -> Observe HTTP 200 response
+            err_state[item["state_key"]] = False
+            with page_err.expect_response(lambda r: target_endpoint in r.url and r.request.method == 'GET') as recov_resp_info:
+                retry_btn.click()
+            recov_resp = recov_resp_info.value
+            assert recov_resp.status == 200, f"ASSERTION FAILED: Target request {target_endpoint} did not return HTTP 200 on retry! Returned: {recov_resp.status}"
+            print(f"  [ASSERTION 3 PASSED] Reintentar triggered request and received HTTP 200.")
 
-            # Check that error is gone and items are recovered
-            assert page_err.locator(f'text={item["expected_error"]}').count() == 0, "Error message did not disappear after clicking Reintentar!"
-            print(f"  [RECUPERACIÓN OK] {stage_info['id']}: Reintentar pulsado y recuperación acreditada correctamente.")
+            # 5. PLAYWRIGHT ASSERTION 4: Error and retry disappear, selector visible and contains known entity
+            page_err.wait_for_timeout(500)
+            assert page_err.locator(f'text={item["expected_error"]}').count() == 0, "ASSERTION FAILED: Error message did not disappear after retry!"
+            assert page_err.locator('button:has-text("Reintentar")').count() == 0, "ASSERTION FAILED: Retry button did not disappear after retry!"
+
+            selector = page_err.locator(item["selector_id"])
+            assert selector.first.is_visible(), f"ASSERTION FAILED: Selector {item['selector_id']} is not visible after recovery!"
+
+            known_opt = selector.locator(f'option[value="{item["known_entity_id"]}"]')
+            assert known_opt.count() > 0, f"ASSERTION FAILED: Known entity {item['known_entity_id']} not present in selector options!"
+
+            # Select the known entity so selector displays it and details are loaded
+            selector.select_option(value=item["known_entity_id"])
+            page_err.wait_for_timeout(500)
+            assert selector.input_value() == item["known_entity_id"], f"ASSERTION FAILED: Selector failed to select known entity {item['known_entity_id']}!"
+
+            # Wait for detail card of the selected entity to be rendered
+            page_err.wait_for_selector(f'text={item["detail_wait_text"]}', timeout=5000)
+            print(f"  [ASSERTION 4 PASSED] Selector populated with known entity '{item['known_entity_id']}' and details loaded.")
+
+            # 6. CAPTURE COMPLETE RECOVERED PANEL WITH KNOWN ENTITY IN SELECTOR
+            affected_panel = selector.locator('xpath=ancestor::div[contains(@class, "ppos-card")]').first
+            affected_panel.scroll_into_view_if_needed()
+            page_err.wait_for_timeout(300)
 
             shot_recov_name = f"{stage_info['id']}_http500_recovered_dark_es.png"
             shot_recov_path = os.path.join(OUT_DIR, shot_recov_name)
-            page_err.screenshot(path=shot_recov_path, full_page=False)
+            affected_panel.screenshot(path=shot_recov_path)
 
             sha_recov = compute_sha256(shot_recov_path)
             sha_map[shot_recov_name] = sha_recov
@@ -548,17 +700,21 @@ def run_captures():
             results.append({
                 "stage": stage_info["name"],
                 "flow": "Recorrido 2 (Recuperación con Reintentar)",
-                "variant": "Desktop 1280x720 - Dark - Recuperación Exitosa - ES",
+                "variant": "Desktop - Dark - Recuperación Exitosa con Entidad Conocida - ES",
                 "file": shot_recov_name,
                 "git_sha": git_sha,
                 "sha256": sha_recov,
                 "overflow": overflow_recov,
                 "simulated_data": {
-                    "recovery_after_retry": True
+                    "http_200_recovered": True,
+                    "target_endpoint": target_endpoint,
+                    "known_entity_selected": item["known_entity_id"]
                 }
             })
+            print(f"  [CAPTURA OK] {shot_recov_name} (Selector con entidad conocida seleccionada: {item['known_entity_id']})")
 
-        ctx_err.close()
+            ctx_err.close()
+
         browser.close()
 
     summary_path = os.path.join(OUT_DIR, "evidence_summary.json")

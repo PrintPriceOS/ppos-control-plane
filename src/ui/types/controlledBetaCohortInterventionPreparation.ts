@@ -59,6 +59,8 @@ export interface CohortInterventionPreparationItem {
   item_id: string;
   preparation_id: string;
   action_key: string;
+  title?: string;
+  label?: string;
   description: string;
   item_status: 'PENDING' | 'COMPLETED' | 'SKIPPED';
   created_at: string;

@@ -493,7 +493,14 @@ export function ControlledBetaRuntimeActivityReview() {
                       <tbody className="divide-y ppos-border font-mono">
                         {findings.map(f => (
                           <tr key={f.finding_id}>
-                            <td className="p-2.5 text-slate-800 dark:text-zinc-200">{f.finding_key}</td>
+                            <td className="p-2.5 text-slate-800 dark:text-zinc-200">
+                              <span className="font-semibold block">{f.finding_key || (f as any).title || f.finding_id}</span>
+                              {((f as any).description || f.details_json?.description) && (
+                                <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-sans block mt-0.5">
+                                  {(f as any).description || f.details_json?.description}
+                                </span>
+                              )}
+                            </td>
                             <td className="p-2.5 text-right">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 f.severity === 'HIGH' || f.severity === 'CRITICAL' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'

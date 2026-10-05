@@ -40,6 +40,8 @@ export interface RuntimeActivityReviewFinding {
   finding_id: string;
   review_id: string;
   finding_key: string;
+  title?: string;
+  description?: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   details_json?: any;
   created_at: string;

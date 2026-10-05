@@ -549,10 +549,10 @@ export function ControlledBetaCohortInterventionPreparation() {
                         )}
                         <div className="truncate">
                           <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 block truncate">
-                            {item.title}
+                            {item.title || (item as any).action_key || item.item_id}
                           </span>
                           <span className="text-[10px] text-zinc-400 truncate block">
-                            {item.description}
+                            {item.description || (item as any).label || ''}
                           </span>
                         </div>
                       </div>

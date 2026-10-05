@@ -513,4 +513,86 @@ describe('Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards
       expect(mockPrepClient.createPreparationFromReview).toHaveBeenCalledWith('rev_alpha_01');
     });
   });
+
+  it('9. Review findings table renders key, title and description without blank rows', async () => {
+    mockReviewClient.listReviews.mockResolvedValue({
+      ok: true,
+      reviews: [
+        { review_id: 'rev_alpha_01', tenant_id: 'tenant_alpha', review_status: 'FINALIZED', risk_level: 'LOW' }
+      ]
+    });
+    mockReviewClient.getReview.mockResolvedValue({
+      ok: true,
+      review: { review_id: 'rev_alpha_01', tenant_id: 'tenant_alpha', review_status: 'FINALIZED', cohort_id: 'cohort_test' },
+      findings: [
+        {
+          finding_id: 'find_01',
+          finding_key: 'LATENCY_NOMINAL',
+          description: 'Latencia p99 dentro de límites contractuales (< 45ms)',
+          severity: 'LOW'
+        }
+      ]
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaRuntimeActivityReview />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    // Select review
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Seleccionar Revisión de Cohorte/i)).toBeDefined();
+    });
+    fireEvent.change(screen.getByLabelText(/Seleccionar Revisión de Cohorte/i), { target: { value: 'rev_alpha_01' } });
+
+    // Verify finding key and description are rendered
+    await waitFor(() => {
+      expect(screen.getByText('LATENCY_NOMINAL')).toBeDefined();
+      expect(screen.getByText('Latencia p99 dentro de límites contractuales (< 45ms)')).toBeDefined();
+    });
+  });
+
+  it('10. Preparation checklist items render action_key fallback and description without blank rows', async () => {
+    mockPrepClient.listPreparations.mockResolvedValue({
+      ok: true,
+      preparations: [
+        { preparation_id: 'prep_01', tenant_id: 'tenant_alpha', preparation_status: 'DRAFT' }
+      ]
+    });
+    mockPrepClient.getPreparation.mockResolvedValue({
+      ok: true,
+      preparation: { preparation_id: 'prep_01', tenant_id: 'tenant_alpha', preparation_status: 'DRAFT' },
+      items: [
+        {
+          item_id: 'item_01',
+          action_key: 'VERIFY_QUOTA_ACTION',
+          description: 'Verificación de cuotas de procesamiento por participante',
+          item_status: 'PENDING'
+        }
+      ]
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider initialLocale="es">
+          <ControlledBetaCohortInterventionPreparation />
+        </LocaleProvider>
+      </MemoryRouter>
+    );
+
+    // Select preparation
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Seleccionar Propuesta de Intervención/i)).toBeDefined();
+    });
+    fireEvent.change(screen.getByLabelText(/Seleccionar Propuesta de Intervención/i), { target: { value: 'prep_01' } });
+
+    // Verify task title (action_key fallback) and description are rendered
+    await waitFor(() => {
+      expect(screen.getByText('VERIFY_QUOTA_ACTION')).toBeDefined();
+      expect(screen.getByText('Verificación de cuotas de procesamiento por participante')).toBeDefined();
+    });
+  });
 });
