@@ -411,7 +411,7 @@ export function ControlledBetaCohortActivation() {
             {t('beta.cohort.activationSafetyNotice') || 'Entorno Beta Controlado — Activación por Invitación'}
           </h4>
           <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
-            {UI_WARNING}
+            {t('beta.cohort.activationSafetyWarning') || UI_WARNING}
           </p>
         </div>
       </div>
@@ -468,11 +468,11 @@ export function ControlledBetaCohortActivation() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Panel 1: Consulta de Estado y Verificación */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldCheckIcon className="w-5 h-5 text-blue-500" />
-              {t('beta.cohort.sectionStatus') || 'Consulta de Estado y Verificación'}
+              <ShieldCheckIcon className="w-5 h-5 text-blue-500 shrink-0" />
+              <span className="truncate">{t('beta.cohort.sectionStatus') || 'Consulta de Estado y Verificación'}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
               Verificación de preparación, salvaguardas y paquete de evidencias.
@@ -483,22 +483,22 @@ export function ControlledBetaCohortActivation() {
             <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
               {t('beta.cohort.activationId') || 'Identificador de Activación'}
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row lg:flex-col 2xl:flex-row gap-2 min-w-0">
               <input
                 type="text"
                 value={activationId}
                 onChange={e => setActivationId(e.target.value)}
                 placeholder="act_..."
-                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full flex-1 min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button
                 type="button"
                 onClick={handleCheckReadiness}
                 disabled={loading}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-sm transition-colors shrink-0 flex items-center gap-1.5"
+                className="w-full sm:w-auto lg:w-full 2xl:w-auto px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5 whitespace-normal text-center min-w-0 shrink-0"
               >
-                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                {t('beta.cohort.verifyReadiness') || 'Verificar'}
+                <ArrowPathIcon className={`w-3.5 h-3.5 shrink-0 ${loading ? 'animate-spin' : ''}`} />
+                <span className="break-words">{t('beta.cohort.verifyReadiness') || 'Verificar Preparación'}</span>
               </button>
             </div>
           </div>
@@ -542,38 +542,38 @@ export function ControlledBetaCohortActivation() {
               type="button"
               onClick={handleGetAuditTimeline}
               disabled={loading || !activationId.trim()}
-              className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold transition-colors"
+              className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold transition-colors text-center whitespace-normal"
             >
-              Consultar Línea Temporal de Auditoría
+              {t('beta.cohort.auditTimelineBtn') || 'Consultar Línea Temporal de Auditoría'}
             </button>
             <button
               type="button"
               onClick={handleGetEvidencePack}
               disabled={loading || !activationId.trim()}
-              className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded text-xs font-semibold transition-colors"
+              className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded text-xs font-semibold transition-colors text-center whitespace-normal"
             >
-              Generar Paquete de Evidencia
+              {t('beta.cohort.evidencePackBtn') || 'Generar Paquete de Evidencia'}
             </button>
           </div>
 
           {/* Collapsible Technical Details */}
           <TechnicalDetailsCollapsible
-            title="Diagnóstico & Payload de Activación"
+            title={t('beta.cohort.technicalDetailsTitle') || 'Diagnóstico & Payload de Activación'}
             data={result}
             missingEndpointNotice={{
               missingEntity: 'Activations & Gates',
               requiredEndpointProposal: 'GET /api/admin/beta/cohort-activation/readiness?activation_id=...',
-              fieldNotice: 'La vinculación se realiza mediante entrada manual asistida de identificadores al no disponer de endpoint de listado en el backend.'
+              fieldNotice: t('beta.cohort.manualEntryNotice') || 'La vinculación se realiza mediante entrada manual asistida de identificadores al no disponer de endpoint de listado en el backend.'
             }}
           />
         </div>
 
         {/* Panel 2: Preparación y Configuración */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ArrowPathIcon className="w-5 h-5 text-indigo-500" />
-              {t('beta.cohort.sectionPrep') || 'Preparación y Configuración'}
+              <ArrowPathIcon className="w-5 h-5 text-indigo-500 shrink-0" />
+              <span className="truncate">{t('beta.cohort.sectionPrep') || 'Preparación y Configuración'}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
               Vinculación de contexto, participantes, alcances y límites de sesión.
@@ -624,7 +624,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !gateId.trim() || !cohortId.trim()}
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
               >
-                Crear Contexto
+                {t('beta.cohort.createContextBtn') || 'Crear Contexto'}
               </button>
               <button
                 type="button"
@@ -632,7 +632,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim() || !gateId.trim()}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
               >
-                Vincular Gate
+                {t('beta.cohort.bindGateBtn') || 'Vincular Gate'}
               </button>
               <button
                 type="button"
@@ -640,7 +640,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim() || !cohortId.trim()}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
               >
-                Vincular Cohorte
+                {t('beta.cohort.bindCohortBtn') || 'Vincular Cohorte'}
               </button>
               <button
                 type="button"
@@ -648,7 +648,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim() || !tenantId.trim()}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
               >
-                Vincular Tenant
+                {t('beta.cohort.bindTenantBtn') || 'Vincular Tenant'}
               </button>
             </div>
           </div>
@@ -656,11 +656,13 @@ export function ControlledBetaCohortActivation() {
           {/* Participant & Invites Setup */}
           <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Gobernanza de Participantes e Invitaciones
+              {t('beta.cohort.participantGovernance') || 'Gobernanza de Participantes e Invitaciones'}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Participant ID</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
+                  {t('beta.cohort.participantId') || 'Participant ID'}
+                </label>
                 <input
                   type="text"
                   value={participantId}
@@ -670,7 +672,9 @@ export function ControlledBetaCohortActivation() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">Invite ID</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
+                  {t('beta.cohort.inviteId') || 'Invite ID'}
+                </label>
                 <input
                   type="text"
                   value={inviteId}
@@ -687,7 +691,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim() || !participantId.trim()}
                 className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded text-xs font-medium"
               >
-                Registrar Participante
+                {t('beta.cohort.addParticipantBtn') || 'Registrar Participante'}
               </button>
               <button
                 type="button"
@@ -695,7 +699,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !participantId.trim()}
                 className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded text-xs font-medium"
               >
-                Eliminar
+                {t('common.delete') || 'Eliminar'}
               </button>
               <button
                 type="button"
@@ -703,7 +707,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim() || !participantId.trim()}
                 className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded text-xs font-medium"
               >
-                Emitir Invitación
+                {t('beta.cohort.issueInviteBtn') || 'Emitir Invitación'}
               </button>
               <button
                 type="button"
@@ -711,7 +715,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !inviteId.trim()}
                 className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-medium"
               >
-                Revocar
+                {t('beta.cohort.revokeBtn') || 'Revocar'}
               </button>
             </div>
           </div>
@@ -719,7 +723,7 @@ export function ControlledBetaCohortActivation() {
           {/* Scopes & Limits */}
           <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Límites y Alcances Permitidos
+              {t('beta.cohort.limitsAndScopes') || 'Límites y Alcances Permitidos'}
             </h3>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
@@ -735,7 +739,7 @@ export function ControlledBetaCohortActivation() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div>
-                <label className="block text-[11px] text-slate-500">Máx. Participantes</label>
+                <label className="block text-[11px] text-slate-500">{t('beta.cohort.maxParticipants') || 'Máx. Participantes'}</label>
                 <input
                   type="number"
                   value={maxParticipants}
@@ -745,7 +749,7 @@ export function ControlledBetaCohortActivation() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-500">Sesiones/Part.</label>
+                <label className="block text-[11px] text-slate-500">{t('beta.cohort.sessionsPerPart') || 'Sesiones/Part.'}</label>
                 <input
                   type="number"
                   value={maxSessions}
@@ -755,7 +759,7 @@ export function ControlledBetaCohortActivation() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-500">Total Sesiones</label>
+                <label className="block text-[11px] text-slate-500">{t('beta.cohort.totalSessions') || 'Total Sesiones'}</label>
                 <input
                   type="number"
                   value={maxTotalSessions}
@@ -772,7 +776,7 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim()}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
               >
-                Fijar Alcance
+                {t('beta.cohort.defineScopeBtn') || 'Fijar Alcance'}
               </button>
               <button
                 type="button"
@@ -780,18 +784,18 @@ export function ControlledBetaCohortActivation() {
                 disabled={loading || !activationId.trim()}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-zinc-300 rounded text-xs font-medium"
               >
-                Fijar Límites
+                {t('beta.cohort.defineLimitsBtn') || 'Fijar Límites'}
               </button>
             </div>
           </div>
         </div>
 
         {/* Panel 3: Acciones que Modifican Acceso (Gobernanza Crítica) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <BoltIcon className="w-5 h-5 text-amber-500" />
-              {t('beta.cohort.sectionGovernance') || 'Acciones que Modifican Acceso'}
+              <BoltIcon className="w-5 h-5 text-amber-500 shrink-0" />
+              <span className="truncate">{t('beta.cohort.sectionGovernance') || 'Acciones que Modifican Acceso'}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
               Operaciones de gobernanza estricta. Requieren confirmación explícita.
@@ -801,44 +805,44 @@ export function ControlledBetaCohortActivation() {
           {/* Cohort Lifecycle Actions */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Ciclo de Vida de la Cohorte
+              {t('beta.cohort.lifecycleTitle') || 'Ciclo de Vida de la Cohorte'}
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={requestActivateCohort}
                 disabled={loading || !activationId.trim()}
-                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center whitespace-normal"
               >
-                <PlayIcon className="w-4 h-4" />
-                Activar Cohorte
+                <PlayIcon className="w-4 h-4 shrink-0" />
+                <span>{t('beta.cohort.activateCohortBtn') || 'Activar Cohorte'}</span>
               </button>
               <button
                 type="button"
                 onClick={requestPauseCohort}
                 disabled={loading || !activationId.trim()}
-                className="p-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="p-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center whitespace-normal"
               >
-                <PauseIcon className="w-4 h-4" />
-                Pausar Cohorte
+                <PauseIcon className="w-4 h-4 shrink-0" />
+                <span>{t('beta.cohort.pauseCohortBtn') || 'Pausar Cohorte'}</span>
               </button>
               <button
                 type="button"
                 onClick={requestResumeCohort}
                 disabled={loading || !activationId.trim()}
-                className="p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center whitespace-normal"
               >
-                <PlayIcon className="w-4 h-4" />
-                Reanudar Cohorte
+                <PlayIcon className="w-4 h-4 shrink-0" />
+                <span>{t('beta.cohort.resumeCohortBtn') || 'Reanudar Cohorte'}</span>
               </button>
               <button
                 type="button"
                 onClick={requestTerminateCohort}
                 disabled={loading || !activationId.trim()}
-                className="p-2.5 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="p-2.5 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center whitespace-normal"
               >
-                <StopIcon className="w-4 h-4" />
-                Terminar Cohorte
+                <StopIcon className="w-4 h-4 shrink-0" />
+                <span>{t('beta.cohort.terminateCohortBtn') || 'Terminar Cohorte'}</span>
               </button>
             </div>
           </div>
@@ -846,8 +850,8 @@ export function ControlledBetaCohortActivation() {
           {/* Emergency Kill Switch */}
           <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
             <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-              <ExclamationTriangleIcon className="w-4 h-4" />
-              Kill Switch de Emergencia
+              <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+              <span>{t('beta.cohort.killSwitchTitle') || 'Control de Emergencia (Kill Switch)'}</span>
             </h3>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
@@ -866,17 +870,17 @@ export function ControlledBetaCohortActivation() {
                 type="button"
                 onClick={requestTriggerKillSwitch}
                 disabled={loading || !activationId.trim() || !killSwitchReason.trim()}
-                className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors"
+                className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-sm transition-colors text-center whitespace-normal"
               >
-                Disparar Kill Switch
+                {t('beta.cohort.triggerKillSwitchBtn') || 'Disparar Kill Switch'}
               </button>
               <button
                 type="button"
                 onClick={requestClearKillSwitch}
                 disabled={loading || !activationId.trim()}
-                className="py-2 px-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold"
+                className="py-2 px-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-zinc-200 rounded text-xs font-semibold text-center whitespace-normal"
               >
-                Restablecer
+                {t('beta.cohort.resetBtn') || 'Restablecer'}
               </button>
             </div>
           </div>
@@ -884,7 +888,7 @@ export function ControlledBetaCohortActivation() {
           {/* Scoped Finding Registry */}
           <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-              Registro de Hallazgos Bloqueantes
+              {t('beta.cohort.findingsTitle') || 'Registro de Hallazgos Bloqueantes'}
             </h3>
             <div>
               <input
@@ -901,7 +905,7 @@ export function ControlledBetaCohortActivation() {
                   disabled={loading || !activationId.trim() || !findingSummary.trim()}
                   className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white rounded text-xs font-medium"
                 >
-                  Registrar Hallazgo
+                  {t('beta.cohort.recordFindingBtn') || 'Registrar Hallazgo'}
                 </button>
                 <input
                   type="text"
@@ -916,7 +920,7 @@ export function ControlledBetaCohortActivation() {
                   disabled={loading || !findingId.trim()}
                   className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-medium"
                 >
-                  Resolver
+                  {t('beta.cohort.resolveBtn') || 'Resolver'}
                 </button>
               </div>
             </div>

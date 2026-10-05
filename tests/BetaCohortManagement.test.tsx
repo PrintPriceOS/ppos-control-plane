@@ -167,7 +167,7 @@ describe('Beta Cohort Management — Operational Super Admin Adaptations', () =>
     expect(container.textContent).not.toContain('participant_beta_01');
 
     // Identifies Beta & Safety Warning
-    expect(screen.getByText(/Controlled Invite-Only Beta Cohort Activation/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Activación de cohorte [bB]eta controlada|Controlled Invite-Only Beta Cohort Activation/i).length).toBeGreaterThan(0);
 
     // 3 Distinct Sections
     expect(screen.getByText(/Consulta de Estado y Verificación/i)).toBeInTheDocument();
@@ -267,8 +267,8 @@ describe('Beta Cohort Management — Operational Super Admin Adaptations', () =>
     expect(container.textContent).not.toContain('Primary Tester');
 
     // Preserves required smoke test copy
-    expect(screen.getByText(/Controlled invite issuance only/i)).toBeInTheDocument();
-    expect(screen.getByText(/This is not public beta, not open marketplace, and not automatic expansion/i)).toBeInTheDocument();
+    expect(screen.getByText(/Emisión controlada de invitaciones|Controlled invite issuance only/i)).toBeInTheDocument();
+    expect(screen.getByText(/Este entorno no constituye una fase beta pública|This is not public beta, not open marketplace, and not automatic expansion/i)).toBeInTheDocument();
 
     // 3 Distinct Sections
     expect(screen.getByText(/Consulta de Estado y Verificación/i)).toBeInTheDocument();
@@ -322,8 +322,8 @@ describe('Beta Cohort Management — Operational Super Admin Adaptations', () =>
     expect(container.textContent).not.toContain('hash_terms_v1_0');
 
     // Preserves required smoke test copy
-    expect(screen.getByText(/Controlled invite acceptance and participant onboarding only/i)).toBeInTheDocument();
-    expect(screen.getByText(/This is not public signup, not public beta, and not open marketplace/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aceptación controlada de invitaciones|Controlled invite acceptance and participant onboarding only/i)).toBeInTheDocument();
+    expect(screen.getByText(/Este entorno no constituye registro público|This is not public signup, not public beta, and not open marketplace/i)).toBeInTheDocument();
 
     // Confirmation for runtime access
     const grantBtn = screen.getByRole('button', { name: /Conceder Acceso a Runtime/i });

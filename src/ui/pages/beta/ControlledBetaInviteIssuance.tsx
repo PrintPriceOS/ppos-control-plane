@@ -292,10 +292,10 @@ export function ControlledBetaInviteIssuance() {
         <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <h4 className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
-            ⚠️ Controlled invite issuance only.
+            ⚠️ {t('beta.cohort.inviteSafetyTitle') || 'Controlled invite issuance only.'}
           </h4>
           <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
-            This is not public beta, not open marketplace, and not automatic expansion. Execution of invite issuance is gated under strict approved preparation and hard limits.
+            {t('beta.cohort.inviteSafetyDesc') || 'This is not public beta, not open marketplace, and not automatic expansion. Execution of invite issuance is gated under strict approved preparation and hard limits.'}
           </p>
         </div>
       </div>
@@ -352,11 +352,11 @@ export function ControlledBetaInviteIssuance() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Panel 1: Consulta de Estado y Verificación */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldCheckIcon className="w-5 h-5 text-blue-500" />
-              {t('beta.cohort.sectionStatus') || 'Consulta de Estado y Verificación'}
+              <ShieldCheckIcon className="w-5 h-5 text-blue-500 shrink-0" />
+              <span className="truncate">{t('beta.cohort.sectionStatus') || 'Consulta de Estado y Verificación'}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
               Supervisión de readiness, métricas globales de emisión y línea temporal de auditoría.
@@ -367,22 +367,22 @@ export function ControlledBetaInviteIssuance() {
             <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
               {t('beta.cohort.gateId') || 'Gate ID'}
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row lg:flex-col 2xl:flex-row gap-2 min-w-0">
               <input
                 type="text"
                 value={gateId}
                 onChange={e => setGateId(e.target.value)}
                 placeholder="gate_..."
-                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full flex-1 min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button
                 type="button"
                 onClick={() => refreshState(gateId)}
                 disabled={loading || !gateId.trim()}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-sm transition-colors shrink-0 flex items-center gap-1.5"
+                className="w-full sm:w-auto lg:w-full 2xl:w-auto px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5 whitespace-normal text-center min-w-0 shrink-0"
               >
-                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                {t('beta.cohort.verifyReadiness') || 'Verificar'}
+                <ArrowPathIcon className={`w-3.5 h-3.5 shrink-0 ${loading ? 'animate-spin' : ''}`} />
+                <span>{t('beta.cohort.verifyReadiness') || 'Verificar'}</span>
               </button>
             </div>
           </div>
@@ -452,7 +452,7 @@ export function ControlledBetaInviteIssuance() {
         </div>
 
         {/* Panel 2: Preparación y Configuración */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <EnvelopeIcon className="w-5 h-5 text-indigo-500" />
@@ -639,11 +639,11 @@ export function ControlledBetaInviteIssuance() {
         </div>
 
         {/* Panel 3: Acciones que Modifican Acceso (Gobernanza Crítica) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5 min-w-0">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <CheckBadgeIcon className="w-5 h-5 text-amber-500" />
-              {t('beta.cohort.sectionGovernance') || 'Acciones que Modifican Acceso'}
+              <CheckBadgeIcon className="w-5 h-5 text-amber-500 shrink-0" />
+              <span className="truncate">{t('beta.cohort.sectionGovernance') || 'Acciones que Modifican Acceso'}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
               Aprobación de gates, emisión efectiva y revocación de credenciales.
@@ -723,24 +723,24 @@ export function ControlledBetaInviteIssuance() {
           {/* Revocation Controls */}
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1">
-              <NoSymbolIcon className="w-4 h-4" />
-              Controles de Revocación
+              <NoSymbolIcon className="w-4 h-4 shrink-0" />
+              <span>{t('beta.cohort.revocationControls') || 'Controles de Revocación'}</span>
             </h3>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 min-w-0">
               <input
                 type="text"
                 value={inviteId}
                 onChange={e => setInviteId(e.target.value)}
                 placeholder="ID de Invitación (inv_...)"
-                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                className="w-full flex-1 min-w-0 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
               />
               <button
                 type="button"
                 onClick={requestRevokeInvite}
                 disabled={loading || !inviteId.trim()}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-semibold"
+                className="w-full sm:w-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-semibold shrink-0"
               >
-                Revocar
+                {t('beta.cohort.revokeBtn') || 'Revocar'}
               </button>
             </div>
             <button

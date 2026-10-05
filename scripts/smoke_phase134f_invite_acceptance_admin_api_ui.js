@@ -30,8 +30,8 @@ function assert(condition, label) {
 
   // Verify warnings and safety constraints in UI Page
   const pageCode = fs.readFileSync(pagePath, 'utf8');
-  assert(pageCode.includes("Controlled invite acceptance and participant onboarding only"), "UI contains warning banner copy");
-  assert(pageCode.includes("This is not public signup, not public beta, and not open marketplace"), "UI explicitly states restrictions");
+  assert(pageCode.includes("acceptanceSafetyTitle") || pageCode.includes("Controlled invite acceptance and participant onboarding only"), "UI contains warning banner copy or translation key");
+  assert(pageCode.includes("acceptanceSafetyDesc") || pageCode.includes("This is not public signup, not public beta, and not open marketplace"), "UI explicitly states restrictions or translation key");
   assert(!pageCode.includes("invite_code") && !pageCode.includes("invite_token") && !pageCode.includes("rawCode"), "UI does not leak raw codes or tokens");
 
   // Verify route registered in App.tsx
