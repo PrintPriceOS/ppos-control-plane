@@ -24,6 +24,26 @@ function canonicalStringify(obj) {
 }
 
 /**
+ * Normalizes SHA-256 checksum admitting strictly 64-character hexadecimal,
+ * with or without 'sha256:' prefix. Returns 64 lowercase hex characters, or null if invalid.
+ */
+function normalizeSha256Hex(checksum) {
+    if (!checksum || typeof checksum !== 'string') return null;
+    const trimmed = checksum.trim();
+    const hex = trimmed.replace(/^sha256:/i, '');
+    if (!/^[0-9a-fA-F]{64}$/.test(hex)) return null;
+    return hex.toLowerCase();
+}
+
+/**
+ * Returns canonical representation 'sha256:<64 lowercase hex characters>', or null if invalid.
+ */
+function toCanonicalSha256(checksum) {
+    const hex = normalizeSha256Hex(checksum);
+    return hex ? `sha256:${hex}` : null;
+}
+
+/**
  * Computes deterministic SHA-256 checksum of rates JSON.
  */
 function computeRatesChecksum(ratesJson) {
@@ -84,12 +104,29 @@ class BpePublicationService {
             throw new Error('BPE response missing explicit rates checksum in response or readback');
         }
 
-        if (returnedRatesChecksum !== sentRatesChecksum) {
-            throw new Error(`BPE response rates checksum mismatch. Expected: ${sentRatesChecksum}, Got: ${returnedRatesChecksum}`);
+        const canonicalSentRates = toCanonicalSha256(sentRatesChecksum);
+        if (!canonicalSentRates) {
+            throw new Error(`Expected sentRatesChecksum must be a valid canonical SHA-256 checksum (got: "${sentRatesChecksum}")`);
         }
 
-        if (readbackRatesChecksum !== sentRatesChecksum) {
-            throw new Error(`BPE readback rates checksum mismatch. Expected: ${sentRatesChecksum}, Got: ${readbackRatesChecksum}`);
+        const normalizedReturnedRates = normalizeSha256Hex(returnedRatesChecksum);
+        const normalizedReadbackRates = normalizeSha256Hex(readbackRatesChecksum);
+        const normalizedSentHex = normalizeSha256Hex(canonicalSentRates);
+
+        if (typeof returnedRatesChecksum !== 'string' || !returnedRatesChecksum.startsWith('sha256:') || !normalizedReturnedRates) {
+            throw new Error(`BPE response rates checksum mismatch: format must be canonical "sha256:<64-hex>". Expected: ${canonicalSentRates}, Got: ${returnedRatesChecksum}`);
+        }
+
+        if (typeof readbackRatesChecksum !== 'string' || !readbackRatesChecksum.startsWith('sha256:') || !normalizedReadbackRates) {
+            throw new Error(`BPE readback rates checksum mismatch: format must be canonical "sha256:<64-hex>". Expected: ${canonicalSentRates}, Got: ${readbackRatesChecksum}`);
+        }
+
+        if (normalizedReturnedRates !== normalizedSentHex) {
+            throw new Error(`BPE response rates checksum mismatch. Expected: ${canonicalSentRates}, Got: ${returnedRatesChecksum}`);
+        }
+
+        if (normalizedReadbackRates !== normalizedSentHex) {
+            throw new Error(`BPE readback rates checksum mismatch. Expected: ${canonicalSentRates}, Got: ${readbackRatesChecksum}`);
         }
 
         return returnedPatchChecksum;
@@ -194,12 +231,23 @@ class BpePublicationService {
 
             // 1.1 Integrity verification: read rates_checksum and compare with canonical hash of rates_json
             const ratesPayload = typeof revision.rates_json === 'string' ? JSON.parse(revision.rates_json) : revision.rates_json;
-            const canonicalRatesHash = computeRatesChecksum(ratesPayload);
+            const canonicalRatesChecksum = computeRatesChecksum(ratesPayload);
+            const canonicalRatesHex = normalizeSha256Hex(canonicalRatesChecksum);
 
-            if (revision.rates_checksum && revision.rates_checksum !== canonicalRatesHash) {
-                throw new Error(`Revision integrity check failed: stored rates_checksum (${revision.rates_checksum}) does not match canonical hash of rates_json (${canonicalRatesHash})`);
+            if (!canonicalRatesHex) {
+                throw new Error(`Failed to compute valid canonical SHA-256 checksum for rates_json in revision ${revisionId}`);
             }
-            const sentRatesChecksum = revision.rates_checksum || canonicalRatesHash;
+
+            if (revision.rates_checksum) {
+                const storedRatesHex = normalizeSha256Hex(revision.rates_checksum);
+                if (!storedRatesHex) {
+                    throw new Error(`Revision integrity check failed: stored rates_checksum has invalid SHA-256 format (got: "${revision.rates_checksum}")`);
+                }
+                if (storedRatesHex !== canonicalRatesHex) {
+                    throw new Error(`Revision integrity check failed: stored rates_checksum (${revision.rates_checksum}) does not match canonical hash of rates_json (${canonicalRatesChecksum})`);
+                }
+            }
+            const sentRatesChecksum = toCanonicalSha256(canonicalRatesChecksum);
 
             // 1.2 Define explicitly the contract revision/patch checksum without confusing patch and rates checksums
             let checksumToPublish;
@@ -223,7 +271,8 @@ class BpePublicationService {
             if (existingPublished) {
                 const isPatchChecksumMatch = existingPublished.accepted_patch_checksum === checksumToPublish &&
                                              existingPublished.bpe_response_checksum === checksumToPublish;
-                const ratesMatch = computeRatesChecksum(revision.rates_json) === sentRatesChecksum;
+                const currentRatesHex = normalizeSha256Hex(computeRatesChecksum(revision.rates_json));
+                const ratesMatch = currentRatesHex !== null && currentRatesHex === canonicalRatesHex;
 
                 if (isPatchChecksumMatch && ratesMatch &&
                     String(existingPublished.revision_id) === String(revisionId) &&
@@ -297,6 +346,7 @@ class BpePublicationService {
                 bpe_printhouse_id: bpePrinthouseId,
                 revision_id: revisionId,
                 accepted_patch_checksum: checksumToPublish,
+                rates_checksum: sentRatesChecksum,
                 version: nextPublicationVersion,
                 rates: ratesPayload,
                 published_at: new Date().toISOString()
@@ -424,4 +474,6 @@ class BpePublicationService {
 const instance = new BpePublicationService();
 instance.BpePublicationService = BpePublicationService;
 instance.computeRatesChecksum = computeRatesChecksum;
+instance.normalizeSha256Hex = normalizeSha256Hex;
+instance.toCanonicalSha256 = toCanonicalSha256;
 module.exports = instance;

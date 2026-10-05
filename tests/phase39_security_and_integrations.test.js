@@ -823,6 +823,203 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             ).rejects.toThrow(/Revision integrity check failed/);
         });
 
+        it('should accept stored rates_checksum in raw 64-char hex format without rewriting historical revision and send canonical sha256 in contract/readback', async () => {
+            const rawRevId = 'rev_raw_hex_' + Date.now();
+            const rates = { base_charge: 45.0, per_unit: 0.85 };
+            const canonicalChecksum = bpePublicationService.computeRatesChecksum(rates);
+            const rawHexChecksum = bpePublicationService.normalizeSha256Hex(canonicalChecksum);
+            expect(rawHexChecksum).toHaveLength(64);
+            expect(rawHexChecksum).not.toMatch(/^sha256:/);
+
+            // Store strictly as raw 64-character hex in MySQL revision
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [rawRevId, tenantId, nodeId, checksum, rawHexChecksum, JSON.stringify(rates)]
+            );
+
+            let capturedSentPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, rawRevId, {
+                mockHandler: async (payload) => {
+                    capturedSentPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.status).toBe('PUBLISHED');
+            // Must send canonical sha256:<hash> in contract
+            expect(capturedSentPayload.rates_checksum).toBe(`sha256:${rawHexChecksum}`);
+            // Must return canonical sha256:<hash> in readback result
+            expect(res.ratesChecksum).toBe(`sha256:${rawHexChecksum}`);
+
+            // Historical revision MUST NOT be rewritten
+            const [storedRev] = await db.query(`SELECT rates_checksum FROM printhouse_pricing_revisions WHERE id = ?`, [rawRevId]);
+            expect(storedRev.rates_checksum).toBe(rawHexChecksum);
+
+            // Fast-path idempotency check must match and return canonical sha256:<hash>
+            const fastPathRes = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, rawRevId);
+            expect(fastPathRes.ok).toBe(true);
+            expect(fastPathRes.alreadyPublished).toBe(true);
+            expect(fastPathRes.ratesChecksum).toBe(`sha256:${rawHexChecksum}`);
+        });
+
+        it('should accept stored rates_checksum with canonical sha256: prefix and successfully publish', async () => {
+            const canonicalRevId = 'rev_canonical_prefix_' + Date.now();
+            const rates = { base_charge: 50.0, per_unit: 0.90 };
+            const canonicalChecksum = bpePublicationService.computeRatesChecksum(rates);
+            expect(canonicalChecksum).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [canonicalRevId, tenantId, nodeId, checksum, canonicalChecksum, JSON.stringify(rates)]
+            );
+
+            let capturedSentPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, canonicalRevId, {
+                mockHandler: async (payload) => {
+                    capturedSentPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.ratesChecksum).toBe(canonicalChecksum);
+            expect(capturedSentPayload.rates_checksum).toBe(canonicalChecksum);
+
+            // Fast-path idempotency check
+            const fastPathRes = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, canonicalRevId);
+            expect(fastPathRes.ok).toBe(true);
+            expect(fastPathRes.alreadyPublished).toBe(true);
+            expect(fastPathRes.ratesChecksum).toBe(canonicalChecksum);
+        });
+
+        it('should reject stored rates_checksum with invalid SHA-256 formats (non-hex, wrong length)', async () => {
+            const rates = { offset: 0.15 };
+            const badFormatRev1 = 'rev_bad_format_1_' + Date.now();
+            // 64 chars but non-hex 'zz'
+            const nonHexChecksum = '39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9bafzz';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badFormatRev1, tenantId, nodeId, checksum, nonHexChecksum, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badFormatRev1)
+            ).rejects.toThrow(/invalid SHA-256 format/);
+
+            const badFormatRev2 = 'rev_bad_format_2_' + Date.now();
+            // Wrong length (too short)
+            const shortChecksum = 'sha256:1234567890abcdef';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badFormatRev2, tenantId, nodeId, checksum, shortChecksum, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badFormatRev2)
+            ).rejects.toThrow(/invalid SHA-256 format/);
+        });
+
+        it('should reject stored rates_checksum when valid 64-char hex is discrepant from rates_json hash', async () => {
+            const rates = { offset: 0.20 };
+            const discrepantRevId = 'rev_discrepant_hash_' + Date.now();
+            // Valid 64-hex string but discrepant
+            const discrepantHex = '0000000000000000000000000000000000000000000000000000000000000000';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [discrepantRevId, tenantId, nodeId, checksum, discrepantHex, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, discrepantRevId)
+            ).rejects.toThrow(/does not match canonical hash/);
+        });
+
+        it('should reject BPE readback when rates_checksum is not in canonical sha256:<64-hex> format (e.g. raw hex)', async () => {
+            const testRevId = 'rev_readback_format_' + Date.now();
+            const rates = { offset: 0.30 };
+            const canonicalCs = bpePublicationService.computeRatesChecksum(rates);
+            const rawHex = bpePublicationService.normalizeSha256Hex(canonicalCs);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [testRevId, tenantId, nodeId, checksum, canonicalCs, JSON.stringify(rates)]
+            );
+
+            // BPE returns raw hex without 'sha256:' prefix in readback -> rejected
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, testRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: rawHex, // raw hex without sha256: prefix!
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: rawHex
+                        }
+                    })
+                })
+            ).rejects.toThrow(/rates checksum mismatch/);
+        });
+
+        it('should correctly normalize and canonicalize SHA-256 checksums via utility functions', () => {
+            const raw = '39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a';
+            const canonical = 'sha256:39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a';
+
+            expect(bpePublicationService.normalizeSha256Hex(raw)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(canonical)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(raw.toUpperCase())).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(`  ${canonical}  `)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex('SHA256:' + raw)).toBe(raw);
+
+            expect(bpePublicationService.toCanonicalSha256(raw)).toBe(canonical);
+            expect(bpePublicationService.toCanonicalSha256(canonical)).toBe(canonical);
+            expect(bpePublicationService.toCanonicalSha256(raw.toUpperCase())).toBe(canonical);
+
+            // Invalid formats
+            expect(bpePublicationService.normalizeSha256Hex(null)).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(undefined)).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex('')).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex('not_a_hash')).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(raw.slice(0, 63))).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(raw + '0')).toBeNull();
+            expect(bpePublicationService.toCanonicalSha256('invalid')).toBeNull();
+        });
+
         it('should reject response without readback.verified: true and mark publication as FAILED', async () => {
             const badRevId = 'rev_bad_readback_' + Date.now();
             const badChecksum = 'sha256:bad_readback_chk';
