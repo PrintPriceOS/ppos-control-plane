@@ -1,14 +1,14 @@
 {
-  "git_commit_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-  "generated_at": "2026-10-05T12:49:43Z",
-  "captures_count": 21,
+  "git_commit_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+  "generated_at": "2026-10-05T20:07:33Z",
+  "captures_count": 22,
   "captures": [
     {
       "stage": "1. Entorno Beta (Overview)",
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "01_entorno_beta_overview_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "baa86d9d467a7e72c47a49f4ab046ca40d9531308e1f745ecf82b54e40fcd33f",
       "overflow": {
         "hasOverflow": false,
@@ -29,7 +29,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "02_sesiones_runtime_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "304a4c46e6f69104896ea17d4067a494d1418f028b62e33425c823fe127e4411",
       "overflow": {
         "hasOverflow": false,
@@ -50,7 +50,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "03_actividad_observacion_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "1c771f3629f30619050a34f16274cdbdef8090e5f10c9ef96ade27f3eb22bfa7",
       "overflow": {
         "hasOverflow": false,
@@ -71,8 +71,8 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "04_revisiones_salud_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "4dd25046163979ee24f476dfc2cf252fffd6e2388fc442e40bb49525605f7d6b",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "2315a8bfaf470e2901a85ee3f8b5faac38a40dc8168530cf6cc740a7537037b4",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -92,8 +92,8 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "05_preparacion_intervenciones_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "588daecef91ff0a3a504b281e22b53d4efe33177f611a3b5fd079fab7f5ea0bb",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "75337a6a518d871d529aa84d8fbe8176c19cf2bd74c28c19aa93c3adde3a4406",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -113,7 +113,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Dark - ES",
       "file": "06_aprobacion_intervenciones_selected_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "127befa9113a701ddafa6eb6c9360422bc64322d76838511e2f1df9aaed2d64a",
       "overflow": {
         "hasOverflow": false,
@@ -134,7 +134,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "01_entorno_beta_overview_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "6e9dfb376cba54af92fb259411c3e43b87852e8352d3079f03f18cc775bcc191",
       "overflow": {
         "hasOverflow": false,
@@ -155,7 +155,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "02_sesiones_runtime_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "6a1e6a1518c2012e2043ae3e2c710d22b2f69c79458bdd037b84664318b36b63",
       "overflow": {
         "hasOverflow": false,
@@ -176,7 +176,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "03_actividad_observacion_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "a7a552f05e3a5d6e95a1898fcdecd630f80413a913d67d6e0c012dd2e2a57e2d",
       "overflow": {
         "hasOverflow": false,
@@ -197,8 +197,8 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "04_revisiones_salud_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "278c88f4d0dbed0e934847cba74241e25c0b7142f9afc8c4b2650636f40345be",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "7f4a0f0d39e5700e85fbedbb7ab0455e596bbc7e14437e74a2ef0ccad2bbb434",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -218,8 +218,8 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "05_preparacion_intervenciones_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "b433bee3e6ce4c6526b87335769daf2852d8c68bea320e393fe855c57a1e2352",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "2c11007b4f99dbc8cad38fec388d122fc98f1a5755ad620a5d4a2890afec958d",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -239,7 +239,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Desktop 1280x720 - Light - ES",
       "file": "06_aprobacion_intervenciones_selected_light_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "341932467aebe986e038cc4b0f7e3e21d3cce35eec249e40f1bb821e22b6c06a",
       "overflow": {
         "hasOverflow": false,
@@ -256,12 +256,29 @@
       }
     },
     {
+      "stage": "2. Sesiones Runtime",
+      "flow": "Recorrido 1 (Entidades Seleccionadas)",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "02_sesiones_runtime_selected_mobile_390x844_dark.png",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "4ab33a7df759af5816b3db0f253b730edc8fa3244d7b569240995cf72256add6",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "simulated_data": {
+        "tenants": true
+      }
+    },
+    {
       "stage": "4. Revisiones de Salud de Cohorte",
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Mobile 390x844 - Dark - ES",
       "file": "04_revisiones_salud_selected_mobile_390x844_dark.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "342f17d3090602a925ef207b4a5557c2f84cc4ef626ee45c4b351955db739a6a",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "72693152668b055b1cee42cbc5aaf1bfbc81e852fa81b00a3ebe7d09b49869df",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 390,
@@ -277,7 +294,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Mobile 390x844 - Dark - ES",
       "file": "05_preparacion_intervenciones_selected_mobile_390x844_dark.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "59495bfed1387f97225995e62b692c6455e541abea5d297ef635ba8a24560607",
       "overflow": {
         "hasOverflow": false,
@@ -294,7 +311,7 @@
       "flow": "Recorrido 1 (Entidades Seleccionadas)",
       "variant": "Mobile 390x844 - Dark - ES",
       "file": "06_aprobacion_intervenciones_selected_mobile_390x844_dark.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
       "sha256": "447c2b766688782cd61e92244b364d126b9dce00a527e52f0571aed7da7d0f74",
       "overflow": {
         "hasOverflow": false,
@@ -309,10 +326,10 @@
     {
       "stage": "4. Revisiones de Salud de Cohorte",
       "flow": "Recorrido 2 (HTTP 500 Error)",
-      "variant": "Desktop 1280x720 - Dark - HTTP 500 Error - ES",
+      "variant": "Desktop - Dark - HTTP 500 Error Panel Completo - ES",
       "file": "04_revisiones_salud_http500_error_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "cd0d24ae25163c5278766584849849a6935a8008b6d67b7e6bc91950faea4f3c",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "f1b7ae9370f98e8df17dc65a2f7ef24c737bd732c0dd8cca18706e60fd0c8e97",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -321,6 +338,7 @@
       },
       "simulated_data": {
         "http_500_injected": true,
+        "target_endpoint": "/api/admin/beta/runtime-reviews/reviews",
         "empty_list_hidden": true,
         "retry_button_present": true
       }
@@ -328,10 +346,10 @@
     {
       "stage": "4. Revisiones de Salud de Cohorte",
       "flow": "Recorrido 2 (Recuperaci\u00f3n con Reintentar)",
-      "variant": "Desktop 1280x720 - Dark - Recuperaci\u00f3n Exitosa - ES",
+      "variant": "Desktop - Dark - Recuperaci\u00f3n Exitosa con Entidad Conocida - ES",
       "file": "04_revisiones_salud_http500_recovered_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "e800f6d7e33c9dcbd2fa792f7b0a9caa58f15438b4682b78909d27ee1e6e6c8f",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "f70f3e2af2ed868ba85aedb287afd9235d7ac8d8783733e42a5a6939ee1c04c3",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -339,16 +357,18 @@
         "bodyWidth": 1280
       },
       "simulated_data": {
-        "recovery_after_retry": true
+        "http_200_recovered": true,
+        "target_endpoint": "/api/admin/beta/runtime-reviews/reviews",
+        "known_entity_selected": "rev_beta_alpha_01"
       }
     },
     {
       "stage": "5. Preparaci\u00f3n de Intervenciones",
       "flow": "Recorrido 2 (HTTP 500 Error)",
-      "variant": "Desktop 1280x720 - Dark - HTTP 500 Error - ES",
+      "variant": "Desktop - Dark - HTTP 500 Error Panel Completo - ES",
       "file": "05_preparacion_intervenciones_http500_error_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "bf399d6be1211a2f19b39c8e79f6946a8d344dc02f051cbf55af1d95ab1c454f",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "d705273662e873f44d41af2b13908375daec0fc8545c4efa012c650d8f3e6f57",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -357,6 +377,7 @@
       },
       "simulated_data": {
         "http_500_injected": true,
+        "target_endpoint": "/api/admin/beta/cohort-interventions/preparations",
         "empty_list_hidden": true,
         "retry_button_present": true
       }
@@ -364,10 +385,10 @@
     {
       "stage": "5. Preparaci\u00f3n de Intervenciones",
       "flow": "Recorrido 2 (Recuperaci\u00f3n con Reintentar)",
-      "variant": "Desktop 1280x720 - Dark - Recuperaci\u00f3n Exitosa - ES",
+      "variant": "Desktop - Dark - Recuperaci\u00f3n Exitosa con Entidad Conocida - ES",
       "file": "05_preparacion_intervenciones_http500_recovered_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "5e62ac473f4e4e1e2837549390ac975563616327830b6a45febc02e20c0da14d",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "d6f214b4e50c9cd9d8dc22e9af5e5ceacd2ced43d9927594d2fc900688b0c80f",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -375,16 +396,18 @@
         "bodyWidth": 1280
       },
       "simulated_data": {
-        "recovery_after_retry": true
+        "http_200_recovered": true,
+        "target_endpoint": "/api/admin/beta/cohort-interventions/preparations",
+        "known_entity_selected": "prep_alpha_intervention_01"
       }
     },
     {
       "stage": "6. Aprobaci\u00f3n de Gobernanza",
       "flow": "Recorrido 2 (HTTP 500 Error)",
-      "variant": "Desktop 1280x720 - Dark - HTTP 500 Error - ES",
+      "variant": "Desktop - Dark - HTTP 500 Error Panel Completo - ES",
       "file": "06_aprobacion_intervenciones_http500_error_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "4a157ed246853058016525890b7d7592ee1cdfdbfde1b213241ed0fccdd81576",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "170c591029932e11a95972d3b2f4cf10b4d0018316b2d5a2c3f069ae2e409c20",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -393,6 +416,7 @@
       },
       "simulated_data": {
         "http_500_injected": true,
+        "target_endpoint": "/api/admin/beta/cohort-intervention-approvals/approvals",
         "empty_list_hidden": true,
         "retry_button_present": true
       }
@@ -400,10 +424,10 @@
     {
       "stage": "6. Aprobaci\u00f3n de Gobernanza",
       "flow": "Recorrido 2 (Recuperaci\u00f3n con Reintentar)",
-      "variant": "Desktop 1280x720 - Dark - Recuperaci\u00f3n Exitosa - ES",
+      "variant": "Desktop - Dark - Recuperaci\u00f3n Exitosa con Entidad Conocida - ES",
       "file": "06_aprobacion_intervenciones_http500_recovered_dark_es.png",
-      "git_sha": "d5982ba5a1033ef661eeabb2c3db6e34b02bf536",
-      "sha256": "d9188a28118fa436bf101cccbf34e34c758e866571f3abbcb703c5513af47852",
+      "git_sha": "86bca68857f97db6509ed775ebc11d4f43611834",
+      "sha256": "18cebdf61e59036e07cab17c528e20a24f3e4ea095fe06432321ca9cd193c894",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -411,7 +435,9 @@
         "bodyWidth": 1280
       },
       "simulated_data": {
-        "recovery_after_retry": true
+        "http_200_recovered": true,
+        "target_endpoint": "/api/admin/beta/cohort-intervention-approvals/approvals",
+        "known_entity_selected": "appr_alpha_gov_01"
       }
     }
   ],
@@ -419,23 +445,24 @@
     "01_entorno_beta_overview_selected_dark_es.png": "baa86d9d467a7e72c47a49f4ab046ca40d9531308e1f745ecf82b54e40fcd33f",
     "02_sesiones_runtime_selected_dark_es.png": "304a4c46e6f69104896ea17d4067a494d1418f028b62e33425c823fe127e4411",
     "03_actividad_observacion_selected_dark_es.png": "1c771f3629f30619050a34f16274cdbdef8090e5f10c9ef96ade27f3eb22bfa7",
-    "04_revisiones_salud_selected_dark_es.png": "4dd25046163979ee24f476dfc2cf252fffd6e2388fc442e40bb49525605f7d6b",
-    "05_preparacion_intervenciones_selected_dark_es.png": "588daecef91ff0a3a504b281e22b53d4efe33177f611a3b5fd079fab7f5ea0bb",
+    "04_revisiones_salud_selected_dark_es.png": "2315a8bfaf470e2901a85ee3f8b5faac38a40dc8168530cf6cc740a7537037b4",
+    "05_preparacion_intervenciones_selected_dark_es.png": "75337a6a518d871d529aa84d8fbe8176c19cf2bd74c28c19aa93c3adde3a4406",
     "06_aprobacion_intervenciones_selected_dark_es.png": "127befa9113a701ddafa6eb6c9360422bc64322d76838511e2f1df9aaed2d64a",
     "01_entorno_beta_overview_selected_light_es.png": "6e9dfb376cba54af92fb259411c3e43b87852e8352d3079f03f18cc775bcc191",
     "02_sesiones_runtime_selected_light_es.png": "6a1e6a1518c2012e2043ae3e2c710d22b2f69c79458bdd037b84664318b36b63",
     "03_actividad_observacion_selected_light_es.png": "a7a552f05e3a5d6e95a1898fcdecd630f80413a913d67d6e0c012dd2e2a57e2d",
-    "04_revisiones_salud_selected_light_es.png": "278c88f4d0dbed0e934847cba74241e25c0b7142f9afc8c4b2650636f40345be",
-    "05_preparacion_intervenciones_selected_light_es.png": "b433bee3e6ce4c6526b87335769daf2852d8c68bea320e393fe855c57a1e2352",
+    "04_revisiones_salud_selected_light_es.png": "7f4a0f0d39e5700e85fbedbb7ab0455e596bbc7e14437e74a2ef0ccad2bbb434",
+    "05_preparacion_intervenciones_selected_light_es.png": "2c11007b4f99dbc8cad38fec388d122fc98f1a5755ad620a5d4a2890afec958d",
     "06_aprobacion_intervenciones_selected_light_es.png": "341932467aebe986e038cc4b0f7e3e21d3cce35eec249e40f1bb821e22b6c06a",
-    "04_revisiones_salud_selected_mobile_390x844_dark.png": "342f17d3090602a925ef207b4a5557c2f84cc4ef626ee45c4b351955db739a6a",
+    "02_sesiones_runtime_selected_mobile_390x844_dark.png": "4ab33a7df759af5816b3db0f253b730edc8fa3244d7b569240995cf72256add6",
+    "04_revisiones_salud_selected_mobile_390x844_dark.png": "72693152668b055b1cee42cbc5aaf1bfbc81e852fa81b00a3ebe7d09b49869df",
     "05_preparacion_intervenciones_selected_mobile_390x844_dark.png": "59495bfed1387f97225995e62b692c6455e541abea5d297ef635ba8a24560607",
     "06_aprobacion_intervenciones_selected_mobile_390x844_dark.png": "447c2b766688782cd61e92244b364d126b9dce00a527e52f0571aed7da7d0f74",
-    "04_revisiones_salud_http500_error_dark_es.png": "cd0d24ae25163c5278766584849849a6935a8008b6d67b7e6bc91950faea4f3c",
-    "04_revisiones_salud_http500_recovered_dark_es.png": "e800f6d7e33c9dcbd2fa792f7b0a9caa58f15438b4682b78909d27ee1e6e6c8f",
-    "05_preparacion_intervenciones_http500_error_dark_es.png": "bf399d6be1211a2f19b39c8e79f6946a8d344dc02f051cbf55af1d95ab1c454f",
-    "05_preparacion_intervenciones_http500_recovered_dark_es.png": "5e62ac473f4e4e1e2837549390ac975563616327830b6a45febc02e20c0da14d",
-    "06_aprobacion_intervenciones_http500_error_dark_es.png": "4a157ed246853058016525890b7d7592ee1cdfdbfde1b213241ed0fccdd81576",
-    "06_aprobacion_intervenciones_http500_recovered_dark_es.png": "d9188a28118fa436bf101cccbf34e34c758e866571f3abbcb703c5513af47852"
+    "04_revisiones_salud_http500_error_dark_es.png": "f1b7ae9370f98e8df17dc65a2f7ef24c737bd732c0dd8cca18706e60fd0c8e97",
+    "04_revisiones_salud_http500_recovered_dark_es.png": "f70f3e2af2ed868ba85aedb287afd9235d7ac8d8783733e42a5a6939ee1c04c3",
+    "05_preparacion_intervenciones_http500_error_dark_es.png": "d705273662e873f44d41af2b13908375daec0fc8545c4efa012c650d8f3e6f57",
+    "05_preparacion_intervenciones_http500_recovered_dark_es.png": "d6f214b4e50c9cd9d8dc22e9af5e5ceacd2ced43d9927594d2fc900688b0c80f",
+    "06_aprobacion_intervenciones_http500_error_dark_es.png": "170c591029932e11a95972d3b2f4cf10b4d0018316b2d5a2c3f069ae2e409c20",
+    "06_aprobacion_intervenciones_http500_recovered_dark_es.png": "18cebdf61e59036e07cab17c528e20a24f3e4ea095fe06432321ca9cd193c894"
   }
 }
