@@ -283,7 +283,7 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
     const inspectBtns = screen.getAllByText(/Inspeccionar Máquina/i);
     expect(inspectBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(inspectBtns[0]);
-    expect(mockOpenMachine).toHaveBeenCalledWith('node_1');
+    expect(mockOpenMachine).toHaveBeenCalledWith('node_1', expect.objectContaining({ id: 'node_1' }));
   });
 
   it('8. Critical actions do NOT invoke endpoints when cancelling confirmation dialog', async () => {
@@ -336,6 +336,6 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
     const inspectBtns = screen.getAllByText(/Inspeccionar Máquina/i);
     expect(inspectBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(inspectBtns[0]);
-    expect(mockOpenMachine).toHaveBeenCalledWith('node_1');
+    expect(mockOpenMachine).toHaveBeenCalledWith('node_1', expect.objectContaining({ id: 'node_1' }));
   });
 });

@@ -1,6 +1,6 @@
 {
-  "git_commit_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-  "generated_at": "2026-10-05T10:24:34Z",
+  "git_commit_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+  "generated_at": "2026-10-05T11:05:41Z",
   "captures": [
     {
       "screen": "Entorno Beta / Limited Beta Runtime",
@@ -8,7 +8,7 @@
       "file": "beta_runtime_desktop_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "d6936ecda2a5c6847951bba3909401397ca4aeedb675fc5a70bf533afef9d668",
       "overflow": {
         "hasOverflow": false,
@@ -27,7 +27,7 @@
       "file": "beta_governance_desktop_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "5e3b5dfe6cb92adef0acc6c5673fc3e2ef9df9a4a45569d1eae91a405e5a8a1b",
       "overflow": {
         "hasOverflow": false,
@@ -46,8 +46,8 @@
       "file": "industrial_ops_desktop_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-      "sha256": "b52d7da907460b979d02370734a7bf9902f2f269b181c036538534767a464861",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+      "sha256": "f59dae5aea083fe1d039a217afe1adb82b8c7a436ab2a009ebef8444ed002a6f",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -65,8 +65,8 @@
       "file": "beta_runtime_desktop_light_es.png",
       "effective_theme": "light",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-      "sha256": "23a396f650f11e57d5d242a5b6f3a77ec247044cbc8527d8036e574148a963c5",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+      "sha256": "745a7c8d6c2ff67f1c22cc9d239e77c18a77eded07dd5150b873fdb9f55ff1c5",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -84,7 +84,7 @@
       "file": "beta_governance_desktop_light_es.png",
       "effective_theme": "light",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "d9a68ba1a39710a7084d0fc105aabab6a09f798799563389648743fb33280dec",
       "overflow": {
         "hasOverflow": false,
@@ -103,8 +103,8 @@
       "file": "industrial_ops_desktop_light_es.png",
       "effective_theme": "light",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-      "sha256": "40ac23d7e2a57049501069c4efbd99abd52f95fe76c4ad579f5b6f8ac2f9efb2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+      "sha256": "f159932faf50b64405771eb9c8a8974c075a7f0c9b1c578a20045a99bda906f0",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -122,7 +122,7 @@
       "file": "beta_runtime_mobile_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "d7c1950ea97a0d7110ef71bd9304cdfe01c3d703b70ef3d758e49fd3c4a54555",
       "overflow": {
         "hasOverflow": false,
@@ -141,7 +141,7 @@
       "file": "beta_governance_mobile_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "0213262542bec041b6e24c456a263f80d5d2d13fd09806ed269e0849afc31637",
       "overflow": {
         "hasOverflow": false,
@@ -160,7 +160,7 @@
       "file": "industrial_ops_mobile_dark_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
       "sha256": "092d21199af1c5b803f67af141751caf0bd75ca1dcdfac272d9cd7543917b7a2",
       "overflow": {
         "hasOverflow": false,
@@ -179,8 +179,8 @@
       "file": "industrial_ops_tile_failure_fallback_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-      "sha256": "3df0601ad847ffe59041c17da1c4eb10379b1fabce8cd13d210e03db4a748c99",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+      "sha256": "a97bd15d071f910d5bbd106caf9956934cef7028a360bd2d619876467f149927",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -199,8 +199,8 @@
       "file": "industrial_ops_node_machine_inspection_es.png",
       "effective_theme": "dark",
       "language": "es",
-      "git_sha": "84acd905d71b9165e8c02fd816b25fbb84c07ee2",
-      "sha256": "f06e45bd4b7783275afc4cba70debdcecc9666b894c0bf7c9f5be64fcf1b5abb",
+      "git_sha": "579b5b6721620379a3f4ce7776eee5073a78bb9a",
+      "sha256": "f2b6bf76d86580757b6c11f08168ca93d78b2c010ac72b180dcc9f8a8ced642b",
       "overflow": {
         "hasOverflow": false,
         "docWidth": 1280,
@@ -217,14 +217,14 @@
   "checksums": {
     "beta_runtime_desktop_dark_es.png": "d6936ecda2a5c6847951bba3909401397ca4aeedb675fc5a70bf533afef9d668",
     "beta_governance_desktop_dark_es.png": "5e3b5dfe6cb92adef0acc6c5673fc3e2ef9df9a4a45569d1eae91a405e5a8a1b",
-    "industrial_ops_desktop_dark_es.png": "b52d7da907460b979d02370734a7bf9902f2f269b181c036538534767a464861",
-    "beta_runtime_desktop_light_es.png": "23a396f650f11e57d5d242a5b6f3a77ec247044cbc8527d8036e574148a963c5",
+    "industrial_ops_desktop_dark_es.png": "f59dae5aea083fe1d039a217afe1adb82b8c7a436ab2a009ebef8444ed002a6f",
+    "beta_runtime_desktop_light_es.png": "745a7c8d6c2ff67f1c22cc9d239e77c18a77eded07dd5150b873fdb9f55ff1c5",
     "beta_governance_desktop_light_es.png": "d9a68ba1a39710a7084d0fc105aabab6a09f798799563389648743fb33280dec",
-    "industrial_ops_desktop_light_es.png": "40ac23d7e2a57049501069c4efbd99abd52f95fe76c4ad579f5b6f8ac2f9efb2",
+    "industrial_ops_desktop_light_es.png": "f159932faf50b64405771eb9c8a8974c075a7f0c9b1c578a20045a99bda906f0",
     "beta_runtime_mobile_dark_es.png": "d7c1950ea97a0d7110ef71bd9304cdfe01c3d703b70ef3d758e49fd3c4a54555",
     "beta_governance_mobile_dark_es.png": "0213262542bec041b6e24c456a263f80d5d2d13fd09806ed269e0849afc31637",
     "industrial_ops_mobile_dark_es.png": "092d21199af1c5b803f67af141751caf0bd75ca1dcdfac272d9cd7543917b7a2",
-    "industrial_ops_tile_failure_fallback_es.png": "3df0601ad847ffe59041c17da1c4eb10379b1fabce8cd13d210e03db4a748c99",
-    "industrial_ops_node_machine_inspection_es.png": "f06e45bd4b7783275afc4cba70debdcecc9666b894c0bf7c9f5be64fcf1b5abb"
+    "industrial_ops_tile_failure_fallback_es.png": "a97bd15d071f910d5bbd106caf9956934cef7028a360bd2d619876467f149927",
+    "industrial_ops_node_machine_inspection_es.png": "f2b6bf76d86580757b6c11f08168ca93d78b2c010ac72b180dcc9f8a8ced642b"
   }
 }

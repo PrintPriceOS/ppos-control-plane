@@ -74,16 +74,23 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
   const theme = useTheme();
   const { t } = useLocale();
   const isLight = theme === 'light';
+  const isDevOrTest = Boolean(
+    (import.meta as any).env?.DEV ||
+    (typeof process !== 'undefined' && (process as any).env?.NODE_ENV === 'test') ||
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  );
+
   const [tileError, setTileError] = React.useState(false);
-  const isTileFailure = forceTileError || tileError || Boolean(typeof window !== 'undefined' && (window as any).__PPOS_FORCE_TILE_ERROR);
+  const isTileFailure = (isDevOrTest && forceTileError) || tileError || (isDevOrTest && Boolean(typeof window !== 'undefined' && (window as any).__PPOS_FORCE_TILE_ERROR));
 
   useEffect(() => {
+    if (!isDevOrTest) return;
     const handler = (e: any) => {
       setTileError(Boolean(e.detail !== false));
     };
     window.addEventListener('ppos-tile-error', handler);
     return () => window.removeEventListener('ppos-tile-error', handler);
-  }, []);
+  }, [isDevOrTest]);
 
   // Tile provider detection
   const cartoApiKey = (import.meta as any).env?.VITE_CARTO_API_KEY;
@@ -243,7 +250,7 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
                   fillOpacity={node?.status === 'OFFLINE' ? 0.2 : (isLight ? 0.75 : 0.6)}
                   weight={2}
                   eventHandlers={{
-                    click: () => node?.id && openMachine(node.id)
+                    click: () => node?.id && openMachine(node.id, node)
                   }}
                 >
                   <Popup>
@@ -319,7 +326,7 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
                             {toDisplayText(node?.company_name || node?.name || 'Print Node')}
                           </h4>
                           <span className="text-[9px] font-mono text-zinc-500 uppercase">
-                            ID: {String(node?.id || '').slice(0, 10)}
+                            ID: {String(node?.id || '')}
                           </span>
                         </div>
                         <span 
@@ -359,7 +366,7 @@ export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forc
                     <div className="pt-2 border-t ppos-border flex items-center justify-between">
                       <button
                         type="button"
-                        onClick={() => node?.id && openMachine(node.id)}
+                        onClick={() => node?.id && openMachine(node.id, node)}
                         className="text-[10px] font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1 transition-colors uppercase tracking-wider"
                       >
                         <WrenchIcon className="w-3 h-3" />
