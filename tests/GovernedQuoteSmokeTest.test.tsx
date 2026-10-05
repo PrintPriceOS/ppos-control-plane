@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GovernedQuoteSmokeTest } from '../src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest';
 import { QuickCalibrationPanel } from '../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel';
@@ -805,13 +805,46 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             return { ...currentSessionState };
         });
 
-        const calculateSpy = vi.spyOn(printhouseCalibrationApi, 'calculateCalibration').mockResolvedValue({
-            id: 'crun-complex-run-1',
-            status: 'SUCCEEDED',
-            targetPrice: 6048,
-            enginePriceAfter: 6048,
-            absoluteResidual: 0,
-            sessionInputChecksum: await computeBookSpecChecksum(sessionPayload.bookSpec)
+        const calculateSpy = vi.spyOn(printhouseCalibrationApi, 'calculateCalibration').mockImplementation(async (id) => {
+            const specChecksum = await computeBookSpecChecksum(currentSessionState.bookSpec);
+            return {
+                id: 'crun-complex-run-1',
+                calibrationSessionId: 'cal-complex-draft-101',
+                status: 'SUCCEEDED',
+                targetPrice: 6048,
+                target_price: 6048,
+                enginePriceAfter: 6048,
+                predicted_manufacturing_price: 6048,
+                absoluteResidual: 0,
+                absolute_residual: 0,
+                percentResidual: 0,
+                percent_residual: 0,
+                sessionInputChecksum: specChecksum,
+                session_input_checksum: specChecksum,
+                proposedPatch: {},
+                proposed_patch: {}
+            };
+        });
+
+        const listRunsSpy = vi.spyOn(printhouseCalibrationApi, 'listRuns').mockImplementation(async (id) => {
+            const specChecksum = await computeBookSpecChecksum(currentSessionState.bookSpec);
+            return [{
+                id: 'crun-complex-run-1',
+                calibrationSessionId: 'cal-complex-draft-101',
+                status: 'SUCCEEDED',
+                targetPrice: 6048,
+                target_price: 6048,
+                enginePriceAfter: 6048,
+                predicted_manufacturing_price: 6048,
+                absoluteResidual: 0,
+                absolute_residual: 0,
+                percentResidual: 0,
+                percent_residual: 0,
+                sessionInputChecksum: specChecksum,
+                session_input_checksum: specChecksum,
+                proposedPatch: {},
+                proposed_patch: {}
+            }];
         });
 
         const getSessionSpy = vi.spyOn(printhouseCalibrationApi, 'getSession').mockImplementation(async (id) => {
@@ -883,13 +916,16 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             expect(calculateSpy).toHaveBeenCalledWith('cal-complex-draft-101');
         });
 
-        // In Step 4, click "Accept Pricing Revision" to open modal
-        const acceptBtns = screen.getAllByRole('button', { name: /Accept Pricing Revision/i });
-        fireEvent.click(acceptBtns[0]);
+        // Wait for calibration to complete and the UI to render the "Accept Pricing Revision" trigger button
+        const acceptTriggerBtn = await screen.findByRole('button', { name: /Accept Pricing Revision/i });
+        fireEvent.click(acceptTriggerBtn);
 
-        // Click Accept Pricing Revision in modal (second button with this name)
-        const modalAcceptBtns = screen.getAllByRole('button', { name: /Accept Pricing Revision/i });
-        fireEvent.click(modalAcceptBtns[modalAcceptBtns.length - 1]);
+        // Wait for the modal dialog to appear and select its confirmation button using within(dialog)
+        const dialog = await screen.findByRole('dialog');
+        expect(dialog).toBeInTheDocument();
+
+        const modalAcceptBtn = within(dialog).getByRole('button', { name: /Accept Pricing Revision/i });
+        fireEvent.click(modalAcceptBtn);
 
         await waitFor(() => {
             expect(acceptSpy).toHaveBeenCalledWith('cal-complex-draft-101', 'crun-complex-run-1');
