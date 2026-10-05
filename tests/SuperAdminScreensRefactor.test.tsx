@@ -145,24 +145,54 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
     vi.clearAllMocks();
   });
 
-  it('1. Topbar derives governance posture dynamically from real telemetry without static unverified assertions', async () => {
+  it('1. Topbar derives core telemetry signal directly from /api/system/health real dependencies contract', async () => {
     const adminApi = await import('../src/ui/lib/adminApi');
 
-    // Healthy telemetry case
-    (adminApi.getSystemHealth as any).mockResolvedValueOnce({ ok: true });
+    // Healthy telemetry case: verifies process uptime and redis dependency 'ready' + 'OK' latency
+    (adminApi.getSystemHealth as any).mockResolvedValueOnce({
+      ok: true,
+      uptime_seconds: 3600,
+      pid: 4120,
+      dependencies: {
+        redis: {
+          status: 'ready',
+          latency: 'OK'
+        }
+      }
+    });
     const { unmount } = renderWithProviders(<Topbar />);
 
     expect(screen.queryByText(/v2\.0\.0 Certified/i)).toBeNull();
     await waitFor(() => {
-      expect(screen.getByText(/Gobernanza Activa|Active Governance|Aktive Governance/i)).toBeDefined();
+      const badge = screen.getByText(/Telemetría Núcleo: OK|Core Telemetry: OK|Kern-Telemetrie: OK/i);
+      expect(badge).toBeDefined();
+      expect(badge.closest('div')?.getAttribute('title')).toContain('4120');
+      expect(badge.closest('div')?.getAttribute('title')).toContain('No evalúa RBAC');
     });
     unmount();
 
+    // Degraded telemetry case: HTTP 200 / ok: true is NOT enough if redis latency or status is degraded
+    (adminApi.getSystemHealth as any).mockResolvedValueOnce({
+      ok: true,
+      uptime_seconds: 120,
+      dependencies: {
+        redis: {
+          status: 'connect',
+          latency: 'ERROR'
+        }
+      }
+    });
+    const { unmount: unmountDegraded } = renderWithProviders(<Topbar />);
+    await waitFor(() => {
+      expect(screen.getByText(/Telemetría Degradada|Degraded Telemetry|Degradierte Telemetrie/i)).toBeDefined();
+    });
+    unmountDegraded();
+
     // Unreachable telemetry case: must NOT assert active operational status without backing data
-    (adminApi.getSystemHealth as any).mockResolvedValueOnce({ ok: false, status: 'UNREACHABLE' });
+    (adminApi.getSystemHealth as any).mockRejectedValueOnce(new Error('Network failure'));
     renderWithProviders(<Topbar />);
     await waitFor(() => {
-      expect(screen.queryByText(/Gobernanza Activa/i)).toBeNull();
+      expect(screen.queryByText(/Telemetría Núcleo: OK/i)).toBeNull();
       expect(screen.getByText(/Sin Telemetría|No Telemetry|Keine Telemetrie/i)).toBeDefined();
     });
   });
@@ -287,5 +317,25 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
       gate_id: 'gate_test_safe',
       reason: 'EMERGENCY_ACCESS_SUSPENSION'
     });
+  });
+
+  it('9. FederationLeafletMap with simulated tile error displays error banner, retains node list, and allows machine inspection', async () => {
+    renderWithProviders(<FederationLeafletMap forceTileError={true} />);
+
+    await waitFor(() => {
+      // Must show explicit error banner
+      expect(screen.getByText(/TILES: LOAD_FAILED/i)).toBeDefined();
+      expect(screen.getByText(/Error al cargar teselas cartográficas/i)).toBeDefined();
+      // Must retain tactical node registry list
+      expect(screen.getAllByText(/Registro Táctico de Nodos/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/Berlin Druck/i)).toBeDefined();
+      expect(screen.getByText(/Madrid Grafic/i)).toBeDefined();
+    });
+
+    // Node inspection must still be fully operative
+    const inspectBtns = screen.getAllByText(/Inspeccionar Máquina/i);
+    expect(inspectBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(inspectBtns[0]);
+    expect(mockOpenMachine).toHaveBeenCalledWith('node_1');
   });
 });

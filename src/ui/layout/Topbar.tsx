@@ -28,7 +28,13 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
   const navigate = useNavigate();
   const { locale, setLocale, t } = useLocale();
   const [currentTheme, setCurrentThemeState] = useState(getTheme());
-  const [governancePosture, setGovernancePosture] = useState<'VERIFYING' | 'ACTIVE' | 'DEGRADED' | 'OFFLINE'>('VERIFYING');
+  const [telemetryState, setTelemetryState] = useState<{
+    status: 'VERIFYING' | 'HEALTHY' | 'DEGRADED' | 'OFFLINE';
+    tooltip: string;
+  }>({
+    status: 'VERIFYING',
+    tooltip: t('topbar.telemetryVerifyingTooltip') || 'Comprobando estado del proceso y dependencias en /api/system/health...'
+  });
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
@@ -39,21 +45,44 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
     getSystemHealth()
       .then(data => {
         if (!isMounted) return;
-        if (data && data.ok) {
-          setGovernancePosture('ACTIVE');
-        } else if (data && data.status === 'HTTP_ERROR') {
-          setGovernancePosture('DEGRADED');
+        // Verify real contract of /api/system/health:
+        // Must inspect specific runtime dependencies:
+        // redis: { status: 'ready', latency: 'OK' }
+        const redisStatus = data?.dependencies?.redis?.status;
+        const redisLatency = data?.dependencies?.redis?.latency;
+        const isRedisReady = redisStatus === 'ready';
+        const isLatencyOk = redisLatency === 'OK';
+        const isUptimeValid = typeof data?.uptime_seconds === 'number' && data.uptime_seconds >= 0;
+
+        if (data?.ok === true && isRedisReady && isLatencyOk && isUptimeValid) {
+          setTelemetryState({
+            status: 'HEALTHY',
+            tooltip: `Telemetría de infraestructura OK: Proceso Node.js (PID ${data.pid || '—'}, ${data.uptime_seconds}s activo), Redis en estado 'ready' con latencia 'OK'. (No evalúa RBAC/gobernanza).`
+          });
+        } else if (data && (data.ok || isRedisReady || data.status === 'HTTP_ERROR')) {
+          setTelemetryState({
+            status: 'DEGRADED',
+            tooltip: `Telemetría degradada: Redis status='${redisStatus || 'unknown'}', latency='${redisLatency || 'unknown'}'. Verifique dependencias.`
+          });
         } else {
-          setGovernancePosture('OFFLINE');
+          setTelemetryState({
+            status: 'OFFLINE',
+            tooltip: 'Endpoint /api/system/health no disponible o sin respuesta. Sin evidencia de dependencias en vivo.'
+          });
         }
       })
       .catch(() => {
-        if (isMounted) setGovernancePosture('OFFLINE');
+        if (isMounted) {
+          setTelemetryState({
+            status: 'OFFLINE',
+            tooltip: 'Fallo de conexión al consultar /api/system/health. Sin evidencia de dependencias en vivo.'
+          });
+        }
       });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const unsubscribe = subscribeTheme((theme) => {
@@ -125,41 +154,41 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             </div>
           )}
 
-          {/* Governed Posture Badge - Derived dynamically from server telemetry */}
-          {governancePosture === 'ACTIVE' && (
+          {/* Core Telemetry Badge - Derived directly from /api/system/health */}
+          {telemetryState.status === 'HEALTHY' && (
             <div
               className="hidden md:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-              title={t('topbar.governedActiveTooltip') || 'Telemetría de servidor y control RBAC verificados en tiempo real.'}
+              title={telemetryState.tooltip}
             >
               <ShieldCheckIcon className="w-3.5 h-3.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedPosture') || 'Gobernanza Activa'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryHealthy') || 'Telemetría Núcleo: OK'}</span>
             </div>
           )}
-          {governancePosture === 'DEGRADED' && (
+          {telemetryState.status === 'DEGRADED' && (
             <div
               className="hidden md:flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20"
-              title={t('topbar.governedDegradedTooltip') || 'Conectividad establecida con dependencias degradadas.'}
+              title={telemetryState.tooltip}
             >
               <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedDegraded') || 'Gobernanza Parcial'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryDegraded') || 'Telemetría Degradada'}</span>
             </div>
           )}
-          {governancePosture === 'OFFLINE' && (
+          {telemetryState.status === 'OFFLINE' && (
             <div
               className="hidden md:flex items-center gap-2 px-3 py-1 bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
-              title={t('topbar.governedOfflineTooltip') || 'No se pudo verificar la telemetría del servidor en vivo; no se afirman garantías operativas.'}
+              title={telemetryState.tooltip}
             >
               <ExclamationCircleIcon className="w-3.5 h-3.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedOffline') || 'Sin Telemetría'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryOffline') || 'Sin Telemetría'}</span>
             </div>
           )}
-          {governancePosture === 'VERIFYING' && (
+          {telemetryState.status === 'VERIFYING' && (
             <div
               className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse"
-              title={t('topbar.governedVerifyingTooltip') || 'Comprobando telemetría de dependencias de servidor y control RBAC.'}
+              title={telemetryState.tooltip}
             >
               <InformationCircleIcon className="w-3.5 h-3.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.governedVerifying') || 'Verificando...'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryVerifying') || 'Comprobando Núcleo...'}</span>
             </div>
           )}
 

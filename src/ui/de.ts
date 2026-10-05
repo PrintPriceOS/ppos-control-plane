@@ -1205,6 +1205,18 @@ export const de = {
   'beta.governance.approvalNotExecution': 'Genehmigung stellt keine unmittelbare Ausführung dar',
   'beta.governance.approvalsTitle': 'Geregelte Interventionsgenehmigungen',
   'beta.governance.executionsTitle': 'Sichere Ausführung geregelter Interventionen',
+
+  // Topbar Telemetry
+  'topbar.telemetryHealthy': 'Kern-Telemetrie: OK',
+  'topbar.telemetryDegraded': 'Degradierte Telemetrie',
+  'topbar.telemetryOffline': 'Keine Telemetrie',
+  'topbar.telemetryVerifying': 'Kern prüfen...',
+  'topbar.telemetryVerifyingTooltip': 'Prozessstatus und Abhängigkeiten unter /api/system/health werden geprüft...',
+
+  // Map Cartography Fallback
+  'map.tileLoadFailed': 'Kartenkacheln konnten nicht geladen werden (401/403/Netzwerk)',
+  'map.tileLoadFailedHint': 'Der konfigurierte Kachelanbieter hat nicht geantwortet. Taktisches Knotenregister und Maschineninspektion bleiben voll einsatzbereit.',
+  'common.retry': 'Wiederholen',
 } as const;
 
 export type TranslationKeys = keyof typeof de;

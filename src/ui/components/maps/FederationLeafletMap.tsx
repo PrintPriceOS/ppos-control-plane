@@ -63,13 +63,19 @@ const BoundsFit: React.FC<{ nodes: any[] }> = ({ nodes }) => {
   return null;
 };
 
-export const FederationLeafletMap: React.FC = () => {
+export interface FederationLeafletMapProps {
+  forceTileError?: boolean;
+}
+
+export const FederationLeafletMap: React.FC<FederationLeafletMapProps> = ({ forceTileError = false }) => {
   const { data: mapState, status } = useAdminQuery('routing:map', getRoutingMap, 5000);
   const isLoading = status === 'loading';
   const { openMachine } = useMachineDrawer();
   const theme = useTheme();
   const { t } = useLocale();
   const isLight = theme === 'light';
+  const [tileError, setTileError] = React.useState(false);
+  const isTileFailure = forceTileError || tileError;
 
   // Tile provider detection
   const cartoApiKey = (import.meta as any).env?.VITE_CARTO_API_KEY;
@@ -112,8 +118,37 @@ export const FederationLeafletMap: React.FC = () => {
     <div className={`relative w-full h-full min-h-[650px] overflow-hidden group border flex flex-col ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-[#050505] border-white/10'}`}>
       <style>{getLeafletOverrideStyles(theme)}</style>
 
-      {/* Explicit Provider Status Header */}
-      {!hasTileConfig && (
+      {/* Explicit Tile Error Header */}
+      {isTileFailure && (
+        <div className={`p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-red-500/10 border-red-500/20 text-zinc-900' : 'bg-red-500/10 border-red-500/20 text-white'}`}>
+          <div className="flex items-start gap-3">
+            <div className="w-2 h-2 mt-1 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-red-500">
+                {t('map.tileLoadFailed') || 'Error al cargar teselas cartográficas (401/403/Red)'}
+              </h4>
+              <p className="text-[10px] text-zinc-400 mt-0.5">
+                {t('map.tileLoadFailedHint') || 'El proveedor cartográfico configurado no respondió satisfactoriamente. Se mantiene activo el registro táctico de nodos y la inspección de maquinaria.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+            <div className="px-2.5 py-1 text-[9px] font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-widest">
+              TILES: LOAD_FAILED
+            </div>
+            <button
+              type="button"
+              onClick={() => setTileError(false)}
+              className="px-2.5 py-1 text-[9px] font-mono font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 uppercase tracking-widest transition-colors"
+            >
+              {t('common.retry') || 'Reintentar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Explicit Provider Status Header (when unconfigured and no tile failure) */}
+      {!hasTileConfig && !isTileFailure && (
         <div className={`p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-amber-500/10 border-amber-500/20 text-zinc-900' : 'bg-amber-500/10 border-amber-500/20 text-white'}`}>
           <div className="flex items-start gap-3">
             <div className="w-2 h-2 mt-1 rounded-full bg-amber-500 animate-pulse shrink-0" />
@@ -134,7 +169,7 @@ export const FederationLeafletMap: React.FC = () => {
 
       {/* Tactical Surface Area */}
       <div className="flex-1 relative w-full h-full min-h-[550px] flex flex-col">
-        {hasTileConfig && tileUrl ? (
+        {hasTileConfig && tileUrl && !isTileFailure ? (
           <MapContainer 
             key={theme}
             center={defaultCenter} 
@@ -143,7 +178,14 @@ export const FederationLeafletMap: React.FC = () => {
             zoomControl={true}
             attributionControl={false}
           >
-            <TileLayer url={tileUrl} />
+            <TileLayer 
+              url={tileUrl} 
+              eventHandlers={{
+                tileerror: () => {
+                  setTileError(true);
+                }
+              }}
+            />
             <BoundsFit nodes={nodes} />
 
             {/* Dispatch Overlays / Routes Polyline Support */}

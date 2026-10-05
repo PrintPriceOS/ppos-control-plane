@@ -1205,6 +1205,18 @@ export const en = {
   'beta.governance.approvalNotExecution': 'Approval does not constitute immediate execution',
   'beta.governance.approvalsTitle': 'Governed Intervention Approvals',
   'beta.governance.executionsTitle': 'Safe Execution of Governed Interventions',
+
+  // Topbar Telemetry
+  'topbar.telemetryHealthy': 'Core Telemetry: OK',
+  'topbar.telemetryDegraded': 'Degraded Telemetry',
+  'topbar.telemetryOffline': 'No Telemetry',
+  'topbar.telemetryVerifying': 'Checking Core...',
+  'topbar.telemetryVerifyingTooltip': 'Checking process state and dependencies on /api/system/health...',
+
+  // Map Cartography Fallback
+  'map.tileLoadFailed': 'Failed to load map tiles (401/403/Network)',
+  'map.tileLoadFailedHint': 'Configured tile provider failed to respond. Tactical node registry and machine inspection remain fully operational.',
+  'common.retry': 'Retry',
 } as const;
 
 export type TranslationKeys = keyof typeof en;

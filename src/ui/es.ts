@@ -1205,6 +1205,18 @@ export const es = {
   'beta.governance.approvalNotExecution': 'La aprobación no constituye ejecución inmediata',
   'beta.governance.approvalsTitle': 'Aprobaciones de Intervenciones Gobernadas',
   'beta.governance.executionsTitle': 'Ejecución Segura de Intervenciones Gobernadas',
+
+  // Topbar Telemetry
+  'topbar.telemetryHealthy': 'Telemetría Núcleo: OK',
+  'topbar.telemetryDegraded': 'Telemetría Degradada',
+  'topbar.telemetryOffline': 'Sin Telemetría',
+  'topbar.telemetryVerifying': 'Comprobando Núcleo...',
+  'topbar.telemetryVerifyingTooltip': 'Comprobando estado del proceso y dependencias en /api/system/health...',
+
+  // Map Cartography Fallback
+  'map.tileLoadFailed': 'Error al cargar teselas cartográficas (401/403/Red)',
+  'map.tileLoadFailedHint': 'El proveedor cartográfico configurado no respondió satisfactoriamente. Se mantiene activo el registro táctico de nodos y la inspección de maquinaria.',
+  'common.retry': 'Reintentar',
 } as const;
 
 export type TranslationKeys = keyof typeof es;
