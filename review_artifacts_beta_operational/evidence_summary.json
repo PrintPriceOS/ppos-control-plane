@@ -1,7 +1,7 @@
 {
-  "git_commit_sha": "1a469d77aac040e4d00697ad78758ca44f7cb4d0",
-  "generated_at": "2026-10-05T20:38:50Z",
-  "captures_count": 25,
+  "git_commit_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+  "generated_at": "2026-10-05T21:18:14Z",
+  "captures_count": 35,
   "captures": [
     {
       "stage": "1. Entorno Beta (Overview)",
@@ -502,6 +502,216 @@
         "login_button_present": true,
         "retry_loop_prevented": true
       }
+    },
+    {
+      "stage": "7. Activaci\u00f3n de Cohortes",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "07_cohortes_activacion_selected_dark_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "8585640b5ca89eb41e99a0c7c28098aee36fc45092c1af47c7f7f2bf81cd8fe5",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "8. Emisi\u00f3n de Invitaciones",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "08_cohortes_invitaciones_selected_dark_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "10234ff57682d2ff62aafe75df28e2f3a10078d72b133658eb746cc6488ca670",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "9. Aceptaci\u00f3n y Participantes",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Dark - ES",
+      "file": "09_cohortes_participantes_selected_dark_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "a9c24812ec83492a4987c830a58470ab87f56c53053b2821a68b319865bb8a0d",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "7. Activaci\u00f3n de Cohortes",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "07_cohortes_activacion_selected_light_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "cf7cdc890e5dae90a6dfbe963051c9bf69a516888a1da99445932aaca02ea8fe",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "8. Emisi\u00f3n de Invitaciones",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "08_cohortes_invitaciones_selected_light_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "9cdfb850413f93075006444bb236163cb5b515726be828bee3ff728b1697631e",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "9. Aceptaci\u00f3n y Participantes",
+      "flow": "Recorrido 1 (Cohortes Beta Operativo)",
+      "variant": "Desktop 1280x720 - Light - ES",
+      "file": "09_cohortes_participantes_selected_light_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "134a08ba3e2898f3195d03f36cfed998d9d2fcff5a073adb3991ad47fa5e03a4",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "7. Activaci\u00f3n de Cohortes",
+      "flow": "Recorrido 2 (Mobile Responsive)",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "07_cohortes_activacion_selected_mobile_390x844_dark.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "6bb73863c361630e245082569cd49835eee71db3d4d3a5bda035136c78532276",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "8. Emisi\u00f3n de Invitaciones",
+      "flow": "Recorrido 2 (Mobile Responsive)",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "08_cohortes_invitaciones_selected_mobile_390x844_dark.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "a2d7ba450c139cb8a5b15fd02f2fbbab5c85f4c09f6b1c1c46569dd2b17708d3",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "9. Aceptaci\u00f3n y Participantes",
+      "flow": "Recorrido 2 (Mobile Responsive)",
+      "variant": "Mobile 390x844 - Dark - ES",
+      "file": "09_cohortes_participantes_selected_mobile_390x844_dark.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "40232c58c963ea059ca7468ffe8596e8146704a0199213affc796e2565962188",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 390,
+        "winWidth": 390,
+        "bodyWidth": 390
+      },
+      "entity_selected": true,
+      "simulated_data": {
+        "tenants": true,
+        "activation_readiness": true,
+        "invite_issuance_readiness": true,
+        "invite_acceptance_readiness": true
+      }
+    },
+    {
+      "stage": "7. Activaci\u00f3n de Cohortes",
+      "flow": "Recorrido 3 (HTTP 401 Sesi\u00f3n Ausente/Expirada)",
+      "variant": "Desktop 1280x720 - Dark - HTTP 401 Error Panel Completo - ES",
+      "file": "07_cohortes_activacion_http401_error_dark_es.png",
+      "git_sha": "f6761e7bd61433466686071f6e33b6407082ac6d",
+      "sha256": "a59d288ccc74d8ac28d13a070e544d4ba22b5d7dbe7185e076a5301c8150aba8",
+      "overflow": {
+        "hasOverflow": false,
+        "docWidth": 1280,
+        "winWidth": 1280,
+        "bodyWidth": 1280
+      },
+      "simulated_data": {
+        "http_401_injected": true,
+        "target_endpoint": "/api/admin/beta/cohort-activation/readiness",
+        "nested_error_object": true,
+        "login_button_present": true,
+        "retry_loop_prevented": true
+      }
     }
   ],
   "checksums": {
@@ -529,6 +739,16 @@
     "06_aprobacion_intervenciones_http500_recovered_dark_es.png": "18cebdf61e59036e07cab17c528e20a24f3e4ea095fe06432321ca9cd193c894",
     "04_revisiones_salud_http401_error_dark_es.png": "f4773a06bcdfaeb79b9be5ec389d25ee065bd2d9e1724b71c8e8c7e69b649ab6",
     "05_preparacion_intervenciones_http401_error_dark_es.png": "5c1bf7a14ab6548a4aa055174d6878e27ecb3928a7adb667fcaf7103e3765419",
-    "06_aprobacion_intervenciones_http401_error_dark_es.png": "21b847d881ae34e70a3b4fb94d77ed22714c56ae9a9af4e62681c4566099d268"
+    "06_aprobacion_intervenciones_http401_error_dark_es.png": "21b847d881ae34e70a3b4fb94d77ed22714c56ae9a9af4e62681c4566099d268",
+    "07_cohortes_activacion_selected_dark_es.png": "8585640b5ca89eb41e99a0c7c28098aee36fc45092c1af47c7f7f2bf81cd8fe5",
+    "08_cohortes_invitaciones_selected_dark_es.png": "10234ff57682d2ff62aafe75df28e2f3a10078d72b133658eb746cc6488ca670",
+    "09_cohortes_participantes_selected_dark_es.png": "a9c24812ec83492a4987c830a58470ab87f56c53053b2821a68b319865bb8a0d",
+    "07_cohortes_activacion_selected_light_es.png": "cf7cdc890e5dae90a6dfbe963051c9bf69a516888a1da99445932aaca02ea8fe",
+    "08_cohortes_invitaciones_selected_light_es.png": "9cdfb850413f93075006444bb236163cb5b515726be828bee3ff728b1697631e",
+    "09_cohortes_participantes_selected_light_es.png": "134a08ba3e2898f3195d03f36cfed998d9d2fcff5a073adb3991ad47fa5e03a4",
+    "07_cohortes_activacion_selected_mobile_390x844_dark.png": "6bb73863c361630e245082569cd49835eee71db3d4d3a5bda035136c78532276",
+    "08_cohortes_invitaciones_selected_mobile_390x844_dark.png": "a2d7ba450c139cb8a5b15fd02f2fbbab5c85f4c09f6b1c1c46569dd2b17708d3",
+    "09_cohortes_participantes_selected_mobile_390x844_dark.png": "40232c58c963ea059ca7468ffe8596e8146704a0199213affc796e2565962188",
+    "07_cohortes_activacion_http401_error_dark_es.png": "a59d288ccc74d8ac28d13a070e544d4ba22b5d7dbe7185e076a5301c8150aba8"
   }
 }
