@@ -60,12 +60,6 @@ db.query = async function (sql, params = []) {
     const s = sql.trim();
     if (/^CREATE TABLE/is.test(s)) return [];
 
-    // Printer Nodes
-    if (/FROM printer_nodes/is.test(s)) {
-        const id = params[0];
-        const node = memoryDb.printer_nodes.find(r => r.id === id);
-        return node ? [node] : [{ id, name: 'Default Node', metadata_json: '{}' }];
-    }
 
     // Webhook Subscriptions
     if (/INSERT INTO webhook_subscriptions/is.test(s)) {
@@ -342,6 +336,46 @@ db.query = async function (sql, params = []) {
     // Tenants
     if (/SELECT plan, metadata_json FROM tenants/is.test(s)) {
         return [{ plan: 'ENTERPRISE', metadata_json: '{}' }];
+    }
+
+    // Identity check
+    if (/SELECT CURRENT_USER/is.test(s)) {
+        return [{ currentUser: 'ppos_test_user@127.0.0.1', currentDb: 'ppos_test_db' }];
+    }
+
+    // Printer Nodes
+    if (/SELECT.*FROM printer_nodes/is.test(s)) {
+        if (s.includes('WHERE id != ? AND JSON_UNQUOTE')) {
+            const [excludeId, houseId] = params;
+            return memoryDb.printer_nodes.filter(n => {
+                if (n.id === excludeId) return false;
+                let meta = {};
+                try { meta = typeof n.metadata_json === 'string' ? JSON.parse(n.metadata_json) : (n.metadata_json || {}); } catch (e) {}
+                return meta.bpe_printhouse_id === houseId;
+            });
+        }
+        if (s.includes('WHERE id = ? AND tenant_id = ?')) {
+            const [id, tenantId] = params;
+            return memoryDb.printer_nodes.filter(n => n.id === id && String(n.tenant_id) === String(tenantId));
+        }
+        if (s.includes('WHERE id = ?')) {
+            const id = params[0];
+            const node = memoryDb.printer_nodes.find(n => n.id === id);
+            return node ? [node] : [{ id, name: 'Default Node', metadata_json: '{}' }];
+        }
+        return memoryDb.printer_nodes;
+    }
+
+    if (/UPDATE printer_nodes/is.test(s)) {
+        if (s.includes('metadata_json = ?')) {
+            const [metaJson, id, tenantId] = params;
+            const node = memoryDb.printer_nodes.find(n => n.id === id && (tenantId === undefined || String(n.tenant_id) === String(tenantId)));
+            if (node) {
+                node.metadata_json = metaJson;
+                return { affectedRows: 1 };
+            }
+        }
+        return { affectedRows: 0 };
     }
 
     return [];
@@ -1422,6 +1456,224 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             // Beta session remains ACTIVE
             const betaCheck = await userSessionService.validateSession(betaSessionId, 'tenant_beta', 'usr_beta_1');
             expect(betaCheck.valid).toBe(true);
+        });
+    });
+
+    // ── 8. GOVERNED PROVISIONING CP -> BPE & SUSPENSION INTEGRITY ──────────
+    describe('8. Governed CP -> BPE Printhouse Provisioning & Suspension Integrity', () => {
+        const { provisionBpePrinthouse } = require('../scripts/provision_bpe_printhouse');
+
+        const realNodeId = 'node-329a3bc4';
+        const realTenantId = 'ph-707a5869';
+        const realHouseId = 'bpe_node-329a3bc4';
+
+        let mockPrinthouses = [];
+        const mockMongoClient = {
+            db: () => ({
+                databaseName: 'test_bpe_harness',
+                collection: () => ({
+                    findOne: async (query) => {
+                        if (query.$or) {
+                            const ids = query.$or.map(o => o.id || o.house_id).filter(Boolean);
+                            return mockPrinthouses.find(p => ids.includes(p.id) || ids.includes(p.house_id)) || null;
+                        }
+                        if (query.printer_node_id) {
+                            return mockPrinthouses.find(p => p.printer_node_id === query.printer_node_id) || null;
+                        }
+                        return null;
+                    },
+                    insertOne: async (doc) => {
+                        const rec = { ...doc, _id: 'mongo_mock_' + Date.now() };
+                        mockPrinthouses.push(rec);
+                        return { insertedId: rec._id };
+                    },
+                    updateOne: async (filter, update) => {
+                        const doc = mockPrinthouses.find(p => p._id === filter._id);
+                        if (doc && update.$set) {
+                            Object.assign(doc, update.$set);
+                        }
+                        return { matchedCount: doc ? 1 : 0 };
+                    }
+                })
+            }),
+            close: async () => {}
+        };
+
+        beforeEach(() => {
+            mockPrinthouses = [];
+            memoryDb.printer_nodes = memoryDb.printer_nodes.filter(n => n.id !== 'node-other-conflicting' && n.id !== 'node-with-meta-test');
+            // Seed the real node in MySQL mock: node-329a3bc4, status: SUSPENDED, metadata_json: null
+            const existingIdx = memoryDb.printer_nodes.findIndex(n => n.id === realNodeId);
+            const nodeRec = {
+                id: realNodeId,
+                tenant_id: realTenantId,
+                name: 'philologica.ai Printhouse',
+                status: 'SUSPENDED',
+                metadata_json: null,
+                rates_json: JSON.stringify({ base_charge: 100 }),
+                signatures: JSON.stringify([16, 32]),
+                production_lead_days: 7,
+                shipping_days: 3,
+                limits: '{}',
+                shipping: '{}'
+            };
+            if (existingIdx >= 0) memoryDb.printer_nodes[existingIdx] = nodeRec;
+            else memoryDb.printer_nodes.push(nodeRec);
+        });
+
+        it('should execute dry-run mode by default for real node node-329a3bc4 without modifying databases', async () => {
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.dryRun).toBe(true);
+            expect(res.plan.node.real_status).toBe('SUSPENDED');
+            expect(res.plan.node.is_cotizable).toBe(false);
+            expect(res.plan.activationGranted).toBe(false);
+            expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
+            expect(res.plan.mongoDocument.active).toBe(false);
+            expect(res.plan.statusPreserved).toBe('SUSPENDED');
+
+            // Verify ZERO mutations
+            expect(mockPrinthouses.length).toBe(0);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+            expect(node.status).toBe('SUSPENDED');
+        });
+
+        it('should reject provisioning when tenant_id does not match node tenant', async () => {
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: 'ph-wrong-tenant',
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/TENANT_MISMATCH/);
+        });
+
+        it('should reject provisioning if BPE house ID is already assigned to another node in MySQL', async () => {
+            // Seed other node with bpe_printhouse_id = 'bpe_node-329a3bc4'
+            memoryDb.printer_nodes.push({
+                id: 'node-other-conflicting',
+                tenant_id: 'tenant-other',
+                name: 'Other Node',
+                status: 'ACTIVE',
+                metadata_json: JSON.stringify({ bpe_printhouse_id: realHouseId })
+            });
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_HOUSE_ID_IN_USE/);
+        });
+
+        it('should reject provisioning if MongoDB already contains conflicting mapping for house ID', async () => {
+            // Seed MongoDB with house mapped to a different node
+            mockPrinthouses.push({
+                _id: 'mongo_conflict_1',
+                id: realHouseId,
+                house_id: realHouseId,
+                printer_node_id: 'node-foreign',
+                tenant_id: 'tenant-foreign'
+            });
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_DUPLICATE_BPE_HOUSE/);
+        });
+
+        it('should execute governed provisioning when execute mode is enabled on local test DB', async () => {
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.dryRun).toBe(false);
+            expect(res.provisioned).toBe(true);
+            expect(res.status).toBe('SUSPENDED');
+            expect(res.active).toBe(false);
+
+            // Verify MongoDB document
+            expect(mockPrinthouses.length).toBe(1);
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.id).toBe(realHouseId);
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+            expect(mongoHouse.printer_node_id).toBe(realNodeId);
+            expect(mongoHouse.tenant_id).toBe(realTenantId);
+
+            // Verify MySQL node metadata update: bpe_printhouse_id added, status remains SUSPENDED
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.status).toBe('SUSPENDED');
+            const meta = JSON.parse(node.metadata_json);
+            expect(meta.bpe_printhouse_id).toBe(realHouseId);
+
+            // Idempotent replay: running again succeeds without creating duplicate documents
+            const replayRes = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+            expect(replayRes.ok).toBe(true);
+            expect(mockPrinthouses.length).toBe(1);
+        });
+
+        it('should preserve existing metadata_json keys when provisioning', async () => {
+            const nodeWithMetaId = 'node-with-meta-test';
+            memoryDb.printer_nodes.push({
+                id: nodeWithMetaId,
+                tenant_id: realTenantId,
+                name: 'Custom Metadata Node',
+                status: 'SUSPENDED',
+                metadata_json: JSON.stringify({ custom_webhook: 'https://hook.test', cluster_zone: 'eu-west-1' }),
+                rates_json: '{}',
+                signatures: '[]'
+            });
+
+            const res = await provisionBpePrinthouse({
+                nodeId: nodeWithMetaId,
+                tenantId: realTenantId,
+                houseId: 'bpe_custom_meta',
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            const node = memoryDb.printer_nodes.find(n => n.id === nodeWithMetaId);
+            const parsed = JSON.parse(node.metadata_json);
+            expect(parsed.custom_webhook).toBe('https://hook.test');
+            expect(parsed.cluster_zone).toBe('eu-west-1');
+            expect(parsed.bpe_printhouse_id).toBe('bpe_custom_meta');
         });
     });
 });
