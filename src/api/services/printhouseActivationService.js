@@ -170,10 +170,14 @@ class PrinthouseActivationService {
             await connection.commit();
 
             // 5. Create Trackable Server Session and Sign JWT
+            const userIdStr = String(user.id);
+            const tenantIdStr = String(tenantId);
+            const printhouseIdStr = String(printhouseId);
+
             const userSessionService = require('./userSessionService');
             const sessionRecord = await userSessionService.createSession({
-                userId: user.id,
-                tenantId: tenantId,
+                userId: userIdStr,
+                tenantId: tenantIdStr,
                 role: user.role,
                 ipAddress: null,
                 userAgent: 'Printhouse-Activation'
@@ -181,12 +185,12 @@ class PrinthouseActivationService {
 
             const token = jwt.sign(
                 {
-                    sub: user.id,
+                    sub: userIdStr,
                     jti: sessionRecord.sessionId,
                     email: user.email,
                     role: user.role,
-                    tenant_id: tenantId,
-                    printhouse_id: printhouseId
+                    tenant_id: tenantIdStr,
+                    printhouse_id: printhouseIdStr
                 },
                 JWT_SECRET,
                 {
@@ -199,20 +203,21 @@ class PrinthouseActivationService {
             // Audit event
             auditLogger.log({
                 type: 'PRINTHOUSE_ACTIVATION_SUCCEEDED',
-                tenantId,
-                userId: user.id,
+                tenantId: tenantIdStr,
+                userId: userIdStr,
                 status: 'SUCCESS',
-                metadata: { email, printhouseId }
+                metadata: { email, printhouseId: printhouseIdStr }
             }).catch(() => {});
 
             return {
                 ok: true,
                 token,
                 user: {
+                    id: userIdStr,
                     email: user.email,
                     role: user.role,
-                    tenantId,
-                    printhouseId
+                    tenantId: tenantIdStr,
+                    printhouseId: printhouseIdStr
                 }
             };
         } catch (err) {

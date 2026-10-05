@@ -87,15 +87,29 @@ function decryptSecret(encryptedPayload) {
     return decipher.update(encrypted) + decipher.final('utf8');
 }
 
+function canonicalId(val) {
+    if (val === null || val === undefined) return null;
+    const str = String(val).trim();
+    return str.length > 0 ? str : null;
+}
+
 class UserMfaService {
 
     /**
      * Initializes MFA setup for a user, returning secret and QR URI.
      */
     async setupMfa(userId, tenantId, userEmail) {
+        const normUserId = canonicalId(userId);
+        const normTenantId = canonicalId(tenantId);
+
+        if (!normUserId || !normTenantId) {
+            const err = new Error('Valid userId and tenantId are required for MFA setup');
+            err.statusCode = 400;
+            throw err;
+        }
 
         // Check if confirmed MFA already exists
-        const [existing] = await db.query(`SELECT is_confirmed FROM user_mfa WHERE user_id = ?`, [userId]).catch(() => []);
+        const [existing] = await db.query(`SELECT is_confirmed FROM user_mfa WHERE user_id = ?`, [normUserId]).catch(() => []);
         if (existing && existing.is_confirmed) {
             const err = new Error('MFA is already enabled and confirmed for this account');
             err.code = 'MFA_ALREADY_ENABLED';
@@ -123,7 +137,7 @@ class UserMfaService {
             `INSERT INTO user_mfa (user_id, tenant_id, totp_secret_encrypted, is_confirmed, recovery_codes_json, last_used_timestep, failed_attempts, created_at)
              VALUES (?, ?, ?, 0, ?, 0, 0, NOW())
              ON DUPLICATE KEY UPDATE totp_secret_encrypted = VALUES(totp_secret_encrypted), is_confirmed = 0, recovery_codes_json = VALUES(recovery_codes_json), failed_attempts = 0, locked_until = NULL`,
-            [userId, tenantId, encryptedSecret, JSON.stringify(recoveryHashes)]
+            [normUserId, normTenantId, encryptedSecret, JSON.stringify(recoveryHashes)]
         );
 
         const issuer = 'PrintPriceOS';
@@ -141,8 +155,16 @@ class UserMfaService {
      * Confirms MFA setup by verifying the first TOTP code.
      */
     async confirmMfa(userId, tenantId, totpCode) {
+        const normUserId = canonicalId(userId);
+        const normTenantId = canonicalId(tenantId);
 
-        const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, recovery_codes_json, is_confirmed FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [userId, tenantId]);
+        if (!normUserId || !normTenantId) {
+            const err = new Error('Valid userId and tenantId are required for MFA confirmation');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, recovery_codes_json, is_confirmed FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [normUserId, normTenantId]);
         if (!record) {
             const err = new Error('No pending MFA setup found. Please initiate setup first.');
             err.code = 'MFA_NOT_SETUP';
@@ -169,7 +191,7 @@ class UserMfaService {
             throw err;
         }
 
-        await db.query(`UPDATE user_mfa SET is_confirmed = 1, last_used_timestep = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [validStep, userId]);
+        await db.query(`UPDATE user_mfa SET is_confirmed = 1, last_used_timestep = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [validStep, normUserId]);
 
         return { ok: true, message: 'MFA confirmed and activated successfully' };
     }
@@ -178,8 +200,12 @@ class UserMfaService {
      * Validates MFA code or recovery code during login challenge.
      */
     async verifyMfaChallenge(userId, codeOrRecoveryCode) {
+        const normUserId = canonicalId(userId);
+        if (!normUserId) {
+            return { valid: false, reason: 'MISSING_USER_ID' };
+        }
 
-        const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, is_confirmed, recovery_codes_json, last_used_timestep, failed_attempts, locked_until FROM user_mfa WHERE user_id = ?`, [userId]);
+        const [record] = await db.query(`SELECT user_id, tenant_id, totp_secret_encrypted, is_confirmed, recovery_codes_json, last_used_timestep, failed_attempts, locked_until FROM user_mfa WHERE user_id = ?`, [normUserId]);
         if (!record || !record.is_confirmed) {
             return { valid: false, reason: 'MFA_NOT_ACTIVE' };
         }
@@ -210,7 +236,7 @@ class UserMfaService {
             }
 
             if (validStep !== null) {
-                await db.query(`UPDATE user_mfa SET last_used_timestep = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [validStep, userId]);
+                await db.query(`UPDATE user_mfa SET last_used_timestep = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [validStep, normUserId]);
                 return { valid: true, tenantId: record.tenant_id };
             }
         }
@@ -230,7 +256,7 @@ class UserMfaService {
         }
 
         if (recoveryMatched) {
-            await db.query(`UPDATE user_mfa SET recovery_codes_json = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [JSON.stringify(recoveryCodes), userId]);
+            await db.query(`UPDATE user_mfa SET recovery_codes_json = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?`, [JSON.stringify(recoveryCodes), normUserId]);
             return { valid: true, tenantId: record.tenant_id, isRecoveryCodeUsed: true };
         }
 
@@ -241,7 +267,7 @@ class UserMfaService {
             lockTime = new Date(Date.now() + (15 * 60 * 1000)); // 15 min lockout
         }
 
-        await db.query(`UPDATE user_mfa SET failed_attempts = ?, locked_until = ? WHERE user_id = ?`, [newFailed, lockTime, userId]);
+        await db.query(`UPDATE user_mfa SET failed_attempts = ?, locked_until = ? WHERE user_id = ?`, [newFailed, lockTime, normUserId]);
         return { valid: false, reason: newFailed >= 5 ? 'MFA_LOCKED_TEMPORARILY' : 'INVALID_MFA_CODE' };
     }
 
@@ -249,8 +275,12 @@ class UserMfaService {
      * Checks whether a user has active confirmed MFA.
      */
     async getUserMfaStatus(userId) {
+        const normUserId = canonicalId(userId);
+        if (!normUserId) {
+            return { mfaEnabled: false, confirmedAt: null };
+        }
 
-        const [record] = await db.query(`SELECT is_confirmed, created_at FROM user_mfa WHERE user_id = ?`, [userId]).catch(() => []);
+        const [record] = await db.query(`SELECT is_confirmed, created_at FROM user_mfa WHERE user_id = ?`, [normUserId]).catch(() => []);
         return {
             mfaEnabled: Boolean(record && record.is_confirmed),
             confirmedAt: record && record.is_confirmed ? record.created_at : null
@@ -261,8 +291,10 @@ class UserMfaService {
      * Disables MFA for a user with re-authentication verification.
      */
     async disableMfa(userId, tenantId) {
+        const normUserId = canonicalId(userId);
+        const normTenantId = canonicalId(tenantId);
 
-        await db.query(`DELETE FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [userId, tenantId]);
+        await db.query(`DELETE FROM user_mfa WHERE user_id = ? AND tenant_id = ?`, [normUserId, normTenantId]);
         return { ok: true, message: 'MFA disabled successfully' };
     }
 }

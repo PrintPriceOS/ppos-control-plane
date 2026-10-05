@@ -206,11 +206,11 @@ async function requireAdmin(req, res, next) {
 
         // 2. Map Industrial Identity
         req.user = {
-            id: decoded.sub,
+            id: String(decoded.sub),
             email: decoded.email,
             role: (decoded.role || 'VIEWER').toUpperCase(),
-            tenantId: decoded.tenant_id,
-            printhouseId: decoded.printhouse_id,
+            tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
+            printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
             scopes: decoded.scopes || [],
             features: features,
             authMode: 'JWT',

@@ -10,12 +10,32 @@ const logger = require('./logger').child('user-sessions');
 const DEFAULT_INACTIVITY_MINUTES = 60;
 const DEFAULT_ABSOLUTE_HOURS = 24;
 
+/**
+ * Normalizes an identity key (userId, tenantId) to a canonical non-empty string.
+ * Returns null if the value is null, undefined, or empty/whitespace.
+ */
+function canonicalId(val) {
+    if (val === null || val === undefined) return null;
+    const str = String(val).trim();
+    return str.length > 0 ? str : null;
+}
+
 class UserSessionService {
 
     /**
-     * Creates a new trackable server session.
+     * Creates a new trackable server session with canonical string IDs.
      */
     async createSession({ userId, tenantId, role, ipAddress = null, userAgent = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES, absoluteHours = DEFAULT_ABSOLUTE_HOURS }) {
+        const canonicalUserId = canonicalId(userId);
+        const canonicalTenantId = canonicalId(tenantId);
+
+        if (!canonicalUserId) {
+            throw new Error('Valid userId is required to create a session');
+        }
+        if (!canonicalTenantId) {
+            throw new Error('Valid tenantId is required to create a session');
+        }
+
         const sessionId = uuidv4();
         const now = new Date();
         const expiresAt = new Date(now.getTime() + (absoluteHours * 60 * 60 * 1000));
@@ -23,13 +43,13 @@ class UserSessionService {
         await db.query(
             `INSERT INTO user_sessions (id, user_id, tenant_id, role, ip_address, user_agent, status, last_activity_at, expires_at, created_at)
              VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', NOW(), ?, NOW())`,
-            [sessionId, userId, tenantId, role, ipAddress, userAgent ? userAgent.slice(0, 500) : null, expiresAt]
+            [sessionId, canonicalUserId, canonicalTenantId, role, ipAddress, userAgent ? userAgent.slice(0, 500) : null, expiresAt]
         );
 
         return {
             sessionId,
-            userId,
-            tenantId,
+            userId: canonicalUserId,
+            tenantId: canonicalTenantId,
             expiresAt,
             inactivityMinutes
         };
@@ -37,6 +57,7 @@ class UserSessionService {
 
     /**
      * Validates session state, expiry, sub, tenant, and inactivity timeout.
+     * Compares canonical representations strictly without weak equality.
      * Preserves internal DB errors without hiding them as missing session.
      */
     async validateSession(sessionId, tenantId = null, userId = null, inactivityMinutes = DEFAULT_INACTIVITY_MINUTES) {
@@ -55,12 +76,22 @@ class UserSessionService {
                 return { valid: false, reason: 'SESSION_NOT_FOUND' };
             }
 
-            if (tenantId && session.tenant_id !== tenantId) {
-                return { valid: false, reason: 'SESSION_TENANT_MISMATCH' };
+            const expectedTenantId = canonicalId(tenantId);
+            const sessionTenantId = canonicalId(session.tenant_id);
+
+            if (expectedTenantId !== null) {
+                if (sessionTenantId === null || sessionTenantId !== expectedTenantId) {
+                    return { valid: false, reason: 'SESSION_TENANT_MISMATCH' };
+                }
             }
 
-            if (userId && session.user_id !== userId) {
-                return { valid: false, reason: 'SESSION_USER_MISMATCH' };
+            const expectedUserId = canonicalId(userId);
+            const sessionUserId = canonicalId(session.user_id);
+
+            if (expectedUserId !== null) {
+                if (sessionUserId === null || sessionUserId !== expectedUserId) {
+                    return { valid: false, reason: 'SESSION_USER_MISMATCH' };
+                }
             }
 
             if (session.status === 'REVOKED') {
@@ -133,9 +164,10 @@ class UserSessionService {
 
         let query = `SELECT id, user_id, tenant_id FROM user_sessions WHERE id = ?`;
         let params = [sessionId];
-        if (tenantId) {
+        const canonicalTenantId = canonicalId(tenantId);
+        if (canonicalTenantId !== null) {
             query += ` AND tenant_id = ?`;
-            params.push(tenantId);
+            params.push(canonicalTenantId);
         }
 
         const [session] = await db.query(query, params).catch(() => []);
@@ -143,7 +175,9 @@ class UserSessionService {
             return { ok: false, code: 'SESSION_NOT_FOUND', statusCode: 404, message: 'Session not found' };
         }
 
-        if (requestingUserId && session.user_id !== requestingUserId) {
+        const canonicalReqUserId = canonicalId(requestingUserId);
+        const sessionUserId = canonicalId(session.user_id);
+        if (canonicalReqUserId !== null && (sessionUserId === null || sessionUserId !== canonicalReqUserId)) {
             const role = (requestingUserRole || '').toUpperCase();
             const isAdmin = role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN' || role === 'ADMIN';
             if (!isAdmin) {
@@ -168,12 +202,19 @@ class UserSessionService {
      * Revokes all active sessions for a user.
      */
     async revokeAllUserSessions(userId, tenantId = null, reason = 'REVOKE_ALL') {
-        let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE user_id = ? AND status = 'ACTIVE'`;
-        let params = [reason, userId];
+        const canonicalUserId = canonicalId(userId);
+        const canonicalTenantId = canonicalId(tenantId);
 
-        if (tenantId) {
+        if (!canonicalUserId) {
+            return { ok: false, code: 'MISSING_USER_ID', message: 'Valid userId is required' };
+        }
+
+        let query = `UPDATE user_sessions SET status = 'REVOKED', revoked_at = NOW(), revoked_reason = ? WHERE user_id = ? AND status = 'ACTIVE'`;
+        let params = [reason, canonicalUserId];
+
+        if (canonicalTenantId !== null) {
             query += ` AND tenant_id = ?`;
-            params.push(tenantId);
+            params.push(canonicalTenantId);
         }
 
         const result = await db.query(query, params);
@@ -184,19 +225,22 @@ class UserSessionService {
      * Lists active sessions for a given user or tenant.
      */
     async listSessions(userId, tenantId) {
+        const canonicalUserId = canonicalId(userId);
+        const canonicalTenantId = canonicalId(tenantId);
+
         const rows = await db.query(
             `SELECT id, user_id, tenant_id, role, ip_address, user_agent, status, last_activity_at, expires_at, created_at
              FROM user_sessions
              WHERE user_id = ? AND tenant_id = ?
              ORDER BY created_at DESC
              LIMIT 50`,
-            [userId, tenantId]
+            [canonicalUserId, canonicalTenantId]
         );
 
         return (rows || []).map(r => ({
             id: r.id,
-            userId: r.user_id,
-            tenantId: r.tenant_id,
+            userId: canonicalId(r.user_id),
+            tenantId: canonicalId(r.tenant_id),
             role: r.role,
             ipAddress: r.ip_address,
             userAgent: r.user_agent,
@@ -207,5 +251,7 @@ class UserSessionService {
         }));
     }
 }
+
+UserSessionService.canonicalId = canonicalId;
 
 module.exports = new UserSessionService();

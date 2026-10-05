@@ -131,16 +131,20 @@ router.post('/login', async (req, res) => {
         let isSuper = userRole === 'SUPER_ADMIN' || user.email === 'admin@printprice.pro';
         if (isSuper) userRole = 'SUPER_ADMIN';
 
+        // Canonical string normalization of identities
+        const userIdStr = String(user.id);
+        const tenantIdStr = String(user.tenant_id || 'default');
+
         // Check if user has active TOTP MFA (Goal B)
         const userMfaService = require('../services/userMfaService');
-        const mfaStatus = await userMfaService.getUserMfaStatus(user.id);
+        const mfaStatus = await userMfaService.getUserMfaStatus(userIdStr);
         if (mfaStatus.mfaEnabled) {
             // Issue short-lived temporary MFA challenge token (5 min expiry) with dedicated audience & purpose
             const mfaToken = jwt.sign(
                 {
-                    sub: user.id,
+                    sub: userIdStr,
                     email: user.email,
-                    tenant_id: user.tenant_id,
+                    tenant_id: tenantIdStr,
                     is_mfa_challenge: true,
                     purpose: 'mfa_challenge'
                 },
@@ -153,8 +157,9 @@ router.post('/login', async (req, res) => {
                 mfaRequired: true,
                 mfaToken,
                 user: {
+                    id: userIdStr,
                     email: user.email,
-                    tenantId: user.tenant_id
+                    tenantId: tenantIdStr
                 }
             });
         }
@@ -162,8 +167,8 @@ router.post('/login', async (req, res) => {
         // Create Trackable Server Session (Goal A)
         const userSessionService = require('../services/userSessionService');
         const sessionRecord = await userSessionService.createSession({
-            userId: user.id,
-            tenantId: user.tenant_id || 'default',
+            userId: userIdStr,
+            tenantId: tenantIdStr,
             role: userRole,
             ipAddress: req.ip || req.connection?.remoteAddress,
             userAgent: req.headers['user-agent']
@@ -172,12 +177,12 @@ router.post('/login', async (req, res) => {
         // Sign JWT with jti linked to server session
         const token = jwt.sign(
             {
-                sub: user.id,
+                sub: userIdStr,
                 jti: sessionRecord.sessionId,
                 email: user.email,
                 role: userRole,
-                tenant_id: user.tenant_id,
-                printhouse_id: user.printhouse_id,
+                tenant_id: tenantIdStr,
+                printhouse_id: user.printhouse_id ? String(user.printhouse_id) : null,
                 is_super_admin: isSuper
             },
             JWT_SECRET,
@@ -192,11 +197,11 @@ router.post('/login', async (req, res) => {
             ok: true,
             token,
             user: {
-                id: user.id,
+                id: userIdStr,
                 email: user.email,
                 role: userRole,
-                tenantId: user.tenant_id,
-                printhouseId: user.printhouse_id,
+                tenantId: tenantIdStr,
+                printhouseId: user.printhouse_id ? String(user.printhouse_id) : null,
                 isSuperAdmin: isSuper,
                 sessionId: sessionRecord.sessionId,
                 mfaEnabled: false
@@ -315,12 +320,15 @@ router.post('/printhouse/register', async (req, res) => {
 
     try {
         const { tenantId, printhouseId, user } = await printhouseService.selfRegister(req.body);
+        const userIdStr = String(user.id);
+        const tenantIdStr = String(tenantId);
+        const printhouseIdStr = printhouseId ? String(printhouseId) : null;
 
         // Auto-login after registration with server session
         const userSessionService = require('../services/userSessionService');
         const sessionRecord = await userSessionService.createSession({
-            userId: user.id,
-            tenantId: tenantId,
+            userId: userIdStr,
+            tenantId: tenantIdStr,
             role: (user.role || 'PRINTHOUSE_ADMIN').toUpperCase(),
             ipAddress: req.ip || req.connection?.remoteAddress,
             userAgent: req.headers['user-agent']
@@ -328,12 +336,12 @@ router.post('/printhouse/register', async (req, res) => {
 
         const token = jwt.sign(
             {
-                sub: user.id,
+                sub: userIdStr,
                 jti: sessionRecord.sessionId,
                 email: user.email,
                 role: user.role,
-                tenant_id: tenantId,
-                printhouse_id: printhouseId
+                tenant_id: tenantIdStr,
+                printhouse_id: printhouseIdStr
             },
             JWT_SECRET,
             {
@@ -347,10 +355,11 @@ router.post('/printhouse/register', async (req, res) => {
             ok: true,
             token,
             user: {
+                id: userIdStr,
                 email: user.email,
                 role: user.role,
-                tenantId,
-                printhouseId
+                tenantId: tenantIdStr,
+                printhouseId: printhouseIdStr
             }
         });
     } catch (err) {
@@ -599,19 +608,23 @@ router.post('/mfa/verify', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Token is not a valid MFA challenge token' });
         }
 
-        const verification = await userMfaService.verifyMfaChallenge(decoded.sub, code);
+        const verifiedUserId = String(decoded.sub);
+        const verifiedTenantId = String(decoded.tenant_id || 'default');
+
+        const verification = await userMfaService.verifyMfaChallenge(verifiedUserId, code);
         if (!verification.valid) {
             return res.status(401).json({ ok: false, error: verification.reason || 'Invalid MFA code' });
         }
 
-        const user = await userService.findById ? await userService.findById(decoded.sub) : await userService.findByEmail(decoded.email);
+        const user = await userService.findById ? await userService.findById(verifiedUserId) : await userService.findByEmail(decoded.email);
         const userRole = (user?.role || 'VIEWER').toUpperCase();
         const isSuper = userRole === 'SUPER_ADMIN' || user?.email === 'admin@printprice.pro';
+        const printhouseIdStr = user?.printhouse_id ? String(user.printhouse_id) : null;
 
         // Create Trackable Server Session
         const sessionRecord = await userSessionService.createSession({
-            userId: decoded.sub,
-            tenantId: decoded.tenant_id || 'default',
+            userId: verifiedUserId,
+            tenantId: verifiedTenantId,
             role: userRole,
             ipAddress: req.ip || req.connection?.remoteAddress,
             userAgent: req.headers['user-agent']
@@ -620,12 +633,12 @@ router.post('/mfa/verify', async (req, res) => {
         // Sign full JWT token with session jti
         const token = jwt.sign(
             {
-                sub: decoded.sub,
+                sub: verifiedUserId,
                 jti: sessionRecord.sessionId,
                 email: decoded.email,
                 role: userRole,
-                tenant_id: decoded.tenant_id,
-                printhouse_id: user?.printhouse_id,
+                tenant_id: verifiedTenantId,
+                printhouse_id: printhouseIdStr,
                 is_super_admin: isSuper
             },
             JWT_SECRET,
@@ -636,11 +649,11 @@ router.post('/mfa/verify', async (req, res) => {
             ok: true,
             token,
             user: {
-                id: decoded.sub,
+                id: verifiedUserId,
                 email: decoded.email,
                 role: userRole,
-                tenantId: decoded.tenant_id,
-                printhouseId: user?.printhouse_id,
+                tenantId: verifiedTenantId,
+                printhouseId: printhouseIdStr,
                 isSuperAdmin: isSuper,
                 sessionId: sessionRecord.sessionId,
                 mfaEnabled: true

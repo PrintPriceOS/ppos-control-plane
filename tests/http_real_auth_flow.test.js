@@ -278,4 +278,106 @@ describe('HTTP Real Auth Flow & Session Revocation Suite', () => {
             delete process.env.STRICT_SESSION_JTI_REQUIRED;
         }
     });
+
+    it('8. Real numeric user ID (INT) with textual session user_id in MySQL -> access granted', async () => {
+        // control_users.id is INT (e.g. 42); user_sessions stores VARCHAR '42'
+        const numericUserId = 42;
+        const tenantId = 'tenant_numeric_1';
+
+        const session = await userSessionService.createSession({
+            userId: numericUserId,
+            tenantId: tenantId,
+            role: 'PRINTHOUSE_ADMIN'
+        });
+
+        expect(session.userId).toBe('42');
+
+        // Human JWT emitted with sub: 42 or sub: '42'
+        const tokenNumeric = jwt.sign(
+            {
+                sub: numericUserId,
+                jti: session.sessionId,
+                email: 'numeric@printprice.pro',
+                role: 'PRINTHOUSE_ADMIN',
+                tenant_id: tenantId
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h', issuer: process.env.JWT_ISSUER, audience: process.env.JWT_AUDIENCE }
+        );
+
+        const res = await axios.get(`${baseUrl}/api/admin/verify`, {
+            headers: { Authorization: `Bearer ${tokenNumeric}` }
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.data.ok).toBe(true);
+        expect(res.data.user.id).toBe('42');
+        expect(res.data.user.sessionId).toBe(session.sessionId);
+    });
+
+    it('9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401', async () => {
+        const session = await userSessionService.createSession({
+            userId: 42,
+            tenantId: 'tenant_strict_1',
+            role: 'PRINTHOUSE_ADMIN'
+        });
+
+        // 1. Different user ID (e.g. 43 trying to use session of 42) -> rejected
+        const differentUserToken = jwt.sign(
+            {
+                sub: 43,
+                jti: session.sessionId,
+                email: 'attacker@printprice.pro',
+                role: 'PRINTHOUSE_ADMIN',
+                tenant_id: 'tenant_strict_1'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h', issuer: process.env.JWT_ISSUER, audience: process.env.JWT_AUDIENCE }
+        );
+
+        try {
+            await axios.get(`${baseUrl}/api/admin/verify`, {
+                headers: { Authorization: `Bearer ${differentUserToken}` }
+            });
+            expect.fail('Different user should be rejected with 401');
+        } catch (err) {
+            expect(err.response.status).toBe(401);
+            expect(err.response.data.error.message).toContain('Session identity mismatch');
+        }
+
+        // 2. Different tenant ID (e.g. tenant_rogue trying to use session of tenant_strict_1) -> rejected
+        const differentTenantToken = jwt.sign(
+            {
+                sub: 42,
+                jti: session.sessionId,
+                email: 'user@printprice.pro',
+                role: 'PRINTHOUSE_ADMIN',
+                tenant_id: 'tenant_rogue'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h', issuer: process.env.JWT_ISSUER, audience: process.env.JWT_AUDIENCE }
+        );
+
+        try {
+            await axios.get(`${baseUrl}/api/admin/verify`, {
+                headers: { Authorization: `Bearer ${differentTenantToken}` }
+            });
+            expect.fail('Different tenant should be rejected with 401');
+        } catch (err) {
+            expect(err.response.status).toBe(401);
+            expect(err.response.data.error.message).toContain('Session identity mismatch');
+        }
+
+        // 3. Direct validateSession unit assertions
+        const directMatch = await userSessionService.validateSession(session.sessionId, 'tenant_strict_1', 42);
+        expect(directMatch.valid).toBe(true);
+
+        const directMismatchUser = await userSessionService.validateSession(session.sessionId, 'tenant_strict_1', 99);
+        expect(directMismatchUser.valid).toBe(false);
+        expect(directMismatchUser.reason).toBe('SESSION_USER_MISMATCH');
+
+        const directMismatchTenant = await userSessionService.validateSession(session.sessionId, 'tenant_wrong', 42);
+        expect(directMismatchTenant.valid).toBe(false);
+        expect(directMismatchTenant.reason).toBe('SESSION_TENANT_MISMATCH');
+    });
 });
