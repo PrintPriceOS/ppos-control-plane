@@ -1302,6 +1302,25 @@ export const en = {
   'drawer.subCapacity': 'Capacity',
   'drawer.subAverage': 'Average',
   'common.noData': 'No data',
+
+  // Tenant Selector & Dynamic Filtering
+  'tenant.label': 'Authorized Tenant',
+  'tenant.selectPrompt': '-- Select Tenant --',
+  'tenant.allTenants': 'All Tenants',
+  'tenant.loading': 'Loading tenants...',
+  'tenant.error': 'Error loading tenants:',
+  'tenant.retry': 'Retry',
+  'tenant.noTenants': 'No registered tenants found.',
+
+  // Technical Details Collapsible
+  'technicalDetails.title': 'Technical Details & Diagnostics',
+  'technicalDetails.show': 'Show',
+  'technicalDetails.hide': 'Hide',
+  'technicalDetails.copy': 'Copy',
+  'technicalDetails.copied': 'Copied!',
+  'technicalDetails.copyJson': 'Copy JSON',
+  'technicalDetails.jsonPayload': 'JSON Diagnostic Payload',
+  'technicalDetails.backendNoticeTitle': 'Backend API Gap / Assisted Manual Entry',
 } as const;
 
 export type TranslationKeys = keyof typeof en;

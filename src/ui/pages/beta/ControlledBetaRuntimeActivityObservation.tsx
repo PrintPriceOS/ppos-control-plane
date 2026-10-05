@@ -10,6 +10,8 @@ import {
   CohortUsageSummary
 } from '../../types/controlledBetaRuntimeActivityObservation';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
   EyeIcon,
   ExclamationTriangleIcon,
@@ -234,42 +236,74 @@ export function ControlledBetaRuntimeActivityObservation() {
               <EyeIcon className="w-4 h-4 text-blue-500" />
               Configuración de Observación de Actividad
             </h3>
+            {/* Tenant Selection */}
+            <div className="mb-4">
+              <TenantSelector
+                id="observation-tenant-selector"
+                selectedTenantId={tenantId}
+                onSelectTenant={(tid) => setTenantId(tid)}
+                allowEmpty={false}
+                label="Tenant de Observación"
+                helperText="Seleccione el tenant auditado para vincular los gates de telemetría y eventos observados."
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Observación</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Gate de Observación (Opcional)
+                </label>
                 <input
                   value={observationGateId}
                   onChange={e => setObservationGateId(e.target.value)}
-                  placeholder="obs_..."
+                  placeholder="obs_... (dejar vacío para crear nuevo)"
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Identificador del gate o clave única autogenerada por el backend.
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Sesión Previo</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Gate de Sesión Previo
+                </label>
                 <input
                   value={sessionGateId}
                   onChange={e => setSessionGateId(e.target.value)}
                   placeholder="sg_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Gate de sesión autorizado emitido en el paso anterior.
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Sesión Activa</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Sesión Activa
+                </label>
                 <input
                   value={runtimeSessionId}
                   onChange={e => setRuntimeSessionId(e.target.value)}
                   placeholder="sess_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  ID de sesión en ejecución cuyos eventos serán capturados.
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Participante</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Participante
+                </label>
                 <input
                   value={participantId}
                   onChange={e => setParticipantId(e.target.value)}
                   placeholder="part_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5">
+                  * Entrada manual validada (Carencia backend: GET /api/admin/beta/participants no implementado).
+                </span>
               </div>
             </div>
             <div className="flex gap-2 pt-2 border-t ppos-border">
@@ -466,17 +500,41 @@ export function ControlledBetaRuntimeActivityObservation() {
             </div>
           )}
 
-          {/* Collapsible Diagnostics */}
-          <details className="ppos-card p-4 border ppos-border rounded text-xs">
-            <summary className="font-bold text-zinc-500 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
-              {t('beta.runtime.advancedDiagnostics') || 'Diagnóstico Técnico y Respuestas JSON'}
-            </summary>
-            <div className="mt-3 space-y-2 font-mono text-[10px]">
-              <div>Observation Gate: {observationGateId || 'N/A'}</div>
-              <div>Session Gate: {sessionGateId || 'N/A'}</div>
-              <div>Participant: {participantId || 'N/A'}</div>
-            </div>
-          </details>
+          {/* Technical Details Collapsible */}
+          <TechnicalDetailsCollapsible
+            title="Detalles Técnicos y Telemetría de Observación"
+            data={{
+              observation_gate_id: observationGateId,
+              session_gate_id: sessionGateId,
+              runtime_session_id: runtimeSessionId,
+              participant_id: participantId,
+              tenant_id: tenantId,
+              cohort_id: cohortId,
+              gate: gate,
+              readiness: readiness,
+              evidence_pack: evidencePack,
+              participant_summary: participantSummary,
+              cohort_summary: cohortSummary,
+              events_count: events.length,
+              blocked_attempts_count: blockedAttempts.length,
+              anomalies_count: anomalySignals.length,
+              health_signals_count: healthSignals.length,
+              audit_log: auditLog
+            }}
+            fields={[
+              { label: 'Observation Gate ID', value: observationGateId, copyable: true },
+              { label: 'Session Gate ID', value: sessionGateId, copyable: true },
+              { label: 'Runtime Session ID', value: runtimeSessionId, copyable: true },
+              { label: 'Participant ID', value: participantId, copyable: true },
+              { label: 'Tenant ID', value: tenantId, copyable: true }
+            ]}
+            missingBackendNotes={[
+              'GET /api/admin/beta/participants?tenant_id=:id (Listado de participantes)',
+              'GET /api/admin/beta/cohorts?tenant_id=:id (Listado de cohortes)',
+              'GET /api/admin/beta/runtime-sessions/gates?tenant_id=:id (Listado de gates de sesión)',
+              'GET /api/admin/beta/observation-gates?tenant_id=:id (Listado de gates de observación)'
+            ]}
+          />
         </div>
       </div>
     </div>

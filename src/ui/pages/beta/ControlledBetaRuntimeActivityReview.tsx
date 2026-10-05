@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { runtimeActivityReviewClient } from '../../api/controlledBetaRuntimeActivityReviewClient';
 import { normalizeUiError } from '../../utils/errorUtils';
@@ -9,13 +9,13 @@ import {
   RuntimeActivityReviewEvidence
 } from '../../types/controlledBetaRuntimeActivityReview';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
-  HeartIcon,
   ExclamationTriangleIcon,
   ShieldCheckIcon,
-  CheckCircleIcon,
-  ArrowPathIcon,
-  DocumentMagnifyingGlassIcon
+  DocumentMagnifyingGlassIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 export function ControlledBetaRuntimeActivityReview() {
@@ -30,7 +30,7 @@ export function ControlledBetaRuntimeActivityReview() {
   const [evidencePack, setEvidencePack] = useState<RuntimeActivityReviewEvidence | null>(null);
 
   // Form states for creation
-  const [tenantId, setTenantId] = useState('tenant_beta_01');
+  const [tenantId, setTenantId] = useState('');
   const [cohortId, setCohortId] = useState('cohort_beta_01');
   const [windowStart, setWindowStart] = useState(new Date(Date.now() - 86400000 * 7).toISOString().substring(0, 16));
   const [windowEnd, setWindowEnd] = useState(new Date().toISOString().substring(0, 16));
@@ -42,17 +42,63 @@ export function ControlledBetaRuntimeActivityReview() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [reviewFetchError, setReviewFetchError] = useState<string | null>(null);
+
+  // Confirmation modal state for critical/destructive actions
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    action: () => {}
+  });
+
+  // Discard stale async responses
+  const reviewSeqRef = useRef(0);
 
   const fetchReviewsList = useCallback(async () => {
+    const seq = ++reviewSeqRef.current;
+    setLoading(true);
+    setReviewFetchError(null);
     try {
       const res = await runtimeActivityReviewClient.listReviews();
+      if (seq !== reviewSeqRef.current) return;
       if (res.ok) {
-        setReviews(res.reviews);
+        setReviews(res.reviews || []);
+      } else {
+        setReviewFetchError((res as any)?.error || 'Error al listar revisiones');
       }
     } catch (err: any) {
-      console.error('Error fetching reviews:', err);
+      if (seq !== reviewSeqRef.current) return;
+      setReviewFetchError(err?.message || String(err));
+    } finally {
+      if (seq === reviewSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
+
+  const handleTenantChange = (newTenantId: string) => {
+    setTenantId(newTenantId);
+    // Changing parent tenant clears incompatible child review selection
+    if (selectedReview && selectedReview.tenant_id && selectedReview.tenant_id !== newTenantId) {
+      setSelectedReviewId('');
+      setSelectedReview(null);
+      setDecision(null);
+      setFindings([]);
+      setEvidencePack(null);
+    }
+  };
+
+  // Filter reviews by selected tenant without mixing other tenants' data
+  const filteredReviews = useMemo(() => {
+    if (!tenantId) return reviews;
+    return reviews.filter(r => !r.tenant_id || r.tenant_id === tenantId);
+  }, [reviews, tenantId]);
 
   const loadReviewDetails = useCallback(async (reviewId: string) => {
     if (!reviewId) return;
@@ -62,12 +108,11 @@ export function ControlledBetaRuntimeActivityReview() {
       if (res.ok) {
         setSelectedReview(res.review);
         setDecision(res.decision || null);
-        setFindings(res.findings);
+        setFindings(res.findings || []);
 
-        // Fetch evidence pack if review is finalized
         if (res.review.review_status === 'FINALIZED') {
           const evRes = await runtimeActivityReviewClient.getEvidencePack(reviewId);
-          if (evRes.ok) {
+          if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
           } else {
             setEvidencePack(null);
@@ -84,6 +129,10 @@ export function ControlledBetaRuntimeActivityReview() {
   }, []);
 
   const handleCreateReview = async () => {
+    if (!tenantId) {
+      setErrorMsg('Seleccione un tenant autorizado antes de crear la revisión.');
+      return;
+    }
     setLoading(true);
     setMessage('');
     setErrorMsg('');
@@ -128,54 +177,71 @@ export function ControlledBetaRuntimeActivityReview() {
     }
   };
 
-  const handleFinalize = async () => {
+  const confirmFinalize = () => {
     if (!selectedReviewId) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await runtimeActivityReviewClient.finalizeReview(selectedReviewId);
-      if (res.ok) {
-        setMessage('Revisión finalizada y protegida criptográficamente.');
-        await loadReviewDetails(selectedReviewId);
-        await fetchReviewsList();
-      } else {
-        setErrorMsg('Error al finalizar la revisión');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Finalizar y Sellar Revisión de Salud',
+      description: `Se bloqueará criptográficamente la revisión ${selectedReviewId}. Esta acción es definitiva y permitirá habilitar propuestas de intervención downstream.`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await runtimeActivityReviewClient.finalizeReview(selectedReviewId);
+          if (res.ok) {
+            setMessage('Revisión finalizada y protegida criptográficamente.');
+            await loadReviewDetails(selectedReviewId);
+            await fetchReviewsList();
+          } else {
+            setErrorMsg('Error al finalizar la revisión');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleSupersede = async () => {
+  const confirmSupersede = () => {
     if (!selectedReviewId || !targetSupersedeId) return;
     if (!supersedeReason.trim()) {
       setErrorMsg('El motivo de sustitución es obligatorio.');
       return;
     }
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await runtimeActivityReviewClient.supersedeReview(selectedReviewId, {
-        supersededByReviewId: targetSupersedeId,
-        reason: supersedeReason
-      });
-      if (res.ok) {
-        setMessage(`Revisión ${selectedReviewId} sustituida correctamente.`);
-        setSupersedeReason('');
-        setTargetSupersedeId('');
-        await loadReviewDetails(selectedReviewId);
-      } else {
-        setErrorMsg('Error al sustituir la revisión');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Sustituir Revisión de Salud',
+      description: `La revisión ${selectedReviewId} quedará marcada como SUPERSEDED por el expediente ${targetSupersedeId}. Consecuencia: No podrá ser utilizada como fuente de nuevas intervenciones. Motivo: "${supersedeReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await runtimeActivityReviewClient.supersedeReview(selectedReviewId, {
+            supersededByReviewId: targetSupersedeId,
+            reason: supersedeReason
+          });
+          if (res.ok) {
+            setMessage(`Revisión ${selectedReviewId} sustituida correctamente.`);
+            setSupersedeReason('');
+            setTargetSupersedeId('');
+            await loadReviewDetails(selectedReviewId);
+            await fetchReviewsList();
+          } else {
+            setErrorMsg('Error al sustituir la revisión');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -187,6 +253,12 @@ export function ControlledBetaRuntimeActivityReview() {
       loadReviewDetails(selectedReviewId);
     }
   }, [selectedReviewId, loadReviewDetails]);
+
+  // Candidate reviews to supersede current review (excluding self and already superseded ones)
+  const supersedeCandidates = useMemo(() => {
+    if (!selectedReview) return [];
+    return reviews.filter(r => r.review_id !== selectedReview.review_id && r.review_status !== 'SUPERSEDED');
+  }, [reviews, selectedReview]);
 
   return (
     <div className="space-y-6">
@@ -206,28 +278,39 @@ export function ControlledBetaRuntimeActivityReview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left pane: Review selector and creation (1/3 width) */}
         <div className="space-y-6">
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          {/* Creation card with Tenant Selector */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
               <DocumentMagnifyingGlassIcon className="w-4 h-4 text-blue-500" />
               Nueva Captura de Revisión
             </h3>
-            <div className="space-y-3 mb-4">
+
+            <TenantSelector
+              id="review-tenant-selector"
+              selectedTenantId={tenantId}
+              onSelectTenant={handleTenantChange}
+              label="Filtrar por Tenant"
+              allowEmpty
+              emptyLabel="Todos los Tenants"
+              helperText="El tenant seleccionado filtra los datos y previene mezclar organizaciones."
+            />
+
+            <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Tenant</label>
-                <input
-                  value={tenantId}
-                  onChange={e => setTenantId(e.target.value)}
-                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Cohorte</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Cohorte
+                </label>
                 <input
                   value={cohortId}
                   onChange={e => setCohortId(e.target.value)}
+                  placeholder="cohort_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[9px] text-zinc-400 mt-0.5 block">
+                  Identificador de cohorte en pruebas (requerido por el runtime).
+                </span>
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Inicio de Ventana</label>
                 <input
@@ -237,6 +320,7 @@ export function ControlledBetaRuntimeActivityReview() {
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Fin de Ventana</label>
                 <input
@@ -247,32 +331,67 @@ export function ControlledBetaRuntimeActivityReview() {
                 />
               </div>
             </div>
+
             <button
               type="button"
               onClick={handleCreateReview}
-              disabled={loading}
+              disabled={loading || !tenantId}
               className="w-full px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
             >
               Crear Revisión de Ventana
             </button>
           </div>
 
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
-              Seleccionar Revisión de Cohorte
-            </h3>
+          {/* Review Selection Card */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Seleccionar Revisión de Cohorte
+              </h3>
+              <button
+                type="button"
+                onClick={fetchReviewsList}
+                disabled={loading}
+                title="Actualizar listado"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              >
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {reviewFetchError && (
+              <div className="p-2 text-[11px] text-red-500 bg-red-500/10 border border-red-500/20 rounded flex items-center justify-between">
+                <span>{reviewFetchError}</span>
+                <button
+                  type="button"
+                  onClick={fetchReviewsList}
+                  className="underline uppercase text-[10px] font-bold ml-2"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
             <select
               value={selectedReviewId}
               onChange={e => setSelectedReviewId(e.target.value)}
               className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
             >
               <option value="">-- Seleccionar Revisión --</option>
-              {reviews.map(r => (
+              {filteredReviews.map(r => (
                 <option key={r.review_id} value={r.review_id}>
-                  {r.review_id} ({r.cohort_id}) - {r.review_status}
+                  {r.review_id.slice(0, 16)}... [{r.review_status}] ({r.cohort_id || 'Sin cohorte'}) - Riesgo: {r.risk_level || 'N/A'}
                 </option>
               ))}
             </select>
+
+            {!loading && filteredReviews.length === 0 && (
+              <p className="text-[11px] text-zinc-400 italic">
+                {tenantId
+                  ? 'No hay revisiones asociadas al tenant seleccionado.'
+                  : 'No se encontraron revisiones de cohorte registradas.'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -292,6 +411,8 @@ export function ControlledBetaRuntimeActivityReview() {
                 <span className={`px-2.5 py-1 rounded text-xs font-black uppercase self-start sm:self-auto ${
                   selectedReview.review_status === 'FINALIZED'
                     ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : selectedReview.review_status === 'SUPERSEDED'
+                    ? 'bg-red-500/10 text-red-500 border border-red-500/20'
                     : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
                 }`}>
                   {selectedReview.review_status}
@@ -303,15 +424,15 @@ export function ControlledBetaRuntimeActivityReview() {
                 <button
                   type="button"
                   onClick={handleEvaluate}
-                  disabled={loading || selectedReview.review_status === 'FINALIZED'}
+                  disabled={loading || selectedReview.review_status === 'FINALIZED' || selectedReview.review_status === 'SUPERSEDED'}
                   className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   Evaluar Salud
                 </button>
                 <button
                   type="button"
-                  onClick={handleFinalize}
-                  disabled={loading || selectedReview.review_status === 'FINALIZED'}
+                  onClick={confirmFinalize}
+                  disabled={loading || selectedReview.review_status === 'FINALIZED' || selectedReview.review_status === 'SUPERSEDED'}
                   className="px-4 py-2 text-xs font-bold bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   Finalizar y Bloquear Revisión
@@ -389,19 +510,27 @@ export function ControlledBetaRuntimeActivityReview() {
                 )}
               </div>
 
-              {/* Supersede Review */}
+              {/* Supersede Review with dynamic Candidate Selector */}
               {selectedReview.review_status !== 'SUPERSEDED' && (
                 <div className="pt-4 border-t ppos-border space-y-3">
                   <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase">Sustituir esta Revisión</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Revisión Reemplazante</label>
-                      <input
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                        Revisión Reemplazante
+                      </label>
+                      <select
                         value={targetSupersedeId}
                         onChange={e => setTargetSupersedeId(e.target.value)}
-                        placeholder="rev_..."
                         className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
-                      />
+                      >
+                        <option value="">-- Seleccionar Revisión Destino --</option>
+                        {supersedeCandidates.map(c => (
+                          <option key={c.review_id} value={c.review_id}>
+                            {c.review_id.slice(0, 16)}... ({c.cohort_id}) - {c.review_status}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Motivo Justificado</label>
@@ -415,14 +544,36 @@ export function ControlledBetaRuntimeActivityReview() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleSupersede}
-                    disabled={loading || !targetSupersedeId || !supersedeReason}
+                    onClick={confirmSupersede}
+                    disabled={loading || !targetSupersedeId || !supersedeReason.trim()}
                     className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded transition-colors"
                   >
                     Aplicar Sustitución
                   </button>
                 </div>
               )}
+
+              {/* Technical Details Collapsible */}
+              <TechnicalDetailsCollapsible
+                title="Detalles Técnicos y Diagnóstico de Revisión"
+                items={[
+                  { label: 'Review ID', value: selectedReview.review_id, copyable: true },
+                  { label: 'Tenant ID', value: selectedReview.tenant_id, copyable: true },
+                  { label: 'Cohorte ID', value: selectedReview.cohort_id, copyable: true },
+                  { label: 'Inicio Ventana', value: selectedReview.review_window_start },
+                  { label: 'Fin Ventana', value: selectedReview.review_window_end },
+                  { label: 'Nivel de Riesgo', value: selectedReview.risk_level },
+                  { label: 'Nivel de Confianza', value: selectedReview.confidence_level },
+                  { label: 'Snapshot Hash', value: evidencePack?.input_snapshot_hash, copyable: true },
+                  { label: 'Evidence Pack Hash', value: evidencePack?.evidence_pack_hash, copyable: true }
+                ]}
+                jsonPayload={evidencePack || selectedReview}
+                missingEndpointNotice={{
+                  missingEntity: 'Cohorte Beta',
+                  requiredEndpointProposal: 'GET /api/admin/beta/cohorts?tenant_id=:tenantId',
+                  fieldNotice: 'El identificador de cohorte se introduce manualmente de forma validada porque el backend no expone un endpoint de listado de cohortes por tenant.'
+                }}
+              />
             </div>
           ) : (
             <div className="ppos-card border border-dashed ppos-border p-10 rounded text-center flex flex-col items-center justify-center space-y-3">
@@ -450,6 +601,36 @@ export function ControlledBetaRuntimeActivityReview() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="ppos-card p-6 border ppos-border rounded max-w-md w-full shadow-2xl space-y-4">
+            <h4 className="text-sm font-black uppercase text-slate-900 dark:text-white">
+              {confirmModal.title}
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+              {confirmModal.description}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-3 py-1.5 text-xs font-bold border ppos-border hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.action}
+                className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+              >
+                Confirmar Acción
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

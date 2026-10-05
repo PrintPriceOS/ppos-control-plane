@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { runtimeSessionClient } from '../../api/controlledBetaRuntimeSessionClient';
 import { RuntimeSessionGate, RuntimeSession, RuntimeSessionLimits, RuntimeSessionReadiness } from '../../types/controlledBetaRuntimeSession';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
@@ -266,41 +268,74 @@ export function ControlledBetaRuntimeSession() {
               <KeyIcon className="w-4 h-4 text-blue-500" />
               Configuración del Gate de Sesión
             </h3>
+            {/* Tenant Selection */}
+            <div className="mb-4">
+              <TenantSelector
+                id="session-tenant-selector"
+                selectedTenantId={tenantId}
+                onSelectTenant={(tid) => setTenantId(tid)}
+                allowEmpty={false}
+                label="Tenant de la Sesión"
+                helperText="Seleccione el tenant para asociar los gates de sesión y participantes autorizados."
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Sesión</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Gate de Sesión (Opcional para autogenerar)
+                </label>
                 <input
                   value={gateId}
                   onChange={e => setGateId(e.target.value)}
-                  placeholder="sg_..."
+                  placeholder="sg_... (dejar vacío para crear nuevo)"
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Identificador del gate o clave única autogenerada por el servidor.
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Gate de Aceptación Previo</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Gate de Aceptación Previo
+                </label>
                 <input
                   value={acceptanceGateId}
                   onChange={e => setAcceptanceGateId(e.target.value)}
                   placeholder="agate_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Requiere gate de aceptación de participante sellado previamente.
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Participante</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Participante
+                </label>
                 <input
                   value={participantId}
                   onChange={e => setParticipantId(e.target.value)}
                   placeholder="part_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5">
+                  * Entrada manual validada (Carencia backend: GET /api/admin/beta/participants no implementado).
+                </span>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Tenant</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                  ID de Cohorte
+                </label>
                 <input
-                  value={tenantId}
-                  onChange={e => setTenantId(e.target.value)}
+                  value={cohortId}
+                  onChange={e => setCohortId(e.target.value)}
+                  placeholder="cohort_..."
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5">
+                  * Entrada manual validada (Carencia backend: GET /api/admin/beta/cohorts no implementado).
+                </span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t ppos-border">
@@ -557,21 +592,35 @@ export function ControlledBetaRuntimeSession() {
             </div>
           )}
 
-          {/* Collapsible Diagnostics */}
-          <details className="ppos-card p-4 border ppos-border rounded text-xs">
-            <summary className="font-bold text-zinc-500 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
-              {t('beta.runtime.advancedDiagnostics') || 'Diagnóstico Técnico y Respuestas JSON'}
-            </summary>
-            <div className="mt-3 space-y-2 font-mono text-[10px]">
-              <div>Gate: {gateId || 'N/A'}</div>
-              <div>Sesión: {activeSessionId || 'N/A'}</div>
-              {evalResult && (
-                <pre className="p-2 ppos-surface-muted border ppos-border rounded overflow-x-auto max-h-48 custom-scrollbar">
-                  {JSON.stringify(evalResult, null, 2)}
-                </pre>
-              )}
-            </div>
-          </details>
+          {/* Technical Details Collapsible */}
+          <TechnicalDetailsCollapsible
+            title="Detalles Técnicos de Sesión y Diagnóstico"
+            data={{
+              gate_id: gateId,
+              tenant_id: tenantId,
+              cohort_id: cohortId,
+              participant_id: participantId,
+              acceptance_gate_id: acceptanceGateId,
+              active_session_id: activeSessionId,
+              gate: gate,
+              readiness: readiness,
+              evidence_pack: evidencePack,
+              eval_result: evalResult,
+              audit_log: auditLog
+            }}
+            fields={[
+              { label: 'Gate ID', value: gateId, copyable: true },
+              { label: 'Active Session ID', value: activeSessionId, copyable: true },
+              { label: 'Acceptance Gate ID', value: acceptanceGateId, copyable: true },
+              { label: 'Participant ID', value: participantId, copyable: true },
+              { label: 'Tenant ID', value: tenantId, copyable: true }
+            ]}
+            missingBackendNotes={[
+              'GET /api/admin/beta/participants?tenant_id=:id (Listado de participantes)',
+              'GET /api/admin/beta/cohorts?tenant_id=:id (Listado de cohortes)',
+              'GET /api/admin/beta/runtime-sessions/gates?tenant_id=:id (Listado de gates de sesión)'
+            ]}
+          />
         </div>
       </div>
 

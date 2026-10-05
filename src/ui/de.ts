@@ -1302,6 +1302,25 @@ export const de = {
   'drawer.subCapacity': 'Kapazität',
   'drawer.subAverage': 'Durchschnitt',
   'common.noData': 'Keine Daten',
+
+  // Tenant Selector & Dynamic Filtering
+  'tenant.label': 'Autorisierter Tenant',
+  'tenant.selectPrompt': '-- Tenant auswählen --',
+  'tenant.allTenants': 'Alle Tenants',
+  'tenant.loading': 'Tenants werden geladen...',
+  'tenant.error': 'Fehler beim Laden der Tenants:',
+  'tenant.retry': 'Wiederholen',
+  'tenant.noTenants': 'Keine registrierten Tenants gefunden.',
+
+  // Technical Details Collapsible
+  'technicalDetails.title': 'Technische Details & Diagnose',
+  'technicalDetails.show': 'Anzeigen',
+  'technicalDetails.hide': 'Ausblenden',
+  'technicalDetails.copy': 'Kopieren',
+  'technicalDetails.copied': 'Kopiert!',
+  'technicalDetails.copyJson': 'JSON kopieren',
+  'technicalDetails.jsonPayload': 'JSON-Diagnosedaten',
+  'technicalDetails.backendNoticeTitle': 'Backend-API-Lücke / Unterstützte manuelle Eingabe',
 } as const;
 
 export type TranslationKeys = keyof typeof de;

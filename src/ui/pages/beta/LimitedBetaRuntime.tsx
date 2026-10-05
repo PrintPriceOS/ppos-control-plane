@@ -29,6 +29,8 @@ import {
   getRuntimeRestartRecoveryEvidencePack
 } from '../../api/limitedBetaRuntimeClient';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
@@ -548,7 +550,20 @@ export function LimitedBetaRuntime() {
               <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
               3. Participantes y Concesiones de Acceso
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+
+            {/* Tenant Selection */}
+            <div className="mb-4">
+              <TenantSelector
+                id="runtime-tenant-selector"
+                selectedTenantId={tenantId}
+                onSelectTenant={(tid) => setTenantId(tid)}
+                allowEmpty={false}
+                label="Tenant de Ejecución"
+                helperText="Selecciona el tenant auditado para las concesiones de acceso y creación de sesiones."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Cohorte</label>
                 <input
@@ -556,6 +571,9 @@ export function LimitedBetaRuntime() {
                   onChange={e => setCohortId(e.target.value)}
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5">
+                  * Entrada manual validada (Carencia backend: GET /api/admin/beta/cohorts no implementado).
+                </span>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Participante</label>
@@ -564,14 +582,9 @@ export function LimitedBetaRuntime() {
                   onChange={e => setParticipantId(e.target.value)}
                   className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
                 />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">ID de Tenant</label>
-                <input
-                  value={tenantId}
-                  onChange={e => setTenantId(e.target.value)}
-                  className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
-                />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5">
+                  * Entrada manual validada (Carencia backend: GET /api/admin/beta/participants no implementado).
+                </span>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 items-center mb-3">
@@ -727,25 +740,36 @@ export function LimitedBetaRuntime() {
               </p>
             )}
 
-            {/* Collapsible Advanced Payload Inspector */}
-            <details className="mt-3 pt-3 border-t ppos-border text-xs">
-              <summary className="font-bold text-zinc-500 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
-                {t('beta.runtime.advancedDiagnostics') || 'Diagnóstico Técnico y Respuestas JSON'}
-              </summary>
-              <div className="mt-3 space-y-2 font-mono text-[11px]">
-                <div className="p-2 ppos-surface-muted border ppos-border rounded">
-                  <div>Drill: {drillId || 'N/A'}</div>
-                  <div>Session: {sessionId || 'N/A'}</div>
-                  <div>Policy: {policyId || 'N/A'}</div>
-                  <div>Grant: {grantId || 'N/A'}</div>
-                </div>
-                {result && (
-                  <pre className="p-3 ppos-surface-muted border ppos-border rounded overflow-x-auto max-h-60 text-[10px] custom-scrollbar">
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
-                )}
-              </div>
-            </details>
+            {/* Technical Details Collapsible */}
+            <div className="mt-3 pt-3 border-t ppos-border">
+              <TechnicalDetailsCollapsible
+                title="Detalles Técnicos y Diagnóstico del Entorno"
+                data={{
+                  gate_id: gateId,
+                  policy_id: policyId,
+                  grant_id: grantId,
+                  session_id: sessionId,
+                  drill_id: drillId,
+                  finding_id: findingId,
+                  tenant_id: tenantId,
+                  cohort_id: cohortId,
+                  participant_id: participantId,
+                  result: result
+                }}
+                fields={[
+                  { label: 'Drill ID', value: drillId, copyable: true },
+                  { label: 'Session ID', value: sessionId, copyable: true },
+                  { label: 'Policy ID', value: policyId, copyable: true },
+                  { label: 'Grant ID', value: grantId, copyable: true },
+                  { label: 'Gate ID', value: gateId, copyable: true },
+                  { label: 'Finding ID', value: findingId, copyable: true }
+                ]}
+                missingBackendNotes={[
+                  'GET /api/admin/beta/cohorts?tenant_id=:id (Listado de cohortes)',
+                  'GET /api/admin/beta/participants?tenant_id=:id (Listado de participantes)'
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>

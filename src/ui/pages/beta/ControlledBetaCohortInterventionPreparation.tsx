@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cohortInterventionPreparationClient } from '../../api/controlledBetaCohortInterventionPreparationClient';
 import { normalizeUiError } from '../../utils/errorUtils';
@@ -10,18 +10,24 @@ import {
 } from '../../types/controlledBetaCohortInterventionPreparation';
 import { RuntimeActivityReview } from '../../types/controlledBetaRuntimeActivityReview';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   ClipboardDocumentCheckIcon,
   CheckCircleIcon,
   ArrowRightIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 export function ControlledBetaCohortInterventionPreparation() {
   const { t } = useLocale();
   const navigate = useNavigate();
+
+  // Tenant Filter
+  const [tenantId, setTenantId] = useState('');
 
   const [preparations, setPreparations] = useState<CohortInterventionPreparation[]>([]);
   const [selectedPrepId, setSelectedPrepId] = useState<string>('');
@@ -41,6 +47,7 @@ export function ControlledBetaCohortInterventionPreparation() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -55,31 +62,72 @@ export function ControlledBetaCohortInterventionPreparation() {
     action: () => {}
   });
 
+  // Stale async response tracking
+  const prepSeqRef = useRef(0);
+  const reviewSeqRef = useRef(0);
+
   const fetchPrepsList = useCallback(async () => {
+    const seq = ++prepSeqRef.current;
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await cohortInterventionPreparationClient.listPreparations();
+      if (seq !== prepSeqRef.current) return;
       if (res.ok) {
-        setPreparations(res.preparations);
+        setPreparations(res.preparations || []);
+      } else {
+        setFetchError((res as any)?.error || 'Error al listar propuestas');
       }
     } catch (err: any) {
-      console.error('Error fetching preparations:', err);
+      if (seq !== prepSeqRef.current) return;
+      setFetchError(err?.message || String(err));
+    } finally {
+      if (seq === prepSeqRef.current) setLoading(false);
     }
   }, []);
 
   const fetchFinalizedReviewsList = useCallback(async () => {
+    const seq = ++reviewSeqRef.current;
     try {
       const res = await runtimeActivityReviewClient.listReviews();
+      if (seq !== reviewSeqRef.current) return;
       if (res.ok) {
-        const filtered = res.reviews.filter(r => r.review_status === 'FINALIZED');
+        const filtered = (res.reviews || []).filter(r => r.review_status === 'FINALIZED');
         setFinalizedReviews(filtered);
-        if (filtered.length > 0 && !sourceReviewId) {
-          setSourceReviewId(filtered[0].review_id);
-        }
+        // Do NOT auto-select to avoid enabling critical actions automatically
       }
     } catch (err: any) {
       console.error('Error fetching reviews:', err);
     }
-  }, [sourceReviewId]);
+  }, []);
+
+  const handleTenantChange = (newTenantId: string) => {
+    setTenantId(newTenantId);
+    // Discard child selections if incompatible with new parent tenant
+    if (sourceReviewId) {
+      const currentReview = finalizedReviews.find(r => r.review_id === sourceReviewId);
+      if (currentReview && currentReview.tenant_id && currentReview.tenant_id !== newTenantId) {
+        setSourceReviewId('');
+      }
+    }
+    if (selectedPrep && selectedPrep.tenant_id && selectedPrep.tenant_id !== newTenantId) {
+      setSelectedPrepId('');
+      setSelectedPrep(null);
+      setChecklistItems([]);
+      setEvidencePack(null);
+    }
+  };
+
+  // Filter entities by tenant to prevent data contamination across tenants
+  const filteredFinalizedReviews = useMemo(() => {
+    if (!tenantId) return finalizedReviews;
+    return finalizedReviews.filter(r => !r.tenant_id || r.tenant_id === tenantId);
+  }, [finalizedReviews, tenantId]);
+
+  const filteredPreparations = useMemo(() => {
+    if (!tenantId) return preparations;
+    return preparations.filter(p => !p.tenant_id || p.tenant_id === tenantId);
+  }, [preparations, tenantId]);
 
   const loadPrepDetails = useCallback(async (prepId: string) => {
     if (!prepId) return;
@@ -92,7 +140,7 @@ export function ControlledBetaCohortInterventionPreparation() {
 
         if (res.preparation.preparation_status === 'FINALIZED') {
           const evRes = await cohortInterventionPreparationClient.getEvidencePack(prepId);
-          if (evRes.ok) {
+          if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
           } else {
             setEvidencePack(null);
@@ -110,7 +158,7 @@ export function ControlledBetaCohortInterventionPreparation() {
 
   const handleCreatePrep = async () => {
     if (!sourceReviewId) {
-      setErrorMsg('Se requiere una revisión previa finalizada.');
+      setErrorMsg('Seleccione una revisión previa finalizada.');
       return;
     }
     setLoading(true);
@@ -206,7 +254,7 @@ export function ControlledBetaCohortInterventionPreparation() {
     setConfirmModal({
       isOpen: true,
       title: 'Rechazar Paquete de Intervención',
-      description: `Se marcará la propuesta ${selectedPrepId} como RECHAZADA. Motivo: "${rejectReason}".`,
+      description: `Se marcará la propuesta ${selectedPrepId} como RECHAZADA. Motivo: "${rejectReason}". Consecuencia: El paquete no podrá enviarse a aprobación.`,
       action: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setLoading(true);
@@ -231,27 +279,35 @@ export function ControlledBetaCohortInterventionPreparation() {
     });
   };
 
-  const handleSupersede = async () => {
+  const confirmSupersede = () => {
     if (!selectedPrepId || !targetSupersedeId || !supersedeReason.trim()) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionPreparationClient.supersedePreparation(selectedPrepId, targetSupersedeId, supersedeReason);
-      if (res.ok) {
-        setMessage(`Propuesta ${selectedPrepId} marcada como sustituida.`);
-        setSupersedeReason('');
-        setTargetSupersedeId('');
-        await loadPrepDetails(selectedPrepId);
-        await fetchPrepsList();
-      } else {
-        setErrorMsg('Error al sustituir la propuesta');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Sustituir Propuesta de Intervención',
+      description: `La propuesta ${selectedPrepId} quedará marcada como SUPERSEDED por el expediente ${targetSupersedeId}. Motivo: "${supersedeReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionPreparationClient.supersedePreparation(selectedPrepId, targetSupersedeId, supersedeReason);
+          if (res.ok) {
+            setMessage(`Propuesta ${selectedPrepId} marcada como sustituida.`);
+            setSupersedeReason('');
+            setTargetSupersedeId('');
+            await loadPrepDetails(selectedPrepId);
+            await fetchPrepsList();
+          } else {
+            setErrorMsg('Error al sustituir la propuesta');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -264,6 +320,16 @@ export function ControlledBetaCohortInterventionPreparation() {
       loadPrepDetails(selectedPrepId);
     }
   }, [selectedPrepId, loadPrepDetails]);
+
+  // Candidates to supersede current preparation
+  const supersedeCandidates = useMemo(() => {
+    if (!selectedPrep) return [];
+    return preparations.filter(
+      p => p.preparation_id !== selectedPrep.preparation_id &&
+           p.preparation_status !== 'SUPERSEDED' &&
+           p.preparation_status !== 'REJECTED'
+    );
+  }, [preparations, selectedPrep]);
 
   return (
     <div className="space-y-6">
@@ -281,25 +347,42 @@ export function ControlledBetaCohortInterventionPreparation() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: Create and Select (1/3 width) */}
+        {/* Left column: Tenant filter, Create and Select (1/3 width) */}
         <div className="space-y-6">
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          {/* Tenant Filter Context */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <TenantSelector
+              id="prep-tenant-selector"
+              selectedTenantId={tenantId}
+              onSelectTenant={handleTenantChange}
+              allowEmpty
+              emptyLabel="Todos los Tenants"
+              label="Filtrar por Tenant"
+              helperText="Selecciona un tenant para acotar las revisiones y propuestas disponibles."
+            />
+          </div>
+
+          {/* Create Proposal from Review */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
               <ClipboardDocumentCheckIcon className="w-4 h-4 text-blue-500" />
               Construir desde Revisión Finalizada
             </h3>
-            {finalizedReviews.length > 0 ? (
+            {filteredFinalizedReviews.length > 0 ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Revisión Finalizada de Origen</label>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    Revisión Finalizada de Origen
+                  </label>
                   <select
                     value={sourceReviewId}
                     onChange={e => setSourceReviewId(e.target.value)}
                     className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
                   >
-                    {finalizedReviews.map(r => (
+                    <option value="">-- Seleccionar Revisión --</option>
+                    {filteredFinalizedReviews.map(r => (
                       <option key={r.review_id} value={r.review_id}>
-                        {r.review_id} ({r.cohort_id}) - Riesgo: {r.risk_level}
+                        {r.review_id.slice(0, 16)}... ({r.cohort_id}) - Riesgo: {r.risk_level || 'N/A'}
                       </option>
                     ))}
                   </select>
@@ -307,7 +390,7 @@ export function ControlledBetaCohortInterventionPreparation() {
                 <button
                   type="button"
                   onClick={handleCreatePrep}
-                  disabled={loading}
+                  disabled={loading || !sourceReviewId}
                   className="w-full px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   Generar Paquete de Propuesta
@@ -316,7 +399,9 @@ export function ControlledBetaCohortInterventionPreparation() {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  {t('beta.governance.noFinalizedReviews') || 'No se encontraron revisiones de salud finalizadas. Se requiere una revisión de actividad antes de preparar una intervención.'}
+                  {tenantId
+                    ? 'No se encontraron revisiones finalizadas para el tenant seleccionado.'
+                    : (t('beta.governance.noFinalizedReviews') || 'No se encontraron revisiones de salud finalizadas. Se requiere una revisión de actividad antes de preparar una intervención.')}
                 </p>
                 <button
                   type="button"
@@ -329,22 +414,57 @@ export function ControlledBetaCohortInterventionPreparation() {
             )}
           </div>
 
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
-              Seleccionar Propuesta Activa
-            </h3>
+          {/* Select Existing Preparation */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Seleccionar Propuesta Activa
+              </h3>
+              <button
+                type="button"
+                onClick={fetchPrepsList}
+                title="Actualizar propuestas"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              >
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {fetchError && (
+              <div className="p-2 text-[11px] text-red-500 bg-red-500/10 border border-red-500/20 rounded flex items-center justify-between">
+                <span>{fetchError}</span>
+                <button
+                  type="button"
+                  onClick={fetchPrepsList}
+                  className="underline uppercase text-[10px] font-bold ml-2"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
             <select
+              id="prep-proposal-selector"
+              aria-label="Seleccionar Propuesta de Intervención"
               value={selectedPrepId}
               onChange={e => setSelectedPrepId(e.target.value)}
               className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
             >
               <option value="">-- Seleccionar Propuesta --</option>
-              {preparations.map(p => (
+              {filteredPreparations.map(p => (
                 <option key={p.preparation_id} value={p.preparation_id}>
-                  {p.preparation_id} ({p.preparation_type}) - {p.preparation_status}
+                  {p.preparation_id.slice(0, 16)}... ({p.preparation_type || 'MANUAL'}) - {p.preparation_status}
                 </option>
               ))}
             </select>
+
+            {!loading && filteredPreparations.length === 0 && (
+              <p className="text-[11px] text-zinc-400 italic">
+                {tenantId
+                  ? 'No hay propuestas de intervención registradas para el tenant seleccionado.'
+                  : 'No se encontraron propuestas de intervención registradas.'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -358,22 +478,22 @@ export function ControlledBetaCohortInterventionPreparation() {
                     Detalle de Propuesta: {selectedPrep.preparation_id}
                   </h3>
                   <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                    Cohorte: {selectedPrep.cohort_id} | Tipo: {selectedPrep.preparation_type}
+                    Origen: {selectedPrep.source_review_id} | Cohorte: {selectedPrep.cohort_id} | Tenant: {selectedPrep.tenant_id}
                   </span>
                 </div>
                 <span className={`px-2.5 py-1 rounded text-xs font-black uppercase self-start sm:self-auto ${
                   selectedPrep.preparation_status === 'FINALIZED'
                     ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    : selectedPrep.preparation_status === 'REJECTED'
-                      ? 'bg-red-500/10 text-red-500 border border-red-500/20'
-                      : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
+                    : selectedPrep.preparation_status === 'REJECTED' || selectedPrep.preparation_status === 'SUPERSEDED'
+                    ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                    : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
                 }`}>
                   {selectedPrep.preparation_status}
                 </span>
               </div>
 
-              {/* Action Button */}
-              <div className="flex gap-2">
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={confirmFinalize}
@@ -382,50 +502,69 @@ export function ControlledBetaCohortInterventionPreparation() {
                 >
                   Finalizar y Sellar Paquete
                 </button>
+                {selectedPrep.preparation_status === 'FINALIZED' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/beta/governance?tab=approvals')}
+                    className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center gap-1.5"
+                  >
+                    <span>Proceder a Aprobación</span>
+                    <ArrowRightIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              {/* Summary Card */}
-              <div className="p-4 ppos-surface-muted border ppos-border rounded space-y-1.5 text-xs">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase mb-2">
-                  Resumen de la Intervención
+              {/* Intervention Summary Card */}
+              <div className="p-4 ppos-surface-muted border ppos-border rounded space-y-2">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Resumen de la Intervención Propuesta
                 </h4>
-                <div>Tipo: <strong className="text-blue-500">{selectedPrep.preparation_type}</strong></div>
-                <div>Revisión de Origen: <strong className="font-mono">{selectedPrep.source_review_id}</strong></div>
-                <div className="text-zinc-600 dark:text-zinc-400 pt-1">
-                  Descripción: <em>{selectedPrep.intervention_summary_json?.summary}</em>
+                <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+                  {selectedPrep.intervention_summary_json?.summary || 'Propuesta de intervención preventiva de cohorte beta.'}
+                </p>
+                <div className="text-[11px] font-mono text-zinc-500 pt-1">
+                  Decisión sugerida: <strong className="text-blue-500">{selectedPrep.recommended_decision_from_phase137}</strong>
                 </div>
               </div>
 
               {/* Checklist Items */}
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
-                  Tareas de Verificación ({checklistItems.length})
+                  Tareas de Verificación Previa ({checklistItems.length})
                 </h4>
                 <div className="space-y-2">
                   {checklistItems.map(item => (
                     <div
                       key={item.item_id}
-                      className="flex items-center justify-between p-3 border ppos-border rounded ppos-surface"
+                      className="flex items-center justify-between p-3 border ppos-border rounded ppos-surface gap-3"
                     >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={item.item_status === 'COMPLETED'}
-                          disabled={selectedPrep.preparation_status === 'FINALIZED'}
-                          onChange={() => handleToggleItemStatus(item.item_id, item.item_status)}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span className={`text-xs ${
-                          item.item_status === 'COMPLETED' ? 'line-through text-zinc-400' : 'text-slate-800 dark:text-zinc-200'
-                        }`}>
-                          {item.description}
-                        </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {item.item_status === 'COMPLETED' ? (
+                          <CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+                        ) : (
+                          <XCircleIcon className="w-4 h-4 text-zinc-400 shrink-0" />
+                        )}
+                        <div className="truncate">
+                          <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 block truncate">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 truncate block">
+                            {item.description}
+                          </span>
+                        </div>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                        item.item_status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
-                      }`}>
-                        {item.item_status}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleItemStatus(item.item_id, item.item_status)}
+                        disabled={selectedPrep.preparation_status === 'FINALIZED'}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded border transition-colors shrink-0 ${
+                          item.item_status === 'COMPLETED'
+                            ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                            : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >
+                        {item.item_status === 'COMPLETED' ? 'Completado' : 'Marcar Hecho'}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -474,8 +613,51 @@ export function ControlledBetaCohortInterventionPreparation() {
                 </ul>
               </div>
 
+              {/* Supersede Section */}
+              {selectedPrep.preparation_status !== 'SUPERSEDED' && selectedPrep.preparation_status !== 'REJECTED' && (
+                <div className="pt-4 border-t ppos-border space-y-3">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase">Sustituir esta Propuesta</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                        Propuesta Reemplazante
+                      </label>
+                      <select
+                        value={targetSupersedeId}
+                        onChange={e => setTargetSupersedeId(e.target.value)}
+                        className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded font-mono"
+                      >
+                        <option value="">-- Seleccionar Propuesta Destino --</option>
+                        {supersedeCandidates.map(c => (
+                          <option key={c.preparation_id} value={c.preparation_id}>
+                            {c.preparation_id.slice(0, 16)}... ({c.preparation_type}) - {c.preparation_status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Motivo Justificado</label>
+                      <input
+                        value={supersedeReason}
+                        onChange={e => setSupersedeReason(e.target.value)}
+                        placeholder="Ej: Sustituido por propuesta con alcance ampliado"
+                        className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={confirmSupersede}
+                    disabled={loading || !targetSupersedeId || !supersedeReason.trim()}
+                    className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded transition-colors"
+                  >
+                    Aplicar Sustitución
+                  </button>
+                </div>
+              )}
+
               {/* Reject Action */}
-              {selectedPrep.preparation_status !== 'REJECTED' && selectedPrep.preparation_status !== 'FINALIZED' && (
+              {selectedPrep.preparation_status !== 'REJECTED' && selectedPrep.preparation_status !== 'FINALIZED' && selectedPrep.preparation_status !== 'SUPERSEDED' && (
                 <div className="pt-4 border-t ppos-border space-y-3">
                   <h4 className="text-xs font-bold text-red-500 uppercase">Rechazar esta Propuesta</h4>
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -496,6 +678,23 @@ export function ControlledBetaCohortInterventionPreparation() {
                   </div>
                 </div>
               )}
+
+              {/* Technical Details Collapsible */}
+              <TechnicalDetailsCollapsible
+                title="Detalles Técnicos del Paquete de Intervención"
+                items={[
+                  { label: 'Preparation ID', value: selectedPrep.preparation_id, copyable: true },
+                  { label: 'Review de Origen', value: selectedPrep.source_review_id, copyable: true },
+                  { label: 'Tenant ID', value: selectedPrep.tenant_id, copyable: true },
+                  { label: 'Cohorte ID', value: selectedPrep.cohort_id, copyable: true },
+                  { label: 'Tipo de Propuesta', value: selectedPrep.preparation_type },
+                  { label: 'Nivel de Riesgo', value: selectedPrep.risk_level },
+                  { label: 'Preparado por', value: selectedPrep.prepared_by },
+                  { label: 'Source Review Evidence Hash', value: selectedPrep.source_review_evidence_pack_hash, copyable: true },
+                  { label: 'Preparation Evidence Hash', value: evidencePack?.evidence_pack_hash, copyable: true }
+                ]}
+                jsonPayload={evidencePack || selectedPrep}
+              />
             </div>
           ) : (
             <div className="ppos-card border border-dashed ppos-border p-10 rounded text-center flex flex-col items-center justify-center space-y-3">
@@ -528,27 +727,26 @@ export function ControlledBetaCohortInterventionPreparation() {
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="ppos-card p-6 border ppos-border rounded max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-red-500">
-              <ExclamationTriangleIcon className="w-6 h-6 shrink-0" />
-              <h3 className="text-base font-black uppercase tracking-wider">{confirmModal.title}</h3>
-            </div>
-            <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+            <h4 className="text-sm font-black uppercase text-slate-900 dark:text-white">
+              {confirmModal.title}
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
               {confirmModal.description}
             </p>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2 text-xs font-bold ppos-surface-muted hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-slate-700 dark:text-zinc-300 transition-colors"
+                className="px-3 py-1.5 text-xs font-bold border ppos-border hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
               >
-                {t('common.cancel') || 'Cancelar'}
+                Cancelar
               </button>
               <button
                 type="button"
                 onClick={confirmModal.action}
-                className="px-4 py-2 text-xs font-black uppercase tracking-wider bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
               >
-                {t('common.confirm') || 'Confirmar'}
+                Confirmar Acción
               </button>
             </div>
           </div>

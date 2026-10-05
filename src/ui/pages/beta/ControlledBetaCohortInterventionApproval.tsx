@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cohortInterventionApprovalClient } from '../../api/controlledBetaCohortInterventionApprovalClient';
 import { normalizeUiError } from '../../utils/errorUtils';
@@ -10,17 +10,23 @@ import {
 } from '../../types/controlledBetaCohortInterventionApproval';
 import { CohortInterventionPreparation } from '../../types/controlledBetaCohortInterventionPreparation';
 import { useLocale } from '../../i18n';
+import { TenantSelector } from '../../components/TenantSelector';
+import { TechnicalDetailsCollapsible } from '../../components/TechnicalDetailsCollapsible';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   CheckBadgeIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 export function ControlledBetaCohortInterventionApproval() {
   const { t } = useLocale();
   const navigate = useNavigate();
+
+  // Tenant scoping
+  const [tenantId, setTenantId] = useState<string>('');
 
   const [approvals, setApprovals] = useState<CohortInterventionApproval[]>([]);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string>('');
@@ -35,7 +41,6 @@ export function ControlledBetaCohortInterventionApproval() {
   // Form states
   const [decision, setDecision] = useState<string>('APPROVE_FOR_FUTURE_EXECUTION');
   const [rationale, setRationale] = useState<string>('');
-  const [rejectReason, setRejectReason] = useState<string>('');
   const [changesReason, setChangesReason] = useState<string>('');
   const [returnReason, setReturnReason] = useState<string>('');
   const [escalateReason, setEscalateReason] = useState<string>('');
@@ -45,6 +50,11 @@ export function ControlledBetaCohortInterventionApproval() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Stale async response tracking
+  const approvalSeqRef = useRef(0);
+  const prepSeqRef = useRef(0);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -60,30 +70,67 @@ export function ControlledBetaCohortInterventionApproval() {
   });
 
   const fetchApprovalsList = useCallback(async () => {
+    const seq = ++approvalSeqRef.current;
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await cohortInterventionApprovalClient.listApprovals();
+      if (seq !== approvalSeqRef.current) return;
       if (res.ok) {
-        setApprovals(res.approvals);
+        setApprovals(res.approvals || []);
+      } else {
+        setFetchError((res as any)?.error || 'Error al listar expedientes de aprobación');
       }
     } catch (err: any) {
-      console.error('Error fetching approvals:', err);
+      if (seq !== approvalSeqRef.current) return;
+      setFetchError(err?.message || String(err));
+    } finally {
+      if (seq === approvalSeqRef.current) setLoading(false);
     }
   }, []);
 
   const fetchFinalizedPrepsList = useCallback(async () => {
+    const seq = ++prepSeqRef.current;
     try {
       const res = await cohortInterventionPreparationClient.listPreparations();
+      if (seq !== prepSeqRef.current) return;
       if (res.ok) {
-        const filtered = res.preparations.filter(p => p.preparation_status === 'FINALIZED');
+        const filtered = (res.preparations || []).filter(p => p.preparation_status === 'FINALIZED');
         setFinalizedPreps(filtered);
-        if (filtered.length > 0 && !sourcePrepId) {
-          setSourcePrepId(filtered[0].preparation_id);
-        }
+        // Do NOT auto-select to avoid enabling critical actions automatically
       }
     } catch (err: any) {
       console.error('Error fetching preparations:', err);
     }
-  }, [sourcePrepId]);
+  }, []);
+
+  const handleTenantChange = (newTenantId: string) => {
+    setTenantId(newTenantId);
+    // Discard child selections if incompatible with new parent tenant
+    if (sourcePrepId) {
+      const currentPrep = finalizedPreps.find(p => p.preparation_id === sourcePrepId);
+      if (currentPrep && currentPrep.tenant_id && currentPrep.tenant_id !== newTenantId) {
+        setSourcePrepId('');
+      }
+    }
+    if (selectedApproval && selectedApproval.tenant_id && selectedApproval.tenant_id !== newTenantId) {
+      setSelectedApprovalId('');
+      setSelectedApproval(null);
+      setSteps([]);
+      setEvidencePack(null);
+    }
+  };
+
+  // Filter entities by tenant to prevent data contamination across tenants
+  const filteredFinalizedPreps = useMemo(() => {
+    if (!tenantId) return finalizedPreps;
+    return finalizedPreps.filter(p => !p.tenant_id || p.tenant_id === tenantId);
+  }, [finalizedPreps, tenantId]);
+
+  const filteredApprovals = useMemo(() => {
+    if (!tenantId) return approvals;
+    return approvals.filter(a => !a.tenant_id || a.tenant_id === tenantId);
+  }, [approvals, tenantId]);
 
   const loadApprovalDetails = useCallback(async (approvalId: string) => {
     if (!approvalId) return;
@@ -92,11 +139,11 @@ export function ControlledBetaCohortInterventionApproval() {
       const res = await cohortInterventionApprovalClient.getApproval(approvalId);
       if (res.ok) {
         setSelectedApproval(res.approval);
-        setSteps(res.steps);
+        setSteps(res.steps || []);
 
         if (res.approval.approval_status === 'FINALIZED') {
           const evRes = await cohortInterventionApprovalClient.getEvidencePack(approvalId);
-          if (evRes.ok) {
+          if (evRes?.ok) {
             setEvidencePack(evRes.evidencePack);
           } else {
             setEvidencePack(null);
@@ -114,7 +161,7 @@ export function ControlledBetaCohortInterventionApproval() {
 
   const handleCreateApproval = async () => {
     if (!sourcePrepId) {
-      setErrorMsg('Se requiere una propuesta previa finalizada.');
+      setErrorMsg('Seleccione una propuesta finalizada de origen.');
       return;
     }
     setLoading(true);
@@ -161,7 +208,7 @@ export function ControlledBetaCohortInterventionApproval() {
     setConfirmModal({
       isOpen: true,
       title: 'Registrar Decisión de Gobernanza',
-      description: `Se registrará formalmente la decisión "${decision}". Justificación: "${rationale}". Esta acción no ejecuta mutaciones industriales directas.`,
+      description: `Se registrará formalmente la decisión "${decision}" para el expediente ${selectedApprovalId}. Justificación: "${rationale}". Esta acción no ejecuta mutaciones industriales directas.`,
       action: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setLoading(true);
@@ -185,93 +232,125 @@ export function ControlledBetaCohortInterventionApproval() {
     });
   };
 
-  const handleRequestChanges = async () => {
+  const confirmRequestChanges = () => {
     if (!selectedApprovalId || !changesReason.trim()) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionApprovalClient.requestChanges(selectedApprovalId, changesReason);
-      if (res.ok) {
-        setMessage('Solicitud de modificaciones enviada.');
-        setChangesReason('');
-        await loadApprovalDetails(selectedApprovalId);
-        await fetchApprovalsList();
-      } else {
-        setErrorMsg('Error al solicitar cambios');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Solicitar Modificaciones a la Propuesta',
+      description: `Se solicitarán formalmente cambios en el expediente ${selectedApprovalId}. Motivo: "${changesReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionApprovalClient.requestChanges(selectedApprovalId, changesReason);
+          if (res.ok) {
+            setMessage('Solicitud de modificaciones enviada.');
+            setChangesReason('');
+            await loadApprovalDetails(selectedApprovalId);
+            await fetchApprovalsList();
+          } else {
+            setErrorMsg('Error al solicitar cambios');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleReturnToPrep = async () => {
+  const confirmReturnToPrep = () => {
     if (!selectedApprovalId || !returnReason.trim()) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionApprovalClient.returnToPreparation(selectedApprovalId, returnReason);
-      if (res.ok) {
-        setMessage('Expediente retornado a fase de preparación.');
-        setReturnReason('');
-        await loadApprovalDetails(selectedApprovalId);
-        await fetchApprovalsList();
-      } else {
-        setErrorMsg('Error al retornar el expediente');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Retornar a Fase de Preparación',
+      description: `El expediente ${selectedApprovalId} será devuelto a la etapa de preparación para ajustes de checklist o re-evaluación. Motivo: "${returnReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionApprovalClient.returnToPreparation(selectedApprovalId, returnReason);
+          if (res.ok) {
+            setMessage('Expediente retornado a fase de preparación.');
+            setReturnReason('');
+            await loadApprovalDetails(selectedApprovalId);
+            await fetchApprovalsList();
+          } else {
+            setErrorMsg('Error al retornar el expediente');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleEscalate = async () => {
+  const confirmEscalate = () => {
     if (!selectedApprovalId || !escalateReason.trim()) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionApprovalClient.escalateApproval(selectedApprovalId, escalateReason);
-      if (res.ok) {
-        setMessage('Expediente escalado para revisión adicional.');
-        setEscalateReason('');
-        await loadApprovalDetails(selectedApprovalId);
-        await fetchApprovalsList();
-      } else {
-        setErrorMsg('Error al escalar el expediente');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Escalar Expediente para Revisión Adicional',
+      description: `Se escalará el expediente ${selectedApprovalId} para dictamen adicional de seguridad y arquitectura. Motivo: "${escalateReason}".`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionApprovalClient.escalateApproval(selectedApprovalId, escalateReason);
+          if (res.ok) {
+            setMessage('Expediente escalado para revisión adicional.');
+            setEscalateReason('');
+            await loadApprovalDetails(selectedApprovalId);
+            await fetchApprovalsList();
+          } else {
+            setErrorMsg('Error al escalar el expediente');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleSupersede = async () => {
+  const confirmSupersede = () => {
     if (!selectedApprovalId || !targetSupersedeId || !supersedeReason.trim()) return;
-    setLoading(true);
-    setMessage('');
-    setErrorMsg('');
-    try {
-      const res = await cohortInterventionApprovalClient.supersedeApproval(selectedApprovalId, targetSupersedeId, supersedeReason);
-      if (res.ok) {
-        setMessage(`Expediente ${selectedApprovalId} marcado como sustituido.`);
-        setSupersedeReason('');
-        setTargetSupersedeId('');
-        await loadApprovalDetails(selectedApprovalId);
-        await fetchApprovalsList();
-      } else {
-        setErrorMsg('Error al sustituir el expediente');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Sustituir Expediente de Aprobación',
+      description: `El expediente ${selectedApprovalId} será marcado como sustituido por ${targetSupersedeId}. Motivo: "${supersedeReason}". Esta acción es irreversible.`,
+      action: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setLoading(true);
+        setMessage('');
+        setErrorMsg('');
+        try {
+          const res = await cohortInterventionApprovalClient.supersedeApproval(selectedApprovalId, targetSupersedeId, supersedeReason);
+          if (res.ok) {
+            setMessage(`Expediente ${selectedApprovalId} marcado como sustituido.`);
+            setSupersedeReason('');
+            setTargetSupersedeId('');
+            await loadApprovalDetails(selectedApprovalId);
+            await fetchApprovalsList();
+          } else {
+            setErrorMsg('Error al sustituir el expediente');
+          }
+        } catch (err: any) {
+          setErrorMsg(normalizeUiError(err));
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setErrorMsg(normalizeUiError(err));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -284,6 +363,16 @@ export function ControlledBetaCohortInterventionApproval() {
       loadApprovalDetails(selectedApprovalId);
     }
   }, [selectedApprovalId, loadApprovalDetails]);
+
+  // Candidates to supersede current approval
+  const supersedeCandidates = useMemo(() => {
+    if (!selectedApproval) return [];
+    return approvals.filter(
+      a => a.approval_id !== selectedApproval.approval_id &&
+           a.approval_status !== 'SUPERSEDED' &&
+           a.approval_status !== 'REJECTED'
+    );
+  }, [approvals, selectedApproval]);
 
   return (
     <div className="space-y-6">
@@ -301,14 +390,28 @@ export function ControlledBetaCohortInterventionApproval() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: Create and Select (1/3 width) */}
+        {/* Left column: Tenant filter, Create and Select (1/3 width) */}
         <div className="space-y-6">
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          {/* Tenant Filter Context */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <TenantSelector
+              id="approval-tenant-selector"
+              selectedTenantId={tenantId}
+              onSelectTenant={handleTenantChange}
+              allowEmpty
+              emptyLabel="Todos los Tenants"
+              label="Filtrar por Tenant"
+              helperText="Selecciona un tenant para acotar las propuestas y expedientes de aprobación."
+            />
+          </div>
+
+          {/* Create Approval from Preparation */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
               <CheckBadgeIcon className="w-4 h-4 text-blue-500" />
               Crear desde Propuesta Finalizada
             </h3>
-            {finalizedPreps.length > 0 ? (
+            {filteredFinalizedPreps.length > 0 ? (
               <div className="space-y-3">
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Propuesta Finalizada de Origen</label>
@@ -317,7 +420,8 @@ export function ControlledBetaCohortInterventionApproval() {
                     onChange={e => setSourcePrepId(e.target.value)}
                     className="w-full ppos-input text-xs px-2.5 py-1.5 border ppos-border rounded"
                   >
-                    {finalizedPreps.map(p => (
+                    <option value="">-- Seleccionar Propuesta Finalizada --</option>
+                    {filteredFinalizedPreps.map(p => (
                       <option key={p.preparation_id} value={p.preparation_id}>
                         {p.preparation_id} ({p.preparation_type})
                       </option>
@@ -327,7 +431,7 @@ export function ControlledBetaCohortInterventionApproval() {
                 <button
                   type="button"
                   onClick={handleCreateApproval}
-                  disabled={loading}
+                  disabled={loading || !sourcePrepId}
                   className="w-full px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   Generar Expediente de Aprobación
@@ -336,7 +440,7 @@ export function ControlledBetaCohortInterventionApproval() {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  No se encontraron paquetes de intervención preparados. Se requiere preparar y finalizar una propuesta de intervención antes de solicitar aprobación.
+                  No se encontraron paquetes de intervención preparados {tenantId ? 'para este tenant' : ''}. Se requiere preparar y finalizar una propuesta antes de solicitar aprobación.
                 </p>
                 <button
                   type="button"
@@ -349,22 +453,57 @@ export function ControlledBetaCohortInterventionApproval() {
             )}
           </div>
 
-          <div className="ppos-card p-5 border ppos-border rounded">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-3">
-              Seleccionar Expediente Activo
-            </h3>
-            <select
-              value={selectedApprovalId}
-              onChange={e => setSelectedApprovalId(e.target.value)}
-              className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
-            >
-              <option value="">-- Seleccionar Aprobación --</option>
-              {approvals.map(a => (
-                <option key={a.approval_id} value={a.approval_id}>
-                  {a.approval_id} ({a.approval_status})
-                </option>
-              ))}
-            </select>
+          {/* Approval Selector */}
+          <div className="ppos-card p-5 border ppos-border rounded space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Expedientes de Aprobación
+              </h3>
+              <button
+                type="button"
+                onClick={fetchApprovalsList}
+                disabled={loading}
+                className="text-zinc-500 hover:text-blue-500 transition-colors p-1"
+                title="Recargar lista"
+              >
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {fetchError ? (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded space-y-2">
+                <p className="text-xs text-red-500 font-medium">{fetchError}</p>
+                <button
+                  type="button"
+                  onClick={fetchApprovalsList}
+                  className="px-2.5 py-1 text-[11px] font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : filteredApprovals.length === 0 ? (
+              <div className="text-xs text-zinc-500 py-3 text-center border border-dashed ppos-border rounded">
+                No hay expedientes registrados {tenantId ? 'para este tenant' : ''}.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label htmlFor="approval-expediente-selector" className="text-[10px] font-bold text-zinc-500 uppercase block">Seleccionar Expediente</label>
+                <select
+                  id="approval-expediente-selector"
+                  aria-label="Seleccionar Expediente de Aprobación"
+                  value={selectedApprovalId}
+                  onChange={e => setSelectedApprovalId(e.target.value)}
+                  className="w-full ppos-input text-xs px-2.5 py-2 border ppos-border rounded"
+                >
+                  <option value="">-- Seleccionar Aprobación --</option>
+                  {filteredApprovals.map(a => (
+                    <option key={a.approval_id} value={a.approval_id}>
+                      {a.approval_id} — {a.approval_status} {a.risk_level ? `[Riesgo: ${a.risk_level}]` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -375,11 +514,13 @@ export function ControlledBetaCohortInterventionApproval() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ppos-border">
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Expediente: {selectedApproval.approval_id}
+                    Expediente de Aprobación
                   </h3>
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                    Propuesta de Origen: {selectedApproval.source_preparation_id}
-                  </span>
+                  <div className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
+                    <span>Tenant: <strong className="text-slate-800 dark:text-zinc-200">{selectedApproval.tenant_id || 'Global / Multi-tenant'}</strong></span>
+                    <span>•</span>
+                    <span>Cohorte: <strong className="text-slate-800 dark:text-zinc-200">{selectedApproval.cohort_id || 'N/A'}</strong></span>
+                  </div>
                 </div>
                 <span className={`px-2.5 py-1 rounded text-xs font-black uppercase self-start sm:self-auto ${
                   selectedApproval.approval_status === 'FINALIZED'
@@ -399,6 +540,7 @@ export function ControlledBetaCohortInterventionApproval() {
                 </h4>
                 <div>Nombre: <strong>{selectedApproval.approval_policy_json?.policy_name}</strong></div>
                 <div>Roles Requeridos: <strong className="font-mono">{selectedApproval.approval_policy_json?.required_roles?.join(', ')}</strong></div>
+                <div>Riesgo Evaluado: <strong className="font-mono">{selectedApproval.risk_level}</strong> | Confianza: <strong className="font-mono">{selectedApproval.confidence_level}</strong></div>
               </div>
 
               {/* Steps/Signatures */}
@@ -414,7 +556,14 @@ export function ControlledBetaCohortInterventionApproval() {
                     >
                       <div className="text-xs text-slate-800 dark:text-zinc-200">
                         Rol: <strong className="font-mono">{step.role}</strong>
-                        {step.status === 'SIGNED' && <span className="text-emerald-500 ml-2 font-bold">(Firmado por {step.approver_id})</span>}
+                        {step.status === 'SIGNED' ? (
+                          <span className="text-emerald-500 ml-2 font-bold flex-inline items-center gap-1">
+                            <CheckCircleIcon className="w-3.5 h-3.5 inline mr-1" />
+                            Firmado por {step.approver_id}
+                          </span>
+                        ) : (
+                          <span className="text-amber-500 ml-2 font-medium">(Pendiente)</span>
+                        )}
                       </div>
                       {step.status !== 'SIGNED' && (
                         <button
@@ -513,7 +662,7 @@ export function ControlledBetaCohortInterventionApproval() {
                       />
                       <button
                         type="button"
-                        onClick={handleRequestChanges}
+                        onClick={confirmRequestChanges}
                         disabled={!changesReason.trim()}
                         className="w-full px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded"
                       >
@@ -529,7 +678,7 @@ export function ControlledBetaCohortInterventionApproval() {
                       />
                       <button
                         type="button"
-                        onClick={handleReturnToPrep}
+                        onClick={confirmReturnToPrep}
                         disabled={!returnReason.trim()}
                         className="w-full px-2.5 py-1 text-xs font-bold bg-zinc-600 hover:bg-zinc-700 disabled:opacity-50 text-white rounded"
                       >
@@ -545,7 +694,7 @@ export function ControlledBetaCohortInterventionApproval() {
                       />
                       <button
                         type="button"
-                        onClick={handleEscalate}
+                        onClick={confirmEscalate}
                         disabled={!escalateReason.trim()}
                         className="w-full px-2.5 py-1 text-xs font-bold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded"
                       >
@@ -553,13 +702,81 @@ export function ControlledBetaCohortInterventionApproval() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Supersede Section */}
+                  <div className="pt-3 border-t ppos-border">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                      Sustituir por Otro Expediente de Aprobación
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={targetSupersedeId}
+                        onChange={e => setTargetSupersedeId(e.target.value)}
+                        className="w-full sm:w-1/2 ppos-input text-xs px-2 py-1 border ppos-border rounded"
+                      >
+                        <option value="">-- Seleccionar Expediente Sustituto --</option>
+                        {supersedeCandidates.map(c => (
+                          <option key={c.approval_id} value={c.approval_id}>
+                            {c.approval_id} ({c.approval_status})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={supersedeReason}
+                        onChange={e => setSupersedeReason(e.target.value)}
+                        placeholder="Motivo de sustitución..."
+                        className="w-full sm:w-1/2 ppos-input text-xs px-2 py-1 border ppos-border rounded"
+                      />
+                      <button
+                        type="button"
+                        onClick={confirmSupersede}
+                        disabled={!targetSupersedeId || !supersedeReason.trim()}
+                        className="px-3 py-1 text-xs font-bold bg-zinc-800 hover:bg-black text-white rounded disabled:opacity-50 shrink-0"
+                      >
+                        Sustituir
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Technical Details Collapsible */}
+              <TechnicalDetailsCollapsible
+                title="Detalles Técnicos y Evidencia Criptográfica"
+                data={{
+                  approval_id: selectedApproval.approval_id,
+                  tenant_id: selectedApproval.tenant_id,
+                  cohort_id: selectedApproval.cohort_id,
+                  source_preparation_id: selectedApproval.source_preparation_id,
+                  source_review_id: selectedApproval.source_review_id,
+                  preparation_type: selectedApproval.preparation_type,
+                  approval_status: selectedApproval.approval_status,
+                  risk_level: selectedApproval.risk_level,
+                  confidence_level: selectedApproval.confidence_level,
+                  hashes: {
+                    source_preparation_hash: selectedApproval.source_preparation_hash,
+                    source_preparation_evidence_pack_hash: selectedApproval.source_preparation_evidence_pack_hash,
+                    source_review_evidence_pack_hash: selectedApproval.source_review_evidence_pack_hash,
+                    approval_result_hash: selectedApproval.approval_result_hash
+                  },
+                  non_execution_attestation: selectedApproval.non_execution_attestation_json,
+                  evidence_pack: evidencePack
+                }}
+                fields={[
+                  { label: 'Approval ID', value: selectedApproval.approval_id, copyable: true },
+                  { label: 'Source Prep ID', value: selectedApproval.source_preparation_id, copyable: true },
+                  { label: 'Source Review ID', value: selectedApproval.source_review_id, copyable: true },
+                  { label: 'Prep Hash', value: selectedApproval.source_preparation_hash, copyable: true },
+                  { label: 'Prep Evidence Hash', value: selectedApproval.source_preparation_evidence_pack_hash, copyable: true },
+                  { label: 'Review Evidence Hash', value: selectedApproval.source_review_evidence_pack_hash, copyable: true },
+                  { label: 'Result Hash', value: selectedApproval.approval_result_hash, copyable: true }
+                ]}
+              />
             </div>
           ) : (
             <div className="ppos-card border border-dashed ppos-border p-10 rounded text-center flex flex-col items-center justify-center space-y-3">
               <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                No se encontraron paquetes de intervención preparados.
+                Seleccione un expediente de aprobación o cree uno nuevo desde una propuesta.
               </span>
               <p className="text-xs text-zinc-500 max-w-md">
                 Para solicitar aprobación se requiere preparar y sellar previamente una propuesta de intervención de cohorte.
@@ -618,3 +835,4 @@ export function ControlledBetaCohortInterventionApproval() {
 }
 
 export default ControlledBetaCohortInterventionApproval;
+
