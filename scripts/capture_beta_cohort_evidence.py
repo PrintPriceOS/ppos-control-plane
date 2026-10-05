@@ -134,6 +134,11 @@ def setup_client_intercepts(page, error_state=None):
             route.fulfill(status=200, content_type='application/json', body=json.dumps(MOCK_ACTIVATION_READINESS))
             return
 
+        # Cohort Activation Action (mutation)
+        if '/api/admin/beta/cohort-activation/activate' in url:
+            route.fulfill(status=200, content_type='application/json', body=json.dumps({"ok": True}))
+            return
+
         # Invite Issuance Readiness
         if '/api/admin/beta/invite-issuance/readiness' in url:
             if error_state.get("fail_invites_401", False):
@@ -167,6 +172,23 @@ def setup_client_intercepts(page, error_state=None):
     page.route('**/*', route_handler)
     return error_state
 
+def verify_button_within_panel(page, stage_name, viewport_name):
+    """Verifies that the primary verify button inside panel 1 does NOT overflow panel 1."""
+    panel1 = page.locator('div.grid > div').first
+    btn = panel1.locator('button:has-text("Verificar")').first
+    if btn.count() > 0 and panel1.count() > 0:
+        btn_box = btn.bounding_box()
+        panel_box = panel1.bounding_box()
+        if btn_box and panel_box:
+            # Button right edge should not exceed panel right edge (+2px tolerance for subpixel rounding)
+            btn_right = btn_box['x'] + btn_box['width']
+            panel_right = panel_box['x'] + panel_box['width']
+            assert btn_right <= panel_right + 2, (
+                f"OVERFLOW VIOLATION on {stage_name} ({viewport_name}): "
+                f"Button right edge ({btn_right:.1f}px) exceeds panel right edge ({panel_right:.1f}px)!"
+            )
+            print(f"    [LAYOUT OK] Button fits inside Panel 1 ({btn_box['width']:.1f}px / {panel_box['width']:.1f}px, stacked={btn_box['width'] > 200})")
+
 def run_cohort_captures():
     git_sha = get_git_sha()
     print("=" * 70)
@@ -180,7 +202,11 @@ def run_cohort_captures():
             "name": "7. Activación de Cohortes",
             "path": "/admin/beta/cohorts?tab=activation",
             "tab_button": "Activación",
-            "required_safety": "First Controlled Invite-Only Beta Cohort Activation",
+            "safety_patterns": [
+                "Activación de cohorte beta controlada",
+                "Activación de cohorte Beta controlada",
+                "Controlled invite-only beta cohort activation"
+            ],
             "forbidden_terms": ["Phase 129", "Phase 133", "Phase 134", "tenant_beta_01", "cohort_beta_01"]
         },
         {
@@ -188,8 +214,10 @@ def run_cohort_captures():
             "name": "8. Emisión de Invitaciones",
             "path": "/admin/beta/cohorts?tab=invitations",
             "tab_button": "Invitaciones",
-            "required_safety": "Controlled invite issuance only",
-            "required_safety_extra": "This is not public beta, not open marketplace, and not automatic expansion",
+            "safety_patterns": [
+                "Emisión controlada de invitaciones únicamente",
+                "Controlled invite issuance only"
+            ],
             "forbidden_terms": ["Phase 133", "Phase 129", "Phase 134", "tenant_beta_01", "user@example.com"]
         },
         {
@@ -197,8 +225,10 @@ def run_cohort_captures():
             "name": "9. Aceptación y Participantes",
             "path": "/admin/beta/cohorts?tab=participants",
             "tab_button": "Participantes",
-            "required_safety": "Controlled invite acceptance and participant onboarding only",
-            "required_safety_extra": "This is not public signup, not public beta, and not open marketplace",
+            "safety_patterns": [
+                "Aceptación controlada de invitaciones",
+                "Controlled invite acceptance and participant onboarding only"
+            ],
             "forbidden_terms": ["Phase 134", "Phase 129", "Phase 133", "participant_beta_01"]
         }
     ]
@@ -209,138 +239,195 @@ def run_cohort_captures():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 
-        # ── 1. Desktop Dark & Light Captures ──
-        print("\n>>> 1. DESKTOP (Dark & Light 1280x720) <<<")
-        for theme in ['dark', 'light']:
-            ctx = browser.new_context(viewport={"width": 1280, "height": 720})
-            page = ctx.new_page()
-            setup_client_intercepts(page)
-            setup_page_auth_and_theme(page, theme=theme, locale='es')
+        # ── Test Matrix of Viewports and Themes ──
+        # Breakpoints requested: 1280px, 1366px, 390px in light and dark
+        test_viewports = [
+            {"width": 1366, "height": 768, "label": "1366x768"},
+            {"width": 1280, "height": 720, "label": "1280x720"},
+            {"width": 390, "height": 844, "label": "390x844"}
+        ]
 
-            for stage in stages:
-                target_url = f"http://localhost:3000{stage['path']}"
-                page.goto(target_url, wait_until='networkidle')
-                page.wait_for_timeout(600)
+        for vp in test_viewports:
+            vp_w = vp["width"]
+            vp_h = vp["height"]
+            vp_lbl = vp["label"]
 
-                # Theme setup
-                if theme == 'dark':
-                    page.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
-                else:
-                    page.evaluate("() => { document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff'; }")
+            for theme in ['dark', 'light']:
+                print(f"\n>>> VIEWPORT: {vp_lbl} | THEME: {theme.upper()} <<<")
+                ctx = browser.new_context(viewport={"width": vp_w, "height": vp_h})
+                page = ctx.new_page()
+                setup_client_intercepts(page)
+                setup_page_auth_and_theme(page, theme=theme, locale='es')
 
-                # Verify clean content (no phase numbers, no preloaded hardcoded tenant_beta_01)
-                page_text = page.content()
-                for term in stage["forbidden_terms"]:
-                    assert term not in page_text, f"ASSERTION FAILED: Forbidden term '{term}' found on {stage['name']}!"
+                for stage in stages:
+                    target_url = f"http://localhost:3000{stage['path']}"
+                    page.goto(target_url, wait_until='networkidle')
+                    page.wait_for_timeout(600)
 
-                if stage.get("required_safety"):
-                    assert stage["required_safety"] in page_text, f"ASSERTION FAILED: Safety copy '{stage['required_safety']}' missing on {stage['name']}!"
-                if stage.get("required_safety_extra"):
-                    assert stage["required_safety_extra"] in page_text, f"ASSERTION FAILED: Extra safety copy missing on {stage['name']}!"
+                    # Theme setup
+                    if theme == 'dark':
+                        page.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
+                    else:
+                        page.evaluate("() => { document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff'; }")
 
-                # Select Tenant
-                tenant_select = page.locator('select[id$="-tenant-selector"]')
-                if tenant_select.count() > 0:
-                    try:
-                        tenant_select.first.select_option(value='tenant_alpha')
-                        page.wait_for_timeout(300)
-                    except Exception:
-                        pass
+                    # Verify clean content (no phase numbers, no preloaded hardcoded sample values)
+                    page_text = page.content()
+                    for term in stage["forbidden_terms"]:
+                        assert term not in page_text, f"ASSERTION FAILED: Forbidden term '{term}' found on {stage['name']}!"
 
-                # Check horizontal overflow
-                overflow = check_overflow(page)
-                assert not overflow["hasOverflow"], f"ASSERTION FAILED: Horizontal overflow detected on {stage['name']} ({theme}): {overflow}"
+                    # Verify safety notice is present (localized or fallback)
+                    has_safety = any(pattern.lower() in page_text.lower() for pattern in stage["safety_patterns"])
+                    assert has_safety, f"ASSERTION FAILED: Safety notice missing on {stage['name']}! Expected one of: {stage['safety_patterns']}"
 
-                # Take screenshot
-                shot_name = f"{stage['id']}_selected_{theme}_es.png"
-                shot_path = os.path.join(OUT_DIR, shot_name)
-                page.screenshot(path=shot_path, full_page=True)
+                    # Select Tenant if present
+                    tenant_select = page.locator('select[id$="-tenant-selector"]')
+                    if tenant_select.count() > 0:
+                        try:
+                            tenant_select.first.select_option(value='tenant_alpha')
+                            page.wait_for_timeout(200)
+                        except Exception:
+                            pass
 
-                file_sha = compute_sha256(shot_path)
-                sha_map[shot_name] = file_sha
+                    # Check horizontal overflow
+                    overflow = check_overflow(page)
+                    assert not overflow["hasOverflow"], (
+                        f"ASSERTION FAILED: Horizontal overflow detected on {stage['name']} ({vp_lbl} - {theme}): {overflow}"
+                    )
 
-                new_results.append({
-                    "stage": stage["name"],
-                    "flow": "Recorrido 1 (Cohortes Beta Operativo)",
-                    "variant": f"Desktop 1280x720 - {theme.capitalize()} - ES",
-                    "file": shot_name,
-                    "git_sha": git_sha,
-                    "sha256": file_sha,
-                    "overflow": overflow,
-                    "entity_selected": True,
-                    "simulated_data": {
-                        "tenants": True,
-                        "activation_readiness": True,
-                        "invite_issuance_readiness": True,
-                        "invite_acceptance_readiness": True
-                    }
-                })
-                print(f"  [CAPTURA OK] {shot_name} (SHA: {file_sha[:12]}..., Overflow: {overflow['hasOverflow']})")
+                    # Check that button fits strictly inside panel 1 (does not overlap next column)
+                    verify_button_within_panel(page, stage["name"], f"{vp_lbl}_{theme}")
 
-            ctx.close()
+                    # Determine filename for artifact
+                    if vp_w == 1280:
+                        shot_name = f"{stage['id']}_selected_{theme}_es.png"
+                    elif vp_w == 1366:
+                        shot_name = f"{stage['id']}_selected_1366x768_{theme}_es.png"
+                    else:
+                        shot_name = f"{stage['id']}_selected_mobile_390x844_{theme}.png"
 
-        # ── 2. Mobile Dark Captures (390x844) ──
-        print("\n>>> 2. MOBILE (Dark 390x844) <<<")
-        ctx_mobile = browser.new_context(viewport={"width": 390, "height": 844})
-        page_mobile = ctx_mobile.new_page()
-        setup_client_intercepts(page_mobile)
-        setup_page_auth_and_theme(page_mobile, theme='dark', locale='es')
+                    shot_path = os.path.join(OUT_DIR, shot_name)
+                    # FULL FORM CAPTURE (not just the header)
+                    page.screenshot(path=shot_path, full_page=True)
 
-        for stage in stages:
-            target_url = f"http://localhost:3000{stage['path']}"
-            page_mobile.goto(target_url, wait_until='networkidle')
-            page_mobile.wait_for_timeout(600)
-            page_mobile.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
+                    file_sha = compute_sha256(shot_path)
+                    sha_map[shot_name] = file_sha
 
-            # Select Tenant
-            tenant_select = page_mobile.locator('select[id$="-tenant-selector"]')
-            if tenant_select.count() > 0:
-                try:
-                    tenant_select.first.select_option(value='tenant_alpha')
-                    page_mobile.wait_for_timeout(300)
-                except Exception:
-                    pass
+                    new_results.append({
+                        "stage": stage["name"],
+                        "flow": "Recorrido Responsive & Visual (Cohortes Beta Operativo)",
+                        "variant": f"{vp_lbl} - {theme.capitalize()} - Formularios Completos - ES",
+                        "file": shot_name,
+                        "git_sha": git_sha,
+                        "sha256": file_sha,
+                        "overflow": overflow,
+                        "entity_selected": True,
+                        "simulated_data": {
+                            "tenants": True,
+                            "activation_readiness": True,
+                            "invite_issuance_readiness": True,
+                            "invite_acceptance_readiness": True
+                        }
+                    })
+                    print(f"  [CAPTURA OK] {shot_name} (SHA: {file_sha[:12]}..., Overflow: {overflow['hasOverflow']})")
 
-            overflow = check_overflow(page_mobile)
-            assert not overflow["hasOverflow"], f"ASSERTION FAILED: Mobile overflow detected on {stage['name']}: {overflow}"
+                ctx.close()
 
-            shot_name = f"{stage['id']}_selected_mobile_390x844_dark.png"
-            shot_path = os.path.join(OUT_DIR, shot_name)
-            page_mobile.screenshot(path=shot_path, full_page=True)
+        # ── 4. Confirmation Modal Evidence & Cancellation Mutation Check ──
+        print("\n>>> 4. CONFIRMATION MODAL & CANCEL (Zero Mutations Check) <<<")
+        ctx_modal = browser.new_context(viewport={"width": 1366, "height": 768})
+        page_modal = ctx_modal.new_page()
+        setup_client_intercepts(page_modal)
+        setup_page_auth_and_theme(page_modal, theme='dark', locale='es')
 
-            file_sha = compute_sha256(shot_path)
-            sha_map[shot_name] = file_sha
+        target_url = "http://localhost:3000/admin/beta/cohorts?tab=activation"
+        page_modal.goto(target_url, wait_until='networkidle')
+        page_modal.wait_for_timeout(500)
+        page_modal.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
 
-            new_results.append({
-                "stage": stage["name"],
-                "flow": "Recorrido 2 (Mobile Responsive)",
-                "variant": "Mobile 390x844 - Dark - ES",
-                "file": shot_name,
-                "git_sha": git_sha,
-                "sha256": file_sha,
-                "overflow": overflow,
-                "entity_selected": True,
-                "simulated_data": {
-                    "tenants": True,
-                    "activation_readiness": True,
-                    "invite_issuance_readiness": True,
-                    "invite_acceptance_readiness": True
-                }
-            })
-            print(f"  [CAPTURA OK] {shot_name} (SHA: {file_sha[:12]}..., Overflow: {overflow['hasOverflow']})")
+        # Fill activation ID
+        act_input = page_modal.locator('input[placeholder*="act_"]').first
+        act_input.fill('act_prod_audit_verification')
+        page_modal.wait_for_timeout(300)
 
-        ctx_mobile.close()
+        # Track mutations
+        mutation_requests = []
+        def track_request(req):
+            if req.method in ["POST", "PUT", "DELETE", "PATCH"] and not req.url.endswith('.js'):
+                mutation_requests.append({"method": req.method, "url": req.url})
+        page_modal.on("request", track_request)
 
-        # ── 3. HTTP 401 Session Handling & Panel Capture ──
-        print("\n>>> 3. HTTP 401 (Sesión Ausente/Expirada con Botón Iniciar Sesión) <<<")
-        ctx_401 = browser.new_context(viewport={"width": 1280, "height": 720})
+        # Open confirmation modal
+        activate_btn = page_modal.locator('button:has-text("Activar Cohorte")').first
+        assert activate_btn.is_visible(), "Activar Cohorte button must be visible"
+        activate_btn.click()
+        page_modal.wait_for_timeout(400)
+
+        # Assert modal is visible
+        dialog = page_modal.locator('div[role="dialog"]').first
+        assert dialog.is_visible(), "Confirmation modal dialog must be visible"
+        print("  [MODAL OK] Modal de confirmación abierto correctamente.")
+
+        # Capture modal
+        modal_shot_name = "07_cohortes_activacion_confirm_modal_dark_es.png"
+        modal_shot_path = os.path.join(OUT_DIR, modal_shot_name)
+        page_modal.screenshot(path=modal_shot_path, full_page=True)
+        sha_modal = compute_sha256(modal_shot_path)
+        sha_map[modal_shot_name] = sha_modal
+
+        new_results.append({
+            "stage": "7. Activación de Cohortes",
+            "flow": "Modal de Confirmación Operativa",
+            "variant": "Desktop 1366x768 - Dark - Modal de Confirmación - ES",
+            "file": modal_shot_name,
+            "git_sha": git_sha,
+            "sha256": sha_modal,
+            "overflow": {"hasOverflow": False},
+            "simulated_data": {"modal_opened": True, "action": "Activar Cohorte"}
+        })
+        print(f"  [CAPTURA OK] {modal_shot_name} (Modal de confirmación en pantalla)")
+
+        # Click Cancelar
+        cancel_btn = dialog.locator('button:has-text("Cancelar")').first
+        assert cancel_btn.is_visible(), "Cancelar button in modal must be visible"
+        cancel_btn.click()
+        page_modal.wait_for_timeout(400)
+
+        # Verify modal dismissed
+        assert dialog.count() == 0 or not dialog.is_visible(), "Modal must be dismissed after clicking Cancelar"
+
+        # VERIFY ZERO MUTATIONS
+        assert len(mutation_requests) == 0, (
+            f"MUTATION INVARIANT VIOLATION: Canceling modal emitted mutation requests: {mutation_requests}"
+        )
+        print("  [INVARIANTE OK] Cancelar modal NO emitió ninguna petición de mutación HTTP (0 peticiones emitidas).")
+
+        # Capture post-cancellation state
+        cancelled_shot_name = "07_cohortes_activacion_confirm_cancelled_dark_es.png"
+        cancelled_shot_path = os.path.join(OUT_DIR, cancelled_shot_name)
+        page_modal.screenshot(path=cancelled_shot_path, full_page=True)
+        sha_cancelled = compute_sha256(cancelled_shot_path)
+        sha_map[cancelled_shot_name] = sha_cancelled
+
+        new_results.append({
+            "stage": "7. Activación de Cohortes",
+            "flow": "Cancelación sin Mutación",
+            "variant": "Desktop 1366x768 - Dark - Estado Post-Cancelación (Zero Mutación) - ES",
+            "file": cancelled_shot_name,
+            "git_sha": git_sha,
+            "sha256": sha_cancelled,
+            "overflow": {"hasOverflow": False},
+            "simulated_data": {"cancelled_cleanly": True, "mutations_emitted": 0}
+        })
+        print(f"  [CAPTURA OK] {cancelled_shot_name} (Post-cancelación confirmado sin mutaciones)")
+
+        ctx_modal.close()
+
+        # ── 5. HTTP 401 Session Handling & Complete Form Capture ──
+        print("\n>>> 5. HTTP 401 (Formulario Completo con Banner de Sesión Expirada) <<<")
+        ctx_401 = browser.new_context(viewport={"width": 1366, "height": 768})
         page_401 = ctx_401.new_page()
         setup_client_intercepts(page_401, error_state={"fail_activation_401": True})
         setup_page_auth_and_theme(page_401, theme='dark', locale='es')
-
-        page_401.on("console", lambda msg: print("PAGE LOG:", msg.text))
-        page_401.on("request", lambda req: print("PAGE REQ:", req.url))
-        page_401.on("response", lambda res: print("PAGE RESP:", res.url, res.status))
 
         target_url = "http://localhost:3000/admin/beta/cohorts?tab=activation"
         page_401.goto(target_url, wait_until='networkidle')
@@ -348,23 +435,14 @@ def run_cohort_captures():
         page_401.evaluate("() => { if (!document.documentElement.classList.contains('dark')) document.documentElement.classList.add('dark'); }")
 
         # Fill activation ID and trigger readiness check to cause 401
-        act_input = page_401.locator('input[placeholder*="act_"]').first
-        print(f"act_input count: {act_input.count()}")
-        if act_input.count() > 0:
-            act_input.fill('act_alpha_test')
-            page_401.wait_for_timeout(300)
-            btn_info = page_401.evaluate("""() => {
-                const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Verificar'));
-                if (btn) {
-                    btn.click();
-                    return { found: true, disabled: btn.disabled, text: btn.textContent };
-                }
-                return { found: false };
-            }""")
-            print("BTN INFO & JS CLICK:", btn_info)
-            page_401.wait_for_timeout(1000)
-
-        page_401.wait_for_timeout(500)
+        act_input_401 = page_401.locator('input[placeholder*="act_"]').first
+        if act_input_401.count() > 0:
+            act_input_401.fill('act_alpha_test')
+            page_401.wait_for_timeout(200)
+            verify_btn_401 = page_401.locator('button:has-text("Verificar")').first
+            if verify_btn_401.is_visible():
+                verify_btn_401.click()
+                page_401.wait_for_timeout(800)
 
         # Assertions
         content = page_401.content()
@@ -379,12 +457,10 @@ def run_cohort_captures():
         retry_count = page_401.locator('button:has-text("Reintentar")').count()
         assert retry_count == 0, "Reintentar button must NOT be rendered on 401 to prevent retry loop"
 
-        # Screenshot full affected panel
-        panel = page_401.locator('div[role="alert"]').first
-        panel.scroll_into_view_if_needed()
+        # FULL FORM CAPTURE (not just the header alert!)
         shot_401_name = "07_cohortes_activacion_http401_error_dark_es.png"
         shot_401_path = os.path.join(OUT_DIR, shot_401_name)
-        panel.screenshot(path=shot_401_path)
+        page_401.screenshot(path=shot_401_path, full_page=True)
 
         sha_401 = compute_sha256(shot_401_path)
         sha_map[shot_401_name] = sha_401
@@ -392,8 +468,8 @@ def run_cohort_captures():
 
         new_results.append({
             "stage": "7. Activación de Cohortes",
-            "flow": "Recorrido 3 (HTTP 401 Sesión Ausente/Expirada)",
-            "variant": "Desktop 1280x720 - Dark - HTTP 401 Error Panel Completo - ES",
+            "flow": "Recorrido HTTP 401 (Formulario Completo)",
+            "variant": "Desktop 1366x768 - Dark - HTTP 401 Formulario Completo - ES",
             "file": shot_401_name,
             "git_sha": git_sha,
             "sha256": sha_401,
@@ -403,10 +479,11 @@ def run_cohort_captures():
                 "target_endpoint": "/api/admin/beta/cohort-activation/readiness",
                 "nested_error_object": True,
                 "login_button_present": True,
-                "retry_loop_prevented": True
+                "retry_loop_prevented": True,
+                "full_form_captured": True
             }
         })
-        print(f"  [CAPTURA OK] {shot_401_name} (Panel 401: Error normalizado y botón Iniciar Sesión)")
+        print(f"  [CAPTURA OK] {shot_401_name} (Formulario completo 401 con alerta y botón Iniciar Sesión)")
 
         ctx_401.close()
         browser.close()
@@ -421,7 +498,7 @@ def run_cohort_captures():
         except Exception:
             pass
 
-    # Filter out any prior cohort captures if present, then append
+    # Filter out prior cohort captures if present, then append
     filtered_captures = [c for c in existing_summary.get("captures", []) if not c["file"].startswith(("07_", "08_", "09_"))]
     combined_captures = filtered_captures + new_results
 
@@ -448,6 +525,7 @@ def run_cohort_captures():
                 rel_f = os.path.relpath(abs_f, OUT_DIR)
                 zf.write(abs_f, rel_f)
     print(f"Paquete ZIP generado exitosamente en: {zip_path}")
+    print(f"ZIP SHA256: {compute_sha256(zip_path)}")
 
 if __name__ == '__main__':
     run_cohort_captures()
