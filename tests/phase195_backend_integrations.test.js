@@ -516,10 +516,27 @@ describe('Phase 195 Backend Integrations Suite', () => {
             );
 
             let capturedPayload = null;
+            const makeMockBpeResponse = (payload) => {
+                const ratesCs = bpePublicationService.computeRatesChecksum(payload.rates);
+                return {
+                    ok: true,
+                    status: 'PUBLISHED',
+                    bpe_printhouse_id: payload.bpe_printhouse_id,
+                    revision_id: payload.revision_id,
+                    accepted_patch_checksum: payload.accepted_patch_checksum,
+                    rates_checksum: ratesCs,
+                    readback: {
+                        verified: true,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: ratesCs
+                    }
+                };
+            };
+
             const pubResult = await bpePublicationService.publishAcceptedRevision(tenantId, printerNodeId, revisionId, {
                 mockHandler: async (payload) => {
                     capturedPayload = payload;
-                    return { ok: true, checksum: payload.accepted_patch_checksum };
+                    return makeMockBpeResponse(payload);
                 }
             });
 
@@ -531,7 +548,7 @@ describe('Phase 195 Backend Integrations Suite', () => {
 
             // Idempotency check
             const rePub = await bpePublicationService.publishAcceptedRevision(tenantId, printerNodeId, revisionId, {
-                mockHandler: async (payload) => ({ ok: true, checksum: payload.accepted_patch_checksum })
+                mockHandler: async (payload) => makeMockBpeResponse(payload)
             });
             expect(rePub.ok).toBe(true);
             expect(rePub.alreadyPublished).toBe(true);

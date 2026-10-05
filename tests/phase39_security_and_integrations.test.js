@@ -220,6 +220,22 @@ db.query = async function (sql, params = []) {
         return { affectedRows: 1 };
     }
     if (/FROM bpe_pricing_publications/is.test(s)) {
+        if (s.includes('WHERE revision_id = ?')) {
+            const revId = params[0];
+            const pubs = memoryDb.bpe_pricing_publications.filter(r => r.revision_id === revId);
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND revision_id = ?')) {
+            const [printerNodeId, revisionId, tenantId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.revision_id === revisionId &&
+                r.tenant_id === tenantId &&
+                r.bpe_printhouse_id === bpePrinthouseId &&
+                r.status === 'PUBLISHED'
+            );
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
         const nodeId = params[0];
         const pubs = memoryDb.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.status === 'PUBLISHED');
         return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
@@ -652,23 +668,137 @@ describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
             expect(checkAuth(configuredServerToken).status).toBe(200);
         });
 
-        it('should verify publication idempotency and readback checksum integrity', async () => {
+        it('should verify publication idempotency and readback checksum integrity under strict contract', async () => {
             process.env.PPOS_BPE_SERVICE_TOKEN = 'test-token-valid';
 
-            // Successful publish
+            const makeValidResponse = (payload) => {
+                const ratesCs = bpePublicationService.computeRatesChecksum(payload.rates);
+                return {
+                    ok: true,
+                    status: 'PUBLISHED',
+                    bpe_printhouse_id: payload.bpe_printhouse_id,
+                    revision_id: payload.revision_id,
+                    accepted_patch_checksum: payload.accepted_patch_checksum,
+                    rates_checksum: ratesCs,
+                    readback: {
+                        verified: true,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: ratesCs
+                    }
+                };
+            };
+
+            // 1. Successful publish
             const res1 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, revId, {
-                mockHandler: async (payload) => ({ ok: true, checksum: payload.accepted_patch_checksum })
+                mockHandler: async (payload) => makeValidResponse(payload)
             });
             expect(res1.ok).toBe(true);
             expect(res1.status).toBe('PUBLISHED');
             expect(res1.checksumMatched).toBe(true);
+            expect(res1.ratesChecksum).toBe(bpePublicationService.computeRatesChecksum({ offset: 0.12 }));
 
-            // Re-publish same checksum -> idempotency returns alreadyPublished
+            // 2. Re-publish same revision & rates -> fast-path returns alreadyPublished
             const res2 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, revId, {
-                mockHandler: async (payload) => ({ ok: true, checksum: payload.accepted_patch_checksum })
+                mockHandler: async (payload) => makeValidResponse(payload)
             });
             expect(res2.alreadyPublished).toBe(true);
             expect(res2.status).toBe('PUBLISHED');
+            expect(res2.ratesChecksum).toBe(res1.ratesChecksum);
+        });
+
+        it('should reject response without readback.verified: true and mark publication as FAILED', async () => {
+            const badRevId = 'rev_bad_readback_' + Date.now();
+            const badChecksum = 'sha256:bad_readback_chk';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
+                [badRevId, tenantId, nodeId, badChecksum, badChecksum, JSON.stringify({ offset: 0.12 })]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                        readback: { verified: false } // NOT verified!
+                    })
+                })
+            ).rejects.toThrow(/readback verification missing or unverified/);
+
+            // Verify DB record is marked FAILED
+            const [failedRec] = await db.query(
+                `SELECT status, error_message FROM bpe_pricing_publications WHERE revision_id = ? ORDER BY created_at DESC LIMIT 1`,
+                [badRevId]
+            );
+            expect(failedRec.status).toBe('FAILED');
+            expect(failedRec.error_message).toMatch(/readback verification/);
+        });
+
+        it('should reject response with mismatched rates_checksum between BPE readback and sent canonical checksum', async () => {
+            const mismatchRevId = 'rev_rates_mismatch_' + Date.now();
+            const mismatchChecksum = 'sha256:rates_mismatch_chk';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
+                [mismatchRevId, tenantId, nodeId, mismatchChecksum, mismatchChecksum, JSON.stringify({ offset: 0.12 })]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, mismatchRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: 'sha256:forged_tampered_rates',
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: 'sha256:forged_tampered_rates'
+                        }
+                    })
+                })
+            ).rejects.toThrow(/rates checksum mismatch/);
+
+            const [failedRec] = await db.query(
+                `SELECT status, error_message FROM bpe_pricing_publications WHERE revision_id = ? ORDER BY created_at DESC LIMIT 1`,
+                [mismatchRevId]
+            );
+            expect(failedRec.status).toBe('FAILED');
+            expect(failedRec.error_message).toMatch(/rates checksum mismatch/);
+        });
+
+        it('should reject response with mismatched printhouse identity', async () => {
+            const identRevId = 'rev_ident_mismatch_' + Date.now();
+            const identChecksum = 'sha256:ident_mismatch_chk';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, accepted_patch_checksum, proposed_patch_checksum, rates_json, version, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, NOW())`,
+                [identRevId, tenantId, nodeId, identChecksum, identChecksum, JSON.stringify({ offset: 0.12 })]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, identRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: 'wrong_house_identity',
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                        }
+                    })
+                })
+            ).rejects.toThrow(/BPE printhouse identity mismatch/);
         });
 
         it('should confirm BPE calculation reflects published rates in isolated engine fixture', () => {
