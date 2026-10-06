@@ -118,6 +118,17 @@ def package():
    Verificación de 0 residuos en las 8 tablas con reporte conjunto en el bloque `finally`.
 8. **Invalidación de Extracción Tardía ante Cambio de Familia y Contexto:** Se incrementa `uploadRequestIdRef` al seleccionar o cambiar de familia (`handleSelectFamilyToCalibrate`), al regresar al selector de familias (`handleReturnToFamilySelector`) y al alternar pestañas de entrada. Pruebas de regresión 20 y 21 en Vitest acreditan el descarte de respuestas lentas de PDF.
 9. **Trazabilidad Git Rigurosa y Publicación Remota:** Las correcciones quedan publicadas en el commit `{git_sha}` sobre la rama `phase-39.2-tenant-management-console` y subidas a `origin`.
+10. **Alineación Estricta con Contratos Oficiales de Rutas y Servicios (HEAD):**
+    - **Payload canónico `bookSpec`:** En `scripts/test_onboarding_connected_suite.js`, los fixtures de calibración principal y cancelación secundaria adoptan la especificación formal exigida por `calibrationSessionService.validateBookSpec`: `copies`, `interior_pages`, `book_width_mm`, `book_height_mm`, `interior_print`, `cover_print`, `paper_type_interior`, `paper_weight_interior`, `paper_type_cover`, `paper_weight_cover`, `binding_method` y `delivery_country`, empleando los enums reales del servicio.
+    - **Semántica explícita del precio:** Se definen de manera unívoca `includesPaper: true`, `includesBinding: true`, `includesFinishing: true` e `includesPackaging: true` en ambos fixtures sin inferir componentes del precio total. Se mantiene la ambigüedad documental de *Die Mysteriösen Steine* sin alteraciones artificiales; el flujo técnico se valida con un fixture sintético explícito de integración (`Synthetic Integration Fixture`).
+    - **Aserciones de Respuestas HTTP contra `printhouseOnboardingRoutes`:**
+      - Creación (`POST /pricing/calibrations`): HTTP 201 estricto, sesión extraída directamente de `body.data.id`.
+      - Cálculo (`POST /pricing/calibrations/:id/calculate`): HTTP 201 estricto, run extraído de `body.data`.
+      - Promoción (`POST /pricing/calibrations/:id/ready`): HTTP 200 estricto, comprobación explícita de `body.data.status === 'READY'` (eliminando fallbacks permisivos `ok === true`).
+      - Cancelación (`POST /pricing/calibrations/:id/reject`): HTTP 200 estricto, comprobación de `body.data.status === 'REJECTED'`.
+      - Aceptación (`POST /pricing/calibrations/:id/accept`): HTTP 200 estricto, validación de `body.data.status === 'ACCEPTED'`, `revisionId` y `acceptanceId`.
+    - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{ code, message, details }` sin registrar headers, cookies ni tokens de autorización.
+    - **Verificación Directa de `runId` en MySQL:** Tras `POST /calculate`, el identificador `realRunId` (`calcRes.body.data.id`) se verifica directamente en `printhouse_pricing_calibration_runs` por `WHERE id = ?`, asegurando coincidencia de `calibration_session_id` y `tenant_id`.
 
 ---
 
@@ -126,8 +137,8 @@ def package():
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
   - **Entregables Técnicos y Evidencias de Contrato (9 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados:**
-  - `npx vitest run`: Ejecución de 21 suites y 273 tests unitarios y de integración (273 pasados, 0 fallidos).
-  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 11.93s).
+  - `npx vitest run`: Ejecución de 21 suites y 273 tests unitarios y de integración (273 pasados, 0 fallidos) en 11.38s.
+  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 12.88s).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
